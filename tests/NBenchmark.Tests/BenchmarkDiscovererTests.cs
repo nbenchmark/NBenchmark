@@ -110,6 +110,41 @@ public class BenchmarkDiscovererTests
 
         await benchmark.AsyncDelegate!(new AsyncBenchmarks());
     }
+
+    [Fact]
+    public void Expands_BenchmarkArguments_Into_One_Definition_Per_Set()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParameterisedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParameterisedBenchmarks));
+
+        var compute = suite.Benchmarks.Where(b => b.Method.Name == "Compute").ToList();
+        Assert.Equal(2, compute.Count);
+        Assert.Equal(new[] { "Compute(100)", "Compute(1000)" }, compute.Select(b => b.DisplayName));
+    }
+
+    [Fact]
+    public void Argument_Bound_Delegate_Invokes_With_The_Bound_Arguments()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParameterisedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParameterisedBenchmarks));
+        var benchmark = suite.Benchmarks.First(b => b.DisplayName == "Compute(1000)");
+
+        var result = benchmark.SyncDelegate!(new ParameterisedBenchmarks());
+        Assert.Equal(1000, result);
+    }
+
+    [Fact]
+    public void Formats_Multiple_And_String_Arguments_In_DisplayName()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParameterisedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParameterisedBenchmarks));
+
+        var concat = suite.Benchmarks.First(b => b.Method.Name == "Concat");
+        Assert.Equal("Concat(\"a\", 3)", concat.DisplayName);
+
+        var result = concat.SyncDelegate!(new ParameterisedBenchmarks());
+        Assert.Equal("aaa", result);
+    }
 }
 
 public class PublicBenchmarks
@@ -164,3 +199,15 @@ internal class InternalBenchmarks
 }
 
 internal static class InternalBenchmarksMarker { }
+
+public class ParameterisedBenchmarks
+{
+    [BenchmarkArguments(100)]
+    [BenchmarkArguments(1000)]
+    [Benchmark]
+    public int Compute(int n) => n;
+
+    [BenchmarkArguments("a", 3)]
+    [Benchmark]
+    public string Concat(string value, int times) => string.Concat(Enumerable.Repeat(value, times));
+}

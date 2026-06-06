@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Linq.Expressions;
 using System.Reflection;
 using NBenchmark.Attributes;
 
@@ -37,42 +39,7 @@ public sealed class BenchmarkDiscoverer
 
             var benchmarks = methods
                 .Where(m => m.GetCustomAttribute<BenchmarkAttribute>() is not null)
-                .Select(m =>
-                {
-                    var isAsync = typeof(Task).IsAssignableFrom(m.ReturnType);
-
-                    Func<object, object?>? syncDelegate = null;
-                    Func<object, Task>? asyncDelegate = null;
-                    Func<Task, object?>? resultExtractor = null;
-
-                    if (isAsync)
-                    {
-                        asyncDelegate = BuildAsyncDelegate(m);
-                        if (m.ReturnType.IsGenericType)
-                            resultExtractor = BuildResultExtractor(m.ReturnType);
-                    }
-                    else if (m.ReturnType == typeof(void))
-                    {
-                        var act = BuildVoidDelegate(m)!;
-                        syncDelegate = instance => { act(instance); return null; };
-                    }
-                    else
-                    {
-                        syncDelegate = BuildSyncDelegate(m);
-                    }
-
-                    return new BenchmarkMethodDefinition(
-                        Method: m,
-                        Attribute: m.GetCustomAttribute<BenchmarkAttribute>()!
-                    )
-                    {
-                        SyncDelegate = syncDelegate,
-                        AsyncDelegate = asyncDelegate,
-                        ResultExtractor = resultExtractor,
-                        IterationSetupDelegate = iterSetupDel,
-                        IterationTeardownDelegate = iterTeardownDel,
-                    };
-                })
+                .SelectMany(m => BuildBenchmarkDefinitions(m, iterSetupDel, iterTeardownDel))
                 .ToList();
 
             if (benchmarks.Count == 0) continue;
@@ -86,6 +53,161 @@ public sealed class BenchmarkDiscoverer
         }
 
         return suites;
+    }
+
+    // Expands a [Benchmark] method into one definition per [BenchmarkArguments] set.
+    // A parameterless method (no [BenchmarkArguments]) yields a single definition.
+    private static IEnumerable<BenchmarkMethodDefinition> BuildBenchmarkDefinitions(
+        MethodInfo method,
+        Action<object>? iterSetupDel,
+        Action<object>? iterTeardownDel)
+    {
+        var attribute = method.GetCustomAttribute<BenchmarkAttribute>()!;
+        var argumentSets = method.GetCustomAttributes<BenchmarkArgumentsAttribute>().ToArray();
+        var parameters = method.GetParameters();
+
+        if (argumentSets.Length == 0)
+        {
+            if (parameters.Length > 0)
+                throw new InvalidOperationException(
+                    $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' declares "
+                    + $"{parameters.Length} parameter(s) but has no [BenchmarkArguments]. "
+                    + "Add one [BenchmarkArguments(...)] per argument set, or remove the parameters.");
+
+            yield return CreateDefinition(method, attribute, method.Name, arguments: null,
+                iterSetupDel, iterTeardownDel);
+            yield break;
+        }
+
+        if (parameters.Length == 0)
+            throw new InvalidOperationException(
+                $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has [BenchmarkArguments] "
+                + "but takes no parameters.");
+
+        foreach (var argumentSet in argumentSets)
+        {
+            var rawArgs = argumentSet.Arguments;
+            if (rawArgs.Length != parameters.Length)
+                throw new InvalidOperationException(
+                    $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' expects "
+                    + $"{parameters.Length} argument(s) but a [BenchmarkArguments] attribute supplied "
+                    + $"{rawArgs.Length}.");
+
+            var converted = ConvertArguments(rawArgs, parameters);
+            var displayName = $"{method.Name}({string.Join(", ", rawArgs.Select(FormatArgument))})";
+            yield return CreateDefinition(method, attribute, displayName, converted,
+                iterSetupDel, iterTeardownDel);
+        }
+    }
+
+    private static BenchmarkMethodDefinition CreateDefinition(
+        MethodInfo method,
+        BenchmarkAttribute attribute,
+        string displayName,
+        object?[]? arguments,
+        Action<object>? iterSetupDel,
+        Action<object>? iterTeardownDel)
+    {
+        var isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
+
+        Func<object, object?>? syncDelegate = null;
+        Func<object, Task>? asyncDelegate = null;
+        Func<Task, object?>? resultExtractor = null;
+
+        if (isAsync)
+        {
+            asyncDelegate = arguments is null
+                ? BuildAsyncDelegate(method)
+                : BuildArgumentBoundAsyncDelegate(method, arguments);
+            if (method.ReturnType.IsGenericType)
+                resultExtractor = BuildResultExtractor(method.ReturnType);
+        }
+        else if (method.ReturnType == typeof(void))
+        {
+            if (arguments is null)
+            {
+                var act = BuildVoidDelegate(method)!;
+                syncDelegate = instance => { act(instance); return null; };
+            }
+            else
+            {
+                syncDelegate = BuildArgumentBoundSyncDelegate(method, arguments);
+            }
+        }
+        else
+        {
+            syncDelegate = arguments is null
+                ? BuildSyncDelegate(method)
+                : BuildArgumentBoundSyncDelegate(method, arguments);
+        }
+
+        return new BenchmarkMethodDefinition(method, attribute)
+        {
+            DisplayName = displayName,
+            SyncDelegate = syncDelegate,
+            AsyncDelegate = asyncDelegate,
+            ResultExtractor = resultExtractor,
+            IterationSetupDelegate = iterSetupDel,
+            IterationTeardownDelegate = iterTeardownDel,
+        };
+    }
+
+    private static object?[] ConvertArguments(object[] arguments, ParameterInfo[] parameters)
+    {
+        var result = new object?[arguments.Length];
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            var target = parameters[i].ParameterType;
+            var value = arguments[i];
+
+            if (value is null || target.IsInstanceOfType(value))
+                result[i] = value;
+            else
+                result[i] = Convert.ChangeType(
+                    value, Nullable.GetUnderlyingType(target) ?? target, CultureInfo.InvariantCulture);
+        }
+        return result;
+    }
+
+    private static string FormatArgument(object? argument) => argument switch
+    {
+        null => "null",
+        string s => $"\"{s}\"",
+        _ => Convert.ToString(argument, CultureInfo.InvariantCulture) ?? argument.ToString() ?? "",
+    };
+
+    // Argument-bound delegates are compiled once per (method, argument set) via an
+    // expression tree, so the measurement hot loop still calls a plain delegate with
+    // no per-iteration reflection. Arbitrary parameter arities and types are supported.
+    private static Func<object, object?> BuildArgumentBoundSyncDelegate(MethodInfo method, object?[] arguments)
+    {
+        var instanceParam = Expression.Parameter(typeof(object), "instance");
+        var call = BuildCall(method, instanceParam, arguments);
+
+        Expression body = method.ReturnType == typeof(void)
+            ? Expression.Block(call, Expression.Constant(null, typeof(object)))
+            : Expression.Convert(call, typeof(object));
+
+        return Expression.Lambda<Func<object, object?>>(body, instanceParam).Compile();
+    }
+
+    private static Func<object, Task> BuildArgumentBoundAsyncDelegate(MethodInfo method, object?[] arguments)
+    {
+        var instanceParam = Expression.Parameter(typeof(object), "instance");
+        var call = BuildCall(method, instanceParam, arguments);
+        var body = Expression.Convert(call, typeof(Task));
+        return Expression.Lambda<Func<object, Task>>(body, instanceParam).Compile();
+    }
+
+    private static MethodCallExpression BuildCall(
+        MethodInfo method, ParameterExpression instanceParam, object?[] arguments)
+    {
+        var typedInstance = Expression.Convert(instanceParam, method.DeclaringType!);
+        var parameters = method.GetParameters();
+        var argExpressions = new Expression[parameters.Length];
+        for (var i = 0; i < parameters.Length; i++)
+            argExpressions[i] = Expression.Constant(arguments[i], parameters[i].ParameterType);
+        return Expression.Call(typedInstance, method, argExpressions);
     }
 
     // Open instance delegates require the delegate's first parameter to match the

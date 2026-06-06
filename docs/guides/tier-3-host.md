@@ -195,6 +195,8 @@ BenchmarkHost.Create(args)
 
 CLI flags like `--iterations` always override `WithOptions` values.
 
+By default benchmarks run in **random** order to reduce systematic bias. Call `WithRunOrder(RunOrder.Declaration)` (or pass `--order declaration`) to run them in declaration order instead.
+
 ## Listing benchmarks without running
 
 ```bash

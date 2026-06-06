@@ -25,7 +25,7 @@ If your benchmark is a one-shot operation where you specifically want to measure
 
 ## Garbage collection
 
-By default, NBenchmark forces a full GC collection (`GC.Collect`) **before each iteration**. This ensures that heap allocations from the previous iteration don't influence the next one.
+By default, NBenchmark forces a gen-0 GC collection (`GC.Collect(0)`) **before each iteration**. This ensures that heap allocations from the previous iteration don't influence the next one.
 
 Without this, allocation patterns from earlier iterations can trigger GC mid-measurement, adding noise to your timings. Forcing GC before each iteration keeps measurements independent.
 

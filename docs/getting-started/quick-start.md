@@ -72,18 +72,18 @@ var results = await new BenchmarkSuite("string concat")
 The console output will look like:
 
 ```
-╭──────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬───────┬───────╮
-│ Benchmark        │ Median │  Mean  │ Error  │ StdDev │  P95   │  P99   │ Ratio │ Alloc │
-├──────────────────┼────────┼────────┼────────┼────────┼────────┼────────┼───────┼───────┤
-│ interpolation  ✓ │ 8.0 ns │ 8.1 ns │ ±1 ns  │ 6 ns   │ 10 ns  │ 11 ns  │ 0.95x │   -   │
-│ plus operator    │ 8.5 ns │ 8.4 ns │ ±1 ns  │ 5 ns   │ 10 ns  │ 10 ns  │ 1.00x │   -   │
-╰──────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┴───────╯
+╭──────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬───────┬──────────╮
+│ Benchmark        │ Median │  Mean  │ Error  │ StdDev │  P95   │  P99   │ Ratio │ Alloc/op │
+├──────────────────┼────────┼────────┼────────┼────────┼────────┼────────┼───────┼──────────┤
+│ interpolation  ✓ │ 8.0 ns │ 8.1 ns │ ±1 ns  │ 6 ns   │ 10 ns  │ 11 ns  │ 0.95x │    -     │
+│ plus operator    │ 8.5 ns │ 8.4 ns │ ±1 ns  │ 5 ns   │ 10 ns  │ 10 ns  │ 1.00x │    -     │
+╰──────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┴──────────╯
 
 Ran 2 benchmark(s) — Significance: Mann-Whitney U (p < 0.05) — Outliers: top 5%
 Error = ±95% confidence interval half-width on the mean.
 ```
 
-The **Ratio** column shows speed relative to the baseline. The **✓** in the Sig column means the difference is statistically significant — it's unlikely to be random noise.
+The **Ratio** column shows speed relative to the baseline. The **✓** next to a benchmark name means the difference is statistically significant — it's unlikely to be random noise.
 
 ## Saving results to a file
 

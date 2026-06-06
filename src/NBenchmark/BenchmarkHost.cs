@@ -88,7 +88,7 @@ public sealed class BenchmarkHost
             {
                 Console.WriteLine($"── {suite.Type.Name} ──");
                 foreach (var b in suite.Benchmarks)
-                    Console.WriteLine($"    {b.Method.Name}"
+                    Console.WriteLine($"    {b.DisplayName}"
                         + (b.Attribute.Description is not null ? $" — {b.Attribute.Description}" : ""));
             }
             return Array.Empty<BenchmarkResult>();
@@ -104,7 +104,7 @@ public sealed class BenchmarkHost
         var runningIndex = 0;
 
         await _progress.OnSuiteStarting(
-            filtered.SelectMany(s => s.Benchmarks.Select(b => $"{s.Type.Name}.{b.Method.Name}")).ToList(),
+            filtered.SelectMany(s => s.Benchmarks.Select(b => $"{s.Type.Name}.{b.DisplayName}")).ToList(),
             totalBenchmarks);
 
         foreach (var suite in filtered)
@@ -151,7 +151,7 @@ public sealed class BenchmarkHost
 
                 foreach (var benchmark in ordered)
                 {
-                    var benchmarkName = $"{suite.Type.Name}.{benchmark.Method.Name}";
+                    var benchmarkName = $"{suite.Type.Name}.{benchmark.DisplayName}";
                     runningIndex++;
 
                     var options = benchmark.Attribute.Iterations.HasValue
@@ -345,7 +345,7 @@ public sealed class BenchmarkHost
             {
                 Benchmarks = s.Benchmarks
                     .Where(b => GlobMatch(_filter,
-                        $"{s.Type.Name}.{b.Method.Name}"))
+                        $"{s.Type.Name}.{b.DisplayName}"))
                     .ToList()
             })
             .Where(s => s.Benchmarks.Count > 0)

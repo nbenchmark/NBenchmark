@@ -95,7 +95,7 @@ dotnet run -- --reporter markdown --output ./results
 ```
 
 ::: warning
-The output directory must already exist. NBenchmark will throw an `ArgumentException` if it does not.
+The output directory must already exist. `MarkdownReporter` and `CsvReporter` will throw a `DirectoryNotFoundException` if it does not (`JsonReporter` creates it automatically).
 :::
 
 ---

@@ -22,7 +22,7 @@ No. Add the NuGet package reference and start calling `Benchmark.Run`. No projec
 
 ### What .NET versions are supported?
 
-NBenchmark targets **net10.0** only. It uses .NET 10 APIs and is not backported to earlier versions.
+NBenchmark targets **net8.0**, **net9.0**, and **net10.0**. You need the .NET 8 SDK or later.
 
 ---
 
@@ -156,7 +156,7 @@ dotnet run -- --seed 42
 
 Common causes:
 
-1. The method is not `public`.
+1. The method is `static` (only instance methods are measured).
 2. The class is abstract.
 3. The assembly containing the class was not passed to `AddFromAssembly`.
 4. The `[Benchmark]` attribute is from a different namespace (make sure you're using `NBenchmark.Attributes`).
