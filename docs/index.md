@@ -34,4 +34,4 @@ Already comfortable with the basics?
 - **[CLI Reference](./cli-reference)** — all command-line flags for `BenchmarkHost`
 - **[Advanced: Statistics](./advanced/statistics)** — how the numbers are calculated
 
-> **Pre-release.** NBenchmark targets .NET 10 and is under active development. The API may change between versions.
+> **Pre-release.** NBenchmark targets .NET 8+ (net8.0, net9.0, net10.0) and is under active development. The API may change between versions.

@@ -8,7 +8,7 @@ order: 1
 
 ## Requirements
 
-NBenchmark targets **net10.0**. You need the [.NET 10 SDK](https://dotnet.microsoft.com/download) or later.
+NBenchmark targets **net8.0**, **net9.0**, and **net10.0**. You need the [.NET 8 SDK](https://dotnet.microsoft.com/download) or later.
 
 ## Packages
 

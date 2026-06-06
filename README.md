@@ -2,7 +2,7 @@
 
 A lightweight, async-native .NET benchmarking library. No configuration files, no separate compilation step — add a reference and start measuring.
 
-> **Pre-release.** NBenchmark targets .NET 10 and is under active development. The API may change between versions.
+> **Pre-release.** NBenchmark targets .NET 8+ (net8.0, net9.0, net10.0) and is under active development. The API may change between versions.
 
 📖 **[Full documentation →](./docs/index.md)**
 
