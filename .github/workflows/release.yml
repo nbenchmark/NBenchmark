@@ -144,38 +144,38 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
 
-  # deploy-docs:
-  #   name: Deploy Documentation
-  #   needs: build-and-pack
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v6
-  #
-  #     - name: Checkout docs.nbenchmark.net repo
-  #       uses: actions/checkout@v6
-  #       with:
-  #         repository: nbenchmark/docs.nbenchmark.net
-  #         token: ${{ secrets.NBENCHMARK_DOCS_NET_TOKEN }}
-  #         path: ./nbenchmark-docs-net
-  #
-  #     - name: Deploy to docs.nbenchmark.net
-  #       run: |
-  #         mkdir -p ./nbenchmark-docs-net/docs
-  #         rm -rf ./nbenchmark-docs-net/docs/*
-  #         cp -r ./docs/* ./nbenchmark-docs-net/docs/
-  #
-  #         cd ./nbenchmark-docs-net
-  #         git config user.name "github-actions[bot]"
-  #         git config user.email "github-actions[bot]@users.noreply.github.com"
-  #
-  #         git add -A
-  #         if git diff --cached --quiet; then
-  #           echo "No changes to commit"
-  #         else
-  #           git commit -m "docs: update documentation from NBenchmark release ${{ github.ref }}"
-  #           git push origin main
-  #         fi
+  deploy-docs:
+    name: Deploy Documentation
+    needs: build-and-pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Checkout nbenchmark.net repo
+        uses: actions/checkout@v6
+        with:
+          repository: nbenchmark/nbenchmark.net
+          token: ${{ secrets.NBENCHMARK_NET_TOKEN }}
+          path: ./nbenchmark-net
+
+      - name: Deploy to nbenchmark.net
+        run: |
+          mkdir -p ./nbenchmark-net/docs
+          rm -rf ./nbenchmark-net/docs/*
+          cp -r ./docs/* ./nbenchmark-net/docs/
+
+          cd ./nbenchmark-net
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: update documentation from NBenchmark release ${{ github.ref }}"
+            git push origin main
+          fi

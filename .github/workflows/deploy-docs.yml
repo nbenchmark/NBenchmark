@@ -1,65 +1,50 @@
-# Deploy Documentation
-#
-# This workflow manually syncs the docs/ directory to a separate
-# docs.nbenchmark.net repository.
-#
-# To activate:
-#   1. Create a repository at github.com/nbenchmark/docs.nbenchmark.net
-#   2. Generate a GitHub Personal Access Token (classic) with repo scope
-#   3. Add it as a repository secret named NBENCHMARK_DOCS_NET_TOKEN
-#   4. Uncomment the workflow below
-#   5. Optionally add a trigger:
-#      on:
-#        push:
-#          branches:
-#            - "main"
-#        workflow_dispatch:
+name: Deploy Documentation
 
-# name: Deploy Documentation
-#
-# on:
-#   workflow_dispatch:
-#     inputs:
-#       branch:
-#         description: "Branch to deploy docs from"
-#         required: false
-#         default: "main"
-#         type: string
-#
-# jobs:
-#   deploy-docs:
-#     name: Deploy Documentation
-#     runs-on: ubuntu-latest
-#     permissions:
-#       contents: read
-#
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v6
-#         with:
-#           ref: ${{ github.event.inputs.branch || 'main' }}
-#
-#       - name: Checkout docs.nbenchmark.net repo
-#         uses: actions/checkout@v6
-#         with:
-#           repository: nbenchmark/docs.nbenchmark.net
-#           token: ${{ secrets.NBENCHMARK_DOCS_NET_TOKEN }}
-#           path: ./nbenchmark-docs-net
-#
-#       - name: Deploy to docs.nbenchmark.net
-#         run: |
-#           mkdir -p ./nbenchmark-docs-net/docs
-#           rm -rf ./nbenchmark-docs-net/docs/*
-#           cp -r ./docs/* ./nbenchmark-docs-net/docs/
-#
-#           cd ./nbenchmark-docs-net
-#           git config user.name "github-actions[bot]"
-#           git config user.email "github-actions[bot]@users.noreply.github.com"
-#
-#           git add -A
-#           if git diff --cached --quiet; then
-#             echo "No changes to commit"
-#           else
-#             git commit -m "docs: update documentation (manual deployment from NBenchmark)"
-#             git push origin main
-#           fi
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy docs from"
+        required: false
+        default: "main"
+        type: string
+
+jobs:
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - name: Checkout nbenchmark.net repo
+        uses: actions/checkout@v6
+        with:
+          repository: nbenchmark/nbenchmark.net
+          token: ${{ secrets.NBENCHMARK_NET_TOKEN }}
+          path: ./nbenchmark-net
+
+      - name: Deploy to nbenchmark.net
+        run: |
+          mkdir -p ./nbenchmark-net/docs
+          rm -rf ./nbenchmark-net/docs/*
+          cp -r ./docs/* ./nbenchmark-net/docs/
+
+          cd ./nbenchmark-net
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: update documentation from NBenchmark"
+            git push origin main
+          fi
