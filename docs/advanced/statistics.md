@@ -50,6 +50,15 @@ After collection, outliers are removed according to `OutlierMode`. The samples a
 
 The trimmed array is passed to `StatsSummary.Compute`. The pre-trim raw array is stored separately for use in significance testing.
 
+::: info Quartile definition
+`IqrFence` computes Q1 and Q3 with the same **nearest-rank** percentile used
+everywhere else in NBenchmark (equivalent to `numpy.percentile(method='inverted_cdf')`).
+This deliberately differs from R's default `type = 7` linear interpolation: for a
+1..20 ramp NBenchmark gives Q1 = 5, Q3 = 15, whereas R type 7 gives Q1 = 5.75,
+Q3 = 15.25. The choice keeps every quantile in the library consistent and is
+pinned by `OutlierModeCrossCheckTests`.
+:::
+
 ## Descriptive statistics
 
 Given a sorted, trimmed array of `n` samples:
@@ -116,6 +125,11 @@ The CI is on the **mean** and relies on the Central Limit Theorem — the assump
 
 NBenchmark computes the t critical value without any external libraries using exact closed forms for df = 1 and df = 2, and the Cornish-Fisher expansion (Abramowitz & Stegun §26.7.5) for df ≥ 3. The normal quantile uses Acklam's rational approximation (max error < 1.15 × 10⁻⁹).
 
+These approximations are cross-checked against SciPy on every build: the t
+critical value matches `scipy.stats.t.ppf` to machine precision for df = 1, 2 and
+to **better than 1%** for df ≥ 3 (worst case ≈ 0.79% at df = 3, 99%). See
+[Validation & Accuracy](./validation) for the full tolerance table.
+
 ## Coefficient of variation
 
 $$\text{CV} = \frac{s}{\bar{x}}$$
@@ -159,6 +173,12 @@ $$U_1 = R_1 - \frac{n_1(n_1+1)}{2}, \quad U_2 = n_1 n_2 - U_1, \quad U = \min(U_
 1. For large samples (n₁ ≥ 5 and n₂ ≥ 5), use the normal approximation with a tie correction to compute a z-score, then derive a two-tailed p-value.
 
 A p-value below **0.05** is considered significant (✓ in the Sig column). This threshold is fixed and is not configurable.
+
+The normal approximation uses **no continuity correction**, so it corresponds to
+`scipy.stats.mannwhitneyu(..., method='asymptotic', use_continuity=False)` — which
+NBenchmark matches to better than 1e-6. On small samples this approximation can
+differ from the exact permutation p-value by up to ≈ 0.05; that gap is pinned and
+documented in [Validation & Accuracy](./validation).
 
 ::: info
 NBenchmark uses the **pre-trim raw samples** (before outlier removal) for significance testing. This gives the test more data to work with. However it means that significance is assessed on the full distribution including extreme measurements.

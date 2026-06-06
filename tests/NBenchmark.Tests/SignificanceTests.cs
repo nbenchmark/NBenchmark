@@ -130,8 +130,9 @@ public class SignificanceTests
             },
         };
 
-        var fastSamples = Enumerable.Range(0, 30).Select(_ => 50.0 + (Random.Shared.NextDouble() - 0.5) * 10).ToArray();
-        var slowSamples = Enumerable.Range(0, 30).Select(_ => 200.0 + (Random.Shared.NextDouble() - 0.5) * 20).ToArray();
+        var rng = new Random(42);
+        var fastSamples = Enumerable.Range(0, 30).Select(_ => 50.0 + (rng.NextDouble() - 0.5) * 10).ToArray();
+        var slowSamples = Enumerable.Range(0, 30).Select(_ => 200.0 + (rng.NextDouble() - 0.5) * 20).ToArray();
 
         var rawSamples = new Dictionary<string, double[]>
         {
