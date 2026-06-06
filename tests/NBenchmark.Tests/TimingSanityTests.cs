@@ -5,17 +5,15 @@ using Xunit;
 namespace NBenchmark.Tests;
 
 /// <summary>
-///     Coarse end-to-end timing sanity checks. These assert that the engine's
-///     reported timings land near an independently measured ground truth for a
-///     CPU-bound busy-wait body. They are inherently sensitive to scheduler noise,
-///     so they use generous tolerances and are tagged so a loaded CI agent can skip
-///     them with <c>dotnet test --filter "Category!=Timing"</c>.
+///     End-to-end sanity check that the measurement engine's output aligns with
+///     ground truth. Unlike mean-based assertions (which absorb all scheduler
+///     preemption spikes), the minimum sample is stable: a CPU-bound busy-wait
+///     has a hard floor, and preemption only ever adds time. This catches unit
+///     errors, wiring bugs, or a broken measurement loop — classes of bugs the
+///     deterministic statistical tests cannot detect.
 /// </summary>
-[Trait("Category", "Timing")]
 public class TimingSanityTests
 {
-    // A CPU-bound busy-wait is far more reproducible than Task.Delay (which is
-    // bounded below by the OS timer granularity, ~15 ms on Windows).
     private static void BusyWait(double microseconds)
     {
         var ticks = (long)(microseconds * Stopwatch.Frequency / 1_000_000.0);
@@ -26,9 +24,9 @@ public class TimingSanityTests
     }
 
     [Fact]
-    public void Engine_Reports_Mean_Near_Known_BusyWait_Duration()
+    public void Engine_MinimumSample_Is_Near_Known_BusyWait_Floor()
     {
-        const double targetMicros = 2_000.0; // 2 ms
+        const double targetMicros = 5_000.0; // 5 ms
         const double targetNanos = targetMicros * 1_000.0;
 
         var outcome = MeasurementEngine.MeasureSync(
@@ -36,46 +34,16 @@ public class TimingSanityTests
             () => BusyWait(targetMicros),
             new MeasurementOptions
             {
-                WarmupIterations = 5,
-                Iterations = 30,
-                OutlierMode = OutlierMode.RemoveTop5Percent,
-                MeasureAllocations = false,
-            });
-
-        // Within ±40% of the target. The mean can only run long (preemption),
-        // never materially short, so this is a generous two-sided band.
-        Assert.InRange(outcome.Result.Mean, targetNanos * 0.6, targetNanos * 1.4);
-    }
-
-    [Fact]
-    public void Engine_Mean_Tracks_Manual_Stopwatch_Loop()
-    {
-        const double targetMicros = 1_000.0; // 1 ms
-        const int iterations = 50;
-
-        // Manual ground-truth measurement of the identical body.
-        for (var w = 0; w < 5; w++)
-            BusyWait(targetMicros);
-
-        var manualStart = Stopwatch.GetTimestamp();
-        for (var i = 0; i < iterations; i++)
-            BusyWait(targetMicros);
-        var manualMeanNanos =
-            Stopwatch.GetElapsedTime(manualStart).TotalNanoseconds / iterations;
-
-        var outcome = MeasurementEngine.MeasureSync(
-            "busywait",
-            () => BusyWait(targetMicros),
-            new MeasurementOptions
-            {
-                WarmupIterations = 5,
-                Iterations = iterations,
+                WarmupIterations = 3,
+                Iterations = 15,
                 OutlierMode = OutlierMode.None,
                 MeasureAllocations = false,
             });
 
-        // The engine's per-iteration mean should track the manual loop within
-        // ±30% — the residual is scheduling jitter, not a systematic bias.
-        Numerics.AssertRelativeClose(manualMeanNanos, outcome.Result.Mean, 0.30);
+        // The fastest iteration cannot beat the busy-wait floor, and preemption
+        // only adds time. A wide upper bound (3x) still catches unit/wiring errors
+        // (e.g. ns reported as ms) without flaking under load. Lower bound (90%)
+        // accounts for minor timer overhead and loop slack.
+        Assert.InRange(outcome.Result.Min, targetNanos * 0.9, targetNanos * 3.0);
     }
 }

@@ -78,17 +78,21 @@ approximation can stray from it:
 
 This is why the significance test requires at least five samples per group.
 
-## 3. End-to-end timing sanity
+## 3. End-to-end measurement loop sanity
 
-`TimingSanityTests` runs the full measurement engine against a CPU-bound
-busy-wait body of known duration and asserts the reported mean lands near the
-target (within ±40%) and tracks an independent manual `Stopwatch` loop (within
-±30%). These tests are deliberately coarse and scheduler-sensitive, so they are
-tagged `[Trait("Category", "Timing")]` and can be skipped on a loaded CI agent:
+`TimingSanityTests.Engine_MinimumSample_Is_Near_Known_BusyWait_Floor` runs the
+full measurement engine against a CPU-bound busy-wait of known duration and
+asserts that the **minimum** sample lands near the target (within 0.9–3.0×).
 
-```bash
-dotnet test --filter "Category!=Timing"
-```
+Unlike mean-based assertions (which absorb all scheduler preemption spikes), the
+minimum is stable:
+
+- A CPU-bound busy-wait has a hard floor — the minimum cannot be materially
+  *below* the target.
+- Preemption only ever adds time, pushing the mean around but barely affecting
+  the minimum.
+- This catches a class of bugs the deterministic statistical tests cannot detect:
+  unit errors (ns vs ms), a broken measurement loop, or the timer wired up wrong.
 
 ## What is *not* asserted to ground truth
 
