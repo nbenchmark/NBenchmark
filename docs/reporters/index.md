@@ -42,10 +42,10 @@ BenchmarkHost.Create(args)
     .RunAsync();
 ```
 
-### Bench (Tier 1) — extension methods
+### Benchmark (Tier 1) — extension methods
 
 ```csharp
-var result = Bench.Time(() => MyMethod());
+var result = Benchmark.Run(() => MyMethod());
 
 await result.ToMarkdownAsync("results.md");
 await result.ToCsvAsync("results.csv");

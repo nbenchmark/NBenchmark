@@ -18,7 +18,7 @@ The two tools are complementary. Use NBenchmark to get quick feedback while deve
 
 ### Does NBenchmark require any special project type or configuration?
 
-No. Add the NuGet package reference and start calling `Bench.Time`. No project template, no attribute on the project, no XML configuration.
+No. Add the NuGet package reference and start calling `Benchmark.Run`. No project template, no attribute on the project, no XML configuration.
 
 ### What .NET versions are supported?
 
@@ -45,7 +45,7 @@ If a few iterations are very slow (e.g. a GC pause), the mean is pulled upward b
 
 The compiler or JIT has likely optimised the benchmark body away because it has no observable side effects. Make sure your benchmark either:
 
-- Returns a value (use `Bench.Time(() => Compute())` which uses the generic overload that consumes the result), or
+- Returns a value (use `Benchmark.Run(() => Compute())` which uses the generic overload that consumes the result), or
 - Has a side effect (writes to a field, uses a passed-in output parameter, etc.)
 
 ### How does allocation tracking work? Does it include framework overhead?
@@ -56,7 +56,7 @@ The value is **thread-local** — allocations made by other threads are not coun
 
 ### Can I benchmark async code?
 
-Yes. Use `Bench.TimeAsync`, the `Func<Task>` overload of `BenchmarkSuite.Add`, or a `Task`-returning `[Benchmark]` method. The timer captures the full async duration including all awaited work.
+Yes. Use `Benchmark.RunAsync`, the `Func<Task>` overload of `BenchmarkSuite.Add`, or a `Task`-returning `[Benchmark]` method. The timer captures the full async duration including all awaited work.
 
 ---
 

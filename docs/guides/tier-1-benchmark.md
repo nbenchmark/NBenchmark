@@ -1,26 +1,26 @@
 ---
-title: "Tier 1: Bench"
-description: Measure a single piece of code with one call using Bench.Time or Bench.TimeAsync.
+title: "Tier 1: Benchmark"
+description: Measure a single piece of code with one call using Benchmark.Run or Benchmark.RunAsync.
 order: 1
 ---
 
-# Tier 1: Bench
+# Tier 1: Benchmark
 
-`Bench` is the entry point for one-off measurements. It requires no class structure, no attributes, and no project setup beyond adding the NuGet reference. Use it anywhere you want a quick, reliable number.
+`Benchmark` is the entry point for one-off measurements. It requires no class structure, no attributes, and no project setup beyond adding the NuGet reference. Use it anywhere you want a quick, reliable number.
 
 ## Basic usage
 
 ```csharp
 using NBenchmark;
 
-var result = Bench.Time(() =>
+var result = Benchmark.Run(() =>
 {
     // code to measure
     for (int i = 0; i < 1000; i++) { }
 });
 ```
 
-`Bench.Time` runs 25 warmup iterations, then 200 measured iterations, trims the top 5% of outliers, and returns a `BenchmarkResult`.
+`Benchmark.Run` runs 25 warmup iterations, then 200 measured iterations, trims the top 5% of outliers, and returns a `BenchmarkResult`.
 
 ## Overloads
 
@@ -28,29 +28,29 @@ var result = Bench.Time(() =>
 
 ```csharp
 // Action — for code with no return value
-var result = Bench.Time(() => DoWork());
+var result = Benchmark.Run(() => DoWork());
 
 // Func<T> — for code that returns a value
 // The result is consumed by a sink to prevent the compiler optimising the call away.
-var result = Bench.Time(() => ComputeHash(data));
+var result = Benchmark.Run(() => ComputeHash(data));
 ```
 
 ### Async
 
 ```csharp
 // Func<Task>
-var result = await Bench.TimeAsync(async () => await FetchDataAsync());
+var result = await Benchmark.RunAsync(async () => await FetchDataAsync());
 
 // Func<Task<T>>
-var result = await Bench.TimeAsync(async () => await ComputeAsync(input));
+var result = await Benchmark.RunAsync(async () => await ComputeAsync(input));
 ```
 
 ### Raw outcome
 
-`Bench.MeasureRaw` returns a `MeasurementOutcome` which includes both the `BenchmarkResult` and the raw per-iteration sample array. Use this if you need the underlying data.
+`Benchmark.MeasureRaw` returns a `MeasurementOutcome` which includes both the `BenchmarkResult` and the raw per-iteration sample array. Use this if you need the underlying data.
 
 ```csharp
-var outcome = Bench.MeasureRaw(() => DoWork());
+var outcome = Benchmark.MeasureRaw(() => DoWork());
 double[] rawSamples = outcome.RawSamples;     // nanoseconds, before outlier trimming
 BenchmarkResult result = outcome.Result;
 ```
@@ -68,7 +68,7 @@ var options = new MeasurementOptions
     ConfidenceLevel = 0.99,
 };
 
-var result = Bench.Time(() => MyMethod(), options: options);
+var result = Benchmark.Run(() => MyMethod(), options: options);
 ```
 
 See [Configuration](../configuration) for the full list of options.
@@ -78,7 +78,7 @@ See [Configuration](../configuration) for the full list of options.
 The `name` parameter sets the label used in output and file reporters:
 
 ```csharp
-var result = Bench.Time(() => MyMethod(), name: "MyMethod with 1000-item input");
+var result = Benchmark.Run(() => MyMethod(), name: "MyMethod with 1000-item input");
 ```
 
 ## Displaying results
@@ -132,7 +132,7 @@ if (result.MeanAllocatedBytes.HasValue)
     Console.WriteLine($"Alloc:   {result.MeanAllocatedBytes.Value} bytes/op");
 ```
 
-## What Bench does not do
+## What Benchmark does not do
 
 - **It does not compare benchmarks.** Use [BenchmarkSuite](./tier-2-suite) for A/B comparisons.
 - **It does not run significance testing** between multiple results. Significance testing requires paired raw samples and is handled by `BenchmarkSuite` and `BenchmarkHost`.

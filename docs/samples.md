@@ -12,7 +12,7 @@ The repository includes three sample projects in the `samples/` directory that d
 
 **`samples/Quick/`**
 
-The simplest possible benchmark: `Bench.Time` on a tight loop, followed by `Print()` and `PrintAsync()`.
+The simplest possible benchmark: `Benchmark.Run` on a tight loop, followed by `Print()` and `PrintAsync()`.
 
 ```bash
 cd samples/Quick
@@ -23,7 +23,7 @@ dotnet run
 using NBenchmark;
 using NBenchmark.Console;
 
-var result = Bench.Time(() =>
+var result = Benchmark.Run(() =>
 {
     for (int i = 0; i < 1000; i++) { }
 });

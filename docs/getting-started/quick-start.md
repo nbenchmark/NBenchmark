@@ -8,13 +8,13 @@ order: 2
 
 ## Your first benchmark
 
-The simplest way to measure code is `Bench.Time`. Call it anywhere — no special project structure, no attributes, no configuration.
+The simplest way to measure code is `Benchmark.Run`. Call it anywhere — no special project structure, no attributes, no configuration.
 
 ```csharp
 using NBenchmark;
 using NBenchmark.Console;
 
-var result = Bench.Time(() =>
+var result = Benchmark.Run(() =>
 {
     for (int i = 0; i < 1000; i++) { }
 });
@@ -36,7 +36,7 @@ That's it. NBenchmark ran 25 warmup iterations (to let the JIT compile your code
 ## Measuring async code
 
 ```csharp
-var result = await Bench.TimeAsync(async () =>
+var result = await Benchmark.RunAsync(async () =>
 {
     await Task.Delay(1);
 });
@@ -49,7 +49,7 @@ result.Print();
 If your benchmark returns a value, use the generic overload. This prevents the compiler from optimising the call away:
 
 ```csharp
-var result = Bench.Time(() => int.Parse("12345"));
+var result = Benchmark.Run(() => int.Parse("12345"));
 result.Print();
 ```
 
@@ -90,7 +90,7 @@ The **Ratio** column shows speed relative to the baseline. The **✓** in the Si
 Chain file reporter methods on any `BenchmarkResult`:
 
 ```csharp
-var result = Bench.Time(() => MyMethod());
+var result = Benchmark.Run(() => MyMethod());
 
 await result.ToMarkdownAsync("results.md");
 await result.ToCsvAsync("results.csv");

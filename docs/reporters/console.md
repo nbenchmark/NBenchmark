@@ -85,12 +85,12 @@ Starting 2 benchmark(s)...
   Completed 2 benchmark(s).
 ```
 
-## Using with Bench (Tier 1)
+## Using with Benchmark (Tier 1)
 
 ```csharp
 using NBenchmark.Console;
 
-var result = Bench.Time(() => MyMethod());
+var result = Benchmark.Run(() => MyMethod());
 await result.PrintAsync();
 ```
 

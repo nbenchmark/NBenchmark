@@ -10,7 +10,7 @@ All measurement settings are controlled by `MeasurementOptions`. The defaults ar
 
 ## Using MeasurementOptions
 
-### With Bench (Tier 1)
+### With Benchmark (Tier 1)
 
 ```csharp
 var options = new MeasurementOptions
@@ -19,7 +19,7 @@ var options = new MeasurementOptions
     WarmupIterations = 50,
 };
 
-var result = Bench.Time(() => MyMethod(), options: options);
+var result = Benchmark.Run(() => MyMethod(), options: options);
 ```
 
 ### With BenchmarkSuite (Tier 2)

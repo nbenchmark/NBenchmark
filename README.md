@@ -26,7 +26,7 @@ dotnet add package NBenchmark.Console   # optional, for pretty terminal output
 using NBenchmark;
 using NBenchmark.Console;
 
-var result = Bench.Time(() =>
+var result = Benchmark.Run(() =>
 {
     for (int i = 0; i < 1000; i++) { }
 });
@@ -43,7 +43,7 @@ result.Print();
 
 ## Three usage tiers
 
-**Tier 1 — `Bench.Time`** — a single static call, no setup required.
+**Tier 1 — `Benchmark.Run`** — a single static call, no setup required.
 
 **Tier 2 — `BenchmarkSuite`** — a fluent builder that runs multiple benchmarks side-by-side and produces a comparison table with ratios and statistical significance.
 

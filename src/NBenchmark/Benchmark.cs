@@ -3,9 +3,9 @@ using NBenchmark.Engine;
 
 namespace NBenchmark;
 
-public static class Bench
+public static class Benchmark
 {
-    public static BenchmarkResult Time(
+    public static BenchmarkResult Run(
         Action action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -15,7 +15,7 @@ public static class Bench
         return outcome.Result;
     }
 
-    public static BenchmarkResult Time<T>(
+    public static BenchmarkResult Run<T>(
         Func<T> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -27,7 +27,7 @@ public static class Bench
         return outcome.Result;
     }
 
-    public static async Task<BenchmarkResult> TimeAsync(
+    public static async Task<BenchmarkResult> RunAsync(
         Func<Task> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -37,7 +37,7 @@ public static class Bench
         return outcome.Result;
     }
 
-    public static async Task<BenchmarkResult> TimeAsync<T>(
+    public static async Task<BenchmarkResult> RunAsync<T>(
         Func<Task<T>> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -60,23 +60,5 @@ public static class Bench
         return MeasurementEngine.MeasureSync(name, action, options, cancellationToken: cancellationToken);
     }
 
-    [Obsolete("Use Bench.Time() for sync benchmarks. TimeAsync(Action) is retained for backward compatibility.")]
-    public static Task<BenchmarkResult> TimeAsync(
-        Action action,
-        MeasurementOptions? options = null,
-        string name = "Benchmark",
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(Time(action, options, name, cancellationToken));
-    }
 
-    [Obsolete("Use Bench.Time<T>() for sync benchmarks with return values.")]
-    public static Task<BenchmarkResult> TimeAsync<T>(
-        Func<T> action,
-        MeasurementOptions? options = null,
-        string name = "Benchmark",
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(Time(action, options, name, cancellationToken));
-    }
 }

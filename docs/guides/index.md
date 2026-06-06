@@ -8,12 +8,12 @@ order: 2
 
 NBenchmark has three usage tiers. Pick the one that matches your situation.
 
-## [Tier 1 — Bench](./tier-1-bench)
+## [Tier 1 — Benchmark](./tier-1-benchmark)
 
 A single static call. No classes, no attributes, no configuration required. Good for a quick measurement anywhere in your code.
 
 ```csharp
-var result = Bench.Time(() => MyMethod());
+var result = Benchmark.Run(() => MyMethod());
 result.Print();
 ```
 

@@ -68,10 +68,10 @@ _Error = ±95% confidence interval half-width on the mean._
 - Errored benchmarks are listed with a `-` in all numeric columns.
 - The output directory must already exist. `MarkdownReporter` does not create it.
 
-## Using with Bench (Tier 1)
+## Using with Benchmark (Tier 1)
 
 ```csharp
-var result = Bench.Time(() => MyMethod());
+var result = Benchmark.Run(() => MyMethod());
 await result.ToMarkdownAsync("results.md");
 ```
 

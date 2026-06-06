@@ -1,7 +1,7 @@
 using NBenchmark;
 using NBenchmark.Console;
 
-var result = Bench.Time(() =>
+var result = Benchmark.Run(() =>
 {
     for (int i = 0; i < 1000; i++) { }
 });
