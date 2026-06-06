@@ -23,7 +23,7 @@ public class BenchmarkSuiteExtendedTests
     public async Task RunAsync_With_Generic_Func_Benchmark()
     {
         var results = await new BenchmarkSuite("generic-suite")
-            .Add<int>("returns-value", () => 42)
+            .Add("returns-value", () => 42)
             .WithWarmup(1)
             .WithIterations(5)
             .WithOutlierMode(OutlierMode.None)
@@ -37,7 +37,11 @@ public class BenchmarkSuiteExtendedTests
     public async Task RunAsync_With_Generic_Async_Benchmark()
     {
         var results = await new BenchmarkSuite("generic-async-suite")
-            .Add<int>("async-returns-value", async () => { await Task.Yield(); return 42; })
+            .Add("async-returns-value", async () =>
+            {
+                await Task.Yield();
+                return 42;
+            })
             .WithWarmup(1)
             .WithIterations(5)
             .WithOutlierMode(OutlierMode.None)
@@ -106,8 +110,8 @@ public class BenchmarkSuiteExtendedTests
 
         var results = await new BenchmarkSuite("iter-lifecycle")
             .Add("work", () => Thread.SpinWait(100),
-                setup: () => Interlocked.Increment(ref setupCount),
-                teardown: () => Interlocked.Increment(ref teardownCount))
+                () => Interlocked.Increment(ref setupCount),
+                () => Interlocked.Increment(ref teardownCount))
             .WithWarmup(2)
             .WithIterations(5)
             .WithOutlierMode(OutlierMode.None)
@@ -122,6 +126,7 @@ public class BenchmarkSuiteExtendedTests
     public async Task RunAsync_With_Reporter_Invokes_Reporter()
     {
         var reported = false;
+
         var results = await new BenchmarkSuite("reporter-suite")
             .Add("a", () => { })
             .WithWarmup(1)

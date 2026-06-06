@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-  </PropertyGroup>
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj" />
-    <ProjectReference Include="..\..\src\NBenchmark.Console\NBenchmark.Console.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
+        <ProjectReference Include="..\..\src\NBenchmark.Console\NBenchmark.Console.csproj"/>
+    </ItemGroup>
 
 </Project>

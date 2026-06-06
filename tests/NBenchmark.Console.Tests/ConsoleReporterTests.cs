@@ -1,5 +1,3 @@
-using NBenchmark;
-using NBenchmark.Console;
 using Xunit;
 
 namespace NBenchmark.Console.Tests;
@@ -38,25 +36,35 @@ public class ConsoleReporterTests
         });
     }
 
-    private static BenchmarkResult MakeResult(string name, double median) => new()
+    private static BenchmarkResult MakeResult(string name, double median)
     {
-        Name = name,
-        Mean = median,
-        Median = median,
-        P95 = median * 1.1,
-        P99 = median * 1.2,
-        Min = median * 0.8,
-        Max = median * 1.3,
-        StandardDeviation = median * 0.05,
-        MeanAllocatedBytes = 64,
-    };
+        return new BenchmarkResult
+        {
+            Name = name,
+            Mean = median,
+            Median = median,
+            P95 = median * 1.1,
+            P99 = median * 1.2,
+            Min = median * 0.8,
+            Max = median * 1.3,
+            StandardDeviation = median * 0.05,
+            MeanAllocatedBytes = 64,
+        };
+    }
 
     private static async Task CaptureConsoleOutputAsync(Func<Task> action)
     {
-        var sw = new System.IO.StringWriter();
+        var sw = new StringWriter();
         var original = System.Console.Out;
         System.Console.SetOut(sw);
-        try { await action(); }
-        finally { System.Console.SetOut(original); }
+
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            System.Console.SetOut(original);
+        }
     }
 }

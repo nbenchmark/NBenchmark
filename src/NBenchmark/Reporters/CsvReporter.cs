@@ -1,5 +1,4 @@
 using System.Text;
-using NBenchmark;
 
 namespace NBenchmark.Reporters;
 
@@ -18,10 +17,12 @@ public sealed class CsvReporter : IReporter
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,AllocPerOp");
+        sb.AppendLine(
+            "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,AllocPerOp");
 
         var multiBenchmark = results.Count > 1;
         var successful = results.Where(r => !r.Errored).ToList();
+
         var baseline = successful.Count > 0
             ? successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median)!
             : null;
@@ -31,12 +32,16 @@ public sealed class CsvReporter : IReporter
             var ratio = result.Errored || baseline is null || baseline.Median == 0
                 ? double.NaN
                 : result.Median / baseline.Median;
+
             var sig = !multiBenchmark || result.IsBaseline || !result.IsSignificant.HasValue
                 ? ""
-                : result.IsSignificant.Value ? "true" : "false";
+                : result.IsSignificant.Value
+                    ? "true"
+                    : "false";
 
             var safeName = result.Name.Replace("\"", "\"\"");
             var safeSig = sig.Replace("\"", "\"\"");
+
             sb.AppendLine(
                 $"\"{safeName}\"," +
                 $"{result.Median:F1}," +

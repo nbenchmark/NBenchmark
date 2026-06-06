@@ -150,33 +150,53 @@ public class BenchmarkDiscovererTests
 public class PublicBenchmarks
 {
     [Benchmark]
-    public void ReturnsNothing() { }
+    public void ReturnsNothing()
+    {
+    }
 
     [Benchmark]
-    public int ReturnsInt() => 42;
+    public int ReturnsInt()
+    {
+        return 42;
+    }
 }
 
 public class LifecycleBenchmarks
 {
-    public int SetupCount;
-    public int TeardownCount;
     public int IterationSetupCount;
     public int IterationTeardownCount;
+    public int SetupCount;
+    public int TeardownCount;
 
     [BenchmarkSetup]
-    public void Setup() => SetupCount++;
+    public void Setup()
+    {
+        SetupCount++;
+    }
 
     [BenchmarkTeardown]
-    public void Teardown() => TeardownCount++;
+    public void Teardown()
+    {
+        TeardownCount++;
+    }
 
     [BenchmarkIterationSetup]
-    public void IterationSetup() => IterationSetupCount++;
+    public void IterationSetup()
+    {
+        IterationSetupCount++;
+    }
 
     [BenchmarkIterationTeardown]
-    public void IterationTeardown() => IterationTeardownCount++;
+    public void IterationTeardown()
+    {
+        IterationTeardownCount++;
+    }
 
     [Benchmark]
-    public int Work() => 1;
+    public int Work()
+    {
+        return 1;
+    }
 }
 
 public class AsyncBenchmarks
@@ -189,25 +209,38 @@ public class AsyncBenchmarks
     }
 
     [Benchmark]
-    public Task ReturnsTask() => Task.CompletedTask;
+    public Task ReturnsTask()
+    {
+        return Task.CompletedTask;
+    }
 }
 
 internal class InternalBenchmarks
 {
     [Benchmark]
-    internal void Hidden() { }
+    internal void Hidden()
+    {
+    }
 }
 
-internal static class InternalBenchmarksMarker { }
+internal static class InternalBenchmarksMarker
+{
+}
 
 public class ParameterisedBenchmarks
 {
     [BenchmarkArguments(100)]
     [BenchmarkArguments(1000)]
     [Benchmark]
-    public int Compute(int n) => n;
+    public int Compute(int n)
+    {
+        return n;
+    }
 
     [BenchmarkArguments("a", 3)]
     [Benchmark]
-    public string Concat(string value, int times) => string.Concat(Enumerable.Repeat(value, times));
+    public string Concat(string value, int times)
+    {
+        return string.Concat(Enumerable.Repeat(value, times));
+    }
 }

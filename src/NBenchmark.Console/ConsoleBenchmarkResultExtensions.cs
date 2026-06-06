@@ -1,5 +1,3 @@
-using global::NBenchmark;
-
 namespace NBenchmark.Console;
 
 public static class ConsoleBenchmarkResultExtensions

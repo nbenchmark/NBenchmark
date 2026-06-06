@@ -1,7 +1,3 @@
-using NBenchmark;
-using NBenchmark.Stats;
-using NBenchmark.Discovery;
-using NBenchmark.Reporters;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -36,7 +32,7 @@ public class BenchmarkSuiteTests
     {
         var results = await new BenchmarkSuite("sig")
             .Add("baseline", () => Thread.SpinWait(1000))
-            .Add("faster",   () => Thread.SpinWait(500))
+            .Add("faster", () => Thread.SpinWait(500))
             .WithBaseline("baseline")
             .WithWarmup(2)
             .WithIterations(20)
@@ -63,7 +59,7 @@ public class BenchmarkSuiteTests
     {
         var results = await new BenchmarkSuite("boom")
             .Add("explodes", () => throw new InvalidOperationException("nope"))
-            .Add("calm",     () => { })
+            .Add("calm", () => { })
             .WithWarmup(1)
             .WithIterations(5)
             .WithOutlierMode(OutlierMode.None)

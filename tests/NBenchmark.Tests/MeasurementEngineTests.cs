@@ -1,5 +1,4 @@
 using NBenchmark.Engine;
-
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -14,6 +13,7 @@ public class MeasurementEngineTests
             () => Task.Delay(1),
             new MeasurementOptions { WarmupIterations = 2, Iterations = 5, OutlierMode = OutlierMode.None }
         );
+
         var result = outcome.Result;
 
         Assert.True(result.Median > 0);
@@ -26,7 +26,11 @@ public class MeasurementEngineTests
     {
         var outcome = await MeasurementEngine.MeasureAsync(
             "test",
-            () => { _ = new byte[64 * 1024]; return Task.CompletedTask; },
+            () =>
+            {
+                _ = new byte[64 * 1024];
+                return Task.CompletedTask;
+            },
             new MeasurementOptions
             {
                 WarmupIterations = 2,
@@ -34,6 +38,7 @@ public class MeasurementEngineTests
                 MeasureAllocations = true,
             }
         );
+
         var result = outcome.Result;
 
         Assert.NotNull(result.MeanAllocatedBytes);
@@ -55,6 +60,7 @@ public class MeasurementEngineTests
             () => Task.CompletedTask,
             options
         );
+
         var result = outcome.Result;
 
         Assert.Equal(95, result.MeasuredIterations);
@@ -104,6 +110,7 @@ public class MeasurementEngineTests
             () => Thread.SpinWait(1000),
             new MeasurementOptions { WarmupIterations = 2, Iterations = 10, OutlierMode = OutlierMode.None }
         );
+
         var result = outcome.Result;
 
         Assert.True(result.Median > 0);

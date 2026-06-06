@@ -12,25 +12,25 @@ public static class ResultSink
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Consume<T>(T value)
     {
-        _hole = value as object;
+        _hole = value;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Consume(int value)
     {
-        System.Threading.Volatile.Write(ref _holeInt, value);
+        Volatile.Write(ref _holeInt, value);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Consume(long value)
     {
-        System.Threading.Volatile.Write(ref _holeLong, value);
+        Volatile.Write(ref _holeLong, value);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Consume(double value)
     {
-        System.Threading.Volatile.Write(ref _holeDouble, value);
+        Volatile.Write(ref _holeDouble, value);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

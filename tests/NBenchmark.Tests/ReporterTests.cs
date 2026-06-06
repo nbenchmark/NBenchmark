@@ -1,4 +1,3 @@
-using NBenchmark;
 using NBenchmark.Reporters;
 using Xunit;
 
@@ -10,6 +9,7 @@ public class ReporterTests
     public async Task JsonReporter_Writes_File_Containing_Results()
     {
         var tempDir = MakeSubDir("nb-json");
+
         try
         {
             var reporter = new JsonReporter(tempDir);
@@ -24,13 +24,17 @@ public class ReporterTests
             Assert.Contains("alpha", content);
             Assert.Contains("\"median\"", content);
         }
-        finally { Cleanup(tempDir); }
+        finally
+        {
+            Cleanup(tempDir);
+        }
     }
 
     [Fact]
     public async Task MarkdownReporter_Writes_Table_Containing_Results()
     {
         var tempPath = Path.Combine(MakeSubDir("nb-md"), "out.md");
+
         try
         {
             var reporter = new MarkdownReporter(tempPath);
@@ -43,13 +47,17 @@ public class ReporterTests
             Assert.Contains("alpha", content);
             Assert.Contains("| Benchmark | Median |", content);
         }
-        finally { Cleanup(Path.GetDirectoryName(tempPath)!); }
+        finally
+        {
+            Cleanup(Path.GetDirectoryName(tempPath)!);
+        }
     }
 
     [Fact]
     public async Task CsvReporter_Writes_Header_And_Row()
     {
         var tempPath = Path.Combine(MakeSubDir("nb-csv"), "out.csv");
+
         try
         {
             var reporter = new CsvReporter(tempPath);
@@ -62,7 +70,10 @@ public class ReporterTests
             Assert.Contains("Name,Median,Mean", content);
             Assert.Contains("\"alpha\"", content);
         }
-        finally { Cleanup(Path.GetDirectoryName(tempPath)!); }
+        finally
+        {
+            Cleanup(Path.GetDirectoryName(tempPath)!);
+        }
     }
 
     private static string MakeSubDir(string name)
@@ -75,7 +86,7 @@ public class ReporterTests
     private static void Cleanup(string dir)
     {
         if (Directory.Exists(dir))
-            Directory.Delete(dir, recursive: true);
+            Directory.Delete(dir, true);
     }
 
     [Fact]
@@ -92,16 +103,19 @@ public class ReporterTests
         Assert.NotNull(reporter);
     }
 
-    private static BenchmarkResult MakeResult(string name, double median) => new()
+    private static BenchmarkResult MakeResult(string name, double median)
     {
-        Name = name,
-        Mean = median,
-        Median = median,
-        P95 = median * 1.1,
-        P99 = median * 1.2,
-        Min = median * 0.8,
-        Max = median * 1.3,
-        StandardDeviation = median * 0.05,
-        MeanAllocatedBytes = 64,
-    };
+        return new BenchmarkResult
+        {
+            Name = name,
+            Mean = median,
+            Median = median,
+            P95 = median * 1.1,
+            P99 = median * 1.2,
+            Min = median * 0.8,
+            Max = median * 1.3,
+            StandardDeviation = median * 0.05,
+            MeanAllocatedBytes = 64,
+        };
+    }
 }

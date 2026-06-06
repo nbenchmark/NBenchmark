@@ -1,6 +1,4 @@
-using NBenchmark;
 using NBenchmark.Attributes;
-using NBenchmark.Discovery;
 using NBenchmark.Reporters;
 using Xunit;
 
@@ -25,6 +23,7 @@ public class BenchmarkHostCliTests
     {
         var prev = Environment.ExitCode;
         Environment.ExitCode = 0;
+
         try
         {
             CaptureConsoleOutput(() =>
@@ -46,6 +45,7 @@ public class BenchmarkHostCliTests
     {
         var prev = Environment.ExitCode;
         Environment.ExitCode = 0;
+
         try
         {
             var stderr = CaptureConsoleError(() =>
@@ -80,6 +80,7 @@ public class BenchmarkHostCliTests
     public async Task RunAsync_Applies_Output_Directory_To_File_Reporters()
     {
         var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-host-{Guid.NewGuid():N}");
+
         try
         {
             await CaptureConsoleOutputAsync(async () =>
@@ -105,54 +106,90 @@ public class BenchmarkHostCliTests
         finally
         {
             if (Directory.Exists(tempDir))
-                Directory.Delete(tempDir, recursive: true);
+                Directory.Delete(tempDir, true);
         }
     }
 
     private static string CaptureConsoleOutput(Action action)
     {
-        var sw = new System.IO.StringWriter();
+        var sw = new StringWriter();
         var original = Console.Out;
         Console.SetOut(sw);
-        try { action(); }
-        finally { Console.SetOut(original); }
+
+        try
+        {
+            action();
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
+
         return sw.ToString();
     }
 
     private static string CaptureConsoleError(Action action)
     {
-        var sw = new System.IO.StringWriter();
+        var sw = new StringWriter();
         var original = Console.Error;
         Console.SetError(sw);
-        try { action(); }
-        finally { Console.SetError(original); }
+
+        try
+        {
+            action();
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+
         return sw.ToString();
     }
 
     private static async Task<T> CaptureConsoleOutputAsync<T>(Func<Task<T>> action)
     {
-        var sw = new System.IO.StringWriter();
+        var sw = new StringWriter();
         var original = Console.Out;
         Console.SetOut(sw);
-        try { return await action(); }
-        finally { Console.SetOut(original); }
+
+        try
+        {
+            return await action();
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
     }
 
     private static async Task CaptureConsoleOutputAsync(Func<Task> action)
     {
-        var sw = new System.IO.StringWriter();
+        var sw = new StringWriter();
         var original = Console.Out;
         Console.SetOut(sw);
-        try { await action(); }
-        finally { Console.SetOut(original); }
+
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
     }
 }
 
 public class TestBenchmarks
 {
     [Benchmark]
-    public int Fast() => 1 + 1;
+    public int Fast()
+    {
+        return 1 + 1;
+    }
 
     [Benchmark(Baseline = true)]
-    public int FastBaseline() => 2 + 2;
+    public int FastBaseline()
+    {
+        return 2 + 2;
+    }
 }

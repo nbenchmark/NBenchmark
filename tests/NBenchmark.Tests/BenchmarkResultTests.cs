@@ -19,8 +19,8 @@ public class BenchmarkResultTests
     [Fact]
     public void CreateErrored_Sets_Description_And_Baseline()
     {
-        var result = BenchmarkResult.CreateErrored("test", "err", description: "desc",
-            isBaseline: true, outlierMode: OutlierMode.None);
+        var result = BenchmarkResult.CreateErrored("test", "err", "desc",
+            true, OutlierMode.None);
 
         Assert.Equal("desc", result.Description);
         Assert.True(result.IsBaseline);

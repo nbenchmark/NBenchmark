@@ -13,24 +13,19 @@ public sealed class BenchmarkDiscoverer
 
         var types = assembly.GetTypes()
             .Where(t => !t.IsAbstract
-                     && t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                         .Any(m => m.GetCustomAttribute<BenchmarkAttribute>() is not null));
+                        && t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Any(m => m.GetCustomAttribute<BenchmarkAttribute>() is not null));
 
         foreach (var type in types)
         {
             var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                           .Cast<MethodInfo>()
-                           .Concat(type.GetMethods(BindingFlags.NonPublic | BindingFlags.Instance))
-                           .ToArray();
+                .Concat(type.GetMethods(BindingFlags.NonPublic | BindingFlags.Instance))
+                .ToArray();
 
-            var setupMethod = methods.FirstOrDefault(
-                m2 => m2.GetCustomAttribute<BenchmarkSetupAttribute>() is not null);
-            var teardownMethod = methods.FirstOrDefault(
-                m2 => m2.GetCustomAttribute<BenchmarkTeardownAttribute>() is not null);
-            var iterSetupMethod = methods.FirstOrDefault(
-                m2 => m2.GetCustomAttribute<BenchmarkIterationSetupAttribute>() is not null);
-            var iterTeardownMethod = methods.FirstOrDefault(
-                m2 => m2.GetCustomAttribute<BenchmarkIterationTeardownAttribute>() is not null);
+            var setupMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<BenchmarkSetupAttribute>() is not null);
+            var teardownMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<BenchmarkTeardownAttribute>() is not null);
+            var iterSetupMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<BenchmarkIterationSetupAttribute>() is not null);
+            var iterTeardownMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<BenchmarkIterationTeardownAttribute>() is not null);
 
             var setupDel = BuildVoidDelegate(setupMethod);
             var teardownDel = BuildVoidDelegate(teardownMethod);
@@ -42,13 +37,14 @@ public sealed class BenchmarkDiscoverer
                 .SelectMany(m => BuildBenchmarkDefinitions(m, iterSetupDel, iterTeardownDel))
                 .ToList();
 
-            if (benchmarks.Count == 0) continue;
+            if (benchmarks.Count == 0)
+                continue;
 
             suites.Add(new BenchmarkSuiteDefinition(
-                Type: type,
-                Benchmarks: benchmarks,
-                SetupDelegate: setupDel,
-                TeardownDelegate: teardownDel
+                type,
+                benchmarks,
+                setupDel,
+                teardownDel
             ));
         }
 
@@ -69,32 +65,41 @@ public sealed class BenchmarkDiscoverer
         if (argumentSets.Length == 0)
         {
             if (parameters.Length > 0)
+            {
                 throw new InvalidOperationException(
                     $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' declares "
                     + $"{parameters.Length} parameter(s) but has no [BenchmarkArguments]. "
                     + "Add one [BenchmarkArguments(...)] per argument set, or remove the parameters.");
+            }
 
-            yield return CreateDefinition(method, attribute, method.Name, arguments: null,
+            yield return CreateDefinition(method, attribute, method.Name, null,
                 iterSetupDel, iterTeardownDel);
+
             yield break;
         }
 
         if (parameters.Length == 0)
+        {
             throw new InvalidOperationException(
                 $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has [BenchmarkArguments] "
                 + "but takes no parameters.");
+        }
 
         foreach (var argumentSet in argumentSets)
         {
             var rawArgs = argumentSet.Arguments;
+
             if (rawArgs.Length != parameters.Length)
+            {
                 throw new InvalidOperationException(
                     $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' expects "
                     + $"{parameters.Length} argument(s) but a [BenchmarkArguments] attribute supplied "
                     + $"{rawArgs.Length}.");
+            }
 
             var converted = ConvertArguments(rawArgs, parameters);
             var displayName = $"{method.Name}({string.Join(", ", rawArgs.Select(FormatArgument))})";
+
             yield return CreateDefinition(method, attribute, displayName, converted,
                 iterSetupDel, iterTeardownDel);
         }
@@ -119,6 +124,7 @@ public sealed class BenchmarkDiscoverer
             asyncDelegate = arguments is null
                 ? BuildAsyncDelegate(method)
                 : BuildArgumentBoundAsyncDelegate(method, arguments);
+
             if (method.ReturnType.IsGenericType)
                 resultExtractor = BuildResultExtractor(method.ReturnType);
         }
@@ -127,12 +133,15 @@ public sealed class BenchmarkDiscoverer
             if (arguments is null)
             {
                 var act = BuildVoidDelegate(method)!;
-                syncDelegate = instance => { act(instance); return null; };
+
+                syncDelegate = instance =>
+                {
+                    act(instance);
+                    return null;
+                };
             }
             else
-            {
                 syncDelegate = BuildArgumentBoundSyncDelegate(method, arguments);
-            }
         }
         else
         {
@@ -155,6 +164,7 @@ public sealed class BenchmarkDiscoverer
     private static object?[] ConvertArguments(object[] arguments, ParameterInfo[] parameters)
     {
         var result = new object?[arguments.Length];
+
         for (var i = 0; i < arguments.Length; i++)
         {
             var target = parameters[i].ParameterType;
@@ -163,18 +173,24 @@ public sealed class BenchmarkDiscoverer
             if (value is null || target.IsInstanceOfType(value))
                 result[i] = value;
             else
+            {
                 result[i] = Convert.ChangeType(
                     value, Nullable.GetUnderlyingType(target) ?? target, CultureInfo.InvariantCulture);
+            }
         }
+
         return result;
     }
 
-    private static string FormatArgument(object? argument) => argument switch
+    private static string FormatArgument(object? argument)
     {
-        null => "null",
-        string s => $"\"{s}\"",
-        _ => Convert.ToString(argument, CultureInfo.InvariantCulture) ?? argument.ToString() ?? "",
-    };
+        return argument switch
+        {
+            null => "null",
+            string s => $"\"{s}\"",
+            _ => Convert.ToString(argument, CultureInfo.InvariantCulture) ?? argument.ToString() ?? "",
+        };
+    }
 
     // Argument-bound delegates are compiled once per (method, argument set) via an
     // expression tree, so the measurement hot loop still calls a plain delegate with
@@ -205,8 +221,12 @@ public sealed class BenchmarkDiscoverer
         var typedInstance = Expression.Convert(instanceParam, method.DeclaringType!);
         var parameters = method.GetParameters();
         var argExpressions = new Expression[parameters.Length];
+
         for (var i = 0; i < parameters.Length; i++)
+        {
             argExpressions[i] = Expression.Constant(arguments[i], parameters[i].ParameterType);
+        }
+
         return Expression.Call(typedInstance, method, argExpressions);
     }
 
@@ -219,11 +239,13 @@ public sealed class BenchmarkDiscoverer
 
     private static Action<object>? BuildVoidDelegate(MethodInfo? method)
     {
-        if (method is null) return null;
+        if (method is null)
+            return null;
 
         var helper = typeof(BenchmarkDiscoverer)
             .GetMethod(nameof(BuildVoidDelegateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(method.DeclaringType!);
+
         return (Action<object>)helper.Invoke(null, [method])!;
     }
 
@@ -238,6 +260,7 @@ public sealed class BenchmarkDiscoverer
         var helper = typeof(BenchmarkDiscoverer)
             .GetMethod(nameof(BuildSyncDelegateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(method.DeclaringType!, method.ReturnType);
+
         return (Func<object, object?>)helper.Invoke(null, [method])!;
     }
 
@@ -252,6 +275,7 @@ public sealed class BenchmarkDiscoverer
         var helper = typeof(BenchmarkDiscoverer)
             .GetMethod(nameof(BuildAsyncDelegateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(method.DeclaringType!);
+
         return (Func<object, Task>)helper.Invoke(null, [method])!;
     }
 
@@ -266,12 +290,16 @@ public sealed class BenchmarkDiscoverer
     private static Func<Task, object?> BuildResultExtractor(Type taskType)
     {
         var resultType = taskType.GetGenericArguments()[0];
+
         var helper = typeof(BenchmarkDiscoverer)
             .GetMethod(nameof(BuildResultExtractorGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(resultType);
+
         return (Func<Task, object?>)helper.Invoke(null, [])!;
     }
 
     private static Func<Task, object?> BuildResultExtractorGeneric<T>()
-        => task => ((Task<T>)task).Result;
+    {
+        return task => ((Task<T>)task).Result;
+    }
 }

@@ -1,4 +1,3 @@
-using NBenchmark;
 using NBenchmark.Reporters;
 
 namespace NBenchmark;
@@ -8,18 +7,24 @@ public static class BenchmarkResultExtensions
     public static BenchmarkResult Print(this BenchmarkResult result)
     {
         Console.WriteLine();
+
         var allocSuffix = result.MeanAllocatedBytes.HasValue
             ? $" ({BenchmarkFormatter.FormatBytes(result.MeanAllocatedBytes.Value)})"
             : "";
+
         Console.WriteLine($"  {result.Name}: {BenchmarkFormatter.FormatNs(result.Median)} median{allocSuffix}");
         Console.WriteLine($"    Mean: {BenchmarkFormatter.FormatNs(result.Mean)}, P95: {BenchmarkFormatter.FormatNs(result.P95)}");
         Console.WriteLine($"    StdDev: {BenchmarkFormatter.FormatNs(result.StandardDeviation)}");
+
         if (result.MarginOfError > 0)
+        {
             Console.WriteLine(
                 $"    {result.ConfidenceLevel * 100:0.#}% CI: "
                 + $"{BenchmarkFormatter.FormatNs(result.ConfidenceIntervalLower)} … "
                 + $"{BenchmarkFormatter.FormatNs(result.ConfidenceIntervalUpper)} "
                 + $"(±{BenchmarkFormatter.FormatNs(result.MarginOfError)})");
+        }
+
         Console.WriteLine();
         return result;
     }

@@ -1,6 +1,5 @@
 using NBenchmark;
 using NBenchmark.Console;
-using NBenchmark.Stats;
 
 var results = await new BenchmarkSuite("sorting")
     .Add("bubble", () =>
@@ -8,10 +7,7 @@ var results = await new BenchmarkSuite("sorting")
         var arr = Enumerable.Range(0, 100).Reverse().ToArray();
         Array.Sort(arr);
     })
-    .Add("linq", () =>
-    {
-        _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray();
-    })
+    .Add("linq", () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
     .WithWarmup(3)
     .WithIterations(50)

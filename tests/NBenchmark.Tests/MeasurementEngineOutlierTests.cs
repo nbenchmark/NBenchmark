@@ -105,11 +105,13 @@ public class MeasurementEngineOutlierTests
     public void Sync_Measure_Result_Has_Valid_Timestamp()
     {
         var before = DateTimeOffset.UtcNow;
+
         var outcome = MeasurementEngine.MeasureSync(
             "test",
             () => Thread.SpinWait(100),
             new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None }
         );
+
         var after = DateTimeOffset.UtcNow;
 
         Assert.True(outcome.Result.RunAt >= before);

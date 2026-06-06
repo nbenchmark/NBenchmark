@@ -17,12 +17,12 @@ public record BenchmarkResult
     public double StandardError { get; init; }
 
     /// <summary>
-    /// Half-width of the confidence interval on the mean at <see cref="ConfidenceLevel"/>.
-    /// The interval is <c>Mean ± MarginOfError</c>.
+    ///     Half-width of the confidence interval on the mean at <see cref="ConfidenceLevel" />.
+    ///     The interval is <c>Mean ± MarginOfError</c>.
     /// </summary>
     public double MarginOfError { get; init; }
 
-    /// <summary>The confidence level for <see cref="MarginOfError"/> (e.g. 0.95). Default 0.95.</summary>
+    /// <summary>The confidence level for <see cref="MarginOfError" /> (e.g. 0.95). Default 0.95.</summary>
     public double ConfidenceLevel { get; init; } = 0.95;
 
     /// <summary>Coefficient of variation: <c>StandardDeviation / Mean</c> (0 when mean is 0).</summary>
@@ -51,7 +51,9 @@ public record BenchmarkResult
 
     public static BenchmarkResult CreateErrored(string name, string errorMessage,
         string? description = null, bool isBaseline = false,
-        OutlierMode outlierMode = OutlierMode.RemoveTop5Percent) => new()
+        OutlierMode outlierMode = OutlierMode.RemoveTop5Percent)
+    {
+        return new BenchmarkResult
         {
             Name = name,
             Description = description,
@@ -68,4 +70,5 @@ public record BenchmarkResult
             OutlierMode = outlierMode,
             RunAt = DateTimeOffset.UtcNow,
         };
+    }
 }

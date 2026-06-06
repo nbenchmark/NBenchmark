@@ -14,12 +14,12 @@ public sealed class StatsSummary
     public double StandardError { get; init; }
 
     /// <summary>
-    /// Half-width of the confidence interval on the mean
-    /// (<c>t* × StandardError</c>) at <see cref="ConfidenceLevel"/>.
+    ///     Half-width of the confidence interval on the mean
+    ///     (<c>t* × StandardError</c>) at <see cref="ConfidenceLevel" />.
     /// </summary>
     public double MarginOfError { get; init; }
 
-    /// <summary>The confidence level used to compute <see cref="MarginOfError"/> (e.g. 0.95).</summary>
+    /// <summary>The confidence level used to compute <see cref="MarginOfError" /> (e.g. 0.95).</summary>
     public double ConfidenceLevel { get; init; }
 
     /// <summary>Coefficient of variation: <c>StandardDeviation / Mean</c> (0 when mean is 0).</summary>
@@ -36,6 +36,7 @@ public sealed class StatsSummary
         var mean = samples.Average();
 
         var sumSq = 0.0;
+
         for (var i = 0; i < n; i++)
         {
             var d = samples[i] - mean;
@@ -48,9 +49,11 @@ public sealed class StatsSummary
         var standardError = n > 1 ? sampleStdDev / Math.Sqrt(n) : 0.0;
 
         var marginOfError = 0.0;
+
         if (n > 1)
         {
             var tCritical = StudentT.CriticalValue(confidenceLevel, n - 1);
+
             if (!double.IsNaN(tCritical))
                 marginOfError = tCritical * standardError;
         }

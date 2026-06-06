@@ -1,17 +1,9 @@
 using System.Text.Json;
-using NBenchmark;
 
 namespace NBenchmark.Reporters;
 
 public sealed class JsonReporter : IReporter
 {
-    private readonly string _outputDirectory;
-
-    public JsonReporter(string outputDirectory = ".")
-    {
-        _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
-    }
-
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
@@ -19,6 +11,12 @@ public sealed class JsonReporter : IReporter
     };
 
     private static int _jsonFileCounter;
+    private readonly string _outputDirectory;
+
+    public JsonReporter(string outputDirectory = ".")
+    {
+        _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
+    }
 
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,

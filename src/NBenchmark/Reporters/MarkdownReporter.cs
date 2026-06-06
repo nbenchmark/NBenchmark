@@ -1,5 +1,4 @@
 using System.Text;
-using NBenchmark;
 
 namespace NBenchmark.Reporters;
 
@@ -11,6 +10,7 @@ public sealed class MarkdownReporter : IReporter
     {
         if (outputPath == "benchmark-results.md")
             outputPath = $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}.md";
+
         _outputPath = PathValidation.ValidateOutputPath(outputPath);
     }
 
@@ -24,6 +24,7 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine();
 
         var successful = results.Where(r => !r.Errored).ToList();
+
         if (successful.Count == 0)
         {
             sb.AppendLine("_All benchmarks errored — no results to display._");
@@ -32,14 +33,17 @@ public sealed class MarkdownReporter : IReporter
         }
 
         var headerSource = successful[0];
+
         sb.AppendLine($"_Run at {headerSource.RunAt:yyyy-MM-dd HH:mm:ss} UTC — "
-                    + $"{headerSource.WarmupIterations} warmup / "
-                    + $"{headerSource.MeasuredIterations} measured_");
+                      + $"{headerSource.WarmupIterations} warmup / "
+                      + $"{headerSource.MeasuredIterations} measured_");
+
         sb.AppendLine();
 
         var multiBenchmark = results.Count > 1;
+
         var baseline = successful.FirstOrDefault(r => r.IsBaseline)
-                    ?? successful.MinBy(r => r.Median)!;
+                       ?? successful.MinBy(r => r.Median)!;
 
         sb.AppendLine("| Benchmark | Median | Mean | Error | StdDev | P95 | P99 | Ratio | Sig | Alloc/op |");
         sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
@@ -47,9 +51,12 @@ public sealed class MarkdownReporter : IReporter
         foreach (var result in results.OrderBy(r => r.Median))
         {
             var ratio = result.Errored ? double.NaN : result.Median / baseline.Median;
+
             var sig = result.Errored || !multiBenchmark || result.IsBaseline || !result.IsSignificant.HasValue
                 ? "-"
-                : result.IsSignificant.Value ? "✓" : "~";
+                : result.IsSignificant.Value
+                    ? "✓"
+                    : "~";
 
             var error = result.Errored
                 ? "-"

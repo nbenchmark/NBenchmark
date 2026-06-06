@@ -1,21 +1,21 @@
 namespace NBenchmark.Stats;
 
 /// <summary>
-/// Quantile (inverse CDF) helpers for the standard normal and Student's t
-/// distributions. Used to compute confidence intervals on the mean.
+///     Quantile (inverse CDF) helpers for the standard normal and Student's t
+///     distributions. Used to compute confidence intervals on the mean.
 /// </summary>
 /// <remarks>
-/// These are self-contained numerical approximations — no external dependency.
-/// The normal quantile uses Acklam's rational approximation (|error| &lt; 1.15e-9).
-/// The Student's t quantile uses exact closed forms for 1 and 2 degrees of freedom
-/// and the Cornish-Fisher expansion (Abramowitz &amp; Stegun 26.7.5) for higher df,
-/// which is accurate to &lt; 1% for df ≥ 3 and converges to the normal as df → ∞.
+///     These are self-contained numerical approximations — no external dependency.
+///     The normal quantile uses Acklam's rational approximation (|error| &lt; 1.15e-9).
+///     The Student's t quantile uses exact closed forms for 1 and 2 degrees of freedom
+///     and the Cornish-Fisher expansion (Abramowitz &amp; Stegun 26.7.5) for higher df,
+///     which is accurate to &lt; 1% for df ≥ 3 and converges to the normal as df → ∞.
 /// </remarks>
 public static class StudentT
 {
     /// <summary>
-    /// Two-tailed critical t value for the given confidence level and degrees of freedom.
-    /// For example, <c>CriticalValue(0.95, 199) ≈ 1.97</c>.
+    ///     Two-tailed critical t value for the given confidence level and degrees of freedom.
+    ///     For example, <c>CriticalValue(0.95, 199) ≈ 1.97</c>.
     /// </summary>
     public static double CriticalValue(double confidenceLevel, int degreesOfFreedom)
     {
@@ -28,12 +28,13 @@ public static class StudentT
     }
 
     /// <summary>
-    /// Inverse CDF (quantile) of Student's t-distribution with <paramref name="df"/>
-    /// degrees of freedom at cumulative probability <paramref name="p"/>.
+    ///     Inverse CDF (quantile) of Student's t-distribution with <paramref name="df" />
+    ///     degrees of freedom at cumulative probability <paramref name="p" />.
     /// </summary>
     public static double InverseCdf(double p, int df)
     {
-        if (df < 1 || p is <= 0 or >= 1) return double.NaN;
+        if (df < 1 || p is <= 0 or >= 1)
+            return double.NaN;
 
         // Exact closed forms for the low-df cases where the asymptotic
         // expansion below is least accurate.
@@ -64,13 +65,16 @@ public static class StudentT
     }
 
     /// <summary>
-    /// Inverse CDF (quantile) of the standard normal distribution.
-    /// Peter Acklam's rational approximation; |error| &lt; 1.15e-9.
+    ///     Inverse CDF (quantile) of the standard normal distribution.
+    ///     Peter Acklam's rational approximation; |error| &lt; 1.15e-9.
     /// </summary>
     public static double NormalQuantile(double p)
     {
-        if (p <= 0) return double.NegativeInfinity;
-        if (p >= 1) return double.PositiveInfinity;
+        if (p <= 0)
+            return double.NegativeInfinity;
+
+        if (p >= 1)
+            return double.PositiveInfinity;
 
         const double a1 = -3.969683028665376e+01;
         const double a2 = 2.209460984245205e+02;
@@ -101,9 +105,11 @@ public static class StudentT
         const double pHigh = 1.0 - pLow;
 
         double q, r;
+
         if (p < pLow)
         {
             q = Math.Sqrt(-2.0 * Math.Log(p));
+
             return (((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
                    ((((d1 * q + d2) * q + d3) * q + d4) * q + 1.0);
         }
@@ -112,12 +118,14 @@ public static class StudentT
         {
             q = p - 0.5;
             r = q * q;
+
             return (((((a1 * r + a2) * r + a3) * r + a4) * r + a5) * r + a6) * q /
                    (((((b1 * r + b2) * r + b3) * r + b4) * r + b5) * r + 1.0);
         }
 
         q = Math.Sqrt(-2.0 * Math.Log(1.0 - p));
+
         return -(((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
-                ((((d1 * q + d2) * q + d3) * q + d4) * q + 1.0);
+               ((((d1 * q + d2) * q + d3) * q + d4) * q + 1.0);
     }
 }

@@ -29,10 +29,8 @@ public class BenchmarkStaticTests
     [Fact]
     public async Task RunAsync_Executes_Async_Benchmark()
     {
-        var result = await Benchmark.RunAsync(async () =>
-        {
-            await Task.Delay(1);
-        }, new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None });
+        var result = await Benchmark.RunAsync(async () => { await Task.Delay(1); },
+            new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None });
 
         Assert.Equal("Benchmark", result.Name);
         Assert.True(result.Median > 0);
@@ -67,7 +65,7 @@ public class BenchmarkStaticTests
     {
         var result = Benchmark.Run(() => Thread.SpinWait(100),
             new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None },
-            name: "CustomName");
+            "CustomName");
 
         Assert.Equal("CustomName", result.Name);
     }

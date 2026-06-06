@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
-using NBenchmark;
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
 
@@ -8,24 +7,25 @@ namespace NBenchmark;
 
 public sealed class BenchmarkSuite(string name)
 {
-    /// <summary>The display name of this suite.</summary>
-    public string Name { get; } = name;
-
     private readonly List<(
         string Name,
         Func<Task>? AsyncAction,
         Action? SyncAction,
         Action? Setup,
         Action? Teardown
-    )> _benchmarks = [];
+        )> _benchmarks = [];
+
     private readonly List<IReporter> _reporters = [];
+    private string? _baselineName;
+    private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
-    private MeasurementOptions _options = MeasurementOptions.Default;
     private RunOrder _runOrder = RunOrder.Random;
-    private string? _baselineName;
     private Action? _suiteSetup;
     private Action? _suiteTeardown;
+
+    /// <summary>The display name of this suite.</summary>
+    public string Name { get; } = name;
 
     public BenchmarkSuite Add(string name, Action action,
         Action? setup = null, Action? teardown = null)
@@ -62,47 +62,86 @@ public sealed class BenchmarkSuite(string name)
     private void EnsureUniqueName(string name)
     {
         if (_benchmarks.Any(b => b.Name == name))
+        {
             throw new ArgumentException(
                 $"A benchmark named '{name}' has already been added to the suite. " +
                 "Benchmark names must be unique — significance testing keys raw samples by name.",
                 nameof(name));
+        }
     }
 
     public BenchmarkSuite WithBaseline(string name)
-    { _baselineName = name; return this; }
+    {
+        _baselineName = name;
+        return this;
+    }
 
     public BenchmarkSuite WithIterations(int iterations)
-    { _options = _options with { Iterations = iterations }; return this; }
+    {
+        _options = _options with { Iterations = iterations };
+        return this;
+    }
 
     public BenchmarkSuite WithWarmup(int iterations)
-    { _options = _options with { WarmupIterations = iterations }; return this; }
+    {
+        _options = _options with { WarmupIterations = iterations };
+        return this;
+    }
 
     public BenchmarkSuite WithMemory(bool enabled = true)
-    { _options = _options with { MeasureAllocations = enabled }; return this; }
+    {
+        _options = _options with { MeasureAllocations = enabled };
+        return this;
+    }
 
     public BenchmarkSuite WithOutlierMode(OutlierMode mode)
-    { _options = _options with { OutlierMode = mode }; return this; }
+    {
+        _options = _options with { OutlierMode = mode };
+        return this;
+    }
 
     public BenchmarkSuite WithConfidenceLevel(double level)
-    { _options = _options with { ConfidenceLevel = level }; return this; }
+    {
+        _options = _options with { ConfidenceLevel = level };
+        return this;
+    }
 
     public BenchmarkSuite WithSignificance(bool enabled)
-    { _options = _options with { EnableSignificance = enabled }; return this; }
+    {
+        _options = _options with { EnableSignificance = enabled };
+        return this;
+    }
 
     public BenchmarkSuite WithRunOrder(RunOrder order)
-    { _runOrder = order; return this; }
+    {
+        _runOrder = order;
+        return this;
+    }
 
     public BenchmarkSuite WithSuiteSetup(Action setup)
-    { _suiteSetup = setup; return this; }
+    {
+        _suiteSetup = setup;
+        return this;
+    }
 
     public BenchmarkSuite WithSuiteTeardown(Action teardown)
-    { _suiteTeardown = teardown; return this; }
+    {
+        _suiteTeardown = teardown;
+        return this;
+    }
 
     public BenchmarkSuite WithReporter(IReporter reporter)
-    { _reporters.Add(reporter); return this; }
+    {
+        _reporters.Add(reporter);
+        return this;
+    }
 
     public BenchmarkSuite WithProgress(IBenchmarkProgress progress)
-    { _progress = progress; _progressExplicitlySet = true; return this; }
+    {
+        _progress = progress;
+        _progressExplicitlySet = true;
+        return this;
+    }
 
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(
         CancellationToken cancellationToken = default)
@@ -111,9 +150,11 @@ public sealed class BenchmarkSuite(string name)
             _progress = NullBenchmarkProgress.Instance;
 
         if (_baselineName is not null && !_benchmarks.Any(b => b.Name == _baselineName))
+        {
             throw new InvalidOperationException(
                 $"Baseline '{_baselineName}' was not found in the suite. Registered names: " +
                 string.Join(", ", _benchmarks.Select(b => b.Name)));
+        }
 
         var ordered = _runOrder == RunOrder.Random
             ? ShuffleBenchmarks(_benchmarks.ToList(), Random.Shared.Next())
@@ -141,12 +182,13 @@ public sealed class BenchmarkSuite(string name)
             try
             {
                 MeasurementOutcome outcome;
+
                 if (syncAction is not null)
                 {
                     outcome = MeasurementEngine.MeasureSync(
-                        name: benchmarkName,
-                        action: syncAction,
-                        options: _options,
+                        benchmarkName,
+                        syncAction,
+                        _options,
                         isBaseline: _baselineName is not null && benchmarkName == _baselineName,
                         iterationSetup: setup,
                         iterationTeardown: teardown,
@@ -156,9 +198,9 @@ public sealed class BenchmarkSuite(string name)
                 else
                 {
                     outcome = await MeasurementEngine.MeasureAsync(
-                        name: benchmarkName,
-                        action: asyncAction!,
-                        options: _options,
+                        benchmarkName,
+                        asyncAction!,
+                        _options,
                         isBaseline: _baselineName is not null && benchmarkName == _baselineName,
                         iterationSetup: setup,
                         iterationTeardown: teardown,
@@ -171,17 +213,22 @@ public sealed class BenchmarkSuite(string name)
 
                 await _progress.OnWarmupCompleted(benchmarkName);
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (TargetInvocationException tiex)
             {
                 var inner = tiex.InnerException ?? tiex;
                 var isBaseline = _baselineName is not null && benchmarkName == _baselineName;
+
                 result = BenchmarkResult.CreateErrored(benchmarkName, inner.ToString(),
                     isBaseline: isBaseline, outlierMode: _options.OutlierMode);
             }
             catch (Exception ex)
             {
                 var isBaseline = _baselineName is not null && benchmarkName == _baselineName;
+
                 result = BenchmarkResult.CreateErrored(benchmarkName, ex.ToString(),
                     isBaseline: isBaseline, outlierMode: _options.OutlierMode);
             }
@@ -191,7 +238,7 @@ public sealed class BenchmarkSuite(string name)
 
             if (_options.ForceGcBetweenBenchmarks)
             {
-                GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+                GC.Collect(2, GCCollectionMode.Forced, true, true);
                 GC.WaitForPendingFinalizers();
             }
         }
@@ -204,7 +251,9 @@ public sealed class BenchmarkSuite(string name)
             Significance.ComputeSignificance(results, rawSamples);
 
         foreach (var reporter in _reporters)
+        {
             await reporter.ReportAsync(results, cancellationToken);
+        }
 
         return results;
     }
@@ -213,11 +262,13 @@ public sealed class BenchmarkSuite(string name)
     {
         var rng = new Random(seed);
         var span = CollectionsMarshal.AsSpan(items);
+
         for (var i = span.Length - 1; i > 0; i--)
         {
             var j = rng.Next(i + 1);
             (span[i], span[j]) = (span[j], span[i]);
         }
+
         return items;
     }
 }

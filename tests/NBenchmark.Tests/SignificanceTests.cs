@@ -1,4 +1,3 @@
-using NBenchmark.Stats;
 using Xunit;
 
 namespace NBenchmark.Tests;

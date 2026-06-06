@@ -27,12 +27,12 @@ public static class MeasurementEngine
             iterationTeardown?.Invoke();
         }
 
-        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.Collect(2, GCCollectionMode.Forced, true, true);
         GC.WaitForPendingFinalizers();
-        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.Collect(2, GCCollectionMode.Forced, true, true);
 
         var timings = new double[options.Iterations];
-        long[]? allocations = options.MeasureAllocations ? new long[options.Iterations] : null;
+        var allocations = options.MeasureAllocations ? new long[options.Iterations] : null;
 
         for (var i = 0; i < options.Iterations; i++)
         {
@@ -44,8 +44,9 @@ public static class MeasurementEngine
             iterationSetup?.Invoke();
 
             long allocBefore = 0;
+
             if (options.MeasureAllocations)
-                allocBefore = GC.GetTotalAllocatedBytes(precise: false);
+                allocBefore = GC.GetTotalAllocatedBytes();
 
             var timestamp = Stopwatch.GetTimestamp();
             action();
@@ -53,7 +54,7 @@ public static class MeasurementEngine
 
             if (options.MeasureAllocations && allocations is not null)
             {
-                var allocAfter = GC.GetTotalAllocatedBytes(precise: false);
+                var allocAfter = GC.GetTotalAllocatedBytes();
                 allocations[i] = Math.Max(0, allocAfter - allocBefore);
             }
 
@@ -100,7 +101,7 @@ public static class MeasurementEngine
                 TotalDuration = totalTimer.Elapsed,
                 IsBaseline = isBaseline,
                 OutlierMode = options.OutlierMode,
-            }
+            },
         };
     }
 
@@ -160,7 +161,7 @@ public static class MeasurementEngine
                 TotalDuration = totalTimer.Elapsed,
                 IsBaseline = isBaseline,
                 OutlierMode = options.OutlierMode,
-            }
+            },
         };
     }
 
@@ -176,6 +177,7 @@ public static class MeasurementEngine
     {
         var outcome = MeasureSync(name, action, options, description, isBaseline,
             iterationSetup, iterationTeardown, cancellationToken);
+
         return Task.FromResult(outcome);
     }
 
@@ -194,9 +196,9 @@ public static class MeasurementEngine
             iterationTeardown?.Invoke();
         }
 
-        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.Collect(2, GCCollectionMode.Forced, true, true);
         GC.WaitForPendingFinalizers();
-        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.Collect(2, GCCollectionMode.Forced, true, true);
     }
 
     private static async Task<(double[] Timings, long[]? Allocations)> CollectSamplesAsync(
@@ -207,7 +209,7 @@ public static class MeasurementEngine
         CancellationToken cancellationToken)
     {
         var timings = new double[options.Iterations];
-        long[]? allocations = options.MeasureAllocations ? new long[options.Iterations] : null;
+        var allocations = options.MeasureAllocations ? new long[options.Iterations] : null;
 
         for (var i = 0; i < options.Iterations; i++)
         {
@@ -219,8 +221,9 @@ public static class MeasurementEngine
             iterationSetup?.Invoke();
 
             long allocBefore = 0;
+
             if (options.MeasureAllocations)
-                allocBefore = GC.GetTotalAllocatedBytes(precise: false);
+                allocBefore = GC.GetTotalAllocatedBytes();
 
             var timestamp = Stopwatch.GetTimestamp();
             await action();
@@ -228,7 +231,7 @@ public static class MeasurementEngine
 
             if (options.MeasureAllocations && allocations is not null)
             {
-                var allocAfter = GC.GetTotalAllocatedBytes(precise: false);
+                var allocAfter = GC.GetTotalAllocatedBytes();
                 allocations[i] = Math.Max(0, allocAfter - allocBefore);
             }
 
@@ -243,7 +246,7 @@ public static class MeasurementEngine
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ForceGen0Collection()
     {
-        GC.Collect(0, GCCollectionMode.Forced, blocking: true);
+        GC.Collect(0, GCCollectionMode.Forced, true);
     }
 
     private static double[] ApplyOutlierMode(double[] timings, OutlierMode mode)

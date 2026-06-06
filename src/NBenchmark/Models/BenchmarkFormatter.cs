@@ -2,18 +2,24 @@ namespace NBenchmark;
 
 public static class BenchmarkFormatter
 {
-    public static string FormatNs(double ns) => ns switch
+    public static string FormatNs(double ns)
     {
-        < 1_000              => $"{ns:F1} ns",
-        < 1_000_000          => $"{ns / 1_000:F2} µs",
-        < 1_000_000_000      => $"{ns / 1_000_000:F2} ms",
-        _                    => $"{ns / 1_000_000_000:F2} s",
-    };
+        return ns switch
+        {
+            < 1_000 => $"{ns:F1} ns",
+            < 1_000_000 => $"{ns / 1_000:F2} µs",
+            < 1_000_000_000 => $"{ns / 1_000_000:F2} ms",
+            _ => $"{ns / 1_000_000_000:F2} s",
+        };
+    }
 
-    public static string FormatBytes(long bytes) => bytes switch
+    public static string FormatBytes(long bytes)
     {
-        < 1024               => $"{bytes} B",
-        < 1024 * 1024        => $"{bytes / 1024.0:F1} KB",
-        _                    => $"{bytes / (1024.0 * 1024):F1} MB",
-    };
+        return bytes switch
+        {
+            < 1024 => $"{bytes} B",
+            < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+            _ => $"{bytes / (1024.0 * 1024):F1} MB",
+        };
+    }
 }

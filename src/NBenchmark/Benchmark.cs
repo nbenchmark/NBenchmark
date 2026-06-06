@@ -1,4 +1,3 @@
-using NBenchmark;
 using NBenchmark.Engine;
 
 namespace NBenchmark;
@@ -24,6 +23,7 @@ public static class Benchmark
         var outcome = MeasurementEngine.MeasureSync(name,
             () => ResultSink.Consume(action()),
             options, cancellationToken: cancellationToken);
+
         return outcome.Result;
     }
 
@@ -48,6 +48,7 @@ public static class Benchmark
             async () => ResultSink.Consume(await action()),
             options,
             cancellationToken: cancellationToken);
+
         return outcome.Result;
     }
 
@@ -59,6 +60,4 @@ public static class Benchmark
     {
         return MeasurementEngine.MeasureSync(name, action, options, cancellationToken: cancellationToken);
     }
-
-
 }

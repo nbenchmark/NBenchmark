@@ -1,5 +1,3 @@
-using NBenchmark;
-
 namespace NBenchmark.Reporters;
 
 public interface IReporter

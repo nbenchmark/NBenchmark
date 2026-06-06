@@ -1,9 +1,9 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using NBenchmark;
-using NBenchmark.Engine;
 using NBenchmark.Discovery;
+using NBenchmark.Engine;
 using NBenchmark.Reporters;
 
 namespace NBenchmark;
@@ -12,19 +12,21 @@ public sealed class BenchmarkHost
 {
     private readonly List<Assembly> _assemblies = [];
     private readonly List<IReporter> _reporters = [];
+    private bool _dryRun;
+    private string? _filter;
+    private bool _listOnly;
+    private MeasurementOptions _options = MeasurementOptions.Default;
+    private string? _outputDir;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
-    private MeasurementOptions _options = MeasurementOptions.Default;
     private RunOrder _runOrder = RunOrder.Random;
-    private string? _filter;
-    private string? _outputDir;
-    private bool _listOnly;
-    private bool _dryRun;
+    private int? _seed;
     private bool _showHelp;
     private bool _thresholdRejected;
-    private int? _seed;
 
-    private BenchmarkHost() { }
+    private BenchmarkHost()
+    {
+    }
 
     public static BenchmarkHost Create(string[] args)
     {
@@ -58,17 +60,29 @@ public sealed class BenchmarkHost
     }
 
     public BenchmarkHost WithRunOrder(RunOrder order)
-    { _runOrder = order; return this; }
+    {
+        _runOrder = order;
+        return this;
+    }
 
     public BenchmarkHost WithProgress(IBenchmarkProgress progress)
-    { _progress = progress; _progressExplicitlySet = true; return this; }
+    {
+        _progress = progress;
+        _progressExplicitlySet = true;
+        return this;
+    }
 
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
     {
-        if (_showHelp) { PrintHelp(); return Array.Empty<BenchmarkResult>(); }
+        if (_showHelp)
+        {
+            PrintHelp();
+            return Array.Empty<BenchmarkResult>();
+        }
 
         Console.WriteLine($"Timer resolution: {Stopwatch.Frequency:N0} ticks/s "
-                        + $"({1_000_000_000.0 / Stopwatch.Frequency:F2} ns per tick)");
+                          + $"({1_000_000_000.0 / Stopwatch.Frequency:F2} ns per tick)");
+
         Console.WriteLine();
 
         var discoverer = new BenchmarkDiscoverer();
@@ -87,10 +101,14 @@ public sealed class BenchmarkHost
             foreach (var suite in filtered)
             {
                 Console.WriteLine($"── {suite.Type.Name} ──");
+
                 foreach (var b in suite.Benchmarks)
+                {
                     Console.WriteLine($"    {b.DisplayName}"
-                        + (b.Attribute.Description is not null ? $" — {b.Attribute.Description}" : ""));
+                                      + (b.Attribute.Description is not null ? $" — {b.Attribute.Description}" : ""));
+                }
             }
+
             return Array.Empty<BenchmarkResult>();
         }
 
@@ -110,6 +128,7 @@ public sealed class BenchmarkHost
         foreach (var suite in filtered)
         {
             object? instance = null;
+
             try
             {
                 instance = Activator.CreateInstance(suite.Type);
@@ -117,9 +136,10 @@ public sealed class BenchmarkHost
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Console.WriteLine($"[Error] Could not instantiate {suite.Type.Name} — "
-                    + "the type must have a public parameterless constructor, or be internal with "
-                    + "a public constructor and InternalsVisibleTo. "
-                    + $"Details: {ex.Message}");
+                                  + "the type must have a public parameterless constructor, or be internal with "
+                                  + "a public constructor and InternalsVisibleTo. "
+                                  + $"Details: {ex.Message}");
+
                 continue;
             }
 
@@ -133,13 +153,16 @@ public sealed class BenchmarkHost
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Console.WriteLine($"[Error] Setup failed for {suite.Type.Name}: {ex.Message}");
+
                 foreach (var b in suite.Benchmarks)
                 {
                     var name = $"{suite.Type.Name}.{b.Method.Name}";
+
                     allResults.Add(BenchmarkResult.CreateErrored(name,
                         $"Suite setup failed: {ex.Message}", b.Attribute.Description,
                         b.Attribute.Baseline, _options.OutlierMode));
                 }
+
                 continue;
             }
 
@@ -165,13 +188,14 @@ public sealed class BenchmarkHost
 
                     try
                     {
-
                         Action? syncAction = null;
                         Func<Task>? asyncAction = null;
+
                         if (benchmark.AsyncDelegate is not null)
                         {
                             var asyncDel = benchmark.AsyncDelegate;
                             var resultExtractor = benchmark.ResultExtractor;
+
                             asyncAction = async () =>
                             {
                                 var task = asyncDel(typedInstance);
@@ -180,6 +204,7 @@ public sealed class BenchmarkHost
                                 if (resultExtractor is not null)
                                 {
                                     var resultValue = resultExtractor(task);
+
                                     if (resultValue is not null)
                                         ResultSink.Consume(resultValue);
                                 }
@@ -188,24 +213,31 @@ public sealed class BenchmarkHost
                         else
                         {
                             var syncDel = benchmark.SyncDelegate!;
+
                             syncAction = () =>
                             {
                                 var r = syncDel(typedInstance);
-                                if (r is not null) ResultSink.Consume(r);
+
+                                if (r is not null)
+                                    ResultSink.Consume(r);
                             };
                         }
 
                         Action? iterSetup = benchmark.IterationSetupDelegate is not null
                             ? () => benchmark.IterationSetupDelegate(typedInstance)
                             : null;
+
                         Action? iterTeardown = benchmark.IterationTeardownDelegate is not null
                             ? () => benchmark.IterationTeardownDelegate(typedInstance)
                             : null;
 
                         if (_dryRun)
                         {
-                            if (syncAction is not null) syncAction();
-                            else await asyncAction!();
+                            if (syncAction is not null)
+                                syncAction();
+                            else
+                                await asyncAction!();
+
                             result = new BenchmarkResult
                             {
                                 Name = benchmarkName,
@@ -233,40 +265,46 @@ public sealed class BenchmarkHost
                         else if (syncAction is not null)
                         {
                             var outcome = MeasurementEngine.MeasureSync(
-                                name: benchmarkName,
-                                action: syncAction,
-                                options: options,
-                                description: benchmark.Attribute.Description,
-                                isBaseline: benchmark.Attribute.Baseline,
-                                iterationSetup: iterSetup,
-                                iterationTeardown: iterTeardown,
-                                cancellationToken: cancellationToken
+                                benchmarkName,
+                                syncAction,
+                                options,
+                                benchmark.Attribute.Description,
+                                benchmark.Attribute.Baseline,
+                                iterSetup,
+                                iterTeardown,
+                                cancellationToken
                             );
+
                             result = outcome.Result;
                             rawSamples[benchmarkName] = outcome.RawSamples;
                         }
                         else
                         {
                             var outcome = await MeasurementEngine.MeasureAsync(
-                                name: benchmarkName,
-                                action: asyncAction!,
-                                options: options,
-                                description: benchmark.Attribute.Description,
-                                isBaseline: benchmark.Attribute.Baseline,
-                                iterationSetup: iterSetup,
-                                iterationTeardown: iterTeardown,
-                                cancellationToken: cancellationToken
+                                benchmarkName,
+                                asyncAction!,
+                                options,
+                                benchmark.Attribute.Description,
+                                benchmark.Attribute.Baseline,
+                                iterSetup,
+                                iterTeardown,
+                                cancellationToken
                             );
+
                             result = outcome.Result;
                             rawSamples[benchmarkName] = outcome.RawSamples;
                         }
 
                         await _progress.OnWarmupCompleted(benchmarkName);
                     }
-                    catch (OperationCanceledException) { throw; }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
                     catch (TargetInvocationException tiex)
                     {
                         var inner = tiex.InnerException ?? tiex;
+
                         result = BenchmarkResult.CreateErrored(benchmarkName, inner.ToString(),
                             benchmark.Attribute.Description, benchmark.Attribute.Baseline,
                             _options.OutlierMode);
@@ -283,7 +321,7 @@ public sealed class BenchmarkHost
 
                     if (_options.ForceGcBetweenBenchmarks)
                     {
-                        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+                        GC.Collect(2, GCCollectionMode.Forced, true, true);
                         GC.WaitForPendingFinalizers();
                     }
                 }
@@ -310,7 +348,9 @@ public sealed class BenchmarkHost
             ApplyOutputDirectory(_outputDir);
 
         foreach (var reporter in _reporters)
+        {
             await reporter.ReportAsync(allResults, cancellationToken);
+        }
 
         // Set the exit code only after reporters finish so a reporter failure cannot
         // clobber it. --threshold-pct is deliberately rejected (not silently accepted)
@@ -338,7 +378,8 @@ public sealed class BenchmarkHost
     private IReadOnlyList<BenchmarkSuiteDefinition> FilterSuites(
         IReadOnlyList<BenchmarkSuiteDefinition> suites)
     {
-        if (_filter is null) return suites;
+        if (_filter is null)
+            return suites;
 
         return suites
             .Select(s => s with
@@ -346,7 +387,7 @@ public sealed class BenchmarkHost
                 Benchmarks = s.Benchmarks
                     .Where(b => GlobMatch(_filter,
                         $"{s.Type.Name}.{b.DisplayName}"))
-                    .ToList()
+                    .ToList(),
             })
             .Where(s => s.Benchmarks.Count > 0)
             .ToList();
@@ -354,33 +395,43 @@ public sealed class BenchmarkHost
 
     private static bool GlobMatch(string pattern, string input)
     {
-        if (pattern == "*") return true;
+        if (pattern == "*")
+            return true;
 
         var parts = pattern.Split('*');
-        if (parts.Length == 0) return true;
+
+        if (parts.Length == 0)
+            return true;
 
         var remaining = input;
 
         if (!pattern.StartsWith("*"))
         {
             var first = parts[0];
+
             if (!remaining.StartsWith(first, StringComparison.OrdinalIgnoreCase))
                 return false;
+
             remaining = remaining[first.Length..];
         }
 
         for (var i = pattern.StartsWith("*") ? 0 : 1; i < parts.Length; i++)
         {
             var part = parts[i];
+
             if (i == parts.Length - 1 && !pattern.EndsWith("*"))
             {
                 if (!remaining.EndsWith(part, StringComparison.OrdinalIgnoreCase))
                     return false;
+
                 break;
             }
 
             var idx = remaining.IndexOf(part, StringComparison.OrdinalIgnoreCase);
-            if (idx < 0) return false;
+
+            if (idx < 0)
+                return false;
+
             remaining = remaining[(idx + part.Length)..];
         }
 
@@ -391,11 +442,13 @@ public sealed class BenchmarkHost
     {
         var rng = new Random(seed);
         var span = CollectionsMarshal.AsSpan(items);
+
         for (var i = span.Length - 1; i > 0; i--)
         {
             var j = rng.Next(i + 1);
             (span[i], span[j]) = (span[j], span[i]);
         }
+
         return items;
     }
 
@@ -436,13 +489,16 @@ public sealed class BenchmarkHost
                         && iters <= MeasurementOptions.MaxIterations)
                         _options = _options with { Iterations = iters };
                     else
-                        Console.WriteLine($"Invalid --iterations value '{args[i]}'. Must be {MeasurementOptions.MinIterations}–{MeasurementOptions.MaxIterations}.");
+                        Console.WriteLine(
+                            $"Invalid --iterations value '{args[i]}'. Must be {MeasurementOptions.MinIterations}–{MeasurementOptions.MaxIterations}.");
+
                     break;
                 case "--warmup" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var warmup) && warmup >= 1 && warmup <= MeasurementOptions.MaxWarmupIterations)
                         _options = _options with { WarmupIterations = warmup };
                     else
                         Console.WriteLine($"Invalid --warmup value '{args[i]}'. Must be 1–{MeasurementOptions.MaxWarmupIterations}.");
+
                     break;
                 case "--output" when i + 1 < args.Length:
                     _outputDir = PathValidation.ValidateOutputPath(args[++i]);
@@ -450,9 +506,15 @@ public sealed class BenchmarkHost
                 case "--reporter" when i + 1 < args.Length:
                     switch (args[++i]?.ToLowerInvariant())
                     {
-                        case "json": _reporters.Add(new JsonReporter()); break;
-                        case "markdown": _reporters.Add(new MarkdownReporter()); break;
-                        case "csv": _reporters.Add(new CsvReporter()); break;
+                        case "json":
+                            _reporters.Add(new JsonReporter());
+                            break;
+                        case "markdown":
+                            _reporters.Add(new MarkdownReporter());
+                            break;
+                        case "csv":
+                            _reporters.Add(new CsvReporter());
+                            break;
                         case "console":
                             Console.WriteLine("The 'console' reporter requires the NBenchmark.Console package.");
                             Console.WriteLine("Add the NBenchmark.Console NuGet package and use AddReporter(new ConsoleReporter()).");
@@ -461,23 +523,27 @@ public sealed class BenchmarkHost
                             Console.WriteLine($"Unknown reporter: '{args[i]}'. Valid: json, markdown, csv (console requires NBenchmark.Console package)");
                             break;
                     }
+
                     break;
                 case "--confidence" when i + 1 < args.Length:
-                    if (double.TryParse(args[++i], System.Globalization.CultureInfo.InvariantCulture, out var conf)
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var conf)
                         && conf is > 0 and < 1)
                         _options = _options with { ConfidenceLevel = conf };
                     else
                         Console.WriteLine($"Invalid --confidence value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.95).");
+
                     break;
                 case "--order" when i + 1 < args.Length:
                     _runOrder = args[++i]?.ToLowerInvariant() == "declaration"
                         ? RunOrder.Declaration
                         : RunOrder.Random;
+
                     break;
                 case "--threshold-pct" when i + 1 < args.Length:
                     Console.Error.WriteLine(
                         "--threshold-pct is not yet implemented. Remove the flag to continue; "
                         + "the run will exit with code 1 until it ships.");
+
                     _thresholdRejected = true;
                     i++;
                     break;
@@ -486,6 +552,7 @@ public sealed class BenchmarkHost
                         _seed = seed;
                     else
                         Console.WriteLine($"Invalid --seed value '{args[i]}'. Must be an integer.");
+
                     break;
                 case "--list":
                     _listOnly = true;

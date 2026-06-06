@@ -11,8 +11,14 @@ await BenchmarkHost.Create(args)
 public class HostBenchmarks
 {
     [Benchmark]
-    public int Compute() => 42;
+    public int Compute()
+    {
+        return 42;
+    }
 
     [Benchmark(Baseline = true)]
-    public int Baseline() => 1;
+    public int Baseline()
+    {
+        return 1;
+    }
 }

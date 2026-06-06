@@ -1,13 +1,12 @@
-using global::NBenchmark;
 using Spectre.Console;
 
 namespace NBenchmark.Console;
 
 public class ConsoleBenchmarkProgress : IBenchmarkProgress
 {
-    private int _suiteTotal;
-    private string? _suiteOptions;
+    private readonly string? _suiteOptions;
     private string? _currentName;
+    private int _suiteTotal;
 
     public ConsoleBenchmarkProgress(int iterations, int warmupIterations)
     {
@@ -53,6 +52,8 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         return Task.CompletedTask;
     }
 
-    private static string EscapeMarkup(string? text) =>
-        text?.Replace("[", "[[").Replace("]", "]]") ?? "";
+    private static string EscapeMarkup(string? text)
+    {
+        return text?.Replace("[", "[[").Replace("]", "]]") ?? "";
+    }
 }

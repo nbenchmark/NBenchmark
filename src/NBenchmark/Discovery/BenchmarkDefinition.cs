@@ -18,9 +18,9 @@ public sealed record BenchmarkMethodDefinition(
     private readonly string? _displayName;
 
     /// <summary>
-    /// The name used in output and filtering. Defaults to the method name, but for
-    /// parameterised benchmarks it is <c>Method(arg1, arg2, ...)</c> so each argument
-    /// set is distinguishable.
+    ///     The name used in output and filtering. Defaults to the method name, but for
+    ///     parameterised benchmarks it is <c>Method(arg1, arg2, ...)</c> so each argument
+    ///     set is distinguishable.
     /// </summary>
     public string DisplayName
     {
