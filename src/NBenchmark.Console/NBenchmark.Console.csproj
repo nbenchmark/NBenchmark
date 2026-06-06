@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>NBenchmark.Console</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.49.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NBenchmark\NBenchmark.csproj" />
+  </ItemGroup>
+
+</Project>

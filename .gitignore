@@ -48,10 +48,19 @@ CodeCoverage/
 *.binlog
 
 # MSTest test Results
-[Tt]est[Rr]esult*/
-[Bb]uild[Ll]og.*
+[TestRr]esult*/
+[BuildLl]og.*
 
 # NUnit
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# IDE / OS
+.DS_Store
+.idea/
+.vs/
+src/NBenchmark/.DS_Store
+/src/NBenchmark/.idea
+/.idea
+.DS_Store
