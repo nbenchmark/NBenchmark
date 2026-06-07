@@ -39,7 +39,9 @@ public class OutcomeBuilderTests
         var measured = TimeSpan.FromMilliseconds(7);
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(stats, MeasuredIterations: 3, allocations, rawTimings),
+            new OutcomeInput.Success(
+                new PipelineResult(stats, MeasuredIterations: 3, MeanAllocatedBytes: (long)allocations.Average()),
+                rawTimings),
             "bench",
             "desc",
             isBaseline: true,
@@ -82,7 +84,9 @@ public class OutcomeBuilderTests
         var allocations = new long[] { 100, 200, 300, 400 };
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(stats, 4, allocations, [1, 2, 3, 4]),
+            new OutcomeInput.Success(
+                new PipelineResult(stats, 4, MeanAllocatedBytes: (long)allocations.Average()),
+                [1, 2, 3, 4]),
             "b", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
@@ -97,7 +101,9 @@ public class OutcomeBuilderTests
         var stats = new StatsSummary { Mean = 1 };
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(stats, 3, Allocations: null, [1, 2, 3]),
+            new OutcomeInput.Success(
+                new PipelineResult(stats, 3, MeanAllocatedBytes: null),
+                [1, 2, 3]),
             "b", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
@@ -113,7 +119,9 @@ public class OutcomeBuilderTests
         var options = new MeasurementOptions { ConfidenceLevel = 0.99 };
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(stats, 1, null, [1]),
+            new OutcomeInput.Success(
+                new PipelineResult(stats, 1, MeanAllocatedBytes: null),
+                [1]),
             "b", null, false,
             options,
             TimeSpan.FromMilliseconds(1),
@@ -129,7 +137,9 @@ public class OutcomeBuilderTests
         var before = DateTimeOffset.UtcNow.AddSeconds(-1);
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(stats, 1, null, [1]),
+            new OutcomeInput.Success(
+                new PipelineResult(stats, 1, MeanAllocatedBytes: null),
+                [1]),
             "b", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),

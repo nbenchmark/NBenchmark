@@ -1,5 +1,3 @@
-using NBenchmark.Stats;
-
 namespace NBenchmark.Engine;
 
 /// <summary>
@@ -10,7 +8,7 @@ namespace NBenchmark.Engine;
 /// </summary>
 internal abstract record OutcomeInput
 {
-    public sealed record Success(StatsSummary Stats, int MeasuredIterations, long[]? Allocations, double[] RawTimings) : OutcomeInput;
+    public sealed record Success(PipelineResult Result, double[] RawTimings) : OutcomeInput;
 
     public sealed record DryRun : OutcomeInput;
 

@@ -28,9 +28,9 @@ internal static class OutcomeBuilder
         {
             OutcomeInput.Success s => Build(
                 name, description, isBaseline, options,
-                stats: s.Stats,
-                measuredIterations: s.MeasuredIterations,
-                allocations: s.Allocations,
+                stats: s.Result.Stats,
+                measuredIterations: s.Result.MeasuredIterations,
+                meanAllocatedBytes: s.Result.MeanAllocatedBytes,
                 rawSamples: s.RawTimings,
                 errored: false,
                 errorMessage: null,
@@ -41,7 +41,7 @@ internal static class OutcomeBuilder
                 name, description, isBaseline, options,
                 stats: null,
                 measuredIterations: 0,
-                allocations: null,
+                meanAllocatedBytes: null,
                 rawSamples: [],
                 errored: false,
                 errorMessage: null,
@@ -52,12 +52,14 @@ internal static class OutcomeBuilder
                 name, description, isBaseline, options,
                 stats: null,
                 measuredIterations: 0,
-                allocations: null,
+                meanAllocatedBytes: null,
                 rawSamples: [],
                 errored: true,
                 errorMessage: e.ErrorMessageOverride ?? Unwrap(e.Error).ToString(),
                 totalDuration,
                 measuredDuration),
+
+            _ => throw new ArgumentOutOfRangeException(nameof(input), input, "Unknown OutcomeInput case."),
         };
     }
 
@@ -68,7 +70,7 @@ internal static class OutcomeBuilder
         MeasurementOptions options,
         StatsSummary? stats,
         int measuredIterations,
-        long[]? allocations,
+        long? meanAllocatedBytes,
         double[] rawSamples,
         bool errored,
         string? errorMessage,
@@ -93,7 +95,7 @@ internal static class OutcomeBuilder
                 MarginOfError = stats?.MarginOfError ?? 0,
                 ConfidenceLevel = options.ConfidenceLevel,
                 CoefficientOfVariation = stats?.CoefficientOfVariation ?? 0,
-                MeanAllocatedBytes = allocations is not null ? (long)allocations.Average() : null,
+                MeanAllocatedBytes = meanAllocatedBytes,
                 PValue = null,
                 IsSignificant = null,
                 Errored = errored,
