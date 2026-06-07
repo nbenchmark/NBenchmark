@@ -59,6 +59,10 @@ public sealed class ConsoleReporter : IReporter
         var baseline = successful.FirstOrDefault(r => r.IsBaseline)
                        ?? successful.MinBy(r => r.Median)!;
 
+        // Sum the end-to-end TotalDuration across all entries. Errored entries
+        // produced by suite-setup failures contribute 0 (no per-benchmark timer was
+        // started); errored entries produced by the runner contribute the real
+        // wall-clock cost up to the throw.
         var totalDuration = results.Aggregate(TimeSpan.Zero, (a, r) => a + r.TotalDuration);
 
         foreach (var result in results.OrderBy(r => r.Median))

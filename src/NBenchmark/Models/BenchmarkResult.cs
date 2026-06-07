@@ -45,13 +45,34 @@ public record BenchmarkResult
     public int MeasuredIterations { get; init; }
     public int WarmupIterations { get; init; }
     public DateTimeOffset RunAt { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    ///     End-to-end wall-clock cost of running this benchmark entry, including warmup,
+    ///     pre-measure <see cref="GC.Collect" />, and the measured loop. Stopped at the
+    ///     end of the measured loop, so it excludes outlier-trim and stats compute
+    ///     (microseconds, not a useful run-budget signal). Populated uniformly across
+    ///     success, dry-run, and errored paths; <see cref="TimeSpan.Zero" /> is reserved
+    ///     for failure sites that did not start a per-benchmark timer (e.g. suite setup).
+    /// </summary>
     public TimeSpan TotalDuration { get; init; } = TimeSpan.Zero;
+
+    /// <summary>
+    ///     Wall-clock cost of the measured loop only, including per-iteration
+    ///     <c>IterationSetup</c> / <c>IterationTeardown</c>, per-iteration
+    ///     <see cref="GC.Collect" />, and allocation-tracking work. Excludes warmup
+    ///     and the pre-measure <see cref="GC.Collect" />. Always
+    ///     <see cref="TimeSpan.Zero" /> when no measured loop ran (dry-run, errored
+    ///     before measurement).
+    /// </summary>
+    public TimeSpan MeasuredDuration { get; init; } = TimeSpan.Zero;
+
     public bool IsBaseline { get; init; }
     public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
 
     public static BenchmarkResult CreateErrored(string name, string errorMessage,
         string? description = null, bool isBaseline = false,
-        OutlierMode outlierMode = OutlierMode.RemoveTop5Percent)
+        OutlierMode outlierMode = OutlierMode.RemoveTop5Percent,
+        TimeSpan totalDuration = default, TimeSpan measuredDuration = default)
     {
         return new BenchmarkResult
         {
@@ -69,6 +90,8 @@ public record BenchmarkResult
             IsBaseline = isBaseline,
             OutlierMode = outlierMode,
             RunAt = DateTimeOffset.UtcNow,
+            TotalDuration = totalDuration,
+            MeasuredDuration = measuredDuration,
         };
     }
 }

@@ -49,14 +49,17 @@ public sealed class BenchmarkRunner
 
             if (options.Iterations == 0)
             {
-                var dryRun = DryRunOutcome(name, spec, totalTimer);
+                totalTimer.Stop();
+                var dryRun = DryRunOutcome(name, spec, totalTimer.Elapsed);
                 progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
                 return dryRun;
             }
 
             ForceFullGc();
 
-            var outcome = MeasureSyncVoid(name, body, spec, ct);
+            var (timings, allocations, measuredDuration) = MeasureSyncVoid(body, spec, ct);
+            totalTimer.Stop();
+            var outcome = BuildOutcome(name, spec, timings, allocations, measuredDuration, totalTimer.Elapsed);
 
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
@@ -67,7 +70,8 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            return ErroredOutcome(name, spec, ex, totalTimer);
+            totalTimer.Stop();
+            return ErroredOutcome(name, spec, ex, totalTimer.Elapsed);
         }
     }
 
@@ -91,14 +95,17 @@ public sealed class BenchmarkRunner
 
             if (options.Iterations == 0)
             {
-                var dryRun = DryRunOutcome(name, spec, totalTimer);
+                totalTimer.Stop();
+                var dryRun = DryRunOutcome(name, spec, totalTimer.Elapsed);
                 progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
                 return dryRun;
             }
 
             ForceFullGc();
 
-            var outcome = MeasureSyncReturning(name, body, spec, ct);
+            var (timings, allocations, measuredDuration) = MeasureSyncReturning<T>(body, spec, ct);
+            totalTimer.Stop();
+            var outcome = BuildOutcome(name, spec, timings, allocations, measuredDuration, totalTimer.Elapsed);
 
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
@@ -109,7 +116,8 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            return ErroredOutcome(name, spec, ex, totalTimer);
+            totalTimer.Stop();
+            return ErroredOutcome(name, spec, ex, totalTimer.Elapsed);
         }
     }
 
@@ -135,14 +143,17 @@ public sealed class BenchmarkRunner
 
             if (options.Iterations == 0)
             {
-                var dryRun = DryRunOutcome(name, spec, totalTimer);
+                totalTimer.Stop();
+                var dryRun = DryRunOutcome(name, spec, totalTimer.Elapsed);
                 await progress.OnWarmupCompleted(name).ConfigureAwait(false);
                 return dryRun;
             }
 
             ForceFullGc();
 
-            var outcome = await MeasureAsyncVoid(name, body, spec, ct).ConfigureAwait(false);
+            var (timings, allocations, measuredDuration) = await MeasureAsyncVoid(body, spec, ct).ConfigureAwait(false);
+            totalTimer.Stop();
+            var outcome = BuildOutcome(name, spec, timings, allocations, measuredDuration, totalTimer.Elapsed);
 
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
@@ -153,7 +164,8 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            return ErroredOutcome(name, spec, ex, totalTimer);
+            totalTimer.Stop();
+            return ErroredOutcome(name, spec, ex, totalTimer.Elapsed);
         }
     }
 
@@ -177,14 +189,17 @@ public sealed class BenchmarkRunner
 
             if (options.Iterations == 0)
             {
-                var dryRun = DryRunOutcome(name, spec, totalTimer);
+                totalTimer.Stop();
+                var dryRun = DryRunOutcome(name, spec, totalTimer.Elapsed);
                 await progress.OnWarmupCompleted(name).ConfigureAwait(false);
                 return dryRun;
             }
 
             ForceFullGc();
 
-            var outcome = await MeasureAsyncReturning(name, body, spec, ct).ConfigureAwait(false);
+            var (timings, allocations, measuredDuration) = await MeasureAsyncReturning<T>(body, spec, ct).ConfigureAwait(false);
+            totalTimer.Stop();
+            var outcome = BuildOutcome(name, spec, timings, allocations, measuredDuration, totalTimer.Elapsed);
 
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
@@ -195,19 +210,20 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            return ErroredOutcome(name, spec, ex, totalTimer);
+            totalTimer.Stop();
+            return ErroredOutcome(name, spec, ex, totalTimer.Elapsed);
         }
     }
 
     // ---------- Measurement loops ----------
 
-    private static MeasurementOutcome MeasureSyncVoid(string name, Action body, RunSpec spec, CancellationToken ct)
+    private static (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncVoid(Action body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var totalTimer = Stopwatch.StartNew();
+        var loopTimer = Stopwatch.StartNew();
 
         for (var i = 0; i < iterations; i++)
         {
@@ -236,17 +252,17 @@ public sealed class BenchmarkRunner
             timings[i] = elapsed.TotalNanoseconds;
         }
 
-        totalTimer.Stop();
-        return BuildOutcome(name, spec, timings, allocations, totalTimer);
+        loopTimer.Stop();
+        return (timings, allocations, loopTimer.Elapsed);
     }
 
-    private static MeasurementOutcome MeasureSyncReturning<T>(string name, Func<T> body, RunSpec spec, CancellationToken ct)
+    private static (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncReturning<T>(Func<T> body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var totalTimer = Stopwatch.StartNew();
+        var loopTimer = Stopwatch.StartNew();
 
         for (var i = 0; i < iterations; i++)
         {
@@ -275,17 +291,17 @@ public sealed class BenchmarkRunner
             timings[i] = elapsed.TotalNanoseconds;
         }
 
-        totalTimer.Stop();
-        return BuildOutcome(name, spec, timings, allocations, totalTimer);
+        loopTimer.Stop();
+        return (timings, allocations, loopTimer.Elapsed);
     }
 
-    private static async Task<MeasurementOutcome> MeasureAsyncVoid(string name, Func<Task> body, RunSpec spec, CancellationToken ct)
+    private static async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncVoid(Func<Task> body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var totalTimer = Stopwatch.StartNew();
+        var loopTimer = Stopwatch.StartNew();
 
         for (var i = 0; i < iterations; i++)
         {
@@ -314,17 +330,17 @@ public sealed class BenchmarkRunner
             timings[i] = elapsed.TotalNanoseconds;
         }
 
-        totalTimer.Stop();
-        return BuildOutcome(name, spec, timings, allocations, totalTimer);
+        loopTimer.Stop();
+        return (timings, allocations, loopTimer.Elapsed);
     }
 
-    private static async Task<MeasurementOutcome> MeasureAsyncReturning<T>(string name, Func<Task<T>> body, RunSpec spec, CancellationToken ct)
+    private static async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(Func<Task<T>> body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var totalTimer = Stopwatch.StartNew();
+        var loopTimer = Stopwatch.StartNew();
 
         for (var i = 0; i < iterations; i++)
         {
@@ -353,15 +369,14 @@ public sealed class BenchmarkRunner
             timings[i] = elapsed.TotalNanoseconds;
         }
 
-        totalTimer.Stop();
-        return BuildOutcome(name, spec, timings, allocations, totalTimer);
+        loopTimer.Stop();
+        return (timings, allocations, loopTimer.Elapsed);
     }
 
     // ---------- Outcome builders ----------
 
-    private static MeasurementOutcome DryRunOutcome(string name, RunSpec spec, Stopwatch totalTimer)
+    private static MeasurementOutcome DryRunOutcome(string name, RunSpec spec, TimeSpan totalDuration)
     {
-        totalTimer.Stop();
         return new MeasurementOutcome
         {
             RawSamples = [],
@@ -388,16 +403,16 @@ public sealed class BenchmarkRunner
                 MeasuredIterations = 0,
                 WarmupIterations = spec.Options.WarmupIterations,
                 RunAt = DateTimeOffset.UtcNow,
-                TotalDuration = totalTimer.Elapsed,
+                TotalDuration = totalDuration,
+                MeasuredDuration = TimeSpan.Zero,
                 IsBaseline = spec.IsBaseline,
                 OutlierMode = spec.Options.OutlierMode,
             },
         };
     }
 
-    private static MeasurementOutcome ErroredOutcome(string name, RunSpec spec, Exception ex, Stopwatch totalTimer)
+    private static MeasurementOutcome ErroredOutcome(string name, RunSpec spec, Exception ex, TimeSpan totalDuration)
     {
-        totalTimer.Stop();
         var inner = ex is System.Reflection.TargetInvocationException tiex ? (tiex.InnerException ?? tiex) : ex;
 
         return new MeasurementOutcome
@@ -408,7 +423,8 @@ public sealed class BenchmarkRunner
                 inner.ToString(),
                 spec.Description,
                 spec.IsBaseline,
-                spec.Options.OutlierMode),
+                spec.Options.OutlierMode,
+                totalDuration),
         };
     }
 
@@ -417,7 +433,8 @@ public sealed class BenchmarkRunner
         RunSpec spec,
         double[] timings,
         long[]? allocations,
-        Stopwatch totalTimer)
+        TimeSpan measuredDuration,
+        TimeSpan totalDuration)
     {
         var options = spec.Options;
         var trimmed = ApplyOutlierMode(timings, options.OutlierMode);
@@ -450,7 +467,8 @@ public sealed class BenchmarkRunner
                 MeasuredIterations = trimmed.Length,
                 WarmupIterations = options.WarmupIterations,
                 RunAt = DateTimeOffset.UtcNow,
-                TotalDuration = totalTimer.Elapsed,
+                TotalDuration = totalDuration,
+                MeasuredDuration = measuredDuration,
                 IsBaseline = spec.IsBaseline,
                 OutlierMode = options.OutlierMode,
             },

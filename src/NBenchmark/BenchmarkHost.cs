@@ -176,6 +176,8 @@ public sealed class BenchmarkHost
                 {
                     var name = $"{suite.Type.Name}.{b.Method.Name}";
 
+                    // TotalDuration/MeasuredDuration stay TimeSpan.Zero: no per-benchmark timer
+                    // was started because failure happened before any benchmark ran.
                     allResults.Add(BenchmarkResult.CreateErrored(name,
                         $"Suite setup failed: {ex.Message}", b.Attribute.Description,
                         b.Attribute.Baseline, _options.OutlierMode));
@@ -263,6 +265,9 @@ public sealed class BenchmarkHost
                     }
                     catch (Exception ex)
                     {
+                        // TotalDuration/MeasuredDuration stay TimeSpan.Zero: an unexpected
+                        // exception escaped the runner before its outer timer could be
+                        // stopped and routed to the result.
                         result = BenchmarkResult.CreateErrored(benchmarkName, ex.ToString(),
                             benchmark.Attribute.Description, benchmark.Attribute.Baseline,
                             options.OutlierMode);

@@ -59,6 +59,7 @@ using NBenchmark.Reporters;
       "warmupIterations": 25,
       "runAt": "2026-06-06T03:40:00.000Z",
       "totalDuration": "00:00:00.050",
+      "measuredDuration": "00:00:00.040",
       "isBaseline": false,
       "outlierMode": "removeTop5Percent"
     }
@@ -67,6 +68,8 @@ using NBenchmark.Reporters;
 ```
 
 All timing values are in **nanoseconds**. Property names use camelCase.
+
+`totalDuration` is end-to-end wall-clock (warmup + pre-measure GC + measured loop); `measuredDuration` is the measured loop only. `measuredDuration <= totalDuration` always; the gap is dominated by warmup iterations and the pre-measure `GC.Collect`.
 
 ## File naming
 

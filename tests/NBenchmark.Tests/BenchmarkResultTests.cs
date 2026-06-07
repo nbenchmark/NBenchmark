@@ -17,6 +17,32 @@ public class BenchmarkResultTests
     }
 
     [Fact]
+    public void CreateErrored_Defaults_Durations_To_Zero()
+    {
+        // Suite-setup-failure and other pre-runner catch sites call CreateErrored
+        // without a timer. Pinned so the zero defaults stay documented.
+        var result = BenchmarkResult.CreateErrored("test", "err");
+
+        Assert.Equal(TimeSpan.Zero, result.TotalDuration);
+        Assert.Equal(TimeSpan.Zero, result.MeasuredDuration);
+    }
+
+    [Fact]
+    public void CreateErrored_Propagates_Provided_Durations()
+    {
+        var total = TimeSpan.FromMilliseconds(42);
+        var measured = TimeSpan.FromMilliseconds(7);
+
+        var result = BenchmarkResult.CreateErrored("test", "err",
+            description: null, isBaseline: false,
+            outlierMode: OutlierMode.RemoveTop5Percent,
+            totalDuration: total, measuredDuration: measured);
+
+        Assert.Equal(total, result.TotalDuration);
+        Assert.Equal(measured, result.MeasuredDuration);
+    }
+
+    [Fact]
     public void CreateErrored_Sets_Description_And_Baseline()
     {
         var result = BenchmarkResult.CreateErrored("test", "err", "desc",

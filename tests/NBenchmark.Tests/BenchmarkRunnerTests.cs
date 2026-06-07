@@ -77,6 +77,26 @@ public class BenchmarkRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_Errored_Result_Records_Positive_TotalDuration()
+    {
+        // Regression: ErroredOutcome previously never set TotalDuration, so it
+        // always reported TimeSpan.Zero — silently understating the suite-time
+        // summary that aggregates across results.
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 2, OutlierMode = OutlierMode.None },
+        };
+
+        var outcome = await BenchmarkRunner.Instance.RunAsync("bad",
+            () => throw new InvalidOperationException("nope"), spec);
+
+        Assert.True(outcome.Result.Errored);
+        Assert.True(outcome.Result.TotalDuration > TimeSpan.Zero,
+            $"Expected TotalDuration > 0 on errored path, got {outcome.Result.TotalDuration}");
+        Assert.Equal(TimeSpan.Zero, outcome.Result.MeasuredDuration);
+    }
+
+    [Fact]
     public async Task RunAsync_Propagates_OperationCanceledException_Untouched()
     {
         var spec = new RunSpec
@@ -170,6 +190,9 @@ public class BenchmarkRunnerTests
         Assert.Equal(0, outcome.Result.Median);
         Assert.False(outcome.Result.Errored);
         Assert.Empty(outcome.RawSamples);
+        Assert.True(outcome.Result.TotalDuration > TimeSpan.Zero,
+            "Dry-run path should still record wall-clock cost of the runner lifecycle");
+        Assert.Equal(TimeSpan.Zero, outcome.Result.MeasuredDuration);
     }
 
     [Fact]
@@ -186,6 +209,9 @@ public class BenchmarkRunnerTests
         Assert.Equal(3, invoked);
         Assert.Equal(0, outcome.Result.MeasuredIterations);
         Assert.Equal(0, outcome.Result.Mean);
+        Assert.True(outcome.Result.TotalDuration > TimeSpan.Zero,
+            "Dry-run-with-warmup path should record wall-clock cost including warmup");
+        Assert.Equal(TimeSpan.Zero, outcome.Result.MeasuredDuration);
     }
 
     // ---------- Outlier mode + confidence level plumbing ----------
@@ -313,6 +339,33 @@ public class BenchmarkRunnerTests
             });
 
         Assert.InRange(outcome.Result.Min, targetNanos * 0.9, targetNanos * 3.0);
+    }
+
+    // ---------- TotalDuration / MeasuredDuration contract ----------
+
+    [Fact]
+    public void Run_Success_Result_Has_TotalDuration_At_Least_MeasuredDuration()
+    {
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                WarmupIterations = 3,
+                Iterations = 10,
+                OutlierMode = OutlierMode.None,
+            },
+        };
+
+        var outcome = BenchmarkRunner.Instance.Run("success-durations",
+            () => Thread.SpinWait(50), spec);
+
+        Assert.False(outcome.Result.Errored);
+        Assert.True(outcome.Result.TotalDuration > TimeSpan.Zero,
+            $"Expected TotalDuration > 0 on success, got {outcome.Result.TotalDuration}");
+        Assert.True(outcome.Result.MeasuredDuration > TimeSpan.Zero,
+            $"Expected MeasuredDuration > 0 on success, got {outcome.Result.MeasuredDuration}");
+        Assert.True(outcome.Result.TotalDuration >= outcome.Result.MeasuredDuration,
+            $"TotalDuration ({outcome.Result.TotalDuration}) must be >= MeasuredDuration ({outcome.Result.MeasuredDuration})");
     }
 
     private static void BusyWait(double microseconds)
