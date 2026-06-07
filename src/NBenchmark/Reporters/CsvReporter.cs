@@ -22,44 +22,36 @@ public sealed class CsvReporter : IReporter
         sb.AppendLine(
             "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,AllocPerOp");
 
-        var multiBenchmark = results.Count > 1;
-        var successful = results.Where(r => !r.Errored).ToList();
+        var table = BenchmarkTable.Build(results);
 
-        var baseline = successful.Count > 0
-            ? successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median)!
-            : null;
-
-        foreach (var result in results.OrderBy(r => r.Median))
+        foreach (var row in table.Rows)
         {
-            var ratio = result.Errored || baseline is null || baseline.Median == 0
-                ? double.NaN
-                : result.Median / baseline.Median;
+            var sig = row.SignificanceLabel switch
+            {
+                "✓" => "true",
+                "~" => "false",
+                _ => "",
+            };
 
-            var sig = !multiBenchmark || result.IsBaseline || !result.IsSignificant.HasValue
-                ? ""
-                : result.IsSignificant.Value
-                    ? "true"
-                    : "false";
-
-            var safeName = result.Name.Replace("\"", "\"\"");
+            var safeName = row.Name.Replace("\"", "\"\"");
             var safeSig = sig.Replace("\"", "\"\"");
 
             sb.AppendLine(
                 $"\"{safeName}\"," +
-                $"{result.Median:F1}," +
-                $"{result.Mean:F1}," +
-                $"{result.StandardDeviation:F1}," +
-                $"{result.StandardError:F1}," +
-                $"{result.MarginOfError:F1}," +
-                $"{result.ConfidenceIntervalLower:F1}," +
-                $"{result.ConfidenceIntervalUpper:F1}," +
-                $"{result.ConfidenceLevel:F2}," +
-                $"{result.CoefficientOfVariation:F4}," +
-                $"{result.P95:F1}," +
-                $"{result.P99:F1}," +
-                $"{(double.IsNaN(ratio) ? "null" : $"{ratio:F2}")}," +
+                $"{row.Median:F1}," +
+                $"{row.Mean:F1}," +
+                $"{row.StandardDeviation:F1}," +
+                $"{row.StandardError:F1}," +
+                $"{row.MarginOfError:F1}," +
+                $"{row.ConfidenceIntervalLower:F1}," +
+                $"{row.ConfidenceIntervalUpper:F1}," +
+                $"{table.ConfidenceLevel:F2}," +
+                $"{row.CoefficientOfVariation:F4}," +
+                $"{row.P95:F1}," +
+                $"{row.P99:F1}," +
+                $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
                 $"\"{safeSig}\"," +
-                $"{result.MeanAllocatedBytes?.ToString() ?? "null"}"
+                $"{row.MeanAllocatedBytes?.ToString() ?? "null"}"
             );
         }
 

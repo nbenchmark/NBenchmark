@@ -25,60 +25,47 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine("## Benchmark Results");
         sb.AppendLine();
 
-        var successful = results.Where(r => !r.Errored).ToList();
+        var table = BenchmarkTable.Build(results);
 
-        if (successful.Count == 0)
+        if (table.Rows.All(r => r.Errored))
         {
             sb.AppendLine("_All benchmarks errored — no results to display._");
             await File.WriteAllTextAsync(_outputPath, sb.ToString(), cancellationToken);
             return;
         }
 
-        var headerSource = successful[0];
-
-        sb.AppendLine($"_Run at {headerSource.RunAt:yyyy-MM-dd HH:mm:ss} UTC — "
-                      + $"{headerSource.WarmupIterations} warmup / "
-                      + $"{headerSource.MeasuredIterations} measured_");
+        sb.AppendLine($"_Run at {table.RunAtUtc} UTC — "
+                      + $"{table.WarmupIterations} warmup / "
+                      + $"{table.MeasuredIterations} measured_");
 
         sb.AppendLine();
-
-        var multiBenchmark = results.Count > 1;
-
-        var baseline = successful.FirstOrDefault(r => r.IsBaseline)
-                       ?? successful.MinBy(r => r.Median)!;
 
         sb.AppendLine("| Benchmark | Median | Mean | Error | StdDev | P95 | P99 | Ratio | Sig | Alloc/op |");
         sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
 
-        foreach (var result in results.OrderBy(r => r.Median))
+        foreach (var row in table.Rows)
         {
-            var ratio = result.Errored ? double.NaN : result.Median / baseline.Median;
-
-            var sig = result.Errored || !multiBenchmark || result.IsBaseline || !result.IsSignificant.HasValue
+            var error = row.Errored
                 ? "-"
-                : result.IsSignificant.Value
-                    ? "✓"
-                    : "~";
+                : $"±{BenchmarkFormatter.FormatNs(row.MarginOfError)}";
 
-            var error = result.Errored
-                ? "-"
-                : $"±{BenchmarkFormatter.FormatNs(result.MarginOfError)}";
+            var sigLabel = string.IsNullOrEmpty(row.SignificanceLabel) ? "-" : row.SignificanceLabel;
 
             sb.AppendLine(
-                $"| {result.Name} " +
-                $"| {BenchmarkFormatter.FormatNs(result.Median)} " +
-                $"| {BenchmarkFormatter.FormatNs(result.Mean)} " +
+                $"| {row.Name} " +
+                $"| {BenchmarkFormatter.FormatNs(row.Median)} " +
+                $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
                 $"| {error} " +
-                $"| {BenchmarkFormatter.FormatNs(result.StandardDeviation)} " +
-                $"| {BenchmarkFormatter.FormatNs(result.P95)} " +
-                $"| {BenchmarkFormatter.FormatNs(result.P99)} " +
-                $"| {(result.Errored ? "-" : $"{ratio:F2}x")} " +
-                $"| {sig} " +
-                $"| {(result.MeanAllocatedBytes.HasValue ? BenchmarkFormatter.FormatBytes(result.MeanAllocatedBytes.Value) : "-")} |"
+                $"| {BenchmarkFormatter.FormatNs(row.StandardDeviation)} " +
+                $"| {BenchmarkFormatter.FormatNs(row.P95)} " +
+                $"| {BenchmarkFormatter.FormatNs(row.P99)} " +
+                $"| {(row.Errored ? "-" : $"{row.Ratio:F2}x")} " +
+                $"| {sigLabel} " +
+                $"| {(row.MeanAllocatedBytes.HasValue ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value) : "-")} |"
             );
         }
 
-        var confidencePct = successful[0].ConfidenceLevel * 100;
+        var confidencePct = table.ConfidenceLevel * 100;
         sb.AppendLine();
         sb.AppendLine($"_Error = ±{confidencePct:0.#}% confidence interval half-width on the mean._");
 

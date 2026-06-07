@@ -28,28 +28,25 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold]Benchmark Results[/]");
 
-        var multiBenchmark = results.Count > 1;
-        var successful = results.Where(r => !r.Errored).ToList();
+        var benchTable = BenchmarkTable.Build(results);
 
-        if (successful.Count == 0)
+        if (benchTable.Rows.All(r => r.Errored))
         {
-            foreach (var result in results)
+            foreach (var row in benchTable.Rows)
             {
-                AnsiConsole.MarkupLine($"[red]Error: {EscapeMarkup(result.Name)}: {EscapeMarkup(result.ErrorMessage)}[/]");
+                AnsiConsole.MarkupLine($"[red]Error: {EscapeMarkup(row.Name)}: {EscapeMarkup(row.ErrorMessage)}[/]");
             }
 
             return Task.CompletedTask;
         }
 
-        var headerSource = successful[0];
-
-        AnsiConsole.MarkupLine($"[grey]Run at {headerSource.RunAt:yyyy-MM-dd HH:mm:ss} UTC — "
-                               + $"{headerSource.WarmupIterations} warmup / "
-                               + $"{headerSource.MeasuredIterations} measured[/]");
+        AnsiConsole.MarkupLine($"[grey]Run at {benchTable.RunAtUtc} UTC — "
+                               + $"{benchTable.WarmupIterations} warmup / "
+                               + $"{benchTable.MeasuredIterations} measured[/]");
 
         AnsiConsole.WriteLine();
 
-        var table = new Table()
+        var consoleTable = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("Benchmark")
             .AddColumn(new TableColumn("Median").Centered())
@@ -64,24 +61,15 @@ public sealed class ConsoleReporter : IReporter
         var hasDescriptions = results.Any(r => !string.IsNullOrEmpty(r.Description));
 
         if (hasDescriptions)
-            table.AddColumn("Description");
+            consoleTable.AddColumn("Description");
 
-        var baseline = successful.FirstOrDefault(r => r.IsBaseline)
-                       ?? successful.MinBy(r => r.Median)!;
-
-        // Sum the end-to-end TotalDuration across all entries. Errored entries
-        // produced by suite-setup failures contribute 0 (no per-benchmark timer was
-        // started); errored entries produced by the runner contribute the real
-        // wall-clock cost up to the throw.
-        var totalDuration = results.Aggregate(TimeSpan.Zero, (a, r) => a + r.TotalDuration);
-
-        foreach (var result in results.OrderBy(r => r.Median))
+        foreach (var row in benchTable.Rows)
         {
-            if (result.Errored)
+            if (row.Errored)
             {
                 var errorCols = new List<string>
                 {
-                    $"[red][Error] {EscapeMarkup(result.Name)}[/]",
+                    $"[red][Error] {EscapeMarkup(row.Name)}[/]",
                     "[red]—[/]", "[red]—[/]", "[red]—[/]",
                     "[red]—[/]", "[red]—[/]", "[red]—[/]", "[red]—[/]", "[red]—[/]",
                 };
@@ -89,66 +77,66 @@ public sealed class ConsoleReporter : IReporter
                 if (hasDescriptions)
                     errorCols.Add("[red]—[/]");
 
-                table.AddRow(errorCols.ToArray());
-                AnsiConsole.MarkupLine($"[red]  Error: {EscapeMarkup(result.ErrorMessage)}[/]");
+                consoleTable.AddRow(errorCols.ToArray());
+                AnsiConsole.MarkupLine($"[red]  Error: {EscapeMarkup(row.ErrorMessage)}[/]");
                 continue;
             }
 
-            var ratio = baseline.Median == 0 ? double.NaN : result.Median / baseline.Median;
-
-            var ratioCol = double.IsNaN(ratio)
+            var ratioCol = double.IsNaN(row.Ratio)
                 ? "[grey]N/A[/]"
-                : result.IsBaseline
+                : row.IsBaseline
                     ? "[grey]1.00x[/]"
-                    : ratio <= 1.05
-                        ? $"[green]{ratio:F2}x[/]"
-                        : ratio <= 1.5
-                            ? $"[yellow]{ratio:F2}x[/]"
-                            : $"[red]{ratio:F2}x[/]";
+                    : row.Ratio <= 1.05
+                        ? $"[green]{row.Ratio:F2}x[/]"
+                        : row.Ratio <= 1.5
+                            ? $"[yellow]{row.Ratio:F2}x[/]"
+                            : $"[red]{row.Ratio:F2}x[/]";
 
-            var significanceCol = "";
-
-            if (multiBenchmark && !result.IsBaseline && result.IsSignificant.HasValue)
+            var significanceCol = row.SignificanceLabel switch
             {
-                significanceCol = result.IsSignificant.Value
-                    ? " [green]✓[/]"
-                    : " [grey]~[/]";
-            }
+                "✓" => " [green]✓[/]",
+                "~" => " [grey]~[/]",
+                _ => "",
+            };
 
-            var safeName = EscapeMarkup(result.Name);
+            var safeName = EscapeMarkup(row.Name);
 
-            var nameCol = result.IsBaseline
+            var nameCol = row.IsBaseline
                 ? $"[bold]{safeName}[/] [grey](baseline)[/]"
-                : ratio <= 1.05
-                    ? $"[green]{safeName}[/]"
-                    : ratio <= 1.5
-                        ? $"[yellow]{safeName}[/]"
-                        : $"[red]{safeName}[/]";
+                : double.IsNaN(row.Ratio)
+                    ? $"[grey]{safeName}[/]"
+                    : row.Ratio <= 1.05
+                        ? $"[green]{safeName}[/]"
+                        : row.Ratio <= 1.5
+                            ? $"[yellow]{safeName}[/]"
+                            : $"[red]{safeName}[/]";
 
             var rowCols = new List<string>
             {
                 $"{nameCol}{significanceCol}",
-                BenchmarkFormatter.FormatNs(result.Median),
-                BenchmarkFormatter.FormatNs(result.Mean),
-                $"[grey]±{BenchmarkFormatter.FormatNs(result.MarginOfError)}[/]",
-                BenchmarkFormatter.FormatNs(result.StandardDeviation),
-                BenchmarkFormatter.FormatNs(result.P95),
-                BenchmarkFormatter.FormatNs(result.P99),
+                BenchmarkFormatter.FormatNs(row.Median),
+                BenchmarkFormatter.FormatNs(row.Mean),
+                $"[grey]±{BenchmarkFormatter.FormatNs(row.MarginOfError)}[/]",
+                BenchmarkFormatter.FormatNs(row.StandardDeviation),
+                BenchmarkFormatter.FormatNs(row.P95),
+                BenchmarkFormatter.FormatNs(row.P99),
                 ratioCol,
-                result.MeanAllocatedBytes.HasValue
-                    ? BenchmarkFormatter.FormatBytes(result.MeanAllocatedBytes.Value)
+                row.MeanAllocatedBytes.HasValue
+                    ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
                     : "[grey]-[/]",
             };
 
             if (hasDescriptions)
-                rowCols.Add(string.IsNullOrEmpty(result.Description) ? "" : EscapeMarkup(result.Description));
+                rowCols.Add(string.IsNullOrEmpty(row.Description) ? "" : EscapeMarkup(row.Description));
 
-            table.AddRow(rowCols.ToArray());
+            consoleTable.AddRow(rowCols.ToArray());
         }
 
-        AnsiConsole.Write(table);
+        AnsiConsole.Write(consoleTable);
 
-        if (successful.Count > 1)
+        var successfulRows = benchTable.Rows.Where(r => !r.Errored).ToList();
+
+        if (successfulRows.Count > 1)
         {
             AnsiConsole.WriteLine();
 
@@ -157,9 +145,9 @@ public sealed class ConsoleReporter : IReporter
                 .Label("[bold]Median (ns)[/]")
                 .CenterLabel();
 
-            foreach (var result in successful.OrderBy(r => r.Median))
+            foreach (var row in successfulRows)
             {
-                chart.AddItem(result.Name, Math.Round(result.Median, 1), Color.SteelBlue1);
+                chart.AddItem(row.Name, Math.Round(row.Median, 1), Color.SteelBlue1);
             }
 
             AnsiConsole.Write(chart);
@@ -168,12 +156,12 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.WriteLine();
 
         AnsiConsole.MarkupLine(
-            $"[grey]Ran {results.Count} benchmark(s) in {totalDuration.TotalSeconds:F1}s — "
+            $"[grey]Ran {results.Count} benchmark(s) in {benchTable.TotalDuration.TotalSeconds:F1}s — "
             + $"Significance: Mann-Whitney U (p < 0.05) — "
-            + $"Outliers: {FormatOutlierMode(results.FirstOrDefault()?.OutlierMode ?? OutlierMode.RemoveTop5Percent)}[/]");
+            + $"Outliers: {FormatOutlierMode(benchTable.OutlierMode)}[/]");
 
         AnsiConsole.MarkupLine(
-            $"[grey]Error = ±{successful[0].ConfidenceLevel * 100:0.#}% confidence interval half-width on the mean.[/]");
+            $"[grey]Error = ±{benchTable.ConfidenceLevel * 100:0.#}% confidence interval half-width on the mean.[/]");
 
         AnsiConsole.WriteLine();
         return Task.CompletedTask;
