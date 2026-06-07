@@ -103,6 +103,14 @@ public class ReporterTests
         Assert.NotNull(reporter);
     }
 
+    [Fact]
+    public void IReporter_Name_Property_Returns_Canonical_Name_For_Seed_Reporters()
+    {
+        Assert.Equal("json", new JsonReporter().Name);
+        Assert.Equal("markdown", new MarkdownReporter().Name);
+        Assert.Equal("csv", new CsvReporter().Name);
+    }
+
     private static BenchmarkResult MakeResult(string name, double median)
     {
         return new BenchmarkResult

@@ -181,6 +181,8 @@ public class BenchmarkSuiteExtendedTests
             _callback = callback;
         }
 
+        public string Name => "stub";
+
         public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
         {
             _callback(results);

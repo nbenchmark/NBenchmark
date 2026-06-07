@@ -15,9 +15,13 @@ All reporters implement `IReporter`:
 ```csharp
 public interface IReporter
 {
+    string Name { get; }
+
     Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default);
 }
 ```
+
+The `Name` property identifies the reporter for the `--reporter` CLI flag and the `--output` directory rewriting. Built-in reporters return their canonical name (`"json"`, `"markdown"`, `"csv"`, `"console"`). Custom reporters may return any unique string.
 
 Reporters are called after all benchmarks in the run have completed. They receive the full result list including any errored benchmarks.
 
@@ -79,15 +83,20 @@ When using `BenchmarkHost` with `--output`, the directory must already exist. Cr
 
 ## Using the CLI reporter flag
 
-With `BenchmarkHost`, the `--reporter` CLI flag adds file reporters:
+With `BenchmarkHost`, the `--reporter` CLI flag adds reporters by name:
 
 ```bash
 dotnet run -- --reporter markdown --output ./results
 dotnet run -- --reporter csv
 dotnet run -- --reporter json
+dotnet run -- --reporter console   # works when NBenchmark.Console is referenced
 ```
 
-The `console` reporter requires the `NBenchmark.Console` package and must be registered in code with `.WithReporter(new ConsoleReporter())`.
+The `--reporter` flag constructs reporters through `ReporterRegistry.TryCreate`, which handles both built-in reporters (`json`/`markdown`/`csv`) and any reporters self-registered by external packages.
+
+External packages (like `NBenchmark.Console`) self-register via `[ModuleInitializer]` + `ReporterRegistry.Register()`. The `--reporter flag` discovers available reporters automatically — no per-reporter code changes needed in `BenchmarkHost`.
+
+If you reference an unknown reporter name, the host prints the list of available reporters plus a hint about the `console` package.
 
 ## Writing a custom reporter
 
@@ -96,6 +105,8 @@ Implement `IReporter` from the `NBenchmark` package:
 ```csharp
 public sealed class MyReporter : IReporter
 {
+    public string Name => "my-reporter";
+
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)
@@ -106,4 +117,18 @@ public sealed class MyReporter : IReporter
         }
     }
 }
+```
+
+Add it to your host or suite with `.WithReporter(new MyReporter())`.
+
+If you want your custom reporter to be usable from the `--reporter` CLI flag, register it with the global `ReporterRegistry`:
+
+```csharp
+using NBenchmark.Reporters;
+
+// In a static constructor or [ModuleInitializer]:
+ReporterRegistry.Register("my-reporter", "Custom output", _ => new MyReporter());
+```
+
+After registration, `--reporter my-reporter` works from the CLI.
 ```

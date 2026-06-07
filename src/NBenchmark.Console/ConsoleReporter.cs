@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using NBenchmark.Reporters;
 using Spectre.Console;
 
@@ -5,6 +6,15 @@ namespace NBenchmark.Console;
 
 public sealed class ConsoleReporter : IReporter
 {
+    public string Name => "console";
+
+    [ModuleInitializer]
+    public static void Register() =>
+        ReporterRegistry.Register(
+            "console",
+            "Console output (Spectre.Console table + bar chart)",
+            _ => new ConsoleReporter());
+
     public Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)

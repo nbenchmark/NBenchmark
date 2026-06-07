@@ -18,6 +18,8 @@ public sealed class JsonReporter : IReporter
         _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
     }
 
+    public string Name => "json";
+
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)

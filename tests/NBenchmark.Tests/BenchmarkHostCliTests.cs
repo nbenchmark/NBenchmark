@@ -131,6 +131,88 @@ public class BenchmarkHostCliTests
         }
     }
 
+    [Fact]
+    public async Task RunAsync_Output_Dir_Rebuilds_All_Seed_Reporters()
+    {
+        foreach (var name in ReporterRegistry.Available.Select(r => r.Name))
+        {
+            var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-host-{name}-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDir);
+
+            try
+            {
+                await CaptureConsoleOutputAsync(async () =>
+                {
+                    await BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--reporter", name, "--output", tempDir])
+                        .AddFromAssembly<TestBenchmarks>()
+                        .WithRunOrder(RunOrder.Declaration)
+                        .RunAsync();
+                });
+
+                Assert.True(Directory.Exists(tempDir), $"directory not created for reporter '{name}'");
+                Assert.NotEmpty(Directory.GetFiles(tempDir));
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir))
+                    Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void RunAsync_Unknown_Reporter_Prints_Available_List_And_Console_Hint()
+    {
+        var stdout = CaptureConsoleOutput(() =>
+        {
+            var host = BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--reporter", "bogus"]);
+            host.RunAsync().GetAwaiter().GetResult();
+        });
+
+        Assert.Contains("bogus", stdout);
+        Assert.Contains("json", stdout);
+        Assert.Contains("markdown", stdout);
+        Assert.Contains("csv", stdout);
+        Assert.Contains("NBenchmark.Console", stdout);
+    }
+
+    [Fact]
+    public async Task RunAsync_Output_Dir_Leaves_Custom_Named_Reporter_Alone()
+    {
+        var customReporter = new CustomNamedReporter();
+        var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-host-custom-{Guid.NewGuid():N}");
+
+        try
+        {
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                await BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--output", tempDir])
+                    .AddFromAssembly<TestBenchmarks>()
+                    .WithRunOrder(RunOrder.Declaration)
+                    .WithReporter(customReporter)
+                    .RunAsync();
+            });
+
+            Assert.Equal(1, customReporter.ReportCount);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, true);
+        }
+    }
+
+    private sealed class CustomNamedReporter : IReporter
+    {
+        public int ReportCount { get; private set; }
+        public string Name => "custom";
+        public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
+        {
+            ReportCount++;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class OrderingProgress : IBenchmarkProgress
     {
         private readonly Action _onSuiteStarting;

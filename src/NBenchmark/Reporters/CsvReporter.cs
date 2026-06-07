@@ -11,6 +11,8 @@ public sealed class CsvReporter : IReporter
         _outputPath = PathValidation.ValidateOutputPath(outputPath);
     }
 
+    public string Name => "csv";
+
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)

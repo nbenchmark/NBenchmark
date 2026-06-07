@@ -121,6 +121,8 @@ Yes. Implement `IReporter` from the `NBenchmark` package:
 ```csharp
 public sealed class MyReporter : IReporter
 {
+    public string Name => "my-reporter";
+
     public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
     {
         foreach (var r in results.Where(r => !r.Errored))
@@ -129,6 +131,14 @@ public sealed class MyReporter : IReporter
     }
 }
 ```
+
+To make it available from the `--reporter` CLI flag, register it with the global `ReporterRegistry`:
+
+```csharp
+ReporterRegistry.Register("my-reporter", "Custom console output", _ => new MyReporter());
+```
+
+The registration can happen in a `[ModuleInitializer]` in your package or at app startup before `BenchmarkHost.Create(args)` is called.
 
 ---
 

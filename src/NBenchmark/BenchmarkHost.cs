@@ -251,13 +251,8 @@ public sealed class BenchmarkHost
     {
         for (var i = 0; i < _reporters.Count; i++)
         {
-            _reporters[i] = _reporters[i] switch
-            {
-                JsonReporter j => new JsonReporter(outputDir),
-                MarkdownReporter m => new MarkdownReporter(Path.Combine(outputDir, "benchmark-results.md")),
-                CsvReporter c => new CsvReporter(Path.Combine(outputDir, "benchmark-results.csv")),
-                var other => other,
-            };
+            if (ReporterRegistry.TryCreate(_reporters[i].Name, outputDir, out var rebuilt))
+                _reporters[i] = rebuilt;
         }
     }
 
@@ -287,7 +282,7 @@ public sealed class BenchmarkHost
         Console.WriteLine("  --filter <pattern>     Run suites/methods matching glob (e.g., String*, *.Contains*)");
         Console.WriteLine("  --iterations <n>       Number of measured iterations (default: 200)");
         Console.WriteLine("  --warmup <n>           Number of warmup iterations (default: 25)");
-        Console.WriteLine("  --reporter <type>      Set reporter: console, json, markdown, csv");
+        Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
@@ -331,25 +326,11 @@ public sealed class BenchmarkHost
                     _outputDir = PathValidation.ValidateOutputPath(args[++i]);
                     break;
                 case "--reporter" when i + 1 < args.Length:
-                    switch (args[++i]?.ToLowerInvariant())
-                    {
-                        case "json":
-                            _reporters.Add(new JsonReporter());
-                            break;
-                        case "markdown":
-                            _reporters.Add(new MarkdownReporter());
-                            break;
-                        case "csv":
-                            _reporters.Add(new CsvReporter());
-                            break;
-                        case "console":
-                            Console.WriteLine("The 'console' reporter requires the NBenchmark.Console package.");
-                            Console.WriteLine("Add the NBenchmark.Console NuGet package and use AddReporter(new ConsoleReporter()).");
-                            break;
-                        default:
-                            Console.WriteLine($"Unknown reporter: '{args[i]}'. Valid: json, markdown, csv (console requires NBenchmark.Console package)");
-                            break;
-                    }
+                    var name = args[++i];
+                    if (ReporterRegistry.TryCreate(name, null, out var reporter))
+                        _reporters.Add(reporter);
+                    else
+                        Console.WriteLine($"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Console package provides 'console'.)");
 
                     break;
                 case "--confidence" when i + 1 < args.Length:

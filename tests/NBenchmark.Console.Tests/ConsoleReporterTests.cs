@@ -1,3 +1,4 @@
+using NBenchmark.Reporters;
 using Xunit;
 
 namespace NBenchmark.Console.Tests;
@@ -46,6 +47,21 @@ public class ConsoleReporterTests
             };
             await reporter.ReportAsync([result]);
         });
+    }
+
+    [Fact]
+    public void IReporter_Name_Property_Returns_Console()
+    {
+        Assert.Equal("console", new ConsoleReporter().Name);
+    }
+
+    [Fact]
+    public void Module_Initializer_Registers_Console_With_Global_Registry()
+    {
+        var ok = ReporterRegistry.TryCreate("console", null, out var reporter);
+
+        Assert.True(ok);
+        Assert.IsType<ConsoleReporter>(reporter);
     }
 
     private static BenchmarkResult MakeResult(string name, double median)

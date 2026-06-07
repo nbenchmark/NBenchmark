@@ -20,6 +20,16 @@ using NBenchmark.Console;
 .WithReporter(new ConsoleReporter())
 ```
 
+### CLI usage
+
+When the `NBenchmark.Console` package is referenced, `ConsoleReporter` self-registers via `[ModuleInitializer]` and becomes available through the `--reporter console` CLI flag:
+
+```bash
+dotnet run -- --reporter console
+```
+
+No explicit `.WithReporter(new ConsoleReporter())` call is needed when using the CLI — the host discovers it automatically through `ReporterRegistry`.
+
 ## Example output
 
 ```

@@ -68,21 +68,23 @@ dotnet run -- --confidence 0.99
 
 ### `--reporter <type>`
 
-Add a file reporter. Can be specified multiple times to stack reporters.
+Add a reporter by name. Can be specified multiple times to stack reporters. Built-in reporters:
 
-| Value | Reporter | Output |
+| Name | Reporter | Output |
 |---|---|---|
 | `json` | `JsonReporter` | JSON file in the current directory (or `--output` directory) |
 | `markdown` | `MarkdownReporter` | Markdown file |
 | `csv` | `CsvReporter` | CSV file |
-| `console` | — | Prints a message telling you to use `NBenchmark.Console` |
+
+The `console` reporter is provided by the `NBenchmark.Console` package. When the package is referenced, it self-registers automatically and becomes available via `--reporter console` — no special setup needed.
 
 ```bash
 dotnet run -- --reporter markdown
 dotnet run -- --reporter json --reporter csv
+dotnet run -- --reporter console
 ```
 
-The `console` reporter must be added in code with `.WithReporter(new ConsoleReporter())` — it cannot be added via `--reporter console`.
+Reporters from external packages self-register through the same mechanism: reference the package, use `--reporter <name>` from the CLI. No per-reporter configuration needed in the host.
 
 ---
 
