@@ -4,6 +4,7 @@ using Xunit;
 
 namespace NBenchmark.Tests;
 
+[Collection("ConsoleCapture")]
 public class BenchmarkHostCliTests
 {
     [Fact]
@@ -28,8 +29,11 @@ public class BenchmarkHostCliTests
         {
             CaptureConsoleOutput(() =>
             {
-                var host = BenchmarkHost.Create(["--bogus-flag"]);
-                host.RunAsync().GetAwaiter().GetResult();
+                CaptureConsoleError(() =>
+                {
+                    var host = BenchmarkHost.Create(["--bogus-flag"]);
+                    host.RunAsync().GetAwaiter().GetResult();
+                });
             });
 
             Assert.Equal(1, Environment.ExitCode);
@@ -48,13 +52,18 @@ public class BenchmarkHostCliTests
 
         try
         {
-            var stderr = CaptureConsoleError(() =>
+            string stderr = string.Empty;
+            CaptureConsoleOutput(() =>
             {
-                var host = BenchmarkHost.Create(["--threshold-pct", "5"]);
-                host.RunAsync().GetAwaiter().GetResult();
+                stderr = CaptureConsoleError(() =>
+                {
+                    var host = BenchmarkHost.Create(["--threshold-pct", "5"]);
+                    host.RunAsync().GetAwaiter().GetResult();
+                });
             });
 
             Assert.Contains("not yet implemented", stderr);
+            Assert.Equal(1, Environment.ExitCode);
         }
         finally
         {
@@ -163,17 +172,32 @@ public class BenchmarkHostCliTests
     [Fact]
     public void RunAsync_Unknown_Reporter_Prints_Available_List_And_Console_Hint()
     {
-        var stdout = CaptureConsoleOutput(() =>
-        {
-            var host = BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--reporter", "bogus"]);
-            host.RunAsync().GetAwaiter().GetResult();
-        });
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
 
-        Assert.Contains("bogus", stdout);
-        Assert.Contains("json", stdout);
-        Assert.Contains("markdown", stdout);
-        Assert.Contains("csv", stdout);
-        Assert.Contains("NBenchmark.Console", stdout);
+        try
+        {
+            string stderr = string.Empty;
+            CaptureConsoleOutput(() =>
+            {
+                stderr = CaptureConsoleError(() =>
+                {
+                    var host = BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--reporter", "bogus"]);
+                    host.RunAsync().GetAwaiter().GetResult();
+                });
+            });
+
+            Assert.Contains("bogus", stderr);
+            Assert.Contains("json", stderr);
+            Assert.Contains("markdown", stderr);
+            Assert.Contains("csv", stderr);
+            Assert.Contains("NBenchmark.Console", stderr);
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+        }
     }
 
     [Fact]

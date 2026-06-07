@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Reflection;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
@@ -9,19 +8,13 @@ namespace NBenchmark;
 
 public sealed class BenchmarkHost
 {
+    private CliArgs _cliArgs = new();
     private readonly List<Assembly> _assemblies = [];
     private readonly List<IReporter> _reporters = [];
-    private bool _dryRun;
-    private string? _filter;
-    private bool _listOnly;
     private MeasurementOptions _options = MeasurementOptions.Default;
-    private string? _outputDir;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
-    private int? _seed;
-    private bool _showHelp;
-    private bool _thresholdRejected;
     private Func<Type, object>? _instanceFactory;
     private Action? _postSuiteCleanup;
 
@@ -31,8 +24,10 @@ public sealed class BenchmarkHost
 
     public static BenchmarkHost Create(string[] args)
     {
+        var cliArgs = CliArgs.Parse(args);
         var host = new BenchmarkHost();
-        host.ParseArgs(args);
+        host._cliArgs = cliArgs;
+        host._reporters.InsertRange(0, cliArgs.CliReporters);
         return host;
     }
 
@@ -87,9 +82,9 @@ public sealed class BenchmarkHost
 
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
     {
-        if (_showHelp)
+        if (_cliArgs.ShowHelp)
         {
-            PrintHelp();
+            CliArgs.PrintHelp();
             return Array.Empty<BenchmarkResult>();
         }
 
@@ -107,9 +102,9 @@ public sealed class BenchmarkHost
             return Array.Empty<BenchmarkResult>();
         }
 
-        var filtered = FilterSuites(allSuites);
+        var filtered = FilterSuites(allSuites, _cliArgs.Filter);
 
-        if (_listOnly)
+        if (_cliArgs.ListOnly)
         {
             foreach (var suite in filtered)
             {
@@ -131,9 +126,9 @@ public sealed class BenchmarkHost
         var allResults = new List<BenchmarkResult>();
         var rawSamples = new Dictionary<string, double[]>();
 
-        var suiteOptions = _dryRun
+        var suiteOptions = _cliArgs.DryRun
             ? _options with { Iterations = 0, WarmupIterations = 0 }
-            : _options;
+            : MergeCliOptions(_options, _cliArgs);
 
         var allNames = filtered
             .SelectMany(s => s.Benchmarks.Select(b => $"{s.Type.Name}.{b.DisplayName}"))
@@ -197,7 +192,7 @@ public sealed class BenchmarkHost
                     .ToList();
 
                 var (results, samples) = await SuiteRunner.RunAsync(
-                    envelopes, _runOrder, _seed, suiteOptions, runningIndex, totalBenchmarks,
+                    envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions, runningIndex, totalBenchmarks,
                     _progress, cancellationToken).ConfigureAwait(false);
 
                 runningIndex += suite.Benchmarks.Count;
@@ -231,17 +226,17 @@ public sealed class BenchmarkHost
 
         await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
 
-        Significance.ApplyIfEnabled(allResults, rawSamples, _options);
+        Significance.ApplyIfEnabled(allResults, rawSamples, suiteOptions);
 
-        if (!string.IsNullOrEmpty(_outputDir))
-            ApplyOutputDirectory(_outputDir);
+        if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
+            ApplyOutputDirectory(_cliArgs.OutputDir);
 
         foreach (var reporter in _reporters)
         {
             await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
         }
 
-        if (_thresholdRejected)
+        if (_cliArgs.ThresholdRejected)
             Environment.ExitCode = 1;
 
         return allResults;
@@ -256,17 +251,17 @@ public sealed class BenchmarkHost
         }
     }
 
-    private IReadOnlyList<BenchmarkSuiteDefinition> FilterSuites(
-        IReadOnlyList<BenchmarkSuiteDefinition> suites)
+    private static IReadOnlyList<BenchmarkSuiteDefinition> FilterSuites(
+        IReadOnlyList<BenchmarkSuiteDefinition> suites, string? filter)
     {
-        if (_filter is null)
+        if (filter is null)
             return suites;
 
         return suites
             .Select(s => s with
             {
                 Benchmarks = s.Benchmarks
-                    .Where(b => GlobMatcher.Match(_filter,
+                    .Where(b => GlobMatcher.Match(filter,
                         $"{s.Type.Name}.{b.DisplayName}"))
                     .ToList(),
             })
@@ -274,105 +269,15 @@ public sealed class BenchmarkHost
             .ToList();
     }
 
-    private static void PrintHelp()
+    private static MeasurementOptions MergeCliOptions(MeasurementOptions options, CliArgs cliArgs)
     {
-        Console.WriteLine("Usage: myapp.exe [options]");
-        Console.WriteLine();
-        Console.WriteLine("Options:");
-        Console.WriteLine("  --filter <pattern>     Run suites/methods matching glob (e.g., String*, *.Contains*)");
-        Console.WriteLine("  --iterations <n>       Number of measured iterations (default: 200)");
-        Console.WriteLine("  --warmup <n>           Number of warmup iterations (default: 25)");
-        Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}");
-        Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
-        Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
-        Console.WriteLine("  --list                 List discovered benchmarks without running");
-        Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
-        Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
-        Console.WriteLine("  --threshold-pct <n>    [NOT YET IMPLEMENTED] Will fail with exit code 1 if");
-        Console.WriteLine("                        any benchmark regresses >N% vs baseline.");
-        Console.WriteLine("  --help, -h             Show this help text");
-    }
-
-    private void ParseArgs(string[] args)
-    {
-        for (var i = 0; i < args.Length; i++)
-        {
-            switch (args[i])
-            {
-                case "--help" or "-h":
-                    _showHelp = true;
-                    break;
-                case "--filter" when i + 1 < args.Length:
-                    _filter = args[++i];
-                    break;
-                case "--iterations" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var iters)
-                        && iters >= MeasurementOptions.MinIterations
-                        && iters <= MeasurementOptions.MaxIterations)
-                        _options = _options with { Iterations = iters };
-                    else
-                        Console.WriteLine(
-                            $"Invalid --iterations value '{args[i]}'. Must be {MeasurementOptions.MinIterations}–{MeasurementOptions.MaxIterations}.");
-
-                    break;
-                case "--warmup" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var warmup) && warmup >= 0 && warmup <= MeasurementOptions.MaxWarmupIterations)
-                        _options = _options with { WarmupIterations = warmup };
-                    else
-                        Console.WriteLine($"Invalid --warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupIterations}.");
-
-                    break;
-                case "--output" when i + 1 < args.Length:
-                    _outputDir = PathValidation.ValidateOutputPath(args[++i]);
-                    break;
-                case "--reporter" when i + 1 < args.Length:
-                    var name = args[++i];
-                    if (ReporterRegistry.TryCreate(name, null, out var reporter))
-                        _reporters.Add(reporter);
-                    else
-                        Console.WriteLine($"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Console package provides 'console'.)");
-
-                    break;
-                case "--confidence" when i + 1 < args.Length:
-                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var conf)
-                        && conf is > 0 and < 1)
-                        _options = _options with { ConfidenceLevel = conf };
-                    else
-                        Console.WriteLine($"Invalid --confidence value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.95).");
-
-                    break;
-                case "--order" when i + 1 < args.Length:
-                    _runOrder = args[++i]?.ToLowerInvariant() == "declaration"
-                        ? RunOrder.Declaration
-                        : RunOrder.Random;
-
-                    break;
-                case "--threshold-pct" when i + 1 < args.Length:
-                    Console.Error.WriteLine(
-                        "--threshold-pct is not yet implemented. Remove the flag to continue; "
-                        + "the run will exit with code 1 until it ships.");
-
-                    _thresholdRejected = true;
-                    i++;
-                    break;
-                case "--seed" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var seed))
-                        _seed = seed;
-                    else
-                        Console.WriteLine($"Invalid --seed value '{args[i]}'. Must be an integer.");
-
-                    break;
-                case "--list":
-                    _listOnly = true;
-                    break;
-                case "--dry-run":
-                    _dryRun = true;
-                    break;
-                default:
-                    Console.Error.WriteLine($"Unknown flag: '{args[i]}'. Use --help to see available options.");
-                    Environment.ExitCode = 1;
-                    break;
-            }
-        }
+        var result = options;
+        if (cliArgs.Iterations.HasValue)
+            result = result with { Iterations = cliArgs.Iterations.Value };
+        if (cliArgs.WarmupIterations.HasValue)
+            result = result with { WarmupIterations = cliArgs.WarmupIterations.Value };
+        if (cliArgs.ConfidenceLevel.HasValue)
+            result = result with { ConfidenceLevel = cliArgs.ConfidenceLevel.Value };
+        return result;
     }
 }
