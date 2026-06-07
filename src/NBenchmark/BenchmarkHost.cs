@@ -141,59 +141,28 @@ public sealed class BenchmarkHost
 
         foreach (var suite in filtered)
         {
-            object? instance = null;
+            var instance = PerClassLifecycle.TryCreateInstance(suite.Type, _instanceFactory);
+            if (instance is null)
+                continue;
+
             var instanceFromFactory = _instanceFactory is not null;
 
             try
             {
-                instance = _instanceFactory?.Invoke(suite.Type) ?? Activator.CreateInstance(suite.Type);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                var hint = _instanceFactory is null
-                    ? "the type must have a public parameterless constructor, or be internal with "
-                      + "a public constructor and InternalsVisibleTo. "
-                    : "the instance factory threw during resolution. ";
-
-                Console.WriteLine($"[Error] Could not instantiate {suite.Type.Name} — "
-                                  + hint
-                                  + $"Details: {ex.Message}");
-
-                continue;
-            }
-
-            var typedInstance = instance!;
-
-            try
-            {
-                try
+                var (setupSuccess, setupErrors) = PerClassLifecycle.TryRunSetup(suite, instance, suiteOptions);
+                if (!setupSuccess)
                 {
-                    suite.SetupDelegate?.Invoke(typedInstance);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    Console.WriteLine($"[Error] Setup failed for {suite.Type.Name}: {ex.Message}");
-
-                    foreach (var b in suite.Benchmarks)
-                    {
-                        var name = $"{suite.Type.Name}.{b.DisplayName}";
-
-                        allResults.Add(OutcomeBuilder.Build(
-                            new OutcomeInput.Errored(ex, $"Suite setup failed: {ex.Message}"),
-                            name, b.Attribute.Description, b.Attribute.Baseline,
-                            suiteOptions, TimeSpan.Zero, TimeSpan.Zero).Result);
-                    }
-
+                    allResults.AddRange(setupErrors!);
                     continue;
                 }
 
                 var envelopes = suite.Benchmarks
-                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, typedInstance))
+                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, instance))
                     .ToList();
 
                 var (results, samples) = await SuiteRunner.RunAsync(
-                    envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions, runningIndex, totalBenchmarks,
-                    _progress, cancellationToken).ConfigureAwait(false);
+                    envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                    runningIndex, totalBenchmarks, _progress, cancellationToken).ConfigureAwait(false);
 
                 runningIndex += suite.Benchmarks.Count;
 
@@ -203,24 +172,7 @@ public sealed class BenchmarkHost
             }
             finally
             {
-                try
-                {
-                    suite.TeardownDelegate?.Invoke(typedInstance);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    Console.WriteLine($"[Warning] Teardown failed for {suite.Type.Name}: {ex.Message}");
-                }
-
-                _postSuiteCleanup?.Invoke();
-
-                if (!instanceFromFactory)
-                {
-                    if (typedInstance is IAsyncDisposable ad)
-                        await ad.DisposeAsync();
-                    else if (typedInstance is IDisposable d)
-                        d.Dispose();
-                }
+                await PerClassLifecycle.RunTeardown(suite, instance, instanceFromFactory, _postSuiteCleanup);
             }
         }
 

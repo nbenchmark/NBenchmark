@@ -1,0 +1,76 @@
+using NBenchmark.Discovery;
+
+namespace NBenchmark.Engine;
+
+internal static class PerClassLifecycle
+{
+    public static object? TryCreateInstance(
+        Type type, Func<Type, object>? instanceFactory)
+    {
+        try
+        {
+            return instanceFactory?.Invoke(type) ?? Activator.CreateInstance(type);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            var hint = instanceFactory is null
+                ? "the type must have a public parameterless constructor, or be internal with "
+                  + "a public constructor and InternalsVisibleTo. "
+                : "the instance factory threw during resolution. ";
+
+            Console.WriteLine($"[Error] Could not instantiate {type.Name} — "
+                              + hint
+                              + $"Details: {ex.Message}");
+
+            return null;
+        }
+    }
+
+    public static (bool Success, IReadOnlyList<BenchmarkResult>? ErroredResults) TryRunSetup(
+        BenchmarkSuiteDefinition suite, object instance, MeasurementOptions suiteOptions)
+    {
+        try
+        {
+            suite.SetupDelegate?.Invoke(instance);
+            return (true, null);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Console.WriteLine($"[Error] Setup failed for {suite.Type.Name}: {ex.Message}");
+
+            var errored = suite.Benchmarks
+                .Select(b =>
+                    OutcomeBuilder.Build(
+                        new OutcomeInput.Errored(ex, $"Suite setup failed: {ex.Message}"),
+                        $"{suite.Type.Name}.{b.DisplayName}", b.Attribute.Description, b.Attribute.Baseline,
+                        suiteOptions, TimeSpan.Zero, TimeSpan.Zero).Result)
+                .ToList();
+
+            return (false, errored);
+        }
+    }
+
+    public static async Task RunTeardown(
+        BenchmarkSuiteDefinition suite, object instance,
+        bool instanceFromFactory, Action? postSuiteCleanup)
+    {
+        try
+        {
+            suite.TeardownDelegate?.Invoke(instance);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Console.WriteLine($"[Warning] Teardown failed for {suite.Type.Name}: {ex.Message}");
+        }
+
+        postSuiteCleanup?.Invoke();
+
+        if (!instanceFromFactory)
+        {
+            if (instance is IAsyncDisposable ad)
+                await ad.DisposeAsync();
+            else if (instance is IDisposable d)
+                d.Dispose();
+        }
+    }
+}
