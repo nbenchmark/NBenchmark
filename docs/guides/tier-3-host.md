@@ -163,6 +163,32 @@ public class MyBenchmarks
 public class MyBenchmarks(IDatabase db) { ... }
 ```
 
+### Benchmark classes with dependencies
+
+If you want benchmark classes to have **constructor dependencies** (a repository, a logger, an `HttpClient`, a `DbContext`, etc.), add the optional `NBenchmark.DependencyInjection` companion package and use `UseDependencyInjection<T>`:
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using NBenchmark.DependencyInjection;
+
+var services = new ServiceCollection()
+    .AddSingleton<IOrderRepository, SqlOrderRepository>()
+    .AddTransient<OrderBenchmarks>()
+    .BuildServiceProvider();
+
+await BenchmarkHost.Create(args)
+    .UseDependencyInjection<OrderBenchmarks>(services)
+    .RunAsync();
+
+public sealed class OrderBenchmarks(IOrderRepository repository)
+{
+    [Benchmark]
+    public int CountOrders() => repository.Count();
+}
+```
+
+The companion package resolves benchmark classes from the supplied `IServiceProvider`, so constructor dependencies are injected automatically. A scoped variant is also available for `DbContext`-style lifetimes. See the [Dependency Injection guide](./dependency-injection) for the full API, lifetime semantics, and how to plug in containers other than `Microsoft.Extensions.DependencyInjection`.
+
 ## Scanning multiple assemblies
 
 Call `AddFromAssembly` once per assembly:

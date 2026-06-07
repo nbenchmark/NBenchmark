@@ -23,6 +23,8 @@ public sealed class BenchmarkHost
     private int? _seed;
     private bool _showHelp;
     private bool _thresholdRejected;
+    private Func<Type, object>? _instanceFactory;
+    private Action? _postSuiteCleanup;
 
     private BenchmarkHost()
     {
@@ -70,6 +72,18 @@ public sealed class BenchmarkHost
         _progress = progress;
         _progressExplicitlySet = true;
         return this;
+    }
+
+    public BenchmarkHost WithInstanceFactory(Func<Type, object> factory)
+    {
+        _instanceFactory = factory;
+        return this;
+    }
+
+    internal Action? PostSuiteCleanup
+    {
+        get => _postSuiteCleanup;
+        set => _postSuiteCleanup = value;
     }
 
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
@@ -128,16 +142,21 @@ public sealed class BenchmarkHost
         foreach (var suite in filtered)
         {
             object? instance = null;
+            var instanceFromFactory = _instanceFactory is not null;
 
             try
             {
-                instance = Activator.CreateInstance(suite.Type);
+                instance = _instanceFactory?.Invoke(suite.Type) ?? Activator.CreateInstance(suite.Type);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                var hint = _instanceFactory is null
+                    ? "the type must have a public parameterless constructor, or be internal with "
+                      + "a public constructor and InternalsVisibleTo. "
+                    : "the instance factory threw during resolution. ";
+
                 Console.WriteLine($"[Error] Could not instantiate {suite.Type.Name} — "
-                                  + "the type must have a public parameterless constructor, or be internal with "
-                                  + "a public constructor and InternalsVisibleTo. "
+                                  + hint
                                   + $"Details: {ex.Message}");
 
                 continue;
@@ -335,6 +354,16 @@ public sealed class BenchmarkHost
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     Console.WriteLine($"[Warning] Teardown failed for {suite.Type.Name}: {ex.Message}");
+                }
+
+                _postSuiteCleanup?.Invoke();
+
+                if (!instanceFromFactory)
+                {
+                    if (typedInstance is IAsyncDisposable ad)
+                        await ad.DisposeAsync();
+                    else if (typedInstance is IDisposable d)
+                        d.Dispose();
                 }
             }
         }

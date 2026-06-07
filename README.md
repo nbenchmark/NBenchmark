@@ -14,10 +14,12 @@ A lightweight, async-native .NET benchmarking library. No configuration files, n
 |---|---|
 | `NBenchmark` | Zero-dependency core — all measurement, statistics, and file reporters. |
 | `NBenchmark.Console` | Adds a rich terminal table via [Spectre.Console](https://spectreconsole.net/). |
+| `NBenchmark.DependencyInjection` | Resolves benchmark classes from an `IServiceProvider` so they can have constructor dependencies. |
 
 ```bash
 dotnet add package NBenchmark
-dotnet add package NBenchmark.Console   # optional, for pretty terminal output
+dotnet add package NBenchmark.Console            # optional, for pretty terminal output
+dotnet add package NBenchmark.DependencyInjection   # optional, for benchmark classes with constructor dependencies
 ```
 
 ## Quick start
@@ -57,6 +59,7 @@ All three tiers share the same measurement engine, produce the same `BenchmarkRe
 |---|---|
 | [Getting Started](./docs/getting-started/installation.md) | Installation, quick start, key concepts |
 | [Guides](./docs/guides/index.md) | Detailed walkthroughs for each tier |
+| [Dependency Injection](./docs/guides/dependency-injection.md) | Benchmark classes with constructor dependencies |
 | [Configuration](./docs/configuration.md) | All `MeasurementOptions` settings |
 | [Reporters](./docs/reporters/index.md) | Console, Markdown, CSV, JSON |
 | [CLI Reference](./docs/cli-reference.md) | All `BenchmarkHost` command-line flags |

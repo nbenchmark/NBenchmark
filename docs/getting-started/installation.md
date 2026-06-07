@@ -12,7 +12,7 @@ NBenchmark targets **net8.0**, **net9.0**, and **net10.0**. You need the [.NET 8
 
 ## Packages
 
-NBenchmark ships as two NuGet packages. Install only what you need.
+NBenchmark ships as three NuGet packages. Install only what you need.
 
 ### Core package
 
@@ -31,6 +31,20 @@ dotnet add package NBenchmark.Console
 ```
 
 You only need `NBenchmark.Console` if you want output in the terminal. File reporters (JSON, Markdown, CSV) work without it.
+
+### Dependency Injection package (optional)
+
+The DI package lets `[Benchmark]` classes have **constructor dependencies** that are resolved from an `IServiceProvider`. Without it, benchmark classes must have a public parameterless constructor (the same constraint as today). See the [Dependency Injection guide](../guides/dependency-injection) for full details.
+
+```bash
+dotnet add package NBenchmark.DependencyInjection
+```
+
+```bash
+# Or, if you also want the concrete Microsoft.Extensions.DependencyInjection
+# implementation (ServiceCollection, BuildServiceProvider, etc.):
+dotnet add package Microsoft.Extensions.DependencyInjection
+```
 
 ## Verify the installation
 

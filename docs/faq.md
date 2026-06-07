@@ -165,4 +165,54 @@ Use `--list` to check what NBenchmark finds before running.
 
 ### The host throws "Could not instantiate MyClass". How do I fix it?
 
-`BenchmarkHost` creates benchmark class instances using `Activator.CreateInstance`, which requires a **public parameterless constructor**. If your class has a constructor with parameters, add a separate parameterless one that provides defaults, or restructure to use `[BenchmarkSetup]` for initialisation.
+`BenchmarkHost` creates benchmark class instances using `Activator.CreateInstance`, which requires a **public parameterless constructor**. There are three ways to satisfy this:
+
+1. **Add a parameterless constructor** that initialises dependencies itself (simplest, but couples the benchmark class to the dependency).
+2. **Use `[BenchmarkSetup]`** to populate fields on a parameterless-constructed instance.
+3. **Use the `NBenchmark.DependencyInjection` companion package** to resolve the class from an `IServiceProvider`:
+
+   ```csharp
+   await BenchmarkHost.Create(args)
+       .UseDependencyInjection<MyBenchmarks>(services)
+       .RunAsync();
+   ```
+
+   This is the cleanest approach when you already have a DI container in your application. See the [Dependency Injection guide](./guides/dependency-injection) for full details.
+
+### My benchmark class needs dependencies. How do I inject them?
+
+Add the optional `NBenchmark.DependencyInjection` package and pass an `IServiceProvider` to the host:
+
+```csharp
+using NBenchmark.DependencyInjection;
+
+var services = new ServiceCollection()
+    .AddSingleton<IOrderRepository, SqlOrderRepository>()
+    .AddTransient<OrderBenchmarks>()
+    .BuildServiceProvider();
+
+await BenchmarkHost.Create(args)
+    .UseDependencyInjection<OrderBenchmarks>(services)
+    .RunAsync();
+
+public sealed class OrderBenchmarks(IOrderRepository repository)
+{
+    [Benchmark] public int CountOrders() => repository.Count();
+}
+```
+
+The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes — the scope is created per suite and disposed after teardown. See the [Dependency Injection guide](./guides/dependency-injection) for the full API and lifetime semantics.
+
+### Can I use a DI container other than `Microsoft.Extensions.DependencyInjection`?
+
+Yes. The companion package only depends on `IServiceProvider` from the BCL. Any container that exposes one — Autofac, DryIoc, SimpleInjector, Lamar, etc. — works:
+
+```csharp
+var container = new ContainerBuilder()
+    .RegisterType<SqlOrderRepository>().As<IOrderRepository>()
+    .Build();
+
+await BenchmarkHost.Create(args)
+    .UseDependencyInjection<OrderBenchmarks>(container.Resolve<IServiceProvider>())
+    .RunAsync();
+```

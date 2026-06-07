@@ -50,6 +50,21 @@ public class MyBenchmarks
 }
 ```
 
+## [Dependency Injection](./dependency-injection)
+
+Optional companion package that lets benchmark classes have **constructor dependencies** resolved from an `IServiceProvider`. Adds support for repositories, loggers, `HttpClient`, EF Core `DbContext`, and any other registered service.
+
+```csharp
+await BenchmarkHost.Create(args)
+    .UseDependencyInjection<OrderBenchmarks>(services)
+    .RunAsync();
+
+public sealed class OrderBenchmarks(IOrderRepository repository)
+{
+    [Benchmark] public int CountOrders() => repository.Count();
+}
+```
+
 ---
 
 The three tiers share the same measurement engine and produce the same `BenchmarkResult` type, so you can mix them in the same project and use the same reporters and configuration across all of them.
