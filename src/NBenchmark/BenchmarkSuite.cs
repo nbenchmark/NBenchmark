@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
 
@@ -6,7 +5,7 @@ namespace NBenchmark;
 
 public sealed class BenchmarkSuite(string name)
 {
-    private readonly List<BenchmarkEntry> _benchmarks = [];
+    private readonly List<BenchmarkEnvelope> _benchmarks = [];
 
     private readonly List<IReporter> _reporters = [];
     private string? _baselineName;
@@ -24,14 +23,12 @@ public sealed class BenchmarkSuite(string name)
         Action? setup = null, Action? teardown = null)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEntry
-        {
-            Name = name,
-            Setup = setup,
-            Teardown = teardown,
-            RunAsync = (spec, ct) => Task.FromResult(
-                BenchmarkRunner.Instance.Run(name, action, spec, ct)),
-        });
+        _benchmarks.Add(new BenchmarkEnvelope(
+            Name: name,
+            Description: null,
+            IsBaseline: false,
+            RunAsync: (spec, ct) => Task.FromResult(
+                BuildSyncOutcome(name, action, spec, setup, teardown, ct))));
         return this;
     }
 
@@ -39,14 +36,11 @@ public sealed class BenchmarkSuite(string name)
         Action? setup = null, Action? teardown = null)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEntry
-        {
-            Name = name,
-            Setup = setup,
-            Teardown = teardown,
-            RunAsync = (spec, ct) =>
-                BenchmarkRunner.Instance.RunAsync(name, action, spec, ct),
-        });
+        _benchmarks.Add(new BenchmarkEnvelope(
+            Name: name,
+            Description: null,
+            IsBaseline: false,
+            RunAsync: (spec, ct) => BuildAsyncVoidOutcome(name, action, spec, setup, teardown, ct)));
         return this;
     }
 
@@ -54,14 +48,12 @@ public sealed class BenchmarkSuite(string name)
         Action? setup = null, Action? teardown = null)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEntry
-        {
-            Name = name,
-            Setup = setup,
-            Teardown = teardown,
-            RunAsync = (spec, ct) => Task.FromResult(
-                BenchmarkRunner.Instance.Run(name, action, spec, ct)),
-        });
+        _benchmarks.Add(new BenchmarkEnvelope(
+            Name: name,
+            Description: null,
+            IsBaseline: false,
+            RunAsync: (spec, ct) => Task.FromResult(
+                BuildSyncReturningOutcome<T>(name, action, spec, setup, teardown, ct))));
         return this;
     }
 
@@ -69,14 +61,11 @@ public sealed class BenchmarkSuite(string name)
         Action? setup = null, Action? teardown = null)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEntry
-        {
-            Name = name,
-            Setup = setup,
-            Teardown = teardown,
-            RunAsync = (spec, ct) =>
-                BenchmarkRunner.Instance.RunAsync(name, action, spec, ct),
-        });
+        _benchmarks.Add(new BenchmarkEnvelope(
+            Name: name,
+            Description: null,
+            IsBaseline: false,
+            RunAsync: (spec, ct) => BuildAsyncReturningOutcome<T>(name, action, spec, setup, teardown, ct)));
         return this;
     }
 
@@ -177,54 +166,24 @@ public sealed class BenchmarkSuite(string name)
                 string.Join(", ", _benchmarks.Select(b => b.Name)));
         }
 
-        var ordered = _runOrder == RunOrder.Random
-            ? ShuffleBenchmarks(_benchmarks.ToList(), Random.Shared.Next())
-            : _benchmarks;
-
-        var results = new List<BenchmarkResult>(ordered.Count);
-        var rawSamples = new Dictionary<string, double[]>();
-        var total = ordered.Count;
-        var index = 0;
-
-        await _progress.OnSuiteStarting(
-            ordered.Select(b => b.Name).ToList(), total).ConfigureAwait(false);
+        var envelopeNames = _benchmarks.Select(b => b.Name).ToList();
+        await _progress.OnSuiteStarting(envelopeNames, _benchmarks.Count).ConfigureAwait(false);
 
         _suiteSetup?.Invoke();
 
-        foreach (var entry in ordered)
-        {
-            index++;
+        var envelopes = _benchmarks
+            .Select(b => b with { IsBaseline = _baselineName is not null && b.Name == _baselineName })
+            .ToList();
 
-            await _progress.OnBenchmarkStarting(entry.Name, index, total).ConfigureAwait(false);
-
-            var spec = new RunSpec
-            {
-                Options = _options,
-                IsBaseline = _baselineName is not null && entry.Name == _baselineName,
-                IterationSetup = entry.Setup,
-                IterationTeardown = entry.Teardown,
-                Progress = _progress,
-            };
-
-            var outcome = await entry.RunAsync(spec, cancellationToken).ConfigureAwait(false);
-            results.Add(outcome.Result);
-            rawSamples[entry.Name] = outcome.RawSamples;
-
-            await _progress.OnBenchmarkCompleted(outcome.Result).ConfigureAwait(false);
-
-            if (_options.ForceGcBetweenBenchmarks)
-            {
-                GC.Collect(2, GCCollectionMode.Forced, true, true);
-                GC.WaitForPendingFinalizers();
-            }
-        }
-
-        await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
+        var (results, rawSamples) = await SuiteRunner.RunAsync(
+            envelopes, _runOrder, seed: null, _options, startIndex: 0,
+            totalBenchmarks: _benchmarks.Count, _progress, cancellationToken).ConfigureAwait(false);
 
         _suiteTeardown?.Invoke();
 
-        if (_options.EnableSignificance && results.Any(r => !r.Errored) && results.Count > 1)
-            Significance.ComputeSignificance(results, rawSamples);
+        await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
+
+        Significance.ApplyIfEnabled(results, rawSamples, _options);
 
         foreach (var reporter in _reporters)
         {
@@ -234,23 +193,47 @@ public sealed class BenchmarkSuite(string name)
         return results;
     }
 
-    private readonly record struct BenchmarkEntry(
-        string Name,
-        Action? Setup,
-        Action? Teardown,
-        Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> RunAsync);
-
-    private static List<T> ShuffleBenchmarks<T>(List<T> items, int seed)
+    private static MeasurementOutcome BuildSyncOutcome(
+        string name, Action body, RunSpec spec, Action? setup, Action? teardown, CancellationToken ct)
     {
-        var rng = new Random(seed);
-        var span = CollectionsMarshal.AsSpan(items);
-
-        for (var i = span.Length - 1; i > 0; i--)
+        var bound = spec with
         {
-            var j = rng.Next(i + 1);
-            (span[i], span[j]) = (span[j], span[i]);
-        }
+            IterationSetup = setup,
+            IterationTeardown = teardown,
+        };
+        return BenchmarkRunner.Instance.Run(name, body, bound, ct);
+    }
 
-        return items;
+    private static async Task<MeasurementOutcome> BuildAsyncVoidOutcome(
+        string name, Func<Task> body, RunSpec spec, Action? setup, Action? teardown, CancellationToken ct)
+    {
+        var bound = spec with
+        {
+            IterationSetup = setup,
+            IterationTeardown = teardown,
+        };
+        return await BenchmarkRunner.Instance.RunAsync(name, body, bound, ct).ConfigureAwait(false);
+    }
+
+    private static MeasurementOutcome BuildSyncReturningOutcome<T>(
+        string name, Func<T> body, RunSpec spec, Action? setup, Action? teardown, CancellationToken ct)
+    {
+        var bound = spec with
+        {
+            IterationSetup = setup,
+            IterationTeardown = teardown,
+        };
+        return BenchmarkRunner.Instance.Run(name, body, bound, ct);
+    }
+
+    private static async Task<MeasurementOutcome> BuildAsyncReturningOutcome<T>(
+        string name, Func<Task<T>> body, RunSpec spec, Action? setup, Action? teardown, CancellationToken ct)
+    {
+        var bound = spec with
+        {
+            IterationSetup = setup,
+            IterationTeardown = teardown,
+        };
+        return await BenchmarkRunner.Instance.RunAsync(name, body, bound, ct).ConfigureAwait(false);
     }
 }

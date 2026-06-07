@@ -146,6 +146,54 @@ public class SignificanceTests
         Assert.NotNull(results[1].PValue);
     }
 
+    [Fact]
+    public void ApplyIfEnabled_Skips_When_Disabled()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            new() { Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true },
+            new() { Name = "b", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3 },
+        };
+        var raw = new Dictionary<string, double[]> { ["a"] = [10, 11, 12], ["b"] = [1, 2, 3] };
+
+        Significance.ApplyIfEnabled(results, raw, new MeasurementOptions { EnableSignificance = false });
+
+        Assert.All(results, r => Assert.Null(r.PValue));
+    }
+
+    [Fact]
+    public void ApplyIfEnabled_Skips_When_Fewer_Than_Two_Results()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            new() { Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true },
+        };
+        var raw = new Dictionary<string, double[]> { ["a"] = [10, 11, 12] };
+
+        Significance.ApplyIfEnabled(results, raw, MeasurementOptions.Default);
+
+        Assert.Null(results[0].PValue);
+    }
+
+    [Fact]
+    public void ApplyIfEnabled_Runs_When_Two_Or_More_Successful()
+    {
+        var rng = new Random(42);
+        var baselineSamples = Enumerable.Range(0, 50).Select(_ => (double)rng.Next(90, 110)).ToArray();
+        var fasterSamples = Enumerable.Range(0, 50).Select(_ => (double)rng.Next(40, 60)).ToArray();
+
+        var results = new List<BenchmarkResult>
+        {
+            new() { Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true },
+            new() { Name = "faster", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3 },
+        };
+        var raw = new Dictionary<string, double[]> { ["baseline"] = baselineSamples, ["faster"] = fasterSamples };
+
+        Significance.ApplyIfEnabled(results, raw, MeasurementOptions.Default);
+
+        Assert.NotNull(results[1].PValue);
+    }
+
     private static BenchmarkResult ErroredResult(string name, string error) =>
         new()
         {

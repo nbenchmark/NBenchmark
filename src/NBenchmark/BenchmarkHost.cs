@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
@@ -132,12 +131,18 @@ public sealed class BenchmarkHost
         var allResults = new List<BenchmarkResult>();
         var rawSamples = new Dictionary<string, double[]>();
 
-        var totalBenchmarks = filtered.Sum(s => s.Benchmarks.Count);
-        var runningIndex = 0;
+        var suiteOptions = _dryRun
+            ? _options with { Iterations = 0, WarmupIterations = 0 }
+            : _options;
 
-        await _progress.OnSuiteStarting(
-            filtered.SelectMany(s => s.Benchmarks.Select(b => $"{s.Type.Name}.{b.DisplayName}")).ToList(),
-            totalBenchmarks).ConfigureAwait(false);
+        var allNames = filtered
+            .SelectMany(s => s.Benchmarks.Select(b => $"{s.Type.Name}.{b.DisplayName}"))
+            .ToList();
+        var totalBenchmarks = allNames.Count;
+
+        await _progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
+
+        var runningIndex = 0;
 
         foreach (var suite in filtered)
         {
@@ -166,124 +171,40 @@ public sealed class BenchmarkHost
 
             try
             {
-                suite.SetupDelegate?.Invoke(typedInstance);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                Console.WriteLine($"[Error] Setup failed for {suite.Type.Name}: {ex.Message}");
-
-                foreach (var b in suite.Benchmarks)
+                try
                 {
-                    var name = $"{suite.Type.Name}.{b.Method.Name}";
+                    suite.SetupDelegate?.Invoke(typedInstance);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Console.WriteLine($"[Error] Setup failed for {suite.Type.Name}: {ex.Message}");
 
-                    // TotalDuration/MeasuredDuration stay TimeSpan.Zero: no per-benchmark timer
-                    // was started because failure happened before any benchmark ran.
-                    allResults.Add(OutcomeBuilder.Build(
-                        new OutcomeInput.Errored(ex, $"Suite setup failed: {ex.Message}"),
-                        name, b.Attribute.Description, b.Attribute.Baseline,
-                        _options, TimeSpan.Zero, TimeSpan.Zero).Result);
+                    foreach (var b in suite.Benchmarks)
+                    {
+                        var name = $"{suite.Type.Name}.{b.DisplayName}";
+
+                        allResults.Add(OutcomeBuilder.Build(
+                            new OutcomeInput.Errored(ex, $"Suite setup failed: {ex.Message}"),
+                            name, b.Attribute.Description, b.Attribute.Baseline,
+                            suiteOptions, TimeSpan.Zero, TimeSpan.Zero).Result);
+                    }
+
+                    continue;
                 }
 
-                continue;
-            }
+                var envelopes = suite.Benchmarks
+                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, typedInstance))
+                    .ToList();
 
-            try
-            {
-                var ordered = _runOrder == RunOrder.Random
-                    ? ShuffleBenchmarks(suite.Benchmarks.ToList(), _seed ?? Random.Shared.Next())
-                    : suite.Benchmarks;
+                var (results, samples) = await SuiteRunner.RunAsync(
+                    envelopes, _runOrder, _seed, suiteOptions, runningIndex, totalBenchmarks,
+                    _progress, cancellationToken).ConfigureAwait(false);
 
-                foreach (var benchmark in ordered)
-                {
-                    var benchmarkName = $"{suite.Type.Name}.{benchmark.DisplayName}";
-                    runningIndex++;
+                runningIndex += suite.Benchmarks.Count;
 
-                    var options = benchmark.Attribute.Iterations.HasValue
-                        ? _options with { Iterations = benchmark.Attribute.Iterations.Value }
-                        : _options;
-
-                    if (_dryRun)
-                    {
-                        options = options with { Iterations = 0, WarmupIterations = 0 };
-                    }
-
-                    var spec = new RunSpec
-                    {
-                        Options = options,
-                        Description = benchmark.Attribute.Description,
-                        IsBaseline = benchmark.Attribute.Baseline,
-                        IterationSetup = benchmark.IterationSetupDelegate is { } s ? () => s(typedInstance) : null,
-                        IterationTeardown = benchmark.IterationTeardownDelegate is { } t ? () => t(typedInstance) : null,
-                        Progress = _progress,
-                    };
-
-                    await _progress.OnBenchmarkStarting(benchmarkName, runningIndex, totalBenchmarks).ConfigureAwait(false);
-
-                    BenchmarkResult result;
-
-                    try
-                    {
-                        MeasurementOutcome outcome;
-
-                        if (benchmark.AsyncDelegate is not null)
-                        {
-                            var asyncDel = benchmark.AsyncDelegate;
-                            var resultExtractor = benchmark.ResultExtractor;
-
-                            if (resultExtractor is not null)
-                            {
-                                Func<Task<object?>> body = async () =>
-                                {
-                                    var task = asyncDel(typedInstance);
-                                    await task.ConfigureAwait(false);
-                                    return resultExtractor(task);
-                                };
-                                outcome = await BenchmarkRunner.Instance.RunAsync(benchmarkName, body, spec, cancellationToken).ConfigureAwait(false);
-                            }
-                            else
-                            {
-                                Func<Task> body = async () =>
-                                {
-                                    var task = asyncDel(typedInstance);
-                                    await task.ConfigureAwait(false);
-                                };
-                                outcome = await BenchmarkRunner.Instance.RunAsync(benchmarkName, body, spec, cancellationToken).ConfigureAwait(false);
-                            }
-                        }
-                        else
-                        {
-                            var syncDel = benchmark.SyncDelegate!;
-                            Func<object?> body = () => syncDel(typedInstance);
-                            outcome = BenchmarkRunner.Instance.Run(benchmarkName, body, spec, cancellationToken);
-                        }
-
-                        result = outcome.Result;
-                        rawSamples[benchmarkName] = outcome.RawSamples;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        // TotalDuration/MeasuredDuration stay TimeSpan.Zero: an unexpected
-                        // exception escaped the runner before its outer timer could be
-                        // stopped and routed to the result.
-                        result = OutcomeBuilder.Build(
-                            new OutcomeInput.Errored(ex),
-                            benchmarkName, benchmark.Attribute.Description, benchmark.Attribute.Baseline,
-                            options, TimeSpan.Zero, TimeSpan.Zero).Result;
-                    }
-
-                    allResults.Add(result);
-                    await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
-
-                    if (options.ForceGcBetweenBenchmarks)
-                    {
-                        GC.Collect(2, GCCollectionMode.Forced, true, true);
-                        GC.WaitForPendingFinalizers();
-                    }
-                }
+                allResults.AddRange(results);
+                foreach (var kvp in samples)
+                    rawSamples[kvp.Key] = kvp.Value;
             }
             finally
             {
@@ -310,8 +231,7 @@ public sealed class BenchmarkHost
 
         await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
 
-        if (_options.EnableSignificance && allResults.Count(r => !r.Errored) > 1)
-            Significance.ComputeSignificance(allResults, rawSamples);
+        Significance.ApplyIfEnabled(allResults, rawSamples, _options);
 
         if (!string.IsNullOrEmpty(_outputDir))
             ApplyOutputDirectory(_outputDir);
@@ -351,71 +271,12 @@ public sealed class BenchmarkHost
             .Select(s => s with
             {
                 Benchmarks = s.Benchmarks
-                    .Where(b => GlobMatch(_filter,
+                    .Where(b => GlobMatcher.Match(_filter,
                         $"{s.Type.Name}.{b.DisplayName}"))
                     .ToList(),
             })
             .Where(s => s.Benchmarks.Count > 0)
             .ToList();
-    }
-
-    private static bool GlobMatch(string pattern, string input)
-    {
-        if (pattern == "*")
-            return true;
-
-        var parts = pattern.Split('*');
-
-        if (parts.Length == 0)
-            return true;
-
-        var remaining = input;
-
-        if (!pattern.StartsWith("*"))
-        {
-            var first = parts[0];
-
-            if (!remaining.StartsWith(first, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            remaining = remaining[first.Length..];
-        }
-
-        for (var i = pattern.StartsWith("*") ? 0 : 1; i < parts.Length; i++)
-        {
-            var part = parts[i];
-
-            if (i == parts.Length - 1 && !pattern.EndsWith("*"))
-            {
-                if (!remaining.EndsWith(part, StringComparison.OrdinalIgnoreCase))
-                    return false;
-
-                break;
-            }
-
-            var idx = remaining.IndexOf(part, StringComparison.OrdinalIgnoreCase);
-
-            if (idx < 0)
-                return false;
-
-            remaining = remaining[(idx + part.Length)..];
-        }
-
-        return true;
-    }
-
-    private static List<T> ShuffleBenchmarks<T>(List<T> items, int seed)
-    {
-        var rng = new Random(seed);
-        var span = CollectionsMarshal.AsSpan(items);
-
-        for (var i = span.Length - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (span[i], span[j]) = (span[j], span[i]);
-        }
-
-        return items;
     }
 
     private static void PrintHelp()

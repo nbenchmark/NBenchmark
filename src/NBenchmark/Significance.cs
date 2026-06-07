@@ -4,6 +4,20 @@ namespace NBenchmark;
 
 internal static class Significance
 {
+    public static void ApplyIfEnabled(
+        List<BenchmarkResult> results,
+        Dictionary<string, double[]> rawSamples,
+        MeasurementOptions options)
+    {
+        if (!options.EnableSignificance)
+            return;
+
+        if (results.Count(r => !r.Errored) < 2)
+            return;
+
+        ComputeSignificance(results, rawSamples);
+    }
+
     public static void ComputeSignificance(
         List<BenchmarkResult> results,
         Dictionary<string, double[]> rawSamples)

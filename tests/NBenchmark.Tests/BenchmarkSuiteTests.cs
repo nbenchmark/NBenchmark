@@ -103,11 +103,57 @@ public class BenchmarkSuiteTests
             });
     }
 
+    [Fact]
+    public async Task RunAsync_Emits_OnSuiteStarting_Before_Setup_And_OnSuiteCompleted_After_Teardown()
+    {
+        var events = new List<string>();
+
+        var suite = new BenchmarkSuite("ordering")
+            .Add("work", () => { })
+            .WithWarmup(0)
+            .WithIterations(1)
+            .WithOutlierMode(OutlierMode.None)
+            .WithSuiteSetup(() => events.Add("setup"))
+            .WithSuiteTeardown(() => events.Add("teardown"))
+            .WithProgress(new OrderingProgress(
+                onSuiteStarting: () => events.Add("onSuiteStarting"),
+                onSuiteCompleted: () => events.Add("onSuiteCompleted")));
+
+        await suite.RunAsync();
+
+        Assert.Equal(new[] { "onSuiteStarting", "setup", "teardown", "onSuiteCompleted" }, events);
+    }
+
+    private sealed class OrderingProgress : IBenchmarkProgress
+    {
+        private readonly Action _onSuiteStarting;
+        private readonly Action _onSuiteCompleted;
+
+        public OrderingProgress(Action onSuiteStarting, Action onSuiteCompleted)
+        {
+            _onSuiteStarting = onSuiteStarting;
+            _onSuiteCompleted = onSuiteCompleted;
+        }
+
+        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) { _onSuiteStarting(); return Task.CompletedTask; }
+        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
+        public Task OnWarmupCompleted(string name) => Task.CompletedTask;
+        public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
+        public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
+        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) { _onSuiteCompleted(); return Task.CompletedTask; }
+    }
+
     private sealed class CapturingProgress : IBenchmarkProgress
     {
         public List<(string Name, int Index, int Total)> BenchmarkStarts { get; } = [];
+        public List<int> SuiteStartings { get; } = [];
+        public List<int> SuiteCompletions { get; } = [];
 
-        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) => Task.CompletedTask;
+        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
+        {
+            SuiteStartings.Add(total);
+            return Task.CompletedTask;
+        }
 
         public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
 
@@ -121,6 +167,10 @@ public class BenchmarkSuiteTests
 
         public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
 
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) => Task.CompletedTask;
+        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
+        {
+            SuiteCompletions.Add(results.Count);
+            return Task.CompletedTask;
+        }
     }
 }
