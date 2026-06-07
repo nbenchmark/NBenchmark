@@ -20,7 +20,6 @@ public class MeasurementOptionsTests
     }
 
     [Theory]
-    [InlineData(0)]
     [InlineData(-1)]
     [InlineData(100001)]
     public void Iterations_Rejects_Invalid_Values(int value)
@@ -30,6 +29,7 @@ public class MeasurementOptionsTests
     }
 
     [Theory]
+    [InlineData(0)]
     [InlineData(1)]
     [InlineData(200)]
     [InlineData(100000)]
@@ -40,7 +40,7 @@ public class MeasurementOptionsTests
     }
 
     [Theory]
-    [InlineData(0)]
+    [InlineData(-1)]
     [InlineData(10001)]
     public void WarmupIterations_Rejects_Invalid_Values(int value)
     {
@@ -49,6 +49,7 @@ public class MeasurementOptionsTests
     }
 
     [Theory]
+    [InlineData(0)]
     [InlineData(1)]
     [InlineData(25)]
     [InlineData(10000)]

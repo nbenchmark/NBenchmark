@@ -29,15 +29,18 @@ public class TimingSanityTests
         const double targetMicros = 5_000.0; // 5 ms
         const double targetNanos = targetMicros * 1_000.0;
 
-        var outcome = MeasurementEngine.MeasureSync(
+        var outcome = BenchmarkRunner.Instance.Run(
             "busywait",
             () => BusyWait(targetMicros),
-            new MeasurementOptions
+            new RunSpec
             {
-                WarmupIterations = 3,
-                Iterations = 15,
-                OutlierMode = OutlierMode.None,
-                MeasureAllocations = false,
+                Options = new MeasurementOptions
+                {
+                    WarmupIterations = 3,
+                    Iterations = 15,
+                    OutlierMode = OutlierMode.None,
+                    MeasureAllocations = false,
+                },
             });
 
         // The fastest iteration cannot beat the busy-wait floor, and preemption

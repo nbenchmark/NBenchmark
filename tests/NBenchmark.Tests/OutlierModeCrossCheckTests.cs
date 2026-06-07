@@ -63,13 +63,16 @@ public class OutlierModeCrossCheckTests
     }
 
     private static Task<MeasurementOutcome> Measure(int iterations, OutlierMode mode) =>
-        MeasurementEngine.MeasureAsync(
+        BenchmarkRunner.Instance.RunAsync(
             "outlier",
             () => Task.CompletedTask,
-            new MeasurementOptions
+            new RunSpec
             {
-                WarmupIterations = 1,
-                Iterations = iterations,
-                OutlierMode = mode,
+                Options = new MeasurementOptions
+                {
+                    WarmupIterations = 1,
+                    Iterations = iterations,
+                    OutlierMode = mode,
+                },
             });
 }

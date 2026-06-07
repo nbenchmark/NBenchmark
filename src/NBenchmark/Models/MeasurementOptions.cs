@@ -2,7 +2,7 @@ namespace NBenchmark;
 
 public record MeasurementOptions
 {
-    public const int MinIterations = 1;
+    public const int MinIterations = 0;
     public const int MaxIterations = 100_000;
     public const int MaxWarmupIterations = 10_000;
     public static readonly MeasurementOptions Default = new();
@@ -13,19 +13,19 @@ public record MeasurementOptions
     public int WarmupIterations
     {
         get => _warmupIterations;
-        init => _warmupIterations = value is >= 1 and <= MaxWarmupIterations
+        init => _warmupIterations = value is >= 0 and <= MaxWarmupIterations
             ? value
             : throw new ArgumentOutOfRangeException(nameof(value), value,
-                $"WarmupIterations must be between 1 and {MaxWarmupIterations}");
+                $"WarmupIterations must be between 0 and {MaxWarmupIterations}");
     }
 
     public int Iterations
     {
         get => _iterations;
-        init => _iterations = value is >= 1 and <= MaxIterations
+        init => _iterations = value is >= 0 and <= MaxIterations
             ? value
             : throw new ArgumentOutOfRangeException(nameof(value), value,
-                $"Iterations must be between {MinIterations} and {MaxIterations}");
+                $"Iterations must be between 0 and {MaxIterations}");
     }
 
     public bool ForceGcBeforeEachIteration { get; init; } = true;

@@ -241,11 +241,13 @@ Output:
 
 ## Dry run
 
-Invokes each benchmark once without measurement — useful for checking that all benchmarks compile and run without errors:
+Validates that all benchmarks compile, discover, and wire up correctly — without invoking the body:
 
 ```bash
 dotnet run -- --dry-run
 ```
+
+`--dry-run` is implemented as `--iterations 0 --warmup 0`. The body is not invoked, and no measurements are taken. Use it to confirm discovery, setup, and instantiation work before a full run. To run the body exactly once for a smoke test, use `--iterations 1 --warmup 0`.
 
 ## Return value
 

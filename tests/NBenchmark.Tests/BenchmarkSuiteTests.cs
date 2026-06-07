@@ -72,4 +72,55 @@ public class BenchmarkSuiteTests
         var calm = results.Single(r => r.Name == "calm");
         Assert.False(calm.Errored);
     }
+
+    [Fact]
+    public async Task RunAsync_Emits_OnBenchmarkStarting_For_Each_Benchmark()
+    {
+        var progress = new CapturingProgress();
+
+        await new BenchmarkSuite("progress")
+            .Add("a", () => { })
+            .Add("b", () => { })
+            .WithWarmup(0)
+            .WithIterations(1)
+            .WithOutlierMode(OutlierMode.None)
+            .WithRunOrder(RunOrder.Declaration)
+            .WithProgress(progress)
+            .RunAsync();
+
+        Assert.Collection(progress.BenchmarkStarts,
+            first =>
+            {
+                Assert.Equal("a", first.Name);
+                Assert.Equal(1, first.Index);
+                Assert.Equal(2, first.Total);
+            },
+            second =>
+            {
+                Assert.Equal("b", second.Name);
+                Assert.Equal(2, second.Index);
+                Assert.Equal(2, second.Total);
+            });
+    }
+
+    private sealed class CapturingProgress : IBenchmarkProgress
+    {
+        public List<(string Name, int Index, int Total)> BenchmarkStarts { get; } = [];
+
+        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) => Task.CompletedTask;
+
+        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
+
+        public Task OnWarmupCompleted(string name) => Task.CompletedTask;
+
+        public Task OnBenchmarkStarting(string name, int index, int total)
+        {
+            BenchmarkStarts.Add((name, index, total));
+            return Task.CompletedTask;
+        }
+
+        public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
+
+        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) => Task.CompletedTask;
+    }
 }

@@ -38,7 +38,7 @@ dotnet run -- --filter StringBenchmarks.Concat   # exact match
 
 ### `--iterations <n>`
 
-Number of measured iterations per benchmark. Valid range: `1` to `100 000`. Default: `200`.
+Number of measured iterations per benchmark. Valid range: `0` to `100 000`. Default: `200`. A value of `0` (combined with `--warmup 0`) is the dry-run signal — the body is not invoked.
 
 ```bash
 dotnet run -- --iterations 1000
@@ -48,7 +48,7 @@ dotnet run -- --iterations 1000
 
 ### `--warmup <n>`
 
-Number of warmup iterations per benchmark. Valid range: `1` to `10 000`. Default: `25`.
+Number of warmup iterations per benchmark. Valid range: `0` to `10 000`. Default: `25`.
 
 ```bash
 dotnet run -- --warmup 50
@@ -149,7 +149,9 @@ Output:
 
 ### `--dry-run`
 
-Invoke each benchmark once without measurement. Useful for checking that benchmarks compile and run without errors before a full run.
+Skip the body entirely. `--dry-run` is implemented as `--iterations 0 --warmup 0`: the body is not invoked, only the discovery and wiring (setup, teardown, instantiation) runs. Use it to validate discovery and configuration without measurement.
+
+> **Behavioural change:** in earlier versions `--dry-run` invoked the body once for a "smoke test". It now does not invoke the body at all. To run the body exactly once for smoke-testing, use `--iterations 1 --warmup 0`.
 
 ```bash
 dotnet run -- --dry-run

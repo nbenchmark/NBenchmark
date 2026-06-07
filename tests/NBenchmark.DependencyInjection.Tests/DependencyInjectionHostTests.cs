@@ -19,7 +19,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--dry-run"])
+            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<DependentBenchmark>()
                 .WithServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -101,7 +101,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--dry-run"])
+            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .UseDependencyInjection<DependentBenchmark>(services)
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();
@@ -138,7 +138,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "ParameterlessBenchmark.*", "--dry-run"])
+            await BenchmarkHost.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<ParameterlessBenchmark>()
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();
@@ -154,7 +154,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "ParameterlessBenchmark.*", "--dry-run"])
+            await BenchmarkHost.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<ParameterlessBenchmark>()
                 .WithInstanceFactory(type =>
                 {

@@ -137,7 +137,7 @@ public sealed class BenchmarkHost
 
         await _progress.OnSuiteStarting(
             filtered.SelectMany(s => s.Benchmarks.Select(b => $"{s.Type.Name}.{b.DisplayName}")).ToList(),
-            totalBenchmarks);
+            totalBenchmarks).ConfigureAwait(false);
 
         foreach (var suite in filtered)
         {
@@ -162,7 +162,6 @@ public sealed class BenchmarkHost
                 continue;
             }
 
-            // instance is non-null here: the try above either assigns it or `continue`s.
             var typedInstance = instance!;
 
             try
@@ -200,145 +199,79 @@ public sealed class BenchmarkHost
                         ? _options with { Iterations = benchmark.Attribute.Iterations.Value }
                         : _options;
 
-                    await _progress.OnWarmupStarting(benchmarkName, options.WarmupIterations);
-                    await _progress.OnBenchmarkStarting(benchmarkName, runningIndex, totalBenchmarks);
+                    if (_dryRun)
+                    {
+                        options = options with { Iterations = 0, WarmupIterations = 0 };
+                    }
+
+                    var spec = new RunSpec
+                    {
+                        Options = options,
+                        Description = benchmark.Attribute.Description,
+                        IsBaseline = benchmark.Attribute.Baseline,
+                        IterationSetup = benchmark.IterationSetupDelegate is { } s ? () => s(typedInstance) : null,
+                        IterationTeardown = benchmark.IterationTeardownDelegate is { } t ? () => t(typedInstance) : null,
+                        Progress = _progress,
+                    };
+
+                    await _progress.OnBenchmarkStarting(benchmarkName, runningIndex, totalBenchmarks).ConfigureAwait(false);
 
                     BenchmarkResult result;
 
                     try
                     {
-                        Action? syncAction = null;
-                        Func<Task>? asyncAction = null;
+                        MeasurementOutcome outcome;
 
                         if (benchmark.AsyncDelegate is not null)
                         {
                             var asyncDel = benchmark.AsyncDelegate;
                             var resultExtractor = benchmark.ResultExtractor;
 
-                            asyncAction = async () =>
+                            if (resultExtractor is not null)
                             {
-                                var task = asyncDel(typedInstance);
-                                await task;
-
-                                if (resultExtractor is not null)
+                                Func<Task<object?>> body = async () =>
                                 {
-                                    var resultValue = resultExtractor(task);
-
-                                    if (resultValue is not null)
-                                        ResultSink.Consume(resultValue);
-                                }
-                            };
+                                    var task = asyncDel(typedInstance);
+                                    await task.ConfigureAwait(false);
+                                    return resultExtractor(task);
+                                };
+                                outcome = await BenchmarkRunner.Instance.RunAsync(benchmarkName, body, spec, cancellationToken).ConfigureAwait(false);
+                            }
+                            else
+                            {
+                                Func<Task> body = async () =>
+                                {
+                                    var task = asyncDel(typedInstance);
+                                    await task.ConfigureAwait(false);
+                                };
+                                outcome = await BenchmarkRunner.Instance.RunAsync(benchmarkName, body, spec, cancellationToken).ConfigureAwait(false);
+                            }
                         }
                         else
                         {
                             var syncDel = benchmark.SyncDelegate!;
-
-                            syncAction = () =>
-                            {
-                                var r = syncDel(typedInstance);
-
-                                if (r is not null)
-                                    ResultSink.Consume(r);
-                            };
+                            Func<object?> body = () => syncDel(typedInstance);
+                            outcome = BenchmarkRunner.Instance.Run(benchmarkName, body, spec, cancellationToken);
                         }
 
-                        Action? iterSetup = benchmark.IterationSetupDelegate is not null
-                            ? () => benchmark.IterationSetupDelegate(typedInstance)
-                            : null;
-
-                        Action? iterTeardown = benchmark.IterationTeardownDelegate is not null
-                            ? () => benchmark.IterationTeardownDelegate(typedInstance)
-                            : null;
-
-                        if (_dryRun)
-                        {
-                            if (syncAction is not null)
-                                syncAction();
-                            else
-                                await asyncAction!();
-
-                            result = new BenchmarkResult
-                            {
-                                Name = benchmarkName,
-                                Description = benchmark.Attribute.Description,
-                                Mean = 0,
-                                Median = 0,
-                                P95 = 0,
-                                P99 = 0,
-                                Min = 0,
-                                Max = 0,
-                                StandardDeviation = 0,
-                                MeanAllocatedBytes = null,
-                                PValue = null,
-                                IsSignificant = null,
-                                Errored = false,
-                                ErrorMessage = null,
-                                MeasuredIterations = 0,
-                                WarmupIterations = 0,
-                                RunAt = DateTimeOffset.UtcNow,
-                                TotalDuration = TimeSpan.Zero,
-                                IsBaseline = benchmark.Attribute.Baseline,
-                                OutlierMode = _options.OutlierMode,
-                            };
-                        }
-                        else if (syncAction is not null)
-                        {
-                            var outcome = MeasurementEngine.MeasureSync(
-                                benchmarkName,
-                                syncAction,
-                                options,
-                                benchmark.Attribute.Description,
-                                benchmark.Attribute.Baseline,
-                                iterSetup,
-                                iterTeardown,
-                                cancellationToken
-                            );
-
-                            result = outcome.Result;
-                            rawSamples[benchmarkName] = outcome.RawSamples;
-                        }
-                        else
-                        {
-                            var outcome = await MeasurementEngine.MeasureAsync(
-                                benchmarkName,
-                                asyncAction!,
-                                options,
-                                benchmark.Attribute.Description,
-                                benchmark.Attribute.Baseline,
-                                iterSetup,
-                                iterTeardown,
-                                cancellationToken
-                            );
-
-                            result = outcome.Result;
-                            rawSamples[benchmarkName] = outcome.RawSamples;
-                        }
-
-                        await _progress.OnWarmupCompleted(benchmarkName);
+                        result = outcome.Result;
+                        rawSamples[benchmarkName] = outcome.RawSamples;
                     }
                     catch (OperationCanceledException)
                     {
                         throw;
                     }
-                    catch (TargetInvocationException tiex)
-                    {
-                        var inner = tiex.InnerException ?? tiex;
-
-                        result = BenchmarkResult.CreateErrored(benchmarkName, inner.ToString(),
-                            benchmark.Attribute.Description, benchmark.Attribute.Baseline,
-                            _options.OutlierMode);
-                    }
                     catch (Exception ex)
                     {
                         result = BenchmarkResult.CreateErrored(benchmarkName, ex.ToString(),
                             benchmark.Attribute.Description, benchmark.Attribute.Baseline,
-                            _options.OutlierMode);
+                            options.OutlierMode);
                     }
 
                     allResults.Add(result);
-                    await _progress.OnBenchmarkCompleted(result);
+                    await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
 
-                    if (_options.ForceGcBetweenBenchmarks)
+                    if (options.ForceGcBetweenBenchmarks)
                     {
                         GC.Collect(2, GCCollectionMode.Forced, true, true);
                         GC.WaitForPendingFinalizers();
@@ -368,7 +301,7 @@ public sealed class BenchmarkHost
             }
         }
 
-        await _progress.OnSuiteCompleted(allResults);
+        await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
 
         if (_options.EnableSignificance && allResults.Count(r => !r.Errored) > 1)
             Significance.ComputeSignificance(allResults, rawSamples);
@@ -378,12 +311,9 @@ public sealed class BenchmarkHost
 
         foreach (var reporter in _reporters)
         {
-            await reporter.ReportAsync(allResults, cancellationToken);
+            await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
         }
 
-        // Set the exit code only after reporters finish so a reporter failure cannot
-        // clobber it. --threshold-pct is deliberately rejected (not silently accepted)
-        // to prevent CI scripts from passing for the wrong reason before it ships.
         if (_thresholdRejected)
             Environment.ExitCode = 1;
 
@@ -493,7 +423,7 @@ public sealed class BenchmarkHost
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
-        Console.WriteLine("  --dry-run              Invoke each benchmark once (skip measurement)");
+        Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
         Console.WriteLine("  --threshold-pct <n>    [NOT YET IMPLEMENTED] Will fail with exit code 1 if");
         Console.WriteLine("                        any benchmark regresses >N% vs baseline.");
@@ -523,10 +453,10 @@ public sealed class BenchmarkHost
 
                     break;
                 case "--warmup" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var warmup) && warmup >= 1 && warmup <= MeasurementOptions.MaxWarmupIterations)
+                    if (int.TryParse(args[++i], out var warmup) && warmup >= 0 && warmup <= MeasurementOptions.MaxWarmupIterations)
                         _options = _options with { WarmupIterations = warmup };
                     else
-                        Console.WriteLine($"Invalid --warmup value '{args[i]}'. Must be 1–{MeasurementOptions.MaxWarmupIterations}.");
+                        Console.WriteLine($"Invalid --warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupIterations}.");
 
                     break;
                 case "--output" when i + 1 < args.Length:
