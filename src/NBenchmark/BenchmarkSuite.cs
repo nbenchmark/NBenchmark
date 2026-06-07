@@ -21,51 +21,32 @@ public sealed class BenchmarkSuite(string name)
 
     public BenchmarkSuite Add(string name, Action action,
         Action? setup = null, Action? teardown = null)
-    {
-        EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEnvelope(
-            Name: name,
-            Description: null,
-            IsBaseline: false,
-            RunAsync: (spec, ct) => Task.FromResult(
-                BuildSyncOutcome(name, action, spec, setup, teardown, ct))));
-        return this;
-    }
+        => AddEnvelope(name, (spec, ct) =>
+            Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
+                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
 
     public BenchmarkSuite Add(string name, Func<Task> action,
         Action? setup = null, Action? teardown = null)
-    {
-        EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEnvelope(
-            Name: name,
-            Description: null,
-            IsBaseline: false,
-            RunAsync: (spec, ct) => BuildAsyncVoidOutcome(name, action, spec, setup, teardown, ct)));
-        return this;
-    }
+        => AddEnvelope(name, async (spec, ct) =>
+            await BenchmarkRunner.Instance.RunAsync(name, action,
+                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
 
     public BenchmarkSuite Add<T>(string name, Func<T> action,
         Action? setup = null, Action? teardown = null)
-    {
-        EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEnvelope(
-            Name: name,
-            Description: null,
-            IsBaseline: false,
-            RunAsync: (spec, ct) => Task.FromResult(
-                BuildSyncReturningOutcome<T>(name, action, spec, setup, teardown, ct))));
-        return this;
-    }
+        => AddEnvelope(name, (spec, ct) =>
+            Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
+                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
 
     public BenchmarkSuite Add<T>(string name, Func<Task<T>> action,
         Action? setup = null, Action? teardown = null)
+        => AddEnvelope(name, async (spec, ct) =>
+            await BenchmarkRunner.Instance.RunAsync(name, action,
+                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+
+    private BenchmarkSuite AddEnvelope(string name, Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEnvelope(
-            Name: name,
-            Description: null,
-            IsBaseline: false,
-            RunAsync: (spec, ct) => BuildAsyncReturningOutcome<T>(name, action, spec, setup, teardown, ct)));
+        _benchmarks.Add(new BenchmarkEnvelope(Name: name, Description: null, IsBaseline: false, RunAsync: runAsync));
         return this;
     }
 
@@ -193,47 +174,4 @@ public sealed class BenchmarkSuite(string name)
         return results;
     }
 
-    private static MeasurementOutcome BuildSyncOutcome(
-        string name, Action body, RunSpec spec, Action? setup, Action? teardown, CancellationToken ct)
-    {
-        var bound = spec with
-        {
-            IterationSetup = setup,
-            IterationTeardown = teardown,
-        };
-        return BenchmarkRunner.Instance.Run(name, body, bound, ct);
-    }
-
-    private static async Task<MeasurementOutcome> BuildAsyncVoidOutcome(
-        string name, Func<Task> body, RunSpec spec, Action? setup, Action? teardown, CancellationToken ct)
-    {
-        var bound = spec with
-        {
-            IterationSetup = setup,
-            IterationTeardown = teardown,
-        };
-        return await BenchmarkRunner.Instance.RunAsync(name, body, bound, ct).ConfigureAwait(false);
-    }
-
-    private static MeasurementOutcome BuildSyncReturningOutcome<T>(
-        string name, Func<T> body, RunSpec spec, Action? setup, Action? teardown, CancellationToken ct)
-    {
-        var bound = spec with
-        {
-            IterationSetup = setup,
-            IterationTeardown = teardown,
-        };
-        return BenchmarkRunner.Instance.Run(name, body, bound, ct);
-    }
-
-    private static async Task<MeasurementOutcome> BuildAsyncReturningOutcome<T>(
-        string name, Func<Task<T>> body, RunSpec spec, Action? setup, Action? teardown, CancellationToken ct)
-    {
-        var bound = spec with
-        {
-            IterationSetup = setup,
-            IterationTeardown = teardown,
-        };
-        return await BenchmarkRunner.Instance.RunAsync(name, body, bound, ct).ConfigureAwait(false);
-    }
 }
