@@ -178,9 +178,10 @@ public sealed class BenchmarkHost
 
                     // TotalDuration/MeasuredDuration stay TimeSpan.Zero: no per-benchmark timer
                     // was started because failure happened before any benchmark ran.
-                    allResults.Add(BenchmarkResult.CreateErrored(name,
-                        $"Suite setup failed: {ex.Message}", b.Attribute.Description,
-                        b.Attribute.Baseline, _options.OutlierMode));
+                    allResults.Add(OutcomeBuilder.Build(
+                        new OutcomeInput.Errored(ex, $"Suite setup failed: {ex.Message}"),
+                        name, b.Attribute.Description, b.Attribute.Baseline,
+                        _options, TimeSpan.Zero, TimeSpan.Zero).Result);
                 }
 
                 continue;
@@ -268,9 +269,10 @@ public sealed class BenchmarkHost
                         // TotalDuration/MeasuredDuration stay TimeSpan.Zero: an unexpected
                         // exception escaped the runner before its outer timer could be
                         // stopped and routed to the result.
-                        result = BenchmarkResult.CreateErrored(benchmarkName, ex.ToString(),
-                            benchmark.Attribute.Description, benchmark.Attribute.Baseline,
-                            options.OutlierMode);
+                        result = OutcomeBuilder.Build(
+                            new OutcomeInput.Errored(ex),
+                            benchmarkName, benchmark.Attribute.Description, benchmark.Attribute.Baseline,
+                            options, TimeSpan.Zero, TimeSpan.Zero).Result;
                     }
 
                     allResults.Add(result);

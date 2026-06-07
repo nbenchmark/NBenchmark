@@ -50,7 +50,9 @@ public sealed class BenchmarkRunner
             if (options.Iterations == 0)
             {
                 totalTimer.Stop();
-                var dryRun = DryRunOutcome(name, spec, totalTimer.Elapsed);
+                var dryRun = OutcomeBuilder.Build(
+                    new OutcomeInput.DryRun(), name, spec.Description, spec.IsBaseline,
+                    spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
                 progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
                 return dryRun;
             }
@@ -59,7 +61,12 @@ public sealed class BenchmarkRunner
 
             var (timings, allocations, measuredDuration) = MeasureSyncVoid(body, spec, ct);
             totalTimer.Stop();
-            var outcome = BuildOutcome(name, spec, timings, allocations, measuredDuration, totalTimer.Elapsed);
+            var trimmed = ApplyOutlierMode(timings, options.OutlierMode);
+            var stats = StatsSummary.Compute(trimmed, options.ConfidenceLevel);
+            var outcome = OutcomeBuilder.Build(
+                new OutcomeInput.Success(stats, trimmed.Length, allocations, timings),
+                name, spec.Description, spec.IsBaseline, spec.Options,
+                totalTimer.Elapsed, measuredDuration);
 
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
@@ -71,7 +78,9 @@ public sealed class BenchmarkRunner
         catch (Exception ex)
         {
             totalTimer.Stop();
-            return ErroredOutcome(name, spec, ex, totalTimer.Elapsed);
+            return OutcomeBuilder.Build(
+                new OutcomeInput.Errored(ex), name, spec.Description, spec.IsBaseline,
+                spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
         }
     }
 
@@ -96,7 +105,9 @@ public sealed class BenchmarkRunner
             if (options.Iterations == 0)
             {
                 totalTimer.Stop();
-                var dryRun = DryRunOutcome(name, spec, totalTimer.Elapsed);
+                var dryRun = OutcomeBuilder.Build(
+                    new OutcomeInput.DryRun(), name, spec.Description, spec.IsBaseline,
+                    spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
                 progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
                 return dryRun;
             }
@@ -105,7 +116,12 @@ public sealed class BenchmarkRunner
 
             var (timings, allocations, measuredDuration) = MeasureSyncReturning<T>(body, spec, ct);
             totalTimer.Stop();
-            var outcome = BuildOutcome(name, spec, timings, allocations, measuredDuration, totalTimer.Elapsed);
+            var trimmed = ApplyOutlierMode(timings, options.OutlierMode);
+            var stats = StatsSummary.Compute(trimmed, options.ConfidenceLevel);
+            var outcome = OutcomeBuilder.Build(
+                new OutcomeInput.Success(stats, trimmed.Length, allocations, timings),
+                name, spec.Description, spec.IsBaseline, spec.Options,
+                totalTimer.Elapsed, measuredDuration);
 
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
@@ -117,7 +133,9 @@ public sealed class BenchmarkRunner
         catch (Exception ex)
         {
             totalTimer.Stop();
-            return ErroredOutcome(name, spec, ex, totalTimer.Elapsed);
+            return OutcomeBuilder.Build(
+                new OutcomeInput.Errored(ex), name, spec.Description, spec.IsBaseline,
+                spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
         }
     }
 
@@ -144,7 +162,9 @@ public sealed class BenchmarkRunner
             if (options.Iterations == 0)
             {
                 totalTimer.Stop();
-                var dryRun = DryRunOutcome(name, spec, totalTimer.Elapsed);
+                var dryRun = OutcomeBuilder.Build(
+                    new OutcomeInput.DryRun(), name, spec.Description, spec.IsBaseline,
+                    spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
                 await progress.OnWarmupCompleted(name).ConfigureAwait(false);
                 return dryRun;
             }
@@ -153,7 +173,12 @@ public sealed class BenchmarkRunner
 
             var (timings, allocations, measuredDuration) = await MeasureAsyncVoid(body, spec, ct).ConfigureAwait(false);
             totalTimer.Stop();
-            var outcome = BuildOutcome(name, spec, timings, allocations, measuredDuration, totalTimer.Elapsed);
+            var trimmed = ApplyOutlierMode(timings, options.OutlierMode);
+            var stats = StatsSummary.Compute(trimmed, options.ConfidenceLevel);
+            var outcome = OutcomeBuilder.Build(
+                new OutcomeInput.Success(stats, trimmed.Length, allocations, timings),
+                name, spec.Description, spec.IsBaseline, spec.Options,
+                totalTimer.Elapsed, measuredDuration);
 
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
@@ -165,7 +190,9 @@ public sealed class BenchmarkRunner
         catch (Exception ex)
         {
             totalTimer.Stop();
-            return ErroredOutcome(name, spec, ex, totalTimer.Elapsed);
+            return OutcomeBuilder.Build(
+                new OutcomeInput.Errored(ex), name, spec.Description, spec.IsBaseline,
+                spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
         }
     }
 
@@ -190,7 +217,9 @@ public sealed class BenchmarkRunner
             if (options.Iterations == 0)
             {
                 totalTimer.Stop();
-                var dryRun = DryRunOutcome(name, spec, totalTimer.Elapsed);
+                var dryRun = OutcomeBuilder.Build(
+                    new OutcomeInput.DryRun(), name, spec.Description, spec.IsBaseline,
+                    spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
                 await progress.OnWarmupCompleted(name).ConfigureAwait(false);
                 return dryRun;
             }
@@ -199,7 +228,12 @@ public sealed class BenchmarkRunner
 
             var (timings, allocations, measuredDuration) = await MeasureAsyncReturning<T>(body, spec, ct).ConfigureAwait(false);
             totalTimer.Stop();
-            var outcome = BuildOutcome(name, spec, timings, allocations, measuredDuration, totalTimer.Elapsed);
+            var trimmed = ApplyOutlierMode(timings, options.OutlierMode);
+            var stats = StatsSummary.Compute(trimmed, options.ConfidenceLevel);
+            var outcome = OutcomeBuilder.Build(
+                new OutcomeInput.Success(stats, trimmed.Length, allocations, timings),
+                name, spec.Description, spec.IsBaseline, spec.Options,
+                totalTimer.Elapsed, measuredDuration);
 
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
@@ -211,7 +245,9 @@ public sealed class BenchmarkRunner
         catch (Exception ex)
         {
             totalTimer.Stop();
-            return ErroredOutcome(name, spec, ex, totalTimer.Elapsed);
+            return OutcomeBuilder.Build(
+                new OutcomeInput.Errored(ex), name, spec.Description, spec.IsBaseline,
+                spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
         }
     }
 
@@ -371,108 +407,6 @@ public sealed class BenchmarkRunner
 
         loopTimer.Stop();
         return (timings, allocations, loopTimer.Elapsed);
-    }
-
-    // ---------- Outcome builders ----------
-
-    private static MeasurementOutcome DryRunOutcome(string name, RunSpec spec, TimeSpan totalDuration)
-    {
-        return new MeasurementOutcome
-        {
-            RawSamples = [],
-            Result = new BenchmarkResult
-            {
-                Name = name,
-                Description = spec.Description,
-                Mean = 0,
-                Median = 0,
-                P95 = 0,
-                P99 = 0,
-                Min = 0,
-                Max = 0,
-                StandardDeviation = 0,
-                StandardError = 0,
-                MarginOfError = 0,
-                ConfidenceLevel = spec.Options.ConfidenceLevel,
-                CoefficientOfVariation = 0,
-                MeanAllocatedBytes = null,
-                PValue = null,
-                IsSignificant = null,
-                Errored = false,
-                ErrorMessage = null,
-                MeasuredIterations = 0,
-                WarmupIterations = spec.Options.WarmupIterations,
-                RunAt = DateTimeOffset.UtcNow,
-                TotalDuration = totalDuration,
-                MeasuredDuration = TimeSpan.Zero,
-                IsBaseline = spec.IsBaseline,
-                OutlierMode = spec.Options.OutlierMode,
-            },
-        };
-    }
-
-    private static MeasurementOutcome ErroredOutcome(string name, RunSpec spec, Exception ex, TimeSpan totalDuration)
-    {
-        var inner = ex is System.Reflection.TargetInvocationException tiex ? (tiex.InnerException ?? tiex) : ex;
-
-        return new MeasurementOutcome
-        {
-            RawSamples = [],
-            Result = BenchmarkResult.CreateErrored(
-                name,
-                inner.ToString(),
-                spec.Description,
-                spec.IsBaseline,
-                spec.Options.OutlierMode,
-                totalDuration),
-        };
-    }
-
-    private static MeasurementOutcome BuildOutcome(
-        string name,
-        RunSpec spec,
-        double[] timings,
-        long[]? allocations,
-        TimeSpan measuredDuration,
-        TimeSpan totalDuration)
-    {
-        var options = spec.Options;
-        var trimmed = ApplyOutlierMode(timings, options.OutlierMode);
-        var stats = StatsSummary.Compute(trimmed, options.ConfidenceLevel);
-        long? meanAllocs = allocations is not null ? (long)allocations.Average() : null;
-
-        return new MeasurementOutcome
-        {
-            RawSamples = timings,
-            Result = new BenchmarkResult
-            {
-                Name = name,
-                Description = spec.Description,
-                Mean = stats.Mean,
-                Median = stats.Median,
-                P95 = stats.P95,
-                P99 = stats.P99,
-                Min = stats.Min,
-                Max = stats.Max,
-                StandardDeviation = stats.StandardDeviation,
-                StandardError = stats.StandardError,
-                MarginOfError = stats.MarginOfError,
-                ConfidenceLevel = stats.ConfidenceLevel,
-                CoefficientOfVariation = stats.CoefficientOfVariation,
-                MeanAllocatedBytes = meanAllocs,
-                PValue = null,
-                IsSignificant = null,
-                Errored = false,
-                ErrorMessage = null,
-                MeasuredIterations = trimmed.Length,
-                WarmupIterations = options.WarmupIterations,
-                RunAt = DateTimeOffset.UtcNow,
-                TotalDuration = totalDuration,
-                MeasuredDuration = measuredDuration,
-                IsBaseline = spec.IsBaseline,
-                OutlierMode = options.OutlierMode,
-            },
-        };
     }
 
     // ---------- JIT-elision sink (private, no public exposure) ----------

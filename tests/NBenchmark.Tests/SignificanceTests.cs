@@ -73,7 +73,7 @@ public class SignificanceTests
     {
         var results = new List<BenchmarkResult>
         {
-            BenchmarkResult.CreateErrored("broken", "error"),
+            ErroredResult("broken", "error"),
             new()
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
@@ -145,4 +145,19 @@ public class SignificanceTests
         Assert.Null(results[0].PValue);
         Assert.NotNull(results[1].PValue);
     }
+
+    private static BenchmarkResult ErroredResult(string name, string error) =>
+        new()
+        {
+            Name = name,
+            Mean = 0,
+            Median = 0,
+            P95 = 0,
+            P99 = 0,
+            Min = 0,
+            Max = 0,
+            StandardDeviation = 0,
+            Errored = true,
+            ErrorMessage = error,
+        };
 }

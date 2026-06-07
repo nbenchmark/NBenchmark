@@ -68,30 +68,4 @@ public record BenchmarkResult
 
     public bool IsBaseline { get; init; }
     public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
-
-    public static BenchmarkResult CreateErrored(string name, string errorMessage,
-        string? description = null, bool isBaseline = false,
-        OutlierMode outlierMode = OutlierMode.RemoveTop5Percent,
-        TimeSpan totalDuration = default, TimeSpan measuredDuration = default)
-    {
-        return new BenchmarkResult
-        {
-            Name = name,
-            Description = description,
-            Mean = 0,
-            Median = 0,
-            P95 = 0,
-            P99 = 0,
-            Min = 0,
-            Max = 0,
-            StandardDeviation = 0,
-            Errored = true,
-            ErrorMessage = errorMessage,
-            IsBaseline = isBaseline,
-            OutlierMode = outlierMode,
-            RunAt = DateTimeOffset.UtcNow,
-            TotalDuration = totalDuration,
-            MeasuredDuration = measuredDuration,
-        };
-    }
 }

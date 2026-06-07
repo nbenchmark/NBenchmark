@@ -31,7 +31,19 @@ public class ConsoleReporterTests
         await CaptureConsoleOutputAsync(async () =>
         {
             var reporter = new ConsoleReporter();
-            var result = BenchmarkResult.CreateErrored("broken", "something went wrong");
+            var result = new BenchmarkResult
+            {
+                Name = "broken",
+                Mean = 0,
+                Median = 0,
+                P95 = 0,
+                P99 = 0,
+                Min = 0,
+                Max = 0,
+                StandardDeviation = 0,
+                Errored = true,
+                ErrorMessage = "something went wrong",
+            };
             await reporter.ReportAsync([result]);
         });
     }
