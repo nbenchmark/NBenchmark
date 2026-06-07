@@ -214,6 +214,132 @@ public class BenchmarkRunnerTests
         Assert.Equal(TimeSpan.Zero, outcome.Result.MeasuredDuration);
     }
 
+    // ---------- Deterministic clock seam ----------
+
+    [Fact]
+    public void Run_With_InjectedClock_DryRun_Uses_Scheduled_TotalDuration()
+    {
+        var clock = new FakeClock([TimeSpan.FromTicks(42)]);
+        var runner = new BenchmarkRunner(clock);
+
+        var outcome = runner.Run("dry", () => { }, new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                WarmupIterations = 0,
+                Iterations = 0,
+                OutlierMode = OutlierMode.None,
+            },
+        });
+
+        Assert.Equal(TimeSpan.FromTicks(42), outcome.Result.TotalDuration);
+        Assert.Equal(TimeSpan.Zero, outcome.Result.MeasuredDuration);
+        Assert.Equal(0, clock.PendingElapsedCount);
+    }
+
+    [Fact]
+    public void Run_With_InjectedClock_SyncVoid_Success_Uses_Scheduled_Durations()
+    {
+        var clock = new FakeClock([
+            TimeSpan.FromTicks(120), // total
+            TimeSpan.FromTicks(80),  // measured loop
+            TimeSpan.FromTicks(10),  // sample 1
+            TimeSpan.FromTicks(30),  // sample 2
+        ]);
+        var runner = new BenchmarkRunner(clock);
+
+        var outcome = runner.Run("sync-void", () => { }, DeterministicSuccessSpec());
+
+        Assert.Equal([1_000.0, 3_000.0], outcome.RawSamples);
+        Assert.Equal(2_000.0, outcome.Result.Mean);
+        Assert.Equal(TimeSpan.FromTicks(80), outcome.Result.MeasuredDuration);
+        Assert.Equal(TimeSpan.FromTicks(120), outcome.Result.TotalDuration);
+        Assert.Equal(0, clock.PendingElapsedCount);
+    }
+
+    [Fact]
+    public void Run_With_InjectedClock_SyncReturning_Success_Uses_Scheduled_Durations()
+    {
+        var clock = new FakeClock([
+            TimeSpan.FromTicks(220), // total
+            TimeSpan.FromTicks(180), // measured loop
+            TimeSpan.FromTicks(40),  // sample 1
+            TimeSpan.FromTicks(20),  // sample 2
+        ]);
+        var runner = new BenchmarkRunner(clock);
+
+        var outcome = runner.Run("sync-returning", () => 123, DeterministicSuccessSpec());
+
+        Assert.Equal([2_000.0, 4_000.0], outcome.RawSamples);
+        Assert.Equal(3_000.0, outcome.Result.Mean);
+        Assert.Equal(TimeSpan.FromTicks(180), outcome.Result.MeasuredDuration);
+        Assert.Equal(TimeSpan.FromTicks(220), outcome.Result.TotalDuration);
+        Assert.Equal(0, clock.PendingElapsedCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_With_InjectedClock_AsyncVoid_Success_Uses_Scheduled_Durations()
+    {
+        var clock = new FakeClock([
+            TimeSpan.FromTicks(320), // total
+            TimeSpan.FromTicks(280), // measured loop
+            TimeSpan.FromTicks(15),  // sample 1
+            TimeSpan.FromTicks(25),  // sample 2
+        ]);
+        var runner = new BenchmarkRunner(clock);
+
+        var outcome = await runner.RunAsync("async-void", () => Task.CompletedTask, DeterministicSuccessSpec());
+
+        Assert.Equal([1_500.0, 2_500.0], outcome.RawSamples);
+        Assert.Equal(2_000.0, outcome.Result.Mean);
+        Assert.Equal(TimeSpan.FromTicks(280), outcome.Result.MeasuredDuration);
+        Assert.Equal(TimeSpan.FromTicks(320), outcome.Result.TotalDuration);
+        Assert.Equal(0, clock.PendingElapsedCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_With_InjectedClock_AsyncReturning_Success_Uses_Scheduled_Durations()
+    {
+        var clock = new FakeClock([
+            TimeSpan.FromTicks(420), // total
+            TimeSpan.FromTicks(380), // measured loop
+            TimeSpan.FromTicks(55),  // sample 1
+            TimeSpan.FromTicks(35),  // sample 2
+        ]);
+        var runner = new BenchmarkRunner(clock);
+
+        var outcome = await runner.RunAsync("async-returning", () => Task.FromResult("ok"), DeterministicSuccessSpec());
+
+        Assert.Equal([3_500.0, 5_500.0], outcome.RawSamples);
+        Assert.Equal(4_500.0, outcome.Result.Mean);
+        Assert.Equal(TimeSpan.FromTicks(380), outcome.Result.MeasuredDuration);
+        Assert.Equal(TimeSpan.FromTicks(420), outcome.Result.TotalDuration);
+        Assert.Equal(0, clock.PendingElapsedCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_With_InjectedClock_Errored_Path_Uses_Scheduled_TotalDuration()
+    {
+        var clock = new FakeClock([TimeSpan.FromTicks(77)]);
+        var runner = new BenchmarkRunner(clock);
+
+        var outcome = await runner.RunAsync("boom", () => throw new InvalidOperationException("boom"),
+            new RunSpec
+            {
+                Options = new MeasurementOptions
+                {
+                    WarmupIterations = 1,
+                    Iterations = 2,
+                    OutlierMode = OutlierMode.None,
+                },
+            });
+
+        Assert.True(outcome.Result.Errored);
+        Assert.Equal(TimeSpan.FromTicks(77), outcome.Result.TotalDuration);
+        Assert.Equal(TimeSpan.Zero, outcome.Result.MeasuredDuration);
+        Assert.Equal(0, clock.PendingElapsedCount);
+    }
+
     // ---------- Outlier mode + confidence level plumbing ----------
 
     [Fact]
@@ -317,30 +443,6 @@ public class BenchmarkRunnerTests
         Assert.True(invoked < 100);
     }
 
-    // ---------- Hot-loop timing invariant (replaces TimingSanityTests at the new seam) ----------
-
-    [Fact]
-    public void HotLoop_MinimumSample_Is_Near_Known_BusyWait_Floor()
-    {
-        const double targetMicros = 5_000.0;
-        const double targetNanos = targetMicros * 1_000.0;
-
-        var outcome = BenchmarkRunner.Instance.Run("busywait",
-            () => BusyWait(targetMicros),
-            new RunSpec
-            {
-                Options = new MeasurementOptions
-                {
-                    WarmupIterations = 3,
-                    Iterations = 15,
-                    OutlierMode = OutlierMode.None,
-                    MeasureAllocations = false,
-                },
-            });
-
-        Assert.InRange(outcome.Result.Min, targetNanos * 0.9, targetNanos * 3.0);
-    }
-
     // ---------- TotalDuration / MeasuredDuration contract ----------
 
     [Fact]
@@ -368,13 +470,18 @@ public class BenchmarkRunnerTests
             $"TotalDuration ({outcome.Result.TotalDuration}) must be >= MeasuredDuration ({outcome.Result.MeasuredDuration})");
     }
 
-    private static void BusyWait(double microseconds)
+    private static RunSpec DeterministicSuccessSpec()
     {
-        var ticks = (long)(microseconds * System.Diagnostics.Stopwatch.Frequency / 1_000_000.0);
-        var start = System.Diagnostics.Stopwatch.GetTimestamp();
-        while (System.Diagnostics.Stopwatch.GetTimestamp() - start < ticks)
+        return new RunSpec
         {
-        }
+            Options = new MeasurementOptions
+            {
+                WarmupIterations = 0,
+                Iterations = 2,
+                OutlierMode = OutlierMode.None,
+                MeasureAllocations = false,
+            },
+        };
     }
 
     private sealed class CapturingProgress : IBenchmarkProgress

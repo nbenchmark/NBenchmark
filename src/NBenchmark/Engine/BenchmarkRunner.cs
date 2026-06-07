@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace NBenchmark.Engine;
@@ -12,7 +11,18 @@ namespace NBenchmark.Engine;
 /// </summary>
 public sealed class BenchmarkRunner
 {
+    private readonly IClock _clock;
+
     public static BenchmarkRunner Instance { get; } = new();
+
+    public BenchmarkRunner() : this(StopwatchClock.Instance)
+    {
+    }
+
+    internal BenchmarkRunner(IClock clock)
+    {
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+    }
 
     public MeasurementOutcome Run(string name, Action body, RunSpec spec, CancellationToken ct = default)
         => RunSyncVoid(name, body, spec, ct);
@@ -28,9 +38,9 @@ public sealed class BenchmarkRunner
 
     // ---------- Sync cores ----------
 
-    private static MeasurementOutcome RunSyncVoid(string name, Action body, RunSpec spec, CancellationToken ct)
+    private MeasurementOutcome RunSyncVoid(string name, Action body, RunSpec spec, CancellationToken ct)
     {
-        var totalTimer = Stopwatch.StartNew();
+        var totalStartTimestamp = _clock.GetTimestamp();
         var options = spec.Options;
         var progress = spec.Progress;
 
@@ -48,10 +58,7 @@ public sealed class BenchmarkRunner
 
             if (options.Iterations == 0)
             {
-                totalTimer.Stop();
-                var dryRun = OutcomeBuilder.Build(
-                    new OutcomeInput.DryRun(), name, spec.Description, spec.IsBaseline,
-                    spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
+                var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
                 progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
                 return dryRun;
             }
@@ -59,12 +66,7 @@ public sealed class BenchmarkRunner
             ForceFullGc();
 
             var (timings, allocations, measuredDuration) = MeasureSyncVoid(body, spec, ct);
-            totalTimer.Stop();
-            var pipeline = StatsPipeline.Run(timings, allocations, options);
-            var outcome = OutcomeBuilder.Build(
-                new OutcomeInput.Success(pipeline, timings),
-                name, spec.Description, spec.IsBaseline, spec.Options,
-                totalTimer.Elapsed, measuredDuration);
+            var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
 
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
@@ -75,16 +77,13 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            totalTimer.Stop();
-            return OutcomeBuilder.Build(
-                new OutcomeInput.Errored(ex), name, spec.Description, spec.IsBaseline,
-                spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
+            return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
         }
     }
 
-    private static MeasurementOutcome RunSyncReturning<T>(string name, Func<T> body, RunSpec spec, CancellationToken ct)
+    private MeasurementOutcome RunSyncReturning<T>(string name, Func<T> body, RunSpec spec, CancellationToken ct)
     {
-        var totalTimer = Stopwatch.StartNew();
+        var totalStartTimestamp = _clock.GetTimestamp();
         var options = spec.Options;
         var progress = spec.Progress;
 
@@ -102,10 +101,7 @@ public sealed class BenchmarkRunner
 
             if (options.Iterations == 0)
             {
-                totalTimer.Stop();
-                var dryRun = OutcomeBuilder.Build(
-                    new OutcomeInput.DryRun(), name, spec.Description, spec.IsBaseline,
-                    spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
+                var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
                 progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
                 return dryRun;
             }
@@ -113,12 +109,7 @@ public sealed class BenchmarkRunner
             ForceFullGc();
 
             var (timings, allocations, measuredDuration) = MeasureSyncReturning<T>(body, spec, ct);
-            totalTimer.Stop();
-            var pipeline = StatsPipeline.Run(timings, allocations, options);
-            var outcome = OutcomeBuilder.Build(
-                new OutcomeInput.Success(pipeline, timings),
-                name, spec.Description, spec.IsBaseline, spec.Options,
-                totalTimer.Elapsed, measuredDuration);
+            var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
 
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
@@ -129,18 +120,15 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            totalTimer.Stop();
-            return OutcomeBuilder.Build(
-                new OutcomeInput.Errored(ex), name, spec.Description, spec.IsBaseline,
-                spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
+            return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
         }
     }
 
     // ---------- Async cores ----------
 
-    private static async Task<MeasurementOutcome> RunAsyncVoid(string name, Func<Task> body, RunSpec spec, CancellationToken ct)
+    private async Task<MeasurementOutcome> RunAsyncVoid(string name, Func<Task> body, RunSpec spec, CancellationToken ct)
     {
-        var totalTimer = Stopwatch.StartNew();
+        var totalStartTimestamp = _clock.GetTimestamp();
         var options = spec.Options;
         var progress = spec.Progress;
 
@@ -158,10 +146,7 @@ public sealed class BenchmarkRunner
 
             if (options.Iterations == 0)
             {
-                totalTimer.Stop();
-                var dryRun = OutcomeBuilder.Build(
-                    new OutcomeInput.DryRun(), name, spec.Description, spec.IsBaseline,
-                    spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
+                var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
                 await progress.OnWarmupCompleted(name).ConfigureAwait(false);
                 return dryRun;
             }
@@ -169,12 +154,7 @@ public sealed class BenchmarkRunner
             ForceFullGc();
 
             var (timings, allocations, measuredDuration) = await MeasureAsyncVoid(body, spec, ct).ConfigureAwait(false);
-            totalTimer.Stop();
-            var pipeline = StatsPipeline.Run(timings, allocations, options);
-            var outcome = OutcomeBuilder.Build(
-                new OutcomeInput.Success(pipeline, timings),
-                name, spec.Description, spec.IsBaseline, spec.Options,
-                totalTimer.Elapsed, measuredDuration);
+            var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
 
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
@@ -185,16 +165,13 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            totalTimer.Stop();
-            return OutcomeBuilder.Build(
-                new OutcomeInput.Errored(ex), name, spec.Description, spec.IsBaseline,
-                spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
+            return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
         }
     }
 
-    private static async Task<MeasurementOutcome> RunAsyncReturning<T>(string name, Func<Task<T>> body, RunSpec spec, CancellationToken ct)
+    private async Task<MeasurementOutcome> RunAsyncReturning<T>(string name, Func<Task<T>> body, RunSpec spec, CancellationToken ct)
     {
-        var totalTimer = Stopwatch.StartNew();
+        var totalStartTimestamp = _clock.GetTimestamp();
         var options = spec.Options;
         var progress = spec.Progress;
 
@@ -212,10 +189,7 @@ public sealed class BenchmarkRunner
 
             if (options.Iterations == 0)
             {
-                totalTimer.Stop();
-                var dryRun = OutcomeBuilder.Build(
-                    new OutcomeInput.DryRun(), name, spec.Description, spec.IsBaseline,
-                    spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
+                var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
                 await progress.OnWarmupCompleted(name).ConfigureAwait(false);
                 return dryRun;
             }
@@ -223,12 +197,7 @@ public sealed class BenchmarkRunner
             ForceFullGc();
 
             var (timings, allocations, measuredDuration) = await MeasureAsyncReturning<T>(body, spec, ct).ConfigureAwait(false);
-            totalTimer.Stop();
-            var pipeline = StatsPipeline.Run(timings, allocations, options);
-            var outcome = OutcomeBuilder.Build(
-                new OutcomeInput.Success(pipeline, timings),
-                name, spec.Description, spec.IsBaseline, spec.Options,
-                totalTimer.Elapsed, measuredDuration);
+            var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
 
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
@@ -239,22 +208,19 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            totalTimer.Stop();
-            return OutcomeBuilder.Build(
-                new OutcomeInput.Errored(ex), name, spec.Description, spec.IsBaseline,
-                spec.Options, totalTimer.Elapsed, TimeSpan.Zero);
+            return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
         }
     }
 
     // ---------- Measurement loops ----------
 
-    private static (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncVoid(Action body, RunSpec spec, CancellationToken ct)
+    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncVoid(Action body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var loopTimer = Stopwatch.StartNew();
+        var loopStartTimestamp = _clock.GetTimestamp();
 
         for (var i = 0; i < iterations; i++)
         {
@@ -269,9 +235,9 @@ public sealed class BenchmarkRunner
             if (options.MeasureAllocations)
                 allocBefore = GC.GetTotalAllocatedBytes();
 
-            var timestamp = Stopwatch.GetTimestamp();
+            var timestamp = _clock.GetTimestamp();
             body();
-            var elapsed = Stopwatch.GetElapsedTime(timestamp);
+            var elapsed = _clock.GetElapsedTime(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
             {
@@ -283,17 +249,16 @@ public sealed class BenchmarkRunner
             timings[i] = elapsed.TotalNanoseconds;
         }
 
-        loopTimer.Stop();
-        return (timings, allocations, loopTimer.Elapsed);
+        return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private static (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncReturning<T>(Func<T> body, RunSpec spec, CancellationToken ct)
+    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncReturning<T>(Func<T> body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var loopTimer = Stopwatch.StartNew();
+        var loopStartTimestamp = _clock.GetTimestamp();
 
         for (var i = 0; i < iterations; i++)
         {
@@ -308,9 +273,9 @@ public sealed class BenchmarkRunner
             if (options.MeasureAllocations)
                 allocBefore = GC.GetTotalAllocatedBytes();
 
-            var timestamp = Stopwatch.GetTimestamp();
+            var timestamp = _clock.GetTimestamp();
             Consume(body());
-            var elapsed = Stopwatch.GetElapsedTime(timestamp);
+            var elapsed = _clock.GetElapsedTime(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
             {
@@ -322,17 +287,16 @@ public sealed class BenchmarkRunner
             timings[i] = elapsed.TotalNanoseconds;
         }
 
-        loopTimer.Stop();
-        return (timings, allocations, loopTimer.Elapsed);
+        return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private static async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncVoid(Func<Task> body, RunSpec spec, CancellationToken ct)
+    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncVoid(Func<Task> body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var loopTimer = Stopwatch.StartNew();
+        var loopStartTimestamp = _clock.GetTimestamp();
 
         for (var i = 0; i < iterations; i++)
         {
@@ -347,9 +311,9 @@ public sealed class BenchmarkRunner
             if (options.MeasureAllocations)
                 allocBefore = GC.GetTotalAllocatedBytes();
 
-            var timestamp = Stopwatch.GetTimestamp();
+            var timestamp = _clock.GetTimestamp();
             await body().ConfigureAwait(false);
-            var elapsed = Stopwatch.GetElapsedTime(timestamp);
+            var elapsed = _clock.GetElapsedTime(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
             {
@@ -361,17 +325,16 @@ public sealed class BenchmarkRunner
             timings[i] = elapsed.TotalNanoseconds;
         }
 
-        loopTimer.Stop();
-        return (timings, allocations, loopTimer.Elapsed);
+        return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private static async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(Func<Task<T>> body, RunSpec spec, CancellationToken ct)
+    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(Func<Task<T>> body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var loopTimer = Stopwatch.StartNew();
+        var loopStartTimestamp = _clock.GetTimestamp();
 
         for (var i = 0; i < iterations; i++)
         {
@@ -386,9 +349,9 @@ public sealed class BenchmarkRunner
             if (options.MeasureAllocations)
                 allocBefore = GC.GetTotalAllocatedBytes();
 
-            var timestamp = Stopwatch.GetTimestamp();
+            var timestamp = _clock.GetTimestamp();
             Consume(await body().ConfigureAwait(false));
-            var elapsed = Stopwatch.GetElapsedTime(timestamp);
+            var elapsed = _clock.GetElapsedTime(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
             {
@@ -400,8 +363,50 @@ public sealed class BenchmarkRunner
             timings[i] = elapsed.TotalNanoseconds;
         }
 
-        loopTimer.Stop();
-        return (timings, allocations, loopTimer.Elapsed);
+        return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
+    }
+
+    private MeasurementOutcome BuildDryRunOutcome(string name, RunSpec spec, long totalStartTimestamp)
+    {
+        return OutcomeBuilder.Build(
+            new OutcomeInput.DryRun(),
+            name,
+            spec.Description,
+            spec.IsBaseline,
+            spec.Options,
+            _clock.GetElapsedTime(totalStartTimestamp),
+            TimeSpan.Zero);
+    }
+
+    private MeasurementOutcome BuildSuccessOutcome(
+        string name,
+        RunSpec spec,
+        long totalStartTimestamp,
+        double[] timings,
+        long[]? allocations,
+        TimeSpan measuredDuration)
+    {
+        var pipeline = StatsPipeline.Run(timings, allocations, spec.Options);
+        return OutcomeBuilder.Build(
+            new OutcomeInput.Success(pipeline, timings),
+            name,
+            spec.Description,
+            spec.IsBaseline,
+            spec.Options,
+            _clock.GetElapsedTime(totalStartTimestamp),
+            measuredDuration);
+    }
+
+    private MeasurementOutcome BuildErroredOutcome(string name, RunSpec spec, long totalStartTimestamp, Exception ex)
+    {
+        return OutcomeBuilder.Build(
+            new OutcomeInput.Errored(ex),
+            name,
+            spec.Description,
+            spec.IsBaseline,
+            spec.Options,
+            _clock.GetElapsedTime(totalStartTimestamp),
+            TimeSpan.Zero);
     }
 
     // ---------- JIT-elision sink (private, no public exposure) ----------
