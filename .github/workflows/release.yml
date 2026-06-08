@@ -6,6 +6,10 @@ on:
       - "v*.*.*"
       - "v*.*.*-*"
 
+jobs:
+  build-and-pack:
+    name: Build and Pack
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
