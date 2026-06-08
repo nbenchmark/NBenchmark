@@ -173,7 +173,7 @@ public sealed class ConsoleReporter : IReporter
         {
             OutlierMode.None => "none",
             OutlierMode.RemoveTop5Percent => "top 5%",
-            OutlierMode.RemoveTop5PercentAndBottom5Percent => "top & bottom 5%",
+            OutlierMode.RemoveTopAndBottom5Percent => "top & bottom 5%",
             OutlierMode.IqrFence => "IQR fence (1.5×)",
             _ => "auto",
         };

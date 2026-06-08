@@ -8,9 +8,9 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
     private string? _currentName;
     private int _suiteTotal;
 
-    public ConsoleBenchmarkProgress(int iterations, int warmupIterations)
+    public ConsoleBenchmarkProgress(int measuredIterations, int warmupIterations)
     {
-        _suiteOptions = $"{warmupIterations} warmup / {iterations} measured";
+        _suiteOptions = $"{warmupIterations} warmup / {measuredIterations} measured";
     }
 
     public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)

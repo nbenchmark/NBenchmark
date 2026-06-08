@@ -39,8 +39,8 @@ public class OutcomeBuilderTests
         var measured = TimeSpan.FromMilliseconds(7);
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(
-                new PipelineResult(stats, MeasuredIterations: 3, MeanAllocatedBytes: (long)allocations.Average()),
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, MeasuredIterations: 3, MeanAllocatedBytes: (long)allocations.Average()),
                 rawTimings),
             "bench",
             "desc",
@@ -66,7 +66,7 @@ public class OutcomeBuilderTests
         Assert.Equal(0.05, r.CoefficientOfVariation);
         Assert.Equal((long)((1024 + 2048 + 4096) / 3.0), r.MeanAllocatedBytes);
         Assert.Null(r.PValue);
-        Assert.Null(r.IsSignificant);
+        Assert.Equal(SignificanceVerdict.NotTested, r.SignificanceVerdict);
         Assert.False(r.Errored);
         Assert.Null(r.ErrorMessage);
         Assert.Equal(3, r.MeasuredIterations);
@@ -84,8 +84,8 @@ public class OutcomeBuilderTests
         var allocations = new long[] { 100, 200, 300, 400 };
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(
-                new PipelineResult(stats, 4, MeanAllocatedBytes: (long)allocations.Average()),
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, 4, MeanAllocatedBytes: (long)allocations.Average()),
                 [1, 2, 3, 4]),
             "b", null, false,
             new MeasurementOptions(),
@@ -101,8 +101,8 @@ public class OutcomeBuilderTests
         var stats = new StatsSummary { Mean = 1 };
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(
-                new PipelineResult(stats, 3, MeanAllocatedBytes: null),
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, 3, MeanAllocatedBytes: null),
                 [1, 2, 3]),
             "b", null, false,
             new MeasurementOptions(),
@@ -119,8 +119,8 @@ public class OutcomeBuilderTests
         var options = new MeasurementOptions { ConfidenceLevel = 0.99 };
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(
-                new PipelineResult(stats, 1, MeanAllocatedBytes: null),
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, 1, MeanAllocatedBytes: null),
                 [1]),
             "b", null, false,
             options,
@@ -137,8 +137,8 @@ public class OutcomeBuilderTests
         var before = DateTimeOffset.UtcNow.AddSeconds(-5);
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Success(
-                new PipelineResult(stats, 1, MeanAllocatedBytes: null),
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, 1, MeanAllocatedBytes: null),
                 [1]),
             "b", null, false,
             new MeasurementOptions(),
@@ -146,7 +146,7 @@ public class OutcomeBuilderTests
             TimeSpan.FromMilliseconds(1));
 
         var after = DateTimeOffset.UtcNow.AddSeconds(5);
-        Assert.InRange(outcome.Result.RunAt, before, after);
+        Assert.InRange(outcome.Result.RunAtUtc, before, after);
     }
 
     // ---------- Dry-run path ----------
@@ -163,7 +163,7 @@ public class OutcomeBuilderTests
         };
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.DryRun(),
+            new RunOutcome.DryRun(),
             "dry", null, false,
             options,
             TimeSpan.FromMilliseconds(10),
@@ -191,7 +191,7 @@ public class OutcomeBuilderTests
     public void Build_DryRun_Has_Zero_MeasuredIterations_And_Empty_RawSamples()
     {
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.DryRun(),
+            new RunOutcome.DryRun(),
             "dry", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(10),
@@ -205,7 +205,7 @@ public class OutcomeBuilderTests
     public void Build_DryRun_MeasuredDuration_Is_Zero_Regardless_Of_Caller()
     {
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.DryRun(),
+            new RunOutcome.DryRun(),
             "dry", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(10),
@@ -220,7 +220,7 @@ public class OutcomeBuilderTests
         var total = TimeSpan.FromMilliseconds(123);
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.DryRun(),
+            new RunOutcome.DryRun(),
             "dry", null, false,
             new MeasurementOptions(),
             total,
@@ -245,7 +245,7 @@ public class OutcomeBuilderTests
         var measured = TimeSpan.Zero;
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Errored(ex),
+            new RunOutcome.Errored(ex),
             "bad", "with desc", isBaseline: true,
             options,
             total,
@@ -268,7 +268,7 @@ public class OutcomeBuilderTests
         Assert.Equal(0, r.CoefficientOfVariation);
         Assert.Null(r.MeanAllocatedBytes);
         Assert.Null(r.PValue);
-        Assert.Null(r.IsSignificant);
+        Assert.Equal(SignificanceVerdict.NotTested, r.SignificanceVerdict);
         Assert.True(r.Errored);
         Assert.NotNull(r.ErrorMessage);
         Assert.Contains("nope", r.ErrorMessage);
@@ -287,7 +287,7 @@ public class OutcomeBuilderTests
         var tiex = new TargetInvocationException(inner);
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Errored(tiex),
+            new RunOutcome.Errored(tiex),
             "b", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
@@ -301,7 +301,7 @@ public class OutcomeBuilderTests
     public void Build_Errored_Uses_Explicit_Message_Override_When_Provided()
     {
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Errored(new Exception("inner"), "setup failed"),
+            new RunOutcome.Errored(new Exception("inner"), "setup failed"),
             "b", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
@@ -316,7 +316,7 @@ public class OutcomeBuilderTests
         var tiex = new TargetInvocationException(message: "outer", inner: null);
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Errored(tiex),
+            new RunOutcome.Errored(tiex),
             "b", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
@@ -332,7 +332,7 @@ public class OutcomeBuilderTests
         var measured = TimeSpan.FromMilliseconds(7);
 
         var outcome = OutcomeBuilder.Build(
-            new OutcomeInput.Errored(new Exception("x")),
+            new RunOutcome.Errored(new Exception("x")),
             "b", null, false,
             new MeasurementOptions(),
             total,
@@ -345,7 +345,7 @@ public class OutcomeBuilderTests
     [Fact]
     public void Build_Null_Input_Throws_ArgumentNullException()
     {
-        OutcomeInput bogus = null!;
+        RunOutcome bogus = null!;
 
         Assert.Throws<ArgumentNullException>(() =>
             OutcomeBuilder.Build(

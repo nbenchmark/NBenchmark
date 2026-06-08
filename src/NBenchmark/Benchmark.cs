@@ -46,7 +46,7 @@ public static class Benchmark
         return outcome.Result;
     }
 
-    public static MeasurementOutcome MeasureRaw(Action action,
+    public static MeasurementOutcome RunRaw(Action action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
         CancellationToken cancellationToken = default)
@@ -55,7 +55,7 @@ public static class Benchmark
         return BenchmarkRunner.Instance.Run(name, action, spec, cancellationToken);
     }
 
-    public static MeasurementOutcome MeasureRaw<T>(Func<T> action,
+    public static MeasurementOutcome RunRaw<T>(Func<T> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
         CancellationToken cancellationToken = default)
@@ -64,7 +64,7 @@ public static class Benchmark
         return BenchmarkRunner.Instance.Run(name, action, spec, cancellationToken);
     }
 
-    public static Task<MeasurementOutcome> MeasureRawAsync(Func<Task> action,
+    public static Task<MeasurementOutcome> RunRawAsync(Func<Task> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
         CancellationToken cancellationToken = default)
@@ -73,7 +73,7 @@ public static class Benchmark
         return BenchmarkRunner.Instance.RunAsync(name, action, spec, cancellationToken);
     }
 
-    public static Task<MeasurementOutcome> MeasureRawAsync<T>(Func<Task<T>> action,
+    public static Task<MeasurementOutcome> RunRawAsync<T>(Func<Task<T>> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
         CancellationToken cancellationToken = default)

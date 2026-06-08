@@ -52,7 +52,7 @@ public class OutlierTrimTests
     {
         var values = Enumerable.Range(1, length).Select(i => (double)i).ToArray();
 
-        var result = OutlierTrim.Trim(values, OutlierMode.RemoveTop5PercentAndBottom5Percent);
+        var result = OutlierTrim.Trim(values, OutlierMode.RemoveTopAndBottom5Percent);
 
         Assert.Equal(expectedKept, result.Length);
     }

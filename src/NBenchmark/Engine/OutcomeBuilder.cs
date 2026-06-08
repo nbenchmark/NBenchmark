@@ -14,7 +14,7 @@ namespace NBenchmark.Engine;
 internal static class OutcomeBuilder
 {
     public static MeasurementOutcome Build(
-        OutcomeInput input,
+        RunOutcome input,
         string name,
         string? description,
         bool isBaseline,
@@ -26,18 +26,18 @@ internal static class OutcomeBuilder
 
         return input switch
         {
-            OutcomeInput.Success s => Build(
+            RunOutcome.Success s => Build(
                 name, description, isBaseline, options,
                 stats: s.Result.Stats,
                 measuredIterations: s.Result.MeasuredIterations,
                 meanAllocatedBytes: s.Result.MeanAllocatedBytes,
-                rawSamples: s.RawTimings,
+                rawSamples: s.RawSamples,
                 errored: false,
                 errorMessage: null,
                 totalDuration,
                 measuredDuration),
 
-            OutcomeInput.DryRun => Build(
+            RunOutcome.DryRun => Build(
                 name, description, isBaseline, options,
                 stats: null,
                 measuredIterations: 0,
@@ -48,7 +48,7 @@ internal static class OutcomeBuilder
                 totalDuration,
                 measuredDuration: TimeSpan.Zero),
 
-            OutcomeInput.Errored e => Build(
+            RunOutcome.Errored e => Build(
                 name, description, isBaseline, options,
                 stats: null,
                 measuredIterations: 0,
@@ -59,7 +59,7 @@ internal static class OutcomeBuilder
                 totalDuration,
                 measuredDuration),
 
-            _ => throw new ArgumentOutOfRangeException(nameof(input), input, "Unknown OutcomeInput case."),
+            _ => throw new ArgumentOutOfRangeException(nameof(input), input, "Unknown RunOutcome case."),
         };
     }
 
@@ -97,12 +97,12 @@ internal static class OutcomeBuilder
                 CoefficientOfVariation = stats?.CoefficientOfVariation ?? 0,
                 MeanAllocatedBytes = meanAllocatedBytes,
                 PValue = null,
-                IsSignificant = null,
+                SignificanceVerdict = NBenchmark.SignificanceVerdict.NotTested,
                 Errored = errored,
                 ErrorMessage = errorMessage,
                 MeasuredIterations = measuredIterations,
                 WarmupIterations = options.WarmupIterations,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
                 TotalDuration = totalDuration,
                 MeasuredDuration = measuredDuration,
                 IsBaseline = isBaseline,

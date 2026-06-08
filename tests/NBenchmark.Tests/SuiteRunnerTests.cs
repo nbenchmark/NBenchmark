@@ -189,7 +189,7 @@ public class SuiteRunnerTests
         };
 
         var dryRunResult = OutcomeBuilder.Build(
-            new OutcomeInput.DryRun(),
+            new RunOutcome.DryRun(),
             name: "dry",
             description: null,
             isBaseline: false,

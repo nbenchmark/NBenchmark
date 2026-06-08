@@ -5,7 +5,7 @@ namespace NBenchmark.Tests;
 public class SignificanceTests
 {
     [Fact]
-    public void ComputeSignificance_Sets_PValue_And_IsSignificant()
+    public void ComputeSignificance_Sets_PValue_And_SignificanceVerdict()
     {
         var rng = new Random(42);
         var baselineSamples = Enumerable.Range(0, 50).Select(_ => (double)rng.Next(90, 110)).ToArray();
@@ -34,9 +34,9 @@ public class SignificanceTests
         Significance.ComputeSignificance(results, rawSamples);
 
         Assert.NotNull(results[1].PValue);
-        Assert.NotNull(results[1].IsSignificant);
+        Assert.NotEqual(SignificanceVerdict.NotTested, results[1].SignificanceVerdict);
         Assert.True(results[1].PValue < 0.05);
-        Assert.True(results[1].IsSignificant);
+        Assert.Equal(SignificanceVerdict.Significant, results[1].SignificanceVerdict);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class SignificanceTests
         Significance.ComputeSignificance(results, rawSamples);
 
         Assert.Null(results[0].PValue);
-        Assert.Null(results[0].IsSignificant);
+        Assert.Equal(SignificanceVerdict.NotTested, results[0].SignificanceVerdict);
     }
 
     [Fact]

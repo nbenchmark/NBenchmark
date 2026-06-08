@@ -45,7 +45,7 @@ After collection, outliers are removed according to `OutlierMode`. The samples a
 |---|---|
 | `None` | No trimming. |
 | `RemoveTop5Percent` | Discard the top `ceil(n × 0.05)` samples. Equivalent to keeping `floor(n × 0.95)`. |
-| `RemoveTop5PercentAndBottom5Percent` | Discard the top and bottom `floor(n × 0.05)` samples from each end. |
+| `RemoveTopAndBottom5Percent` | Discard the top and bottom `floor(n × 0.05)` samples from each end. |
 | `IqrFence` | Compute Q1, Q3, and IQR = Q3 − Q1. Discard any sample above Q3 + 1.5 × IQR or below Q1 − 1.5 × IQR. |
 
 The trimmed array is passed to `StatsSummary.Compute`. The pre-trim raw array is stored separately for use in significance testing.
@@ -209,5 +209,5 @@ The test requires at least **5 samples in each group**. With fewer samples the n
 | `ConfidenceIntervalUpper` | $\bar{x} + \text{MoE}$ | Upper CI bound. |
 | `CoefficientOfVariation` | $s / \bar{x}$ | Relative variability. |
 | `PValue` | Mann-Whitney U | Two-tailed p-value vs. baseline. |
-| `IsSignificant` | $p < 0.05$ | Whether the difference is real. |
+| `SignificanceVerdict` | $p < 0.05$ | Whether the difference is real (`Significant`, `NotSignificant`, or `NotTested`). |
 | `MeanAllocatedBytes` | Mean of iteration deltas | Mean heap allocation per iteration. |

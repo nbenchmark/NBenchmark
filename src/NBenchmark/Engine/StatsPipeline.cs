@@ -12,7 +12,7 @@ namespace NBenchmark.Engine;
 /// </summary>
 internal static class StatsPipeline
 {
-    public static PipelineResult Run(
+    public static ProcessedMeasurements Run(
         double[] rawTimings,
         long[]? rawAllocations,
         MeasurementOptions options)
@@ -25,7 +25,7 @@ internal static class StatsPipeline
         var stats = StatsSummary.Compute(trimmed, options.ConfidenceLevel);
         long? meanAllocs = rawAllocations is not null ? (long)rawAllocations.Average() : null;
 
-        return new PipelineResult(stats, trimmed.Length, meanAllocs);
+        return new ProcessedMeasurements(stats, trimmed.Length, meanAllocs);
     }
 
     private static bool IsSorted(double[] values)
@@ -38,7 +38,7 @@ internal static class StatsPipeline
     }
 }
 
-internal sealed record PipelineResult(
+internal sealed record ProcessedMeasurements(
     StatsSummary Stats,
     int MeasuredIterations,
     long? MeanAllocatedBytes);

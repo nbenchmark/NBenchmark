@@ -78,11 +78,11 @@ await new BenchmarkSuite("name")
     .WithIterations(200)
     .WithWarmup(25)
     .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress(iterations: 200, warmupIterations: 25))
+    .WithProgress(new ConsoleBenchmarkProgress(measuredIterations: 200, warmupIterations: 25))
     .RunAsync();
 ```
 
-Pass the same `iterations` and `warmupIterations` values you gave to `WithIterations` and `WithWarmup` so the progress display shows accurate counts.
+Pass the same `measuredIterations` and `warmupIterations` values you gave to `WithIterations` and `WithWarmup` so the progress display shows accurate counts.
 
 Progress output looks like:
 

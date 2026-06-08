@@ -37,14 +37,14 @@ public record BenchmarkResult
     public long? MeanAllocatedBytes { get; init; }
 
     public double? PValue { get; init; }
-    public bool? IsSignificant { get; init; }
+    public SignificanceVerdict SignificanceVerdict { get; init; }
 
     public bool Errored { get; init; }
     public string? ErrorMessage { get; init; }
 
     public int MeasuredIterations { get; init; }
     public int WarmupIterations { get; init; }
-    public DateTimeOffset RunAt { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset RunAtUtc { get; init; } = DateTimeOffset.UtcNow;
 
     /// <summary>
     ///     End-to-end wall-clock cost of running this benchmark entry, including warmup,

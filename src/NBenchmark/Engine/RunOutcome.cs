@@ -6,11 +6,11 @@ namespace NBenchmark.Engine;
 ///     configuration pass that did not invoke the body, or <see cref="Errored" /> for
 ///     an exception that aborted the run.
 /// </summary>
-internal abstract record OutcomeInput
+internal abstract record RunOutcome
 {
-    public sealed record Success(PipelineResult Result, double[] RawTimings) : OutcomeInput;
+    public sealed record Success(ProcessedMeasurements Result, double[] RawSamples) : RunOutcome;
 
-    public sealed record DryRun : OutcomeInput;
+    public sealed record DryRun : RunOutcome;
 
-    public sealed record Errored(Exception Error, string? ErrorMessageOverride = null) : OutcomeInput;
+    public sealed record Errored(Exception Error, string? ErrorMessageOverride = null) : RunOutcome;
 }

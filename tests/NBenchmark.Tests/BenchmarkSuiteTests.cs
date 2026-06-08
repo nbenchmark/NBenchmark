@@ -28,7 +28,7 @@ public class BenchmarkSuiteTests
     }
 
     [Fact]
-    public async Task RunAsync_WithBaseline_Significance_Sets_IsSignificant()
+    public async Task RunAsync_WithBaseline_Significance_Sets_SignificanceVerdict()
     {
         var results = await new BenchmarkSuite("sig")
             .Add("baseline", () => Thread.SpinWait(1000))
@@ -40,7 +40,7 @@ public class BenchmarkSuiteTests
             .RunAsync();
 
         var faster = results.Single(r => r.Name == "faster");
-        Assert.True(faster.IsSignificant.HasValue);
+        Assert.NotEqual(SignificanceVerdict.NotTested, faster.SignificanceVerdict);
         Assert.NotNull(faster.PValue);
     }
 

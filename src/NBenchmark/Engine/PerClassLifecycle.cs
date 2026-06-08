@@ -41,7 +41,7 @@ internal static class PerClassLifecycle
             var errored = suite.Benchmarks
                 .Select(b =>
                     OutcomeBuilder.Build(
-                        new OutcomeInput.Errored(ex, $"Suite setup failed: {ex.Message}"),
+                        new RunOutcome.Errored(ex, $"Suite setup failed: {ex.Message}"),
                         $"{suite.Type.Name}.{b.DisplayName}", b.Attribute.Description, b.Attribute.Baseline,
                         suiteOptions, TimeSpan.Zero, TimeSpan.Zero).Result)
                 .ToList();

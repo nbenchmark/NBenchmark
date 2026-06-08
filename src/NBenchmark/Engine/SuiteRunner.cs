@@ -52,7 +52,7 @@ internal static class SuiteRunner
             catch (Exception ex)
             {
                 outcome = OutcomeBuilder.Build(
-                    new OutcomeInput.Errored(ex),
+                    new RunOutcome.Errored(ex),
                     envelope.Name,
                     envelope.Description,
                     envelope.IsBaseline,

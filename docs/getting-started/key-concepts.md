@@ -43,7 +43,7 @@ Available modes:
 |---|---|
 | `None` | Nothing. All samples are used. |
 | `RemoveTop5Percent` | The slowest 5% of samples. **(default)** |
-| `RemoveTop5PercentAndBottom5Percent` | The slowest and fastest 5%. |
+| `RemoveTopAndBottom5Percent` | The slowest and fastest 5%. |
 | `IqrFence` | Any sample beyond 1.5× the inter-quartile range. |
 
 ## Median vs. mean

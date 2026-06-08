@@ -58,7 +58,7 @@ public class BenchmarkSuiteExtendedTests
             .Add("alloc", () => { _ = new byte[1024]; })
             .WithWarmup(1)
             .WithIterations(10)
-            .WithMemory()
+            .WithAllocations()
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -152,7 +152,7 @@ public class BenchmarkSuiteExtendedTests
             .RunAsync();
 
         Assert.Null(results[0].PValue);
-        Assert.Null(results[0].IsSignificant);
+        Assert.Equal(SignificanceVerdict.NotTested, results[0].SignificanceVerdict);
     }
 
     [Fact]

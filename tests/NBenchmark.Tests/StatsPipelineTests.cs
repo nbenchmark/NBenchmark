@@ -84,7 +84,7 @@ public class StatsPipelineTests
     {
         var timings = Enumerable.Range(1, 100).Select(i => (double)i).ToArray();
 
-        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { OutlierMode = OutlierMode.RemoveTop5PercentAndBottom5Percent });
+        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { OutlierMode = OutlierMode.RemoveTopAndBottom5Percent });
 
         Assert.Equal(90, result.MeasuredIterations);
     }

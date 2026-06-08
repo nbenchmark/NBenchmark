@@ -51,9 +51,9 @@ public class BenchmarkStaticTests
     }
 
     [Fact]
-    public void MeasureRaw_Returns_RawSamples()
+    public void RunRaw_Returns_RawSamples()
     {
-        var outcome = Benchmark.MeasureRaw(() => Thread.SpinWait(100),
+        var outcome = Benchmark.RunRaw(() => Thread.SpinWait(100),
             new MeasurementOptions { WarmupIterations = 1, Iterations = 20, OutlierMode = OutlierMode.None });
 
         Assert.Equal(20, outcome.RawSamples.Length);

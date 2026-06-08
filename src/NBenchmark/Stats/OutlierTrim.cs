@@ -14,7 +14,7 @@ internal static class OutlierTrim
     {
         OutlierMode.None => SortAndReturn(timings),
         OutlierMode.RemoveTop5Percent => RemoveTopPercent(timings, 0.05),
-        OutlierMode.RemoveTop5PercentAndBottom5Percent => RemoveBothPercent(timings, 0.05),
+        OutlierMode.RemoveTopAndBottom5Percent => RemoveBothPercent(timings, 0.05),
         OutlierMode.IqrFence => RemoveIqrOutliers(timings),
         _ => timings,
     };

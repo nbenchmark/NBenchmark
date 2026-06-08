@@ -29,7 +29,7 @@ public sealed record BenchmarkTable
         return new BenchmarkTable
         {
             Rows = rows,
-            RunAtUtc = headerSource?.RunAt.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
+            RunAtUtc = headerSource?.RunAtUtc.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
             WarmupIterations = headerSource?.WarmupIterations ?? 0,
             MeasuredIterations = headerSource?.MeasuredIterations ?? 0,
             ConfidenceLevel = headerSource?.ConfidenceLevel ?? 0.95,
@@ -72,9 +72,9 @@ public sealed record BenchmarkTable
 
     private static string ComputeSignificanceLabel(BenchmarkResult result, bool multiBenchmark)
     {
-        if (result.Errored || !multiBenchmark || result.IsBaseline || !result.IsSignificant.HasValue)
+        if (result.Errored || !multiBenchmark || result.IsBaseline || result.SignificanceVerdict == SignificanceVerdict.NotTested)
             return "";
-        return result.IsSignificant.Value ? "✓" : "~";
+        return result.SignificanceVerdict == SignificanceVerdict.Significant ? "✓" : "~";
     }
 }
 

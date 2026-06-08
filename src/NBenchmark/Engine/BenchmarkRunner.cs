@@ -357,7 +357,7 @@ public sealed class BenchmarkRunner
     private MeasurementOutcome BuildDryRunOutcome(string name, RunSpec spec, long totalStartTimestamp)
     {
         return OutcomeBuilder.Build(
-            new OutcomeInput.DryRun(),
+            new RunOutcome.DryRun(),
             name,
             spec.Description,
             spec.IsBaseline,
@@ -376,7 +376,7 @@ public sealed class BenchmarkRunner
     {
         var pipeline = StatsPipeline.Run(timings, allocations, spec.Options);
         return OutcomeBuilder.Build(
-            new OutcomeInput.Success(pipeline, timings),
+            new RunOutcome.Success(pipeline, timings),
             name,
             spec.Description,
             spec.IsBaseline,
@@ -388,7 +388,7 @@ public sealed class BenchmarkRunner
     private MeasurementOutcome BuildErroredOutcome(string name, RunSpec spec, long totalStartTimestamp, Exception ex)
     {
         return OutcomeBuilder.Build(
-            new OutcomeInput.Errored(ex),
+            new RunOutcome.Errored(ex),
             name,
             spec.Description,
             spec.IsBaseline,

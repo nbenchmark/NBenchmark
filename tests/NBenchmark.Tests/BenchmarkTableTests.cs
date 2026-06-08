@@ -24,7 +24,7 @@ public class BenchmarkTableTests
             {
                 Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 
@@ -45,13 +45,13 @@ public class BenchmarkTableTests
             {
                 Name = "Fast", Mean = 50, Median = 50, P95 = 50, P99 = 50, Min = 50, Max = 50,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "Slow", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow, IsBaseline = true,
+                RunAtUtc = DateTimeOffset.UtcNow, IsBaseline = true,
             },
         };
 
@@ -74,13 +74,13 @@ public class BenchmarkTableTests
             {
                 Name = "Fast", Mean = 50, Median = 50, P95 = 50, P99 = 50, Min = 50, Max = 50,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "Slow", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 
@@ -104,7 +104,7 @@ public class BenchmarkTableTests
             {
                 Name = "A", Mean = 0, Median = 0, P95 = 0, P99 = 0, Min = 0, Max = 0,
                 StandardDeviation = 0, Errored = true, ErrorMessage = "fail",
-                MeasuredIterations = 0, WarmupIterations = 0, RunAt = DateTimeOffset.UtcNow,
+                MeasuredIterations = 0, WarmupIterations = 0, RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 
@@ -125,19 +125,19 @@ public class BenchmarkTableTests
             {
                 Name = "Base", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "TwoX", Mean = 200, Median = 200, P95 = 200, P99 = 200, Min = 200, Max = 200,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "Half", Mean = 50, Median = 50, P95 = 50, P99 = 50, Min = 50, Max = 50,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 
@@ -157,13 +157,13 @@ public class BenchmarkTableTests
             {
                 Name = "Base", Mean = 0, Median = 0, P95 = 0, P99 = 0, Min = 0, Max = 0,
                 StandardDeviation = 0, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "Other", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 
@@ -181,14 +181,14 @@ public class BenchmarkTableTests
             {
                 Name = "Base", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "Fail", Mean = 0, Median = 0, P95 = 0, P99 = 0, Min = 0, Max = 0,
                 StandardDeviation = 0, Errored = true, ErrorMessage = "crash",
                 MeasuredIterations = 0, WarmupIterations = 0,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 
@@ -206,29 +206,29 @@ public class BenchmarkTableTests
             {
                 Name = "Base", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
-                IsSignificant = false,
-                RunAt = DateTimeOffset.UtcNow,
+                SignificanceVerdict = SignificanceVerdict.NotSignificant,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "Sig", Mean = 200, Median = 200, P95 = 200, P99 = 200, Min = 200, Max = 200,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                IsSignificant = true,
-                RunAt = DateTimeOffset.UtcNow,
+                SignificanceVerdict = SignificanceVerdict.Significant,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "NotSig", Mean = 150, Median = 150, P95 = 150, P99 = 150, Min = 150, Max = 150,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                IsSignificant = false,
-                RunAt = DateTimeOffset.UtcNow,
+                SignificanceVerdict = SignificanceVerdict.NotSignificant,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "NoSig", Mean = 120, Median = 120, P95 = 120, P99 = 120, Min = 120, Max = 120,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                IsSignificant = null,
-                RunAt = DateTimeOffset.UtcNow,
+                SignificanceVerdict = SignificanceVerdict.NotTested,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 
@@ -249,8 +249,8 @@ public class BenchmarkTableTests
             {
                 Name = "Only", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
-                IsSignificant = true,
-                RunAt = DateTimeOffset.UtcNow,
+                SignificanceVerdict = SignificanceVerdict.Significant,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 
@@ -269,7 +269,7 @@ public class BenchmarkTableTests
             {
                 Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = now, ConfidenceLevel = 0.99,
+                RunAtUtc = now, ConfidenceLevel = 0.99,
             },
         };
 
@@ -291,14 +291,14 @@ public class BenchmarkTableTests
                 Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 TotalDuration = TimeSpan.FromSeconds(1),
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "B", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 TotalDuration = TimeSpan.FromSeconds(2),
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 
@@ -316,19 +316,19 @@ public class BenchmarkTableTests
             {
                 Name = "Slowest", Mean = 300, Median = 300, P95 = 300, P99 = 300, Min = 300, Max = 300,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "Fastest", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
             new BenchmarkResult
             {
                 Name = "Middle", Mean = 200, Median = 200, P95 = 200, P99 = 200, Min = 200, Max = 200,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                RunAt = DateTimeOffset.UtcNow,
+                RunAtUtc = DateTimeOffset.UtcNow,
             },
         };
 

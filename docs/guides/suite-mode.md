@@ -86,7 +86,7 @@ await new BenchmarkSuite("name")
     .WithBaseline("name")           // which benchmark is the 1.00x reference
     .WithIterations(200)            // default: 200
     .WithWarmup(25)                 // default: 25
-    .WithMemory()                   // enable allocation tracking
+    .WithAllocations()              // enable allocation tracking
     .WithOutlierMode(OutlierMode.RemoveTop5Percent)   // default
     .WithConfidenceLevel(0.99)      // default: 0.95
     .WithSignificance(false)        // disable Mann-Whitney U test
@@ -145,7 +145,7 @@ suite
 `ConsoleBenchmarkProgress` (from `NBenchmark.Console`) shows warmup and measurement progress for each benchmark:
 
 ```csharp
-.WithProgress(new ConsoleBenchmarkProgress(iterations: 200, warmupIterations: 25))
+.WithProgress(new ConsoleBenchmarkProgress(measuredIterations: 200, warmupIterations: 25))
 ```
 
 Pass the same values you gave to `WithIterations` and `WithWarmup` so the progress display is accurate.

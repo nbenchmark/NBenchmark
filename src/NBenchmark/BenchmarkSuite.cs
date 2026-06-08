@@ -79,7 +79,7 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
-    public BenchmarkSuite WithMemory(bool enabled = true)
+    public BenchmarkSuite WithAllocations(bool enabled = true)
     {
         _options = _options with { MeasureAllocations = enabled };
         return this;

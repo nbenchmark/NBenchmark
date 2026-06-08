@@ -30,7 +30,7 @@ Use the fluent `With*` methods - they each update a single option:
 await new BenchmarkSuite("name")
     .WithIterations(500)
     .WithWarmup(50)
-    .WithMemory()
+    .WithAllocations()
     .WithOutlierMode(OutlierMode.IqrFence)
     .WithConfidenceLevel(0.99)
     .RunAsync();
@@ -98,7 +98,7 @@ MeasureAllocations = false   // default
 
 When `true`, NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` around each iteration and reports the mean bytes allocated per operation in the **Alloc/op** column (with a process-wide fallback for async thread hops).
 
-BenchmarkSuite fluent method: `.WithMemory()`
+BenchmarkSuite fluent method: `.WithAllocations()`
 
 ::: info
 Allocation tracking adds a small overhead to each iteration and may slightly affect timing measurements.
@@ -116,7 +116,7 @@ Controls which samples are discarded before statistics are computed.
 |---|---|
 | `OutlierMode.None` | No samples are removed. |
 | `OutlierMode.RemoveTop5Percent` | The slowest 5% of samples are removed. **(default)** |
-| `OutlierMode.RemoveTop5PercentAndBottom5Percent` | The slowest and fastest 5% are removed. |
+| `OutlierMode.RemoveTopAndBottom5Percent` | The slowest and fastest 5% are removed. |
 | `OutlierMode.IqrFence` | Samples beyond 1.5× the IQR (inter-quartile range) are removed. |
 
 With 200 iterations and `RemoveTop5Percent`, the 10 noisiest measurements are discarded. This guards against OS scheduling spikes and thermal throttling without discarding too much data.

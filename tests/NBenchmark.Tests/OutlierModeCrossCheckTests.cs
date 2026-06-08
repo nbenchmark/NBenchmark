@@ -26,7 +26,7 @@ public class OutlierModeCrossCheckTests
         Assert.Equal(iterations, outcome.RawSamples.Length);
     }
 
-    // RemoveTop5PercentAndBottom5Percent removes floor(n × 0.05) from each end.
+    // RemoveTopAndBottom5Percent removes floor(n × 0.05) from each end.
     [Theory]
     [InlineData(20, 18)]
     [InlineData(50, 46)]
@@ -34,7 +34,7 @@ public class OutlierModeCrossCheckTests
     [InlineData(200, 180)]
     public async Task RemoveBoth5Percent_Trims_Floor_Each_End(int iterations, int expectedKept)
     {
-        var outcome = await Measure(iterations, OutlierMode.RemoveTop5PercentAndBottom5Percent);
+        var outcome = await Measure(iterations, OutlierMode.RemoveTopAndBottom5Percent);
 
         Assert.Equal(expectedKept, outcome.Result.MeasuredIterations);
         Assert.Equal(iterations, outcome.RawSamples.Length);

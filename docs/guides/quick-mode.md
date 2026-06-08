@@ -47,10 +47,10 @@ var result = await Benchmark.RunAsync(async () => await ComputeAsync(input));
 
 ### Raw outcome
 
-`Benchmark.MeasureRaw` returns a `MeasurementOutcome` which includes both the `BenchmarkResult` and the raw per-iteration sample array. Use this if you need the underlying data.
+`Benchmark.RunRaw` returns a `MeasurementOutcome` which includes both the `BenchmarkResult` and the raw per-iteration sample array. Use this if you need the underlying data.
 
 ```csharp
-var outcome = Benchmark.MeasureRaw(() => DoWork());
+var outcome = Benchmark.RunRaw(() => DoWork());
 double[] rawSamples = outcome.RawSamples;     // nanoseconds, before outlier trimming
 BenchmarkResult result = outcome.Result;
 ```
