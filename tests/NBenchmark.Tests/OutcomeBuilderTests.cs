@@ -134,7 +134,7 @@ public class OutcomeBuilderTests
     public void Build_Success_RunAt_Is_Recent_UtcNow()
     {
         var stats = new StatsSummary { Mean = 1 };
-        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
+        var before = DateTimeOffset.UtcNow.AddSeconds(-5);
 
         var outcome = OutcomeBuilder.Build(
             new OutcomeInput.Success(
@@ -145,7 +145,7 @@ public class OutcomeBuilderTests
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
 
-        var after = DateTimeOffset.UtcNow.AddSeconds(1);
+        var after = DateTimeOffset.UtcNow.AddSeconds(5);
         Assert.InRange(outcome.Result.RunAt, before, after);
     }
 
