@@ -117,7 +117,7 @@ Controls which samples are discarded before statistics are computed.
 | `OutlierMode.None` | No samples are removed. |
 | `OutlierMode.RemoveTop5Percent` | The slowest 5% of samples are removed. **(default)** |
 | `OutlierMode.RemoveTopAndBottom5Percent` | The slowest and fastest 5% are removed. |
-| `OutlierMode.IqrFence` | Samples beyond 1.5× the IQR (inter-quartile range) are removed. |
+| `OutlierMode.IqrFence` | Samples beyond 1.5× the [IQR (inter-quartile range)](https://en.wikipedia.org/wiki/Interquartile_range) are removed. |
 
 With 200 iterations and `RemoveTop5Percent`, the 10 noisiest measurements are discarded. This guards against OS scheduling spikes and thermal throttling without discarding too much data.
 
@@ -148,7 +148,7 @@ CLI flag: `--confidence 0.99`
 EnableSignificance = true   // default
 ```
 
-When `true` and there are two or more benchmarks, NBenchmark runs a Mann-Whitney U test to determine whether the difference in medians is statistically significant (p < 0.05).
+When `true` and there are two or more benchmarks, NBenchmark runs a [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) to determine whether the difference in medians is statistically significant (p < 0.05).
 
 Disable it if you don't need significance testing and want to reduce overhead:
 

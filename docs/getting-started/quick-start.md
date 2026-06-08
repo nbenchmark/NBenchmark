@@ -107,7 +107,7 @@ await result.ToJsonAsync("results/");   // directory
 | **StdDev** | How spread out the measurements are. High StdDev = unpredictable timing. |
 | **P95 / P99** | Worst-case timing 95% / 99% of the time. Useful for latency budgets. |
 | **Ratio** | Speed relative to the baseline. `0.75x` = 25% faster; `2.0x` = twice as slow. |
-| **Sig ✓** | Difference from the baseline is statistically significant (p < 0.05). |
+| **Sig ✓** | Difference from the baseline is statistically significant ([p < 0.05](https://en.wikipedia.org/wiki/P-value)). |
 
 See [Key Concepts](./key-concepts) for a deeper explanation of what these mean and how they are calculated.
 

@@ -14,8 +14,8 @@ Before any measurements are recorded, each benchmark runs for a number of **warm
 
 Warmup exists because the first few runs of .NET code are artificially slow:
 
-- The **JIT compiler** hasn't compiled your method yet. The first call triggers compilation, which takes time.
-- **CPU caches** are cold. Memory that your code accesses frequently won't be in the L1/L2 cache yet.
+- The **JIT compiler** hasn't compiled your method yet. The first call triggers [compilation](https://en.wikipedia.org/wiki/Just-in-time_compilation), which takes time.
+- **CPU caches** are cold. Memory that your code accesses frequently won't be in the [L1/L2 cache](https://en.wikipedia.org/wiki/CPU_cache) yet.
 
 If you skipped warmup, your first measurements would include JIT compilation time, which is not representative of steady-state performance. After warmup, subsequent runs use the compiled, cached version of your code.
 
@@ -44,7 +44,7 @@ Available modes:
 | `None` | Nothing. All samples are used. |
 | `RemoveTop5Percent` | The slowest 5% of samples. **(default)** |
 | `RemoveTopAndBottom5Percent` | The slowest and fastest 5%. |
-| `IqrFence` | Any sample beyond 1.5× the inter-quartile range. |
+| `IqrFence` | Any sample beyond 1.5× the [inter-quartile range](https://en.wikipedia.org/wiki/Interquartile_range). |
 
 ## Median vs. mean
 
@@ -56,7 +56,7 @@ For most purposes, the **median** is the most reliable single number to compare 
 
 ## Standard deviation
 
-**Standard deviation (StdDev)** measures how spread out your measurements are. A high StdDev relative to the mean means your timings are inconsistent - the code runs in very different amounts of time from iteration to iteration. This can be caused by:
+**Standard deviation (StdDev)** measures how spread out your measurements are. A [standard deviation](https://en.wikipedia.org/wiki/Standard_deviation) high relative to the mean means your timings are inconsistent - the code runs in very different amounts of time from iteration to iteration. This can be caused by:
 
 - GC pressure and pauses
 - Cache misses due to working-set size
@@ -67,11 +67,11 @@ A low StdDev means your benchmark is stable and the mean is trustworthy.
 
 ## Confidence intervals and the Error column
 
-The **Error** column shows the **margin of error** on the mean at a given confidence level (default: 95%).
+The **Error** column shows the **[margin of error](https://en.wikipedia.org/wiki/Margin_of_error)** on the mean at a given confidence level (default: 95%).
 
 Concretely: with 200 samples and a 95% confidence level, the true mean is likely within `Mean ± Error`. If the Error is `±50 ns` and the mean is `1.20 µs`, you can be 95% confident the true mean is somewhere between `1.15 µs` and `1.25 µs`.
 
-**How it's calculated:** NBenchmark computes the standard error of the mean (`StdDev / √n`), then multiplies by the critical value of Student's t-distribution at the configured confidence level and `n-1` degrees of freedom. For large sample counts this converges to the familiar `z = 1.96` you might know from normal-distribution CIs.
+**How it's calculated:** NBenchmark computes the [standard error of the mean](https://en.wikipedia.org/wiki/Standard_error) (`StdDev / √n`), then multiplies by the critical value of [Student's t-distribution](https://en.wikipedia.org/wiki/Student%27s_t-distribution) at the configured confidence level and `n-1` degrees of freedom. For large sample counts this converges to the familiar `z = 1.96` you might know from normal-distribution CIs.
 
 **What a large Error means:** your measurements are highly variable, or you have too few iterations. Consider increasing `WithIterations(...)` or checking whether something external is interfering (e.g. background processes on your machine).
 
@@ -85,13 +85,13 @@ These are important for **latency-sensitive** code where you care about worst-ca
 
 When comparing two or more benchmarks, it's not enough to see that one has a lower median. The difference might be random noise.
 
-NBenchmark uses the **Mann-Whitney U test** to answer: "Is this difference statistically significant?"
+NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** to answer: "Is this difference statistically significant?"
 
 - A **✓** in the Sig column means the difference would occur by chance less than 5% of the time (p < 0.05). It is very unlikely to be noise.
 - A **~** means the difference is not statistically significant - you cannot confidently conclude one is faster than the other.
 - The test requires at least **5 samples** in each group; with fewer it returns no result.
 
-The Mann-Whitney U test is **non-parametric** - it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
+The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** — it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
 
 ::: info
 Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Always look at the Ratio column alongside significance.

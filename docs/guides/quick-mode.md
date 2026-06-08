@@ -20,7 +20,7 @@ var result = Benchmark.Run(() =>
 });
 ```
 
-`Benchmark.Run` runs 25 warmup iterations, then 200 measured iterations, trims the top 5% of outliers, and returns a `BenchmarkResult`.
+`Benchmark.Run` runs 25 warmup iterations, then 200 measured iterations, trims the top 5% of [outliers](https://en.wikipedia.org/wiki/Outlier), and returns a `BenchmarkResult`.
 
 ## Overloads
 

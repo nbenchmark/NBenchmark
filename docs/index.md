@@ -10,7 +10,7 @@ NBenchmark is a lightweight benchmarking library for .NET. It is designed around
 
 - **Excellent developer experience.** Go from nothing to your first measurement in one line of code.
 - **High performance.** No reflection overhead in the measurement loop, accurate timers, proper GC handling.
-- **Statistically honest output.** Confidence intervals, outlier trimming, and a non-parametric significance test are on by default so you know whether a difference is real.
+- **Statistically honest output.** Confidence intervals, outlier trimming, and a [non-parametric significance test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) are on by default so you know whether a difference is real.
 
 ## Packages
 

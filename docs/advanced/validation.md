@@ -7,8 +7,8 @@ order: 2
 # Validation & Accuracy
 
 NBenchmark's numerical core is dependency-free - it ships its own implementations
-of the Student's t quantile, the normal quantile, percentiles, and the
-Mann-Whitney U test. This page documents how those implementations are verified,
+of the [Student's t quantile](https://en.wikipedia.org/wiki/Student%27s_t-distribution), the normal quantile, percentiles, and the
+[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test). This page documents how those implementations are verified,
 and to what tolerance, so you can trust the numbers in the output.
 
 The verification lives in the test suite (`tests/NBenchmark.Tests`) and runs on
@@ -58,17 +58,17 @@ from scipy import stats
 np.mean(x)                                   # mean
 np.std(x, ddof=1)                            # sample standard deviation
 np.percentile(x, q, method='inverted_cdf')  # nearest-rank percentile
-stats.t.ppf((1 + cl) / 2, df)                # two-tailed t critical value
-stats.norm.ppf(p)                            # normal quantile
+stats.t.ppf((1 + cl) / 2, df)                # two-tailed [t critical value](https://en.wikipedia.org/wiki/Student%27s_t-distribution)
+stats.norm.ppf(p)                            # [normal quantile](https://en.wikipedia.org/wiki/Normal_distribution)
 stats.mannwhitneyu(a, b, alternative='two-sided',
-                   method='asymptotic', use_continuity=False)  # p-value
+                   method='asymptotic', use_continuity=False)  # [p-value](https://en.wikipedia.org/wiki/P-value)
 ```
 
 ### Exact vs. approximate Mann-Whitney U
 
 NBenchmark uses the large-sample normal approximation (no continuity
 correction). `MannWhitneyCrossCheckTests` also enumerates the **exact**
-permutation distribution in-process (validated against
+[permutation](https://en.wikipedia.org/wiki/Permutation_test) distribution in-process (validated against
 `scipy.stats.mannwhitneyu(method='exact')` to 1e-9) and pins how far the
 approximation can stray from it:
 

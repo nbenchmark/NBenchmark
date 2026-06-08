@@ -51,7 +51,7 @@ All timing values are in **nanoseconds**.
 | `P95` | float | 95th percentile in nanoseconds. |
 | `P99` | float | 99th percentile in nanoseconds. |
 | `Ratio` | float or `null` | Speed relative to the baseline. `null` if no baseline or only one benchmark. |
-| `Significant` | `"true"` / `"false"` / empty | Mann-Whitney U significance result. Empty for the baseline or when significance testing is disabled. |
+| `Significant` | `"true"` / `"false"` / empty | [Mann-Whitney U](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) significance result. Empty for the baseline or when significance testing is disabled. |
 | `AllocPerOp` | integer or `null` | Mean heap bytes per iteration. `null` if allocation tracking is disabled. |
 
 ## Notes

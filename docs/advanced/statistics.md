@@ -39,23 +39,23 @@ On most modern hardware the resolution is 1 ns. On some virtual machines it may 
 
 ## Outlier trimming
 
-After collection, outliers are removed according to `OutlierMode`. The samples are first sorted ascending.
+After collection, [outliers](https://en.wikipedia.org/wiki/Outlier) are removed according to `OutlierMode`. The samples are first sorted ascending.
 
 | Mode | Algorithm |
 |---|---|
 | `None` | No trimming. |
 | `RemoveTop5Percent` | Discard the top `ceil(n × 0.05)` samples. Equivalent to keeping `floor(n × 0.95)`. |
 | `RemoveTopAndBottom5Percent` | Discard the top and bottom `floor(n × 0.05)` samples from each end. |
-| `IqrFence` | Compute Q1, Q3, and IQR = Q3 − Q1. Discard any sample above Q3 + 1.5 × IQR or below Q1 − 1.5 × IQR. |
+| `IqrFence` | Compute Q1, Q3, and [IQR](https://en.wikipedia.org/wiki/Interquartile_range) = Q3 − Q1. Discard any sample above Q3 + 1.5 × IQR or below Q1 − 1.5 × IQR. |
 
 The trimmed array is passed to `StatsSummary.Compute`. The pre-trim raw array is stored separately for use in significance testing.
 
 ::: info Quartile definition
-`IqrFence` computes Q1 and Q3 with the same **nearest-rank** percentile used
+`IqrFence` computes Q1 and Q3 with the same **[nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method)** percentile used
 everywhere else in NBenchmark (equivalent to `numpy.percentile(method='inverted_cdf')`).
 This deliberately differs from R's default `type = 7` linear interpolation: for a
 1..20 ramp NBenchmark gives Q1 = 5, Q3 = 15, whereas R type 7 gives Q1 = 5.75,
-Q3 = 15.25. The choice keeps every quantile in the library consistent and is
+Q3 = 15.25. The choice keeps every [quantile](https://en.wikipedia.org/wiki/Quantile) in the library consistent and is
 pinned by `OutlierModeCrossCheckTests`.
 :::
 
@@ -69,35 +69,35 @@ $$\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i$$
 
 ### Median
 
-The nearest-rank method. For sorted sample index `i = ceil(0.5 × n)` (1-based). Equivalent to the middle value for odd `n`, and the lower-middle for even `n`.
+The [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method) method. For sorted sample index `i = ceil(0.5 × n)` (1-based). Equivalent to the middle value for odd `n`, and the lower-middle for even `n`.
 
 ### Percentiles (P95, P99)
 
-Also nearest-rank: `i = ceil(p × n)`.
+Also [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method): `i = ceil(p × n)`.
 
 ### Min and Max
 
 `samples[0]` and `samples[n-1]` of the sorted, trimmed array.
 
-### Sample standard deviation (Bessel's correction)
+### Sample standard deviation ([Bessel's correction](https://en.wikipedia.org/wiki/Bessel%27s_correction))
 
 $$s = \sqrt{\frac{1}{n-1} \sum_{i=1}^{n}(x_i - \bar{x})^2}$$
 
-The `n-1` denominator (Bessel's correction) makes `s` an unbiased estimator of the population standard deviation. For `n = 1`, the standard deviation is reported as `0`.
+The `n-1` denominator (Bessel's correction) makes `s` an unbiased estimator of the population standard deviation. For `n = 1`, the [standard deviation](https://en.wikipedia.org/wiki/Standard_deviation) is reported as `0`.
 
-## Standard error of the mean
+## [Standard error of the mean](https://en.wikipedia.org/wiki/Standard_error)
 
 $$\text{SEM} = \frac{s}{\sqrt{n}}$$
 
 SEM measures how precisely the mean is estimated. For `n = 1`, SEM is `0`.
 
-## Confidence interval on the mean
+## [Confidence interval](https://en.wikipedia.org/wiki/Confidence_interval) on the mean
 
 The margin of error is the half-width of the confidence interval:
 
 $$\text{MoE} = t^{*}_{\alpha/2,\, n-1} \times \text{SEM}$$
 
-where $t^{*}_{\alpha/2,\, n-1}$ is the two-tailed critical value of Student's t-distribution at the configured confidence level and `n − 1` degrees of freedom.
+where $t^{*}_{\alpha/2,\, n-1}$ is the two-tailed critical value of [Student's t-distribution](https://en.wikipedia.org/wiki/Student%27s_t-distribution) at the configured confidence level and `n − 1` degrees of freedom.
 
 The confidence interval is:
 
@@ -105,13 +105,13 @@ $$\bar{x} \pm \text{MoE} = [\bar{x} - \text{MoE},\; \bar{x} + \text{MoE}]$$
 
 ### Why Student's t and not the normal distribution?
 
-The normal distribution's critical value (e.g. 1.96 for 95%) assumes the population standard deviation is known. In benchmarking it is not - we estimate it from the sample. Student's t compensates by using wider critical values for small sample sizes, shrinking towards the normal as `n` grows.
+The [normal distribution](https://en.wikipedia.org/wiki/Normal_distribution)'s critical value (e.g. 1.96 for 95%) assumes the population standard deviation is known. In benchmarking it is not - we estimate it from the sample. Student's t compensates by using wider critical values for small sample sizes, shrinking towards the normal as `n` grows.
 
 With the default 200 iterations (190 after 5% trimming), the t critical value at 95% is approximately **1.973** - very close to the normal 1.960, so the practical difference is small.
 
 ### Honest caveats
 
-The CI is on the **mean** and relies on the Central Limit Theorem - the assumption that the sample mean is approximately normally distributed. For `n ≥ 30` this is generally safe even when the underlying distribution is not normal. For very small sample counts (e.g. a parameterised benchmark with 10 iterations) the approximation is weaker, but the t-distribution's heavier tails at low degrees of freedom provide some protection.
+The CI is on the **mean** and relies on the [Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem) — the assumption that the sample mean is approximately normally distributed. For `n ≥ 30` this is generally safe even when the underlying distribution is not normal. For very small sample counts (e.g. a parameterised benchmark with 10 iterations) the approximation is weaker, but the t-distribution's heavier tails at low degrees of freedom provide some protection.
 
 ### t-critical values in practice
 
@@ -123,14 +123,14 @@ The CI is on the **mean** and relies on the Central Limit Theorem - the assumpti
 
 ### Dependency-free implementation
 
-NBenchmark computes the t critical value without any external libraries using exact closed forms for df = 1 and df = 2, and the Cornish-Fisher expansion (Abramowitz & Stegun §26.7.5) for df ≥ 3. The normal quantile uses Acklam's rational approximation (max error < 1.15 × 10⁻⁹).
+NBenchmark computes the t critical value without any external libraries using exact closed forms for df = 1 and df = 2, and the [Cornish-Fisher expansion](https://en.wikipedia.org/wiki/Cornish%E2%80%93Fisher_expansion) (Abramowitz & Stegun §26.7.5) for df ≥ 3. The normal quantile uses Acklam's rational approximation (max error < 1.15 × 10⁻⁹).
 
 These approximations are cross-checked against SciPy on every build: the t
 critical value matches `scipy.stats.t.ppf` to machine precision for df = 1, 2 and
 to **better than 1%** for df ≥ 3 (worst case ≈ 0.79% at df = 3, 99%). See
 [Validation & Accuracy](./validation) for the full tolerance table.
 
-## Coefficient of variation
+## [Coefficient of variation](https://en.wikipedia.org/wiki/Coefficient_of_variation)
 
 $$\text{CV} = \frac{s}{\bar{x}}$$
 
@@ -155,13 +155,13 @@ The reported `MeanAllocatedBytes` is the arithmetic mean across all iterations. 
 
 In synchronous benchmarks this is thread-local (`GC.GetAllocatedBytesForCurrentThread`) and does not include allocations from other threads. In async benchmarks, if the continuation hops threads, NBenchmark falls back to process-wide delta for that sample, which can include background allocation noise.
 
-## Statistical significance: Mann-Whitney U test
+## Statistical significance: [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)
 
 When two or more benchmarks have been run, NBenchmark tests whether the difference in their distributions is statistically significant using the **Mann-Whitney U test** (also called the Wilcoxon rank-sum test).
 
 ### Why Mann-Whitney U?
 
-Benchmark timings are typically right-skewed (a few slow outliers) and do not follow a normal distribution. Parametric tests like the t-test assume normality. The Mann-Whitney U test is **non-parametric** - it ranks combined values rather than computing moments, and makes no distributional assumptions.
+Benchmark timings are typically right-skewed (a few slow outliers) and do not follow a normal distribution. Parametric tests like the t-test assume normality. The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** — it ranks combined values rather than computing moments, and makes no distributional assumptions.
 
 ### Algorithm
 
@@ -174,14 +174,14 @@ Given the **pre-trim raw samples** of two benchmarks A (length n₁) and B (leng
 
 $$U_1 = R_1 - \frac{n_1(n_1+1)}{2}, \quad U_2 = n_1 n_2 - U_1, \quad U = \min(U_1, U_2)$$
 
-1. For large samples (n₁ ≥ 5 and n₂ ≥ 5), use the normal approximation with a tie correction to compute a z-score, then derive a two-tailed p-value.
+1. For large samples (n₁ ≥ 5 and n₂ ≥ 5), use the [normal approximation](https://en.wikipedia.org/wiki/Normal_distribution#Central_limit_theorem) with a tie correction to compute a z-score, then derive a two-tailed [p-value](https://en.wikipedia.org/wiki/P-value).
 
-A p-value below **0.05** is considered significant (✓ in the Sig column). This threshold is fixed and is not configurable.
+A [p-value](https://en.wikipedia.org/wiki/P-value) below **0.05** is considered significant (✓ in the Sig column). This threshold is fixed and is not configurable.
 
 The normal approximation uses **no continuity correction**, so it corresponds to
 `scipy.stats.mannwhitneyu(..., method='asymptotic', use_continuity=False)` - which
 NBenchmark matches to better than 1e-6. On small samples this approximation can
-differ from the exact permutation p-value by up to ≈ 0.05; that gap is pinned and
+differ from the exact [permutation](https://en.wikipedia.org/wiki/Permutation_test) p-value by up to ≈ 0.05; that gap is pinned and
 documented in [Validation & Accuracy](./validation).
 
 ::: info

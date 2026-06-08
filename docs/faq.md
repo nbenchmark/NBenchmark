@@ -64,7 +64,7 @@ Yes. Use `Benchmark.RunAsync`, the `Func<Task>` overload of `BenchmarkSuite.Add`
 
 ### What does the Sig column mean?
 
-It shows the result of a **Mann-Whitney U test** comparing the benchmark to the baseline. A **✓** means the difference is statistically significant (p < 0.05) - unlikely to be random noise. A **~** means it is not significant.
+It shows the result of a **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** comparing the benchmark to the baseline. A **✓** means the difference is statistically significant (p < 0.05) - unlikely to be random noise. A **~** means it is not significant.
 
 See [Statistical Significance](./getting-started/key-concepts#statistical-significance) and the [Statistics Deep Dive](./advanced/statistics) for full details.
 
