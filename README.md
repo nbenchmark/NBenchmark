@@ -1,6 +1,6 @@
 # NBenchmark
 
-A lightweight, async-native .NET benchmarking library. No configuration files, no separate compilation step - add a reference and start measuring.
+NBenchmark is the easiest way to measure the speed of your .NET code. With zero setup and a focus on simplicity, you can go from installation to your first accurate benchmark in seconds-perfect for quick checks and full performance suites alike.
 
 > **Pre-release.** NBenchmark targets .NET 8+ (net8.0, net9.0, net10.0) and is under active development. The API may change between versions.
 

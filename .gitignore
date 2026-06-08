@@ -60,7 +60,4 @@ nunit-*.xml
 .DS_Store
 .idea/
 .vs/
-src/NBenchmark/.DS_Store
-/src/NBenchmark/.idea
-/.idea
-.DS_Store
+*.user
