@@ -3,6 +3,7 @@
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <VersionPrefix>0.0.1</VersionPrefix>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(IsPackable)' != 'false'">
