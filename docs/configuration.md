@@ -96,7 +96,7 @@ Disable it if your benchmark intentionally tests GC pressure or allocation-heavy
 MeasureAllocations = false   // default
 ```
 
-When `true`, NBenchmark samples `GC.GetTotalAllocatedBytes` around each iteration and reports the mean bytes allocated per operation in the **Alloc/op** column.
+When `true`, NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` around each iteration and reports the mean bytes allocated per operation in the **Alloc/op** column (with a process-wide fallback for async thread hops).
 
 BenchmarkSuite fluent method: `.WithMemory()`
 

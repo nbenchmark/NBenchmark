@@ -99,7 +99,7 @@ Statistical significance does not mean the difference is *large* or *important*.
 
 ## Allocation tracking
 
-When `MeasureAllocations` is enabled, NBenchmark samples `GC.GetTotalAllocatedBytes` before and after each iteration and reports the **mean bytes allocated per iteration** in the Alloc/op column.
+When `MeasureAllocations` is enabled, NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` before and after each iteration and reports the **mean bytes allocated per iteration** in the Alloc/op column. If an async iteration resumes on a different thread, it falls back to a process-wide allocation delta for that sample.
 
 This is useful for detecting unexpected heap allocations - boxing of value types, LINQ overhead, string formatting, etc. Zero allocations in the hot path typically means less GC pressure and more predictable latency.
 

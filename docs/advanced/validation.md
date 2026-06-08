@@ -98,6 +98,6 @@ minimum is stable:
 
 - **Allocation tracking** is a smoke test (a 64 KiB allocation reports ≥ 1 KiB),
   not an exact byte comparison, because framework allocations can appear between
-  the two `GC.GetTotalAllocatedBytes` reads.
+  the before/after allocation counter reads.
 - **Absolute timing accuracy** depends on the platform's `Stopwatch` resolution
   and scheduler; the timing tests bound it coarsely rather than precisely.

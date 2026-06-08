@@ -402,6 +402,51 @@ public class BenchmarkRunnerTests
         Assert.True(outcome.Result.MeanAllocatedBytes >= 1024);
     }
 
+    [Fact]
+    public async Task Run_With_MeasureAllocations_Sync_Path_Ignores_Background_Thread_Noise()
+    {
+        using var cts = new CancellationTokenSource();
+        var backgroundAllocator = Task.Run(() =>
+        {
+            while (!cts.Token.IsCancellationRequested)
+                _ = new byte[1024];
+        }, cts.Token);
+
+        try
+        {
+            var spec = new RunSpec
+            {
+                Options = new MeasurementOptions
+                {
+                    WarmupIterations = 1,
+                    Iterations = 30,
+                    MeasureAllocations = true,
+                    ForceGcBeforeEachIteration = false,
+                    OutlierMode = OutlierMode.None,
+                },
+            };
+
+            var outcome = BenchmarkRunner.Instance.Run("alloc-sync-noise", () => Thread.SpinWait(20_000), spec);
+
+            Assert.NotNull(outcome.Result.MeanAllocatedBytes);
+            Assert.True(outcome.Result.MeanAllocatedBytes < 64 * 1024,
+                $"Expected sync allocation measurement to stay near zero despite background allocator; got {outcome.Result.MeanAllocatedBytes} bytes/op.");
+        }
+        finally
+        {
+            cts.Cancel();
+
+            try
+            {
+                await backgroundAllocator;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on cancellation.
+            }
+        }
+    }
+
     // ---------- IsBaseline plumbing ----------
 
     [Fact]

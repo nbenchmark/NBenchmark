@@ -50,9 +50,9 @@ The compiler or JIT has likely optimised the benchmark body away because it has 
 
 ### How does allocation tracking work? Does it include framework overhead?
 
-NBenchmark uses `GC.GetTotalAllocatedBytes` sampled immediately before and after the action. Any allocations by the benchmark framework itself (setup/teardown delegates, etc.) that fall between the two reads would be included, but in practice this is zero for simple benchmarks.
+NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` immediately before and after the action. If an async benchmark resumes on a different thread, it falls back to a `GC.GetTotalAllocatedBytes` delta for that iteration.
 
-The value is **thread-local** - allocations made by other threads are not counted.
+Any allocations by the benchmark framework itself (setup/teardown delegates, etc.) that fall between the two reads would be included, but in practice this is usually negligible for simple benchmarks.
 
 ### Can I benchmark async code?
 

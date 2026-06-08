@@ -62,6 +62,50 @@ public class EnvelopeTests
         Assert.Equal("the baseline", envelope.Description);
     }
 
+    [Fact]
+    public async Task FromDiscovered_Applies_PerMethod_Iteration_And_Warmup_Overrides()
+    {
+        var instance = new AttributeOverrideBenchmarks();
+        var method = TestReflectionHelper.ResolveMethod(typeof(AttributeOverrideBenchmarks), nameof(AttributeOverrideBenchmarks.Work));
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AttributeOverrideBenchmarks), instance);
+
+        var outcome = await envelope.RunAsync(new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                Iterations = 5,
+                WarmupIterations = 1,
+                OutlierMode = OutlierMode.None,
+            },
+        }, CancellationToken.None);
+
+        Assert.Equal(2, outcome.Result.MeasuredIterations);
+        Assert.Equal(3, outcome.Result.WarmupIterations);
+        Assert.Equal(5, instance.InvocationCount);
+    }
+
+    [Fact]
+    public async Task FromDiscovered_DryRun_Spec_Does_Not_Apply_PerMethod_Overrides()
+    {
+        var instance = new AttributeOverrideBenchmarks();
+        var method = TestReflectionHelper.ResolveMethod(typeof(AttributeOverrideBenchmarks), nameof(AttributeOverrideBenchmarks.Work));
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AttributeOverrideBenchmarks), instance);
+
+        var outcome = await envelope.RunAsync(new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                Iterations = 0,
+                WarmupIterations = 0,
+                OutlierMode = OutlierMode.None,
+            },
+        }, CancellationToken.None);
+
+        Assert.Equal(0, outcome.Result.MeasuredIterations);
+        Assert.Equal(0, outcome.Result.WarmupIterations);
+        Assert.Equal(0, instance.InvocationCount);
+    }
+
     private static RunSpec MinimalSpec() => new()
     {
         Options = new MeasurementOptions { Iterations = 0, WarmupIterations = 0 },
@@ -71,6 +115,14 @@ public class EnvelopeTests
     {
         [NBenchmark.Attributes.Benchmark(Baseline = true, Description = "the baseline")]
         public int Fast() => 1;
+    }
+
+    private sealed class AttributeOverrideBenchmarks
+    {
+        public int InvocationCount;
+
+        [NBenchmark.Attributes.Benchmark(Iterations = 2, WarmupIterations = 3)]
+        public void Work() => InvocationCount++;
     }
 }
 

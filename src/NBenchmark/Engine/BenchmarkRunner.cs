@@ -231,19 +231,16 @@ public sealed class BenchmarkRunner
 
             spec.IterationSetup?.Invoke();
 
-            long allocBefore = 0;
+            AllocationSnapshot allocBefore = default;
             if (options.MeasureAllocations)
-                allocBefore = GC.GetTotalAllocatedBytes();
+                allocBefore = CaptureAllocationSnapshot();
 
             var timestamp = _clock.GetTimestamp();
             body();
             var elapsed = _clock.GetElapsedTime(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
-            {
-                var allocAfter = GC.GetTotalAllocatedBytes();
-                allocations[i] = Math.Max(0, allocAfter - allocBefore);
-            }
+                allocations[i] = ComputeAllocationDelta(allocBefore);
 
             spec.IterationTeardown?.Invoke();
             timings[i] = elapsed.TotalNanoseconds;
@@ -269,19 +266,16 @@ public sealed class BenchmarkRunner
 
             spec.IterationSetup?.Invoke();
 
-            long allocBefore = 0;
+            AllocationSnapshot allocBefore = default;
             if (options.MeasureAllocations)
-                allocBefore = GC.GetTotalAllocatedBytes();
+                allocBefore = CaptureAllocationSnapshot();
 
             var timestamp = _clock.GetTimestamp();
             Consume(body());
             var elapsed = _clock.GetElapsedTime(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
-            {
-                var allocAfter = GC.GetTotalAllocatedBytes();
-                allocations[i] = Math.Max(0, allocAfter - allocBefore);
-            }
+                allocations[i] = ComputeAllocationDelta(allocBefore);
 
             spec.IterationTeardown?.Invoke();
             timings[i] = elapsed.TotalNanoseconds;
@@ -307,19 +301,16 @@ public sealed class BenchmarkRunner
 
             spec.IterationSetup?.Invoke();
 
-            long allocBefore = 0;
+            AllocationSnapshot allocBefore = default;
             if (options.MeasureAllocations)
-                allocBefore = GC.GetTotalAllocatedBytes();
+                allocBefore = CaptureAllocationSnapshot();
 
             var timestamp = _clock.GetTimestamp();
             await body().ConfigureAwait(false);
             var elapsed = _clock.GetElapsedTime(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
-            {
-                var allocAfter = GC.GetTotalAllocatedBytes();
-                allocations[i] = Math.Max(0, allocAfter - allocBefore);
-            }
+                allocations[i] = ComputeAllocationDelta(allocBefore);
 
             spec.IterationTeardown?.Invoke();
             timings[i] = elapsed.TotalNanoseconds;
@@ -345,19 +336,16 @@ public sealed class BenchmarkRunner
 
             spec.IterationSetup?.Invoke();
 
-            long allocBefore = 0;
+            AllocationSnapshot allocBefore = default;
             if (options.MeasureAllocations)
-                allocBefore = GC.GetTotalAllocatedBytes();
+                allocBefore = CaptureAllocationSnapshot();
 
             var timestamp = _clock.GetTimestamp();
             Consume(await body().ConfigureAwait(false));
             var elapsed = _clock.GetElapsedTime(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
-            {
-                var allocAfter = GC.GetTotalAllocatedBytes();
-                allocations[i] = Math.Max(0, allocAfter - allocBefore);
-            }
+                allocations[i] = ComputeAllocationDelta(allocBefore);
 
             spec.IterationTeardown?.Invoke();
             timings[i] = elapsed.TotalNanoseconds;
@@ -430,6 +418,26 @@ public sealed class BenchmarkRunner
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Consume(bool value) => System.Threading.Volatile.Write(ref _holeInt, value ? 1 : 0);
+
+    private readonly record struct AllocationSnapshot(long ThreadBytes, long ProcessBytes, int ThreadId);
+
+    private static AllocationSnapshot CaptureAllocationSnapshot()
+    {
+        return new AllocationSnapshot(
+            GC.GetAllocatedBytesForCurrentThread(),
+            GC.GetTotalAllocatedBytes(),
+            Environment.CurrentManagedThreadId);
+    }
+
+    private static long ComputeAllocationDelta(AllocationSnapshot before)
+    {
+        if (Environment.CurrentManagedThreadId == before.ThreadId)
+            return Math.Max(0, GC.GetAllocatedBytesForCurrentThread() - before.ThreadBytes);
+
+        // Async continuations may resume on a different worker thread.
+        // Fall back to process-wide allocation delta in that case.
+        return Math.Max(0, GC.GetTotalAllocatedBytes() - before.ProcessBytes);
+    }
 
     // ---------- GC helpers ----------
 

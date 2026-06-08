@@ -17,6 +17,9 @@ internal sealed record BenchmarkEnvelope(
         var description = method.Attribute.Description;
         var isBaseline = method.Attribute.Baseline;
         var attributeIterations = method.Attribute.Iterations;
+        var attributeWarmupIterations = method.Attribute.WarmupIterations;
+        var hasIterationsOverride = method.Attribute.HasIterationsOverride;
+        var hasWarmupIterationsOverride = method.Attribute.HasWarmupIterationsOverride;
         var iterationSetupDel = method.IterationSetupDelegate;
         var iterationTeardownDel = method.IterationTeardownDelegate;
         var asyncDel = method.AsyncDelegate;
@@ -25,9 +28,20 @@ internal sealed record BenchmarkEnvelope(
 
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync = (spec, ct) =>
         {
-            var specWithOverride = attributeIterations.HasValue && spec.Options.Iterations > 0
-                ? spec with { Options = spec.Options with { Iterations = attributeIterations.Value } }
-                : spec;
+            var specWithOverride = spec;
+
+            if (spec.Options.Iterations > 0)
+            {
+                var overriddenOptions = spec.Options;
+
+                if (hasIterationsOverride)
+                    overriddenOptions = overriddenOptions with { Iterations = attributeIterations };
+
+                if (hasWarmupIterationsOverride)
+                    overriddenOptions = overriddenOptions with { WarmupIterations = attributeWarmupIterations };
+
+                specWithOverride = spec with { Options = overriddenOptions };
+            }
 
             var specWithIter = (iterationSetupDel, iterationTeardownDel) switch
             {

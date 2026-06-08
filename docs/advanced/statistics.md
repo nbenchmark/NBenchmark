@@ -20,7 +20,7 @@ For each benchmark, NBenchmark runs the following sequence:
    - Record `Stopwatch.GetTimestamp()`.
    - Invoke the benchmark action.
    - Calculate elapsed time with `Stopwatch.GetElapsedTime(timestamp)`.
-   - Record `GC.GetTotalAllocatedBytes` delta if `MeasureAllocations` is true.
+   - Record allocation delta if `MeasureAllocations` is true.
    - Call `iterationTeardown` if provided.
 
 **Important:** the timer is read immediately after the action returns, before teardown runs. Teardown time is not included in the measurement.
@@ -141,15 +141,19 @@ A dimensionless relative measure of variability. A CV of 0.05 means the standard
 When `MeasureAllocations = true`, each iteration records:
 
 ```
-allocBefore = GC.GetTotalAllocatedBytes(precise: false)
+beforeThreadId    = CurrentManagedThreadId
+beforeThreadBytes = GC.GetAllocatedBytesForCurrentThread()
+beforeProcess     = GC.GetTotalAllocatedBytes()
 // action runs
-allocAfter  = GC.GetTotalAllocatedBytes(precise: false)
-allocations[i] = Max(0, allocAfter - allocBefore)
+if CurrentManagedThreadId == beforeThreadId:
+   allocations[i] = Max(0, GC.GetAllocatedBytesForCurrentThread() - beforeThreadBytes)
+else:
+   allocations[i] = Max(0, GC.GetTotalAllocatedBytes() - beforeProcess)
 ```
 
-The reported `MeanAllocatedBytes` is the arithmetic mean across all iterations. This includes any allocations made by the benchmark framework itself that appear between the two reads - in practice, for simple benchmarks, this is zero.
+The reported `MeanAllocatedBytes` is the arithmetic mean across all iterations. This includes any allocations made by the benchmark framework itself that appear between the two reads - in practice, for simple benchmarks, this is usually negligible.
 
-`GC.GetTotalAllocatedBytes` is thread-local and does not count allocations made by other threads.
+In synchronous benchmarks this is thread-local (`GC.GetAllocatedBytesForCurrentThread`) and does not include allocations from other threads. In async benchmarks, if the continuation hops threads, NBenchmark falls back to process-wide delta for that sample, which can include background allocation noise.
 
 ## Statistical significance: Mann-Whitney U test
 
