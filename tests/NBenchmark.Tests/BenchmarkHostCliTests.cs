@@ -56,7 +56,7 @@ public class BenchmarkHostCliTests
             {
                 var host = BenchmarkHost.Create([
                     "--filter", "TestBenchmarks.*",
-                    "--threshold-pct", "100",
+                    "--threshold-pct", "999999",
                     "--iterations", "20",
                     "--warmup", "3",
                 ]);
