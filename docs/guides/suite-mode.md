@@ -1,10 +1,10 @@
 ---
-title: "Tier 2: BenchmarkSuite"
+title: "Suite mode: BenchmarkSuite"
 description: Compare multiple implementations side-by-side using the fluent BenchmarkSuite API.
 order: 2
 ---
 
-# Tier 2: BenchmarkSuite
+# Suite mode: BenchmarkSuite
 
 `BenchmarkSuite` is a fluent builder for running several benchmarks in the same run and comparing them. It handles run ordering, significance testing, setup and teardown, and reporter output automatically.
 
@@ -165,6 +165,6 @@ Errored benchmarks have `result.Errored == true` and a message in `result.ErrorM
 
 ## Next steps
 
-- [Tier 3: BenchmarkHost](./tier-3-host) - attribute-based discovery and CLI control
+- [Host mode: BenchmarkHost](./host-mode) - attribute-based discovery and CLI control
 - [Configuration](../configuration) - full options reference
 - [Reporters](../reporters/) - all available reporters

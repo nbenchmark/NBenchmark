@@ -60,7 +60,7 @@ All timing values are in **nanoseconds**.
 - The output directory must already exist. `CsvReporter` does not create it.
 - Names containing double-quotes are escaped by doubling the quote character (standard CSV escaping).
 
-## Using with Benchmark (Tier 1)
+## Using with Benchmark (Quick mode)
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());

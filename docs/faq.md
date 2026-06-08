@@ -94,7 +94,7 @@ A higher confidence level produces a **wider** (larger) Error value.
 
 ### Can I use the Markdown or CSV reporter from a BenchmarkSuite?
 
-Yes - all three tiers support any reporter:
+Yes - all three modes support any reporter:
 
 ```csharp
 await new BenchmarkSuite("name")
@@ -142,7 +142,7 @@ The registration can happen in a `[ModuleInitializer]` in your package or at app
 
 ---
 
-## BenchmarkHost (Tier 3)
+## BenchmarkHost (Host mode)
 
 ### Can I run benchmarks in source order instead of random order?
 

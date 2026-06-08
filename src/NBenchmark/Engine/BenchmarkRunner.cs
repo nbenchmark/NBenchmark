@@ -6,7 +6,7 @@ namespace NBenchmark.Engine;
 ///     The single owner of the per-benchmark measurement lifecycle: warmup loop,
 ///     force-GC, per-iteration timing, allocation measurement, outlier trimming,
 ///     stats computation, <see cref="BenchmarkResult" /> construction, error
-///     translation, JIT-elision, and warmup progress emission. Tier 1/2/3 entry
+///     translation, JIT-elision, and warmup progress emission. Quick/Suite/Host mode
 ///     points are thin adapters on top of this module.
 /// </summary>
 public sealed class BenchmarkRunner

@@ -1,10 +1,10 @@
 ---
-title: "Tier 1: Benchmark"
+title: "Quick mode: Benchmark"
 description: Measure a single piece of code with one call using Benchmark.Run or Benchmark.RunAsync.
 order: 1
 ---
 
-# Tier 1: Benchmark
+# Quick mode: Benchmark
 
 `Benchmark` is the entry point for one-off measurements. It requires no class structure, no attributes, and no project setup beyond adding the NuGet reference. Use it anywhere you want a quick, reliable number.
 
@@ -134,11 +134,11 @@ if (result.MeanAllocatedBytes.HasValue)
 
 ## What Benchmark does not do
 
-- **It does not compare benchmarks.** Use [BenchmarkSuite](./tier-2-suite) for A/B comparisons.
+- **It does not compare benchmarks.** Use [BenchmarkSuite](./suite-mode) for A/B comparisons.
 - **It does not run significance testing** between multiple results. Significance testing requires paired raw samples and is handled by `BenchmarkSuite` and `BenchmarkHost`.
 
 ## Next steps
 
-- [Tier 2: BenchmarkSuite](./tier-2-suite) - compare two or more implementations
+- [Suite mode: BenchmarkSuite](./suite-mode) - compare two or more implementations
 - [Configuration](../configuration) - full options reference
 - [Reporters](../reporters/) - save results to files

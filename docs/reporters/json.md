@@ -86,7 +86,7 @@ The filename includes the UTC timestamp and a counter so multiple suites running
 - The output directory is created automatically if it does not exist.
 - `BenchmarkResult` is serialised with all properties, including `ConfidenceIntervalLower` and `ConfidenceIntervalUpper` (computed from `Mean ± MarginOfError`).
 
-## Using with Benchmark (Tier 1)
+## Using with Benchmark (Quick mode)
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());

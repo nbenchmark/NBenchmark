@@ -95,7 +95,7 @@ Starting 2 benchmark(s)...
   Completed 2 benchmark(s).
 ```
 
-## Using with Benchmark (Tier 1)
+## Using with Benchmark (Quick mode)
 
 ```csharp
 using NBenchmark.Console;

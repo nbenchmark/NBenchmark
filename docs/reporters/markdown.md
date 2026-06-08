@@ -68,7 +68,7 @@ _Error = ±95% confidence interval half-width on the mean._
 - Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, StdDev, P95, and P99 columns show `0.0 ns`.
 - The output directory must already exist. `MarkdownReporter` does not create it.
 
-## Using with Benchmark (Tier 1)
+## Using with Benchmark (Quick mode)
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());

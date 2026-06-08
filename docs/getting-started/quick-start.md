@@ -114,5 +114,5 @@ See [Key Concepts](./key-concepts) for a deeper explanation of what these mean a
 ## Next steps
 
 - **[Key Concepts](./key-concepts)** - understand warmup, outlier trimming, and the statistics
-- **[Guides](../guides/)** - detailed coverage of all three usage tiers
+- **[Guides](../guides/)** - detailed coverage of all three usage modes
 - **[Configuration](../configuration)** - change defaults (iterations, warmup, confidence level, etc.)

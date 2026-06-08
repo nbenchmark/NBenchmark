@@ -27,7 +27,7 @@ Reporters are called after all benchmarks in the run have completed. They receiv
 
 ## Attaching reporters
 
-### BenchmarkSuite (Tier 2)
+### BenchmarkSuite (Suite mode)
 
 ```csharp
 await new BenchmarkSuite("name")
@@ -37,7 +37,7 @@ await new BenchmarkSuite("name")
     .RunAsync();
 ```
 
-### BenchmarkHost (Tier 3)
+### BenchmarkHost (Host mode)
 
 ```csharp
 BenchmarkHost.Create(args)
@@ -46,7 +46,7 @@ BenchmarkHost.Create(args)
     .RunAsync();
 ```
 
-### Benchmark (Tier 1) - extension methods
+### Benchmark (Quick mode) - extension methods
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());

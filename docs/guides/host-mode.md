@@ -1,14 +1,14 @@
 ---
-title: "Tier 3: BenchmarkHost"
+title: "Host mode: BenchmarkHost"
 description: Attribute-based benchmark discovery with a built-in command-line interface.
 order: 3
 ---
 
-# Tier 3: BenchmarkHost
+# Host mode: BenchmarkHost
 
 `BenchmarkHost` discovers benchmarks by scanning assemblies for `[Benchmark]`-decorated methods. It also parses command-line arguments, so you can filter, configure, and drive runs entirely from the terminal without recompiling.
 
-This tier is designed for **dedicated benchmark projects** - a separate console project that you run against your library.
+This mode is designed for **dedicated benchmark projects** - a separate console project that you run against your library.
 
 ## Minimal setup
 

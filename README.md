@@ -43,22 +43,22 @@ result.Print();
     95% CI: 1.19 µs … 1.29 µs (±50 ns)
 ```
 
-## Three usage tiers
+## Three usage modes
 
-**Tier 1 - `Benchmark.Run`** - a single static call, no setup required.
+**Quick mode - `Benchmark.Run`** - a single static call, no setup required.
 
-**Tier 2 - `BenchmarkSuite`** - a fluent builder that runs multiple benchmarks side-by-side and produces a comparison table with ratios and statistical significance.
+**Suite mode - `BenchmarkSuite`** - a fluent builder that runs multiple benchmarks side-by-side and produces a comparison table with ratios and statistical significance.
 
-**Tier 3 - `BenchmarkHost`** - attribute-based discovery (`[Benchmark]`, `[BenchmarkArguments]`, lifecycle attributes) driven by a built-in CLI. Designed for dedicated benchmark projects.
+**Host mode - `BenchmarkHost`** - attribute-based discovery (`[Benchmark]`, `[BenchmarkArguments]`, lifecycle attributes) driven by a built-in CLI. Designed for dedicated benchmark projects.
 
-All three tiers share the same measurement engine, produce the same `BenchmarkResult` type, and support the same reporters and configuration.
+All three modes share the same measurement engine, produce the same `BenchmarkResult` type, and support the same reporters and configuration.
 
 ## Documentation
 
 | | |
 |---|---|
 | [Getting Started](./docs/getting-started/installation.md) | Installation, quick start, key concepts |
-| [Guides](./docs/guides/index.md) | Detailed walkthroughs for each tier |
+| [Guides](./docs/guides/index.md) | Detailed walkthroughs for each mode |
 | [Dependency Injection](./docs/guides/dependency-injection.md) | Benchmark classes with constructor dependencies |
 | [Configuration](./docs/configuration.md) | All `MeasurementOptions` settings |
 | [Reporters](./docs/reporters/index.md) | Console, Markdown, CSV, JSON |

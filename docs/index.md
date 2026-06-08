@@ -30,7 +30,7 @@ Not sure where to begin? Start here:
 
 Already comfortable with the basics?
 
-- **[Guides](./guides/)** - detailed walkthroughs for each usage tier
+- **[Guides](./guides/)** - detailed walkthroughs for each usage mode
 - **[Dependency Injection](./guides/dependency-injection)** - benchmark classes with constructor dependencies
 - **[Configuration](./configuration)** - every option explained
 - **[CLI Reference](./cli-reference)** - all command-line flags for `BenchmarkHost`

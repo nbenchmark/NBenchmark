@@ -150,15 +150,15 @@ host.WithInstanceFactory(type =>
 
 This is what the `NBenchmark.DependencyInjection` package does internally. The factory is called once per suite, and the returned instance is used for all `[Benchmark]` methods in that suite.
 
-## A note on Tier 1 and Tier 2
+## A note on Quick mode and Suite mode
 
-The DI integration only affects **Tier 3** (`BenchmarkHost`), where classes are discovered reflectively and instantiated. Tier 1 (`Benchmark.Run`) and Tier 2 (`BenchmarkSuite`) take lambdas directly, so dependencies are captured in the closure - no DI package needed:
+The DI integration only affects **Host mode** (`BenchmarkHost`), where classes are discovered reflectively and instantiated. Quick mode (`Benchmark.Run`) and Suite mode (`BenchmarkSuite`) take lambdas directly, so dependencies are captured in the closure - no DI package needed:
 
 ```csharp
-// Tier 1 - dependencies captured in the closure
+// Quick mode - dependencies captured in the closure
 var result = Benchmark.Run(() => repository.GetCount());
 
-// Tier 2 - same closure trick
+// Suite mode - same closure trick
 await new BenchmarkSuite("repo")
     .Add("count", () => repository.GetCount())
     .Add("list",  () => repository.ListAll())
@@ -167,6 +167,6 @@ await new BenchmarkSuite("repo")
 
 ## Next steps
 
-- [Tier 3: BenchmarkHost](./tier-3-host) - full reference for the host tier
+- [Host mode: BenchmarkHost](./host-mode) - full reference for the host mode
 - [Samples](../samples) - see the `samples/DependencyInjection/` project for a complete working example
 - [FAQ](../faq#my-benchmark-class-needs-dependencies-how-do-i-inject-them) - common questions

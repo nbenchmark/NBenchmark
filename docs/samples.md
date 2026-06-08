@@ -6,9 +6,9 @@ order: 7
 
 # Samples
 
-The repository includes four sample projects in the `samples/` directory that demonstrate each usage tier. Run any of them with `dotnet run`.
+The repository includes four sample projects in the `samples/` directory that demonstrate each usage mode. Run any of them with `dotnet run`.
 
-## Quick - Tier 1
+## Quick - Quick mode
 
 **`samples/Quick/`**
 
@@ -40,7 +40,7 @@ What to look at:
 
 ---
 
-## Suite - Tier 2
+## Suite - Suite mode
 
 **`samples/Suite/`**
 
@@ -82,7 +82,7 @@ What to look at:
 
 ---
 
-## Host - Tier 3
+## Host - Host mode
 
 **`samples/Host/`**
 
@@ -127,7 +127,7 @@ What to look at:
 
 ---
 
-## DependencyInjection - Tier 3 with DI
+## DependencyInjection - Host mode with DI
 
 **`samples/DependencyInjection/`**
 

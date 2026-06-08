@@ -6,7 +6,7 @@ order: 6
 
 # CLI Reference
 
-When using `BenchmarkHost` (Tier 3), all configuration can be driven from the command line. `BenchmarkHost.Create(args)` parses `args` automatically - no argument-parsing library required.
+When using `BenchmarkHost` (Host mode), all configuration can be driven from the command line. `BenchmarkHost.Create(args)` parses `args` automatically - no argument-parsing library required.
 
 ## Usage
 

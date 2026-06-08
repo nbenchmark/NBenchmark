@@ -10,15 +10,15 @@ Now that you've run your first benchmark, here's where to go depending on what y
 
 ## I want to compare multiple implementations
 
-Use **Tier 2: BenchmarkSuite** - a fluent builder for running several benchmarks side-by-side with a comparison table.
+Use **Suite mode: BenchmarkSuite** - a fluent builder for running several benchmarks side-by-side with a comparison table.
 
-→ [Guide: BenchmarkSuite](../guides/tier-2-suite)
+→ [Guide: BenchmarkSuite](../guides/suite-mode)
 
 ## I want a dedicated benchmark project with attribute-based discovery
 
-Use **Tier 3: BenchmarkHost** - mark methods with `[Benchmark]`, point the host at your assembly, and control everything from the command line.
+Use **Host mode: BenchmarkHost** - mark methods with `[Benchmark]`, point the host at your assembly, and control everything from the command line.
 
-→ [Guide: BenchmarkHost](../guides/tier-3-host)
+→ [Guide: BenchmarkHost](../guides/host-mode)
 
 ## I want richer terminal output
 

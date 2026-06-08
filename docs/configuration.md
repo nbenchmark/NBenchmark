@@ -10,7 +10,7 @@ All measurement settings are controlled by `MeasurementOptions`. The defaults ar
 
 ## Using MeasurementOptions
 
-### With Benchmark (Tier 1)
+### With Benchmark (Quick mode)
 
 ```csharp
 var options = new MeasurementOptions
@@ -22,7 +22,7 @@ var options = new MeasurementOptions
 var result = Benchmark.Run(() => MyMethod(), options: options);
 ```
 
-### With BenchmarkSuite (Tier 2)
+### With BenchmarkSuite (Suite mode)
 
 Use the fluent `With*` methods - they each update a single option:
 
@@ -36,7 +36,7 @@ await new BenchmarkSuite("name")
     .RunAsync();
 ```
 
-### With BenchmarkHost (Tier 3)
+### With BenchmarkHost (Host mode)
 
 Call `WithOptions` or use CLI flags. CLI flags always take priority over `WithOptions`:
 
@@ -164,9 +164,9 @@ ForceGcBetweenBenchmarks = true   // default
 
 When `true`, a full gen-2 GC collection runs between benchmarks to clean up any heap allocations from the previous benchmark before the next one begins.
 
-## Applying options per-method (Tier 3)
+## Applying options per-method (Host mode)
 
-In Tier 3, the `[Benchmark]` attribute accepts per-method overrides that take priority over the host-level options:
+In Host mode, the `[Benchmark]` attribute accepts per-method overrides that take priority over the host-level options:
 
 ```csharp
 // This method uses 1000 iterations regardless of the host setting.

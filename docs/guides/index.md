@@ -1,14 +1,14 @@
 ---
 title: Guides
-description: Step-by-step guides for each NBenchmark usage tier.
+description: Step-by-step guides for each NBenchmark usage mode.
 order: 2
 ---
 
 # Guides
 
-NBenchmark has three usage tiers. Pick the one that matches your situation.
+NBenchmark has three usage modes. Pick the one that matches your situation.
 
-## [Tier 1 - Benchmark](./tier-1-benchmark)
+## [Quick mode - Benchmark](./quick-mode)
 
 A single static call. No classes, no attributes, no configuration required. Good for a quick measurement anywhere in your code.
 
@@ -17,7 +17,7 @@ var result = Benchmark.Run(() => MyMethod());
 result.Print();
 ```
 
-## [Tier 2 - BenchmarkSuite](./tier-2-suite)
+## [Suite mode - BenchmarkSuite](./suite-mode)
 
 A fluent builder for comparing multiple implementations. Produces a comparison table with ratios, confidence intervals, and significance testing.
 
@@ -30,7 +30,7 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-## [Tier 3 - BenchmarkHost](./tier-3-host)
+## [Host mode - BenchmarkHost](./host-mode)
 
 Attribute-based discovery driven by a command-line interface. Designed for dedicated benchmark projects - similar to BenchmarkDotNet's style.
 
@@ -67,4 +67,4 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 
 ---
 
-The three tiers share the same measurement engine and produce the same `BenchmarkResult` type, so you can mix them in the same project and use the same reporters and configuration across all of them.
+The three modes share the same measurement engine and produce the same `BenchmarkResult` type, so you can mix them in the same project and use the same reporters and configuration across all of them.
