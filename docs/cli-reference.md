@@ -173,9 +173,13 @@ dotnet run -- --help
 
 ### `--threshold-pct <n>`
 
-::: danger Not implemented
-This flag is reserved for a future feature (fail the run if a benchmark regresses more than N% vs baseline). If you use it today, the run exits immediately with **exit code 1** and a message telling you to remove the flag.
-:::
+Causes the run to fail with **exit code 1** if any benchmark regresses more than `n`% against the baseline. `n` must be a positive integer (1 or greater). The regression check compares median execution times: a benchmark is considered regressed if `candidate.Median / baseline.Median > 1.0 + (n / 100.0)`.
+
+If the selected baseline median is `0`, ratio math is undefined. In that case, any non-baseline benchmark with a positive median is treated as regressed.
+
+The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fastest benchmark (lowest median) if no baseline is explicitly set. Errored benchmarks are excluded from the check.
+
+**Example:** `--threshold-pct 10` fails the run when any benchmark is more than 10% slower than the baseline.
 
 ---
 
@@ -184,9 +188,9 @@ This flag is reserved for a future feature (fail the run if a benchmark regresse
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`), invalid format (`--confidence`, `--seed`), unknown reporter name (`--reporter`), or use of `--threshold-pct`. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`), invalid format (`--confidence`, `--seed`), unknown reporter name (`--reporter`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
-When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem.
+When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation — but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 
 ## Examples
 

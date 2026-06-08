@@ -15,7 +15,7 @@ public class CliArgsTests
         Assert.False(result.ShowHelp);
         Assert.False(result.ListOnly);
         Assert.False(result.DryRun);
-        Assert.False(result.ThresholdRejected);
+        Assert.Null(result.ThresholdPct);
         Assert.Null(result.Filter);
         Assert.Null(result.OutputDir);
         Assert.Null(result.Seed);
@@ -233,20 +233,97 @@ public class CliArgsTests
     }
 
     [Fact]
-    public void Parse_ThresholdPct_SetsThresholdRejected()
+    public void Parse_ThresholdPct_Valid_SetsThresholdPct()
     {
         var prev = Environment.ExitCode;
         Environment.ExitCode = 0;
 
         try
         {
+            CliArgs? result = null;
             var stderr = CaptureConsoleError(() =>
             {
-                var result = CliArgs.Parse(["--threshold-pct", "5"]);
-                Assert.True(result.ThresholdRejected);
+                result = CliArgs.Parse(["--threshold-pct", "5"]);
             });
 
-            Assert.Contains("not yet implemented", stderr);
+            Assert.NotNull(result);
+            Assert.Equal(5, result!.ThresholdPct);
+            Assert.Empty(stderr);
+            Assert.Equal(0, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+        }
+    }
+
+    [Fact]
+    public void Parse_ThresholdPct_NonNumeric_PrintsError()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            CliArgs? result = null;
+            var stderr = CaptureConsoleError(() =>
+            {
+                result = CliArgs.Parse(["--threshold-pct", "abc"]);
+            });
+
+            Assert.NotNull(result);
+            Assert.Null(result!.ThresholdPct);
+            Assert.Contains("Invalid --threshold-pct", stderr);
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+        }
+    }
+
+    [Fact]
+    public void Parse_ThresholdPct_Negative_PrintsError()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            CliArgs? result = null;
+            var stderr = CaptureConsoleError(() =>
+            {
+                result = CliArgs.Parse(["--threshold-pct", "-5"]);
+            });
+
+            Assert.NotNull(result);
+            Assert.Null(result!.ThresholdPct);
+            Assert.Contains("Invalid --threshold-pct", stderr);
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+        }
+    }
+
+    [Fact]
+    public void Parse_ThresholdPct_Zero_PrintsError()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            CliArgs? result = null;
+            var stderr = CaptureConsoleError(() =>
+            {
+                result = CliArgs.Parse(["--threshold-pct", "0"]);
+            });
+
+            Assert.NotNull(result);
+            Assert.Null(result!.ThresholdPct);
+            Assert.Contains("Invalid --threshold-pct", stderr);
             Assert.Equal(1, Environment.ExitCode);
         }
         finally

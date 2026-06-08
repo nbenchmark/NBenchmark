@@ -45,7 +45,35 @@ public class BenchmarkHostCliTests
     }
 
     [Fact]
-    public void Threshold_Pct_Sets_ExitCode_And_Prints_Not_Implemented()
+    public void Threshold_Pct_No_Regression_With_Real_Benchmarks()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            CaptureConsoleOutput(() =>
+            {
+                var host = BenchmarkHost.Create([
+                    "--filter", "TestBenchmarks.*",
+                    "--threshold-pct", "100",
+                    "--iterations", "20",
+                    "--warmup", "3",
+                ]);
+                host.AddFromAssembly<TestBenchmarks>().WithRunOrder(RunOrder.Declaration)
+                    .RunAsync().GetAwaiter().GetResult();
+            });
+
+            Assert.Equal(0, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+        }
+    }
+
+    [Fact]
+    public void Threshold_Pct_Regression_Sets_ExitCode_One()
     {
         var prev = Environment.ExitCode;
         Environment.ExitCode = 0;
@@ -57,13 +85,20 @@ public class BenchmarkHostCliTests
             {
                 stderr = CaptureConsoleError(() =>
                 {
-                    var host = BenchmarkHost.Create(["--threshold-pct", "5"]);
-                    host.RunAsync().GetAwaiter().GetResult();
+                    var host = BenchmarkHost.Create([
+                        "--filter", "SlowVsBaselineBenchmarks.*",
+                        "--threshold-pct", "1",
+                        "--iterations", "20",
+                        "--warmup", "3",
+                    ]);
+                    host.AddFromAssembly<SlowVsBaselineBenchmarks>().WithRunOrder(RunOrder.Declaration)
+                        .RunAsync().GetAwaiter().GetResult();
                 });
             });
 
-            Assert.Contains("not yet implemented", stderr);
             Assert.Equal(1, Environment.ExitCode);
+            Assert.Contains("Regression threshold exceeded", stderr);
+            Assert.Contains("SlowVsBaselineBenchmarks.Slow", stderr);
         }
         finally
         {
@@ -337,5 +372,23 @@ public class TestBenchmarks
     public int FastBaseline()
     {
         return 2 + 2;
+    }
+}
+
+public class SlowVsBaselineBenchmarks
+{
+    [Benchmark(Baseline = true)]
+    public int FastBaseline()
+    {
+        return 2 + 2;
+    }
+
+    [Benchmark]
+    public int Slow()
+    {
+        var sum = 0;
+        for (var i = 0; i < 1000; i++)
+            sum += i;
+        return sum;
     }
 }

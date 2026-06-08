@@ -180,6 +180,15 @@ public sealed class BenchmarkHost
 
         Significance.ApplyIfEnabled(allResults, rawSamples, suiteOptions);
 
+        if (_cliArgs.ThresholdPct.HasValue
+            && ThresholdCheck.HasRegression(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
+        {
+            Console.Error.WriteLine(
+                $"Regression threshold exceeded ({_cliArgs.ThresholdPct.Value}%). "
+                + $"Regressed benchmarks: {string.Join(", ", regressed)}");
+            Environment.ExitCode = 1;
+        }
+
         if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
             ApplyOutputDirectory(_cliArgs.OutputDir);
 
@@ -187,9 +196,6 @@ public sealed class BenchmarkHost
         {
             await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
         }
-
-        if (_cliArgs.ThresholdRejected)
-            Environment.ExitCode = 1;
 
         return allResults;
     }

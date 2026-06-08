@@ -8,7 +8,7 @@ internal sealed record CliArgs
     public bool ShowHelp { get; init; }
     public bool ListOnly { get; init; }
     public bool DryRun { get; init; }
-    public bool ThresholdRejected { get; init; }
+    public int? ThresholdPct { get; init; }
     public string? Filter { get; init; }
     public string? OutputDir { get; init; }
     public int? Seed { get; init; }
@@ -23,7 +23,7 @@ internal sealed record CliArgs
         var showHelp = false;
         var listOnly = false;
         var dryRun = false;
-        var thresholdRejected = false;
+        int? thresholdPct = null;
         string? filter = null;
         string? outputDir = null;
         int? seed = null;
@@ -106,12 +106,15 @@ internal sealed record CliArgs
                     }
                     break;
                 case "--threshold-pct" when i + 1 < args.Length:
-                    Console.Error.WriteLine(
-                        "--threshold-pct is not yet implemented. Remove the flag to continue; "
-                        + "the run will exit with code 1 until it ships.");
-                    thresholdRejected = true;
-                    Environment.ExitCode = 1;
-                    i++;
+                    if (int.TryParse(args[++i], out var tPct)
+                        && tPct > 0)
+                        thresholdPct = tPct;
+                    else
+                    {
+                        Console.Error.WriteLine(
+                            $"Invalid --threshold-pct value '{args[i]}'. Must be a positive integer (1 or greater).");
+                        Environment.ExitCode = 1;
+                    }
                     break;
                 case "--seed" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var seedVal))
@@ -145,7 +148,7 @@ internal sealed record CliArgs
             ShowHelp = showHelp,
             ListOnly = listOnly,
             DryRun = dryRun,
-            ThresholdRejected = thresholdRejected,
+            ThresholdPct = thresholdPct,
             Filter = filter,
             OutputDir = outputDir,
             Seed = seed,
@@ -172,8 +175,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
         Console.WriteLine("  --seed <n>             Seed for deterministic random ordering");
-        Console.WriteLine("  --threshold-pct <n>    [NOT YET IMPLEMENTED] Will fail with exit code 1 if");
-        Console.WriteLine("                        any benchmark regresses >N% vs baseline.");
+        Console.WriteLine("  --threshold-pct <n>    Fail with exit code 1 if any benchmark regresses");
+        Console.WriteLine("                        >N% vs baseline (median-based comparison; n >= 1).");
         Console.WriteLine("  --help, -h             Show this help text");
     }
 }
