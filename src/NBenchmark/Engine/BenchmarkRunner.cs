@@ -419,6 +419,33 @@ public sealed class BenchmarkRunner
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Consume(bool value) => System.Threading.Volatile.Write(ref _holeInt, value ? 1 : 0);
 
+    /// <summary>
+    ///     Returns a typed result-consumer delegate that writes a value to the
+    ///     JIT-elision sink without boxing value types. Used by the discovery
+    ///     pipeline to avoid per-iteration allocation overhead for
+    ///     <c>Task&lt;T&gt;</c>-returning benchmarks.
+    /// </summary>
+    public static Action<T> GetResultConsumer<T>() =>
+        JitSinkCache<T>.Instance;
+
+    private static class JitSinkCache<T>
+    {
+        public static readonly Action<T> Instance = CreateTypedConsumer();
+
+        private static Action<T> CreateTypedConsumer()
+        {
+            if (typeof(T) == typeof(int))
+                return (Action<T>)(object)(Action<int>)(static v => Consume(v));
+            if (typeof(T) == typeof(long))
+                return (Action<T>)(object)(Action<long>)(static v => Consume(v));
+            if (typeof(T) == typeof(double))
+                return (Action<T>)(object)(Action<double>)(static v => Consume(v));
+            if (typeof(T) == typeof(bool))
+                return (Action<T>)(object)(Action<bool>)(static v => Consume(v));
+            return static v => Consume(v);
+        }
+    }
+
     private readonly record struct AllocationSnapshot(long ThreadBytes, long ProcessBytes, int ThreadId);
 
     private static AllocationSnapshot CaptureAllocationSnapshot()

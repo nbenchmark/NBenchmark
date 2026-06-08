@@ -41,7 +41,7 @@ public class EnvelopeTests
     }
 
     [Fact]
-    public async Task FromDiscovered_Async_Generic_With_ResultExtractor_Extracts_Result()
+    public async Task FromDiscovered_Async_Generic_With_ResultConsumer_Consumes_Result()
     {
         var method = TestReflectionHelper.ResolveMethod(typeof(AsyncBenchmarks), nameof(AsyncBenchmarks.ReturnsValueAsync));
         var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AsyncBenchmarks), new AsyncBenchmarks());

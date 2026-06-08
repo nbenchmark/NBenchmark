@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
 using NBenchmark.Attributes;
+using NBenchmark.Engine;
 
 namespace NBenchmark.Discovery;
 
@@ -117,7 +118,7 @@ public sealed class BenchmarkDiscoverer
 
         Func<object, object?>? syncDelegate = null;
         Func<object, Task>? asyncDelegate = null;
-        Func<Task, object?>? resultExtractor = null;
+        Action<Task>? resultConsumer = null;
 
         if (isAsync)
         {
@@ -126,7 +127,7 @@ public sealed class BenchmarkDiscoverer
                 : BuildArgumentBoundAsyncDelegate(method, arguments);
 
             if (method.ReturnType.IsGenericType)
-                resultExtractor = BuildResultExtractor(method.ReturnType);
+                resultConsumer = BuildResultConsumer(method.ReturnType);
         }
         else if (method.ReturnType == typeof(void))
         {
@@ -155,7 +156,7 @@ public sealed class BenchmarkDiscoverer
             DisplayName = displayName,
             SyncDelegate = syncDelegate,
             AsyncDelegate = asyncDelegate,
-            ResultExtractor = resultExtractor,
+            ResultConsumer = resultConsumer,
             IterationSetupDelegate = iterSetupDel,
             IterationTeardownDelegate = iterTeardownDel,
         };
@@ -287,19 +288,20 @@ public sealed class BenchmarkDiscoverer
         return instance => typed((TInstance)instance);
     }
 
-    private static Func<Task, object?> BuildResultExtractor(Type taskType)
+    private static Action<Task> BuildResultConsumer(Type taskType)
     {
         var resultType = taskType.GetGenericArguments()[0];
 
         var helper = typeof(BenchmarkDiscoverer)
-            .GetMethod(nameof(BuildResultExtractorGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetMethod(nameof(BuildResultConsumerGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(resultType);
 
-        return (Func<Task, object?>)helper.Invoke(null, [])!;
+        return (Action<Task>)helper.Invoke(null, [])!;
     }
 
-    private static Func<Task, object?> BuildResultExtractorGeneric<T>()
+    private static Action<Task> BuildResultConsumerGeneric<T>()
     {
-        return task => ((Task<T>)task).Result;
+        var consume = BenchmarkRunner.GetResultConsumer<T>();
+        return task => consume(((Task<T>)task).Result);
     }
 }

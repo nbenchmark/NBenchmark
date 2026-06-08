@@ -24,7 +24,7 @@ internal sealed record BenchmarkEnvelope(
         var iterationTeardownDel = method.IterationTeardownDelegate;
         var asyncDel = method.AsyncDelegate;
         var syncDel = method.SyncDelegate;
-        var resultExtractor = method.ResultExtractor;
+        var resultConsumer = method.ResultConsumer;
 
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync = (spec, ct) =>
         {
@@ -61,7 +61,7 @@ internal sealed record BenchmarkEnvelope(
                 },
             };
 
-            return ExecuteAsync(name, asyncDel, syncDel, resultExtractor, instance, specWithIter, ct);
+            return ExecuteAsync(name, asyncDel, syncDel, resultConsumer, instance, specWithIter, ct);
         };
 
         return new BenchmarkEnvelope(name, description, isBaseline, runAsync);
@@ -71,20 +71,20 @@ internal sealed record BenchmarkEnvelope(
         string name,
         Func<object, Task>? asyncDel,
         Func<object, object?>? syncDel,
-        Func<Task, object?>? resultExtractor,
+        Action<Task>? resultConsumer,
         object instance,
         RunSpec spec,
         CancellationToken ct)
     {
         if (asyncDel is not null)
         {
-            if (resultExtractor is not null)
+            if (resultConsumer is not null)
             {
-                Func<Task<object?>> returningBody = async () =>
+                Func<Task> returningBody = async () =>
                 {
                     var task = asyncDel(instance);
                     await task.ConfigureAwait(false);
-                    return resultExtractor(task);
+                    resultConsumer(task);
                 };
 
                 return BenchmarkRunner.Instance.RunAsync(name, returningBody, spec, ct);

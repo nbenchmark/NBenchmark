@@ -30,7 +30,7 @@ public sealed record BenchmarkMethodDefinition(
 
     public Func<object, object?>? SyncDelegate { get; init; }
     public Func<object, Task>? AsyncDelegate { get; init; }
-    public Func<Task, object?>? ResultExtractor { get; init; }
+    public Action<Task>? ResultConsumer { get; init; }
     public Action<object>? IterationSetupDelegate { get; init; }
     public Action<object>? IterationTeardownDelegate { get; init; }
 }

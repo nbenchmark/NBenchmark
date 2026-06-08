@@ -447,6 +447,81 @@ public class BenchmarkRunnerTests
         }
     }
 
+    [Fact]
+    public async Task RunAsync_With_MeasureAllocations_Thread_Hop_Reports_NonZero_Allocations()
+    {
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                WarmupIterations = 1,
+                Iterations = 10,
+                MeasureAllocations = true,
+                OutlierMode = OutlierMode.None,
+            },
+        };
+
+        var outcome = await BenchmarkRunner.Instance.RunAsync("alloc-thread-hop",
+            async () =>
+            {
+                await Task.Yield();
+                _ = new byte[2048];
+            }, spec);
+
+        Assert.NotNull(outcome.Result.MeanAllocatedBytes);
+        Assert.True(outcome.Result.MeanAllocatedBytes >= 512,
+            $"Expected async thread-hop benchmark to report at least 512 bytes/op; got {outcome.Result.MeanAllocatedBytes}");
+    }
+
+    [Fact]
+    public async Task RunAsync_With_MeasureAllocations_Thread_Hop_With_Background_Noise_Still_Reports_Body_Allocations()
+    {
+        using var cts = new CancellationTokenSource();
+        var backgroundAllocator = Task.Run(() =>
+        {
+            while (!cts.Token.IsCancellationRequested)
+                _ = new byte[1024];
+        }, cts.Token);
+
+        try
+        {
+            var spec = new RunSpec
+            {
+                Options = new MeasurementOptions
+                {
+                    WarmupIterations = 1,
+                    Iterations = 30,
+                    MeasureAllocations = true,
+                    ForceGcBeforeEachIteration = false,
+                    OutlierMode = OutlierMode.RemoveTop5Percent,
+                },
+            };
+
+            var outcome = await BenchmarkRunner.Instance.RunAsync("alloc-async-noise",
+                async () =>
+                {
+                    await Task.Yield();
+                    _ = new byte[4096];
+                }, spec);
+
+            Assert.NotNull(outcome.Result.MeanAllocatedBytes);
+            Assert.True(outcome.Result.MeanAllocatedBytes >= 1024,
+                $"Expected async thread-hop benchmark with background noise to report body allocations; got {outcome.Result.MeanAllocatedBytes}");
+        }
+        finally
+        {
+            cts.Cancel();
+
+            try
+            {
+                await backgroundAllocator;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
     // ---------- IsBaseline plumbing ----------
 
     [Fact]

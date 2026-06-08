@@ -83,19 +83,19 @@ public class BenchmarkDiscovererTests
     }
 
     [Fact]
-    public async Task Caches_Async_Delegate_And_Result_Extractor()
+    public async Task Caches_Async_Delegate_And_Result_Consumer()
     {
         var suites = new BenchmarkDiscoverer().Discover(typeof(AsyncBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(AsyncBenchmarks));
         var benchmark = suite.Benchmarks.First(m => m.Method.Name == "ReturnsValueAsync");
 
         Assert.NotNull(benchmark.AsyncDelegate);
-        Assert.NotNull(benchmark.ResultExtractor);
+        Assert.NotNull(benchmark.ResultConsumer);
 
         var instance = new AsyncBenchmarks();
         var task = benchmark.AsyncDelegate!(instance);
         await task;
-        Assert.Equal(7, benchmark.ResultExtractor!(task));
+        benchmark.ResultConsumer!(task);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class BenchmarkDiscovererTests
         var benchmark = suite.Benchmarks.First(m => m.Method.Name == "ReturnsTask");
 
         Assert.NotNull(benchmark.AsyncDelegate);
-        Assert.Null(benchmark.ResultExtractor);
+        Assert.Null(benchmark.ResultConsumer);
 
         await benchmark.AsyncDelegate!(new AsyncBenchmarks());
     }
