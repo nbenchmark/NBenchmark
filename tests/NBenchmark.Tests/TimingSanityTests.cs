@@ -9,7 +9,7 @@ namespace NBenchmark.Tests;
 ///     ground truth. Unlike mean-based assertions (which absorb all scheduler
 ///     preemption spikes), the minimum sample is stable: a CPU-bound busy-wait
 ///     has a hard floor, and preemption only ever adds time. This catches unit
-///     errors, wiring bugs, or a broken measurement loop — classes of bugs the
+///     errors, wiring bugs, or a broken measurement loop - classes of bugs the
 ///     deterministic statistical tests cannot detect.
 /// </summary>
 public class TimingSanityTests

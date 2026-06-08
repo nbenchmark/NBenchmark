@@ -5,7 +5,7 @@ namespace NBenchmark.Stats;
 ///     computation. The returned array is always sorted in ascending order, so
 ///     callers can hand it to <see cref="Percentile.Compute" /> directly. Moved
 ///     from <c>BenchmarkRunner</c> so the trim logic is directly testable in
-///     isolation — in particular, the all-filtered-fallback branch in
+///     isolation - in particular, the all-filtered-fallback branch in
 ///     <see cref="OutlierMode.IqrFence" />.
 /// </summary>
 internal static class OutlierTrim

@@ -8,7 +8,7 @@ order: 7
 
 The repository includes four sample projects in the `samples/` directory that demonstrate each usage tier. Run any of them with `dotnet run`.
 
-## Quick — Tier 1
+## Quick - Tier 1
 
 **`samples/Quick/`**
 
@@ -40,7 +40,7 @@ What to look at:
 
 ---
 
-## Suite — Tier 2
+## Suite - Tier 2
 
 **`samples/Suite/`**
 
@@ -78,11 +78,11 @@ What to look at:
 
 - The comparison table with Ratio and Sig columns.
 - The bar chart rendered below the table.
-- The significance indicator (✓ or ~) — does the difference appear real?
+- The significance indicator (✓ or ~) - does the difference appear real?
 
 ---
 
-## Host — Tier 3
+## Host - Tier 3
 
 **`samples/Host/`**
 
@@ -127,7 +127,7 @@ What to look at:
 
 ---
 
-## DependencyInjection — Tier 3 with DI
+## DependencyInjection - Tier 3 with DI
 
 **`samples/DependencyInjection/`**
 
@@ -166,6 +166,6 @@ public sealed class DependencyInjectionBenchmarks(OrderRepository repository)
 
 What to look at:
 
-- The benchmark class takes an `OrderRepository` in its primary constructor — no parameterless constructor anywhere.
+- The benchmark class takes an `OrderRepository` in its primary constructor - no parameterless constructor anywhere.
 - `UseDependencyInjection<T>` combines assembly discovery and DI wiring in one call.
 - A scoped variant (`UseScopedDependencyInjection<T>`) is also available for `DbContext`-style lifetimes.

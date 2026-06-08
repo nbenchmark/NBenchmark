@@ -101,7 +101,7 @@ public class OutlierTrimTests
     {
         // For 1..20 the nearest-rank percentile gives Q1 = 5, Q3 = 15
         // (numpy 'inverted_cdf'). Pin against the existing cross-check
-        // contract — deliberately diverges from R's default type-7.
+        // contract - deliberately diverges from R's default type-7.
         var sorted = Enumerable.Range(1, 20).Select(i => (double)i).ToArray();
 
         var q1 = Percentile.Compute(sorted, 0.25);

@@ -15,7 +15,7 @@ Markdown output is a good choice for committing results to source control, attac
 ```csharp
 using NBenchmark.Reporters;
 
-// Default path — auto-generates a timestamped filename
+// Default path - auto-generates a timestamped filename
 .WithReporter(new MarkdownReporter())
 
 // Explicit path
@@ -37,7 +37,7 @@ Pass an explicit path if you always want the same filename.
 ```markdown
 ## Benchmark Results
 
-_Run at 2026-06-06 03:40:00 UTC — 25 warmup / 190 measured_
+_Run at 2026-06-06 03:40:00 UTC - 25 warmup / 190 measured_
 
 | Benchmark | Median | Mean | Error | StdDev | P95 | P99 | Ratio | Sig | Alloc/op |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|

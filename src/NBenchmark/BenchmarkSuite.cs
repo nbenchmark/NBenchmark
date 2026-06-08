@@ -56,7 +56,7 @@ public sealed class BenchmarkSuite(string name)
         {
             throw new ArgumentException(
                 $"A benchmark named '{name}' has already been added to the suite. " +
-                "Benchmark names must be unique — significance testing keys raw samples by name.",
+                "Benchmark names must be unique - significance testing keys raw samples by name.",
                 nameof(name));
         }
     }

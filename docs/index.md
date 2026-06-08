@@ -24,16 +24,16 @@ NBenchmark is a lightweight benchmarking library for .NET. It is designed around
 
 Not sure where to begin? Start here:
 
-- **[Installation](./getting-started/installation)** — add the NuGet packages
-- **[Quick Start](./getting-started/quick-start)** — your first benchmark in 60 seconds
-- **[Key Concepts](./getting-started/key-concepts)** — what warmup, outliers, and the Error column mean
+- **[Installation](./getting-started/installation)** - add the NuGet packages
+- **[Quick Start](./getting-started/quick-start)** - your first benchmark in 60 seconds
+- **[Key Concepts](./getting-started/key-concepts)** - what warmup, outliers, and the Error column mean
 
 Already comfortable with the basics?
 
-- **[Guides](./guides/)** — detailed walkthroughs for each usage tier
-- **[Dependency Injection](./guides/dependency-injection)** — benchmark classes with constructor dependencies
-- **[Configuration](./configuration)** — every option explained
-- **[CLI Reference](./cli-reference)** — all command-line flags for `BenchmarkHost`
-- **[Advanced: Statistics](./advanced/statistics)** — how the numbers are calculated
+- **[Guides](./guides/)** - detailed walkthroughs for each usage tier
+- **[Dependency Injection](./guides/dependency-injection)** - benchmark classes with constructor dependencies
+- **[Configuration](./configuration)** - every option explained
+- **[CLI Reference](./cli-reference)** - all command-line flags for `BenchmarkHost`
+- **[Advanced: Statistics](./advanced/statistics)** - how the numbers are calculated
 
 > **Pre-release.** NBenchmark targets .NET 8+ (net8.0, net9.0, net10.0) and is under active development. The API may change between versions.

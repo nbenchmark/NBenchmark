@@ -10,7 +10,7 @@ order: 8
 
 ### How is NBenchmark different from BenchmarkDotNet?
 
-BenchmarkDotNet is the industry-standard .NET benchmarking tool and is feature-rich — process isolation, multiple runtimes, diagnosers, and extensive reporting. It is the right tool for serious performance work.
+BenchmarkDotNet is the industry-standard .NET benchmarking tool and is feature-rich - process isolation, multiple runtimes, diagnosers, and extensive reporting. It is the right tool for serious performance work.
 
 NBenchmark takes a different trade-off: **no out-of-process compilation, no XML configuration, minimal dependencies, and three lines of code to get started**. It is designed for day-to-day measurements during development where the overhead of a full BenchmarkDotNet run is too high.
 
@@ -52,7 +52,7 @@ The compiler or JIT has likely optimised the benchmark body away because it has 
 
 NBenchmark uses `GC.GetTotalAllocatedBytes` sampled immediately before and after the action. Any allocations by the benchmark framework itself (setup/teardown delegates, etc.) that fall between the two reads would be included, but in practice this is zero for simple benchmarks.
 
-The value is **thread-local** — allocations made by other threads are not counted.
+The value is **thread-local** - allocations made by other threads are not counted.
 
 ### Can I benchmark async code?
 
@@ -64,7 +64,7 @@ Yes. Use `Benchmark.RunAsync`, the `Func<Task>` overload of `BenchmarkSuite.Add`
 
 ### What does the Sig column mean?
 
-It shows the result of a **Mann-Whitney U test** comparing the benchmark to the baseline. A **✓** means the difference is statistically significant (p < 0.05) — unlikely to be random noise. A **~** means it is not significant.
+It shows the result of a **Mann-Whitney U test** comparing the benchmark to the baseline. A **✓** means the difference is statistically significant (p < 0.05) - unlikely to be random noise. A **~** means it is not significant.
 
 See [Statistical Significance](./getting-started/key-concepts#statistical-significance) and the [Statistics Deep Dive](./advanced/statistics) for full details.
 
@@ -80,13 +80,13 @@ Statistical significance does not imply practical importance. With many iteratio
 
 ### What confidence level should I use?
 
-The default **95%** is the standard choice for most purposes. Use **99%** when you need to be more conservative — for example, when asserting a performance budget in CI.
+The default **95%** is the standard choice for most purposes. Use **99%** when you need to be more conservative - for example, when asserting a performance budget in CI.
 
 A higher confidence level produces a **wider** (larger) Error value.
 
 ### The Error column is showing `±0 ns`. Is that correct?
 
-`MarginOfError` is zero when `n < 2` (only one sample was collected) or when the measured standard deviation is exactly zero (all iterations took the same time). The latter can happen when the timer resolution is coarser than the benchmark duration — if everything rounds to the same tick count, there is no measured spread.
+`MarginOfError` is zero when `n < 2` (only one sample was collected) or when the measured standard deviation is exactly zero (all iterations took the same time). The latter can happen when the timer resolution is coarser than the benchmark duration - if everything rounds to the same tick count, there is no measured spread.
 
 ---
 
@@ -94,7 +94,7 @@ A higher confidence level produces a **wider** (larger) Error value.
 
 ### Can I use the Markdown or CSV reporter from a BenchmarkSuite?
 
-Yes — all three tiers support any reporter:
+Yes - all three tiers support any reporter:
 
 ```csharp
 await new BenchmarkSuite("name")
@@ -112,7 +112,7 @@ mkdir -p results
 dotnet run -- --reporter markdown --output ./results
 ```
 
-`JsonReporter` is an exception — it creates the output directory automatically.
+`JsonReporter` is an exception - it creates the output directory automatically.
 
 ### Can I write my own reporter?
 
@@ -211,11 +211,11 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes — the scope is created per suite and disposed after teardown. See the [Dependency Injection guide](./guides/dependency-injection) for the full API and lifetime semantics.
+The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per suite and disposed after teardown. See the [Dependency Injection guide](./guides/dependency-injection) for the full API and lifetime semantics.
 
 ### Can I use a DI container other than `Microsoft.Extensions.DependencyInjection`?
 
-Yes. The companion package only depends on `IServiceProvider` from the BCL. Any container that exposes one — Autofac, DryIoc, SimpleInjector, Lamar, etc. — works:
+Yes. The companion package only depends on `IServiceProvider` from the BCL. Any container that exposes one - Autofac, DryIoc, SimpleInjector, Lamar, etc. - works:
 
 ```csharp
 var container = new ContainerBuilder()

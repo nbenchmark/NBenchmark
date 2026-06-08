@@ -15,7 +15,7 @@ JSON output is suitable for CI dashboards, performance tracking over time, or an
 ```csharp
 using NBenchmark.Reporters;
 
-// Default — writes to the current directory
+// Default - writes to the current directory
 .WithReporter(new JsonReporter())
 
 // Explicit output directory

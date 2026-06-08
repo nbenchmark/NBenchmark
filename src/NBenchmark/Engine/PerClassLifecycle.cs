@@ -18,7 +18,7 @@ internal static class PerClassLifecycle
                   + "a public constructor and InternalsVisibleTo. "
                 : "the instance factory threw during resolution. ";
 
-            Console.WriteLine($"[Error] Could not instantiate {type.Name} — "
+            Console.WriteLine($"[Error] Could not instantiate {type.Name} - "
                               + hint
                               + $"Details: {ex.Message}");
 

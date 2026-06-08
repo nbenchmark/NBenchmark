@@ -6,7 +6,7 @@ order: 3
 
 # Configuration
 
-All measurement settings are controlled by `MeasurementOptions`. The defaults are sensible for most benchmarks — only change what you have a reason to change.
+All measurement settings are controlled by `MeasurementOptions`. The defaults are sensible for most benchmarks - only change what you have a reason to change.
 
 ## Using MeasurementOptions
 
@@ -24,7 +24,7 @@ var result = Benchmark.Run(() => MyMethod(), options: options);
 
 ### With BenchmarkSuite (Tier 2)
 
-Use the fluent `With*` methods — they each update a single option:
+Use the fluent `With*` methods - they each update a single option:
 
 ```csharp
 await new BenchmarkSuite("name")
@@ -133,9 +133,9 @@ The confidence level for the margin of error reported in the Error column. Must 
 
 | Value | Meaning |
 |---|---|
-| `0.90` | 90% confidence — narrower interval, less conservative |
-| `0.95` | 95% confidence — the standard choice **(default)** |
-| `0.99` | 99% confidence — wider interval, more conservative |
+| `0.90` | 90% confidence - narrower interval, less conservative |
+| `0.95` | 95% confidence - the standard choice **(default)** |
+| `0.99` | 99% confidence - wider interval, more conservative |
 
 A higher confidence level produces a wider (larger) Error value. Use `0.99` when a result will be used to make an important decision and you want to be very conservative.
 
@@ -181,10 +181,10 @@ public void MyExpensiveBenchmark() => SlowOperation();
 | `Iterations` | `int` | `200` | `0` – `100 000` |
 | `WarmupIterations` | `int` | `25` | `0` – `10 000` |
 | `ConfidenceLevel` | `double` | `0.95` | `>0` and `<1` |
-| `ForceGcBeforeEachIteration` | `bool` | `true` | — |
-| `MeasureAllocations` | `bool` | `false` | — |
+| `ForceGcBeforeEachIteration` | `bool` | `true` | - |
+| `MeasureAllocations` | `bool` | `false` | - |
 | `OutlierMode` | `enum` | `RemoveTop5Percent` | See above |
-| `EnableSignificance` | `bool` | `true` | — |
-| `ForceGcBetweenBenchmarks` | `bool` | `true` | — |
+| `EnableSignificance` | `bool` | `true` | - |
+| `ForceGcBetweenBenchmarks` | `bool` | `true` | - |
 
 Values outside the valid range throw `ArgumentOutOfRangeException`.

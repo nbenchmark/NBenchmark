@@ -231,7 +231,7 @@ public sealed class BenchmarkDiscoverer
     }
 
     // Open instance delegates require the delegate's first parameter to match the
-    // method's declaring type — Action<object>/Func<object, _> cannot bind directly
+    // method's declaring type - Action<object>/Func<object, _> cannot bind directly
     // (the implicit `this` cannot be contravariantly widened to object). We build a
     // strongly-typed delegate against the declaring type via a generic helper, then
     // wrap it to accept object and cast once per call. This eliminates per-iteration

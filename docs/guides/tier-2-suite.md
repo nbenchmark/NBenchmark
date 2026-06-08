@@ -36,7 +36,7 @@ var results = await new BenchmarkSuite("sorting")
 ```csharp
 suite.Add("name", () => DoWork());
 
-// Return a value — prevents dead-code elimination
+// Return a value - prevents dead-code elimination
 suite.Add("name", () => ComputeHash(data));
 ```
 
@@ -109,7 +109,7 @@ If no baseline is set, NBenchmark uses the benchmark with the lowest median as t
 
 ## Suite setup and teardown
 
-`WithSuiteSetup` and `WithSuiteTeardown` run once around the entire suite — useful for starting a server, opening a connection, or initialising shared state:
+`WithSuiteSetup` and `WithSuiteTeardown` run once around the entire suite - useful for starting a server, opening a connection, or initialising shared state:
 
 ```csharp
 await new BenchmarkSuite("http")
@@ -165,6 +165,6 @@ Errored benchmarks have `result.Errored == true` and a message in `result.ErrorM
 
 ## Next steps
 
-- [Tier 3: BenchmarkHost](./tier-3-host) — attribute-based discovery and CLI control
-- [Configuration](../configuration) — full options reference
-- [Reporters](../reporters/) — all available reporters
+- [Tier 3: BenchmarkHost](./tier-3-host) - attribute-based discovery and CLI control
+- [Configuration](../configuration) - full options reference
+- [Reporters](../reporters/) - all available reporters

@@ -40,7 +40,7 @@ public sealed class ConsoleReporter : IReporter
             return Task.CompletedTask;
         }
 
-        AnsiConsole.MarkupLine($"[grey]Run at {benchTable.RunAtUtc} UTC — "
+        AnsiConsole.MarkupLine($"[grey]Run at {benchTable.RunAtUtc} UTC - "
                                + $"{benchTable.WarmupIterations} warmup / "
                                + $"{benchTable.MeasuredIterations} measured[/]");
 
@@ -70,12 +70,12 @@ public sealed class ConsoleReporter : IReporter
                 var errorCols = new List<string>
                 {
                     $"[red][Error] {EscapeMarkup(row.Name)}[/]",
-                    "[red]—[/]", "[red]—[/]", "[red]—[/]",
-                    "[red]—[/]", "[red]—[/]", "[red]—[/]", "[red]—[/]", "[red]—[/]",
+                    "[red]-[/]", "[red]-[/]", "[red]-[/]",
+                    "[red]-[/]", "[red]-[/]", "[red]-[/]", "[red]-[/]", "[red]-[/]",
                 };
 
                 if (hasDescriptions)
-                    errorCols.Add("[red]—[/]");
+                    errorCols.Add("[red]-[/]");
 
                 consoleTable.AddRow(errorCols.ToArray());
                 AnsiConsole.MarkupLine($"[red]  Error: {EscapeMarkup(row.ErrorMessage)}[/]");
@@ -156,8 +156,8 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.WriteLine();
 
         AnsiConsole.MarkupLine(
-            $"[grey]Ran {results.Count} benchmark(s) in {benchTable.TotalDuration.TotalSeconds:F1}s — "
-            + $"Significance: Mann-Whitney U (p < 0.05) — "
+            $"[grey]Ran {results.Count} benchmark(s) in {benchTable.TotalDuration.TotalSeconds:F1}s - "
+            + $"Significance: Mann-Whitney U (p < 0.05) - "
             + $"Outliers: {FormatOutlierMode(benchTable.OutlierMode)}[/]");
 
         AnsiConsole.MarkupLine(

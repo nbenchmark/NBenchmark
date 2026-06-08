@@ -28,13 +28,13 @@ When the `NBenchmark.Console` package is referenced, `ConsoleReporter` self-regi
 dotnet run -- --reporter console
 ```
 
-No explicit `.WithReporter(new ConsoleReporter())` call is needed when using the CLI — the host discovers it automatically through `ReporterRegistry`.
+No explicit `.WithReporter(new ConsoleReporter())` call is needed when using the CLI - the host discovers it automatically through `ReporterRegistry`.
 
 ## Example output
 
 ```
 Benchmark Results
-Run at 2026-06-06 03:40:00 UTC — 25 warmup / 190 measured
+Run at 2026-06-06 03:40:00 UTC - 25 warmup / 190 measured
 
 ╭──────────────────────┬─────────┬─────────┬────────┬─────────┬─────────┬─────────┬───────┬──────────╮
 │ Benchmark            │ Median  │  Mean   │ Error  │ StdDev  │   P95   │   P99   │ Ratio │ Alloc/op │
@@ -43,7 +43,7 @@ Run at 2026-06-06 03:40:00 UTC — 25 warmup / 190 measured
 │ Baseline (baseline)  │ 400 ns  │ 376 ns  │ ±22 ns │ 114 ns  │ 500 ns  │ 900 ns  │ 1.00x │    -     │
 ╰──────────────────────┴─────────┴─────────┴────────┴─────────┴─────────┴─────────┴───────┴──────────╯
 
-Ran 2 benchmark(s) in 0.0s — Significance: Mann-Whitney U (p < 0.05) — Outliers: top 5%
+Ran 2 benchmark(s) in 0.0s - Significance: Mann-Whitney U (p < 0.05) - Outliers: top 5%
 Error = ±95% confidence interval half-width on the mean.
 ```
 
@@ -89,9 +89,9 @@ Progress output looks like:
 ```
 Starting 2 benchmark(s)...
   [[Compute]] warming up (25 iterations)...
-  [1/2] Compute — running (25 warmup / 200 measured)...
+  [1/2] Compute - running (25 warmup / 200 measured)...
   [[Baseline]] warming up (25 iterations)...
-  [2/2] Baseline — running (25 warmup / 200 measured)...
+  [2/2] Baseline - running (25 warmup / 200 measured)...
   Completed 2 benchmark(s).
 ```
 

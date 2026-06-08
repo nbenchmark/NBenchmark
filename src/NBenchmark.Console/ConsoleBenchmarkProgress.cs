@@ -34,7 +34,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
     public Task OnBenchmarkStarting(string name, int index, int total)
     {
         _suiteTotal = total;
-        AnsiConsole.MarkupLine($"  [grey][[{index}/{total}]][/] {EscapeMarkup(name)} — running ({_suiteOptions})...");
+        AnsiConsole.MarkupLine($"  [grey][[{index}/{total}]][/] {EscapeMarkup(name)} - running ({_suiteOptions})...");
         return Task.CompletedTask;
     }
 

@@ -6,7 +6,7 @@ order: 2
 
 # Validation & Accuracy
 
-NBenchmark's numerical core is dependency-free — it ships its own implementations
+NBenchmark's numerical core is dependency-free - it ships its own implementations
 of the Student's t quantile, the normal quantile, percentiles, and the
 Mann-Whitney U test. This page documents how those implementations are verified,
 and to what tolerance, so you can trust the numbers in the output.
@@ -87,7 +87,7 @@ asserts that the **minimum** sample lands near the target (within 0.9–3.0×).
 Unlike mean-based assertions (which absorb all scheduler preemption spikes), the
 minimum is stable:
 
-- A CPU-bound busy-wait has a hard floor — the minimum cannot be materially
+- A CPU-bound busy-wait has a hard floor - the minimum cannot be materially
   *below* the target.
 - Preemption only ever adds time, pushing the mean around but barely affecting
   the minimum.

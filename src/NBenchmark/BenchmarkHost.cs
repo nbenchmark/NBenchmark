@@ -113,7 +113,7 @@ public sealed class BenchmarkHost
                 foreach (var b in suite.Benchmarks)
                 {
                     Console.WriteLine($"    {b.DisplayName}"
-                                      + (b.Attribute.Description is not null ? $" — {b.Attribute.Description}" : ""));
+                                      + (b.Attribute.Description is not null ? $" - {b.Attribute.Description}" : ""));
                 }
             }
 

@@ -6,15 +6,15 @@ order: 1
 
 # Statistics Deep Dive
 
-This page explains exactly how NBenchmark collects and analyses measurements. You don't need to understand all of this to use the library — the [Key Concepts](../getting-started/key-concepts) page covers the practical side. This is for readers who want the full mathematical picture.
+This page explains exactly how NBenchmark collects and analyses measurements. You don't need to understand all of this to use the library - the [Key Concepts](../getting-started/key-concepts) page covers the practical side. This is for readers who want the full mathematical picture.
 
 ## The measurement loop
 
 For each benchmark, NBenchmark runs the following sequence:
 
-1. **Warmup** — run the action `WarmupIterations` times (default: 25) without recording timings.
-2. **Post-warmup GC** — force a full gen-2 GC collection to establish a clean heap baseline.
-3. **Measurement loop** — for each of the `Iterations` (default: 200) measured runs:
+1. **Warmup** - run the action `WarmupIterations` times (default: 25) without recording timings.
+2. **Post-warmup GC** - force a full gen-2 GC collection to establish a clean heap baseline.
+3. **Measurement loop** - for each of the `Iterations` (default: 200) measured runs:
    - If `ForceGcBeforeEachIteration` is true, force a gen-0 collection.
    - Call `iterationSetup` if provided.
    - Record `Stopwatch.GetTimestamp()`.
@@ -105,13 +105,13 @@ $$\bar{x} \pm \text{MoE} = [\bar{x} - \text{MoE},\; \bar{x} + \text{MoE}]$$
 
 ### Why Student's t and not the normal distribution?
 
-The normal distribution's critical value (e.g. 1.96 for 95%) assumes the population standard deviation is known. In benchmarking it is not — we estimate it from the sample. Student's t compensates by using wider critical values for small sample sizes, shrinking towards the normal as `n` grows.
+The normal distribution's critical value (e.g. 1.96 for 95%) assumes the population standard deviation is known. In benchmarking it is not - we estimate it from the sample. Student's t compensates by using wider critical values for small sample sizes, shrinking towards the normal as `n` grows.
 
-With the default 200 iterations (190 after 5% trimming), the t critical value at 95% is approximately **1.973** — very close to the normal 1.960, so the practical difference is small.
+With the default 200 iterations (190 after 5% trimming), the t critical value at 95% is approximately **1.973** - very close to the normal 1.960, so the practical difference is small.
 
 ### Honest caveats
 
-The CI is on the **mean** and relies on the Central Limit Theorem — the assumption that the sample mean is approximately normally distributed. For `n ≥ 30` this is generally safe even when the underlying distribution is not normal. For very small sample counts (e.g. a parameterised benchmark with 10 iterations) the approximation is weaker, but the t-distribution's heavier tails at low degrees of freedom provide some protection.
+The CI is on the **mean** and relies on the Central Limit Theorem - the assumption that the sample mean is approximately normally distributed. For `n ≥ 30` this is generally safe even when the underlying distribution is not normal. For very small sample counts (e.g. a parameterised benchmark with 10 iterations) the approximation is weaker, but the t-distribution's heavier tails at low degrees of freedom provide some protection.
 
 ### t-critical values in practice
 
@@ -134,7 +134,7 @@ to **better than 1%** for df ≥ 3 (worst case ≈ 0.79% at df = 3, 99%). See
 
 $$\text{CV} = \frac{s}{\bar{x}}$$
 
-A dimensionless relative measure of variability. A CV of 0.05 means the standard deviation is 5% of the mean — the benchmark is fairly stable. A CV of 0.5 or higher indicates high variability and the results should be treated with caution.
+A dimensionless relative measure of variability. A CV of 0.05 means the standard deviation is 5% of the mean - the benchmark is fairly stable. A CV of 0.5 or higher indicates high variability and the results should be treated with caution.
 
 ## Allocation measurement
 
@@ -147,7 +147,7 @@ allocAfter  = GC.GetTotalAllocatedBytes(precise: false)
 allocations[i] = Max(0, allocAfter - allocBefore)
 ```
 
-The reported `MeanAllocatedBytes` is the arithmetic mean across all iterations. This includes any allocations made by the benchmark framework itself that appear between the two reads — in practice, for simple benchmarks, this is zero.
+The reported `MeanAllocatedBytes` is the arithmetic mean across all iterations. This includes any allocations made by the benchmark framework itself that appear between the two reads - in practice, for simple benchmarks, this is zero.
 
 `GC.GetTotalAllocatedBytes` is thread-local and does not count allocations made by other threads.
 
@@ -157,7 +157,7 @@ When two or more benchmarks have been run, NBenchmark tests whether the differen
 
 ### Why Mann-Whitney U?
 
-Benchmark timings are typically right-skewed (a few slow outliers) and do not follow a normal distribution. Parametric tests like the t-test assume normality. The Mann-Whitney U test is **non-parametric** — it ranks combined values rather than computing moments, and makes no distributional assumptions.
+Benchmark timings are typically right-skewed (a few slow outliers) and do not follow a normal distribution. Parametric tests like the t-test assume normality. The Mann-Whitney U test is **non-parametric** - it ranks combined values rather than computing moments, and makes no distributional assumptions.
 
 ### Algorithm
 
@@ -175,7 +175,7 @@ $$U_1 = R_1 - \frac{n_1(n_1+1)}{2}, \quad U_2 = n_1 n_2 - U_1, \quad U = \min(U_
 A p-value below **0.05** is considered significant (✓ in the Sig column). This threshold is fixed and is not configurable.
 
 The normal approximation uses **no continuity correction**, so it corresponds to
-`scipy.stats.mannwhitneyu(..., method='asymptotic', use_continuity=False)` — which
+`scipy.stats.mannwhitneyu(..., method='asymptotic', use_continuity=False)` - which
 NBenchmark matches to better than 1e-6. On small samples this approximation can
 differ from the exact permutation p-value by up to ≈ 0.05; that gap is pinned and
 documented in [Validation & Accuracy](./validation).

@@ -33,7 +33,7 @@ This behaviour is controlled by `ForceGcBeforeEachIteration` (default: `true`). 
 
 ## Outlier trimming
 
-Even with warmup and forced GC, occasional **OS scheduling interrupts**, context switches, or thermal throttling can spike an individual measurement. These outliers are not representative of your code's performance — they reflect system noise.
+Even with warmup and forced GC, occasional **OS scheduling interrupts**, context switches, or thermal throttling can spike an individual measurement. These outliers are not representative of your code's performance - they reflect system noise.
 
 By default, NBenchmark trims the **top 5%** of samples before computing statistics (`OutlierMode.RemoveTop5Percent`). With 200 iterations, this discards the 10 noisiest measurements.
 
@@ -48,7 +48,7 @@ Available modes:
 
 ## Median vs. mean
 
-The **median** is the middle value when all measurements are sorted. It is robust to outliers — a few very slow measurements do not pull it upward.
+The **median** is the middle value when all measurements are sorted. It is robust to outliers - a few very slow measurements do not pull it upward.
 
 The **mean** is the arithmetic average. Even after outlier trimming, the mean is more sensitive to skewed distributions than the median.
 
@@ -56,7 +56,7 @@ For most purposes, the **median** is the most reliable single number to compare 
 
 ## Standard deviation
 
-**Standard deviation (StdDev)** measures how spread out your measurements are. A high StdDev relative to the mean means your timings are inconsistent — the code runs in very different amounts of time from iteration to iteration. This can be caused by:
+**Standard deviation (StdDev)** measures how spread out your measurements are. A high StdDev relative to the mean means your timings are inconsistent - the code runs in very different amounts of time from iteration to iteration. This can be caused by:
 
 - GC pressure and pauses
 - Cache misses due to working-set size
@@ -88,10 +88,10 @@ When comparing two or more benchmarks, it's not enough to see that one has a low
 NBenchmark uses the **Mann-Whitney U test** to answer: "Is this difference statistically significant?"
 
 - A **✓** in the Sig column means the difference would occur by chance less than 5% of the time (p < 0.05). It is very unlikely to be noise.
-- A **~** means the difference is not statistically significant — you cannot confidently conclude one is faster than the other.
+- A **~** means the difference is not statistically significant - you cannot confidently conclude one is faster than the other.
 - The test requires at least **5 samples** in each group; with fewer it returns no result.
 
-The Mann-Whitney U test is **non-parametric** — it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
+The Mann-Whitney U test is **non-parametric** - it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
 
 ::: info
 Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Always look at the Ratio column alongside significance.
@@ -101,12 +101,12 @@ Statistical significance does not mean the difference is *large* or *important*.
 
 When `MeasureAllocations` is enabled, NBenchmark samples `GC.GetTotalAllocatedBytes` before and after each iteration and reports the **mean bytes allocated per iteration** in the Alloc/op column.
 
-This is useful for detecting unexpected heap allocations — boxing of value types, LINQ overhead, string formatting, etc. Zero allocations in the hot path typically means less GC pressure and more predictable latency.
+This is useful for detecting unexpected heap allocations - boxing of value types, LINQ overhead, string formatting, etc. Zero allocations in the hot path typically means less GC pressure and more predictable latency.
 
 Allocation tracking is off by default because it adds a small measurement overhead.
 
 ## Next steps
 
-- **[Guides](../guides/)** — see these concepts applied in real benchmarks
-- **[Advanced: Statistics](../advanced/statistics)** — the full mathematical detail
-- **[Configuration](../configuration)** — tune iterations, warmup, outlier mode, and confidence level
+- **[Guides](../guides/)** - see these concepts applied in real benchmarks
+- **[Advanced: Statistics](../advanced/statistics)** - the full mathematical detail
+- **[Configuration](../configuration)** - tune iterations, warmup, outlier mode, and confidence level

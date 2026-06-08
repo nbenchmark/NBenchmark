@@ -10,13 +10,13 @@ Now that you've run your first benchmark, here's where to go depending on what y
 
 ## I want to compare multiple implementations
 
-Use **Tier 2: BenchmarkSuite** — a fluent builder for running several benchmarks side-by-side with a comparison table.
+Use **Tier 2: BenchmarkSuite** - a fluent builder for running several benchmarks side-by-side with a comparison table.
 
 → [Guide: BenchmarkSuite](../guides/tier-2-suite)
 
 ## I want a dedicated benchmark project with attribute-based discovery
 
-Use **Tier 3: BenchmarkHost** — mark methods with `[Benchmark]`, point the host at your assembly, and control everything from the command line.
+Use **Tier 3: BenchmarkHost** - mark methods with `[Benchmark]`, point the host at your assembly, and control everything from the command line.
 
 → [Guide: BenchmarkHost](../guides/tier-3-host)
 
@@ -52,6 +52,6 @@ Use `BenchmarkHost`, which parses CLI arguments automatically. You can filter be
 
 ## My benchmark class needs dependencies (a repository, `DbContext`, logger, etc.)
 
-Add the optional `NBenchmark.DependencyInjection` companion package and use `UseDependencyInjection<T>` — your benchmark class can then take constructor dependencies that the container resolves.
+Add the optional `NBenchmark.DependencyInjection` companion package and use `UseDependencyInjection<T>` - your benchmark class can then take constructor dependencies that the container resolves.
 
 → [Dependency Injection guide](../guides/dependency-injection)

@@ -29,12 +29,12 @@ public sealed class MarkdownReporter : IReporter
 
         if (table.Rows.All(r => r.Errored))
         {
-            sb.AppendLine("_All benchmarks errored — no results to display._");
+            sb.AppendLine("_All benchmarks errored - no results to display._");
             await File.WriteAllTextAsync(_outputPath, sb.ToString(), cancellationToken);
             return;
         }
 
-        sb.AppendLine($"_Run at {table.RunAtUtc} UTC — "
+        sb.AppendLine($"_Run at {table.RunAtUtc} UTC - "
                       + $"{table.WarmupIterations} warmup / "
                       + $"{table.MeasuredIterations} measured_");
 

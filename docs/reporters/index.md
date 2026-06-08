@@ -6,7 +6,7 @@ order: 4
 
 # Reporters
 
-Reporters consume the finished `BenchmarkResult` list and produce output — terminal tables, Markdown files, CSVs, or JSON. You can attach as many reporters as you like to a single run.
+Reporters consume the finished `BenchmarkResult` list and produce output - terminal tables, Markdown files, CSVs, or JSON. You can attach as many reporters as you like to a single run.
 
 ## How reporters work
 
@@ -46,7 +46,7 @@ BenchmarkHost.Create(args)
     .RunAsync();
 ```
 
-### Benchmark (Tier 1) — extension methods
+### Benchmark (Tier 1) - extension methods
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
@@ -70,10 +70,10 @@ await result.ToJsonAsync("results/");
 File reporters validate that the output path is **under the current working directory**. Paths outside the CWD (e.g. `/tmp/results` or `../../other-project`) are rejected with an `ArgumentException`. This prevents accidental writes outside the project directory.
 
 ```csharp
-// Works — relative path under CWD
+// Works - relative path under CWD
 new MarkdownReporter("results/benchmark.md")
 
-// Throws ArgumentException — outside CWD
+// Throws ArgumentException - outside CWD
 new MarkdownReporter("/tmp/benchmark.md")
 ```
 
@@ -94,7 +94,7 @@ dotnet run -- --reporter console   # works when NBenchmark.Console is referenced
 
 The `--reporter` flag constructs reporters through `ReporterRegistry.TryCreate`, which handles both built-in reporters (`json`/`markdown`/`csv`) and any reporters self-registered by external packages.
 
-External packages (like `NBenchmark.Console`) self-register via `[ModuleInitializer]` + `ReporterRegistry.Register()`. The `--reporter flag` discovers available reporters automatically — no per-reporter code changes needed in `BenchmarkHost`.
+External packages (like `NBenchmark.Console`) self-register via `[ModuleInitializer]` + `ReporterRegistry.Register()`. The `--reporter flag` discovers available reporters automatically - no per-reporter code changes needed in `BenchmarkHost`.
 
 If you reference an unknown reporter name, the host prints the list of available reporters plus a hint about the `console` package.
 
@@ -136,11 +136,11 @@ After registration, `--reporter my-reporter` works from the CLI.
 
 For reporters that produce comparison tables, use `BenchmarkTable.Build(results)` rather than working with `IReadOnlyList<BenchmarkResult>` directly. It centralises the logic you would otherwise duplicate:
 
-- **Baseline selection** — picks the first result marked `[Baseline]`, or falls back to the fastest (lowest median) if none is marked.
-- **Ratio computation** — `row.Ratio` is `result.Median / baseline.Median`, or `NaN` for errored results or single-benchmark runs.
-- **Significance labels** — `row.SignificanceLabel` is `"✓"` (significant), `"~"` (not significant), or `""` (not applicable).
-- **Ordering** — rows are sorted by median ascending.
-- **Run metadata** — `table.RunAtUtc`, `table.WarmupIterations`, `table.MeasuredIterations`, `table.ConfidenceLevel`, `table.OutlierMode`, and `table.TotalDuration` are available for building a header without picking fields from individual results.
+- **Baseline selection** - picks the first result marked `[Baseline]`, or falls back to the fastest (lowest median) if none is marked.
+- **Ratio computation** - `row.Ratio` is `result.Median / baseline.Median`, or `NaN` for errored results or single-benchmark runs.
+- **Significance labels** - `row.SignificanceLabel` is `"✓"` (significant), `"~"` (not significant), or `""` (not applicable).
+- **Ordering** - rows are sorted by median ascending.
+- **Run metadata** - `table.RunAtUtc`, `table.WarmupIterations`, `table.MeasuredIterations`, `table.ConfidenceLevel`, `table.OutlierMode`, and `table.TotalDuration` are available for building a header without picking fields from individual results.
 
 ```csharp
 public async Task ReportAsync(
@@ -150,13 +150,13 @@ public async Task ReportAsync(
     var table = BenchmarkTable.Build(results);
 
     Console.WriteLine(
-        $"Run at {table.RunAtUtc} UTC — {table.WarmupIterations} warmup / {table.MeasuredIterations} measured");
+        $"Run at {table.RunAtUtc} UTC - {table.WarmupIterations} warmup / {table.MeasuredIterations} measured");
 
     foreach (var row in table.Rows)
     {
         if (row.Errored)
         {
-            Console.WriteLine($"{row.Name}: ERROR — {row.ErrorMessage}");
+            Console.WriteLine($"{row.Name}: ERROR - {row.ErrorMessage}");
             continue;
         }
 

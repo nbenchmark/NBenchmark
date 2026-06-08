@@ -8,7 +8,7 @@ order: 2
 
 ## Your first benchmark
 
-The simplest way to measure code is `Benchmark.Run`. Call it anywhere — no special project structure, no attributes, no configuration.
+The simplest way to measure code is `Benchmark.Run`. Call it anywhere - no special project structure, no attributes, no configuration.
 
 ```csharp
 using NBenchmark;
@@ -79,11 +79,11 @@ The console output will look like:
 │ plus operator    │ 8.5 ns │ 8.4 ns │ ±1 ns  │ 5 ns   │ 10 ns  │ 10 ns  │ 1.00x │    -     │
 ╰──────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┴──────────╯
 
-Ran 2 benchmark(s) — Significance: Mann-Whitney U (p < 0.05) — Outliers: top 5%
+Ran 2 benchmark(s) - Significance: Mann-Whitney U (p < 0.05) - Outliers: top 5%
 Error = ±95% confidence interval half-width on the mean.
 ```
 
-The **Ratio** column shows speed relative to the baseline. The **✓** next to a benchmark name means the difference is statistically significant — it's unlikely to be random noise.
+The **Ratio** column shows speed relative to the baseline. The **✓** next to a benchmark name means the difference is statistically significant - it's unlikely to be random noise.
 
 ## Saving results to a file
 
@@ -101,7 +101,7 @@ await result.ToJsonAsync("results/");   // directory
 
 | Value | What it tells you |
 |---|---|
-| **Median** | The middle value — the most reliable single number. Ignores extreme outliers. |
+| **Median** | The middle value - the most reliable single number. Ignores extreme outliers. |
 | **Mean** | The average. Close to the median for stable code; further away when timings vary widely. |
 | **Error** | How precisely the mean is estimated (±95% CI). A small Error means the mean is reliable. |
 | **StdDev** | How spread out the measurements are. High StdDev = unpredictable timing. |
@@ -113,6 +113,6 @@ See [Key Concepts](./key-concepts) for a deeper explanation of what these mean a
 
 ## Next steps
 
-- **[Key Concepts](./key-concepts)** — understand warmup, outlier trimming, and the statistics
-- **[Guides](../guides/)** — detailed coverage of all three usage tiers
-- **[Configuration](../configuration)** — change defaults (iterations, warmup, confidence level, etc.)
+- **[Key Concepts](./key-concepts)** - understand warmup, outlier trimming, and the statistics
+- **[Guides](../guides/)** - detailed coverage of all three usage tiers
+- **[Configuration](../configuration)** - change defaults (iterations, warmup, confidence level, etc.)

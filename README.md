@@ -1,6 +1,6 @@
 # NBenchmark
 
-A lightweight, async-native .NET benchmarking library. No configuration files, no separate compilation step — add a reference and start measuring.
+A lightweight, async-native .NET benchmarking library. No configuration files, no separate compilation step - add a reference and start measuring.
 
 > **Pre-release.** NBenchmark targets .NET 8+ (net8.0, net9.0, net10.0) and is under active development. The API may change between versions.
 
@@ -12,7 +12,7 @@ A lightweight, async-native .NET benchmarking library. No configuration files, n
 
 | Package | Description |
 |---|---|
-| `NBenchmark` | Zero-dependency core — all measurement, statistics, and file reporters. |
+| `NBenchmark` | Zero-dependency core - all measurement, statistics, and file reporters. |
 | `NBenchmark.Console` | Adds a rich terminal table via [Spectre.Console](https://spectreconsole.net/). |
 | `NBenchmark.DependencyInjection` | Resolves benchmark classes from an `IServiceProvider` so they can have constructor dependencies. |
 
@@ -45,11 +45,11 @@ result.Print();
 
 ## Three usage tiers
 
-**Tier 1 — `Benchmark.Run`** — a single static call, no setup required.
+**Tier 1 - `Benchmark.Run`** - a single static call, no setup required.
 
-**Tier 2 — `BenchmarkSuite`** — a fluent builder that runs multiple benchmarks side-by-side and produces a comparison table with ratios and statistical significance.
+**Tier 2 - `BenchmarkSuite`** - a fluent builder that runs multiple benchmarks side-by-side and produces a comparison table with ratios and statistical significance.
 
-**Tier 3 — `BenchmarkHost`** — attribute-based discovery (`[Benchmark]`, `[BenchmarkArguments]`, lifecycle attributes) driven by a built-in CLI. Designed for dedicated benchmark projects.
+**Tier 3 - `BenchmarkHost`** - attribute-based discovery (`[Benchmark]`, `[BenchmarkArguments]`, lifecycle attributes) driven by a built-in CLI. Designed for dedicated benchmark projects.
 
 All three tiers share the same measurement engine, produce the same `BenchmarkResult` type, and support the same reporters and configuration.
 

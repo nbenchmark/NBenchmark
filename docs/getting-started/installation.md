@@ -16,7 +16,7 @@ NBenchmark ships as three NuGet packages. Install only what you need.
 
 ### Core package
 
-The core package contains all measurement, statistics, and file-based reporters (JSON, Markdown, CSV). It has **no NuGet dependencies** — only the .NET BCL.
+The core package contains all measurement, statistics, and file-based reporters (JSON, Markdown, CSV). It has **no NuGet dependencies** - only the .NET BCL.
 
 ```bash
 dotnet add package NBenchmark

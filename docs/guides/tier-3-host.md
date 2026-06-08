@@ -8,7 +8,7 @@ order: 3
 
 `BenchmarkHost` discovers benchmarks by scanning assemblies for `[Benchmark]`-decorated methods. It also parses command-line arguments, so you can filter, configure, and drive runs entirely from the terminal without recompiling.
 
-This tier is designed for **dedicated benchmark projects** — a separate console project that you run against your library.
+This tier is designed for **dedicated benchmark projects** - a separate console project that you run against your library.
 
 ## Minimal setup
 
@@ -150,16 +150,16 @@ public class DatabaseBenchmarks
 NBenchmark instantiates benchmark classes using `Activator.CreateInstance`. The class must have a **public parameterless constructor** (the default for any class without explicit constructors).
 
 ```csharp
-// Works — implicit parameterless constructor
+// Works - implicit parameterless constructor
 public class MyBenchmarks { ... }
 
-// Works — explicit parameterless constructor
+// Works - explicit parameterless constructor
 public class MyBenchmarks
 {
     public MyBenchmarks() { /* setup */ }
 }
 
-// Does not work — no parameterless constructor
+// Does not work - no parameterless constructor
 public class MyBenchmarks(IDatabase db) { ... }
 ```
 
@@ -233,15 +233,15 @@ Output:
 
 ```
 ── StringBenchmarks ──
-    Concat — current production implementation
-    Interpolate — candidate replacement
+    Concat - current production implementation
+    Interpolate - candidate replacement
 ── DatabaseBenchmarks ──
     RunQuery
 ```
 
 ## Dry run
 
-Validates that all benchmarks compile, discover, and wire up correctly — without invoking the body:
+Validates that all benchmarks compile, discover, and wire up correctly - without invoking the body:
 
 ```bash
 dotnet run -- --dry-run
@@ -255,6 +255,6 @@ dotnet run -- --dry-run
 
 ## Next steps
 
-- [CLI Reference](../cli-reference) — all command-line flags
-- [Configuration](../configuration) — options reference
-- [Reporters](../reporters/) — all reporters
+- [CLI Reference](../cli-reference) - all command-line flags
+- [Configuration](../configuration) - options reference
+- [Reporters](../reporters/) - all reporters

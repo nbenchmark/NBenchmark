@@ -7,7 +7,7 @@ namespace NBenchmark.Tests;
 /// <summary>
 ///     Cross-checks for the outlier-trimming modes. The trim *counts* are pinned
 ///     against their documented formulas, and the quartile definition used by
-///     <see cref="OutlierMode.IqrFence" /> is pinned to the nearest-rank percentile —
+///     <see cref="OutlierMode.IqrFence" /> is pinned to the nearest-rank percentile -
 ///     which deliberately diverges from R's default (type 7) linear interpolation.
 /// </summary>
 public class OutlierModeCrossCheckTests

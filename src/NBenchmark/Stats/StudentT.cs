@@ -5,7 +5,7 @@ namespace NBenchmark.Stats;
 ///     distributions. Used to compute confidence intervals on the mean.
 /// </summary>
 /// <remarks>
-///     These are self-contained numerical approximations — no external dependency.
+///     These are self-contained numerical approximations - no external dependency.
 ///     The normal quantile uses Acklam's rational approximation (|error| &lt; 1.15e-9).
 ///     The Student's t quantile uses exact closed forms for 1 and 2 degrees of freedom
 ///     and the Cornish-Fisher expansion (Abramowitz &amp; Stegun 26.7.5) for higher df,

@@ -6,7 +6,7 @@ order: 6
 
 # CLI Reference
 
-When using `BenchmarkHost` (Tier 3), all configuration can be driven from the command line. `BenchmarkHost.Create(args)` parses `args` automatically — no argument-parsing library required.
+When using `BenchmarkHost` (Tier 3), all configuration can be driven from the command line. `BenchmarkHost.Create(args)` parses `args` automatically - no argument-parsing library required.
 
 ## Usage
 
@@ -76,7 +76,7 @@ Add a reporter by name. Can be specified multiple times to stack reporters. Buil
 | `markdown` | `MarkdownReporter` | Markdown file |
 | `csv` | `CsvReporter` | CSV file |
 
-The `console` reporter is provided by the `NBenchmark.Console` package. When the package is referenced, it self-registers automatically and becomes available via `--reporter console` — no special setup needed.
+The `console` reporter is provided by the `NBenchmark.Console` package. When the package is referenced, it self-registers automatically and becomes available via `--reporter console` - no special setup needed.
 
 ```bash
 dotnet run -- --reporter markdown
@@ -141,7 +141,7 @@ Output:
 
 ```
 ── StringBenchmarks ──
-    Concat — current production implementation
+    Concat - current production implementation
     Interpolate
 ── DatabaseBenchmarks ──
     RunQuery
@@ -151,7 +151,7 @@ Output:
 
 ### `--dry-run`
 
-Skip measurement entirely. Equivalent to `--iterations 0 --warmup 0`: benchmark classes are discovered, setup/teardown is wired up, and instances are created — but the benchmark body is never invoked. Use it to confirm that your classes are discovered and your DI wiring is correct before committing to a full run.
+Skip measurement entirely. Equivalent to `--iterations 0 --warmup 0`: benchmark classes are discovered, setup/teardown is wired up, and instances are created - but the benchmark body is never invoked. Use it to confirm that your classes are discovered and your DI wiring is correct before committing to a full run.
 
 To invoke the body exactly once without warmup (e.g., a quick smoke test), use `--iterations 1 --warmup 0` instead.
 
@@ -186,7 +186,7 @@ This flag is reserved for a future feature (fail the run if a benchmark regresse
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
 | `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`), invalid format (`--confidence`, `--seed`), unknown reporter name (`--reporter`), or use of `--threshold-pct`. |
 
-When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation — but the non-zero exit code ensures CI pipelines catch the problem.
+When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem.
 
 ## Examples
 

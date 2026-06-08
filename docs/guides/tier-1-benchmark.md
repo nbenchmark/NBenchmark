@@ -27,10 +27,10 @@ var result = Benchmark.Run(() =>
 ### Synchronous
 
 ```csharp
-// Action — for code with no return value
+// Action - for code with no return value
 var result = Benchmark.Run(() => DoWork());
 
-// Func<T> — for code that returns a value
+// Func<T> - for code that returns a value
 // The result is consumed by a sink to prevent the compiler optimising the call away.
 var result = Benchmark.Run(() => ComputeHash(data));
 ```
@@ -118,7 +118,7 @@ await result.ToJsonAsync("results/");   // output directory
 
 ## Accessing result fields directly
 
-`BenchmarkResult` is a plain record — access any field directly:
+`BenchmarkResult` is a plain record - access any field directly:
 
 ```csharp
 Console.WriteLine($"Median:  {result.Median} ns");
@@ -139,6 +139,6 @@ if (result.MeanAllocatedBytes.HasValue)
 
 ## Next steps
 
-- [Tier 2: BenchmarkSuite](./tier-2-suite) — compare two or more implementations
-- [Configuration](../configuration) — full options reference
-- [Reporters](../reporters/) — save results to files
+- [Tier 2: BenchmarkSuite](./tier-2-suite) - compare two or more implementations
+- [Configuration](../configuration) - full options reference
+- [Reporters](../reporters/) - save results to files

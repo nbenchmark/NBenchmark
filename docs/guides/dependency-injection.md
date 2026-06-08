@@ -15,7 +15,7 @@ dotnet add package NBenchmark.DependencyInjection
 dotnet add package Microsoft.Extensions.DependencyInjection   # if you also want the concrete DI implementation
 ```
 
-The companion package only adds `Microsoft.Extensions.DependencyInjection.Abstractions`. The `Microsoft.Extensions.DependencyInjection` reference is only required if you want to use the `ServiceCollection` / `BuildServiceProvider` API directly — any container that exposes an `IServiceProvider` works.
+The companion package only adds `Microsoft.Extensions.DependencyInjection.Abstractions`. The `Microsoft.Extensions.DependencyInjection` reference is only required if you want to use the `ServiceCollection` / `BuildServiceProvider` API directly - any container that exposes an `IServiceProvider` works.
 
 ## Minimal example
 
@@ -92,7 +92,7 @@ The DI integration matches how `BenchmarkHost` already manages benchmark instanc
 | `WithServiceProvider` | Resolved from the root provider. Re-used across all `[Benchmark]` methods in the suite. | None. The root provider lives as long as your application. |
 | `WithScopedServiceProvider` | Resolved from a fresh scope. The scope is disposed **after** the suite's teardown runs, so any `IDisposable` / `IAsyncDisposable` services (e.g. `DbContext`) are cleaned up. | One scope per suite. Disposed in the `finally` block. |
 
-The host **does not** auto-dispose the benchmark instance when a service provider is configured — the scope's disposal already handles that. This avoids double-disposal of `IDisposable` benchmarks that come from a scope.
+The host **does not** auto-dispose the benchmark instance when a service provider is configured - the scope's disposal already handles that. This avoids double-disposal of `IDisposable` benchmarks that come from a scope.
 
 ## Constructor injection
 
@@ -152,13 +152,13 @@ This is what the `NBenchmark.DependencyInjection` package does internally. The f
 
 ## A note on Tier 1 and Tier 2
 
-The DI integration only affects **Tier 3** (`BenchmarkHost`), where classes are discovered reflectively and instantiated. Tier 1 (`Benchmark.Run`) and Tier 2 (`BenchmarkSuite`) take lambdas directly, so dependencies are captured in the closure — no DI package needed:
+The DI integration only affects **Tier 3** (`BenchmarkHost`), where classes are discovered reflectively and instantiated. Tier 1 (`Benchmark.Run`) and Tier 2 (`BenchmarkSuite`) take lambdas directly, so dependencies are captured in the closure - no DI package needed:
 
 ```csharp
-// Tier 1 — dependencies captured in the closure
+// Tier 1 - dependencies captured in the closure
 var result = Benchmark.Run(() => repository.GetCount());
 
-// Tier 2 — same closure trick
+// Tier 2 - same closure trick
 await new BenchmarkSuite("repo")
     .Add("count", () => repository.GetCount())
     .Add("list",  () => repository.ListAll())
@@ -167,6 +167,6 @@ await new BenchmarkSuite("repo")
 
 ## Next steps
 
-- [Tier 3: BenchmarkHost](./tier-3-host) — full reference for the host tier
-- [Samples](../samples) — see the `samples/DependencyInjection/` project for a complete working example
-- [FAQ](../faq#my-benchmark-class-needs-dependencies-how-do-i-inject-them) — common questions
+- [Tier 3: BenchmarkHost](./tier-3-host) - full reference for the host tier
+- [Samples](../samples) - see the `samples/DependencyInjection/` project for a complete working example
+- [FAQ](../faq#my-benchmark-class-needs-dependencies-how-do-i-inject-them) - common questions
