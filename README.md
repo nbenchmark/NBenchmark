@@ -1,8 +1,12 @@
 # NBenchmark
 
-NBenchmark is the easiest way to measure the speed of your .NET code. With zero setup and a focus on simplicity, you can go from installation to your first accurate benchmark in seconds-perfect for quick checks and full performance suites alike.
+[![Build](https://github.com/nbenchmark/nbenchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/nbenchmark/nbenchmark/actions/workflows/ci.yml)
+[![NuGet Version](https://img.shields.io/nuget/v/NBenchmark.svg)](https://www.nuget.org/packages/NBenchmark)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/NBenchmark.svg)](https://www.nuget.org/packages/NBenchmark)
+[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-blue.svg)](https://dotnet.microsoft.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **Pre-release.** NBenchmark targets .NET 8+ (net8.0, net9.0, net10.0) and is under active development. The API may change between versions.
+NBenchmark is the easiest way to measure the speed of your .NET code. With zero setup and a focus on simplicity, you can go from installation to your first accurate benchmark in seconds-perfect for quick checks and full performance suites alike.
 
 📖 **[Full documentation →](./docs/index.md)**
 
