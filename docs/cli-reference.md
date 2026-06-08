@@ -38,7 +38,7 @@ dotnet run -- --filter StringBenchmarks.Concat   # exact match
 
 ### `--iterations <n>`
 
-Number of measured iterations per benchmark. Valid range: `0` to `100 000`. Default: `200`. A value of `0` (combined with `--warmup 0`) is the dry-run signal — the body is not invoked.
+Number of measured iterations per benchmark. Valid range: `0` to `100 000`. Default: `200`. Use `--dry-run` to skip measurement entirely rather than setting this to `0` manually.
 
 ```bash
 dotnet run -- --iterations 1000
@@ -151,9 +151,9 @@ Output:
 
 ### `--dry-run`
 
-Skip the body entirely. `--dry-run` is implemented as `--iterations 0 --warmup 0`: the body is not invoked, only the discovery and wiring (setup, teardown, instantiation) runs. Use it to validate discovery and configuration without measurement.
+Skip measurement entirely. Equivalent to `--iterations 0 --warmup 0`: benchmark classes are discovered, setup/teardown is wired up, and instances are created — but the benchmark body is never invoked. Use it to confirm that your classes are discovered and your DI wiring is correct before committing to a full run.
 
-> **Behavioural change:** in earlier versions `--dry-run` invoked the body once for a "smoke test". It now does not invoke the body at all. To run the body exactly once for smoke-testing, use `--iterations 1 --warmup 0`.
+To invoke the body exactly once without warmup (e.g., a quick smoke test), use `--iterations 1 --warmup 0` instead.
 
 ```bash
 dotnet run -- --dry-run
@@ -183,8 +183,10 @@ This flag is reserved for a future feature (fail the run if a benchmark regresse
 
 | Code | Meaning |
 |---|---|
-| `0` | All benchmarks completed (including errored benchmarks — errors are not fatal). |
-| `1` | An unknown flag was passed, or `--threshold-pct` was used. |
+| `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`), invalid format (`--confidence`, `--seed`), unknown reporter name (`--reporter`), or use of `--threshold-pct`. |
+
+When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation — but the non-zero exit code ensures CI pipelines catch the problem.
 
 ## Examples
 
