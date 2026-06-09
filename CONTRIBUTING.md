@@ -53,7 +53,7 @@ docs/                                   Documentation site
 - One logical change per PR
 - Include tests for bug fixes and new features
 - Keep public API changes minimal and documented
-- Follow the existing code style — the repo uses an `.editorconfig`
+- Follow the existing code style - the repo uses an `.editorconfig`
 
 ## Reporting Issues
 

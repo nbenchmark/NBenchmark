@@ -10,7 +10,7 @@ Now that you've run your first benchmark, here's where to go depending on what y
 
 ## I want to compare multiple implementations
 
-Use **Suite mode: BenchmarkSuite** - a fluent builder for running several benchmarks side-by-side with a comparison table.
+Use **Suite mode: BenchmarkSuite** - a fluent builder for running several benchmarks side-by-side with a comparison table. When your suite grows to need complex setup or dependency injection, graduate to **Host mode**.
 
 → [Guide: BenchmarkSuite](../guides/suite-mode)
 

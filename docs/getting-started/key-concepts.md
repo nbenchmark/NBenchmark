@@ -65,6 +65,10 @@ For most purposes, the **median** is the most reliable single number to compare 
 
 A low StdDev means your benchmark is stable and the mean is trustworthy.
 
+::: tip
+If you see high StdDev or a large Error, see the [Troubleshooting guide](../troubleshooting) for configuration remedies.
+:::
+
 ## Confidence intervals and the Error column
 
 The **Error** column shows the **[margin of error](https://en.wikipedia.org/wiki/Margin_of_error)** on the mean at a given confidence level (default: 95%).
@@ -85,13 +89,13 @@ These are important for **latency-sensitive** code where you care about worst-ca
 
 When comparing two or more benchmarks, it's not enough to see that one has a lower median. The difference might be random noise.
 
-NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** to answer: "Is this difference statistically significant?"
+NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** to answer: "Is this difference statistically significant?" The test implementation (along with every other statistical primitive in the library) is dependency-free and cross-validated against SciPy and NumPy - see [Validation & Accuracy](../advanced/validation).
 
 - A **✓** in the Sig column means the difference would occur by chance less than 5% of the time (p < 0.05). It is very unlikely to be noise.
 - A **~** means the difference is not statistically significant - you cannot confidently conclude one is faster than the other.
 - The test requires at least **5 samples** in each group; with fewer it returns no result.
 
-The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** — it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
+The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** - it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
 
 ::: info
 Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Always look at the Ratio column alongside significance.

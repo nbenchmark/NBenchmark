@@ -10,11 +10,11 @@ order: 8
 
 ### How is NBenchmark different from BenchmarkDotNet?
 
-BenchmarkDotNet is the industry-standard .NET benchmarking tool and is feature-rich - process isolation, multiple runtimes, diagnosers, and extensive reporting. It is the right tool for serious performance work.
+NBenchmark brings serious statistical rigor - non-parametric significance testing, confidence intervals, and percentile analysis - directly into your daily development cycle with zero configuration and zero external dependencies. Its numerical core is dependency-free and cross-validated against SciPy and NumPy to machine precision (see [Validation & Accuracy](./advanced/validation)).
 
-NBenchmark takes a different trade-off: **no out-of-process compilation, no XML configuration, minimal dependencies, and three lines of code to get started**. It is designed for day-to-day measurements during development where the overhead of a full BenchmarkDotNet run is too high.
+NBenchmark takes a different trade-off from tools like BenchmarkDotNet: **no out-of-process compilation, no XML configuration, minimal dependencies, and three lines of code to get started**.
 
-The two tools are complementary. Use NBenchmark to get quick feedback while developing, and BenchmarkDotNet for rigorous, publishable results.
+The two tools are complementary - NBenchmark for day-to-day development feedback, BenchmarkDotNet for publishable cross-platform results. See also the [Troubleshooting guide](./troubleshooting) for help with common measurement issues.
 
 ### Does NBenchmark require any special project type or configuration?
 
@@ -33,9 +33,11 @@ NBenchmark targets **net8.0**, **net9.0**, and **net10.0**. You need the .NET 8 
 A large Error (margin of error) means the measurements are highly variable. Common causes:
 
 - **Too few iterations.** Try `WithIterations(500)` or higher.
-- **Background processes.** Close browsers and other applications. Run on a quiet machine.
-- **Thermal throttling.** On laptops, the CPU may reduce clock speed mid-run. Let the machine cool down or use a plugged-in desktop.
+- **OS scheduling noise.** Switch to `.WithOutlierMode(OutlierMode.IqrFence)` to discard extreme measurements from context switches or scheduler interrupts.
+- **Thermal throttling.** On laptops, the CPU may reduce clock speed mid-run. Increase warmup with `.WithWarmup(50)` to let the CPU stabilise before measurement, or reduce iterations to shorten the run.
 - **The code path varies.** If your benchmark hits different code paths each iteration (e.g. a cache that fills up), that variability is real and expected.
+
+See the [Troubleshooting guide](./troubleshooting) for the full symptom matrix and configuration remedies.
 
 ### Why should I care about the median vs. the mean?
 
@@ -47,6 +49,8 @@ The compiler or JIT has likely optimised the benchmark body away because it has 
 
 - Returns a value (use `Benchmark.Run(() => Compute())` which uses the generic overload that consumes the result), or
 - Has a side effect (writes to a field, uses a passed-in output parameter, etc.)
+
+Use `--dry-run` to verify the body is being invoked. See the [Troubleshooting guide](./troubleshooting) for more on dead code elimination and other zero-result causes.
 
 ### How does allocation tracking work? Does it include framework overhead?
 

@@ -188,3 +188,7 @@ public void MyExpensiveBenchmark() => SlowOperation();
 | `ForceGcBetweenBenchmarks` | `bool` | `true` | - |
 
 Values outside the valid range throw `ArgumentOutOfRangeException`.
+
+---
+
+**Still having issues?** See the [Troubleshooting guide](./troubleshooting) for symptom-to-configuration mappings for common measurement problems.
