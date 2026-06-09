@@ -11,9 +11,9 @@ public static class ReporterRegistry
 
     private static readonly Entry[] _seed =
     [
-        new("json", "JSON file output (one file per run)", dir => dir is null ? new JsonReporter() : new JsonReporter(dir)),
-        new("markdown", "Markdown table output", dir => dir is null ? new MarkdownReporter() : new MarkdownReporter(Path.Combine(dir, "benchmark-results.md"))),
-        new("csv", "CSV file output", dir => dir is null ? new CsvReporter() : new CsvReporter(Path.Combine(dir, "benchmark-results.csv"))),
+        new("json", "JSON file output (one file per run)", dir => new JsonReporter(dir ?? ".")),
+        new("markdown", "Markdown table output", dir => new MarkdownReporter(dir ?? ".")),
+        new("csv", "CSV file output", dir => new CsvReporter(dir ?? ".")),
     ];
 
     private static readonly object _lock = new();

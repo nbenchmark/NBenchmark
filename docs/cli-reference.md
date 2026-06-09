@@ -73,8 +73,8 @@ Add a reporter by name. Can be specified multiple times to stack reporters. Buil
 | Name | Reporter | Output |
 |---|---|---|
 | `json` | `JsonReporter` | JSON file in the current directory (or `--output` directory) |
-| `markdown` | `MarkdownReporter` | Markdown file |
-| `csv` | `CsvReporter` | CSV file |
+| `markdown` | `MarkdownReporter` | Markdown file in the current directory (or `--output` directory) |
+| `csv` | `CsvReporter` | CSV file in the current directory (or `--output` directory) |
 
 The `console` reporter is provided by the `NBenchmark.Console` package. When the package is referenced, it self-registers automatically and becomes available via `--reporter console` - no special setup needed.
 
@@ -90,14 +90,11 @@ Reporters from external packages self-register through the same mechanism: refer
 
 ### `--output <directory>`
 
-Set the output directory for file reporters. Must be a path under the current working directory. Default: current directory.
+Set the output directory for file reporters. Must be a path under the current working directory. The directory is created automatically if it does not exist. Default: current directory.
 
 ```bash
 dotnet run -- --reporter markdown --output ./results
 ```
-
-> [!WARNING]
-> The output directory must already exist. `MarkdownReporter` and `CsvReporter` will throw a `DirectoryNotFoundException` if it does not (`JsonReporter` creates it automatically).
 
 ---
 

@@ -29,23 +29,23 @@ public static class BenchmarkResultExtensions
         return result;
     }
 
-    public static async Task<BenchmarkResult> ToMarkdownAsync(this BenchmarkResult result, string path = "benchmark.md")
+    public static async Task<BenchmarkResult> ToMarkdownAsync(this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {
-        var reporter = new MarkdownReporter(path);
+        var reporter = new MarkdownReporter(outputDir, fileName);
         await reporter.ReportAsync([result]);
         return result;
     }
 
-    public static async Task<BenchmarkResult> ToJsonAsync(this BenchmarkResult result, string outputDir = ".")
+    public static async Task<BenchmarkResult> ToJsonAsync(this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {
-        var reporter = new JsonReporter(outputDir);
+        var reporter = new JsonReporter(outputDir, fileName);
         await reporter.ReportAsync([result]);
         return result;
     }
 
-    public static async Task<BenchmarkResult> ToCsvAsync(this BenchmarkResult result, string path = "benchmark.csv")
+    public static async Task<BenchmarkResult> ToCsvAsync(this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {
-        var reporter = new CsvReporter(path);
+        var reporter = new CsvReporter(outputDir, fileName);
         await reporter.ReportAsync([result]);
         return result;
     }

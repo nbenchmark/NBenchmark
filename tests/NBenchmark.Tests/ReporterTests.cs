@@ -31,48 +31,305 @@ public class ReporterTests
     }
 
     [Fact]
-    public async Task MarkdownReporter_Writes_Table_Containing_Results()
+    public async Task JsonReporter_Uses_Explicit_FileName()
     {
-        var tempPath = Path.Combine(MakeSubDir("nb-md"), "out.md");
+        var tempDir = MakeSubDir("nb-json-explicit");
 
         try
         {
-            var reporter = new MarkdownReporter(tempPath);
+            var reporter = new JsonReporter(tempDir, "custom.json");
             var result = MakeResult("alpha", 100);
 
             await reporter.ReportAsync([result]);
 
-            Assert.True(File.Exists(tempPath));
-            var content = await File.ReadAllTextAsync(tempPath);
+            var filePath = Path.Combine(tempDir, "custom.json");
+            Assert.True(File.Exists(filePath));
+
+            var content = await File.ReadAllTextAsync(filePath);
+            Assert.Contains("alpha", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task JsonReporter_Creates_Directory()
+    {
+        var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-json-dir-{Guid.NewGuid():N}");
+
+        try
+        {
+            Assert.False(Directory.Exists(tempDir));
+
+            var reporter = new JsonReporter(tempDir);
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            Assert.True(Directory.Exists(tempDir));
+            Assert.NotEmpty(Directory.GetFiles(tempDir));
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task MarkdownReporter_Writes_Table_Containing_Results()
+    {
+        var tempDir = MakeSubDir("nb-md");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md");
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            var filePath = Path.Combine(tempDir, "out.md");
+            Assert.True(File.Exists(filePath));
+            var content = await File.ReadAllTextAsync(filePath);
             Assert.Contains("alpha", content);
             Assert.Contains("| Benchmark | Median |", content);
         }
         finally
         {
-            Cleanup(Path.GetDirectoryName(tempPath)!);
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task MarkdownReporter_Auto_Names_File_When_No_FileName()
+    {
+        var tempDir = MakeSubDir("nb-md-auto");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir);
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "benchmark-results-*.md");
+            Assert.Single(files);
+
+            var content = await File.ReadAllTextAsync(files[0]);
+            Assert.Contains("alpha", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task MarkdownReporter_Creates_Directory()
+    {
+        var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-md-dir-{Guid.NewGuid():N}");
+
+        try
+        {
+            Assert.False(Directory.Exists(tempDir));
+
+            var reporter = new MarkdownReporter(tempDir);
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            Assert.True(Directory.Exists(tempDir));
+            Assert.NotEmpty(Directory.GetFiles(tempDir));
+        }
+        finally
+        {
+            Cleanup(tempDir);
         }
     }
 
     [Fact]
     public async Task CsvReporter_Writes_Header_And_Row()
     {
-        var tempPath = Path.Combine(MakeSubDir("nb-csv"), "out.csv");
+        var tempDir = MakeSubDir("nb-csv");
 
         try
         {
-            var reporter = new CsvReporter(tempPath);
+            var reporter = new CsvReporter(tempDir, "out.csv");
             var result = MakeResult("alpha", 100);
 
             await reporter.ReportAsync([result]);
 
-            Assert.True(File.Exists(tempPath));
-            var content = await File.ReadAllTextAsync(tempPath);
+            var filePath = Path.Combine(tempDir, "out.csv");
+            Assert.True(File.Exists(filePath));
+            var content = await File.ReadAllTextAsync(filePath);
             Assert.Contains("Name,Median,Mean", content);
             Assert.Contains("\"alpha\"", content);
         }
         finally
         {
-            Cleanup(Path.GetDirectoryName(tempPath)!);
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task CsvReporter_Auto_Names_File_When_No_FileName()
+    {
+        var tempDir = MakeSubDir("nb-csv-auto");
+
+        try
+        {
+            var reporter = new CsvReporter(tempDir);
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "benchmark-results-*.csv");
+            Assert.Single(files);
+
+            var content = await File.ReadAllTextAsync(files[0]);
+            Assert.Contains("alpha", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task CsvReporter_Creates_Directory()
+    {
+        var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-csv-dir-{Guid.NewGuid():N}");
+
+        try
+        {
+            Assert.False(Directory.Exists(tempDir));
+
+            var reporter = new CsvReporter(tempDir);
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            Assert.True(Directory.Exists(tempDir));
+            Assert.NotEmpty(Directory.GetFiles(tempDir));
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task Counter_Increments_Across_Calls()
+    {
+        var tempDir = MakeSubDir("nb-counter");
+
+        try
+        {
+            var reporter = new JsonReporter(tempDir);
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
+            Assert.Equal(2, files.Length);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task MarkdownReporter_Counter_Increments_Across_Calls()
+    {
+        var tempDir = MakeSubDir("nb-md-counter");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir);
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "benchmark-results-*.md");
+            Assert.Equal(2, files.Length);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task CsvReporter_Counter_Increments_Across_Calls()
+    {
+        var tempDir = MakeSubDir("nb-csv-counter");
+
+        try
+        {
+            var reporter = new CsvReporter(tempDir);
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "benchmark-results-*.csv");
+            Assert.Equal(2, files.Length);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task MarkdownReporter_Uses_Explicit_FileName()
+    {
+        var tempDir = MakeSubDir("nb-md-explicit");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "custom.md");
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            var filePath = Path.Combine(tempDir, "custom.md");
+            Assert.True(File.Exists(filePath));
+
+            var content = await File.ReadAllTextAsync(filePath);
+            Assert.Contains("alpha", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task CsvReporter_Uses_Explicit_FileName()
+    {
+        var tempDir = MakeSubDir("nb-csv-explicit");
+
+        try
+        {
+            var reporter = new CsvReporter(tempDir, "custom.csv");
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            var filePath = Path.Combine(tempDir, "custom.csv");
+            Assert.True(File.Exists(filePath));
+
+            var content = await File.ReadAllTextAsync(filePath);
+            Assert.Contains("alpha", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
         }
     }
 

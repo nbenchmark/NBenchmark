@@ -32,8 +32,8 @@ Reporters are called after all benchmarks in the run have completed. They receiv
 ```csharp
 await new BenchmarkSuite("name")
     .WithReporter(new ConsoleReporter())
-    .WithReporter(new MarkdownReporter("results.md"))
-    .WithReporter(new CsvReporter("results.csv"))
+    .WithReporter(new MarkdownReporter("results/"))
+    .WithReporter(new CsvReporter("results/"))
     .RunAsync();
 ```
 
@@ -51,8 +51,8 @@ BenchmarkHost.Create(args)
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
 
-await result.ToMarkdownAsync("results.md");
-await result.ToCsvAsync("results.csv");
+await result.ToMarkdownAsync("results/");
+await result.ToCsvAsync("results/");
 await result.ToJsonAsync("results/");
 ```
 
@@ -67,18 +67,17 @@ await result.ToJsonAsync("results/");
 
 ## Output path validation
 
-File reporters validate that the output path is **under the current working directory**. Paths outside the CWD (e.g. `/tmp/results` or `../../other-project`) are rejected with an `ArgumentException`. This prevents accidental writes outside the project directory.
+File reporters validate that the output directory is **under the current working directory**. Paths outside the CWD (e.g. `/tmp/results` or `../../other-project`) are rejected with an `ArgumentException`. This prevents accidental writes outside the project directory.
 
 ```csharp
 // Works - relative path under CWD
-new MarkdownReporter("results/benchmark.md")
+new MarkdownReporter("results/")
 
 // Throws ArgumentException - outside CWD
-new MarkdownReporter("/tmp/benchmark.md")
+new MarkdownReporter("/tmp/results/")
 ```
 
-> [!TIP]
-> When using `BenchmarkHost` with `--output`, the directory must already exist. Create it before running if it does not.
+The output directory is created automatically if it does not exist.
 
 ## Using the CLI reporter flag
 

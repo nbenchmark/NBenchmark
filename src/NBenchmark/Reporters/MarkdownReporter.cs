@@ -4,14 +4,15 @@ namespace NBenchmark.Reporters;
 
 public sealed class MarkdownReporter : IReporter
 {
-    private readonly string _outputPath;
+    private static int _fileCounter;
 
-    public MarkdownReporter(string outputPath = "benchmark-results.md")
+    private readonly string _outputDirectory;
+    private readonly string? _fileName;
+
+    public MarkdownReporter(string outputDirectory = ".", string? fileName = null)
     {
-        if (outputPath == "benchmark-results.md")
-            outputPath = $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}.md";
-
-        _outputPath = PathValidation.ValidateOutputPath(outputPath);
+        _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
+        _fileName = fileName;
     }
 
     public string Name => "markdown";
@@ -20,6 +21,12 @@ public sealed class MarkdownReporter : IReporter
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)
     {
+        Directory.CreateDirectory(_outputDirectory);
+
+        var fileName = _fileName
+            ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.md";
+        var filePath = Path.Combine(_outputDirectory, fileName);
+
         var sb = new StringBuilder();
 
         sb.AppendLine("## Benchmark Results");
@@ -30,7 +37,7 @@ public sealed class MarkdownReporter : IReporter
         if (table.Rows.All(r => r.Errored))
         {
             sb.AppendLine("_All benchmarks errored - no results to display._");
-            await File.WriteAllTextAsync(_outputPath, sb.ToString(), cancellationToken);
+            await File.WriteAllTextAsync(filePath, sb.ToString(), cancellationToken);
             return;
         }
 
@@ -69,6 +76,6 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine();
         sb.AppendLine($"_Error = ±{confidencePct:0.#}% confidence interval half-width on the mean._");
 
-        await File.WriteAllTextAsync(_outputPath, sb.ToString(), cancellationToken);
+        await File.WriteAllTextAsync(filePath, sb.ToString(), cancellationToken);
     }
 }

@@ -102,21 +102,22 @@ Yes - all three modes support any reporter:
 
 ```csharp
 await new BenchmarkSuite("name")
-    .WithReporter(new MarkdownReporter("results.md"))
-    .WithReporter(new CsvReporter("results.csv"))
+    .WithReporter(new MarkdownReporter("results/"))
+    .WithReporter(new CsvReporter("results/"))
     .RunAsync();
 ```
 
-### Why does the output directory need to already exist?
+### Can I specify a custom filename?
 
-`MarkdownReporter` and `CsvReporter` do not create directories to avoid accidentally writing to unexpected locations. Create the directory before running:
+Yes. All file reporters accept an optional `fileName` parameter:
 
-```bash
-mkdir -p results
-dotnet run -- --reporter markdown --output ./results
+```csharp
+new JsonReporter("results/", "benchmarks.json")
+new MarkdownReporter("results/", "BENCHMARKS.md")
+new CsvReporter("results/", "results.csv")
 ```
 
-`JsonReporter` is an exception - it creates the output directory automatically.
+When `fileName` is omitted, the reporter auto-generates a timestamped filename with a per-process counter (e.g. `benchmark-results-20260606-034000-001.md`). When specified, the exact filename is used and subsequent runs overwrite the same file.
 
 ### Can I write my own reporter?
 

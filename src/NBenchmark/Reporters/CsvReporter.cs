@@ -4,11 +4,15 @@ namespace NBenchmark.Reporters;
 
 public sealed class CsvReporter : IReporter
 {
-    private readonly string _outputPath;
+    private static int _fileCounter;
 
-    public CsvReporter(string outputPath = "benchmark-results.csv")
+    private readonly string _outputDirectory;
+    private readonly string? _fileName;
+
+    public CsvReporter(string outputDirectory = ".", string? fileName = null)
     {
-        _outputPath = PathValidation.ValidateOutputPath(outputPath);
+        _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
+        _fileName = fileName;
     }
 
     public string Name => "csv";
@@ -17,6 +21,12 @@ public sealed class CsvReporter : IReporter
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)
     {
+        Directory.CreateDirectory(_outputDirectory);
+
+        var fileName = _fileName
+            ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.csv";
+        var filePath = Path.Combine(_outputDirectory, fileName);
+
         var sb = new StringBuilder();
 
         sb.AppendLine(
@@ -55,6 +65,6 @@ public sealed class CsvReporter : IReporter
             );
         }
 
-        await File.WriteAllTextAsync(_outputPath, sb.ToString(), cancellationToken);
+        await File.WriteAllTextAsync(filePath, sb.ToString(), cancellationToken);
     }
 }

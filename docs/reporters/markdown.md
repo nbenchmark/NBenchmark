@@ -15,22 +15,44 @@ Markdown output is a good choice for committing results to source control, attac
 ```csharp
 using NBenchmark.Reporters;
 
-// Default path - auto-generates a timestamped filename
+// Default - writes to the current directory with auto-naming
 .WithReporter(new MarkdownReporter())
 
-// Explicit path
-.WithReporter(new MarkdownReporter("results/benchmark.md"))
+// Explicit directory
+.WithReporter(new MarkdownReporter("results/"))
+
+// Explicit directory and filename
+.WithReporter(new MarkdownReporter("results/", "benchmarks.md"))
 ```
 
-### Default filename
+### Constructor
 
-When constructed with no arguments (or the literal default path), `MarkdownReporter` generates a timestamped filename to avoid overwriting previous runs:
-
-```
-benchmark-results-20260606-034000.md
+```csharp
+MarkdownReporter(string outputDirectory = ".", string? fileName = null)
 ```
 
-Pass an explicit path if you always want the same filename.
+- `outputDirectory` - The directory to write the file to. Created automatically if it does not exist. Must be under the current working directory.
+- `fileName` - When `null` (the default), the reporter generates a timestamped filename to avoid overwriting previous runs. When specified, the exact filename is used (no counter or timestamp is appended).
+
+### Auto-naming
+
+When `fileName` is not provided, the reporter generates a filename that includes the UTC timestamp and a per-process counter:
+
+```
+benchmark-results-20260606-034000-001.md
+```
+
+The counter increments each time `ReportAsync` is called within the same process, so multiple suite runs produce separate files instead of overwriting each other.
+
+### Explicit filename
+
+Pass a `fileName` when you want a stable output path (e.g. for CI scripts that expect a known filename):
+
+```csharp
+new MarkdownReporter("results/", "BENCHMARKS.md")
+```
+
+When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overwrite the same file.
 
 ## Output format
 
@@ -66,13 +88,14 @@ _Error = ±95% confidence interval half-width on the mean._
 
 - Results are sorted by median (fastest first).
 - Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, StdDev, P95, and P99 columns show `0.0 ns`.
-- The output directory must already exist. `MarkdownReporter` does not create it.
+- The output directory is created automatically if it does not exist.
 
 ## Using with Benchmark (Quick mode)
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
-await result.ToMarkdownAsync("results.md");
+await result.ToMarkdownAsync("results/");
+await result.ToMarkdownAsync("results/", "benchmarks.md");
 ```
 
 ## CLI usage (BenchmarkHost)
@@ -82,4 +105,4 @@ dotnet run -- --reporter markdown
 dotnet run -- --reporter markdown --output ./results
 ```
 
-When `--output` is specified, the file is written as `benchmark-results.md` inside that directory.
+When `--output` is specified, files are written inside that directory.

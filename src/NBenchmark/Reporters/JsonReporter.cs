@@ -10,12 +10,14 @@ public sealed class JsonReporter : IReporter
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    private static int _jsonFileCounter;
+    private static int _fileCounter;
     private readonly string _outputDirectory;
+    private readonly string? _fileName;
 
-    public JsonReporter(string outputDirectory = ".")
+    public JsonReporter(string outputDirectory = ".", string? fileName = null)
     {
         _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
+        _fileName = fileName;
     }
 
     public string Name => "json";
@@ -26,8 +28,8 @@ public sealed class JsonReporter : IReporter
     {
         Directory.CreateDirectory(_outputDirectory);
 
-        var counter = Interlocked.Increment(ref _jsonFileCounter);
-        var fileName = $"benchmarks-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{counter:D3}.json";
+        var fileName = _fileName
+            ?? $"benchmarks-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.json";
         var filePath = Path.Combine(_outputDirectory, fileName);
 
         var envelope = new ResultEnvelope

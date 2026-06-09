@@ -15,17 +15,44 @@ JSON output is suitable for CI dashboards, performance tracking over time, or an
 ```csharp
 using NBenchmark.Reporters;
 
-// Default - writes to the current directory
+// Default - writes to the current directory with auto-naming
 .WithReporter(new JsonReporter())
 
-// Explicit output directory
+// Explicit directory
 .WithReporter(new JsonReporter("results/"))
+
+// Explicit directory and filename
+.WithReporter(new JsonReporter("results/", "benchmarks.json"))
 ```
 
-`JsonReporter` takes an **output directory**, not a file path. It creates a uniquely named file inside that directory on each run (see [File naming](#file-naming) below).
+### Constructor
 
-> [!NOTE]
-> `JsonReporter` automatically creates the output directory if it does not exist. This is different from `MarkdownReporter` and `CsvReporter`, which require the directory to exist.
+```csharp
+JsonReporter(string outputDirectory = ".", string? fileName = null)
+```
+
+- `outputDirectory` - The directory to write the file to. Created automatically if it does not exist. Must be under the current working directory.
+- `fileName` - When `null` (the default), the reporter generates a timestamped filename to avoid overwriting previous runs. When specified, the exact filename is used (no counter or timestamp is appended).
+
+### Auto-naming
+
+When `fileName` is not provided, the reporter generates a filename that includes the UTC timestamp and a per-process counter:
+
+```
+benchmarks-20260606-034000-001.json
+```
+
+The counter increments each time `ReportAsync` is called within the same process, so multiple suite runs produce separate files instead of overwriting each other.
+
+### Explicit filename
+
+Pass a `fileName` when you want a stable output path:
+
+```csharp
+new JsonReporter("results/", "benchmarks.json")
+```
+
+When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overwrite the same file.
 
 ## Output format
 
@@ -70,16 +97,6 @@ All timing values are in **nanoseconds**. Property names use camelCase.
 
 `totalDuration` is end-to-end wall-clock (warmup + pre-measure GC + measured loop); `measuredDuration` is the measured loop only. `measuredDuration <= totalDuration` always; the gap is dominated by warmup iterations and the pre-measure `GC.Collect`.
 
-## File naming
-
-Each call to `ReportAsync` writes a new file to prevent overwriting previous runs:
-
-```
-benchmarks-20260606-034000-001.json
-```
-
-The filename includes the UTC timestamp and a counter so multiple suites running in the same process do not collide.
-
 ## Notes
 
 - The output directory is created automatically if it does not exist.
@@ -90,6 +107,7 @@ The filename includes the UTC timestamp and a counter so multiple suites running
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
 await result.ToJsonAsync("results/");
+await result.ToJsonAsync("results/", "benchmarks.json");
 ```
 
 ## CLI usage (BenchmarkHost)

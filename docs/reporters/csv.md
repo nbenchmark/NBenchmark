@@ -15,14 +15,44 @@ CSV output is well-suited for post-processing in spreadsheets, Python/pandas, R,
 ```csharp
 using NBenchmark.Reporters;
 
-// Default path
+// Default - writes to the current directory with auto-naming
 .WithReporter(new CsvReporter())
 
-// Explicit path
-.WithReporter(new CsvReporter("results/benchmark.csv"))
+// Explicit directory
+.WithReporter(new CsvReporter("results/"))
+
+// Explicit directory and filename
+.WithReporter(new CsvReporter("results/", "benchmarks.csv"))
 ```
 
-The default path is `benchmark-results.csv` in the current working directory.
+### Constructor
+
+```csharp
+CsvReporter(string outputDirectory = ".", string? fileName = null)
+```
+
+- `outputDirectory` - The directory to write the file to. Created automatically if it does not exist. Must be under the current working directory.
+- `fileName` - When `null` (the default), the reporter generates a timestamped filename to avoid overwriting previous runs. When specified, the exact filename is used (no counter or timestamp is appended).
+
+### Auto-naming
+
+When `fileName` is not provided, the reporter generates a filename that includes the UTC timestamp and a per-process counter:
+
+```
+benchmark-results-20260606-034000-001.csv
+```
+
+The counter increments each time `ReportAsync` is called within the same process.
+
+### Explicit filename
+
+Pass a `fileName` when you want a stable output path:
+
+```csharp
+new CsvReporter("results/", "benchmarks.csv")
+```
+
+When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overwrite the same file.
 
 ## Output format
 
@@ -57,14 +87,15 @@ All timing values are in **nanoseconds**.
 ## Notes
 
 - Results are sorted by median (fastest first).
-- The output directory must already exist. `CsvReporter` does not create it.
+- The output directory is created automatically if it does not exist.
 - Names containing double-quotes are escaped by doubling the quote character (standard CSV escaping).
 
 ## Using with Benchmark (Quick mode)
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
-await result.ToCsvAsync("results.csv");
+await result.ToCsvAsync("results/");
+await result.ToCsvAsync("results/", "benchmarks.csv");
 ```
 
 ## CLI usage (BenchmarkHost)
@@ -74,4 +105,4 @@ dotnet run -- --reporter csv
 dotnet run -- --reporter csv --output ./results
 ```
 
-When `--output` is specified, the file is written as `benchmark-results.csv` inside that directory.
+When `--output` is specified, files are written inside that directory.

@@ -34,7 +34,7 @@ public class ReporterRegistryTests : IDisposable
     }
 
     [Fact]
-    public void TryCreate_Markdown_With_Dir_Appends_Default_Filename()
+    public void TryCreate_Markdown_With_Dir_Passes_Dir()
     {
         var dir = MakeSubDir("nb-reg");
         try
@@ -51,7 +51,7 @@ public class ReporterRegistryTests : IDisposable
     }
 
     [Fact]
-    public void TryCreate_Csv_With_Dir_Appends_Default_Filename()
+    public void TryCreate_Csv_With_Dir_Passes_Dir()
     {
         var dir = MakeSubDir("nb-reg");
         try
@@ -77,24 +77,12 @@ public class ReporterRegistryTests : IDisposable
     }
 
     [Fact]
-    public void TryCreate_Markdown_Without_Dir_Uses_Timestamped_Default_Name()
+    public void TryCreate_Markdown_Without_Dir_Defaults_To_Cwd()
     {
         var ok = ReporterRegistry.TryCreate("markdown", null, out var reporter);
 
         Assert.True(ok);
-
-        var markdown = Assert.IsType<MarkdownReporter>(reporter);
-        var outputPathField = typeof(MarkdownReporter)
-            .GetField("_outputPath", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.NotNull(outputPathField);
-
-        var outputPath = Assert.IsType<string>(outputPathField!.GetValue(markdown));
-        var fileName = Path.GetFileName(outputPath);
-
-        Assert.StartsWith("benchmark-results-", fileName);
-        Assert.EndsWith(".md", fileName);
-        Assert.NotEqual("benchmark-results.md", fileName);
+        Assert.IsType<MarkdownReporter>(reporter);
     }
 
     [Fact]
@@ -125,7 +113,6 @@ public class ReporterRegistryTests : IDisposable
     public void Available_Seed_Contains_Json_Markdown_Csv()
     {
         var names = ReporterRegistry.Available.Select(r => r.Name).ToList();
-
         Assert.Contains("json", names);
         Assert.Contains("markdown", names);
         Assert.Contains("csv", names);

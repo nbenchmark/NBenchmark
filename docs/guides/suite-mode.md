@@ -93,7 +93,7 @@ await new BenchmarkSuite("name")
     .WithSuiteSetup(() => { })      // runs once before all benchmarks
     .WithSuiteTeardown(() => { })   // runs once after all benchmarks
     .WithReporter(new ConsoleReporter())
-    .WithReporter(new MarkdownReporter("results.md"))
+    .WithReporter(new MarkdownReporter("results/"))
     .WithProgress(new ConsoleBenchmarkProgress(200, 25))
     .RunAsync();
 ```
@@ -135,8 +135,8 @@ You can attach any number of reporters. They all receive the same results:
 ```csharp
 suite
     .WithReporter(new ConsoleReporter())
-    .WithReporter(new MarkdownReporter("results.md"))
-    .WithReporter(new CsvReporter("results.csv"))
+    .WithReporter(new MarkdownReporter("results/"))
+    .WithReporter(new CsvReporter("results/"))
 ```
 
 ## Progress display
