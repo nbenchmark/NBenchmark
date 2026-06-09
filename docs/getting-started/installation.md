@@ -46,6 +46,16 @@ dotnet add package NBenchmark.DependencyInjection
 dotnet add package Microsoft.Extensions.DependencyInjection
 ```
 
+### Analyzers package (optional)
+
+The analyzers package adds compile-time diagnostics that catch common NBenchmark configuration errors - missing parameterless constructors, static benchmark methods, out-of-range settings, and more.
+
+```bash
+dotnet add package NBenchmark.Analyzers
+```
+
+The analyzers run automatically in the IDE and during `dotnet build`. See the [Analyzers](../analyzers) page for the full diagnostic reference.
+
 ## Verify the installation
 
 Create a new console project and add a quick sanity check:
