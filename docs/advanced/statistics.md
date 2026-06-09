@@ -50,14 +50,13 @@ After collection, [outliers](https://en.wikipedia.org/wiki/Outlier) are removed 
 
 The trimmed array is passed to `StatsSummary.Compute`. The pre-trim raw array is stored separately for use in significance testing.
 
-::: info Quartile definition
-`IqrFence` computes Q1 and Q3 with the same **[nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method)** percentile used
-everywhere else in NBenchmark (equivalent to `numpy.percentile(method='inverted_cdf')`).
-This deliberately differs from R's default `type = 7` linear interpolation: for a
-1..20 ramp NBenchmark gives Q1 = 5, Q3 = 15, whereas R type 7 gives Q1 = 5.75,
-Q3 = 15.25. The choice keeps every [quantile](https://en.wikipedia.org/wiki/Quantile) in the library consistent and is
-pinned by `OutlierModeCrossCheckTests`.
-:::
+> [!NOTE] Quartile definition
+> `IqrFence` computes Q1 and Q3 with the same **[nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method)** percentile used
+> everywhere else in NBenchmark (equivalent to `numpy.percentile(method='inverted_cdf')`).
+> This deliberately differs from R's default `type = 7` linear interpolation: for a
+> 1..20 ramp NBenchmark gives Q1 = 5, Q3 = 15, whereas R type 7 gives Q1 = 5.75,
+> Q3 = 15.25. The choice keeps every [quantile](https://en.wikipedia.org/wiki/Quantile) in the library consistent and is
+> pinned by `OutlierModeCrossCheckTests`.
 
 ## Descriptive statistics
 
@@ -184,9 +183,8 @@ NBenchmark matches to better than 1e-6. On small samples this approximation can
 differ from the exact [permutation](https://en.wikipedia.org/wiki/Permutation_test) p-value by up to ≈ 0.05; that gap is pinned and
 documented in [Validation & Accuracy](./validation.md).
 
-::: info
-NBenchmark uses the **pre-trim raw samples** (before outlier removal) for significance testing. This gives the test more data to work with. However it means that significance is assessed on the full distribution including extreme measurements.
-:::
+> [!NOTE]
+> NBenchmark uses the **pre-trim raw samples** (before outlier removal) for significance testing. This gives the test more data to work with. However it means that significance is assessed on the full distribution including extreme measurements.
 
 ### Minimum sample requirement
 

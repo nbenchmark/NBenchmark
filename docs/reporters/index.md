@@ -77,9 +77,8 @@ new MarkdownReporter("results/benchmark.md")
 new MarkdownReporter("/tmp/benchmark.md")
 ```
 
-::: tip
-When using `BenchmarkHost` with `--output`, the directory must already exist. Create it before running if it does not.
-:::
+> [!TIP]
+> When using `BenchmarkHost` with `--output`, the directory must already exist. Create it before running if it does not.
 
 ## Using the CLI reporter flag
 

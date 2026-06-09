@@ -96,9 +96,8 @@ Set the output directory for file reporters. Must be a path under the current wo
 dotnet run -- --reporter markdown --output ./results
 ```
 
-::: warning
-The output directory must already exist. `MarkdownReporter` and `CsvReporter` will throw a `DirectoryNotFoundException` if it does not (`JsonReporter` creates it automatically).
-:::
+> [!WARNING]
+> The output directory must already exist. `MarkdownReporter` and `CsvReporter` will throw a `DirectoryNotFoundException` if it does not (`JsonReporter` creates it automatically).
 
 ---
 

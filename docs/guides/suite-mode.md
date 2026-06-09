@@ -62,9 +62,8 @@ suite.Add(
 );
 ```
 
-::: warning
-Setup and teardown time is **not** included in the measurement. Only the `action` is timed.
-:::
+> [!WARNING]
+> Setup and teardown time is **not** included in the measurement. Only the `action` is timed.
 
 ### Benchmark names must be unique
 

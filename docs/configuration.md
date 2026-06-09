@@ -64,9 +64,8 @@ A value of `0` (combined with `WarmupIterations = 0`) is the dry-run signal: the
 
 More iterations produce a tighter confidence interval (smaller Error column) at the cost of a longer run time. The default of 200 is a good balance for most benchmarks.
 
-::: tip
-If you see a large Error (margin of error) relative to the mean, try increasing iterations to `500` or `1000`.
-:::
+> [!TIP]
+> If you see a large Error (margin of error) relative to the mean, try increasing iterations to `500` or `1000`.
 
 ### WarmupIterations
 
@@ -100,9 +99,8 @@ When `true`, NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` around ea
 
 BenchmarkSuite fluent method: `.WithAllocations()`
 
-::: info
-Allocation tracking adds a small overhead to each iteration and may slightly affect timing measurements.
-:::
+> [!NOTE]
+> Allocation tracking adds a small overhead to each iteration and may slightly affect timing measurements.
 
 ### OutlierMode
 

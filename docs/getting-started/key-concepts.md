@@ -19,9 +19,8 @@ Warmup exists because the first few runs of .NET code are artificially slow:
 
 If you skipped warmup, your first measurements would include JIT compilation time, which is not representative of steady-state performance. After warmup, subsequent runs use the compiled, cached version of your code.
 
-::: tip
-If your benchmark is a one-shot operation where you specifically want to measure cold-start time, set `WithWarmup(0)` or `WarmupIterations = 1`.
-:::
+> [!TIP]
+> If your benchmark is a one-shot operation where you specifically want to measure cold-start time, set `WithWarmup(0)` or `WarmupIterations = 1`.
 
 ## Garbage collection
 
@@ -65,9 +64,8 @@ For most purposes, the **median** is the most reliable single number to compare 
 
 A low StdDev means your benchmark is stable and the mean is trustworthy.
 
-::: tip
-If you see high StdDev or a large Error, see the [Troubleshooting guide](../troubleshooting.md) for configuration remedies.
-:::
+> [!TIP]
+> If you see high StdDev or a large Error, see the [Troubleshooting guide](../troubleshooting.md) for configuration remedies.
 
 ## Confidence intervals and the Error column
 
@@ -97,9 +95,8 @@ NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E
 
 The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** - it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
 
-::: info
-Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Always look at the Ratio column alongside significance.
-:::
+> [!NOTE]
+> Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Always look at the Ratio column alongside significance.
 
 ## Allocation tracking
 

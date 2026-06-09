@@ -24,9 +24,8 @@ using NBenchmark.Reporters;
 
 `JsonReporter` takes an **output directory**, not a file path. It creates a uniquely named file inside that directory on each run (see [File naming](#file-naming) below).
 
-::: info
-`JsonReporter` automatically creates the output directory if it does not exist. This is different from `MarkdownReporter` and `CsvReporter`, which require the directory to exist.
-:::
+> [!NOTE]
+> `JsonReporter` automatically creates the output directory if it does not exist. This is different from `MarkdownReporter` and `CsvReporter`, which require the directory to exist.
 
 ## Output format
 
