@@ -10,5 +10,5 @@ This section covers the internals of how NBenchmark works - for readers who want
 
 ## In this section
 
-- **[Statistics Deep Dive](./statistics)** - how every number in the output is calculated, including the measurement loop, confidence intervals, and the significance test.
-- **[Validation & Accuracy](./validation)** - how those numbers are verified against SciPy/NumPy and to what tolerance.
+- **[Statistics Deep Dive](./statistics.md)** - how every number in the output is calculated, including the measurement loop, confidence intervals, and the significance test.
+- **[Validation & Accuracy](./validation.md)** - how those numbers are verified against SciPy/NumPy and to what tolerance.

@@ -66,7 +66,7 @@ For most purposes, the **median** is the most reliable single number to compare 
 A low StdDev means your benchmark is stable and the mean is trustworthy.
 
 ::: tip
-If you see high StdDev or a large Error, see the [Troubleshooting guide](../troubleshooting) for configuration remedies.
+If you see high StdDev or a large Error, see the [Troubleshooting guide](../troubleshooting.md) for configuration remedies.
 :::
 
 ## Confidence intervals and the Error column
@@ -89,7 +89,7 @@ These are important for **latency-sensitive** code where you care about worst-ca
 
 When comparing two or more benchmarks, it's not enough to see that one has a lower median. The difference might be random noise.
 
-NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** to answer: "Is this difference statistically significant?" The test implementation (along with every other statistical primitive in the library) is dependency-free and cross-validated against SciPy and NumPy - see [Validation & Accuracy](../advanced/validation).
+NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** to answer: "Is this difference statistically significant?" The test implementation (along with every other statistical primitive in the library) is dependency-free and cross-validated against SciPy and NumPy - see [Validation & Accuracy](../advanced/validation.md).
 
 - A **✓** in the Sig column means the difference would occur by chance less than 5% of the time (p < 0.05). It is very unlikely to be noise.
 - A **~** means the difference is not statistically significant - you cannot confidently conclude one is faster than the other.
@@ -112,5 +112,5 @@ Allocation tracking is off by default because it adds a small measurement overhe
 ## Next steps
 
 - **[Guides](../guides/)** - see these concepts applied in real benchmarks
-- **[Advanced: Statistics](../advanced/statistics)** - the full mathematical detail
-- **[Configuration](../configuration)** - tune iterations, warmup, outlier mode, and confidence level
+- **[Advanced: Statistics](../advanced/statistics.md)** - the full mathematical detail
+- **[Configuration](../configuration.md)** - tune iterations, warmup, outlier mode, and confidence level

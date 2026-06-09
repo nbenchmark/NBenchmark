@@ -187,7 +187,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-The companion package resolves benchmark classes from the supplied `IServiceProvider`, so constructor dependencies are injected automatically. A scoped variant is also available for `DbContext`-style lifetimes. See the [Dependency Injection guide](./dependency-injection) for the full API, lifetime semantics, and how to plug in containers other than `Microsoft.Extensions.DependencyInjection`.
+The companion package resolves benchmark classes from the supplied `IServiceProvider`, so constructor dependencies are injected automatically. A scoped variant is also available for `DbContext`-style lifetimes. See the [Dependency Injection guide](./dependency-injection.md) for the full API, lifetime semantics, and how to plug in containers other than `Microsoft.Extensions.DependencyInjection`.
 
 ## Scanning multiple assemblies
 
@@ -255,6 +255,6 @@ dotnet run -- --dry-run
 
 ## Next steps
 
-- [CLI Reference](../cli-reference) - all command-line flags
-- [Configuration](../configuration) - options reference
+- [CLI Reference](../cli-reference.md) - all command-line flags
+- [Configuration](../configuration.md) - options reference
 - [Reporters](../reporters/) - all reporters

@@ -60,10 +60,10 @@ await result.ToJsonAsync("results/");
 
 | Reporter | Package | Output |
 |---|---|---|
-| [ConsoleReporter](./console) | `NBenchmark.Console` | Rich terminal table with colour and a bar chart |
-| [MarkdownReporter](./markdown) | `NBenchmark` | `.md` file with a formatted results table |
-| [CsvReporter](./csv) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |
-| [JsonReporter](./json) | `NBenchmark` | `.json` file with full structured results |
+| [ConsoleReporter](./console.md) | `NBenchmark.Console` | Rich terminal table with colour and a bar chart |
+| [MarkdownReporter](./markdown.md) | `NBenchmark` | `.md` file with a formatted results table |
+| [CsvReporter](./csv.md) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |
+| [JsonReporter](./json.md) | `NBenchmark` | `.json` file with full structured results |
 
 ## Output path validation
 

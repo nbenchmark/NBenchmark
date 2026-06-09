@@ -34,7 +34,7 @@ You only need `NBenchmark.Console` if you want output in the terminal. File repo
 
 ### Dependency Injection package (optional)
 
-The DI package lets `[Benchmark]` classes have **constructor dependencies** that are resolved from an `IServiceProvider`. Without it, benchmark classes must have a public parameterless constructor (the same constraint as today). See the [Dependency Injection guide](../guides/dependency-injection) for full details.
+The DI package lets `[Benchmark]` classes have **constructor dependencies** that are resolved from an `IServiceProvider`. Without it, benchmark classes must have a public parameterless constructor (the same constraint as today). See the [Dependency Injection guide](../guides/dependency-injection.md) for full details.
 
 ```bash
 dotnet add package NBenchmark.DependencyInjection
@@ -54,7 +54,7 @@ The analyzers package adds compile-time diagnostics that catch common NBenchmark
 dotnet add package NBenchmark.Analyzers
 ```
 
-The analyzers run automatically in the IDE and during `dotnet build`. See the [Analyzers](../analyzers) page for the full diagnostic reference.
+The analyzers run automatically in the IDE and during `dotnet build`. See the [Analyzers](../analyzers.md) page for the full diagnostic reference.
 
 ## Verify the installation
 
@@ -100,4 +100,4 @@ If you see numbers, everything is working.
 
 ## Next steps
 
-Continue to the [Quick Start](./quick-start) guide to learn more about what you can do.
+Continue to the [Quick Start](./quick-start.md) guide to learn more about what you can do.

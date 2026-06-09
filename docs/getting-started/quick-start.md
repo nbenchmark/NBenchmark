@@ -109,10 +109,10 @@ await result.ToJsonAsync("results/");   // directory
 | **Ratio** | Speed relative to the baseline. `0.75x` = 25% faster; `2.0x` = twice as slow. |
 | **Sig ✓** | Difference from the baseline is statistically significant ([p < 0.05](https://en.wikipedia.org/wiki/P-value)). |
 
-See [Key Concepts](./key-concepts) for a deeper explanation of what these mean and how they are calculated.
+See [Key Concepts](./key-concepts.md) for a deeper explanation of what these mean and how they are calculated.
 
 ## Next steps
 
-- **[Key Concepts](./key-concepts)** - understand warmup, outlier trimming, and the statistics
+- **[Key Concepts](./key-concepts.md)** - understand warmup, outlier trimming, and the statistics
 - **[Guides](../guides/)** - detailed coverage of all three usage modes
-- **[Configuration](../configuration)** - change defaults (iterations, warmup, confidence level, etc.)
+- **[Configuration](../configuration.md)** - change defaults (iterations, warmup, confidence level, etc.)

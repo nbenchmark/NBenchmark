@@ -6,7 +6,7 @@ order: 1
 
 # Statistics Deep Dive
 
-This page explains exactly how NBenchmark collects and analyses measurements. You don't need to understand all of this to use the library - the [Key Concepts](../getting-started/key-concepts) page covers the practical side. This is for readers who want the full mathematical picture.
+This page explains exactly how NBenchmark collects and analyses measurements. You don't need to understand all of this to use the library - the [Key Concepts](../getting-started/key-concepts.md) page covers the practical side. This is for readers who want the full mathematical picture.
 
 ## The measurement loop
 
@@ -128,7 +128,7 @@ NBenchmark computes the t critical value without any external libraries using ex
 These approximations are cross-checked against SciPy on every build: the t
 critical value matches `scipy.stats.t.ppf` to machine precision for df = 1, 2 and
 to **better than 1%** for df ≥ 3 (worst case ≈ 0.79% at df = 3, 99%). See
-[Validation & Accuracy](./validation) for the full tolerance table.
+[Validation & Accuracy](./validation.md) for the full tolerance table.
 
 ## [Coefficient of variation](https://en.wikipedia.org/wiki/Coefficient_of_variation)
 
@@ -182,7 +182,7 @@ The normal approximation uses **no continuity correction**, so it corresponds to
 `scipy.stats.mannwhitneyu(..., method='asymptotic', use_continuity=False)` - which
 NBenchmark matches to better than 1e-6. On small samples this approximation can
 differ from the exact [permutation](https://en.wikipedia.org/wiki/Permutation_test) p-value by up to ≈ 0.05; that gap is pinned and
-documented in [Validation & Accuracy](./validation).
+documented in [Validation & Accuracy](./validation.md).
 
 ::: info
 NBenchmark uses the **pre-trim raw samples** (before outlier removal) for significance testing. This gives the test more data to work with. However it means that significance is assessed on the full distribution including extreme measurements.

@@ -8,7 +8,7 @@ order: 2
 
 NBenchmark has three usage modes. Pick the one that matches your situation.
 
-## [Quick mode - Benchmark](./quick-mode)
+## [Quick mode - Benchmark](./quick-mode.md)
 
 A single static call. No classes, no attributes, no configuration required. Good for a quick measurement anywhere in your code.
 
@@ -17,7 +17,7 @@ var result = Benchmark.Run(() => MyMethod());
 result.Print();
 ```
 
-## [Suite mode - BenchmarkSuite](./suite-mode)
+## [Suite mode - BenchmarkSuite](./suite-mode.md)
 
 A fluent builder for comparing multiple implementations. Produces a comparison table with ratios, confidence intervals, and significance testing.
 
@@ -30,7 +30,7 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-## [Host mode - BenchmarkHost](./host-mode)
+## [Host mode - BenchmarkHost](./host-mode.md)
 
 Attribute-based discovery driven by a command-line interface. Designed for dedicated benchmark projects - similar to BenchmarkDotNet's style.
 
@@ -50,7 +50,7 @@ public class MyBenchmarks
 }
 ```
 
-## [Dependency Injection](./dependency-injection)
+## [Dependency Injection](./dependency-injection.md)
 
 Optional companion package that lets benchmark classes have **constructor dependencies** resolved from an `IServiceProvider`. Adds support for repositories, loggers, `HttpClient`, EF Core `DbContext`, and any other registered service.
 

@@ -10,9 +10,9 @@ This section walks you through everything you need to start benchmarking - from 
 
 ## In this section
 
-- **[Installation](./installation)** - Add NBenchmark to a project and verify the setup.
-- **[Quick Start](./quick-start)** - Write your first benchmark and read the results.
-- **[Key Concepts](./key-concepts)** - Understand what warmup, outlier trimming, confidence intervals, and significance testing mean in practice.
-- **[What's Next?](./whats-next)** - Where to go after the basics.
+- **[Installation](./installation.md)** - Add NBenchmark to a project and verify the setup.
+- **[Quick Start](./quick-start.md)** - Write your first benchmark and read the results.
+- **[Key Concepts](./key-concepts.md)** - Understand what warmup, outlier trimming, confidence intervals, and significance testing mean in practice.
+- **[What's Next?](./whats-next.md)** - Where to go after the basics.
 
-For benchmark classes with constructor dependencies, see the [Dependency Injection guide](../guides/dependency-injection).
+For benchmark classes with constructor dependencies, see the [Dependency Injection guide](../guides/dependency-injection.md).

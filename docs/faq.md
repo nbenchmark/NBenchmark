@@ -10,11 +10,11 @@ order: 8
 
 ### How is NBenchmark different from BenchmarkDotNet?
 
-NBenchmark brings serious statistical rigor - non-parametric significance testing, confidence intervals, and percentile analysis - directly into your daily development cycle with zero configuration and zero external dependencies. Its numerical core is dependency-free and cross-validated against SciPy and NumPy to machine precision (see [Validation & Accuracy](./advanced/validation)).
+NBenchmark brings serious statistical rigor - non-parametric significance testing, confidence intervals, and percentile analysis - directly into your daily development cycle with zero configuration and zero external dependencies. Its numerical core is dependency-free and cross-validated against SciPy and NumPy to machine precision (see [Validation & Accuracy](./advanced/validation.md)).
 
 NBenchmark takes a different trade-off from tools like BenchmarkDotNet: **no out-of-process compilation, no XML configuration, minimal dependencies, and three lines of code to get started**.
 
-The two tools are complementary - NBenchmark for day-to-day development feedback, BenchmarkDotNet for publishable cross-platform results. See also the [Troubleshooting guide](./troubleshooting) for help with common measurement issues.
+The two tools are complementary - NBenchmark for day-to-day development feedback, BenchmarkDotNet for publishable cross-platform results. See also the [Troubleshooting guide](./troubleshooting.md) for help with common measurement issues.
 
 ### Does NBenchmark require any special project type or configuration?
 
@@ -37,7 +37,7 @@ A large Error (margin of error) means the measurements are highly variable. Comm
 - **Thermal throttling.** On laptops, the CPU may reduce clock speed mid-run. Increase warmup with `.WithWarmup(50)` to let the CPU stabilise before measurement, or reduce iterations to shorten the run.
 - **The code path varies.** If your benchmark hits different code paths each iteration (e.g. a cache that fills up), that variability is real and expected.
 
-See the [Troubleshooting guide](./troubleshooting) for the full symptom matrix and configuration remedies.
+See the [Troubleshooting guide](./troubleshooting.md) for the full symptom matrix and configuration remedies.
 
 ### Why should I care about the median vs. the mean?
 
@@ -50,7 +50,7 @@ The compiler or JIT has likely optimised the benchmark body away because it has 
 - Returns a value (use `Benchmark.Run(() => Compute())` which uses the generic overload that consumes the result), or
 - Has a side effect (writes to a field, uses a passed-in output parameter, etc.)
 
-Use `--dry-run` to verify the body is being invoked. See the [Troubleshooting guide](./troubleshooting) for more on dead code elimination and other zero-result causes.
+Use `--dry-run` to verify the body is being invoked. See the [Troubleshooting guide](./troubleshooting.md) for more on dead code elimination and other zero-result causes.
 
 ### How does allocation tracking work? Does it include framework overhead?
 
@@ -70,7 +70,7 @@ Yes. Use `Benchmark.RunAsync`, the `Func<Task>` overload of `BenchmarkSuite.Add`
 
 It shows the result of a **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** comparing the benchmark to the baseline. A **✓** means the difference is statistically significant (p < 0.05) - unlikely to be random noise. A **~** means it is not significant.
 
-See [Statistical Significance](./getting-started/key-concepts#statistical-significance) and the [Statistics Deep Dive](./advanced/statistics) for full details.
+See [Statistical Significance](./getting-started/key-concepts.md#statistical-significance) and the [Statistics Deep Dive](./advanced/statistics.md) for full details.
 
 ### Why is significance sometimes blank?
 
@@ -191,7 +191,7 @@ Use `--list` to check what NBenchmark finds before running.
        .RunAsync();
    ```
 
-   This is the cleanest approach when you already have a DI container in your application. See the [Dependency Injection guide](./guides/dependency-injection) for full details.
+   This is the cleanest approach when you already have a DI container in your application. See the [Dependency Injection guide](./guides/dependency-injection.md) for full details.
 
 ### My benchmark class needs dependencies. How do I inject them?
 
@@ -215,7 +215,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per suite and disposed after teardown. See the [Dependency Injection guide](./guides/dependency-injection) for the full API and lifetime semantics.
+The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per suite and disposed after teardown. See the [Dependency Injection guide](./guides/dependency-injection.md) for the full API and lifetime semantics.
 
 ### Can I use a DI container other than `Microsoft.Extensions.DependencyInjection`?
 

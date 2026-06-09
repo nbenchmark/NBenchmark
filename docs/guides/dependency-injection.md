@@ -167,6 +167,6 @@ await new BenchmarkSuite("repo")
 
 ## Next steps
 
-- [Host mode: BenchmarkHost](./host-mode) - full reference for the host mode
-- [Samples](../samples) - see the `samples/DependencyInjection/` project for a complete working example
-- [FAQ](../faq#my-benchmark-class-needs-dependencies-how-do-i-inject-them) - common questions
+- [Host mode: BenchmarkHost](./host-mode.md) - full reference for the host mode
+- [Samples](../samples.md) - see the `samples/DependencyInjection/` project for a complete working example
+- [FAQ](../faq.md#my-benchmark-class-needs-dependencies-how-do-i-inject-them) - common questions

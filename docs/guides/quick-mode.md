@@ -71,7 +71,7 @@ var options = new MeasurementOptions
 var result = Benchmark.Run(() => MyMethod(), options: options);
 ```
 
-See [Configuration](../configuration) for the full list of options.
+See [Configuration](../configuration.md) for the full list of options.
 
 ## Naming the benchmark
 
@@ -134,11 +134,11 @@ if (result.MeanAllocatedBytes.HasValue)
 
 ## What Benchmark does not do
 
-- **It does not compare benchmarks.** Use [BenchmarkSuite](./suite-mode) for A/B comparisons.
+- **It does not compare benchmarks.** Use [BenchmarkSuite](./suite-mode.md) for A/B comparisons.
 - **It does not run significance testing** between multiple results. Significance testing requires paired raw samples and is handled by `BenchmarkSuite` and `BenchmarkHost`.
 
 ## Next steps
 
-- [Suite mode: BenchmarkSuite](./suite-mode) - compare two or more implementations
-- [Configuration](../configuration) - full options reference
+- [Suite mode: BenchmarkSuite](./suite-mode.md) - compare two or more implementations
+- [Configuration](../configuration.md) - full options reference
 - [Reporters](../reporters/) - save results to files
