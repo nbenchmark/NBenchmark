@@ -77,7 +77,7 @@ internal sealed record CliArgs
                     else
                     {
                         Console.Error.WriteLine(
-                            $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Console package provides 'console'.)");
+                            $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
                         Environment.ExitCode = 1;
                     }
                     break;

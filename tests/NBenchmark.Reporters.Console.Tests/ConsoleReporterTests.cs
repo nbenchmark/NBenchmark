@@ -1,7 +1,7 @@
 using NBenchmark.Reporters;
 using Xunit;
 
-namespace NBenchmark.Console.Tests;
+namespace NBenchmark.Reporters.Console.Tests;
 
 public class ConsoleReporterTests
 {

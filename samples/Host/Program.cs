@@ -1,6 +1,6 @@
 using NBenchmark;
 using NBenchmark.Attributes;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 await BenchmarkHost.Create(args)
     .AddFromAssembly<HostBenchmarks>()

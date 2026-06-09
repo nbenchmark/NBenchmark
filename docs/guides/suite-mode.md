@@ -12,7 +12,7 @@ order: 2
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 var results = await new BenchmarkSuite("sorting")
     .Add("bubble", () =>
@@ -141,7 +141,7 @@ suite
 
 ## Progress display
 
-`ConsoleBenchmarkProgress` (from `NBenchmark.Console`) shows warmup and measurement progress for each benchmark:
+`ConsoleBenchmarkProgress` (from `NBenchmark.Reporters.Console`) shows warmup and measurement progress for each benchmark:
 
 ```csharp
 .WithProgress(new ConsoleBenchmarkProgress(measuredIterations: 200, warmupIterations: 25))

@@ -1,4 +1,4 @@
-namespace NBenchmark.Console;
+namespace NBenchmark.Reporters.Console;
 
 public static class ConsoleBenchmarkResultExtensions
 {

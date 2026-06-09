@@ -76,7 +76,7 @@ Add a reporter by name. Can be specified multiple times to stack reporters. Buil
 | `markdown` | `MarkdownReporter` | Markdown file in the current directory (or `--output` directory) |
 | `csv` | `CsvReporter` | CSV file in the current directory (or `--output` directory) |
 
-The `console` reporter is provided by the `NBenchmark.Console` package. When the package is referenced, it self-registers automatically and becomes available via `--reporter console` - no special setup needed.
+The `console` reporter is provided by the `NBenchmark.Reporters.Console` package. When the package is referenced, it self-registers automatically and becomes available via `--reporter console` - no special setup needed.
 
 ```bash
 dotnet run -- --reporter markdown

@@ -6,23 +6,23 @@ order: 2
 
 # ConsoleReporter
 
-`ConsoleReporter` renders results to the terminal as a colour-coded table using [Spectre.Console](https://spectreconsole.net/). It is part of the `NBenchmark.Console` package.
+`ConsoleReporter` renders results to the terminal as a colour-coded table using [Spectre.Console](https://spectreconsole.net/). It is part of the `NBenchmark.Reporters.Console` package.
 
 ## Setup
 
 ```bash
-dotnet add package NBenchmark.Console
+dotnet add package NBenchmark.Reporters.Console
 ```
 
 ```csharp
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 .WithReporter(new ConsoleReporter())
 ```
 
 ### CLI usage
 
-When the `NBenchmark.Console` package is referenced, `ConsoleReporter` self-registers via `[ModuleInitializer]` and becomes available through the `--reporter console` CLI flag:
+When the `NBenchmark.Reporters.Console` package is referenced, `ConsoleReporter` self-registers via `[ModuleInitializer]` and becomes available through the `--reporter console` CLI flag:
 
 ```bash
 dotnet run -- --reporter console
@@ -72,7 +72,7 @@ A **✓** next to the name indicates the difference from the baseline is statist
 `ConsoleBenchmarkProgress` displays warmup and measurement progress for each benchmark as it runs. It is independent of `ConsoleReporter` and can be used without it.
 
 ```csharp
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 await new BenchmarkSuite("name")
     .WithIterations(200)
@@ -98,7 +98,7 @@ Starting 2 benchmark(s)...
 ## Using with Benchmark (Quick mode)
 
 ```csharp
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 var result = Benchmark.Run(() => MyMethod());
 await result.PrintAsync();

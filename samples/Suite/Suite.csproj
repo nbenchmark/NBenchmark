@@ -8,7 +8,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
-        <ProjectReference Include="..\..\src\NBenchmark.Console\NBenchmark.Console.csproj"/>
+        <ProjectReference Include="..\..\src\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj"/>
     </ItemGroup>
 
 </Project>

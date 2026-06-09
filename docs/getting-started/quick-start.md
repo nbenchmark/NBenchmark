@@ -12,7 +12,7 @@ The simplest way to measure code is `Benchmark.Run`. Call it anywhere - no speci
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 var result = Benchmark.Run(() =>
 {
@@ -59,7 +59,7 @@ To compare two approaches side-by-side, use `BenchmarkSuite`:
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 var results = await new BenchmarkSuite("string concat")
     .Add("plus operator",  () => { var s = "hello" + " " + "world"; })

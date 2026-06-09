@@ -98,10 +98,10 @@ Output:
     95% CI: 1.19 µs … 1.29 µs (±50 ns)
 ```
 
-### Rich console table (NBenchmark.Console)
+### Rich console table (NBenchmark.Reporters.Console)
 
 ```csharp
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 await result.PrintAsync();
 ```

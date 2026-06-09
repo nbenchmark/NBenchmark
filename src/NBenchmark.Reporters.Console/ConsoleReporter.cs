@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using NBenchmark.Reporters;
 using Spectre.Console;
 
-namespace NBenchmark.Console;
+namespace NBenchmark.Reporters.Console;
 
 public sealed class ConsoleReporter : IReporter
 {

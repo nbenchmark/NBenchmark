@@ -27,10 +27,10 @@ dotnet add package NBenchmark
 The console package adds a rich terminal table with colour-coded results and an optional progress display. It depends on [Spectre.Console](https://spectreconsole.net/).
 
 ```bash
-dotnet add package NBenchmark.Console
+dotnet add package NBenchmark.Reporters.Console
 ```
 
-You only need `NBenchmark.Console` if you want output in the terminal. File reporters (JSON, Markdown, CSV) work without it.
+You only need `NBenchmark.Reporters.Console` if you want output in the terminal. File reporters (JSON, Markdown, CSV) work without it.
 
 ### Dependency Injection package (optional)
 
@@ -64,14 +64,14 @@ Create a new console project and add a quick sanity check:
 dotnet new console -n MyBenchmarks
 cd MyBenchmarks
 dotnet add package NBenchmark
-dotnet add package NBenchmark.Console
+dotnet add package NBenchmark.Reporters.Console
 ```
 
 Replace the contents of `Program.cs`:
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 var result = Benchmark.Run(() =>
 {

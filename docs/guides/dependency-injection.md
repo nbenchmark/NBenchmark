@@ -23,7 +23,7 @@ The companion package only adds `Microsoft.Extensions.DependencyInjection.Abstra
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
 using NBenchmark.Attributes;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 using NBenchmark.DependencyInjection;
 
 var services = new ServiceCollection()

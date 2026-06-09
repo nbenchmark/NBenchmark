@@ -1,6 +1,6 @@
 using Spectre.Console;
 
-namespace NBenchmark.Console;
+namespace NBenchmark.Reporters.Console;
 
 public class ConsoleBenchmarkProgress : IBenchmarkProgress
 {

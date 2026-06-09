@@ -18,7 +18,7 @@ This mode is designed for **dedicated benchmark projects** - a separate console 
 dotnet new console -n MyApp.Benchmarks
 cd MyApp.Benchmarks
 dotnet add package NBenchmark
-dotnet add package NBenchmark.Console
+dotnet add package NBenchmark.Reporters.Console
 dotnet add reference ../MyApp/MyApp.csproj
 ```
 
@@ -42,7 +42,7 @@ public class StringBenchmarks
 ```csharp
 // Program.cs
 using NBenchmark;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 using NBenchmark.Attributes;
 
 await BenchmarkHost.Create(args)

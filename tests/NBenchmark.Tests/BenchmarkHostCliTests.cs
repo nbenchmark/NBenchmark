@@ -226,7 +226,7 @@ public class BenchmarkHostCliTests
             Assert.Contains("json", stderr);
             Assert.Contains("markdown", stderr);
             Assert.Contains("csv", stderr);
-            Assert.Contains("NBenchmark.Console", stderr);
+            Assert.Contains("NBenchmark.Reporters.Console", stderr);
             Assert.Equal(1, Environment.ExitCode);
         }
         finally

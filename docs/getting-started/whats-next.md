@@ -22,7 +22,7 @@ Use **Host mode: BenchmarkHost** - mark methods with `[Benchmark]`, point the ho
 
 ## I want richer terminal output
 
-Add `NBenchmark.Console` and use `ConsoleReporter`. It produces a colour-coded table with a bar chart, significance indicators, and a footnote explaining the Error column.
+Add `NBenchmark.Reporters.Console` and use `ConsoleReporter`. It produces a colour-coded table with a bar chart, significance indicators, and a footnote explaining the Error column.
 
 → [ConsoleReporter](../reporters/console.md)
 

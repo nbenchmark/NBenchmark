@@ -60,7 +60,7 @@ await result.ToJsonAsync("results/");
 
 | Reporter | Package | Output |
 |---|---|---|
-| [ConsoleReporter](./console.md) | `NBenchmark.Console` | Rich terminal table with colour and a bar chart |
+| [ConsoleReporter](./console.md) | `NBenchmark.Reporters.Console` | Rich terminal table with colour and a bar chart |
 | [MarkdownReporter](./markdown.md) | `NBenchmark` | `.md` file with a formatted results table |
 | [CsvReporter](./csv.md) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |
 | [JsonReporter](./json.md) | `NBenchmark` | `.json` file with full structured results |
@@ -87,12 +87,12 @@ With `BenchmarkHost`, the `--reporter` CLI flag adds reporters by name:
 dotnet run -- --reporter markdown --output ./results
 dotnet run -- --reporter csv
 dotnet run -- --reporter json
-dotnet run -- --reporter console   # works when NBenchmark.Console is referenced
+dotnet run -- --reporter console   # works when NBenchmark.Reporters.Console is referenced
 ```
 
 The `--reporter` flag constructs reporters through `ReporterRegistry.TryCreate`, which handles both built-in reporters (`json`/`markdown`/`csv`) and any reporters self-registered by external packages.
 
-External packages (like `NBenchmark.Console`) self-register via `[ModuleInitializer]` + `ReporterRegistry.Register()`. The `--reporter flag` discovers available reporters automatically - no per-reporter code changes needed in `BenchmarkHost`.
+External packages (like `NBenchmark.Reporters.Console`) self-register via `[ModuleInitializer]` + `ReporterRegistry.Register()`. The `--reporter flag` discovers available reporters automatically - no per-reporter code changes needed in `BenchmarkHost`.
 
 If you reference an unknown reporter name, the host prints the list of available reporters plus a hint about the `console` package.
 

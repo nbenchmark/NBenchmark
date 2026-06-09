@@ -17,7 +17,7 @@ NBenchmark is a lightweight benchmarking library for .NET. It is designed around
 | Package | Description |
 |---|---|
 | `NBenchmark` | The zero-dependency core. All measurement, statistics, and file reporters. |
-| `NBenchmark.Console` | Adds a rich terminal table and progress display via Spectre.Console. |
+| `NBenchmark.Reporters.Console` | Adds a rich terminal table and progress display via Spectre.Console. |
 | `NBenchmark.DependencyInjection` | Optional integration that lets `[Benchmark]` classes have constructor dependencies resolved from an `IServiceProvider`. |
 | `NBenchmark.Analyzers` | Roslyn analyzers that catch common configuration errors at compile time. See the [Analyzers page](./analyzers.md) for the full diagnostic list. |
 

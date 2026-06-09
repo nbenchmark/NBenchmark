@@ -21,7 +21,7 @@ dotnet run
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 var result = Benchmark.Run(() =>
 {
@@ -35,7 +35,7 @@ await result.PrintAsync();
 What to look at:
 
 - The plain-text output from `result.Print()` (core package only).
-- The Spectre.Console table from `result.PrintAsync()` (requires `NBenchmark.Console`).
+- The Spectre.Console table from `result.PrintAsync()` (requires `NBenchmark.Reporters.Console`).
 - The 95% CI line in the plain-text output.
 
 ---
@@ -53,7 +53,7 @@ dotnet run
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 
 var results = await new BenchmarkSuite("sorting")
     .Add("bubble", () =>
@@ -99,7 +99,7 @@ dotnet run -- --confidence 0.99
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 using NBenchmark.Attributes;
 
 await BenchmarkHost.Create(args)
@@ -142,7 +142,7 @@ dotnet run -- --filter DependencyInjectionBenchmarks.Read
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
-using NBenchmark.Console;
+using NBenchmark.Reporters.Console;
 using NBenchmark.DependencyInjection;
 
 var services = new ServiceCollection()
