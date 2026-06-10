@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace NBenchmark.DependencyInjection;
+namespace NBenchmark.Extensions.DependencyInjection;
 
 public static class DependencyInjectionHostExtensions
 {
@@ -21,30 +21,10 @@ public static class DependencyInjectionHostExtensions
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(serviceProvider);
 
-        IServiceScope? scope = null;
+        var scope = serviceProvider.CreateScope();
 
-        host.WithInstanceFactory(type =>
-        {
-            var s = serviceProvider.CreateScope();
-
-            try
-            {
-                var instance = s.ServiceProvider.GetRequiredService(type);
-                scope = s;
-                return instance;
-            }
-            catch
-            {
-                s.Dispose();
-                throw;
-            }
-        });
-
-        host.PostSuiteCleanup = () =>
-        {
-            scope?.Dispose();
-            scope = null;
-        };
+        host.WithInstanceFactory(type => scope.ServiceProvider.GetRequiredService(type));
+        host.PostSuiteCleanup = scope.Dispose;
 
         return host;
     }

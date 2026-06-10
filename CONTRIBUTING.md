@@ -22,10 +22,10 @@ The library projects multi-target `net8.0;net9.0;net10.0`. Tests run against all
 ```
 src/NBenchmark/                        Core library (zero dependencies)
 src/NBenchmark.Reporters.Console/     Spectre.Console terminal output
-src/NBenchmark.DependencyInjection/     Microsoft.Extensions.DependencyInjection integration
+src/NBenchmark.Extensions.DependencyInjection/     Microsoft.Extensions.DependencyInjection integration
 tests/NBenchmark.Tests/                 Core library tests
 tests/NBenchmark.Reporters.Console.Tests/  Console reporter tests
-tests/NBenchmark.DependencyInjection.Tests/  DI integration tests
+tests/NBenchmark.Extensions.DependencyInjection.Tests/  DI integration tests
 samples/                                Runnable example projects
 docs/                                   Documentation site
 ```

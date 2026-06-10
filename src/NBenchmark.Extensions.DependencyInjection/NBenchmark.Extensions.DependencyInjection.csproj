@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <RootNamespace>NBenchmark.DependencyInjection</RootNamespace>
-    <PackageId>NBenchmark.DependencyInjection</PackageId>
+    <RootNamespace>NBenchmark.Extensions.DependencyInjection</RootNamespace>
+    <PackageId>NBenchmark.Extensions.DependencyInjection</PackageId>
     <Description>Resolves benchmark classes from an IServiceProvider so they can have constructor dependencies.</Description>
     <PackageTags>benchmark;performance;dependency-injection;di</PackageTags>
   </PropertyGroup>

@@ -6,12 +6,12 @@ order: 4
 
 # Dependency Injection
 
-By default, `BenchmarkHost` instantiates benchmark classes with `Activator.CreateInstance`, which means the class must have a public parameterless constructor. The `NBenchmark.DependencyInjection` companion package lifts that constraint: it resolves benchmark classes from an `IServiceProvider`, so constructor dependencies are injected automatically.
+By default, `BenchmarkHost` instantiates benchmark classes with `Activator.CreateInstance`, which means the class must have a public parameterless constructor. The `NBenchmark.Extensions.DependencyInjection` companion package lifts that constraint: it resolves benchmark classes from an `IServiceProvider`, so constructor dependencies are injected automatically.
 
 ## Install
 
 ```bash
-dotnet add package NBenchmark.DependencyInjection
+dotnet add package NBenchmark.Extensions.DependencyInjection
 dotnet add package Microsoft.Extensions.DependencyInjection   # if you also want the concrete DI implementation
 ```
 
@@ -24,7 +24,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
 using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
-using NBenchmark.DependencyInjection;
+using NBenchmark.Extensions.DependencyInjection;
 
 var services = new ServiceCollection()
     .AddSingleton<IOrderRepository, SqlOrderRepository>()
@@ -148,7 +148,7 @@ host.WithInstanceFactory(type =>
 });
 ```
 
-This is what the `NBenchmark.DependencyInjection` package does internally. The factory is called once per suite, and the returned instance is used for all `[Benchmark]` methods in that suite.
+This is what the `NBenchmark.Extensions.DependencyInjection` package does internally. The factory is called once per suite, and the returned instance is used for all `[Benchmark]` methods in that suite.
 
 ## A note on Quick mode and Suite mode
 

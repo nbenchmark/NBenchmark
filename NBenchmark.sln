@@ -16,13 +16,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Suite", "samples\Suite\Suit
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Host", "samples\Host\Host.csproj", "{E7688918-FC16-4DBE-80A7-89544BE798F7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.DependencyInjection.Tests", "tests\NBenchmark.DependencyInjection.Tests\NBenchmark.DependencyInjection.Tests.csproj", "{570FCCF5-1D1E-42F7-9F66-615B305AEF13}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Extensions.DependencyInjection.Tests", "tests\NBenchmark.Extensions.DependencyInjection.Tests\NBenchmark.Extensions.DependencyInjection.Tests.csproj", "{570FCCF5-1D1E-42F7-9F66-615B305AEF13}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DependencyInjection", "samples\DependencyInjection\DependencyInjection.csproj", "{3C4F5DFE-D381-401C-A5F3-0C4A1157DC4E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Reporters.Console", "src\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj", "{33F18503-511F-4F6A-9B88-23CBA6820945}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.DependencyInjection", "src\NBenchmark.DependencyInjection\NBenchmark.DependencyInjection.csproj", "{35155F7A-0DD7-4B96-B056-9A19D7A0FC66}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Extensions.DependencyInjection", "src\NBenchmark.Extensions.DependencyInjection\NBenchmark.Extensions.DependencyInjection.csproj", "{35155F7A-0DD7-4B96-B056-9A19D7A0FC66}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Analyzers", "src\NBenchmark.Analyzers\NBenchmark.Analyzers.csproj", "{02584320-C311-445C-B661-5ABC6924E47F}"
 EndProject
@@ -33,6 +33,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Analyzers.Tests", "tests\NBenchmark.Analyzers.Tests\NBenchmark.Analyzers.Tests.csproj", "{CAFA3951-F501-4E34-95FC-66B5A6D9D49B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Reporters", "Reporters", "{110B9D0B-0A1B-48A8-8CF5-078C6787EA98}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{6DACAAB3-5C61-4CFC-81B3-170A35BEA7E9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -226,5 +228,6 @@ Global
 		{CAFA3951-F501-4E34-95FC-66B5A6D9D49B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{3C4F5DFE-D381-401C-A5F3-0C4A1157DC4E} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{33F18503-511F-4F6A-9B88-23CBA6820945} = {110B9D0B-0A1B-48A8-8CF5-078C6787EA98}
+		{35155F7A-0DD7-4B96-B056-9A19D7A0FC66} = {6DACAAB3-5C61-4CFC-81B3-170A35BEA7E9}
 	EndGlobalSection
 EndGlobal

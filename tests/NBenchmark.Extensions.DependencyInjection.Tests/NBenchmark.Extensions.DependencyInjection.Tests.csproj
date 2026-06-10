@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <RootNamespace>NBenchmark.DependencyInjection.Tests</RootNamespace>
+    <RootNamespace>NBenchmark.Extensions.DependencyInjection.Tests</RootNamespace>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\NBenchmark.DependencyInjection\NBenchmark.DependencyInjection.csproj"/>
+    <ProjectReference Include="..\..\src\NBenchmark.Extensions.DependencyInjection\NBenchmark.Extensions.DependencyInjection.csproj"/>
   </ItemGroup>
 
 </Project>

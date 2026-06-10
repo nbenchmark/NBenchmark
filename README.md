@@ -18,13 +18,13 @@ NBenchmark is the easiest way to measure the speed of your .NET code. With zero 
 |---|---|
 | `NBenchmark` | Zero-dependency core - all measurement, statistics, and file reporters. |
 | `NBenchmark.Reporters.Console` | Adds a rich terminal table via [Spectre.Console](https://spectreconsole.net/). |
-| `NBenchmark.DependencyInjection` | Resolves benchmark classes from an `IServiceProvider` so they can have constructor dependencies. |
+| `NBenchmark.Extensions.DependencyInjection` | Resolves benchmark classes from an `IServiceProvider` so they can have constructor dependencies. |
 | `NBenchmark.Analyzers` | Roslyn analyzers that catch common benchmark authoring mistakes at compile time. |
 
 ```bash
 dotnet add package NBenchmark
 dotnet add package NBenchmark.Reporters.Console    # optional, for pretty terminal output
-dotnet add package NBenchmark.DependencyInjection   # optional, for benchmark classes with constructor dependencies
+dotnet add package NBenchmark.Extensions.DependencyInjection   # optional, for benchmark classes with constructor dependencies
 dotnet add package NBenchmark.Analyzers            # optional, compile-time checks for benchmark correctness
 ```
 

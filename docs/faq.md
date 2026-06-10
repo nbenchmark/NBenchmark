@@ -184,7 +184,7 @@ Use `--list` to check what NBenchmark finds before running.
 
 1. **Add a parameterless constructor** that initialises dependencies itself (simplest, but couples the benchmark class to the dependency).
 2. **Use `[BenchmarkSetup]`** to populate fields on a parameterless-constructed instance.
-3. **Use the `NBenchmark.DependencyInjection` companion package** to resolve the class from an `IServiceProvider`:
+3. **Use the `NBenchmark.Extensions.DependencyInjection` companion package** to resolve the class from an `IServiceProvider`:
 
    ```csharp
    await BenchmarkHost.Create(args)
@@ -196,10 +196,10 @@ Use `--list` to check what NBenchmark finds before running.
 
 ### My benchmark class needs dependencies. How do I inject them?
 
-Add the optional `NBenchmark.DependencyInjection` package and pass an `IServiceProvider` to the host:
+Add the optional `NBenchmark.Extensions.DependencyInjection` package and pass an `IServiceProvider` to the host:
 
 ```csharp
-using NBenchmark.DependencyInjection;
+using NBenchmark.Extensions.DependencyInjection;
 
 var services = new ServiceCollection()
     .AddSingleton<IOrderRepository, SqlOrderRepository>()

@@ -131,7 +131,7 @@ What to look at:
 
 **`samples/DependencyInjection/`**
 
-A `BenchmarkHost` setup where the benchmark class has **constructor dependencies** resolved from a `Microsoft.Extensions.DependencyInjection` container. Demonstrates the `NBenchmark.DependencyInjection` companion package and `UseDependencyInjection<T>`.
+A `BenchmarkHost` setup where the benchmark class has **constructor dependencies** resolved from a `Microsoft.Extensions.DependencyInjection` container. Demonstrates the `NBenchmark.Extensions.DependencyInjection` companion package and `UseDependencyInjection<T>`.
 
 ```bash
 cd samples/DependencyInjection
@@ -143,7 +143,7 @@ dotnet run -- --filter DependencyInjectionBenchmarks.Read
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
 using NBenchmark.Reporters.Console;
-using NBenchmark.DependencyInjection;
+using NBenchmark.Extensions.DependencyInjection;
 
 var services = new ServiceCollection()
     .AddSingleton<IDataStore, InMemoryDataStore>()

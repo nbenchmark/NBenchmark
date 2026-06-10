@@ -52,6 +52,6 @@ Use `BenchmarkHost`, which parses CLI arguments automatically. You can filter be
 
 ## My benchmark class needs dependencies (a repository, `DbContext`, logger, etc.)
 
-Add the optional `NBenchmark.DependencyInjection` companion package and use `UseDependencyInjection<T>` - your benchmark class can then take constructor dependencies that the container resolves.
+Add the optional `NBenchmark.Extensions.DependencyInjection` companion package and use `UseDependencyInjection<T>` - your benchmark class can then take constructor dependencies that the container resolves.
 
 → [Dependency Injection guide](../guides/dependency-injection.md)

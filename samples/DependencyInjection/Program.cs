@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
 using NBenchmark.Attributes;
-using NBenchmark.DependencyInjection;
+using NBenchmark.Extensions.DependencyInjection;
 using NBenchmark.Reporters.Console;
 
 var services = new ServiceCollection()

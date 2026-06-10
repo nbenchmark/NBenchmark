@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NBenchmark.Attributes;
 using Xunit;
 
-namespace NBenchmark.DependencyInjection.Tests;
+namespace NBenchmark.Extensions.DependencyInjection.Tests;
 
 public class DependencyInjectionHostTests
 {

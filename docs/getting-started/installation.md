@@ -37,7 +37,7 @@ You only need `NBenchmark.Reporters.Console` if you want output in the terminal.
 The DI package lets `[Benchmark]` classes have **constructor dependencies** that are resolved from an `IServiceProvider`. Without it, benchmark classes must have a public parameterless constructor (the same constraint as today). See the [Dependency Injection guide](../guides/dependency-injection.md) for full details.
 
 ```bash
-dotnet add package NBenchmark.DependencyInjection
+dotnet add package NBenchmark.Extensions.DependencyInjection
 ```
 
 ```bash
