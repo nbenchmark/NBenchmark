@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>NBenchmark.Extensions.xUnit</RootNamespace>
+    <PackageId>NBenchmark.Extensions.xUnit</PackageId>
+    <Description>Run NBenchmark benchmarks as xUnit tests with configurable performance thresholds.</Description>
+    <PackageTags>benchmark;performance;xunit;testing;microbenchmark</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.extensibility.core"/>
+    <PackageReference Include="xunit.extensibility.execution"/>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\IPerformanceThresholds.cs" Link="Internal\IPerformanceThresholds.cs"/>
+    <Compile Include="..\Shared\PerformanceThresholds.cs" Link="Internal\PerformanceThresholds.cs"/>
+    <Compile Include="..\Shared\BenchmarkAssert.cs" Link="Internal\BenchmarkAssert.cs"/>
+    <Compile Include="..\Shared\RegressionBaseline.cs" Link="Internal\RegressionBaseline.cs"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="NBenchmark.Extensions.xUnit.Tests"/>
+  </ItemGroup>
+
+</Project>
