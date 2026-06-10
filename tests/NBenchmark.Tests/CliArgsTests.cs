@@ -240,10 +240,7 @@ public class CliArgsTests
         try
         {
             CliArgs? result = null;
-            var stderr = CaptureConsoleError(() =>
-            {
-                result = CliArgs.Parse(["--threshold-pct", "5"]);
-            });
+            var stderr = CaptureConsoleError(() => { result = CliArgs.Parse(["--threshold-pct", "5"]); });
 
             Assert.NotNull(result);
             Assert.Equal(5, result!.ThresholdPct);
@@ -265,10 +262,7 @@ public class CliArgsTests
         try
         {
             CliArgs? result = null;
-            var stderr = CaptureConsoleError(() =>
-            {
-                result = CliArgs.Parse(["--threshold-pct", "abc"]);
-            });
+            var stderr = CaptureConsoleError(() => { result = CliArgs.Parse(["--threshold-pct", "abc"]); });
 
             Assert.NotNull(result);
             Assert.Null(result!.ThresholdPct);
@@ -290,10 +284,7 @@ public class CliArgsTests
         try
         {
             CliArgs? result = null;
-            var stderr = CaptureConsoleError(() =>
-            {
-                result = CliArgs.Parse(["--threshold-pct", "-5"]);
-            });
+            var stderr = CaptureConsoleError(() => { result = CliArgs.Parse(["--threshold-pct", "-5"]); });
 
             Assert.NotNull(result);
             Assert.Null(result!.ThresholdPct);
@@ -315,10 +306,7 @@ public class CliArgsTests
         try
         {
             CliArgs? result = null;
-            var stderr = CaptureConsoleError(() =>
-            {
-                result = CliArgs.Parse(["--threshold-pct", "0"]);
-            });
+            var stderr = CaptureConsoleError(() => { result = CliArgs.Parse(["--threshold-pct", "0"]); });
 
             Assert.NotNull(result);
             Assert.Null(result!.ThresholdPct);
@@ -365,10 +353,7 @@ public class CliArgsTests
         try
         {
             CliArgs? result = null;
-            var stderr = CaptureConsoleError(() =>
-            {
-                result = CliArgs.Parse(["--reporter", "unknown-reporter"]);
-            });
+            var stderr = CaptureConsoleError(() => { result = CliArgs.Parse(["--reporter", "unknown-reporter"]); });
 
             Assert.NotNull(result);
             Assert.Empty(result!.CliReporters);

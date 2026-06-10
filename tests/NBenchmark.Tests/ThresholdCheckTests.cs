@@ -22,7 +22,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 10);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 10);
 
         Assert.True(hasRegression);
         Assert.Single(regressed);
@@ -46,7 +46,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 15);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 15);
 
         Assert.False(hasRegression);
         Assert.Empty(regressed);
@@ -64,7 +64,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 10);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 10);
 
         Assert.False(hasRegression);
         Assert.Empty(regressed);
@@ -83,7 +83,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 10);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 10);
 
         Assert.False(hasRegression);
         Assert.Empty(regressed);
@@ -106,7 +106,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 10);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 10);
 
         Assert.True(hasRegression);
         Assert.Single(regressed);
@@ -130,7 +130,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 10);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 10);
 
         Assert.False(hasRegression);
         Assert.Empty(regressed);
@@ -153,8 +153,7 @@ public class ThresholdCheckTests
             },
         };
 
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => ThresholdCheck.HasRegression(results, thresholdPct: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ThresholdCheck.HasRegression(results, 0));
     }
 
     [Fact]
@@ -169,8 +168,7 @@ public class ThresholdCheckTests
             },
         };
 
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => ThresholdCheck.HasRegression(results, thresholdPct: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ThresholdCheck.HasRegression(results, -1));
     }
 
     [Fact]
@@ -190,7 +188,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 10);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 10);
 
         Assert.False(hasRegression);
         Assert.Empty(regressed);
@@ -218,7 +216,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 20);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 20);
 
         Assert.True(hasRegression);
         Assert.Equal(2, regressed.Count);
@@ -243,7 +241,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 10);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 10);
 
         Assert.True(hasRegression);
         Assert.Single(regressed);
@@ -273,7 +271,7 @@ public class ThresholdCheckTests
             },
         };
 
-        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, thresholdPct: 10);
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 10);
 
         Assert.True(hasRegression);
         Assert.Single(regressed);

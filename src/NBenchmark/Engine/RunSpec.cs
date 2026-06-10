@@ -8,7 +8,9 @@ namespace NBenchmark.Engine;
 /// </summary>
 public readonly record struct RunSpec
 {
-    public RunSpec() { }
+    public RunSpec()
+    {
+    }
 
     public MeasurementOptions Options { get; init; } = MeasurementOptions.Default;
     public string? Description { get; init; }

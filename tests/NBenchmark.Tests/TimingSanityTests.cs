@@ -18,6 +18,7 @@ public class TimingSanityTests
     {
         var ticks = (long)(microseconds * Stopwatch.Frequency / 1_000_000.0);
         var start = Stopwatch.GetTimestamp();
+
         while (Stopwatch.GetTimestamp() - start < ticks)
         {
         }

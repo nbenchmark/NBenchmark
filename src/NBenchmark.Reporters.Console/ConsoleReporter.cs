@@ -7,13 +7,6 @@ public sealed class ConsoleReporter : IReporter
 {
     public string Name => "console";
 
-    [ModuleInitializer]
-    public static void Register() =>
-        ReporterRegistry.Register(
-            "console",
-            "Console output (Spectre.Console table + bar chart)",
-            _ => new ConsoleReporter());
-
     public Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)
@@ -166,6 +159,13 @@ public sealed class ConsoleReporter : IReporter
         return Task.CompletedTask;
     }
 
+    [ModuleInitializer]
+    public static void Register() =>
+        ReporterRegistry.Register(
+            "console",
+            "Console output (Spectre.Console table + bar chart)",
+            _ => new ConsoleReporter());
+
     private static string FormatOutlierMode(OutlierMode mode)
     {
         return mode switch
@@ -178,8 +178,5 @@ public sealed class ConsoleReporter : IReporter
         };
     }
 
-    private static string EscapeMarkup(string? text)
-    {
-        return text?.Replace("[", "[[").Replace("]", "]]") ?? "";
-    }
+    private static string EscapeMarkup(string? text) => text?.Replace("[", "[[").Replace("]", "]]") ?? "";
 }

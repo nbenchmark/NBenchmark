@@ -43,7 +43,8 @@ public sealed class MissingParameterlessConstructorAnalyzer : DiagnosticAnalyzer
         if (typeDecl.Modifiers.Any(SyntaxKind.AbstractKeyword))
             return;
 
-        var type = context.SemanticModel.GetDeclaredSymbol(typeDecl) as INamedTypeSymbol;
+        var type = context.SemanticModel.GetDeclaredSymbol(typeDecl);
+
         if (type is null)
             return;
 
@@ -66,6 +67,7 @@ public sealed class MissingParameterlessConstructorAnalyzer : DiagnosticAnalyzer
             if (!ctor.IsStatic && ctor.DeclaredAccessibility == Accessibility.Public && ctor.Parameters.Length == 0)
                 return true;
         }
+
         return false;
     }
 }

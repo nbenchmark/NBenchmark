@@ -26,6 +26,7 @@ public static class DependencyInjectionHostExtensions
         host.WithInstanceFactory(type =>
         {
             var s = serviceProvider.CreateScope();
+
             try
             {
                 var instance = s.ServiceProvider.GetRequiredService(type);

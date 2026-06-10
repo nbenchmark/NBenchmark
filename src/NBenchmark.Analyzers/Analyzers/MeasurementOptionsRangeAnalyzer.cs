@@ -1,5 +1,5 @@
-using System.Globalization;
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -39,6 +39,7 @@ public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
             return;
 
         var typeSymbol = context.SemanticModel.GetSymbolInfo(creation.Type).Symbol as INamedTypeSymbol;
+
         if (typeSymbol is null)
             return;
 
@@ -60,6 +61,7 @@ public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
             return;
 
         var typeSymbol = context.SemanticModel.GetTypeInfo(creation).Type as INamedTypeSymbol;
+
         if (typeSymbol is null)
             return;
 
@@ -81,6 +83,7 @@ public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
             return;
 
         var typeSymbol = context.SemanticModel.GetTypeInfo(with.Expression).Type as INamedTypeSymbol;
+
         if (typeSymbol is null)
             return;
 
@@ -102,6 +105,7 @@ public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
             return;
 
         var constant = context.SemanticModel.GetConstantValue(assignment.Right);
+
         if (!constant.HasValue || constant.Value is null)
             return;
 
@@ -114,6 +118,7 @@ public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
                         assignment.GetLocation(),
                         $"Iterations = {iters} is out of range. Must be 0-{MaxIterations}."));
                 }
+
                 break;
 
             case "WarmupIterations":
@@ -123,16 +128,19 @@ public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
                         assignment.GetLocation(),
                         $"WarmupIterations = {warmup} is out of range. Must be 0-{MaxWarmupIterations}."));
                 }
+
                 break;
 
             case "ConfidenceLevel":
                 if (TryConvertToDouble(constant.Value, out var conf) && (conf <= 0 || conf >= 1))
                 {
                     var display = conf.ToString(CultureInfo.InvariantCulture);
+
                     context.ReportDiagnostic(Diagnostic.Create(Rule,
                         assignment.GetLocation(),
                         $"ConfidenceLevel = {display} is out of range. Must be strictly between 0 and 1."));
                 }
+
                 break;
         }
     }

@@ -17,7 +17,8 @@ public sealed class MarkdownReporter(string outputDirectory = ".", string? name 
         Directory.CreateDirectory(_outputDirectory);
 
         var fileName = name
-            ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.md";
+                       ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.md";
+
         var filePath = Path.Combine(_outputDirectory, fileName);
 
         var sb = new StringBuilder();

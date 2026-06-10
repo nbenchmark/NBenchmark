@@ -36,7 +36,8 @@ public sealed class BenchmarkAttributeRangeAnalyzer : DiagnosticAnalyzer
         if (context.Node is not MethodDeclarationSyntax methodDecl)
             return;
 
-        var method = context.SemanticModel.GetDeclaredSymbol(methodDecl) as IMethodSymbol;
+        var method = context.SemanticModel.GetDeclaredSymbol(methodDecl);
+
         if (method is null)
             return;
 
@@ -56,6 +57,7 @@ public sealed class BenchmarkAttributeRangeAnalyzer : DiagnosticAnalyzer
                                 methodDecl.Identifier.GetLocation(),
                                 $"[Benchmark(Iterations = {iters})] is out of range. Must be 0-{MaxIterations} (or -1 to use the suite default)."));
                         }
+
                         break;
 
                     case "WarmupIterations" when namedArg.Value.Value is int warmup:
@@ -65,6 +67,7 @@ public sealed class BenchmarkAttributeRangeAnalyzer : DiagnosticAnalyzer
                                 methodDecl.Identifier.GetLocation(),
                                 $"[Benchmark(WarmupIterations = {warmup})] is out of range. Must be 0-{MaxWarmupIterations} (or -1 to use the suite default)."));
                         }
+
                         break;
                 }
             }

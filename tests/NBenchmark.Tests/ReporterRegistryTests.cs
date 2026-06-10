@@ -10,15 +10,13 @@ public class ReporterRegistryTests : IDisposable
         ReporterRegistry.Reset();
     }
 
-    public void Dispose()
-    {
-        ReporterRegistry.Reset();
-    }
+    public void Dispose() => ReporterRegistry.Reset();
 
     [Fact]
     public void TryCreate_Json_With_Dir_Uses_Dir()
     {
         var dir = MakeSubDir("nb-reg");
+
         try
         {
             var ok = ReporterRegistry.TryCreate("json", dir, out var reporter);
@@ -36,6 +34,7 @@ public class ReporterRegistryTests : IDisposable
     public void TryCreate_Markdown_With_Dir_Passes_Dir()
     {
         var dir = MakeSubDir("nb-reg");
+
         try
         {
             var ok = ReporterRegistry.TryCreate("markdown", dir, out var reporter);
@@ -53,6 +52,7 @@ public class ReporterRegistryTests : IDisposable
     public void TryCreate_Csv_With_Dir_Passes_Dir()
     {
         var dir = MakeSubDir("nb-reg");
+
         try
         {
             var ok = ReporterRegistry.TryCreate("csv", dir, out var reporter);
@@ -145,6 +145,7 @@ public class ReporterRegistryTests : IDisposable
     public void Register_Respects_Custom_Factory_For_OutputDir()
     {
         string? captured = null;
+
         ReporterRegistry.Register("capturing", "Captures outputDir", dir =>
         {
             captured = dir;
@@ -152,6 +153,7 @@ public class ReporterRegistryTests : IDisposable
         });
 
         var dir = MakeSubDir("nb-reg-cap");
+
         try
         {
             ReporterRegistry.TryCreate("capturing", dir, out _);

@@ -8,12 +8,12 @@ public sealed class StaticBenchmarkMethodAnalyzerTests
     public async Task Reports_static_method()
     {
         var code = """
-            using NBenchmark.Attributes;
-            public class C {
-                [Benchmark]
-                public static void M() { }
-            }
-            """;
+                   using NBenchmark.Attributes;
+                   public class C {
+                       [Benchmark]
+                       public static void M() { }
+                   }
+                   """;
 
         await NBAnalyzerVerifier<StaticBenchmarkMethodAnalyzer>
             .VerifyAnalyzerAsync(code, "NB0002");
@@ -23,12 +23,12 @@ public sealed class StaticBenchmarkMethodAnalyzerTests
     public async Task No_diagnostic_for_instance_method()
     {
         var code = """
-            using NBenchmark.Attributes;
-            public class C {
-                [Benchmark]
-                public void M() { }
-            }
-            """;
+                   using NBenchmark.Attributes;
+                   public class C {
+                       [Benchmark]
+                       public void M() { }
+                   }
+                   """;
 
         await NBAnalyzerVerifier<StaticBenchmarkMethodAnalyzer>
             .VerifyNoDiagnosticAsync(code, "NB0002");
@@ -38,13 +38,13 @@ public sealed class StaticBenchmarkMethodAnalyzerTests
     public async Task No_diagnostic_for_static_non_benchmark()
     {
         var code = """
-            using NBenchmark.Attributes;
-            public class C {
-                public static void M() { }
-                [Benchmark]
-                public void N() { }
-            }
-            """;
+                   using NBenchmark.Attributes;
+                   public class C {
+                       public static void M() { }
+                       [Benchmark]
+                       public void N() { }
+                   }
+                   """;
 
         await NBAnalyzerVerifier<StaticBenchmarkMethodAnalyzer>
             .VerifyNoDiagnosticAsync(code, "NB0002");

@@ -32,7 +32,8 @@ public sealed class BenchmarkArgumentsArityAnalyzer : DiagnosticAnalyzer
         if (context.Node is not MethodDeclarationSyntax methodDecl)
             return;
 
-        var method = context.SemanticModel.GetDeclaredSymbol(methodDecl) as IMethodSymbol;
+        var method = context.SemanticModel.GetDeclaredSymbol(methodDecl);
+
         if (method is null)
             return;
 
@@ -47,6 +48,7 @@ public sealed class BenchmarkArgumentsArityAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
                 $"Method '{method.Name}' has [BenchmarkArguments] but takes no parameters."));
+
             return;
         }
 
@@ -55,12 +57,14 @@ public sealed class BenchmarkArgumentsArityAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
                 $"Method '{method.Name}' has {parameterCount} parameter(s) but no [BenchmarkArguments]. Add one [BenchmarkArguments(...)] per argument set."));
+
             return;
         }
 
         foreach (var attr in argumentSets)
         {
             var effectiveCount = GetEffectiveArgumentCount(attr);
+
             if (effectiveCount == 0 && parameterCount > 0)
             {
                 context.ReportDiagnostic(Diagnostic.Create(Rule,
@@ -83,9 +87,7 @@ public sealed class BenchmarkArgumentsArityAnalyzer : DiagnosticAnalyzer
 
         if (attr.ConstructorArguments.Length == 1 &&
             attr.ConstructorArguments[0].Kind == TypedConstantKind.Array)
-        {
             return attr.ConstructorArguments[0].Values.Length;
-        }
 
         return attr.ConstructorArguments.Length;
     }
@@ -93,11 +95,13 @@ public sealed class BenchmarkArgumentsArityAnalyzer : DiagnosticAnalyzer
     private static ImmutableArray<AttributeData> GetBenchmarkArgumentsAttributes(IMethodSymbol method)
     {
         var builder = ImmutableArray.CreateBuilder<AttributeData>();
+
         foreach (var attr in method.GetAttributes())
         {
             if (BenchmarkSymbols.IsBenchmarkArgumentsAttribute(attr.AttributeClass))
                 builder.Add(attr);
         }
+
         return builder.ToImmutable();
     }
 }

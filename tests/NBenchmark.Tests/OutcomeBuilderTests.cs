@@ -26,8 +26,10 @@ public class OutcomeBuilderTests
             ConfidenceLevel = 0.95,
             CoefficientOfVariation = 0.05,
         };
+
         var allocations = new long[] { 1024, 2048, 4096 };
         var rawTimings = new double[] { 90, 100, 110 };
+
         var options = new MeasurementOptions
         {
             Iterations = 3,
@@ -35,16 +37,17 @@ public class OutcomeBuilderTests
             OutlierMode = OutlierMode.RemoveTop5Percent,
             ConfidenceLevel = 0.95,
         };
+
         var total = TimeSpan.FromMilliseconds(42);
         var measured = TimeSpan.FromMilliseconds(7);
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, MeasuredIterations: 3, MeanAllocatedBytes: (long)allocations.Average()),
+                new ProcessedMeasurements(stats, 3, (long)allocations.Average()),
                 rawTimings),
             "bench",
             "desc",
-            isBaseline: true,
+            true,
             options,
             total,
             measured);
@@ -85,7 +88,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 4, MeanAllocatedBytes: (long)allocations.Average()),
+                new ProcessedMeasurements(stats, 4, (long)allocations.Average()),
                 [1, 2, 3, 4]),
             "b", null, false,
             new MeasurementOptions(),
@@ -102,7 +105,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 3, MeanAllocatedBytes: null),
+                new ProcessedMeasurements(stats, 3, null),
                 [1, 2, 3]),
             "b", null, false,
             new MeasurementOptions(),
@@ -120,7 +123,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 1, MeanAllocatedBytes: null),
+                new ProcessedMeasurements(stats, 1, null),
                 [1]),
             "b", null, false,
             options,
@@ -138,7 +141,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 1, MeanAllocatedBytes: null),
+                new ProcessedMeasurements(stats, 1, null),
                 [1]),
             "b", null, false,
             new MeasurementOptions(),
@@ -240,13 +243,14 @@ public class OutcomeBuilderTests
             OutlierMode = OutlierMode.IqrFence,
             ConfidenceLevel = 0.99,
         };
+
         var ex = new InvalidOperationException("nope");
         var total = TimeSpan.FromMilliseconds(50);
         var measured = TimeSpan.Zero;
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Errored(ex),
-            "bad", "with desc", isBaseline: true,
+            "bad", "with desc", true,
             options,
             total,
             measured);
@@ -313,7 +317,7 @@ public class OutcomeBuilderTests
     [Fact]
     public void Build_Errored_Falls_Back_To_Outer_When_Inner_Is_Null()
     {
-        var tiex = new TargetInvocationException(message: "outer", inner: null);
+        var tiex = new TargetInvocationException("outer", null);
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Errored(tiex),

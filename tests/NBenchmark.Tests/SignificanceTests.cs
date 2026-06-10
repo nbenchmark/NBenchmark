@@ -154,6 +154,7 @@ public class SignificanceTests
             new() { Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true },
             new() { Name = "b", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3 },
         };
+
         var raw = new Dictionary<string, double[]> { ["a"] = [10, 11, 12], ["b"] = [1, 2, 3] };
 
         Significance.ApplyIfEnabled(results, raw, new MeasurementOptions { EnableSignificance = false });
@@ -168,6 +169,7 @@ public class SignificanceTests
         {
             new() { Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true },
         };
+
         var raw = new Dictionary<string, double[]> { ["a"] = [10, 11, 12] };
 
         Significance.ApplyIfEnabled(results, raw, MeasurementOptions.Default);
@@ -187,6 +189,7 @@ public class SignificanceTests
             new() { Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true },
             new() { Name = "faster", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3 },
         };
+
         var raw = new Dictionary<string, double[]> { ["baseline"] = baselineSamples, ["faster"] = fasterSamples };
 
         Significance.ApplyIfEnabled(results, raw, MeasurementOptions.Default);

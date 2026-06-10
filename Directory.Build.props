@@ -1,26 +1,26 @@
 <Project>
-    <PropertyGroup>
-        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <VersionPrefix>0.0.1</VersionPrefix>
-    </PropertyGroup>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <VersionPrefix>0.0.1</VersionPrefix>
+  </PropertyGroup>
 
-    <PropertyGroup Condition="'$(IsPackable)' != 'false'">
-        <Authors>NBenchmark</Authors>
-        <Copyright>Copyright (c) NBenchmark</Copyright>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <PackageProjectUrl>https://github.com/nbenchmark/nbenchmark</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/nbenchmark/nbenchmark.git</RepositoryUrl>
-        <RepositoryType>git</RepositoryType>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
-        <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <IncludeSymbols>true</IncludeSymbols>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <PackageIcon>icon.png</PackageIcon>
-    </PropertyGroup>
+  <PropertyGroup Condition="'$(IsPackable)' != 'false'">
+    <Authors>NBenchmark</Authors>
+    <Copyright>Copyright (c) NBenchmark</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/nbenchmark/nbenchmark</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nbenchmark/nbenchmark.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageIcon>icon.png</PackageIcon>
+  </PropertyGroup>
 
-    <ItemGroup Condition="'$(IsPackable)' != 'false'">
-        <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="" />
-    </ItemGroup>
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath=""/>
+  </ItemGroup>
 </Project>

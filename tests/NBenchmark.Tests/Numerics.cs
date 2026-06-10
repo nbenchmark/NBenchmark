@@ -19,6 +19,7 @@ internal static class Numerics
             Assert.True(
                 Math.Abs(actual) <= relativeTolerance,
                 $"Expected ~0 (abs ≤ {relativeTolerance}), got {actual}.");
+
             return;
         }
 

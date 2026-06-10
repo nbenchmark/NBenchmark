@@ -49,9 +49,12 @@ internal static class OutlierTrim
         var upper = q3 + 1.5 * iqr;
 
         var keep = 0;
+
         foreach (var t in values)
+        {
             if (t >= lower && t <= upper)
                 keep++;
+        }
 
         if (keep == 0)
             return values;
@@ -61,12 +64,15 @@ internal static class OutlierTrim
 
         var result = new double[keep];
         var write = 0;
+
         for (var i = 0; i < values.Length; i++)
         {
             var v = values[i];
+
             if (v >= lower && v <= upper)
                 result[write++] = v;
         }
+
         return result;
     }
 }

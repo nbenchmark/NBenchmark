@@ -16,6 +16,7 @@ public sealed record BenchmarkTable
         var multiBenchmark = results.Count > 1;
 
         BenchmarkResult? baseline = null;
+
         if (successful.Count > 0)
             baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
 
@@ -67,6 +68,7 @@ public sealed record BenchmarkTable
     {
         if (result.Errored || baseline is null || baseline.Median == 0)
             return double.NaN;
+
         return result.Median / baseline.Median;
     }
 
@@ -74,6 +76,7 @@ public sealed record BenchmarkTable
     {
         if (result.Errored || !multiBenchmark || result.IsBaseline || result.SignificanceVerdict == SignificanceVerdict.NotTested)
             return "";
+
         return result.SignificanceVerdict == SignificanceVerdict.Significant ? "✓" : "~";
     }
 }

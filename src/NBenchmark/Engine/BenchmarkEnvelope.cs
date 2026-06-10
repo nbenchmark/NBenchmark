@@ -80,7 +80,7 @@ internal sealed record BenchmarkEnvelope(
         {
             if (resultConsumer is not null)
             {
-                Func<Task> returningBody = async () =>
+                var returningBody = async () =>
                 {
                     var task = asyncDel(instance);
                     await task.ConfigureAwait(false);
@@ -90,7 +90,7 @@ internal sealed record BenchmarkEnvelope(
                 return BenchmarkRunner.Instance.RunAsync(name, returningBody, spec, ct);
             }
 
-            Func<Task> voidBody = async () =>
+            var voidBody = async () =>
             {
                 var task = asyncDel(instance);
                 await task.ConfigureAwait(false);
@@ -100,7 +100,7 @@ internal sealed record BenchmarkEnvelope(
         }
 
         var sd = syncDel!;
-        Func<object?> syncBody = () => sd(instance);
+        var syncBody = () => sd(instance);
         return Task.FromResult(BenchmarkRunner.Instance.Run(name, syncBody, spec, ct));
     }
 }

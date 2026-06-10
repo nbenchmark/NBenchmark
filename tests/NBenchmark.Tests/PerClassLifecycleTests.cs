@@ -1,3 +1,4 @@
+using NBenchmark.Attributes;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using Xunit;
@@ -40,10 +41,11 @@ public class PerClassLifecycleTests
     public void TryRunSetup_Success_ReturnsTrue()
     {
         var flag = false;
+
         var suite = new BenchmarkSuiteDefinition(
-            Type: typeof(SimpleType),
-            Benchmarks: [],
-            SetupDelegate: _ => { flag = true; });
+            typeof(SimpleType),
+            [],
+            _ => { flag = true; });
 
         var (success, errors) = PerClassLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default);
 
@@ -56,8 +58,8 @@ public class PerClassLifecycleTests
     public void TryRunSetup_NoSetup_ReturnsTrue()
     {
         var suite = new BenchmarkSuiteDefinition(
-            Type: typeof(SimpleType),
-            Benchmarks: []);
+            typeof(SimpleType),
+            []);
 
         var (success, errors) = PerClassLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default);
 
@@ -69,14 +71,13 @@ public class PerClassLifecycleTests
     public void TryRunSetup_SetupFailure_ReturnsErroredResults()
     {
         var suite = new BenchmarkSuiteDefinition(
-            Type: typeof(SimpleType),
-            Benchmarks:
+            typeof(SimpleType),
             [
                 new BenchmarkMethodDefinition(
-                    Method: typeof(SimpleType).GetMethod(nameof(SimpleType.Method))!,
-                    Attribute: new Attributes.BenchmarkAttribute()),
+                    typeof(SimpleType).GetMethod(nameof(SimpleType.Method))!,
+                    new BenchmarkAttribute()),
             ],
-            SetupDelegate: _ => throw new InvalidOperationException("setup failed"));
+            _ => throw new InvalidOperationException("setup failed"));
 
         var (success, errors) = PerClassLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default);
 
@@ -91,9 +92,10 @@ public class PerClassLifecycleTests
     public async Task RunTeardown_CallsTeardownDelegate()
     {
         var teardownCalled = false;
+
         var suite = new BenchmarkSuiteDefinition(
-            Type: typeof(SimpleType),
-            Benchmarks: [],
+            typeof(SimpleType),
+            [],
             TeardownDelegate: _ => { teardownCalled = true; });
 
         await PerClassLifecycle.RunTeardown(suite, new SimpleType(), false, null);
@@ -105,7 +107,7 @@ public class PerClassLifecycleTests
     public async Task RunTeardown_DisposesDisposable()
     {
         var disposable = new DisposableSpy();
-        var suite = new BenchmarkSuiteDefinition(Type: typeof(DisposableSpy), Benchmarks: []);
+        var suite = new BenchmarkSuiteDefinition(typeof(DisposableSpy), []);
 
         await PerClassLifecycle.RunTeardown(suite, disposable, false, null);
 
@@ -116,7 +118,7 @@ public class PerClassLifecycleTests
     public async Task RunTeardown_DoesNotDispose_WhenFromFactory()
     {
         var disposable = new DisposableSpy();
-        var suite = new BenchmarkSuiteDefinition(Type: typeof(DisposableSpy), Benchmarks: []);
+        var suite = new BenchmarkSuiteDefinition(typeof(DisposableSpy), []);
 
         await PerClassLifecycle.RunTeardown(suite, disposable, true, null);
 
@@ -127,7 +129,7 @@ public class PerClassLifecycleTests
     public async Task RunTeardown_RunsPostCleanup()
     {
         var cleanupCalled = false;
-        var suite = new BenchmarkSuiteDefinition(Type: typeof(SimpleType), Benchmarks: []);
+        var suite = new BenchmarkSuiteDefinition(typeof(SimpleType), []);
 
         await PerClassLifecycle.RunTeardown(suite, new SimpleType(), false, () => cleanupCalled = true);
 
@@ -138,8 +140,8 @@ public class PerClassLifecycleTests
     public async Task RunTeardown_TeardownFailure_DoesNotThrow()
     {
         var suite = new BenchmarkSuiteDefinition(
-            Type: typeof(SimpleType),
-            Benchmarks: [],
+            typeof(SimpleType),
+            [],
             TeardownDelegate: _ => throw new InvalidOperationException("teardown failed"));
 
         var ex = await Record.ExceptionAsync(() =>
@@ -152,7 +154,7 @@ public class PerClassLifecycleTests
     public async Task RunTeardown_AsyncDisposesAsyncDisposable()
     {
         var disposable = new AsyncDisposableSpy();
-        var suite = new BenchmarkSuiteDefinition(Type: typeof(AsyncDisposableSpy), Benchmarks: []);
+        var suite = new BenchmarkSuiteDefinition(typeof(AsyncDisposableSpy), []);
 
         await PerClassLifecycle.RunTeardown(suite, disposable, false, null);
 
@@ -171,9 +173,9 @@ public class PerClassLifecycleTests
     public void TryRunSetup_Propagates_OperationCanceledException()
     {
         var suite = new BenchmarkSuiteDefinition(
-            Type: typeof(SimpleType),
-            Benchmarks: [],
-            SetupDelegate: _ => throw new OperationCanceledException());
+            typeof(SimpleType),
+            [],
+            _ => throw new OperationCanceledException());
 
         Assert.Throws<OperationCanceledException>(() =>
             PerClassLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default));
@@ -183,8 +185,8 @@ public class PerClassLifecycleTests
     public async Task RunTeardown_Propagates_OperationCanceledException()
     {
         var suite = new BenchmarkSuiteDefinition(
-            Type: typeof(SimpleType),
-            Benchmarks: [],
+            typeof(SimpleType),
+            [],
             TeardownDelegate: _ => throw new OperationCanceledException());
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -193,12 +195,16 @@ public class PerClassLifecycleTests
 
     private sealed class SimpleType
     {
-        public void Method() { }
+        public void Method()
+        {
+        }
     }
 
     private sealed class NoDefaultCtor
     {
-        public NoDefaultCtor(int _) { }
+        public NoDefaultCtor(int _)
+        {
+        }
     }
 
     private sealed class DisposableSpy : IDisposable
@@ -210,6 +216,7 @@ public class PerClassLifecycleTests
     private sealed class AsyncDisposableSpy : IAsyncDisposable
     {
         public bool Disposed { get; private set; }
+
         public ValueTask DisposeAsync()
         {
             Disposed = true;

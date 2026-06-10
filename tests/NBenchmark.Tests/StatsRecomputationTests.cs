@@ -45,19 +45,27 @@ public class StatsRecomputationTests
         Array.Sort(samples);
 
         const double confidence = 0.95;
-        var stats = StatsSummary.Compute(samples, confidence);
+        var stats = StatsSummary.Compute(samples);
 
         // Mean from first principles.
         var sum = 0.0;
+
         foreach (var v in samples)
+        {
             sum += v;
+        }
+
         var expectedMean = sum / n;
         Numerics.AssertRelativeClose(expectedMean, stats.Mean, RelTol);
 
         // Sample variance / standard deviation (Bessel's correction).
         var sumSq = 0.0;
+
         foreach (var v in samples)
+        {
             sumSq += (v - expectedMean) * (v - expectedMean);
+        }
+
         var expectedVariance = sumSq / (n - 1);
         var expectedStdDev = Math.Sqrt(expectedVariance);
         Numerics.AssertRelativeClose(expectedStdDev, stats.StandardDeviation, RelTol);
@@ -91,7 +99,9 @@ public class StatsRecomputationTests
         var samples = new double[n];
 
         for (var i = 0; i < n; i++)
+        {
             samples[i] = rng.NextDouble() * 10_000.0;
+        }
 
         Array.Sort(samples);
 

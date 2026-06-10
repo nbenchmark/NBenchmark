@@ -48,7 +48,8 @@ public sealed class DuplicateLifecycleMethodAnalyzer : DiagnosticAnalyzer
         if (typeDecl is null)
             return;
 
-        var cls = context.SemanticModel.GetDeclaredSymbol(typeDecl) as INamedTypeSymbol;
+        var cls = context.SemanticModel.GetDeclaredSymbol(typeDecl);
+
         if (cls is null)
             return;
 
@@ -64,10 +65,12 @@ public sealed class DuplicateLifecycleMethodAnalyzer : DiagnosticAnalyzer
             {
                 if (member.ContainingType?.Equals(cls, SymbolEqualityComparer.Default) != true)
                     continue;
+
                 foreach (var attr in member.GetAttributes())
                 {
                     var attrFullName = attr.AttributeClass?.OriginalDefinition?.ToDisplayString()
                                        ?? attr.AttributeClass?.ToDisplayString();
+
                     if (attrFullName == fullName)
                     {
                         methodsWithAttr.Add(member);

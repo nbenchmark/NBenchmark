@@ -7,6 +7,7 @@ internal static class ThresholdCheck
     {
         if (thresholdPct <= 0)
             throw new ArgumentOutOfRangeException(nameof(thresholdPct), "Must be a positive integer (1 or greater).");
+
         var successful = results.Where(r => !r.Errored).ToList();
 
         if (successful.Count <= 1)
@@ -19,7 +20,6 @@ internal static class ThresholdCheck
 
         if (baseline.Median <= 0)
         {
-
             // Ratio comparison is undefined at zero; treat any positive candidate median as slower.
             for (var i = 0; i < successful.Count; i++)
             {

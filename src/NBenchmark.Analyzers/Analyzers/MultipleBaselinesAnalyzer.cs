@@ -40,7 +40,8 @@ public sealed class MultipleBaselinesAnalyzer : DiagnosticAnalyzer
         if (typeDecl is null)
             return;
 
-        var cls = context.SemanticModel.GetDeclaredSymbol(typeDecl) as INamedTypeSymbol;
+        var cls = context.SemanticModel.GetDeclaredSymbol(typeDecl);
+
         if (cls is null)
             return;
 
@@ -48,16 +49,19 @@ public sealed class MultipleBaselinesAnalyzer : DiagnosticAnalyzer
             return;
 
         string? firstBaselineName = null;
+
         foreach (var member in cls.GetMembers().OfType<IMethodSymbol>())
         {
             if (member.ContainingType?.Equals(cls, SymbolEqualityComparer.Default) != true)
                 continue;
+
             foreach (var attr in member.GetAttributes())
             {
                 if (!BenchmarkSymbols.IsBenchmarkAttribute(attr.AttributeClass))
                     continue;
 
                 var isBaseline = false;
+
                 foreach (var namedArg in attr.NamedArguments)
                 {
                     if (namedArg.Key == "Baseline" && namedArg.Value.Value is true)
@@ -71,9 +75,7 @@ public sealed class MultipleBaselinesAnalyzer : DiagnosticAnalyzer
                     continue;
 
                 if (firstBaselineName is null)
-                {
                     firstBaselineName = member.Name;
-                }
                 else
                 {
                     var methodDecl = member.DeclaringSyntaxReferences

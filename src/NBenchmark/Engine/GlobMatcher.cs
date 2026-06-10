@@ -38,9 +38,7 @@ internal static class GlobMatcher
             }
         }
         else
-        {
             lastPartIndex--;
-        }
 
         for (var i = partIndex; i <= lastPartIndex; i++)
         {

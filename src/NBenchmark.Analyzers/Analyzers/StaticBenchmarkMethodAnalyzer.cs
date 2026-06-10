@@ -35,7 +35,8 @@ public sealed class StaticBenchmarkMethodAnalyzer : DiagnosticAnalyzer
         if (!methodDeclaration.Modifiers.Any(SyntaxKind.StaticKeyword))
             return;
 
-        var method = context.SemanticModel.GetDeclaredSymbol(methodDeclaration) as IMethodSymbol;
+        var method = context.SemanticModel.GetDeclaredSymbol(methodDeclaration);
+
         if (method is null)
             return;
 

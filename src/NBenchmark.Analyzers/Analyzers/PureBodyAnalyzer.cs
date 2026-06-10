@@ -41,7 +41,8 @@ public sealed class PureBodyAnalyzer : DiagnosticAnalyzer
         if (context.Node is not MethodDeclarationSyntax methodDecl)
             return;
 
-        var method = context.SemanticModel.GetDeclaredSymbol(methodDecl) as IMethodSymbol;
+        var method = context.SemanticModel.GetDeclaredSymbol(methodDecl);
+
         if (method is null)
             return;
 
@@ -57,10 +58,14 @@ public sealed class PureBodyAnalyzer : DiagnosticAnalyzer
             {
                 var walker = new SideEffectWalker(context.SemanticModel);
                 walker.Visit(methodDecl.ExpressionBody.Expression);
+
                 if (!walker.HasAnyEffect)
+                {
                     context.ReportDiagnostic(Diagnostic.Create(NoSideEffectRule,
                         methodDecl.Identifier.GetLocation(), method.Name));
+                }
             }
+
             return;
         }
 
@@ -70,6 +75,7 @@ public sealed class PureBodyAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(NoWorkRule,
                 methodDecl.Identifier.GetLocation(), method.Name));
+
             return;
         }
 

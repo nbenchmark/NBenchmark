@@ -21,10 +21,7 @@ public class ConsoleBenchmarkProgress(int measuredIterations, int warmupIteratio
         return Task.CompletedTask;
     }
 
-    public Task OnWarmupCompleted(string name)
-    {
-        return Task.CompletedTask;
-    }
+    public Task OnWarmupCompleted(string name) => Task.CompletedTask;
 
     public Task OnBenchmarkStarting(string name, int index, int total)
     {
@@ -47,8 +44,5 @@ public class ConsoleBenchmarkProgress(int measuredIterations, int warmupIteratio
         return Task.CompletedTask;
     }
 
-    private static string EscapeMarkup(string? text)
-    {
-        return text?.Replace("[", "[[").Replace("]", "]]") ?? "";
-    }
+    private static string EscapeMarkup(string? text) => text?.Replace("[", "[[").Replace("]", "]]") ?? "";
 }

@@ -22,7 +22,8 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
         Directory.CreateDirectory(_outputDirectory);
 
         var fileName = name
-            ?? $"benchmarks-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.json";
+                       ?? $"benchmarks-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.json";
+
         var filePath = Path.Combine(_outputDirectory, fileName);
 
         var envelope = new ResultEnvelope

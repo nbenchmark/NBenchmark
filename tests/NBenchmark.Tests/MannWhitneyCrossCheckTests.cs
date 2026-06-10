@@ -8,7 +8,6 @@ namespace NBenchmark.Tests;
 ///     self-contained exact-permutation enumerator that validates how far the
 ///     normal approximation NBenchmark uses can stray from the exact p-value on
 ///     small samples.
-///
 ///     NBenchmark uses the large-sample normal approximation *without* a
 ///     continuity correction, which corresponds to
 ///     <c>scipy.stats.mannwhitneyu(..., method='asymptotic', use_continuity=False)</c>.
@@ -26,6 +25,7 @@ public class MannWhitneyCrossCheckTests
             0.0007775304469403847, // asymptotic, no continuity correction
             0.0001554001554001554, // exact
         ];
+
         yield return
         [
             new double[] { 1, 3, 5, 7, 9, 11, 13, 15 },
@@ -33,6 +33,7 @@ public class MannWhitneyCrossCheckTests
             0.6744240722352938,
             0.7209013209013208,
         ];
+
         yield return
         [
             new double[] { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 },
@@ -94,13 +95,21 @@ public class MannWhitneyCrossCheckTests
         var total = n1 + n2;
 
         var combined = new (double Value, int Group)[total];
+
         for (var i = 0; i < n1; i++)
+        {
             combined[i] = (a[i], 0);
+        }
+
         for (var i = 0; i < n2; i++)
+        {
             combined[n1 + i] = (b[i], 1);
+        }
+
         Array.Sort(combined, (x, y) => x.Value.CompareTo(y.Value));
 
         double rankSumA = 0;
+
         for (var i = 0; i < total; i++)
         {
             if (combined[i].Group == 0)
@@ -118,8 +127,10 @@ public class MannWhitneyCrossCheckTests
         foreach (var rankSum in EnumerateCombinationSums(total, n1, combo))
         {
             var u1 = rankSum - (double)n1 * (n1 + 1) / 2.0;
+
             if (Math.Abs(u1 - mu) >= observedDistance - 1e-9)
                 extreme++;
+
             count++;
         }
 
@@ -130,25 +141,37 @@ public class MannWhitneyCrossCheckTests
     private static IEnumerable<double> EnumerateCombinationSums(int n, int k, int[] combo)
     {
         for (var i = 0; i < k; i++)
+        {
             combo[i] = i + 1;
+        }
 
         while (true)
         {
             double sum = 0;
+
             for (var i = 0; i < k; i++)
+            {
                 sum += combo[i];
+            }
+
             yield return sum;
 
             var pos = k - 1;
+
             while (pos >= 0 && combo[pos] == n - k + pos + 1)
+            {
                 pos--;
+            }
 
             if (pos < 0)
                 yield break;
 
             combo[pos]++;
+
             for (var i = pos + 1; i < k; i++)
+            {
                 combo[i] = combo[i - 1] + 1;
+            }
         }
     }
 }

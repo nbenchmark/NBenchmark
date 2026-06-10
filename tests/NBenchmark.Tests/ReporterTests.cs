@@ -347,10 +347,7 @@ public class ReporterTests
     }
 
     [Fact]
-    public void PathValidation_Rejects_Path_Traversal()
-    {
-        Assert.Throws<ArgumentException>(() => new JsonReporter("../escaped"));
-    }
+    public void PathValidation_Rejects_Path_Traversal() => Assert.Throws<ArgumentException>(() => new JsonReporter("../escaped"));
 
     [Fact]
     public void PathValidation_Accepts_Subdirectory()

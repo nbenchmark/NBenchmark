@@ -19,7 +19,11 @@ public class BenchmarkStaticTests
     [Fact]
     public void Run_With_Func_Executes_And_Measures()
     {
-        var result = Benchmark.Run(() => { Thread.SpinWait(10); return 42; },
+        var result = Benchmark.Run(() =>
+            {
+                Thread.SpinWait(10);
+                return 42;
+            },
             new MeasurementOptions { WarmupIterations = 1, Iterations = 10, OutlierMode = OutlierMode.None });
 
         Assert.True(result.Median > 0);

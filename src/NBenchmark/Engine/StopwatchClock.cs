@@ -14,9 +14,6 @@ namespace NBenchmark.Engine;
 /// </summary>
 internal sealed class StopwatchClock : IClock
 {
-    /// <summary>The default real-time clock; used by <see cref="BenchmarkRunner.Instance" />.</summary>
-    public static StopwatchClock WallClock { get; } = new();
-
     private readonly IClock? _inner;
 
     private StopwatchClock()
@@ -27,6 +24,17 @@ internal sealed class StopwatchClock : IClock
     {
         _inner = inner;
     }
+
+    /// <summary>The default real-time clock; used by <see cref="BenchmarkRunner.Instance" />.</summary>
+    public static StopwatchClock WallClock { get; } = new();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public long GetTimestamp()
+        => _inner?.GetTimestamp() ?? Stopwatch.GetTimestamp();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public TimeSpan GetElapsedTime(long startTimestamp)
+        => _inner?.GetElapsedTime(startTimestamp) ?? Stopwatch.GetElapsedTime(startTimestamp);
 
     /// <summary>
     ///     Wraps an arbitrary <see cref="IClock" /> (typically <c>FakeClock</c> from
@@ -39,12 +47,4 @@ internal sealed class StopwatchClock : IClock
         ArgumentNullException.ThrowIfNull(clock);
         return clock as StopwatchClock ?? new StopwatchClock(clock);
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public long GetTimestamp()
-        => _inner?.GetTimestamp() ?? Stopwatch.GetTimestamp();
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public TimeSpan GetElapsedTime(long startTimestamp)
-        => _inner?.GetElapsedTime(startTimestamp) ?? Stopwatch.GetElapsedTime(startTimestamp);
 }

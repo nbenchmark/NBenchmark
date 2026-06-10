@@ -14,22 +14,36 @@ internal static class SharedReferences
 
     public static MetadataReference[] Get()
     {
-        if (_refs is not null) return _refs;
+        if (_refs is not null)
+            return _refs;
+
         lock (_lock)
         {
-            if (_refs is not null) return _refs;
+            if (_refs is not null)
+                return _refs;
+
             var coreDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
             var list = new List<MetadataReference>();
+
             foreach (var dll in Directory.EnumerateFiles(coreDir, "*.dll").OrderBy(x => x))
             {
                 var name = Path.GetFileNameWithoutExtension(dll);
+
                 if (name is "System.Private.Uri" or "System.Private.Xml")
                     continue;
-                try { list.Add(MetadataReference.CreateFromFile(dll)); }
-                catch { }
+
+                try
+                {
+                    list.Add(MetadataReference.CreateFromFile(dll));
+                }
+                catch
+                {
+                }
             }
+
             _refs = list.ToArray();
         }
+
         return _refs;
     }
 }
@@ -37,56 +51,56 @@ internal static class SharedReferences
 internal static class TestSources
 {
     public const string Stubs = """
-        namespace NBenchmark.Attributes
-        {
-            [System.AttributeUsage(System.AttributeTargets.Method)]
-            public sealed class BenchmarkAttribute : System.Attribute
-            {
-                public string? Description { get; set; }
-                public bool Baseline { get; set; }
-                public int Iterations { get; set; } = -1;
-                public int WarmupIterations { get; set; } = -1;
-            }
-            [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = true)]
-            public sealed class BenchmarkArgumentsAttribute : System.Attribute
-            {
-                public BenchmarkArgumentsAttribute(params object[] arguments) { Arguments = arguments; }
-                public object[] Arguments { get; }
-            }
-            [System.AttributeUsage(System.AttributeTargets.Method)]
-            public sealed class BenchmarkSetupAttribute : System.Attribute {}
-            [System.AttributeUsage(System.AttributeTargets.Method)]
-            public sealed class BenchmarkTeardownAttribute : System.Attribute {}
-            [System.AttributeUsage(System.AttributeTargets.Method)]
-            public sealed class BenchmarkIterationSetupAttribute : System.Attribute {}
-            [System.AttributeUsage(System.AttributeTargets.Method)]
-            public sealed class BenchmarkIterationTeardownAttribute : System.Attribute {}
-        }
-        namespace NBenchmark
-        {
-            public sealed class BenchmarkResult {}
-            public sealed class MeasurementOutcome {}
+                                namespace NBenchmark.Attributes
+                                {
+                                    [System.AttributeUsage(System.AttributeTargets.Method)]
+                                    public sealed class BenchmarkAttribute : System.Attribute
+                                    {
+                                        public string? Description { get; set; }
+                                        public bool Baseline { get; set; }
+                                        public int Iterations { get; set; } = -1;
+                                        public int WarmupIterations { get; set; } = -1;
+                                    }
+                                    [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = true)]
+                                    public sealed class BenchmarkArgumentsAttribute : System.Attribute
+                                    {
+                                        public BenchmarkArgumentsAttribute(params object[] arguments) { Arguments = arguments; }
+                                        public object[] Arguments { get; }
+                                    }
+                                    [System.AttributeUsage(System.AttributeTargets.Method)]
+                                    public sealed class BenchmarkSetupAttribute : System.Attribute {}
+                                    [System.AttributeUsage(System.AttributeTargets.Method)]
+                                    public sealed class BenchmarkTeardownAttribute : System.Attribute {}
+                                    [System.AttributeUsage(System.AttributeTargets.Method)]
+                                    public sealed class BenchmarkIterationSetupAttribute : System.Attribute {}
+                                    [System.AttributeUsage(System.AttributeTargets.Method)]
+                                    public sealed class BenchmarkIterationTeardownAttribute : System.Attribute {}
+                                }
+                                namespace NBenchmark
+                                {
+                                    public sealed class BenchmarkResult {}
+                                    public sealed class MeasurementOutcome {}
 
-            public sealed class MeasurementOptions
-            {
-                public int Iterations { get; init; }
-                public int WarmupIterations { get; init; }
-                public double ConfidenceLevel { get; init; }
-            }
-            public static class Benchmark
-            {
-                public static BenchmarkResult Run(System.Action action) { return new BenchmarkResult(); }
-                public static BenchmarkResult Run<T>(System.Func<T> action) { return new BenchmarkResult(); }
-                public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
-                public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
+                                    public sealed class MeasurementOptions
+                                    {
+                                        public int Iterations { get; init; }
+                                        public int WarmupIterations { get; init; }
+                                        public double ConfidenceLevel { get; init; }
+                                    }
+                                    public static class Benchmark
+                                    {
+                                        public static BenchmarkResult Run(System.Action action) { return new BenchmarkResult(); }
+                                        public static BenchmarkResult Run<T>(System.Func<T> action) { return new BenchmarkResult(); }
+                                        public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
+                                        public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
 
-                public static MeasurementOutcome RunRaw(System.Action action) { return new MeasurementOutcome(); }
-                public static MeasurementOutcome RunRaw<T>(System.Func<T> action) { return new MeasurementOutcome(); }
-                public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
-                public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
-            }
-        }
-        """;
+                                        public static MeasurementOutcome RunRaw(System.Action action) { return new MeasurementOutcome(); }
+                                        public static MeasurementOutcome RunRaw<T>(System.Func<T> action) { return new MeasurementOutcome(); }
+                                        public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
+                                        public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
+                                    }
+                                }
+                                """;
 }
 
 public static class NBAnalyzerVerifier<TAnalyzer>
@@ -104,7 +118,9 @@ public static class NBAnalyzerVerifier<TAnalyzer>
     public static async Task VerifyNoDiagnosticAsync(string source)
     {
         var analyzerDiagnostics = await GetDiagnosticsAsync(source);
-        Assert.True(analyzerDiagnostics.Length == 0, $"Expected no diagnostics but found:\n{string.Join("\n", analyzerDiagnostics.Select(d => $"  [{d.Id}] {d.GetMessage()}"))}");
+
+        Assert.True(analyzerDiagnostics.Length == 0,
+            $"Expected no diagnostics but found:\n{string.Join("\n", analyzerDiagnostics.Select(d => $"  [{d.Id}] {d.GetMessage()}"))}");
     }
 
     public static async Task VerifyNoDiagnosticAsync(string source, string diagnosticId)
@@ -136,6 +152,7 @@ public static class NBAnalyzerVerifier<TAnalyzer>
 
         var project = solution.GetProject(projectId)!
             .AddAnalyzerReference(new AnalyzerImageReference(ImmutableArray.Create<DiagnosticAnalyzer>(new TAnalyzer())));
+
         var document = project.GetDocument(documentId)!;
 
         var codeFixProvider = new TCodeFix();
@@ -152,6 +169,7 @@ public static class NBAnalyzerVerifier<TAnalyzer>
 
         var expectedTree = CSharpSyntaxTree.ParseText(fixedSource, parseOptions);
         var actualTree = CSharpSyntaxTree.ParseText(changedText, parseOptions);
+
         Assert.True(actualTree.IsEquivalentTo(expectedTree),
             $"Code fix output does not match expected.\nExpected:\n{fixedSource}\n\nActual:\n{changedText}");
     }
@@ -160,7 +178,10 @@ public static class NBAnalyzerVerifier<TAnalyzer>
     {
         var userTree = CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp12));
         var stubTree = CSharpSyntaxTree.ParseText(TestSources.Stubs, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp12));
-        var compilation = CSharpCompilation.Create("TestAssembly", [userTree, stubTree], SharedReferences.Get(), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var compilation = CSharpCompilation.Create("TestAssembly", [userTree, stubTree], SharedReferences.Get(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
         var compilationWithAnalyzers = compilation.WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(Analyzer));
         var allDiagnostics = await compilationWithAnalyzers.GetAllDiagnosticsAsync().ConfigureAwait(false);
         var supportedIds = Analyzer.SupportedDiagnostics.Select(d => d.Id).ToImmutableHashSet();

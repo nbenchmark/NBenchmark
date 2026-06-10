@@ -9,12 +9,12 @@ public sealed class RemoveStaticKeywordCodeFixTests
     public async Task Analyzer_detects_static_method()
     {
         var source = """
-            using NBenchmark.Attributes;
-            public class C {
-                [Benchmark]
-                public static void M() { }
-            }
-            """;
+                     using NBenchmark.Attributes;
+                     public class C {
+                         [Benchmark]
+                         public static void M() { }
+                     }
+                     """;
 
         await NBAnalyzerVerifier<StaticBenchmarkMethodAnalyzer>
             .VerifyAnalyzerAsync(source, "NB0002");
@@ -24,12 +24,12 @@ public sealed class RemoveStaticKeywordCodeFixTests
     public async Task No_diagnostic_for_instance_method()
     {
         var source = """
-            using NBenchmark.Attributes;
-            public class C {
-                [Benchmark]
-                public void M() { }
-            }
-            """;
+                     using NBenchmark.Attributes;
+                     public class C {
+                         [Benchmark]
+                         public void M() { }
+                     }
+                     """;
 
         await NBAnalyzerVerifier<StaticBenchmarkMethodAnalyzer>
             .VerifyNoDiagnosticAsync(source, "NB0002");
@@ -39,20 +39,20 @@ public sealed class RemoveStaticKeywordCodeFixTests
     public async Task CodeFix_removes_static_modifier()
     {
         var source = """
-            using NBenchmark.Attributes;
-            public class C {
-                [Benchmark]
-                public static void M() { }
-            }
-            """;
+                     using NBenchmark.Attributes;
+                     public class C {
+                         [Benchmark]
+                         public static void M() { }
+                     }
+                     """;
 
         var fixedSource = """
-            using NBenchmark.Attributes;
-            public class C {
-                [Benchmark]
-                public void M() { }
-            }
-            """;
+                          using NBenchmark.Attributes;
+                          public class C {
+                              [Benchmark]
+                              public void M() { }
+                          }
+                          """;
 
         await NBAnalyzerVerifier<StaticBenchmarkMethodAnalyzer>
             .VerifyCodeFixAsync<RemoveStaticKeywordCodeFixProvider>(source, fixedSource, "NB0002");

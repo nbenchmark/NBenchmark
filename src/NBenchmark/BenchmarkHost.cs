@@ -8,19 +8,20 @@ namespace NBenchmark;
 
 public sealed class BenchmarkHost
 {
-    private CliArgs _cliArgs = new();
     private readonly List<Assembly> _assemblies = [];
     private readonly List<IReporter> _reporters = [];
+    private CliArgs _cliArgs = new();
+    private Func<Type, object>? _instanceFactory;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
-    private Func<Type, object>? _instanceFactory;
-    private Action? _postSuiteCleanup;
 
     private BenchmarkHost()
     {
     }
+
+    internal Action? PostSuiteCleanup { get; set; }
 
     public static BenchmarkHost Create(string[] args)
     {
@@ -72,12 +73,6 @@ public sealed class BenchmarkHost
     {
         _instanceFactory = factory;
         return this;
-    }
-
-    internal Action? PostSuiteCleanup
-    {
-        get => _postSuiteCleanup;
-        set => _postSuiteCleanup = value;
     }
 
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
@@ -133,6 +128,7 @@ public sealed class BenchmarkHost
         var allNames = filtered
             .SelectMany(s => s.Benchmarks.Select(b => $"{s.Type.Name}.{b.DisplayName}"))
             .ToList();
+
         var totalBenchmarks = allNames.Count;
 
         await _progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
@@ -142,6 +138,7 @@ public sealed class BenchmarkHost
         foreach (var suite in filtered)
         {
             var instance = PerClassLifecycle.TryCreateInstance(suite.Type, _instanceFactory);
+
             if (instance is null)
                 continue;
 
@@ -150,6 +147,7 @@ public sealed class BenchmarkHost
             try
             {
                 var (setupSuccess, setupErrors) = PerClassLifecycle.TryRunSetup(suite, instance, suiteOptions);
+
                 if (!setupSuccess)
                 {
                     allResults.AddRange(setupErrors!);
@@ -167,12 +165,15 @@ public sealed class BenchmarkHost
                 runningIndex += suite.Benchmarks.Count;
 
                 allResults.AddRange(results);
+
                 foreach (var kvp in samples)
+                {
                     rawSamples[kvp.Key] = kvp.Value;
+                }
             }
             finally
             {
-                await PerClassLifecycle.RunTeardown(suite, instance, instanceFromFactory, _postSuiteCleanup);
+                await PerClassLifecycle.RunTeardown(suite, instance, instanceFromFactory, PostSuiteCleanup);
             }
         }
 
@@ -186,6 +187,7 @@ public sealed class BenchmarkHost
             Console.Error.WriteLine(
                 $"Regression threshold exceeded ({_cliArgs.ThresholdPct.Value}%). "
                 + $"Regressed benchmarks: {string.Join(", ", regressed)}");
+
             Environment.ExitCode = 1;
         }
 
@@ -230,12 +232,16 @@ public sealed class BenchmarkHost
     private static MeasurementOptions MergeCliOptions(MeasurementOptions options, CliArgs cliArgs)
     {
         var result = options;
+
         if (cliArgs.Iterations.HasValue)
             result = result with { Iterations = cliArgs.Iterations.Value };
+
         if (cliArgs.WarmupIterations.HasValue)
             result = result with { WarmupIterations = cliArgs.WarmupIterations.Value };
+
         if (cliArgs.ConfidenceLevel.HasValue)
             result = result with { ConfidenceLevel = cliArgs.ConfidenceLevel.Value };
+
         return result;
     }
 }

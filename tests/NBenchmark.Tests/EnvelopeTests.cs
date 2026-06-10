@@ -1,3 +1,5 @@
+using NBenchmark.Attributes;
+using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using Xunit;
 
@@ -113,7 +115,7 @@ public class EnvelopeTests
 
     private sealed class BaselineBenchmarks
     {
-        [NBenchmark.Attributes.Benchmark(Baseline = true, Description = "the baseline")]
+        [Benchmark(Baseline = true, Description = "the baseline")]
         public int Fast() => 1;
     }
 
@@ -121,16 +123,16 @@ public class EnvelopeTests
     {
         public int InvocationCount;
 
-        [NBenchmark.Attributes.Benchmark(Iterations = 2, WarmupIterations = 3)]
+        [Benchmark(Iterations = 2, WarmupIterations = 3)]
         public void Work() => InvocationCount++;
     }
 }
 
 internal static class TestReflectionHelper
 {
-    public static NBenchmark.Discovery.BenchmarkMethodDefinition ResolveMethod(Type type, string methodName)
+    public static BenchmarkMethodDefinition ResolveMethod(Type type, string methodName)
     {
-        var discoverer = new NBenchmark.Discovery.BenchmarkDiscoverer();
+        var discoverer = new BenchmarkDiscoverer();
         var suite = discoverer.Discover(type.Assembly).First(s => s.Type == type);
         return suite.Benchmarks.First(m => m.Method.Name == methodName);
     }

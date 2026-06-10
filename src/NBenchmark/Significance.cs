@@ -43,8 +43,11 @@ internal static class Significance
                 var pValue = MannWhitneyU.Test(baselineSamples, candidateSamples);
 
                 results[i] = double.IsNaN(pValue)
-                    ? result with { PValue = null, SignificanceVerdict = NBenchmark.SignificanceVerdict.NotTested }
-                    : result with { PValue = pValue, SignificanceVerdict = pValue < 0.05 ? NBenchmark.SignificanceVerdict.Significant : NBenchmark.SignificanceVerdict.NotSignificant };
+                    ? result with { PValue = null, SignificanceVerdict = SignificanceVerdict.NotTested }
+                    : result with
+                    {
+                        PValue = pValue, SignificanceVerdict = pValue < 0.05 ? SignificanceVerdict.Significant : SignificanceVerdict.NotSignificant,
+                    };
             }
         }
     }

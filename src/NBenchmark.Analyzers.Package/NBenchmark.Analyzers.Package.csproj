@@ -1,60 +1,60 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFramework>netstandard2.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <IsPackable>true</IsPackable>
-        <RootNamespace>NBenchmark.Analyzers.Package</RootNamespace>
-        <LangVersion>12</LangVersion>
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>true</IsPackable>
+    <RootNamespace>NBenchmark.Analyzers.Package</RootNamespace>
+    <LangVersion>12</LangVersion>
 
-        <!-- Package Configuration -->
-        <PackageId>NBenchmark.Analyzers</PackageId>
-        <Title>NBenchmark Analyzers</Title>
-        <Description>NBenchmark analyzers and code fixes for detecting and resolving common benchmark configuration issues at compile time</Description>
-        <PackageTags>analyzers;roslyn;nbenchmark;codefixes;diagnostics;benchmark</PackageTags>
-        <Authors>NBenchmark</Authors>
-        <Copyright>Copyright (c) NBenchmark</Copyright>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <PackageProjectUrl>https://github.com/nbenchmark/nbenchmark</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/nbenchmark/nbenchmark.git</RepositoryUrl>
-        <RepositoryType>git</RepositoryType>
+    <!-- Package Configuration -->
+    <PackageId>NBenchmark.Analyzers</PackageId>
+    <Title>NBenchmark Analyzers</Title>
+    <Description>NBenchmark analyzers and code fixes for detecting and resolving common benchmark configuration issues at compile time</Description>
+    <PackageTags>analyzers;roslyn;nbenchmark;codefixes;diagnostics;benchmark</PackageTags>
+    <Authors>NBenchmark</Authors>
+    <Copyright>Copyright (c) NBenchmark</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/nbenchmark/nbenchmark</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nbenchmark/nbenchmark.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
 
-        <!-- Analyzer Configuration -->
-        <DevelopmentDependency>true</DevelopmentDependency>
-        <IncludeSymbols>false</IncludeSymbols>
-        <IncludeBuildOutput>false</IncludeBuildOutput>
-        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-        <NoWarn>$(NoWarn);RS2008;NU5128</NoWarn>
-    </PropertyGroup>
+    <!-- Analyzer Configuration -->
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeSymbols>false</IncludeSymbols>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);RS2008;NU5128</NoWarn>
+  </PropertyGroup>
 
-    <PropertyGroup>
-        <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1591</WarningsNotAsErrors>
-    </PropertyGroup>
+  <PropertyGroup>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1591</WarningsNotAsErrors>
+  </PropertyGroup>
 
-    <!-- Project references for analyzer and code fixes -->
+  <!-- Project references for analyzer and code fixes -->
+  <ItemGroup>
+    <ProjectReference Include="..\NBenchmark.Analyzers\NBenchmark.Analyzers.csproj" PrivateAssets="all" ReferenceOutputAssembly="false"/>
+    <ProjectReference Include="..\NBenchmark.CodeFixes\NBenchmark.CodeFixes.csproj" PrivateAssets="all" ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+  <!-- Custom target to include analyzer assemblies in the package -->
+  <Target Name="IncludeAnalyzersInPackage">
     <ItemGroup>
-        <ProjectReference Include="..\NBenchmark.Analyzers\NBenchmark.Analyzers.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" />
-        <ProjectReference Include="..\NBenchmark.CodeFixes\NBenchmark.CodeFixes.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" />
+      <TfmSpecificPackageFile Include="..\NBenchmark.Analyzers\bin\$(Configuration)\netstandard2.0\NBenchmark.Analyzers.dll">
+        <PackagePath>analyzers/dotnet/cs</PackagePath>
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="..\NBenchmark.CodeFixes\bin\$(Configuration)\netstandard2.0\NBenchmark.CodeFixes.dll">
+        <PackagePath>analyzers/dotnet/cs</PackagePath>
+      </TfmSpecificPackageFile>
     </ItemGroup>
+  </Target>
 
-    <!-- Custom target to include analyzer assemblies in the package -->
-    <Target Name="IncludeAnalyzersInPackage">
-        <ItemGroup>
-            <TfmSpecificPackageFile Include="..\NBenchmark.Analyzers\bin\$(Configuration)\netstandard2.0\NBenchmark.Analyzers.dll">
-                <PackagePath>analyzers/dotnet/cs</PackagePath>
-            </TfmSpecificPackageFile>
-            <TfmSpecificPackageFile Include="..\NBenchmark.CodeFixes\bin\$(Configuration)\netstandard2.0\NBenchmark.CodeFixes.dll">
-                <PackagePath>analyzers/dotnet/cs</PackagePath>
-            </TfmSpecificPackageFile>
-        </ItemGroup>
-    </Target>
-
-    <!-- Hook into the pack process -->
-    <PropertyGroup>
-        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeAnalyzersInPackage</TargetsForTfmSpecificContentInPackage>
-        <NoWarn>$(NoWarn);NU5128</NoWarn>
-    </PropertyGroup>
+  <!-- Hook into the pack process -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeAnalyzersInPackage</TargetsForTfmSpecificContentInPackage>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
 
 </Project>

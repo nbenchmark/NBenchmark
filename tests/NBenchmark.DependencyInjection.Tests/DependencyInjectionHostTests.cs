@@ -173,6 +173,7 @@ public class DependencyInjectionHostTests
         var sw = new StringWriter();
         var original = Console.Out;
         Console.SetOut(sw);
+
         try
         {
             await action();
@@ -186,8 +187,8 @@ public class DependencyInjectionHostTests
 
 public interface IDataStore
 {
-    int ReadCount { get; }
-    void Read();
+    public int ReadCount { get; }
+    public void Read();
 }
 
 public sealed class RecordingDataStore : IDataStore
@@ -238,12 +239,16 @@ public sealed class DisposableTracker
 public sealed class DisposableBenchmark : IDisposable
 {
     private readonly DisposableTracker _tracker;
-    public DisposableBenchmark(DisposableTracker tracker) => _tracker = tracker;
+
+    public DisposableBenchmark(DisposableTracker tracker)
+    {
+        _tracker = tracker;
+    }
+
+    public void Dispose() => _tracker.DisposeCount++;
 
     [Benchmark]
     public int DoWork() => 42;
-
-    public void Dispose() => _tracker.DisposeCount++;
 }
 
 public sealed class UnresolvableBenchmark(IMissingDependency missing)

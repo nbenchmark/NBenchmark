@@ -31,6 +31,7 @@ public class ConsoleReporterTests
         await CaptureConsoleOutputAsync(async () =>
         {
             var reporter = new ConsoleReporter();
+
             var result = new BenchmarkResult
             {
                 Name = "broken",
@@ -44,15 +45,13 @@ public class ConsoleReporterTests
                 Errored = true,
                 ErrorMessage = "something went wrong",
             };
+
             await reporter.ReportAsync([result]);
         });
     }
 
     [Fact]
-    public void IReporter_Name_Property_Returns_Console()
-    {
-        Assert.Equal("console", new ConsoleReporter().Name);
-    }
+    public void IReporter_Name_Property_Returns_Console() => Assert.Equal("console", new ConsoleReporter().Name);
 
     [Fact]
     public void Module_Initializer_Registers_Console_With_Global_Registry()

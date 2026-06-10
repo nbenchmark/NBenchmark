@@ -46,7 +46,7 @@ public sealed class BenchmarkSuite(string name)
     private BenchmarkSuite AddEnvelope(string name, Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEnvelope(Name: name, Description: null, IsBaseline: false, RunAsync: runAsync));
+        _benchmarks.Add(new BenchmarkEnvelope(name, null, false, runAsync));
         return this;
     }
 
@@ -157,8 +157,8 @@ public sealed class BenchmarkSuite(string name)
             .ToList();
 
         var (results, rawSamples) = await SuiteRunner.RunAsync(
-            envelopes, _runOrder, seed: null, _options, startIndex: 0,
-            totalBenchmarks: _benchmarks.Count, _progress, cancellationToken).ConfigureAwait(false);
+            envelopes, _runOrder, null, _options, 0,
+            _benchmarks.Count, _progress, cancellationToken).ConfigureAwait(false);
 
         _suiteTeardown?.Invoke();
 
@@ -173,5 +173,4 @@ public sealed class BenchmarkSuite(string name)
 
         return results;
     }
-
 }

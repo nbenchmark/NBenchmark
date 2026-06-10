@@ -16,8 +16,8 @@ public class SuiteRunnerTests
         };
 
         var (results, rawSamples) = await SuiteRunner.RunAsync(
-            envelopes, RunOrder.Declaration, seed: null, MeasurementOptions.Default,
-            startIndex: 0, totalBenchmarks: 2,
+            envelopes, RunOrder.Declaration, null, MeasurementOptions.Default,
+            0, 2,
             NullBenchmarkProgress.Instance, CancellationToken.None);
 
         Assert.Equal(2, results.Count);
@@ -40,13 +40,13 @@ public class SuiteRunnerTests
         };
 
         var (first, _) = await SuiteRunner.RunAsync(
-            envelopes, RunOrder.Random, seed: 42, MeasurementOptions.Default,
-            startIndex: 0, totalBenchmarks: 4,
+            envelopes, RunOrder.Random, 42, MeasurementOptions.Default,
+            0, 4,
             NullBenchmarkProgress.Instance, CancellationToken.None);
 
         var (second, _) = await SuiteRunner.RunAsync(
-            envelopes, RunOrder.Random, seed: 42, MeasurementOptions.Default,
-            startIndex: 0, totalBenchmarks: 4,
+            envelopes, RunOrder.Random, 42, MeasurementOptions.Default,
+            0, 4,
             NullBenchmarkProgress.Instance, CancellationToken.None);
 
         var firstOrder = first.Select(r => r.Name).ToList();
@@ -67,8 +67,8 @@ public class SuiteRunnerTests
         };
 
         var (results, _) = await SuiteRunner.RunAsync(
-            envelopes, RunOrder.Declaration, seed: 99, MeasurementOptions.Default,
-            startIndex: 0, totalBenchmarks: 3,
+            envelopes, RunOrder.Declaration, 99, MeasurementOptions.Default,
+            0, 3,
             NullBenchmarkProgress.Instance, CancellationToken.None);
 
         Assert.Equal(new[] { "first", "second", "third" }, results.Select(r => r.Name).ToList());
@@ -78,6 +78,7 @@ public class SuiteRunnerTests
     public async Task RunAsync_Emits_OnBenchmarkStarting_With_Local_Index()
     {
         var progress = new CapturingProgress();
+
         var envelopes = new[]
         {
             StaticEnvelope("a", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
@@ -85,8 +86,8 @@ public class SuiteRunnerTests
         };
 
         await SuiteRunner.RunAsync(
-            envelopes, RunOrder.Declaration, seed: null, MeasurementOptions.Default,
-            startIndex: 0, totalBenchmarks: 2,
+            envelopes, RunOrder.Declaration, null, MeasurementOptions.Default,
+            0, 2,
             progress, CancellationToken.None);
 
         Assert.Equal(new[] { "a", "b" }, progress.BenchmarkStarts.Select(s => s.Name).ToList());
@@ -98,6 +99,7 @@ public class SuiteRunnerTests
     public async Task RunAsync_Emits_OnBenchmarkStarting_With_StartIndex_Offset()
     {
         var progress = new CapturingProgress();
+
         var envelopes = new[]
         {
             StaticEnvelope("b", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
@@ -105,8 +107,8 @@ public class SuiteRunnerTests
         };
 
         await SuiteRunner.RunAsync(
-            envelopes, RunOrder.Declaration, seed: null, MeasurementOptions.Default,
-            startIndex: 1, totalBenchmarks: 3,
+            envelopes, RunOrder.Declaration, null, MeasurementOptions.Default,
+            1, 3,
             progress, CancellationToken.None);
 
         Assert.Equal(new[] { 2, 3 }, progress.BenchmarkStarts.Select(s => s.Index).ToList());
@@ -117,14 +119,15 @@ public class SuiteRunnerTests
     public async Task RunAsync_Does_Not_Emit_OnSuiteStarting_Or_OnSuiteCompleted()
     {
         var progress = new CapturingProgress();
+
         var envelopes = new[]
         {
             StaticEnvelope("a", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
         };
 
         await SuiteRunner.RunAsync(
-            envelopes, RunOrder.Declaration, seed: null, MeasurementOptions.Default,
-            startIndex: 0, totalBenchmarks: 1,
+            envelopes, RunOrder.Declaration, null, MeasurementOptions.Default,
+            0, 1,
             progress, CancellationToken.None);
 
         Assert.Empty(progress.SuiteStartings);
@@ -140,9 +143,9 @@ public class SuiteRunnerTests
         };
 
         var (results, _) = await SuiteRunner.RunAsync(
-            envelopes, RunOrder.Declaration, seed: null,
+            envelopes, RunOrder.Declaration, null,
             new MeasurementOptions { Iterations = 0, WarmupIterations = 0, ForceGcBetweenBenchmarks = true },
-            startIndex: 0, totalBenchmarks: 1,
+            0, 1,
             NullBenchmarkProgress.Instance, CancellationToken.None);
 
         Assert.Single(results);
@@ -155,16 +158,16 @@ public class SuiteRunnerTests
         var envelopes = new[]
         {
             new BenchmarkEnvelope(
-                Name: "boom",
-                Description: "boom description",
-                IsBaseline: false,
-                RunAsync: (_, _) => throw new InvalidOperationException("boom")),
+                "boom",
+                "boom description",
+                false,
+                (_, _) => throw new InvalidOperationException("boom")),
             StaticEnvelope("ok", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
         };
 
         var (results, rawSamples) = await SuiteRunner.RunAsync(
-            envelopes, RunOrder.Declaration, seed: null, MeasurementOptions.Default,
-            startIndex: 0, totalBenchmarks: 2,
+            envelopes, RunOrder.Declaration, null, MeasurementOptions.Default,
+            0, 2,
             NullBenchmarkProgress.Instance, CancellationToken.None);
 
         Assert.Equal(2, results.Count);
@@ -190,21 +193,21 @@ public class SuiteRunnerTests
 
         var dryRunResult = OutcomeBuilder.Build(
             new RunOutcome.DryRun(),
-            name: "dry",
-            description: null,
-            isBaseline: false,
+            "dry",
+            null,
+            false,
             options,
-            totalDuration: TimeSpan.Zero,
-            measuredDuration: TimeSpan.Zero).Result;
+            TimeSpan.Zero,
+            TimeSpan.Zero).Result;
 
         Assert.False(InvokeShouldForceGcBetweenBenchmarks(options, dryRunResult));
     }
 
     private static BenchmarkEnvelope StaticEnvelope(string name, MeasurementOptions _) => new(
-        Name: name,
-        Description: null,
-        IsBaseline: false,
-        RunAsync: (spec, ct) =>
+        name,
+        null,
+        false,
+        (spec, ct) =>
         {
             var outcome = BenchmarkRunner.Instance.Run(name, () => { }, spec, ct);
             return Task.FromResult(outcome);
@@ -214,7 +217,7 @@ public class SuiteRunnerTests
     {
         var method = typeof(SuiteRunner).GetMethod("ShouldForceGcBetweenBenchmarks", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
-        return (bool)method!.Invoke(obj: null, parameters: [options, result])!;
+        return (bool)method!.Invoke(null, [options, result])!;
     }
 
     private sealed class CapturingProgress : IBenchmarkProgress

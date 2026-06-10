@@ -263,6 +263,7 @@ public class BenchmarkTableTests
     public void Build_HeaderMetadata_CopiedFromFirstSuccessful()
     {
         var now = DateTimeOffset.UtcNow;
+
         var results = new[]
         {
             new BenchmarkResult

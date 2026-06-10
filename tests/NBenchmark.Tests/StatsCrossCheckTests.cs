@@ -7,13 +7,12 @@ namespace NBenchmark.Tests;
 ///     External cross-checks: NBenchmark's in-process numerical results are pinned
 ///     against values pre-computed by SciPy 1.17.1 / NumPy 2.4.6. The reference
 ///     values and tolerances let the docs claim "matches SciPy/NumPy within …".
-///
 ///     Reference generation (see docs/advanced/validation.md):
-///       mean   = numpy.mean(x)
-///       stddev = numpy.std(x, ddof=1)
-///       sem    = stddev / sqrt(n)
-///       moe    = scipy.stats.t.ppf((1+cl)/2, n-1) * sem
-///       pXX    = numpy.percentile(x, XX, method='inverted_cdf')   (nearest-rank)
+///     mean   = numpy.mean(x)
+///     stddev = numpy.std(x, ddof=1)
+///     sem    = stddev / sqrt(n)
+///     moe    = scipy.stats.t.ppf((1+cl)/2, n-1) * sem
+///     pXX    = numpy.percentile(x, XX, method='inverted_cdf')   (nearest-rank)
 /// </summary>
 public class StatsCrossCheckTests
 {
@@ -122,10 +121,8 @@ public class StatsCrossCheckTests
     [InlineData(0.99, 1, 63.656741162871526)]
     [InlineData(0.95, 2, 4.302652729749462)]
     [InlineData(0.99, 2, 9.924843200918287)]
-    public void TCritical_ExactForms_Match_Scipy(double cl, int df, double expected)
-    {
+    public void TCritical_ExactForms_Match_Scipy(double cl, int df, double expected) =>
         Numerics.AssertRelativeClose(expected, StudentT.CriticalValue(cl, df), 1e-9);
-    }
 
     // df ≥ 3 uses the Cornish-Fisher expansion: documented < 1% (worst case is
     // df = 3 at 99%, ≈ 0.79% relative error). For df ≥ 30 the error is ≪ 0.1%.
@@ -138,10 +135,8 @@ public class StatsCrossCheckTests
     [InlineData(0.99, 30, 2.7499956535672254, 1e-4)]
     [InlineData(0.95, 100, 1.983971518523552, 1e-4)]
     [InlineData(0.95, 1000, 1.9623390808264078, 1e-4)]
-    public void TCritical_CornishFisher_Matches_Scipy(double cl, int df, double expected, double relTol)
-    {
+    public void TCritical_CornishFisher_Matches_Scipy(double cl, int df, double expected, double relTol) =>
         Numerics.AssertRelativeClose(expected, StudentT.CriticalValue(cl, df), relTol);
-    }
 
     // ---- Normal quantile vs SciPy norm.ppf ---------------------------------
 

@@ -20,34 +20,34 @@ internal static class OutcomeBuilder
         {
             RunOutcome.Success s => Build(
                 name, description, isBaseline, options,
-                stats: s.Result.Stats,
-                measuredIterations: s.Result.MeasuredIterations,
-                meanAllocatedBytes: s.Result.MeanAllocatedBytes,
-                rawSamples: s.RawSamples,
-                errored: false,
-                errorMessage: null,
+                s.Result.Stats,
+                s.Result.MeasuredIterations,
+                s.Result.MeanAllocatedBytes,
+                s.RawSamples,
+                false,
+                null,
                 totalDuration,
                 measuredDuration),
 
             RunOutcome.DryRun => Build(
                 name, description, isBaseline, options,
-                stats: null,
-                measuredIterations: 0,
-                meanAllocatedBytes: null,
-                rawSamples: [],
-                errored: false,
-                errorMessage: null,
+                null,
+                0,
+                null,
+                [],
+                false,
+                null,
                 totalDuration,
-                measuredDuration: TimeSpan.Zero),
+                TimeSpan.Zero),
 
             RunOutcome.Errored e => Build(
                 name, description, isBaseline, options,
-                stats: null,
-                measuredIterations: 0,
-                meanAllocatedBytes: null,
-                rawSamples: [],
-                errored: true,
-                errorMessage: e.ErrorMessageOverride ?? Unwrap(e.Error).ToString(),
+                null,
+                0,
+                null,
+                [],
+                true,
+                e.ErrorMessageOverride ?? Unwrap(e.Error).ToString(),
                 totalDuration,
                 measuredDuration),
 
@@ -89,7 +89,7 @@ internal static class OutcomeBuilder
                 CoefficientOfVariation = stats?.CoefficientOfVariation ?? 0,
                 MeanAllocatedBytes = meanAllocatedBytes,
                 PValue = null,
-                SignificanceVerdict = NBenchmark.SignificanceVerdict.NotTested,
+                SignificanceVerdict = SignificanceVerdict.NotTested,
                 Errored = errored,
                 ErrorMessage = errorMessage,
                 MeasuredIterations = measuredIterations,
@@ -104,5 +104,5 @@ internal static class OutcomeBuilder
     }
 
     private static Exception Unwrap(Exception ex) =>
-        ex is TargetInvocationException tiex ? (tiex.InnerException ?? tiex) : ex;
+        ex is TargetInvocationException tiex ? tiex.InnerException ?? tiex : ex;
 }

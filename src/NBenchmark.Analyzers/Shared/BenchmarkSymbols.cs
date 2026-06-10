@@ -30,6 +30,7 @@ internal static class BenchmarkSymbols
     public static bool IsLifecycleAttribute(INamedTypeSymbol? attributeClass)
     {
         var name = GetAttributeFullName(attributeClass);
+
         return name is BenchmarkSetupAttributeFullName
             or BenchmarkTeardownAttributeFullName
             or BenchmarkIterationSetupAttributeFullName
@@ -43,6 +44,7 @@ internal static class BenchmarkSymbols
             if (IsBenchmarkAttribute(attr.AttributeClass))
                 return true;
         }
+
         return false;
     }
 
@@ -53,6 +55,7 @@ internal static class BenchmarkSymbols
             if (HasBenchmarkAttribute(method))
                 return true;
         }
+
         return false;
     }
 
@@ -62,9 +65,11 @@ internal static class BenchmarkSymbols
         {
             if (method.ContainingType?.Equals(type, SymbolEqualityComparer.Default) != true)
                 continue;
+
             if (HasBenchmarkAttribute(method))
                 return true;
         }
+
         return false;
     }
 

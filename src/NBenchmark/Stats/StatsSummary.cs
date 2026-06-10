@@ -34,8 +34,12 @@ public sealed class StatsSummary
 
         var n = samples.Length;
         var sum = 0.0;
+
         for (var i = 0; i < n; i++)
+        {
             sum += samples[i];
+        }
+
         var mean = sum / n;
 
         var sumSq = 0.0;

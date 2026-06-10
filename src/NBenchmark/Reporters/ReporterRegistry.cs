@@ -1,5 +1,5 @@
-using System.Reflection;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 
 namespace NBenchmark.Reporters;
 
@@ -7,8 +7,6 @@ public sealed record ReporterInfo(string Name, string Description);
 
 public static class ReporterRegistry
 {
-    private sealed record Entry(string Name, string Description, Func<string?, IReporter> Factory);
-
     private static readonly Entry[] _seed =
     [
         new("json", "JSON file output (one file per run)", dir => new JsonReporter(dir ?? ".")),
@@ -83,6 +81,7 @@ public static class ReporterRegistry
             return;
 
         var entryAssembly = Assembly.GetEntryAssembly();
+
         if (entryAssembly is null)
             return;
 
@@ -117,4 +116,6 @@ public static class ReporterRegistry
             _availableCache = null;
         }
     }
+
+    private sealed record Entry(string Name, string Description, Func<string?, IReporter> Factory);
 }

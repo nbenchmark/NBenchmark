@@ -2,7 +2,7 @@ namespace NBenchmark.Reporters;
 
 public interface IReporter
 {
-    string Name { get; }
+    public string Name { get; }
 
-    Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default);
+    public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default);
 }

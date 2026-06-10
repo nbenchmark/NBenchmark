@@ -6,7 +6,7 @@ namespace NBenchmark.Engine;
 /// </summary>
 internal interface IClock
 {
-    long GetTimestamp();
+    public long GetTimestamp();
 
-    TimeSpan GetElapsedTime(long startTimestamp);
+    public TimeSpan GetElapsedTime(long startTimestamp);
 }

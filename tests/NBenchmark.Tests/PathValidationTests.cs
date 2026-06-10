@@ -24,10 +24,7 @@ public class PathValidationTests
     [InlineData("../escaped")]
     [InlineData("../../etc")]
     [InlineData("/tmp")]
-    public void ValidateOutputPath_Rejects_Path_Traversal(string path)
-    {
-        Assert.Throws<ArgumentException>(() => PathValidation.ValidateOutputPath(path));
-    }
+    public void ValidateOutputPath_Rejects_Path_Traversal(string path) => Assert.Throws<ArgumentException>(() => PathValidation.ValidateOutputPath(path));
 
     [Fact]
     public void ValidateOutputPath_Accepts_Nested_Subdirectory()

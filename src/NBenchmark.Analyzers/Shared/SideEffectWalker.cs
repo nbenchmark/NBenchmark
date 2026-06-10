@@ -8,17 +8,12 @@ internal sealed class SideEffectWalker(SemanticModel semanticModel) : CSharpSynt
 {
     public bool HasAnyEffect { get; private set; }
 
-    public override void VisitInvocationExpression(InvocationExpressionSyntax node)
-    {
-        HasAnyEffect = true;
-    }
+    public override void VisitInvocationExpression(InvocationExpressionSyntax node) => HasAnyEffect = true;
 
     public override void VisitAssignmentExpression(AssignmentExpressionSyntax node)
     {
         if (node.Left is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax)
-        {
             HasAnyEffect = true;
-        }
         else if (node.Left is IdentifierNameSyntax identifier)
         {
             if (IsFieldOrProperty(identifier))
@@ -41,9 +36,7 @@ internal sealed class SideEffectWalker(SemanticModel semanticModel) : CSharpSynt
     private void CheckUnaryOperand(ExpressionSyntax operand)
     {
         if (operand is MemberAccessExpressionSyntax)
-        {
             HasAnyEffect = true;
-        }
         else if (operand is IdentifierNameSyntax identifier)
         {
             if (IsFieldOrProperty(identifier))
@@ -57,32 +50,19 @@ internal sealed class SideEffectWalker(SemanticModel semanticModel) : CSharpSynt
         return symbol is IFieldSymbol or IPropertySymbol;
     }
 
-    public override void VisitObjectCreationExpression(ObjectCreationExpressionSyntax node)
-    {
-        HasAnyEffect = true;
-    }
+    public override void VisitObjectCreationExpression(ObjectCreationExpressionSyntax node) => HasAnyEffect = true;
 
-    public override void VisitArrayCreationExpression(ArrayCreationExpressionSyntax node)
-    {
-        HasAnyEffect = true;
-    }
+    public override void VisitArrayCreationExpression(ArrayCreationExpressionSyntax node) => HasAnyEffect = true;
 
-    public override void VisitImplicitArrayCreationExpression(ImplicitArrayCreationExpressionSyntax node)
-    {
-        HasAnyEffect = true;
-    }
+    public override void VisitImplicitArrayCreationExpression(ImplicitArrayCreationExpressionSyntax node) => HasAnyEffect = true;
 
     public override void VisitArgument(ArgumentSyntax node)
     {
         var kind = node.RefOrOutKeyword.Kind();
+
         if (kind == SyntaxKind.RefKeyword || kind == SyntaxKind.OutKeyword)
-        {
             HasAnyEffect = true;
-        }
     }
 
-    public override void VisitAwaitExpression(AwaitExpressionSyntax node)
-    {
-        HasAnyEffect = true;
-    }
+    public override void VisitAwaitExpression(AwaitExpressionSyntax node) => HasAnyEffect = true;
 }

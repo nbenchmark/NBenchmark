@@ -9,7 +9,8 @@ using NBenchmark.Analyzers.Shared;
 
 namespace NBenchmark.CodeFixes.CodeFixes;
 
-[ExportCodeFixProvider(LanguageNames.CSharp), Shared]
+[ExportCodeFixProvider(LanguageNames.CSharp)]
+[Shared]
 public sealed class RemoveStaticKeywordCodeFixProvider : CodeFixProvider
 {
     public override ImmutableArray<string> FixableDiagnosticIds =>
@@ -21,6 +22,7 @@ public sealed class RemoveStaticKeywordCodeFixProvider : CodeFixProvider
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+
         if (root is null)
             return;
 
@@ -38,7 +40,7 @@ public sealed class RemoveStaticKeywordCodeFixProvider : CodeFixProvider
             CodeAction.Create(
                 "Remove static modifier",
                 cancellationToken => RemoveStaticAsync(context.Document, methodDecl, cancellationToken),
-                equivalenceKey: "RemoveStatic"),
+                "RemoveStatic"),
             diagnostic);
     }
 
@@ -48,10 +50,12 @@ public sealed class RemoveStaticKeywordCodeFixProvider : CodeFixProvider
         CancellationToken cancellationToken)
     {
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+
         if (root is null)
             return document;
 
         var staticToken = methodDecl.Modifiers.FirstOrDefault(m => m.IsKind(SyntaxKind.StaticKeyword));
+
         if (staticToken.IsKind(SyntaxKind.None))
             return document;
 

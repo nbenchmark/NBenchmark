@@ -60,6 +60,7 @@ public class BenchmarkHostCliTests
                     "--iterations", "20",
                     "--warmup", "3",
                 ]);
+
                 host.AddFromAssembly<TestBenchmarks>().WithRunOrder(RunOrder.Declaration)
                     .RunAsync().GetAwaiter().GetResult();
             });
@@ -80,7 +81,8 @@ public class BenchmarkHostCliTests
 
         try
         {
-            string stderr = string.Empty;
+            var stderr = string.Empty;
+
             CaptureConsoleOutput(() =>
             {
                 stderr = CaptureConsoleError(() =>
@@ -91,6 +93,7 @@ public class BenchmarkHostCliTests
                         "--iterations", "20",
                         "--warmup", "3",
                     ]);
+
                     host.AddFromAssembly<SlowVsBaselineBenchmarks>().WithRunOrder(RunOrder.Declaration)
                         .RunAsync().GetAwaiter().GetResult();
                 });
@@ -131,8 +134,8 @@ public class BenchmarkHostCliTests
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithProgress(new OrderingProgress(
-                    onSuiteStarting: () => events.Add("onSuiteStarting"),
-                    onSuiteCompleted: () => events.Add("onSuiteCompleted")))
+                    () => events.Add("onSuiteStarting"),
+                    () => events.Add("onSuiteCompleted")))
                 .RunAsync();
         });
 
@@ -212,7 +215,8 @@ public class BenchmarkHostCliTests
 
         try
         {
-            string stderr = string.Empty;
+            var stderr = string.Empty;
+
             CaptureConsoleOutput(() =>
             {
                 stderr = CaptureConsoleError(() =>
@@ -259,36 +263,6 @@ public class BenchmarkHostCliTests
             if (Directory.Exists(tempDir))
                 Directory.Delete(tempDir, true);
         }
-    }
-
-    private sealed class CustomNamedReporter : IReporter
-    {
-        public int ReportCount { get; private set; }
-        public string Name => "custom";
-        public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
-        {
-            ReportCount++;
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class OrderingProgress : IBenchmarkProgress
-    {
-        private readonly Action _onSuiteStarting;
-        private readonly Action _onSuiteCompleted;
-
-        public OrderingProgress(Action onSuiteStarting, Action onSuiteCompleted)
-        {
-            _onSuiteStarting = onSuiteStarting;
-            _onSuiteCompleted = onSuiteCompleted;
-        }
-
-        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) { _onSuiteStarting(); return Task.CompletedTask; }
-        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
-        public Task OnWarmupCompleted(string name) => Task.CompletedTask;
-        public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
-        public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) { _onSuiteCompleted(); return Task.CompletedTask; }
     }
 
     private static string CaptureConsoleOutput(Action action)
@@ -358,37 +332,73 @@ public class BenchmarkHostCliTests
             Console.SetOut(original);
         }
     }
+
+    private sealed class CustomNamedReporter : IReporter
+    {
+        public int ReportCount { get; private set; }
+        public string Name => "custom";
+
+        public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
+        {
+            ReportCount++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class OrderingProgress : IBenchmarkProgress
+    {
+        private readonly Action _onSuiteCompleted;
+        private readonly Action _onSuiteStarting;
+
+        public OrderingProgress(Action onSuiteStarting, Action onSuiteCompleted)
+        {
+            _onSuiteStarting = onSuiteStarting;
+            _onSuiteCompleted = onSuiteCompleted;
+        }
+
+        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
+        {
+            _onSuiteStarting();
+            return Task.CompletedTask;
+        }
+
+        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
+        public Task OnWarmupCompleted(string name) => Task.CompletedTask;
+        public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
+        public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
+
+        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
+        {
+            _onSuiteCompleted();
+            return Task.CompletedTask;
+        }
+    }
 }
 
 public class TestBenchmarks
 {
     [Benchmark]
-    public int Fast()
-    {
-        return 1 + 1;
-    }
+    public int Fast() => 1 + 1;
 
     [Benchmark(Baseline = true)]
-    public int FastBaseline()
-    {
-        return 2 + 2;
-    }
+    public int FastBaseline() => 2 + 2;
 }
 
 public class SlowVsBaselineBenchmarks
 {
     [Benchmark(Baseline = true)]
-    public int FastBaseline()
-    {
-        return 2 + 2;
-    }
+    public int FastBaseline() => 2 + 2;
 
     [Benchmark]
     public int Slow()
     {
         var sum = 0;
+
         for (var i = 0; i < 1000; i++)
+        {
             sum += i;
+        }
+
         return sum;
     }
 }

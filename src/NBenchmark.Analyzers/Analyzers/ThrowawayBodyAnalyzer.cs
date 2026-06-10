@@ -46,6 +46,7 @@ public sealed class ThrowawayBodyAnalyzer : DiagnosticAnalyzer
             return;
 
         var methodSymbol = context.SemanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+
         if (methodSymbol is null)
             return;
 
@@ -62,6 +63,7 @@ public sealed class ThrowawayBodyAnalyzer : DiagnosticAnalyzer
             return;
 
         var invokeMethod = delegateType.DelegateInvokeMethod;
+
         if (invokeMethod is null || !invokeMethod.ReturnsVoid)
             return;
 

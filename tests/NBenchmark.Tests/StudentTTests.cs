@@ -38,27 +38,18 @@ public class StudentTTests
     }
 
     [Fact]
-    public void CriticalValue_Higher_Confidence_Is_Larger()
-    {
-        Assert.True(StudentT.CriticalValue(0.99, 20) > StudentT.CriticalValue(0.95, 20));
-    }
+    public void CriticalValue_Higher_Confidence_Is_Larger() => Assert.True(StudentT.CriticalValue(0.99, 20) > StudentT.CriticalValue(0.95, 20));
 
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    public void CriticalValue_Invalid_Df_Returns_NaN(int df)
-    {
-        Assert.True(double.IsNaN(StudentT.CriticalValue(0.95, df)));
-    }
+    public void CriticalValue_Invalid_Df_Returns_NaN(int df) => Assert.True(double.IsNaN(StudentT.CriticalValue(0.95, df)));
 
     [Theory]
     [InlineData(0.0)]
     [InlineData(1.0)]
     [InlineData(1.5)]
-    public void CriticalValue_Invalid_Confidence_Returns_NaN(double level)
-    {
-        Assert.True(double.IsNaN(StudentT.CriticalValue(level, 30)));
-    }
+    public void CriticalValue_Invalid_Confidence_Returns_NaN(double level) => Assert.True(double.IsNaN(StudentT.CriticalValue(level, 30)));
 
     [Fact]
     public void NormalQuantile_Matches_Known_Values()

@@ -1,8 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
 using NBenchmark.Attributes;
-using NBenchmark.Reporters.Console;
 using NBenchmark.DependencyInjection;
+using NBenchmark.Reporters.Console;
 
 var services = new ServiceCollection()
     .AddSingleton<IDataStore, InMemoryDataStore>()
@@ -18,8 +18,8 @@ await BenchmarkHost.Create(args)
 
 public interface IDataStore
 {
-    int Read();
-    void Write(int value);
+    public int Read();
+    public void Write(int value);
 }
 
 public sealed class InMemoryDataStore : IDataStore
@@ -38,10 +38,7 @@ public sealed class OrderRepository(IDataStore store)
 public sealed class DependencyInjectionBenchmarks(OrderRepository repository)
 {
     [Benchmark]
-    public int Read()
-    {
-        return repository.GetCurrent();
-    }
+    public int Read() => repository.GetCurrent();
 
     [Benchmark]
     public int Write()

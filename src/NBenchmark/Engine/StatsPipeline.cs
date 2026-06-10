@@ -32,8 +32,12 @@ internal static class StatsPipeline
     private static long ComputeMean(long[] values)
     {
         double sum = 0;
+
         for (var i = 0; i < values.Length; i++)
+        {
             sum += values[i];
+        }
+
         return (long)(sum / values.Length);
     }
 
@@ -41,8 +45,10 @@ internal static class StatsPipeline
     {
         for (var i = 1; i < values.Length; i++)
         {
-            if (values[i] < values[i - 1]) return false;
+            if (values[i] < values[i - 1])
+                return false;
         }
+
         return true;
     }
 }

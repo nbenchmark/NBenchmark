@@ -52,8 +52,10 @@ internal sealed record CliArgs
                     {
                         Console.Error.WriteLine(
                             $"Invalid --iterations value '{args[i]}'. Must be {MeasurementOptions.MinIterations}–{MeasurementOptions.MaxIterations}.");
+
                         Environment.ExitCode = 1;
                     }
+
                     break;
                 case "--warmup" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var warmup)
@@ -64,22 +66,27 @@ internal sealed record CliArgs
                     {
                         Console.Error.WriteLine(
                             $"Invalid --warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupIterations}.");
+
                         Environment.ExitCode = 1;
                     }
+
                     break;
                 case "--output" when i + 1 < args.Length:
                     outputDir = PathValidation.ValidateOutputPath(args[++i]);
                     break;
                 case "--reporter" when i + 1 < args.Length:
                     var name = args[++i];
+
                     if (ReporterRegistry.TryCreate(name, null, out var reporter))
                         cliReporters.Add(reporter);
                     else
                     {
                         Console.Error.WriteLine(
                             $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
+
                         Environment.ExitCode = 1;
                     }
+
                     break;
                 case "--confidence" when i + 1 < args.Length:
                     if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var conf)
@@ -89,11 +96,14 @@ internal sealed record CliArgs
                     {
                         Console.Error.WriteLine(
                             $"Invalid --confidence value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.95).");
+
                         Environment.ExitCode = 1;
                     }
+
                     break;
                 case "--order" when i + 1 < args.Length:
                     var order = args[++i];
+
                     if (string.Equals(order, "declaration", StringComparison.OrdinalIgnoreCase))
                         runOrder = NBenchmark.RunOrder.Declaration;
                     else if (string.Equals(order, "random", StringComparison.OrdinalIgnoreCase))
@@ -102,8 +112,10 @@ internal sealed record CliArgs
                     {
                         Console.Error.WriteLine(
                             $"Invalid --order value '{order}'. Must be 'random' or 'declaration'.");
+
                         Environment.ExitCode = 1;
                     }
+
                     break;
                 case "--threshold-pct" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var tPct)
@@ -113,8 +125,10 @@ internal sealed record CliArgs
                     {
                         Console.Error.WriteLine(
                             $"Invalid --threshold-pct value '{args[i]}'. Must be a positive integer (1 or greater).");
+
                         Environment.ExitCode = 1;
                     }
+
                     break;
                 case "--seed" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var seedVal))
@@ -124,6 +138,7 @@ internal sealed record CliArgs
                         Console.Error.WriteLine($"Invalid --seed value '{args[i]}'. Must be an integer.");
                         Environment.ExitCode = 1;
                     }
+
                     break;
                 case "--list":
                     listOnly = true;

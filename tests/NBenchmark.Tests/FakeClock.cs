@@ -4,8 +4,8 @@ namespace NBenchmark.Tests;
 
 internal sealed class FakeClock : IClock
 {
-    private readonly Queue<TimeSpan> _scheduledElapsed;
     private readonly Dictionary<long, TimeSpan> _elapsedByTimestamp = [];
+    private readonly Queue<TimeSpan> _scheduledElapsed;
     private long _nextTimestamp = 1;
 
     public FakeClock(IEnumerable<TimeSpan> scheduledElapsed)

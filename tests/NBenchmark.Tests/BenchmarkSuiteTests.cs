@@ -116,8 +116,8 @@ public class BenchmarkSuiteTests
             .WithSuiteSetup(() => events.Add("setup"))
             .WithSuiteTeardown(() => events.Add("teardown"))
             .WithProgress(new OrderingProgress(
-                onSuiteStarting: () => events.Add("onSuiteStarting"),
-                onSuiteCompleted: () => events.Add("onSuiteCompleted")));
+                () => events.Add("onSuiteStarting"),
+                () => events.Add("onSuiteCompleted")));
 
         await suite.RunAsync();
 
@@ -126,8 +126,8 @@ public class BenchmarkSuiteTests
 
     private sealed class OrderingProgress : IBenchmarkProgress
     {
-        private readonly Action _onSuiteStarting;
         private readonly Action _onSuiteCompleted;
+        private readonly Action _onSuiteStarting;
 
         public OrderingProgress(Action onSuiteStarting, Action onSuiteCompleted)
         {
@@ -135,12 +135,22 @@ public class BenchmarkSuiteTests
             _onSuiteCompleted = onSuiteCompleted;
         }
 
-        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) { _onSuiteStarting(); return Task.CompletedTask; }
+        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
+        {
+            _onSuiteStarting();
+            return Task.CompletedTask;
+        }
+
         public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
         public Task OnWarmupCompleted(string name) => Task.CompletedTask;
         public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
         public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) { _onSuiteCompleted(); return Task.CompletedTask; }
+
+        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
+        {
+            _onSuiteCompleted();
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class CapturingProgress : IBenchmarkProgress

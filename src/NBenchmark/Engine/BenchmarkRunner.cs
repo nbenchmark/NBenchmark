@@ -10,9 +10,12 @@ namespace NBenchmark.Engine;
 /// </summary>
 public sealed class BenchmarkRunner
 {
-    private readonly StopwatchClock _clock;
+    // ---------- JIT-elision sink ----------
 
-    public static BenchmarkRunner Instance { get; } = new();
+    private static int _holeInt;
+    private static long _holeLong;
+    private static double _holeDouble;
+    private readonly StopwatchClock _clock;
 
     public BenchmarkRunner() : this(StopwatchClock.WallClock)
     {
@@ -22,6 +25,8 @@ public sealed class BenchmarkRunner
     {
         _clock = StopwatchClock.Wrap(clock ?? throw new ArgumentNullException(nameof(clock)));
     }
+
+    public static BenchmarkRunner Instance { get; } = new();
 
     public MeasurementOutcome Run(string name, Action body, RunSpec spec, CancellationToken ct = default)
         => RunSyncVoid(name, body, spec, ct);
@@ -231,6 +236,7 @@ public sealed class BenchmarkRunner
             spec.IterationSetup?.Invoke();
 
             AllocationSnapshot allocBefore = default;
+
             if (options.MeasureAllocations)
                 allocBefore = CaptureAllocationSnapshot();
 
@@ -266,6 +272,7 @@ public sealed class BenchmarkRunner
             spec.IterationSetup?.Invoke();
 
             AllocationSnapshot allocBefore = default;
+
             if (options.MeasureAllocations)
                 allocBefore = CaptureAllocationSnapshot();
 
@@ -301,6 +308,7 @@ public sealed class BenchmarkRunner
             spec.IterationSetup?.Invoke();
 
             AllocationSnapshot allocBefore = default;
+
             if (options.MeasureAllocations)
                 allocBefore = CaptureAllocationSnapshot();
 
@@ -318,7 +326,8 @@ public sealed class BenchmarkRunner
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(Func<Task<T>> body, RunSpec spec, CancellationToken ct)
+    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(Func<Task<T>> body, RunSpec spec,
+        CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
@@ -336,6 +345,7 @@ public sealed class BenchmarkRunner
             spec.IterationSetup?.Invoke();
 
             AllocationSnapshot allocBefore = default;
+
             if (options.MeasureAllocations)
                 allocBefore = CaptureAllocationSnapshot();
 
@@ -374,6 +384,7 @@ public sealed class BenchmarkRunner
         TimeSpan measuredDuration)
     {
         var pipeline = StatsPipeline.Run(timings, allocations, spec.Options);
+
         return OutcomeBuilder.Build(
             new RunOutcome.Success(pipeline, timings),
             name,
@@ -395,12 +406,6 @@ public sealed class BenchmarkRunner
             _clock.GetElapsedTime(totalStartTimestamp),
             TimeSpan.Zero);
     }
-
-    // ---------- JIT-elision sink ----------
-
-    private static int _holeInt;
-    private static long _holeLong;
-    private static double _holeDouble;
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Consume(int value) => Volatile.Write(ref _holeInt, value);
@@ -435,35 +440,6 @@ public sealed class BenchmarkRunner
     public static Action<T> GetResultConsumer<T>() =>
         JitSinkCache<T>.Instance;
 
-    private static class JitSinkCache<T>
-    {
-        public static readonly Action<T> Instance = CreateTypedConsumer();
-
-        // Closed-generic static field - one instance per T. Reference-type T
-        // stores a reference (no alloc); value-type T stores the value
-        // directly (no box on assign). This sink is best-effort anti-elision
-        // state and not a synchronization primitive.
-        public static T? _hole;
-
-        private static Action<T> CreateTypedConsumer()
-        {
-            if (typeof(T) == typeof(int))
-                return (Action<T>)(object)(Action<int>)(static v => Consume(v));
-            if (typeof(T) == typeof(long))
-                return (Action<T>)(object)(Action<long>)(static v => Consume(v));
-            if (typeof(T) == typeof(double))
-                return (Action<T>)(object)(Action<double>)(static v => Consume(v));
-            if (typeof(T) == typeof(bool))
-                return (Action<T>)(object)(Action<bool>)(static v => Consume(v));
-            // For every other T (reference types, structs, decimals, enums,
-            // etc.), this static delegate writes directly to the closed-generic
-            // JIT sink field with no boxing and no runtime expression compile.
-            return static v => Consume(v);
-        }
-    }
-
-    private readonly record struct AllocationSnapshot(long ThreadBytes, long ProcessBytes, int ThreadId);
-
     private static AllocationSnapshot CaptureAllocationSnapshot()
     {
         return new AllocationSnapshot(
@@ -496,4 +472,37 @@ public sealed class BenchmarkRunner
         GC.WaitForPendingFinalizers();
         GC.Collect(2, GCCollectionMode.Forced, true, true);
     }
+
+    private static class JitSinkCache<T>
+    {
+        public static readonly Action<T> Instance = CreateTypedConsumer();
+
+        // Closed-generic static field - one instance per T. Reference-type T
+        // stores a reference (no alloc); value-type T stores the value
+        // directly (no box on assign). This sink is best-effort anti-elision
+        // state and not a synchronization primitive.
+        public static T? _hole;
+
+        private static Action<T> CreateTypedConsumer()
+        {
+            if (typeof(T) == typeof(int))
+                return (Action<T>)(object)(Action<int>)(static v => Consume(v));
+
+            if (typeof(T) == typeof(long))
+                return (Action<T>)(object)(Action<long>)(static v => Consume(v));
+
+            if (typeof(T) == typeof(double))
+                return (Action<T>)(object)(Action<double>)(static v => Consume(v));
+
+            if (typeof(T) == typeof(bool))
+                return (Action<T>)(object)(Action<bool>)(static v => Consume(v));
+
+            // For every other T (reference types, structs, decimals, enums,
+            // etc.), this static delegate writes directly to the closed-generic
+            // JIT sink field with no boxing and no runtime expression compile.
+            return static v => Consume(v);
+        }
+    }
+
+    private readonly record struct AllocationSnapshot(long ThreadBytes, long ProcessBytes, int ThreadId);
 }

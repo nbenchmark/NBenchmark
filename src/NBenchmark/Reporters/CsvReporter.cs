@@ -17,7 +17,8 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         Directory.CreateDirectory(_outputDirectory);
 
         var fileName = name
-            ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.csv";
+                       ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.csv";
+
         var filePath = Path.Combine(_outputDirectory, fileName);
 
         var sb = new StringBuilder();
