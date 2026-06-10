@@ -6,7 +6,7 @@ using NBenchmark.Integration.Abstractions;
 
 namespace NBenchmark.Integration.MSTest;
 
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+[AttributeUsage(AttributeTargets.Method)]
 public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerformanceThresholds
 {
     public double MaxMeanNs { get; init; } = -1;
@@ -25,12 +25,13 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
         var methodInfo = testMethod.MethodInfo;
         var name = $"{testMethod.TestClassName}.{testMethod.TestMethodName}";
         var args = testMethod.Arguments ?? Array.Empty<object?>();
+
         var runSpec = new RunSpec
         {
             Options = MeasurementOptionsBuilder.Build(this),
         };
 
-        object? instance = methodInfo.IsStatic ? null : CreateInstance(methodInfo);
+        var instance = methodInfo.IsStatic ? null : CreateInstance(methodInfo);
 
         BenchmarkResult result;
 
@@ -43,14 +44,13 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
                     if (body is Func<Task> taskBody)
                     {
                         var outcome = BenchmarkRunner.Instance.RunAsync(
-                            name, taskBody, runSpec, CancellationToken.None)
+                                name, taskBody, runSpec, CancellationToken.None)
                             .GetAwaiter().GetResult();
+
                         result = outcome.Result;
                     }
                     else
-                    {
                         return [CreateErrorResult($"Unsupported async body type for method {methodInfo.Name}.")];
-                    }
                 }
                 else
                 {
@@ -58,18 +58,15 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
                     {
                         var outcome = BenchmarkRunner.Instance.Run(
                             name, actionBody, runSpec, CancellationToken.None);
+
                         result = outcome.Result;
                     }
                     else
-                    {
                         return [CreateErrorResult($"Unsupported sync body type for method {methodInfo.Name}.")];
-                    }
                 }
             }
             else
-            {
                 return [CreateErrorResult($"Could not build body for method {methodInfo.Name}.")];
-            }
         }
         catch (Exception ex)
         {
@@ -77,6 +74,7 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
         }
 
         var violations = ValidateResult(result, this);
+
         var testResult = new TestResult
         {
             DisplayName = testMethod.TestMethodName,
@@ -95,9 +93,7 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
             testResult.TestFailureException = new PerformanceAssertException($"Benchmark errored: {result.ErrorMessage}");
         }
         else
-        {
             testResult.Outcome = UnitTestOutcome.Passed;
-        }
 
         return [testResult];
     }
@@ -145,11 +141,12 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
     private static object CreateInstance(MethodInfo method)
     {
         var declaringType = method.DeclaringType
-            ?? throw new InvalidOperationException(
-                $"Method {method.Name} has no declaring type and cannot be invoked on an instance.");
+                            ?? throw new InvalidOperationException(
+                                $"Method {method.Name} has no declaring type and cannot be invoked on an instance.");
+
         return Activator.CreateInstance(declaringType)
-            ?? throw new InvalidOperationException(
-                $"Failed to create instance of {declaringType.FullName} for benchmark method {method.Name}.");
+               ?? throw new InvalidOperationException(
+                   $"Failed to create instance of {declaringType.FullName} for benchmark method {method.Name}.");
     }
 
     private static Action BuildSyncBody(MethodInfo method, object? instance, object?[] args)
@@ -201,6 +198,7 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
         return async () =>
         {
             var task = invokeTask();
+
             if (task is not null)
                 await task.ConfigureAwait(false);
         };
@@ -210,9 +208,7 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
     {
         if (returnType == typeof(Task)
             || (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>)))
-        {
             return Expression.Convert(call, typeof(Task));
-        }
 
         if (returnType == typeof(ValueTask))
             return Expression.Call(call, nameof(ValueTask.AsTask), Type.EmptyTypes);
@@ -232,6 +228,7 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
     private static MethodCallExpression BuildCall(MethodInfo method, object? instance, object?[] args)
     {
         var parameters = method.GetParameters();
+
         if (parameters.Length != args.Length)
         {
             throw new InvalidOperationException(
@@ -239,6 +236,7 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
         }
 
         var argExpressions = new Expression[parameters.Length];
+
         for (var i = 0; i < parameters.Length; i++)
         {
             argExpressions[i] = Expression.Constant(args[i], parameters[i].ParameterType);
@@ -254,8 +252,5 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
         return Expression.Call(typedInstance, method, argExpressions);
     }
 
-    private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask)
-    {
-        return valueTask.AsTask();
-    }
+    private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask) => valueTask.AsTask();
 }

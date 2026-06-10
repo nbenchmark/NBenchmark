@@ -2,7 +2,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using NBenchmark.Engine;
 using NBenchmark.Integration.Abstractions;
-using Xunit;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
@@ -44,9 +43,6 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         _skipReason = _data?.SkipReason;
     }
 
-    protected override string GetSkipReason(IAttributeInfo factAttribute) =>
-        _skipReason ?? base.GetSkipReason(factAttribute);
-
     Task<RunSummary> IXunitTestCase.RunAsync(
         IMessageSink diagnosticMessageSink,
         IMessageBus messageBus,
@@ -54,6 +50,9 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         ExceptionAggregator aggregator,
         CancellationTokenSource cancellationTokenSource)
         => RunPerformanceTestAsync(messageBus, constructorArguments, aggregator, cancellationTokenSource);
+
+    protected override string GetSkipReason(IAttributeInfo factAttribute) =>
+        _skipReason ?? base.GetSkipReason(factAttribute);
 
     private async Task<RunSummary> RunPerformanceTestAsync(
         IMessageBus messageBus,
@@ -100,6 +99,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                     var name = $"{TestMethod.TestClass.Class.Name}.{TestMethod.Method.Name}";
 
                     BenchmarkResult result;
+
                     if (TryBuildBody(methodInfo, instance, methodArgs, out var body, out var isAsync))
                     {
                         if (isAsync)
@@ -108,12 +108,11 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                             {
                                 var outcome = await BenchmarkRunner.Instance.RunAsync(
                                     name, taskBody, runSpec, cancellationTokenSource.Token);
+
                                 result = outcome.Result;
                             }
                             else
-                            {
                                 throw new InvalidOperationException("Async body must be Func<Task>.");
-                            }
                         }
                         else
                         {
@@ -121,18 +120,15 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                             {
                                 var outcome = BenchmarkRunner.Instance.Run(
                                     name, actionBody, runSpec, cancellationTokenSource.Token);
+
                                 result = outcome.Result;
                             }
                             else
-                            {
                                 throw new InvalidOperationException("Sync body must be Action.");
-                            }
                         }
                     }
                     else
-                    {
                         throw new InvalidOperationException($"Could not build body for method {methodInfo.Name}.");
-                    }
 
                     var violations = ValidateResult(result, data);
                     var output = MetricsFormatter.Format(result);
@@ -145,16 +141,13 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                         messageBus.QueueMessage(new TestFailed(test, timer.Total, output, exception));
                     }
                     else
-                    {
                         messageBus.QueueMessage(new TestPassed(test, timer.Total, output));
-                    }
                 }
                 finally
                 {
                     if (instance is not null)
                         await DisposeTestClassInstanceAsync(instance).ConfigureAwait(false);
                 }
-
             });
         }
         catch (Exception ex)
@@ -251,6 +244,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         return async () =>
         {
             var task = invokeTask();
+
             if (task is not null)
                 await task.ConfigureAwait(false);
         };
@@ -260,9 +254,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
     {
         if (returnType == typeof(Task)
             || (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>)))
-        {
             return Expression.Convert(call, typeof(Task));
-        }
 
         if (returnType == typeof(ValueTask))
             return Expression.Call(call, nameof(ValueTask.AsTask), Type.EmptyTypes);
@@ -282,6 +274,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
     private static MethodCallExpression BuildCall(MethodInfo method, object? instance, object[] args)
     {
         var parameters = method.GetParameters();
+
         if (parameters.Length != args.Length)
         {
             throw new InvalidOperationException(
@@ -289,6 +282,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         }
 
         var argExpressions = new Expression[parameters.Length];
+
         for (var i = 0; i < parameters.Length; i++)
         {
             argExpressions[i] = Expression.Constant(args[i], parameters[i].ParameterType);
@@ -304,10 +298,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         return Expression.Call(typedInstance, method, argExpressions);
     }
 
-    private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask)
-    {
-        return valueTask.AsTask();
-    }
+    private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask) => valueTask.AsTask();
 
     private static async ValueTask DisposeTestClassInstanceAsync(object instance)
     {

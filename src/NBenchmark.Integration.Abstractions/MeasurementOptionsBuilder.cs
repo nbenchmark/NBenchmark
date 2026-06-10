@@ -1,5 +1,3 @@
-using NBenchmark.Engine;
-
 namespace NBenchmark.Integration.Abstractions;
 
 public static class MeasurementOptionsBuilder
@@ -10,10 +8,13 @@ public static class MeasurementOptionsBuilder
 
         if (thresholds.Iterations > 0)
             options = options with { Iterations = thresholds.Iterations };
+
         if (thresholds.WarmupIterations > 0)
             options = options with { WarmupIterations = thresholds.WarmupIterations };
+
         if (thresholds.MeasureAllocations || thresholds.MaxAllocatedBytes >= 0)
             options = options with { MeasureAllocations = true };
+
         options = options with
         {
             OutlierMode = NormalizeOutlierMode(thresholds.OutlierMode),

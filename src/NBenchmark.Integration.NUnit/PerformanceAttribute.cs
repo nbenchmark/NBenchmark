@@ -7,10 +7,18 @@ using NUnit.Framework.Internal.Commands;
 
 namespace NBenchmark.Integration.NUnit;
 
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+[AttributeUsage(AttributeTargets.Method)]
 public sealed class PerformanceAttribute : NUnitAttribute, ISimpleTestBuilder, IWrapTestMethod, IApplyToTest, IPerformanceThresholds
 {
     private readonly NUnitTestCaseBuilder _builder = new();
+
+    public void ApplyToTest(Test test)
+    {
+        if (test.RunState == RunState.NotRunnable)
+            return;
+
+        test.Properties.Set(PropertyNames.Description, $"Performance: {test.Name}");
+    }
 
     public double MaxMeanNs { get; init; } = -1;
     public double MaxP95Ns { get; init; } = -1;
@@ -37,6 +45,8 @@ public sealed class PerformanceAttribute : NUnitAttribute, ISimpleTestBuilder, I
         return _builder.BuildTestMethod(method, suite, parms);
     }
 
+    public TestCommand Wrap(TestCommand command) => new PerformanceCommand(command, this);
+
     private static bool RequiresExpectedResultPlaceholder(Type returnType)
     {
         if (returnType == typeof(void))
@@ -48,23 +58,11 @@ public sealed class PerformanceAttribute : NUnitAttribute, ISimpleTestBuilder, I
         if (returnType.IsGenericType)
         {
             var def = returnType.GetGenericTypeDefinition();
+
             if (def == typeof(Task<>) || def == typeof(ValueTask<>))
                 return true;
         }
 
         return true;
-    }
-
-    public TestCommand Wrap(TestCommand command)
-    {
-        return new PerformanceCommand(command, this);
-    }
-
-    public void ApplyToTest(Test test)
-    {
-        if (test.RunState == RunState.NotRunnable)
-            return;
-
-        test.Properties.Set(PropertyNames.Description, $"Performance: {test.Name}");
     }
 }

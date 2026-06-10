@@ -25,7 +25,7 @@ internal static class PerformanceAttributeParser
             Iterations = NormalizeIterations(ParseInt(attribute, nameof(PerformanceFactAttribute.Iterations))),
             WarmupIterations = NormalizeIterations(ParseInt(attribute, nameof(PerformanceFactAttribute.WarmupIterations))),
             MeasureAllocations = ParseBool(attribute, nameof(PerformanceFactAttribute.MeasureAllocations)),
-            OutlierMode = NormalizeOutlierMode(ParseOutlierMode(attribute), treatNoneAsUnset: true),
+            OutlierMode = NormalizeOutlierMode(ParseOutlierMode(attribute), true),
             ConfidenceLevel = NormalizeConfidenceLevel(ParseDouble(attribute, nameof(PerformanceFactAttribute.ConfidenceLevel))),
         };
     }
@@ -47,22 +47,16 @@ internal static class PerformanceAttributeParser
             Iterations = NormalizeIterations(runtime.Iterations),
             WarmupIterations = NormalizeIterations(runtime.WarmupIterations),
             MeasureAllocations = runtime.MeasureAllocations,
-            OutlierMode = NormalizeOutlierMode(runtime.OutlierMode, treatNoneAsUnset: false),
+            OutlierMode = NormalizeOutlierMode(runtime.OutlierMode, false),
             ConfidenceLevel = NormalizeConfidenceLevel(runtime.ConfidenceLevel),
         };
 
         return true;
     }
 
-    private static double ParseDouble(IAttributeInfo attribute, string name)
-    {
-        return attribute.GetNamedArgument<double>(name);
-    }
+    private static double ParseDouble(IAttributeInfo attribute, string name) => attribute.GetNamedArgument<double>(name);
 
-    private static long ParseLong(IAttributeInfo attribute, string name)
-    {
-        return attribute.GetNamedArgument<long>(name);
-    }
+    private static long ParseLong(IAttributeInfo attribute, string name) => attribute.GetNamedArgument<long>(name);
 
     private static string? ParseString(IAttributeInfo attribute, string name)
     {
@@ -88,35 +82,17 @@ internal static class PerformanceAttributeParser
         return raw;
     }
 
-    private static double NormalizeThreshold(double value)
-    {
-        return value > 0 ? value : UnsetDouble;
-    }
+    private static double NormalizeThreshold(double value) => value > 0 ? value : UnsetDouble;
 
-    private static long NormalizeThreshold(long value)
-    {
-        return value > 0 ? value : UnsetLong;
-    }
+    private static long NormalizeThreshold(long value) => value > 0 ? value : UnsetLong;
 
-    private static string? NormalizeBaselinePath(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value;
-    }
+    private static string? NormalizeBaselinePath(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
-    private static int NormalizeIterations(int value)
-    {
-        return value > 0 ? value : 0;
-    }
+    private static int NormalizeIterations(int value) => value > 0 ? value : 0;
 
-    private static double NormalizeSlowdownRatio(double value)
-    {
-        return value > 0 ? value : DefaultMaxSlowdownRatio;
-    }
+    private static double NormalizeSlowdownRatio(double value) => value > 0 ? value : DefaultMaxSlowdownRatio;
 
-    private static double NormalizeConfidenceLevel(double value)
-    {
-        return value is > 0 and <= 1 ? value : DefaultConfidenceLevel;
-    }
+    private static double NormalizeConfidenceLevel(double value) => value is > 0 and <= 1 ? value : DefaultConfidenceLevel;
 
     private static OutlierMode NormalizeOutlierMode(OutlierMode value, bool treatNoneAsUnset)
     {

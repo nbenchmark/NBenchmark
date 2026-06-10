@@ -42,8 +42,10 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
+
         var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken)
             .ConfigureAwait(false);
+
         Validate(result, resolvedOptions);
         return result;
     }
@@ -57,8 +59,10 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
+
         var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken)
             .ConfigureAwait(false);
+
         Validate(result, resolvedOptions);
         return result;
     }

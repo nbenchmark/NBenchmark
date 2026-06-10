@@ -2,7 +2,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using NBenchmark.Engine;
 using NBenchmark.Integration.Abstractions;
-using NUnit.Framework;
 using NUnit.Framework.Interfaces;
 using NUnit.Framework.Internal;
 using NUnit.Framework.Internal.Commands;
@@ -44,16 +43,20 @@ public sealed class PerformanceCommand : DelegatingTestCommand
             {
                 // NUnit's DelegatingTestCommand.Execute is synchronous, so we block on the async runner.
                 var taskBody = (Func<Task>)body;
+
                 var outcome = BenchmarkRunner.Instance.RunAsync(
-                    name, taskBody, runSpec, context.CancellationToken)
+                        name, taskBody, runSpec, context.CancellationToken)
                     .GetAwaiter().GetResult();
+
                 result = outcome.Result;
             }
             else
             {
                 var actionBody = (Action)body;
+
                 var outcome = BenchmarkRunner.Instance.Run(
                     name, actionBody, runSpec, context.CancellationToken);
+
                 result = outcome.Result;
             }
 
@@ -67,9 +70,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
                 context.CurrentResult.SetResult(ResultState.Failure, message);
             }
             else
-            {
                 context.CurrentResult.SetResult(ResultState.Success);
-            }
         }
         catch (Exception ex)
         {
@@ -101,10 +102,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
         return violations;
     }
 
-    private static void WriteMetrics(TestExecutionContext context, BenchmarkResult result)
-    {
-        context.OutWriter.WriteLine(MetricsFormatter.Format(result));
-    }
+    private static void WriteMetrics(TestExecutionContext context, BenchmarkResult result) => context.OutWriter.WriteLine(MetricsFormatter.Format(result));
 
     private static Action BuildSyncBody(MethodInfo method, object? instance, object?[] args)
     {
@@ -155,6 +153,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
         return async () =>
         {
             var task = invokeTask();
+
             if (task is not null)
                 await task.ConfigureAwait(false);
         };
@@ -164,9 +163,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
     {
         if (returnType == typeof(Task)
             || (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>)))
-        {
             return Expression.Convert(call, typeof(Task));
-        }
 
         if (returnType == typeof(ValueTask))
             return Expression.Call(call, nameof(ValueTask.AsTask), Type.EmptyTypes);
@@ -186,6 +183,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
     private static MethodCallExpression BuildCall(MethodInfo method, object? instance, object?[] args)
     {
         var parameters = method.GetParameters();
+
         if (parameters.Length != args.Length)
         {
             throw new InvalidOperationException(
@@ -193,6 +191,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
         }
 
         var argExpressions = new Expression[parameters.Length];
+
         for (var i = 0; i < parameters.Length; i++)
         {
             argExpressions[i] = Expression.Constant(args[i], parameters[i].ParameterType);
@@ -208,8 +207,5 @@ public sealed class PerformanceCommand : DelegatingTestCommand
         return Expression.Call(typedInstance, method, argExpressions);
     }
 
-    private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask)
-    {
-        return valueTask.AsTask();
-    }
+    private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask) => valueTask.AsTask();
 }

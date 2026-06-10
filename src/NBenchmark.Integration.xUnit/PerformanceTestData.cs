@@ -6,20 +6,11 @@ namespace NBenchmark.Integration.xUnit;
 public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresholds
 {
     private const string NullSentinel = "\0";
-    public double MaxMeanNs { get; private set; } = -1;
-    public double MaxP95Ns { get; private set; } = -1;
-    public long MaxAllocatedBytes { get; private set; } = -1;
-    public string? BaselinePath { get; private set; }
-    public double MaxSlowdownRatio { get; private set; } = 1.2;
-    public int Iterations { get; private set; }
-    public int WarmupIterations { get; private set; }
-    public bool MeasureAllocations { get; private set; }
-    public OutlierMode OutlierMode { get; private set; } = OutlierMode.RemoveTop5Percent;
-    public double ConfidenceLevel { get; private set; } = 0.95;
-    internal string? SkipReason { get; private set; }
 
     [Obsolete("Called by the deserializer", true)]
-    public PerformanceTestData() { }
+    public PerformanceTestData()
+    {
+    }
 
     internal PerformanceTestData(
         double maxMeanNs,
@@ -47,19 +38,17 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         SkipReason = skipReason;
     }
 
-    internal static PerformanceTestData FromThresholds(IPerformanceThresholds thresholds, string? skipReason = null) =>
-        new(
-            thresholds.MaxMeanNs,
-            thresholds.MaxP95Ns,
-            thresholds.MaxAllocatedBytes,
-            thresholds.BaselinePath,
-            thresholds.MaxSlowdownRatio,
-            thresholds.Iterations,
-            thresholds.WarmupIterations,
-            thresholds.MeasureAllocations,
-            thresholds.OutlierMode,
-            thresholds.ConfidenceLevel,
-            skipReason);
+    internal string? SkipReason { get; private set; }
+    public double MaxMeanNs { get; private set; } = -1;
+    public double MaxP95Ns { get; private set; } = -1;
+    public long MaxAllocatedBytes { get; private set; } = -1;
+    public string? BaselinePath { get; private set; }
+    public double MaxSlowdownRatio { get; private set; } = 1.2;
+    public int Iterations { get; private set; }
+    public int WarmupIterations { get; private set; }
+    public bool MeasureAllocations { get; private set; }
+    public OutlierMode OutlierMode { get; private set; } = OutlierMode.RemoveTop5Percent;
+    public double ConfidenceLevel { get; private set; } = 0.95;
 
     public void Serialize(IXunitSerializationInfo info)
     {
@@ -92,4 +81,18 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         var skipReason = info.GetValue<string>(nameof(SkipReason));
         SkipReason = skipReason == NullSentinel ? null : skipReason;
     }
+
+    internal static PerformanceTestData FromThresholds(IPerformanceThresholds thresholds, string? skipReason = null) =>
+        new(
+            thresholds.MaxMeanNs,
+            thresholds.MaxP95Ns,
+            thresholds.MaxAllocatedBytes,
+            thresholds.BaselinePath,
+            thresholds.MaxSlowdownRatio,
+            thresholds.Iterations,
+            thresholds.WarmupIterations,
+            thresholds.MeasureAllocations,
+            thresholds.OutlierMode,
+            thresholds.ConfidenceLevel,
+            skipReason);
 }
