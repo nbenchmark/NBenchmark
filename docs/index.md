@@ -16,13 +16,13 @@ NBenchmark is a lightweight benchmarking library for .NET. It is designed around
 
 | Package | Description |
 |---|---|
-| `NBenchmark` | The zero-dependency core. All measurement, statistics, and file reporters. |
-| `NBenchmark.Reporters.Console` | Adds a rich terminal table and progress display via Spectre.Console. |
-| `NBenchmark.DependencyInjection` | Optional integration that lets `[Benchmark]` classes have constructor dependencies resolved from an `IServiceProvider`. |
-| `NBenchmark.Integration.xUnit` | Enforce performance thresholds as xUnit tests using `[PerformanceFact]` and `[PerformanceTheory]`. |
-| `NBenchmark.Integration.NUnit` | Enforce performance thresholds as NUnit tests using `[Performance]` or `PerformanceAssert`. |
-| `NBenchmark.Integration.MSTest` | Enforce performance thresholds as MSTest tests using `[PerformanceTestMethod]` or `PerformanceAssert`. |
-| `NBenchmark.Analyzers` | Roslyn analyzers that catch common configuration errors at compile time. See the [Analyzers page](./analyzers.md) for the full diagnostic list. |
+| `NBenchmark` | Zero-dependency core - all measurement, statistics, and file reporters. |
+| `NBenchmark.Analyzers` | Roslyn analyzers that catch common benchmark authoring mistakes at compile time. See the [Analyzers page](./analyzers.md) for the full diagnostic list. |
+| `NBenchmark.DependencyInjection` | Resolves benchmark classes from an `IServiceProvider` so they can have constructor dependencies. |
+| `NBenchmark.Reporters.Console` | Adds a rich terminal table via [Spectre.Console](https://spectreconsole.net/). |
+| `NBenchmark.Integration.xUnit` | Run NBenchmark benchmarks as xUnit tests with configurable performance thresholds. |
+| `NBenchmark.Integration.NUnit` | Run NBenchmark benchmarks as NUnit tests with configurable performance thresholds. |
+| `NBenchmark.Integration.MSTest` | Run NBenchmark benchmarks as MSTest tests with configurable performance thresholds. |
 
 ## Pick a starting point
 
