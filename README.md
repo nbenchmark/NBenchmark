@@ -17,15 +17,21 @@ NBenchmark is the easiest way to measure the speed of your .NET code. With zero 
 | Package | Description |
 |---|---|
 | `NBenchmark` | Zero-dependency core - all measurement, statistics, and file reporters. |
-| `NBenchmark.Reporters.Console` | Adds a rich terminal table via [Spectre.Console](https://spectreconsole.net/). |
-| `NBenchmark.DependencyInjection` | Resolves benchmark classes from an `IServiceProvider` so they can have constructor dependencies. |
 | `NBenchmark.Analyzers` | Roslyn analyzers that catch common benchmark authoring mistakes at compile time. |
+| `NBenchmark.DependencyInjection` | Resolves benchmark classes from an `IServiceProvider` so they can have constructor dependencies. |
+| `NBenchmark.Reporters.Console` | Adds a rich terminal table via [Spectre.Console](https://spectreconsole.net/). |
+| `NBenchmark.Integration.xUnit` | Run NBenchmark benchmarks as xUnit tests with configurable performance thresholds. |
+| `NBenchmark.Integration.NUnit` | Run NBenchmark benchmarks as NUnit tests with configurable performance thresholds. |
+| `NBenchmark.Integration.MSTest` | Run NBenchmark benchmarks as MSTest tests with configurable performance thresholds. |
 
 ```bash
 dotnet add package NBenchmark
-dotnet add package NBenchmark.Reporters.Console    # optional, for pretty terminal output
-dotnet add package NBenchmark.DependencyInjection   # optional, for benchmark classes with constructor dependencies
 dotnet add package NBenchmark.Analyzers            # optional, compile-time checks for benchmark correctness
+dotnet add package NBenchmark.DependencyInjection   # optional, for benchmark classes with constructor dependencies
+dotnet add package NBenchmark.Reporters.Console    # optional, for pretty terminal output
+dotnet add package NBenchmark.Integration.xUnit    # optional, run benchmarks as xUnit tests
+dotnet add package NBenchmark.Integration.NUnit    # optional, run benchmarks as NUnit tests
+dotnet add package NBenchmark.Integration.MSTest   # optional, run benchmarks as MSTest tests
 ```
 
 ## Quick start
