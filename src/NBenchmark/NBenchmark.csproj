@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="NBenchmark.Tests"/>
-    <InternalsVisibleTo Include="NBenchmark.Extensions.DependencyInjection"/>
+    <InternalsVisibleTo Include="NBenchmark.DependencyInjection"/>
   </ItemGroup>
 
   <ItemGroup>

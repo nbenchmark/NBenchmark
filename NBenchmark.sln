@@ -16,13 +16,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Suite", "samples\Suite\Suit
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Host", "samples\Host\Host.csproj", "{E7688918-FC16-4DBE-80A7-89544BE798F7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Extensions.DependencyInjection.Tests", "tests\NBenchmark.Extensions.DependencyInjection.Tests\NBenchmark.Extensions.DependencyInjection.Tests.csproj", "{570FCCF5-1D1E-42F7-9F66-615B305AEF13}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.DependencyInjection.Tests", "tests\NBenchmark.DependencyInjection.Tests\NBenchmark.DependencyInjection.Tests.csproj", "{570FCCF5-1D1E-42F7-9F66-615B305AEF13}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DependencyInjection", "samples\DependencyInjection\DependencyInjection.csproj", "{3C4F5DFE-D381-401C-A5F3-0C4A1157DC4E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Reporters.Console", "src\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj", "{33F18503-511F-4F6A-9B88-23CBA6820945}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Extensions.DependencyInjection", "src\NBenchmark.Extensions.DependencyInjection\NBenchmark.Extensions.DependencyInjection.csproj", "{35155F7A-0DD7-4B96-B056-9A19D7A0FC66}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.DependencyInjection", "src\NBenchmark.DependencyInjection\NBenchmark.DependencyInjection.csproj", "{35155F7A-0DD7-4B96-B056-9A19D7A0FC66}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Analyzers", "src\NBenchmark.Analyzers\NBenchmark.Analyzers.csproj", "{02584320-C311-445C-B661-5ABC6924E47F}"
 EndProject

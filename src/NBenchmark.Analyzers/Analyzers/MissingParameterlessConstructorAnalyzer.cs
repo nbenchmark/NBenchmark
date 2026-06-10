@@ -13,7 +13,7 @@ public sealed class MissingParameterlessConstructorAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticIds.MissingParameterlessConstructor,
         "Benchmark class must have a public parameterless constructor",
-        "Type '{0}' has [Benchmark] methods but no public parameterless constructor. Add one or use NBenchmark.Extensions.DependencyInjection.",
+        "Type '{0}' has [Benchmark] methods but no public parameterless constructor. Add one or use NBenchmark.DependencyInjection.",
         "NBenchmark.Usage",
         DiagnosticSeverity.Warning,
         true);

@@ -20,7 +20,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 
 | ID | Title | Severity | Description |
 |---|---|---|---|
-| NB0001 | Benchmark class must have a public parameterless constructor | Warning | A class or record with `[Benchmark]` methods has no public parameterless constructor. Add one, or use `NBenchmark.Extensions.DependencyInjection`. |
+| NB0001 | Benchmark class must have a public parameterless constructor | Warning | A class or record with `[Benchmark]` methods has no public parameterless constructor. Add one, or use `NBenchmark.DependencyInjection`. |
 | NB0002 | `[Benchmark]` method must not be static | Error | A method is marked `[Benchmark]` but is `static`. Only instance methods are discovered. Remove the `static` keyword. |
 | NB0003 | `[BenchmarkArguments]` must match method parameters | Error | The number of `[BenchmarkArguments]` values does not match the method's parameter count, or `[BenchmarkArguments]` is present when the method has no parameters. |
 | NB0004 | `[Benchmark]` body has no observable side effects | Info | A void `[Benchmark]` method body has no observable side effects. The JIT may eliminate it, producing 0 ns results. |
@@ -51,7 +51,7 @@ public class MyBenchmarks
 Fix options:
 
 1. Add a public parameterless constructor
-2. Use `NBenchmark.Extensions.DependencyInjection` to resolve from a DI container
+2. Use `NBenchmark.DependencyInjection` to resolve from a DI container
 
 ### NB0002 - Static benchmark method
 
