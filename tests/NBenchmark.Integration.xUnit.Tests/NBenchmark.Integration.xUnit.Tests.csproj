@@ -1,13 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <RootNamespace>NBenchmark.Extensions.DependencyInjection.Tests</RootNamespace>
+    <RootNamespace>NBenchmark.Integration.xUnit.Tests</RootNamespace>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
     <PackageReference Include="Microsoft.NET.Test.Sdk"/>
     <PackageReference Include="xunit"/>
     <PackageReference Include="xunit.runner.visualstudio">
@@ -17,7 +16,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\NBenchmark.Extensions.DependencyInjection\NBenchmark.Extensions.DependencyInjection.csproj"/>
+    <ProjectReference Include="..\..\src\NBenchmark.Integration.Abstractions\NBenchmark.Integration.Abstractions.csproj"/>
+    <ProjectReference Include="..\..\src\NBenchmark.Integration.xUnit\NBenchmark.Integration.xUnit.csproj"/>
+    <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
   </ItemGroup>
 
 </Project>

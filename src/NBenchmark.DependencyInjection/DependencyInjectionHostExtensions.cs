@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace NBenchmark.Extensions.DependencyInjection;
+namespace NBenchmark.DependencyInjection;
 
 public static class DependencyInjectionHostExtensions
 {

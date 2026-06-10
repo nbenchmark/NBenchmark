@@ -13,7 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
     <ProjectReference Include="..\..\src\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj"/>
-    <ProjectReference Include="..\..\src\NBenchmark.Extensions.DependencyInjection\NBenchmark.Extensions.DependencyInjection.csproj"/>
+    <ProjectReference Include="..\..\src\NBenchmark.DependencyInjection\NBenchmark.DependencyInjection.csproj"/>
   </ItemGroup>
 
 </Project>

@@ -52,6 +52,12 @@ Use `BenchmarkHost`, which parses CLI arguments automatically. You can filter be
 
 ## My benchmark class needs dependencies (a repository, `DbContext`, logger, etc.)
 
-Add the optional `NBenchmark.Extensions.DependencyInjection` companion package and use `UseDependencyInjection<T>` - your benchmark class can then take constructor dependencies that the container resolves.
+Add the optional `NBenchmark.DependencyInjection` companion package and use `UseDependencyInjection<T>` - your benchmark class can then take constructor dependencies that the container resolves.
 
 → [Dependency Injection guide](../guides/dependency-injection.md)
+
+## I want performance checks to run as part of my existing test suite
+
+Use one of the test framework integration packages. Replace your test attribute with the corresponding performance attribute, set threshold values as named arguments, and the benchmark runs when your tests run.
+
+→ [Integration: Test Frameworks](../integration/)

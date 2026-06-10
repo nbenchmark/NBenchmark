@@ -37,7 +37,7 @@ You only need `NBenchmark.Reporters.Console` if you want output in the terminal.
 The DI package lets `[Benchmark]` classes have **constructor dependencies** that are resolved from an `IServiceProvider`. Without it, benchmark classes must have a public parameterless constructor (the same constraint as today). See the [Dependency Injection guide](../guides/dependency-injection.md) for full details.
 
 ```bash
-dotnet add package NBenchmark.Extensions.DependencyInjection
+dotnet add package NBenchmark.DependencyInjection
 ```
 
 ```bash
@@ -55,6 +55,18 @@ dotnet add package NBenchmark.Analyzers
 ```
 
 The analyzers run automatically in the IDE and during `dotnet build`. See the [Analyzers](../analyzers.md) page for the full diagnostic reference.
+
+### Test framework integration packages (optional)
+
+The integration packages let you enforce performance thresholds as ordinary test assertions inside your existing test project. When a threshold is exceeded, the test fails.
+
+```bash
+dotnet add package NBenchmark.Integration.xUnit    # xUnit v2
+dotnet add package NBenchmark.Integration.NUnit    # NUnit 3 / 4
+dotnet add package NBenchmark.Integration.MSTest   # MSTest v2 / v3
+```
+
+Each package pulls in `NBenchmark` automatically, so you don't need a separate `NBenchmark` reference. See the [Integration](../integration/) guide for usage.
 
 ## Verify the installation
 
