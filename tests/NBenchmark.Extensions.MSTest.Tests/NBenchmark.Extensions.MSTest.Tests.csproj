@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>NBenchmark.Extensions.MSTest.Tests</RootNamespace>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+    <PackageReference Include="MSTest"/>
+    <PackageReference Include="MSTest.TestFramework"/>
+    <PackageReference Include="MSTest.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NBenchmark.Extensions.MSTest\NBenchmark.Extensions.MSTest.csproj"/>
+    <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
+  </ItemGroup>
+
+</Project>

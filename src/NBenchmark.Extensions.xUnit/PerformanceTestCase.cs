@@ -94,7 +94,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
 
                     var runSpec = new RunSpec
                     {
-                        Options = BuildMeasurementOptions(data),
+                        Options = MeasurementOptionsBuilder.Build(data),
                     };
 
                     var name = $"{TestMethod.TestClass.Class.Name}.{TestMethod.Method.Name}";
@@ -135,7 +135,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                     }
 
                     var violations = ValidateResult(result, data);
-                    var output = FormatBenchmarkOutput(result);
+                    var output = MetricsFormatter.Format(result);
 
                     if (violations.Count > 0)
                     {
@@ -180,25 +180,6 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         return Activator.CreateInstance(testClass)!;
     }
 
-    private static MeasurementOptions BuildMeasurementOptions(PerformanceTestData data)
-    {
-        var options = MeasurementOptions.Default;
-
-        if (data.Iterations > 0)
-            options = options with { Iterations = data.Iterations };
-        if (data.WarmupIterations > 0)
-            options = options with { WarmupIterations = data.WarmupIterations };
-        if (data.MeasureAllocations || data.MaxAllocatedBytes >= 0)
-            options = options with { MeasureAllocations = true };
-        options = options with
-        {
-            OutlierMode = data.OutlierMode,
-            ConfidenceLevel = data.ConfidenceLevel,
-        };
-
-        return options;
-    }
-
     internal static IReadOnlyList<string> ValidateResult(BenchmarkResult result, PerformanceTestData data)
     {
         var violations = new List<string>();
@@ -215,24 +196,10 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
 
         violations.AddRange(BenchmarkAssert.Validate(result, thresholds));
 
-        if (data.BaselinePath is not null)
-            violations.AddRange(RegressionBaseline.Check(result, data.BaselinePath, data.MaxSlowdownRatio));
+        if (!string.IsNullOrWhiteSpace(data.BaselinePath))
+            violations.AddRange(RegressionBaseline.Check(result, data.BaselinePath!, data.MaxSlowdownRatio));
 
         return violations;
-    }
-
-    private static string FormatBenchmarkOutput(BenchmarkResult result)
-    {
-        var allocations = result.MeanAllocatedBytes.HasValue
-            ? $"{result.MeanAllocatedBytes.Value} B"
-            : "n/a";
-
-        return
-            $"NBenchmark metrics{Environment.NewLine}" +
-            $"Mean: {result.Mean:F2} ns{Environment.NewLine}" +
-            $"P95: {result.P95:F2} ns{Environment.NewLine}" +
-            $"Allocations: {allocations}{Environment.NewLine}" +
-            $"Iterations: {result.MeasuredIterations} (warmup: {result.WarmupIterations})";
     }
 
     private static Action BuildSyncBody(MethodInfo method, object? instance, object[] args)

@@ -3,7 +3,7 @@ using Xunit.Abstractions;
 
 namespace NBenchmark.Extensions.xUnit;
 
-public sealed class PerformanceTestData : IXunitSerializable
+public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresholds
 {
     private const string NullSentinel = "\0";
     public double MaxMeanNs { get; private set; } = -1;
@@ -47,7 +47,7 @@ public sealed class PerformanceTestData : IXunitSerializable
         SkipReason = skipReason;
     }
 
-    public static PerformanceTestData FromThresholds(IPerformanceThresholds thresholds, string? skipReason = null) =>
+    internal static PerformanceTestData FromThresholds(IPerformanceThresholds thresholds, string? skipReason = null) =>
         new(
             thresholds.MaxMeanNs,
             thresholds.MaxP95Ns,

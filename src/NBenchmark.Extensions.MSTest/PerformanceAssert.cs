@@ -14,7 +14,7 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
-        var result = Benchmark.Run(action, BuildMeasurementOptions(resolvedOptions), name, cancellationToken);
+        var result = Benchmark.Run(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken);
         Validate(result, resolvedOptions);
         return result;
     }
@@ -28,7 +28,7 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
-        var result = Benchmark.Run(action, BuildMeasurementOptions(resolvedOptions), name, cancellationToken);
+        var result = Benchmark.Run(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken);
         Validate(result, resolvedOptions);
         return result;
     }
@@ -42,7 +42,7 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
-        var result = await Benchmark.RunAsync(action, BuildMeasurementOptions(resolvedOptions), name, cancellationToken)
+        var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken)
             .ConfigureAwait(false);
         Validate(result, resolvedOptions);
         return result;
@@ -57,7 +57,7 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
-        var result = await Benchmark.RunAsync(action, BuildMeasurementOptions(resolvedOptions), name, cancellationToken)
+        var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken)
             .ConfigureAwait(false);
         Validate(result, resolvedOptions);
         return result;
@@ -74,28 +74,6 @@ public static class PerformanceAssert
             return;
 
         Assert.Fail(BuildFailureMessage(result, violations));
-    }
-
-    private static MeasurementOptions BuildMeasurementOptions(PerformanceAssertionOptions options)
-    {
-        var measurementOptions = MeasurementOptions.Default;
-
-        if (options.Iterations > 0)
-            measurementOptions = measurementOptions with { Iterations = options.Iterations };
-
-        if (options.WarmupIterations > 0)
-            measurementOptions = measurementOptions with { WarmupIterations = options.WarmupIterations };
-
-        if (options.MeasureAllocations || options.MaxAllocatedBytes >= 0)
-            measurementOptions = measurementOptions with { MeasureAllocations = true };
-
-        measurementOptions = measurementOptions with
-        {
-            OutlierMode = NormalizeOutlierMode(options.OutlierMode),
-            ConfidenceLevel = options.ConfidenceLevel is > 0 and <= 1 ? options.ConfidenceLevel : 0.95,
-        };
-
-        return measurementOptions;
     }
 
     private static List<string> CollectViolations(BenchmarkResult result, PerformanceAssertionOptions options)
@@ -128,30 +106,6 @@ public static class PerformanceAssert
     {
         return $"Performance assertions failed for '{result.Name}'.{Environment.NewLine}" +
                $"{string.Join(Environment.NewLine, violations)}{Environment.NewLine}{Environment.NewLine}" +
-               FormatMetrics(result);
-    }
-
-    private static string FormatMetrics(BenchmarkResult result)
-    {
-        var allocations = result.MeanAllocatedBytes.HasValue
-            ? $"{result.MeanAllocatedBytes.Value} B"
-            : "n/a";
-
-        return
-            $"NBenchmark metrics{Environment.NewLine}" +
-            $"Mean: {result.Mean:F2} ns{Environment.NewLine}" +
-            $"P95: {result.P95:F2} ns{Environment.NewLine}" +
-            $"Allocations: {allocations}{Environment.NewLine}" +
-            $"Iterations: {result.MeasuredIterations} (warmup: {result.WarmupIterations})";
-    }
-
-    private static OutlierMode NormalizeOutlierMode(OutlierMode mode)
-    {
-        return mode is OutlierMode.None
-            or OutlierMode.RemoveTop5Percent
-            or OutlierMode.RemoveTopAndBottom5Percent
-            or OutlierMode.IqrFence
-            ? mode
-            : OutlierMode.RemoveTop5Percent;
+               MetricsFormatter.Format(result);
     }
 }

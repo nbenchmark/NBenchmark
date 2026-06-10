@@ -23,6 +23,8 @@
     <Compile Include="..\Shared\PerformanceThresholds.cs" Link="Internal\PerformanceThresholds.cs"/>
     <Compile Include="..\Shared\BenchmarkAssert.cs" Link="Internal\BenchmarkAssert.cs"/>
     <Compile Include="..\Shared\RegressionBaseline.cs" Link="Internal\RegressionBaseline.cs"/>
+    <Compile Include="..\Shared\MeasurementOptionsBuilder.cs" Link="Internal\MeasurementOptionsBuilder.cs"/>
+    <Compile Include="..\Shared\MetricsFormatter.cs" Link="Internal\MetricsFormatter.cs"/>
   </ItemGroup>
 
   <ItemGroup>

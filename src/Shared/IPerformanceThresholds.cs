@@ -1,6 +1,6 @@
 namespace NBenchmark.Extensions.Abstractions;
 
-public interface IPerformanceThresholds
+internal interface IPerformanceThresholds
 {
     double MaxMeanNs { get; }
     double MaxP95Ns { get; }

@@ -1,6 +1,8 @@
+using NBenchmark.Extensions.Abstractions;
+
 namespace NBenchmark.Extensions.MSTest;
 
-public sealed class PerformanceAssertionOptions
+public sealed class PerformanceAssertionOptions : IPerformanceThresholds
 {
     public double MaxMeanNs { get; init; } = -1;
     public double MaxP95Ns { get; init; } = -1;
