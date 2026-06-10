@@ -56,6 +56,18 @@ dotnet add package NBenchmark.Analyzers
 
 The analyzers run automatically in the IDE and during `dotnet build`. See the [Analyzers](../analyzers.md) page for the full diagnostic reference.
 
+### Test framework integration packages (optional)
+
+The integration packages let you enforce performance thresholds as ordinary test assertions inside your existing test project. When a threshold is exceeded, the test fails.
+
+```bash
+dotnet add package NBenchmark.Integration.xUnit    # xUnit v2
+dotnet add package NBenchmark.Integration.NUnit    # NUnit 3 / 4
+dotnet add package NBenchmark.Integration.MSTest   # MSTest v2 / v3
+```
+
+Each package pulls in `NBenchmark` automatically, so you don't need a separate `NBenchmark` reference. See the [Integration](../integration/) guide for usage.
+
 ## Verify the installation
 
 Create a new console project and add a quick sanity check:
