@@ -258,6 +258,25 @@ public class BenchmarkRunnerTests
     }
 
     [Fact]
+    public void Run_With_InjectedClock_Preserves_Raw_Sample_Order_Before_Trim()
+    {
+        var clock = new FakeClock([
+            TimeSpan.FromTicks(520), // total
+            TimeSpan.FromTicks(480), // measured loop
+            TimeSpan.FromTicks(30),  // sample 1
+            TimeSpan.FromTicks(10),  // sample 2
+        ]);
+        var runner = new BenchmarkRunner(clock);
+
+        var outcome = runner.Run("raw-order", () => { }, DeterministicSuccessSpec());
+
+        Assert.Equal([3_000.0, 1_000.0], outcome.RawSamples);
+        Assert.Equal(1_000.0, outcome.Result.Min);
+        Assert.Equal(3_000.0, outcome.Result.Max);
+        Assert.Equal(0, clock.PendingElapsedCount);
+    }
+
+    [Fact]
     public void Run_With_InjectedClock_SyncReturning_Success_Uses_Scheduled_Durations()
     {
         var clock = new FakeClock([
@@ -270,7 +289,7 @@ public class BenchmarkRunnerTests
 
         var outcome = runner.Run("sync-returning", () => 123, DeterministicSuccessSpec());
 
-        Assert.Equal([2_000.0, 4_000.0], outcome.RawSamples);
+        Assert.Equal([4_000.0, 2_000.0], outcome.RawSamples);
         Assert.Equal(3_000.0, outcome.Result.Mean);
         Assert.Equal(TimeSpan.FromTicks(180), outcome.Result.MeasuredDuration);
         Assert.Equal(TimeSpan.FromTicks(220), outcome.Result.TotalDuration);
@@ -310,7 +329,7 @@ public class BenchmarkRunnerTests
 
         var outcome = await runner.RunAsync("async-returning", () => Task.FromResult("ok"), DeterministicSuccessSpec());
 
-        Assert.Equal([3_500.0, 5_500.0], outcome.RawSamples);
+        Assert.Equal([5_500.0, 3_500.0], outcome.RawSamples);
         Assert.Equal(4_500.0, outcome.Result.Mean);
         Assert.Equal(TimeSpan.FromTicks(380), outcome.Result.MeasuredDuration);
         Assert.Equal(TimeSpan.FromTicks(420), outcome.Result.TotalDuration);

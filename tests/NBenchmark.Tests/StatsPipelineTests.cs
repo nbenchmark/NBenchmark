@@ -122,4 +122,17 @@ public class StatsPipelineTests
         Assert.Equal(sortedResult.Stats.Min, unsortedResult.Stats.Min);
         Assert.Equal(sortedResult.Stats.Max, unsortedResult.Stats.Max);
     }
+
+    [Theory]
+    [InlineData(OutlierMode.None)]
+    [InlineData(OutlierMode.IqrFence)]
+    public void Run_Does_Not_Mutate_RawTimings_Input(OutlierMode mode)
+    {
+        var rawTimings = new double[] { 5, 2, 8, 1, 9, 3, 7, 4, 6 };
+        var snapshot = (double[])rawTimings.Clone();
+
+        _ = StatsPipeline.Run(rawTimings, null, new MeasurementOptions { OutlierMode = mode });
+
+        Assert.Equal(snapshot, rawTimings);
+    }
 }

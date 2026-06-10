@@ -15,7 +15,7 @@ public interface IBenchmarkProgress
     Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results);
 }
 
-public class NullBenchmarkProgress : IBenchmarkProgress
+public sealed class NullBenchmarkProgress : IBenchmarkProgress
 {
     public static readonly NullBenchmarkProgress Instance = new();
 

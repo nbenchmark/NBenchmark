@@ -19,6 +19,7 @@ public static class ReporterRegistry
     private static readonly object _lock = new();
     private static List<Entry> _entries = new(_seed);
     private static List<Entry>? _initialState;
+    private static IReadOnlyList<ReporterInfo>? _availableCache;
     private static int _extensionsLoaded;
 
     public static IReadOnlyList<ReporterInfo> Available
@@ -29,7 +30,10 @@ public static class ReporterRegistry
 
             lock (_lock)
             {
-                return _entries.Select(e => new ReporterInfo(e.Name, e.Description)).ToList();
+                return _availableCache ??= _entries
+                    .Select(e => new ReporterInfo(e.Name, e.Description))
+                    .ToArray()
+                    .AsReadOnly();
             }
         }
     }
@@ -46,6 +50,7 @@ public static class ReporterRegistry
                 throw new InvalidOperationException($"Reporter '{name}' is already registered.");
 
             _entries.Add(new Entry(name, description, factory));
+            _availableCache = null;
         }
     }
 
@@ -109,6 +114,7 @@ public static class ReporterRegistry
         {
             _initialState ??= new List<Entry>(_entries);
             _entries = new List<Entry>(_initialState);
+            _availableCache = null;
         }
     }
 }

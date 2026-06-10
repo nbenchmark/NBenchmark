@@ -47,8 +47,26 @@ internal static class OutlierTrim
         var iqr = q3 - q1;
         var lower = q1 - 1.5 * iqr;
         var upper = q3 + 1.5 * iqr;
-        var filtered = values.Where(v => v >= lower && v <= upper).ToArray();
 
-        return filtered.Length > 0 ? filtered : values;
+        var keep = 0;
+        foreach (var t in values)
+            if (t >= lower && t <= upper)
+                keep++;
+
+        if (keep == 0)
+            return values;
+
+        if (keep == values.Length)
+            return values;
+
+        var result = new double[keep];
+        var write = 0;
+        for (var i = 0; i < values.Length; i++)
+        {
+            var v = values[i];
+            if (v >= lower && v <= upper)
+                result[write++] = v;
+        }
+        return result;
     }
 }

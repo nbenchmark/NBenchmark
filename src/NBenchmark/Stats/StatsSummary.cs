@@ -33,7 +33,10 @@ public sealed class StatsSummary
             return new StatsSummary { ConfidenceLevel = confidenceLevel };
 
         var n = samples.Length;
-        var mean = samples.Average();
+        var sum = 0.0;
+        for (var i = 0; i < n; i++)
+            sum += samples[i];
+        var mean = sum / n;
 
         var sumSq = 0.0;
 
