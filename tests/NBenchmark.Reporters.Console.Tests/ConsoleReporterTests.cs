@@ -1,4 +1,3 @@
-using NBenchmark.Reporters;
 using Xunit;
 
 namespace NBenchmark.Reporters.Console.Tests;

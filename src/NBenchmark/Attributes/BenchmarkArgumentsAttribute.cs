@@ -1,12 +1,7 @@
 namespace NBenchmark.Attributes;
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
-public sealed class BenchmarkArgumentsAttribute : Attribute
+public sealed class BenchmarkArgumentsAttribute(params object[] arguments) : Attribute
 {
-    public BenchmarkArgumentsAttribute(params object[] arguments)
-    {
-        Arguments = arguments;
-    }
-
-    public object[] Arguments { get; }
+    public object[] Arguments { get; } = arguments;
 }

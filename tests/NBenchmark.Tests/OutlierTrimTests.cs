@@ -3,12 +3,6 @@ using Xunit;
 
 namespace NBenchmark.Tests;
 
-/// <summary>
-///     Direct unit tests for <see cref="OutlierTrim" />. The trim was previously
-///     private to <c>BenchmarkRunner</c>; the most important test in this file
-///     is <see cref="IqrFence_All_Filtered_Falls_Back_To_All_Values" />, which
-///     pins the previously-untested all-filtered-fallback branch.
-/// </summary>
 public class OutlierTrimTests
 {
     [Fact]
@@ -86,8 +80,7 @@ public class OutlierTrimTests
         // When every value is the same, IQR is 0 and the fence collapses to a
         // single point. No value is strictly "outside" the fence (every value
         // equals the fence), so the filter logic must fall back to returning
-        // the input rather than an empty array. This branch was previously
-        // untested.
+        // the input rather than an empty array.
         var values = new double[] { 42, 42, 42, 42, 42, 42, 42, 42 };
 
         var result = OutlierTrim.Trim(values, OutlierMode.IqrFence);

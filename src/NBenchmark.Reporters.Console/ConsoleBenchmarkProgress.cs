@@ -2,16 +2,11 @@ using Spectre.Console;
 
 namespace NBenchmark.Reporters.Console;
 
-public class ConsoleBenchmarkProgress : IBenchmarkProgress
+public class ConsoleBenchmarkProgress(int measuredIterations, int warmupIterations) : IBenchmarkProgress
 {
-    private readonly string? _suiteOptions;
+    private readonly string? _suiteOptions = $"{warmupIterations} warmup / {measuredIterations} measured";
     private string? _currentName;
     private int _suiteTotal;
-
-    public ConsoleBenchmarkProgress(int measuredIterations, int warmupIterations)
-    {
-        _suiteOptions = $"{warmupIterations} warmup / {measuredIterations} measured";
-    }
 
     public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
     {

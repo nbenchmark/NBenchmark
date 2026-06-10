@@ -1,14 +1,8 @@
 using NBenchmark.Engine;
-using NBenchmark.Stats;
 using Xunit;
 
 namespace NBenchmark.Tests;
 
-/// <summary>
-///     Direct unit tests for <see cref="StatsPipeline" />. The pipeline was
-///     previously the runner's private wiring; these tests pin the trim →
-///     stats → meanAllocations composition that the runner used to own.
-/// </summary>
 public class StatsPipelineTests
 {
     [Fact]

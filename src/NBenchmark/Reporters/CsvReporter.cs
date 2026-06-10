@@ -2,18 +2,11 @@ using System.Text;
 
 namespace NBenchmark.Reporters;
 
-public sealed class CsvReporter : IReporter
+public sealed class CsvReporter(string outputDirectory = ".", string? name = null) : IReporter
 {
     private static int _fileCounter;
 
-    private readonly string _outputDirectory;
-    private readonly string? _fileName;
-
-    public CsvReporter(string outputDirectory = ".", string? fileName = null)
-    {
-        _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
-        _fileName = fileName;
-    }
+    private readonly string _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
 
     public string Name => "csv";
 
@@ -23,7 +16,7 @@ public sealed class CsvReporter : IReporter
     {
         Directory.CreateDirectory(_outputDirectory);
 
-        var fileName = _fileName
+        var fileName = name
             ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.csv";
         var filePath = Path.Combine(_outputDirectory, fileName);
 

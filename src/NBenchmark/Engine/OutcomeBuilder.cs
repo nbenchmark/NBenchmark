@@ -3,14 +3,6 @@ using NBenchmark.Stats;
 
 namespace NBenchmark.Engine;
 
-/// <summary>
-///     Single owner of the 22-field <see cref="BenchmarkResult" /> literal. Replaces
-///     the three duplicated literals that previously lived in
-///     <c>BenchmarkRunner.DryRunOutcome</c>, <c>BenchmarkRunner.BuildOutcome</c>, and
-///     <c>BenchmarkRunner.ErroredOutcome</c>, plus the <c>CreateErrored</c> factory
-///     on <see cref="BenchmarkResult" />. Concentrates result construction so the
-///     shape can evolve in one place. See ADR 0001 (status update).
-/// </summary>
 internal static class OutcomeBuilder
 {
     public static MeasurementOutcome Build(

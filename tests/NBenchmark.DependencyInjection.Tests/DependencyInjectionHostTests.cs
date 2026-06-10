@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark.Attributes;
-using NBenchmark.DependencyInjection;
 using Xunit;
 
 namespace NBenchmark.DependencyInjection.Tests;

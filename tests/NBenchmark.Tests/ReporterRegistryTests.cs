@@ -1,4 +1,3 @@
-using System.Reflection;
 using NBenchmark.Reporters;
 using Xunit;
 

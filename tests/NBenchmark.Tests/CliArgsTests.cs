@@ -1,5 +1,4 @@
 using NBenchmark.Engine;
-using NBenchmark.Reporters;
 using Xunit;
 
 namespace NBenchmark.Tests;

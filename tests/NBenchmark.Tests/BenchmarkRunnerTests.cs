@@ -79,9 +79,6 @@ public class BenchmarkRunnerTests
     [Fact]
     public async Task RunAsync_Errored_Result_Records_Positive_TotalDuration()
     {
-        // Regression: ErroredOutcome previously never set TotalDuration, so it
-        // always reported TimeSpan.Zero - silently understating the suite-time
-        // summary that aggregates across results.
         var spec = new RunSpec
         {
             Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 2, OutlierMode = OutlierMode.None },

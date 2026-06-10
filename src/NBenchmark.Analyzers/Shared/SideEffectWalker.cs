@@ -4,16 +4,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace NBenchmark.Analyzers.Shared;
 
-internal sealed class SideEffectWalker : CSharpSyntaxWalker
+internal sealed class SideEffectWalker(SemanticModel semanticModel) : CSharpSyntaxWalker
 {
-    private readonly SemanticModel _semanticModel;
-
     public bool HasAnyEffect { get; private set; }
-
-    public SideEffectWalker(SemanticModel semanticModel)
-    {
-        _semanticModel = semanticModel;
-    }
 
     public override void VisitInvocationExpression(InvocationExpressionSyntax node)
     {
@@ -60,7 +53,7 @@ internal sealed class SideEffectWalker : CSharpSyntaxWalker
 
     private bool IsFieldOrProperty(IdentifierNameSyntax identifier)
     {
-        var symbol = _semanticModel.GetSymbolInfo(identifier).Symbol;
+        var symbol = semanticModel.GetSymbolInfo(identifier).Symbol;
         return symbol is IFieldSymbol or IPropertySymbol;
     }
 

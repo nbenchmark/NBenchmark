@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using NBenchmark.Reporters;
 using Spectre.Console;
 
 namespace NBenchmark.Reporters.Console;

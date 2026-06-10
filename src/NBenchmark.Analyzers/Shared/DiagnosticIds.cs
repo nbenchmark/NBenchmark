@@ -1,4 +1,4 @@
-namespace NBenchmark.Analyzers;
+namespace NBenchmark.Analyzers.Shared;
 
 public static class DiagnosticIds
 {

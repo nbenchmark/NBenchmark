@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace NBenchmark.Reporters;
 
-public sealed class JsonReporter : IReporter
+public sealed class JsonReporter(string outputDirectory = ".", string? name = null) : IReporter
 {
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -11,14 +11,7 @@ public sealed class JsonReporter : IReporter
     };
 
     private static int _fileCounter;
-    private readonly string _outputDirectory;
-    private readonly string? _fileName;
-
-    public JsonReporter(string outputDirectory = ".", string? fileName = null)
-    {
-        _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
-        _fileName = fileName;
-    }
+    private readonly string _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
 
     public string Name => "json";
 
@@ -28,7 +21,7 @@ public sealed class JsonReporter : IReporter
     {
         Directory.CreateDirectory(_outputDirectory);
 
-        var fileName = _fileName
+        var fileName = name
             ?? $"benchmarks-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.json";
         var filePath = Path.Combine(_outputDirectory, fileName);
 
