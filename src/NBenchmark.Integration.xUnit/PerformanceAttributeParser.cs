@@ -97,14 +97,14 @@ internal static class PerformanceAttributeParser
     private static OutlierMode NormalizeOutlierMode(OutlierMode value, bool treatNoneAsUnset)
     {
         if (treatNoneAsUnset && value == OutlierMode.None)
-            return OutlierMode.RemoveTop5Percent;
+            return OutlierMode.IqrFence;
 
         return value is OutlierMode.None
             or OutlierMode.RemoveTop5Percent
             or OutlierMode.RemoveTopAndBottom5Percent
             or OutlierMode.IqrFence
             ? value
-            : OutlierMode.RemoveTop5Percent;
+            : OutlierMode.IqrFence;
     }
 
     private sealed class ParsedThresholds : IPerformanceThresholds
@@ -117,7 +117,7 @@ internal static class PerformanceAttributeParser
         public int Iterations { get; init; }
         public int WarmupIterations { get; init; }
         public bool MeasureAllocations { get; init; }
-        public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
+        public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
         public double ConfidenceLevel { get; init; } = 0.95;
     }
 }

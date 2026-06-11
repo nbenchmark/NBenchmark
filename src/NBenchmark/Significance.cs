@@ -15,12 +15,18 @@ internal static class Significance
         if (results.Count(r => !r.Errored) < 2)
             return;
 
-        ComputeSignificance(results, rawSamples);
+        ComputeSignificance(results, rawSamples, options.SignificanceLevel);
     }
 
+    /// <summary>
+    ///     Computes the Mann-Whitney U significance verdict for each non-baseline result
+    ///     against the baseline and updates <paramref name="results" /> <b>in place</b>:
+    ///     each affected element is replaced with an updated <see cref="BenchmarkResult" />.
+    /// </summary>
     public static void ComputeSignificance(
         List<BenchmarkResult> results,
-        Dictionary<string, double[]> rawSamples)
+        Dictionary<string, double[]> rawSamples,
+        double significanceLevel = 0.05)
     {
         var successful = results.Where(r => !r.Errored).ToList();
 
@@ -46,7 +52,7 @@ internal static class Significance
                     ? result with { PValue = null, SignificanceVerdict = SignificanceVerdict.NotTested }
                     : result with
                     {
-                        PValue = pValue, SignificanceVerdict = pValue < 0.05 ? SignificanceVerdict.Significant : SignificanceVerdict.NotSignificant,
+                        PValue = pValue, SignificanceVerdict = pValue < significanceLevel ? SignificanceVerdict.Significant : SignificanceVerdict.NotSignificant,
                     };
             }
         }

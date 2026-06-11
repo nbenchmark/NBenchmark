@@ -105,7 +105,7 @@ BenchmarkSuite fluent method: `.WithAllocations()`
 ### OutlierMode
 
 ```csharp
-OutlierMode = OutlierMode.RemoveTop5Percent   // default
+OutlierMode = OutlierMode.IqrFence   // default
 ```
 
 Controls which samples are discarded before statistics are computed.
@@ -113,11 +113,11 @@ Controls which samples are discarded before statistics are computed.
 | Value | Behaviour |
 |---|---|
 | `OutlierMode.None` | No samples are removed. |
-| `OutlierMode.RemoveTop5Percent` | The slowest 5% of samples are removed. **(default)** |
+| `OutlierMode.RemoveTop5Percent` | The slowest 5% of samples are removed. |
 | `OutlierMode.RemoveTopAndBottom5Percent` | The slowest and fastest 5% are removed. |
-| `OutlierMode.IqrFence` | Samples beyond 1.5× the [IQR (inter-quartile range)](https://en.wikipedia.org/wiki/Interquartile_range) are removed. |
+| `OutlierMode.IqrFence` | Samples beyond 1.5× the [IQR (inter-quartile range)](https://en.wikipedia.org/wiki/Interquartile_range) are removed. **(default)** |
 
-With 200 iterations and `RemoveTop5Percent`, the 10 noisiest measurements are discarded. This guards against OS scheduling spikes and thermal throttling without discarding too much data.
+`IqrFence` adapts to the actual spread of each benchmark instead of always discarding a fixed 5%: a clean run keeps nearly every sample, while a noisy run trims more. When the discarded slow samples form a tight secondary cluster (rather than scattered scheduling noise), NBenchmark adds a bimodal-distribution warning to the result so you can investigate the tail latency.
 
 BenchmarkSuite fluent method: `.WithOutlierMode(mode)`
 
@@ -146,13 +146,23 @@ CLI flag: `--confidence 0.99`
 EnableSignificance = true   // default
 ```
 
-When `true` and there are two or more benchmarks, NBenchmark runs a [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) to determine whether the difference in medians is statistically significant (p < 0.05).
+When `true` and there are two or more benchmarks, NBenchmark runs a [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) to determine whether the difference in medians is statistically significant. For small, tie-free samples (combined n ≤ 20) the exact permutation p-value is used; larger samples use the normal approximation with tie and continuity corrections.
 
 Disable it if you don't need significance testing and want to reduce overhead:
 
 ```csharp
 .WithSignificance(false)
 ```
+
+### SignificanceLevel
+
+```csharp
+SignificanceLevel = 0.05   // default
+```
+
+The significance threshold (alpha) a result's p-value is compared against. A result is flagged significant when `p < SignificanceLevel`. Must be strictly between `0` and `1`. Lower it (e.g. `0.01`) to demand stronger evidence before calling a difference real.
+
+CLI flag: `--alpha 0.01`
 
 ### ForceGcBetweenBenchmarks
 
@@ -179,9 +189,10 @@ public void MyExpensiveBenchmark() => SlowOperation();
 | `Iterations` | `int` | `200` | `0` – `100 000` |
 | `WarmupIterations` | `int` | `25` | `0` – `10 000` |
 | `ConfidenceLevel` | `double` | `0.95` | `>0` and `<1` |
+| `SignificanceLevel` | `double` | `0.05` | `>0` and `<1` |
 | `ForceGcBeforeEachIteration` | `bool` | `true` | - |
 | `MeasureAllocations` | `bool` | `false` | - |
-| `OutlierMode` | `enum` | `RemoveTop5Percent` | See above |
+| `OutlierMode` | `enum` | `IqrFence` | See above |
 | `EnableSignificance` | `bool` | `true` | - |
 | `ForceGcBetweenBenchmarks` | `bool` | `true` | - |
 

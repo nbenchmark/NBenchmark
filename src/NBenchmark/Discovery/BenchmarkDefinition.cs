@@ -33,4 +33,11 @@ public sealed record BenchmarkMethodDefinition(
     public Action<Task>? ResultConsumer { get; init; }
     public Action<object>? IterationSetupDelegate { get; init; }
     public Action<object>? IterationTeardownDelegate { get; init; }
+
+    /// <summary>
+    ///     When true, the host runs this benchmark in a dedicated child process for a
+    ///     clean-room CLR, rather than in-process. Set by <c>[IsolatedProcess]</c> on the
+    ///     method or its declaring class.
+    /// </summary>
+    public bool IsolatedProcess { get; init; }
 }

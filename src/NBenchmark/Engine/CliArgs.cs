@@ -16,7 +16,18 @@ internal sealed record CliArgs
     public int? Iterations { get; init; }
     public int? WarmupIterations { get; init; }
     public double? ConfidenceLevel { get; init; }
+    public double? Alpha { get; init; }
     public IReadOnlyList<IReporter> CliReporters { get; init; } = [];
+
+    /// <summary>
+    ///     Internal: when set, the host runs only this single benchmark (by full name)
+    ///     in-process and writes its serialized result to <see cref="IsolatedOutput" />.
+    ///     Set by the parent process when dispatching an <c>[IsolatedProcess]</c> benchmark.
+    /// </summary>
+    public string? IsolatedRun { get; init; }
+
+    /// <summary>Internal: file path the isolated child writes its serialized result to.</summary>
+    public string? IsolatedOutput { get; init; }
 
     public static CliArgs Parse(string[] args)
     {
@@ -32,6 +43,10 @@ internal sealed record CliArgs
         int? warmupIterations = null;
         double? confidenceLevel = null;
         var cliReporters = new List<IReporter>();
+
+        double? alpha = null;
+        string? isolatedRun = null;
+        string? isolatedOutput = null;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -101,6 +116,19 @@ internal sealed record CliArgs
                     }
 
                     break;
+                case "--alpha" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var a)
+                        && a is > 0 and < 1)
+                        alpha = a;
+                    else
+                    {
+                        Console.Error.WriteLine(
+                            $"Invalid --alpha value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.05).");
+
+                        Environment.ExitCode = 1;
+                    }
+
+                    break;
                 case "--order" when i + 1 < args.Length:
                     var order = args[++i];
 
@@ -146,8 +174,15 @@ internal sealed record CliArgs
                 case "--dry-run":
                     dryRun = true;
                     break;
+                case "--nb-isolated-run" when i + 1 < args.Length:
+                    isolatedRun = args[++i];
+                    break;
+                case "--nb-isolated-output" when i + 1 < args.Length:
+                    isolatedOutput = args[++i];
+                    break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
-                    or "--reporter" or "--confidence" or "--order" or "--threshold-pct" or "--seed":
+                    or "--reporter" or "--confidence" or "--order" or "--threshold-pct" or "--seed" or "--alpha"
+                    or "--nb-isolated-run" or "--nb-isolated-output":
                     Console.Error.WriteLine($"Missing value for '{args[i]}'.");
                     Environment.ExitCode = 1;
                     break;
@@ -171,10 +206,12 @@ internal sealed record CliArgs
             Iterations = iterations,
             WarmupIterations = warmupIterations,
             ConfidenceLevel = confidenceLevel,
+            Alpha = alpha,
             CliReporters = cliReporters,
+            IsolatedRun = isolatedRun,
+            IsolatedOutput = isolatedOutput,
         };
     }
-
     internal static void PrintHelp()
     {
         Console.WriteLine("Usage: myapp.exe [options]");
@@ -186,6 +223,7 @@ internal sealed record CliArgs
         Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
+        Console.WriteLine("  --alpha <0-1>          Significance level for the Mann-Whitney U test (default: 0.05)");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");

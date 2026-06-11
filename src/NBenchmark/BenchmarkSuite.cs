@@ -103,6 +103,12 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    public BenchmarkSuite WithSignificanceLevel(double level)
+    {
+        _options = _options with { SignificanceLevel = level };
+        return this;
+    }
+
     public BenchmarkSuite WithRunOrder(RunOrder order)
     {
         _runOrder = order;

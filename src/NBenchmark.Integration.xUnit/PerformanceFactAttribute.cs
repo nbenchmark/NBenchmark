@@ -17,6 +17,6 @@ public sealed class PerformanceFactAttribute : FactAttribute, IPerformanceThresh
     public int Iterations { get; init; }
     public int WarmupIterations { get; init; }
     public bool MeasureAllocations { get; init; }
-    public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
+    public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; init; } = 0.95;
 }

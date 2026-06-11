@@ -79,7 +79,7 @@ The console output will look like:
 │ plus operator    │ 8.5 ns │ 8.4 ns │ ±1 ns  │ 5 ns   │ 10 ns  │ 10 ns  │ 1.00x │    -     │
 ╰──────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┴──────────╯
 
-Ran 2 benchmark(s) - Significance: Mann-Whitney U (p < 0.05) - Outliers: top 5%
+Ran 2 benchmark(s) - Significance: Mann-Whitney U (p < 0.05) - Outliers: IQR fence (1.5×)
 Error = ±95% confidence interval half-width on the mean.
 ```
 

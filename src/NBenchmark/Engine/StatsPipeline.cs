@@ -18,15 +18,33 @@ internal static class StatsPipeline
     {
         // Preserve caller-visible RawSamples order; trim/sort works on a private copy.
         var timingsForStats = (double[])rawTimings.Clone();
-        var trimmed = OutlierTrim.Trim(timingsForStats, options.OutlierMode);
+        var (trimmed, discarded) = OutlierTrim.TrimDetailed(timingsForStats, options.OutlierMode);
 
         Debug.Assert(IsSorted(trimmed),
             "OutlierTrim must produce sorted output; Percentile.Compute requires sorted input.");
 
         var stats = StatsSummary.Compute(trimmed, options.ConfidenceLevel);
         long? meanAllocs = rawAllocations is not null ? ComputeMean(rawAllocations) : null;
+        var warnings = BuildWarnings(trimmed, discarded, rawTimings.Length);
 
-        return new ProcessedMeasurements(stats, trimmed.Length, meanAllocs);
+        return new ProcessedMeasurements(stats, trimmed.Length, meanAllocs) { Warnings = warnings };
+    }
+
+    private static IReadOnlyList<string> BuildWarnings(double[] trimmed, double[] discarded, int totalSamples)
+    {
+        var cluster = BimodalDetector.DetectSlowCluster(trimmed, discarded, totalSamples);
+
+        if (cluster is null)
+            return [];
+
+        var (count, center) = cluster.Value;
+
+        return
+        [
+            $"{count} discarded outlier(s) form a distinct cluster near {BenchmarkFormatter.FormatNs(center)} "
+            + "rather than scattered noise - possible bimodal distribution; investigate this tail latency "
+            + "(e.g. GC pauses, lock contention, or cache misses).",
+        ];
     }
 
     private static long ComputeMean(long[] values)
@@ -56,4 +74,7 @@ internal static class StatsPipeline
 internal sealed record ProcessedMeasurements(
     StatsSummary Stats,
     int MeasuredIterations,
-    long? MeanAllocatedBytes);
+    long? MeanAllocatedBytes)
+{
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+}

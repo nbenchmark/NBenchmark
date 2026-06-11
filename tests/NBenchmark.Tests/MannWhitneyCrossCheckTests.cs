@@ -5,12 +5,12 @@ namespace NBenchmark.Tests;
 
 /// <summary>
 ///     Cross-checks for the Mann-Whitney U test against SciPy 1.17.1, plus a
-///     self-contained exact-permutation enumerator that validates how far the
-///     normal approximation NBenchmark uses can stray from the exact p-value on
-///     small samples.
-///     NBenchmark uses the large-sample normal approximation *without* a
-///     continuity correction, which corresponds to
-///     <c>scipy.stats.mannwhitneyu(..., method='asymptotic', use_continuity=False)</c>.
+///     self-contained exact-permutation enumerator.
+///     For small, tie-free samples (combined n &lt;= 20) NBenchmark computes the
+///     <em>exact</em> two-sided permutation p-value, matching
+///     <c>scipy.stats.mannwhitneyu(..., method='exact')</c>. The retained
+///     asymptotic reference values document the gap to the large-sample normal
+///     approximation that is used for larger samples.
 /// </summary>
 public class MannWhitneyCrossCheckTests
 {
@@ -45,16 +45,15 @@ public class MannWhitneyCrossCheckTests
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public void Test_Matches_Scipy_Asymptotic(double[] a, double[] b, double asymptoticP, double exactP)
+    public void Test_Matches_Scipy_Exact_For_Small_TieFree_Samples(
+        double[] a, double[] b, double asymptoticP, double exactP)
     {
-        _ = exactP;
+        _ = asymptoticP;
         var p = MannWhitneyU.Test(a, b);
 
-        // Absolute tolerance: the only gap is the rational erf approximation
-        // (|error| < 2e-7), which dominates relative error for tiny p-values.
-        Assert.True(
-            Math.Abs(p - asymptoticP) < 1e-6,
-            $"|{p} − {asymptoticP}| = {Math.Abs(p - asymptoticP)} ≥ 1e-6.");
+        // Combined n <= 20 and tie-free, so NBenchmark takes the exact path and
+        // must reproduce SciPy's exact p-value to within floating-point noise.
+        Numerics.AssertRelativeClose(exactP, p, 1e-9);
     }
 
     [Theory]
@@ -70,20 +69,19 @@ public class MannWhitneyCrossCheckTests
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public void Asymptotic_Approximation_Within_Documented_Bound_Of_Exact(
+    public void Test_Matches_Independent_Exact_Enumerator(
         double[] a, double[] b, double asymptoticP, double exactP)
     {
         _ = (asymptoticP, exactP);
 
-        var approx = MannWhitneyU.Test(a, b);
-        var exact = ExactTwoSidedPValue(a, b);
+        var nbenchmark = MannWhitneyU.Test(a, b);
+        var enumerated = ExactTwoSidedPValue(a, b);
 
-        // For n ≈ 8–10 per group the normal approximation can differ from the
-        // exact permutation p-value by up to ≈ 0.05. This pins that the gap stays
-        // within the documented bound and does not silently widen.
+        // NBenchmark's bounded-partition DP must agree with a brute-force
+        // rank-assignment enumerator on these small, tie-free samples.
         Assert.True(
-            Math.Abs(approx - exact) < 0.06,
-            $"|approx {approx} − exact {exact}| = {Math.Abs(approx - exact)} ≥ 0.06.");
+            Math.Abs(nbenchmark - enumerated) < 1e-9,
+            $"|nbenchmark {nbenchmark} − enumerated {enumerated}| = {Math.Abs(nbenchmark - enumerated)} >= 1e-9.");
     }
 
     // Exact two-sided Mann-Whitney p-value by full enumeration of which combined

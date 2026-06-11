@@ -86,8 +86,9 @@ await new BenchmarkSuite("name")
     .WithIterations(200)            // default: 200
     .WithWarmup(25)                 // default: 25
     .WithAllocations()              // enable allocation tracking
-    .WithOutlierMode(OutlierMode.RemoveTop5Percent)   // default
+    .WithOutlierMode(OutlierMode.IqrFence)   // default
     .WithConfidenceLevel(0.99)      // default: 0.95
+    .WithSignificanceLevel(0.05)    // alpha for the significance test; default: 0.05
     .WithSignificance(false)        // disable [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)
     .WithRunOrder(RunOrder.Declaration)   // default: RunOrder.Random
     .WithSuiteSetup(() => { })      // runs once before all benchmarks

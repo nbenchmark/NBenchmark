@@ -87,7 +87,7 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
       "totalDuration": "00:00:00.050",
       "measuredDuration": "00:00:00.040",
       "isBaseline": false,
-      "outlierMode": "removeTop5Percent"
+      "outlierMode": "iqrFence"
     }
   ]
 }

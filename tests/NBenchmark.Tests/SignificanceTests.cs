@@ -197,6 +197,51 @@ public class SignificanceTests
         Assert.NotNull(results[1].PValue);
     }
 
+    [Fact]
+    public void ComputeSignificance_Respects_Configurable_SignificanceLevel()
+    {
+        var rng = new Random(7);
+        var baselineSamples = Enumerable.Range(0, 40).Select(_ => 100.0 + (rng.NextDouble() - 0.5) * 30).ToArray();
+        var candidateSamples = Enumerable.Range(0, 40).Select(_ => 92.0 + (rng.NextDouble() - 0.5) * 30).ToArray();
+
+        var rawSamples = new Dictionary<string, double[]>
+        {
+            ["baseline"] = baselineSamples,
+            ["candidate"] = candidateSamples,
+        };
+
+        // First measure the actual p-value at the default level.
+        var probe = NewPair();
+        Significance.ComputeSignificance(probe, rawSamples);
+        var pValue = probe[1].PValue;
+
+        Assert.NotNull(pValue);
+
+        // A threshold below the observed p makes the same difference NOT significant.
+        var strict = NewPair();
+        Significance.ComputeSignificance(strict, rawSamples, significanceLevel: pValue!.Value / 2);
+        Assert.Equal(SignificanceVerdict.NotSignificant, strict[1].SignificanceVerdict);
+
+        // A threshold above the observed p makes it significant.
+        var lenient = NewPair();
+        Significance.ComputeSignificance(lenient, rawSamples, significanceLevel: Math.Min(1.0, pValue.Value * 2));
+        Assert.Equal(SignificanceVerdict.Significant, lenient[1].SignificanceVerdict);
+
+        static List<BenchmarkResult> NewPair() =>
+        [
+            new()
+            {
+                Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
+                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+            },
+            new()
+            {
+                Name = "candidate", Mean = 92, Median = 92, P95 = 100, P99 = 105,
+                Min = 80, Max = 110, StandardDeviation = 5, IsBaseline = false,
+            },
+        ];
+    }
+
     private static BenchmarkResult ErroredResult(string name, string error) =>
         new()
         {

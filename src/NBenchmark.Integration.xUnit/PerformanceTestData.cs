@@ -47,7 +47,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     public int Iterations { get; private set; }
     public int WarmupIterations { get; private set; }
     public bool MeasureAllocations { get; private set; }
-    public OutlierMode OutlierMode { get; private set; } = OutlierMode.RemoveTop5Percent;
+    public OutlierMode OutlierMode { get; private set; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; private set; } = 0.95;
 
     public void Serialize(IXunitSerializationInfo info)

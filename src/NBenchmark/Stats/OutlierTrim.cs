@@ -10,13 +10,21 @@ namespace NBenchmark.Stats;
 /// </summary>
 internal static class OutlierTrim
 {
-    public static double[] Trim(double[] timings, OutlierMode mode) => mode switch
+    public static double[] Trim(double[] timings, OutlierMode mode) => TrimDetailed(timings, mode).Kept;
+
+    /// <summary>
+    ///     Trims by <paramref name="mode" /> and reports both the kept samples (sorted
+    ///     ascending) and the discarded ones (sorted ascending). The discarded set feeds
+    ///     bimodal-cluster diagnostics; callers that only need the kept array use
+    ///     <see cref="Trim" />.
+    /// </summary>
+    public static TrimResult TrimDetailed(double[] timings, OutlierMode mode) => mode switch
     {
-        OutlierMode.None => SortAndReturn(timings),
+        OutlierMode.None => new TrimResult(SortAndReturn(timings), []),
         OutlierMode.RemoveTop5Percent => RemoveTopPercent(timings, 0.05),
         OutlierMode.RemoveTopAndBottom5Percent => RemoveBothPercent(timings, 0.05),
         OutlierMode.IqrFence => RemoveIqrOutliers(timings),
-        _ => timings,
+        _ => new TrimResult(timings, []),
     };
 
     private static double[] SortAndReturn(double[] values)
@@ -25,21 +33,26 @@ internal static class OutlierTrim
         return values;
     }
 
-    private static double[] RemoveTopPercent(double[] values, double fraction)
+    private static TrimResult RemoveTopPercent(double[] values, double fraction)
     {
         Array.Sort(values);
         var keep = (int)Math.Floor(values.Length * (1.0 - fraction));
-        return values[..keep];
+        return new TrimResult(values[..keep], values[keep..]);
     }
 
-    private static double[] RemoveBothPercent(double[] values, double fraction)
+    private static TrimResult RemoveBothPercent(double[] values, double fraction)
     {
         Array.Sort(values);
         var trimEach = (int)Math.Floor(values.Length * fraction);
-        return values[trimEach..(values.Length - trimEach)];
+        var kept = values[trimEach..(values.Length - trimEach)];
+        var discarded = new double[trimEach * 2];
+        Array.Copy(values, 0, discarded, 0, trimEach);
+        Array.Copy(values, values.Length - trimEach, discarded, trimEach, trimEach);
+        Array.Sort(discarded);
+        return new TrimResult(kept, discarded);
     }
 
-    private static double[] RemoveIqrOutliers(double[] values)
+    private static TrimResult RemoveIqrOutliers(double[] values)
     {
         Array.Sort(values);
         var q1 = Percentile.Compute(values, 0.25);
@@ -56,14 +69,13 @@ internal static class OutlierTrim
                 keep++;
         }
 
-        if (keep == 0)
-            return values;
-
-        if (keep == values.Length)
-            return values;
+        if (keep == 0 || keep == values.Length)
+            return new TrimResult(values, []);
 
         var result = new double[keep];
+        var discarded = new double[values.Length - keep];
         var write = 0;
+        var writeDiscarded = 0;
 
         for (var i = 0; i < values.Length; i++)
         {
@@ -71,8 +83,16 @@ internal static class OutlierTrim
 
             if (v >= lower && v <= upper)
                 result[write++] = v;
+            else
+                discarded[writeDiscarded++] = v;
         }
 
-        return result;
+        return new TrimResult(result, discarded);
     }
 }
+
+/// <summary>
+///     The outcome of an outlier trim: <see cref="Kept" /> samples retained for stats
+///     (sorted ascending) and <see cref="Discarded" /> samples removed (sorted ascending).
+/// </summary>
+internal readonly record struct TrimResult(double[] Kept, double[] Discarded);

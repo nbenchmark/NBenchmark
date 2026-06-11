@@ -66,6 +66,16 @@ dotnet run -- --confidence 0.99
 
 ---
 
+### `--alpha <value>`
+
+Significance level (alpha) for the Mann-Whitney U test. A benchmark is flagged significant when its p-value is below this threshold. Must be a decimal strictly between `0` and `1`. Default: `0.05`.
+
+```bash
+dotnet run -- --alpha 0.01
+```
+
+---
+
 ### `--reporter <type>`
 
 Add a reporter by name. Can be specified multiple times to stack reporters. Built-in reporters:

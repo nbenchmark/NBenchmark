@@ -25,6 +25,34 @@ public class BenchmarkDiscovererTests
     }
 
     [Fact]
+    public void Discovers_Method_Level_IsolatedProcess_Attribute()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(IsolatedMethodBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(IsolatedMethodBenchmarks));
+
+        Assert.True(suite.Benchmarks.First(b => b.Method.Name == "Isolated").IsolatedProcess);
+        Assert.False(suite.Benchmarks.First(b => b.Method.Name == "InProcess").IsolatedProcess);
+    }
+
+    [Fact]
+    public void Class_Level_IsolatedProcess_Attribute_Applies_To_All_Benchmarks()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(IsolatedClassBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(IsolatedClassBenchmarks));
+
+        Assert.All(suite.Benchmarks, b => Assert.True(b.IsolatedProcess));
+    }
+
+    [Fact]
+    public void Class_Level_IsolatedProcess_Attribute_Is_Inherited_By_Derived_Classes()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(DerivedIsolatedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(DerivedIsolatedBenchmarks));
+
+        Assert.All(suite.Benchmarks, b => Assert.True(b.IsolatedProcess));
+    }
+
+    [Fact]
     public void Caches_Delegates_For_Benchmarks()
     {
         var suites = new BenchmarkDiscoverer().Discover(typeof(PublicBenchmarks).Assembly);
@@ -156,6 +184,39 @@ public class PublicBenchmarks
 
     [Benchmark]
     public int ReturnsInt() => 42;
+}
+
+public class IsolatedMethodBenchmarks
+{
+    [Benchmark]
+    [IsolatedProcess]
+    public int Isolated() => 1;
+
+    [Benchmark]
+    public int InProcess() => 2;
+}
+
+[IsolatedProcess]
+public class IsolatedClassBenchmarks
+{
+    [Benchmark]
+    public int A() => 1;
+
+    [Benchmark]
+    public int B() => 2;
+}
+
+[IsolatedProcess]
+public class BaseIsolatedBenchmarks
+{
+    [Benchmark]
+    public int Inherited() => 1;
+}
+
+public class DerivedIsolatedBenchmarks : BaseIsolatedBenchmarks
+{
+    [Benchmark]
+    public int Declared() => 2;
 }
 
 public class LifecycleBenchmarks

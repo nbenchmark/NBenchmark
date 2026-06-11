@@ -39,6 +39,9 @@ public record BenchmarkResult
     public double? PValue { get; init; }
     public SignificanceVerdict SignificanceVerdict { get; init; }
 
+    /// <summary>The significance level (alpha) the <see cref="PValue" /> was compared against.</summary>
+    public double SignificanceLevel { get; init; } = 0.05;
+
     public bool Errored { get; init; }
     public string? ErrorMessage { get; init; }
 
@@ -67,5 +70,12 @@ public record BenchmarkResult
     public TimeSpan MeasuredDuration { get; init; } = TimeSpan.Zero;
 
     public bool IsBaseline { get; init; }
-    public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
+    public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
+
+    /// <summary>
+    ///     Non-fatal diagnostics surfaced during measurement - for example, a notice that
+    ///     trimmed outliers formed a distinct secondary cluster rather than scattered noise.
+    ///     Empty when nothing notable was detected.
+    /// </summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
 }

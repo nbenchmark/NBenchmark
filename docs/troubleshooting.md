@@ -21,9 +21,9 @@ This page maps symptoms you may see in benchmark output to their likely causes a
 
 | Mode | When to use |
 |---|---|
-| `RemoveTop5Percent` (default) | General-purpose. Removes the slowest 5% of iterations. |
+| `IqrFence` (default) | General-purpose. The [IQR](https://en.wikipedia.org/wiki/Interquartile_range)-based fence adapts to your data's spread, trimming spikes from OS scheduling interrupts without discarding clean samples. |
+| `RemoveTop5Percent` | When you want a fixed quota - always removes the slowest 5% of iterations. |
 | `RemoveTopAndBottom5Percent` | When very fast outliers (e.g. cache hits after warmup) also skew results. |
-| `IqrFence` | When you see sporadic large spikes from OS scheduling interrupts - the [IQR](https://en.wikipedia.org/wiki/Interquartile_range)-based fence adapts to your data's spread rather than a fixed percentage. |
 | `None` | When every sample matters (latency-tail analysis). |
 
 ## Zero or unexpected results

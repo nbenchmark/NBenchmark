@@ -15,4 +15,10 @@ public class HostBenchmarks
 
     [Benchmark(Baseline = true)]
     public int Baseline() => 1;
+
+    // Opt this benchmark into a clean-room child process so its measurement is not
+    // influenced by JIT, GC, or thread-pool state warmed up by the other benchmarks.
+    [Benchmark]
+    [IsolatedProcess]
+    public int Isolated() => 7;
 }

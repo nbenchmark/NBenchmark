@@ -145,6 +145,23 @@ public class DatabaseBenchmarks
 }
 ```
 
+### `[IsolatedProcess]`
+
+Runs a benchmark in a freshly spawned child process instead of in-process. Apply it to a single method, or to a class to isolate every benchmark it declares.
+
+```csharp
+public class StartupBenchmarks
+{
+    [Benchmark]
+    [IsolatedProcess]
+    public int ColdPath() => RunColdSensitiveWork();
+}
+```
+
+Each isolated benchmark runs in a clean CLR, so it is not influenced by JIT, GC, or thread-pool state warmed up by sibling benchmarks running in the same process. The host re-runs the same entry assembly for the child, executes only that one benchmark, and reads its result back through a temporary file (never stdout, so the child's own console output cannot corrupt the data).
+
+Isolation trades wall-clock cost - a process launch per benchmark - for measurement cleanliness. Reach for it when a benchmark is sensitive to runtime warmup state; leave it off for ordinary microbenchmarks where the in-process path is faster and accurate enough. In-process and isolated benchmarks can coexist in the same suite and are run separately.
+
 ## Class requirements
 
 NBenchmark instantiates benchmark classes using `Activator.CreateInstance`. The class must have a **public parameterless constructor** (the default for any class without explicit constructors).

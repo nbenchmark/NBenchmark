@@ -82,7 +82,7 @@ All three packages share the same set of threshold properties. A threshold of `-
 | `Iterations` | `int` | 0 (use default) | Override the number of measured iterations. `0` uses the framework default (200). |
 | `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup iterations. `0` uses the framework default (25). |
 | `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
-| `OutlierMode` | `OutlierMode` | `RemoveTop5Percent` | Outlier removal strategy applied before statistics are computed. |
+| `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
 | `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |
 
 See [Configuration](../configuration.md) for a full explanation of each option.

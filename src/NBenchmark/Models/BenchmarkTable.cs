@@ -9,6 +9,7 @@ public sealed record BenchmarkTable
     public required double ConfidenceLevel { get; init; }
     public required OutlierMode OutlierMode { get; init; }
     public required TimeSpan TotalDuration { get; init; }
+    public double SignificanceLevel { get; init; } = 0.05;
 
     public static BenchmarkTable Build(IReadOnlyList<BenchmarkResult> results)
     {
@@ -34,8 +35,9 @@ public sealed record BenchmarkTable
             WarmupIterations = headerSource?.WarmupIterations ?? 0,
             MeasuredIterations = headerSource?.MeasuredIterations ?? 0,
             ConfidenceLevel = headerSource?.ConfidenceLevel ?? 0.95,
-            OutlierMode = results.FirstOrDefault()?.OutlierMode ?? OutlierMode.RemoveTop5Percent,
+            OutlierMode = results.FirstOrDefault()?.OutlierMode ?? OutlierMode.IqrFence,
             TotalDuration = results.Aggregate(TimeSpan.Zero, (a, r) => a + r.TotalDuration),
+            SignificanceLevel = headerSource?.SignificanceLevel ?? 0.05,
         };
     }
 
@@ -61,6 +63,7 @@ public sealed record BenchmarkTable
             ConfidenceIntervalLower = result.ConfidenceIntervalLower,
             ConfidenceIntervalUpper = result.ConfidenceIntervalUpper,
             SignificanceLabel = ComputeSignificanceLabel(result, multiBenchmark),
+            Warnings = result.Warnings,
         };
     }
 
@@ -101,4 +104,5 @@ public record BenchmarkRow
     public required double ConfidenceIntervalUpper { get; init; }
     public long? MeanAllocatedBytes { get; init; }
     public string SignificanceLabel { get; init; } = "";
+    public IReadOnlyList<string> Warnings { get; init; } = [];
 }

@@ -47,7 +47,8 @@ listed below so they can be regenerated.
 | `StudentT.CriticalValue` (df = 1, 2) | `scipy.stats.t.ppf` | ≤ 1e-9 relative |
 | `StudentT.CriticalValue` (df ≥ 3) | `scipy.stats.t.ppf` | < 1% (worst ≈ 0.79% at df = 3, 99%) |
 | `StudentT.NormalQuantile` | `scipy.stats.norm.ppf` | ≤ 1.15e-8 absolute |
-| `MannWhitneyU.Test` | `scipy.stats.mannwhitneyu(method='asymptotic', use_continuity=False)` | < 1e-6 absolute |
+| `MannWhitneyU.Test` (small, tie-free, combined n ≤ 20) | `scipy.stats.mannwhitneyu(method='exact')` | ≤ 1e-9 relative |
+| `MannWhitneyU.Test` (otherwise) | `scipy.stats.mannwhitneyu(method='asymptotic', use_continuity=True)` | < 1e-6 absolute |
 
 Reference values were generated with:
 
@@ -61,22 +62,27 @@ np.percentile(x, q, method='inverted_cdf')  # nearest-rank percentile
 stats.t.ppf((1 + cl) / 2, df)                # two-tailed [t critical value](https://en.wikipedia.org/wiki/Student%27s_t-distribution)
 stats.norm.ppf(p)                            # [normal quantile](https://en.wikipedia.org/wiki/Normal_distribution)
 stats.mannwhitneyu(a, b, alternative='two-sided',
-                   method='asymptotic', use_continuity=False)  # [p-value](https://en.wikipedia.org/wiki/P-value)
+                   method='exact')                          # exact p-value (small samples)
+stats.mannwhitneyu(a, b, alternative='two-sided',
+                   method='asymptotic', use_continuity=True)  # [p-value](https://en.wikipedia.org/wiki/P-value) (large samples)
 ```
 
 ### Exact vs. approximate Mann-Whitney U
 
-NBenchmark uses the large-sample normal approximation (no continuity
-correction). `MannWhitneyCrossCheckTests` also enumerates the **exact**
-[permutation](https://en.wikipedia.org/wiki/Permutation_test) distribution in-process (validated against
-`scipy.stats.mannwhitneyu(method='exact')` to 1e-9) and pins how far the
-approximation can stray from it:
+For small, tie-free samples (combined `n ≤ 20`) NBenchmark computes the **exact**
+[permutation](https://en.wikipedia.org/wiki/Permutation_test) p-value, matching
+`scipy.stats.mannwhitneyu(method='exact')` to 1e-9. `MannWhitneyCrossCheckTests`
+verifies this against both SciPy and an independent in-process rank-assignment
+enumerator. For larger samples NBenchmark falls back to the tie- and
+continuity-corrected normal approximation, which matches SciPy's asymptotic
+method (`use_continuity=True`) to better than 1e-6:
 
-> For 8–10 samples per group the normal-approximation p-value differs from the
-> exact permutation p-value by up to **≈ 0.05**. The gap shrinks as the sample
-> count grows; with NBenchmark's default of 200 iterations it is negligible.
+> Using the exact test on small samples removes the up-to-**≈ 0.05** gap that a
+> normal approximation alone would have versus the exact permutation p-value.
+> For larger samples the approximation is accurate and the difference is
+> negligible.
 
-This is why the significance test requires at least five samples per group.
+The significance test requires at least two samples per group.
 
 ## 3. End-to-end measurement loop sanity
 

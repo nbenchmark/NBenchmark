@@ -13,9 +13,10 @@ public class MeasurementOptionsTests
         Assert.Equal(200, opts.Iterations);
         Assert.True(opts.ForceGcBeforeEachIteration);
         Assert.False(opts.MeasureAllocations);
-        Assert.Equal(OutlierMode.RemoveTop5Percent, opts.OutlierMode);
+        Assert.Equal(OutlierMode.IqrFence, opts.OutlierMode);
         Assert.Equal(0.95, opts.ConfidenceLevel);
         Assert.True(opts.EnableSignificance);
+        Assert.Equal(0.05, opts.SignificanceLevel);
         Assert.True(opts.ForceGcBetweenBenchmarks);
     }
 

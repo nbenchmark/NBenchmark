@@ -27,7 +27,8 @@ internal static class OutcomeBuilder
                 false,
                 null,
                 totalDuration,
-                measuredDuration),
+                measuredDuration,
+                s.Result.Warnings),
 
             RunOutcome.DryRun => Build(
                 name, description, isBaseline, options,
@@ -38,7 +39,8 @@ internal static class OutcomeBuilder
                 false,
                 null,
                 totalDuration,
-                TimeSpan.Zero),
+                TimeSpan.Zero,
+                []),
 
             RunOutcome.Errored e => Build(
                 name, description, isBaseline, options,
@@ -49,7 +51,8 @@ internal static class OutcomeBuilder
                 true,
                 e.ErrorMessageOverride ?? Unwrap(e.Error).ToString(),
                 totalDuration,
-                measuredDuration),
+                measuredDuration,
+                []),
 
             _ => throw new ArgumentOutOfRangeException(nameof(input), input, "Unknown RunOutcome case."),
         };
@@ -67,7 +70,8 @@ internal static class OutcomeBuilder
         bool errored,
         string? errorMessage,
         TimeSpan totalDuration,
-        TimeSpan measuredDuration)
+        TimeSpan measuredDuration,
+        IReadOnlyList<string> warnings)
     {
         return new MeasurementOutcome
         {
@@ -99,6 +103,8 @@ internal static class OutcomeBuilder
                 MeasuredDuration = measuredDuration,
                 IsBaseline = isBaseline,
                 OutlierMode = options.OutlierMode,
+                SignificanceLevel = options.SignificanceLevel,
+                Warnings = warnings,
             },
         };
     }

@@ -31,6 +31,6 @@ public static class MeasurementOptionsBuilder
             or OutlierMode.RemoveTopAndBottom5Percent
             or OutlierMode.IqrFence
             ? mode
-            : OutlierMode.RemoveTop5Percent;
+            : OutlierMode.IqrFence;
     }
 }

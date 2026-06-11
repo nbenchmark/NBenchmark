@@ -25,7 +25,7 @@ public class BenchmarkResultTests
     }
 
     [Fact]
-    public void Default_OutlierMode_Is_RemoveTop5Percent()
+    public void Default_OutlierMode_Is_IqrFence()
     {
         var result = new BenchmarkResult
         {
@@ -39,6 +39,6 @@ public class BenchmarkResultTests
             StandardDeviation = 0,
         };
 
-        Assert.Equal(OutlierMode.RemoveTop5Percent, result.OutlierMode);
+        Assert.Equal(OutlierMode.IqrFence, result.OutlierMode);
     }
 }

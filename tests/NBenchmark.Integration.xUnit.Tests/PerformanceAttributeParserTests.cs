@@ -22,7 +22,7 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(0, parsed.Iterations);
         Assert.Equal(0, parsed.WarmupIterations);
         Assert.False(parsed.MeasureAllocations);
-        Assert.Equal(OutlierMode.RemoveTop5Percent, parsed.OutlierMode);
+        Assert.Equal(OutlierMode.IqrFence, parsed.OutlierMode);
         Assert.Equal(0.95, parsed.ConfidenceLevel);
     }
 
@@ -84,7 +84,7 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(0, parsed.Iterations);
         Assert.Equal(0, parsed.WarmupIterations);
         Assert.False(parsed.MeasureAllocations);
-        Assert.Equal(OutlierMode.RemoveTop5Percent, parsed.OutlierMode);
+        Assert.Equal(OutlierMode.IqrFence, parsed.OutlierMode);
         Assert.Equal(0.95, parsed.ConfidenceLevel);
     }
 

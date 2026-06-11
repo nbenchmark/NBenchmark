@@ -58,14 +58,18 @@ public class MannWhitneyUTests
     }
 
     [Fact]
-    public void Small_Sample_Returns_NaN()
+    public void Small_But_Valid_Samples_Use_Exact_Path()
     {
+        // 4 vs 16 observations: both groups have >= 2 values, so the test is
+        // defined. Combined n = 20 and tie-free, so the exact path is taken.
+        // Group A is strictly below group B, so the result is highly significant.
         var a = new double[] { 1, 2, 3, 4 };
         var b = new double[] { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
 
         var p = MannWhitneyU.Test(a, b);
 
-        Assert.True(double.IsNaN(p));
+        Assert.False(double.IsNaN(p));
+        Assert.True(p < 0.05);
     }
 
     [Fact]

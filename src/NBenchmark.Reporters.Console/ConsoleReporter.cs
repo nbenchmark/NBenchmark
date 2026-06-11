@@ -61,7 +61,7 @@ public sealed class ConsoleReporter : IReporter
             {
                 var errorCols = new List<string>
                 {
-                    $"[red][Error] {EscapeMarkup(row.Name)}[/]",
+                    $"[red][[Error]] {EscapeMarkup(row.Name)}[/]",
                     "[red]-[/]", "[red]-[/]", "[red]-[/]",
                     "[red]-[/]", "[red]-[/]", "[red]-[/]", "[red]-[/]", "[red]-[/]",
                 };
@@ -126,6 +126,24 @@ public sealed class ConsoleReporter : IReporter
 
         AnsiConsole.Write(consoleTable);
 
+        var warnings = benchTable.Rows
+            .Where(r => !r.Errored && r.Warnings.Count > 0)
+            .ToList();
+
+        if (warnings.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+
+            foreach (var row in warnings)
+            {
+                foreach (var warning in row.Warnings)
+                {
+                    AnsiConsole.MarkupLine(
+                        $"[yellow]! {EscapeMarkup(row.Name)}: {EscapeMarkup(warning)}[/]");
+                }
+            }
+        }
+
         var successfulRows = benchTable.Rows.Where(r => !r.Errored).ToList();
 
         if (successfulRows.Count > 1)
@@ -149,7 +167,7 @@ public sealed class ConsoleReporter : IReporter
 
         AnsiConsole.MarkupLine(
             $"[grey]Ran {results.Count} benchmark(s) in {benchTable.TotalDuration.TotalSeconds:F1}s - "
-            + $"Significance: Mann-Whitney U (p < 0.05) - "
+            + $"Significance: Mann-Whitney U (p < {benchTable.SignificanceLevel:0.###}) - "
             + $"Outliers: {FormatOutlierMode(benchTable.OutlierMode)}[/]");
 
         AnsiConsole.MarkupLine(

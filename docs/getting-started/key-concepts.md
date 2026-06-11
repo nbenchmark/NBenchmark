@@ -34,16 +34,16 @@ This behaviour is controlled by `ForceGcBeforeEachIteration` (default: `true`). 
 
 Even with warmup and forced GC, occasional **OS scheduling interrupts**, context switches, or thermal throttling can spike an individual measurement. These outliers are not representative of your code's performance - they reflect system noise.
 
-By default, NBenchmark trims the **top 5%** of samples before computing statistics (`OutlierMode.RemoveTop5Percent`). With 200 iterations, this discards the 10 noisiest measurements.
+By default, NBenchmark trims samples beyond an **[IQR fence](https://en.wikipedia.org/wiki/Interquartile_range)** before computing statistics (`OutlierMode.IqrFence`): anything below `Q1 - 1.5 × IQR` or above `Q3 + 1.5 × IQR`. Unlike a fixed quota, this adapts to the run - a clean run keeps almost every sample, while a noisy run trims more. If the discarded slow samples cluster tightly (a possible second execution profile rather than random noise), NBenchmark adds a bimodal-distribution warning to the result.
 
 Available modes:
 
 | Mode | What is removed |
 |---|---|
 | `None` | Nothing. All samples are used. |
-| `RemoveTop5Percent` | The slowest 5% of samples. **(default)** |
+| `RemoveTop5Percent` | The slowest 5% of samples. |
 | `RemoveTopAndBottom5Percent` | The slowest and fastest 5%. |
-| `IqrFence` | Any sample beyond 1.5× the [inter-quartile range](https://en.wikipedia.org/wiki/Interquartile_range). |
+| `IqrFence` | Any sample beyond 1.5× the [inter-quartile range](https://en.wikipedia.org/wiki/Interquartile_range). **(default)** |
 
 ## Median vs. mean
 
@@ -91,7 +91,7 @@ NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E
 
 - A **✓** in the Sig column means the difference would occur by chance less than 5% of the time (p < 0.05). It is very unlikely to be noise.
 - A **~** means the difference is not statistically significant - you cannot confidently conclude one is faster than the other.
-- The test requires at least **5 samples** in each group; with fewer it returns no result.
+- The test requires at least **2 samples** in each group; with fewer it returns no result.
 
 The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** - it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
 

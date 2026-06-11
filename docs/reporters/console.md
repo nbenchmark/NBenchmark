@@ -43,7 +43,7 @@ Run at 2026-06-06 03:40:00 UTC - 25 warmup / 190 measured
 │ Baseline (baseline)  │ 400 ns  │ 376 ns  │ ±22 ns │ 114 ns  │ 500 ns  │ 900 ns  │ 1.00x │    -     │
 ╰──────────────────────┴─────────┴─────────┴────────┴─────────┴─────────┴─────────┴───────┴──────────╯
 
-Ran 2 benchmark(s) in 0.0s - Significance: Mann-Whitney U (p < 0.05) - Outliers: top 5%
+Ran 2 benchmark(s) in 0.0s - Significance: Mann-Whitney U (p < 0.05) - Outliers: IQR fence (1.5×)
 Error = ±95% confidence interval half-width on the mean.
 ```
 

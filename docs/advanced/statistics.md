@@ -50,6 +50,8 @@ After collection, [outliers](https://en.wikipedia.org/wiki/Outlier) are removed 
 
 The trimmed array is passed to `StatsSummary.Compute`. The pre-trim raw array is stored separately for use in significance testing.
 
+`IqrFence` is the default because it adapts to each benchmark's actual spread rather than always discarding a fixed quota: a clean run keeps almost every sample, while a noisy run trims more. When the slow samples it discards form a tight secondary cluster - low relative spread, rather than scattered scheduling noise - NBenchmark records a non-fatal **bimodal-distribution warning** on the result (surfaced in `BenchmarkResult.Warnings` and by the console reporter). That pattern usually signals a structural second execution profile worth investigating (GC pauses, lock contention, cache misses) rather than random jitter.
+
 > [!NOTE] Quartile definition
 > `IqrFence` computes Q1 and Q3 with the same **[nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method)** percentile used
 > everywhere else in NBenchmark (equivalent to `numpy.percentile(method='inverted_cdf')`).
@@ -106,7 +108,7 @@ $$\bar{x} \pm \text{MoE} = [\bar{x} - \text{MoE},\; \bar{x} + \text{MoE}]$$
 
 The [normal distribution](https://en.wikipedia.org/wiki/Normal_distribution)'s critical value (e.g. 1.96 for 95%) assumes the population standard deviation is known. In benchmarking it is not - we estimate it from the sample. Student's t compensates by using wider critical values for small sample sizes, shrinking towards the normal as `n` grows.
 
-With the default 200 iterations (190 after 5% trimming), the t critical value at 95% is approximately **1.973** - very close to the normal 1.960, so the practical difference is small.
+With the default 200 iterations (slightly fewer after outlier trimming), the t critical value at 95% is approximately **1.973** - very close to the normal 1.960, so the practical difference is small.
 
 ### Honest caveats
 
@@ -173,22 +175,20 @@ Given the **pre-trim raw samples** of two benchmarks A (length n₁) and B (leng
 
 $$U_1 = R_1 - \frac{n_1(n_1+1)}{2}, \quad U_2 = n_1 n_2 - U_1, \quad U = \min(U_1, U_2)$$
 
-1. For large samples (n₁ ≥ 5 and n₂ ≥ 5), use the [normal approximation](https://en.wikipedia.org/wiki/Normal_distribution#Central_limit_theorem) with a tie correction to compute a z-score, then derive a two-tailed [p-value](https://en.wikipedia.org/wiki/P-value).
+1. Depending on the sample sizes:
+   - **Small, tie-free samples** (combined `n₁ + n₂ ≤ 20` with no tied values): compute the **exact** two-sided [permutation](https://en.wikipedia.org/wiki/Permutation_test) p-value by enumerating the full distribution of U over all rank assignments (via a bounded-partition dynamic program). This matches `scipy.stats.mannwhitneyu(..., method='exact')`.
+   - **Otherwise**: use the [normal approximation](https://en.wikipedia.org/wiki/Normal_distribution#Central_limit_theorem) with a **tie correction** and a **continuity correction** to compute a z-score, then derive a two-tailed [p-value](https://en.wikipedia.org/wiki/P-value).
 
-A [p-value](https://en.wikipedia.org/wiki/P-value) below **0.05** is considered significant (✓ in the Sig column). This threshold is fixed and is not configurable.
+A [p-value](https://en.wikipedia.org/wiki/P-value) below the configured significance level (alpha, default **0.05**) is considered significant (✓ in the Sig column). Set it with `MeasurementOptions.SignificanceLevel`, the `.WithSignificanceLevel(...)` fluent method, or the `--alpha` CLI flag.
 
-The normal approximation uses **no continuity correction**, so it corresponds to
-`scipy.stats.mannwhitneyu(..., method='asymptotic', use_continuity=False)` - which
-NBenchmark matches to better than 1e-6. On small samples this approximation can
-differ from the exact [permutation](https://en.wikipedia.org/wiki/Permutation_test) p-value by up to ≈ 0.05; that gap is pinned and
-documented in [Validation & Accuracy](./validation.md).
+Using the exact test for small samples removes the main source of error in the old normal-approximation-only approach, where the asymptotic p-value could differ from the exact permutation p-value by up to ≈ 0.05. For larger samples the continuity-corrected normal approximation is accurate and matches SciPy's asymptotic method closely; the exact and approximate paths are cross-checked against SciPy in [Validation & Accuracy](./validation.md).
 
 > [!NOTE]
 > NBenchmark uses the **pre-trim raw samples** (before outlier removal) for significance testing. This gives the test more data to work with. However it means that significance is assessed on the full distribution including extreme measurements.
 
 ### Minimum sample requirement
 
-The test requires at least **5 samples in each group**. With fewer samples the normal approximation is unreliable and the test returns `null` (no significance indicator is shown).
+The test requires at least **2 samples in each group**. With fewer samples the U statistic is undefined and the test returns `null` (no significance indicator is shown).
 
 ## Summary of all reported statistics
 

@@ -109,13 +109,13 @@ public sealed class PerformanceFactIntegrationTests
     {
         var spec = new RunSpec
         {
-            Options = MeasurementOptions.Default with { MeasureAllocations = true },
+            Options = MeasurementOptions.Default with { MeasureAllocations = true, OutlierMode = OutlierMode.None },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("DefaultTest", SimpleWork, spec);
 
         var result = outcome.Result;
-        Assert.Equal(190, result.MeasuredIterations);
+        Assert.Equal(200, result.MeasuredIterations);
         Assert.Equal(25, result.WarmupIterations);
     }
 
