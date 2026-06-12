@@ -114,6 +114,17 @@ public sealed class BenchmarkAssertTests
             MeanAllocatedBytes = allocations,
             MeasuredIterations = 100,
             WarmupIterations = 25,
+            Q1 = mean * 0.7,
+            Q3 = mean * 1.2,
+            InterquartileRange = mean * 0.5,
+            OutliersRemoved = 0,
+            N = 100,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = allocations,
+            AllocP95 = allocations,
+            AllocMax = allocations,
         };
     }
 }

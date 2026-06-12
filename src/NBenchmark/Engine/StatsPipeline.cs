@@ -3,12 +3,6 @@ using NBenchmark.Stats;
 
 namespace NBenchmark.Engine;
 
-/// <summary>
-///     Composes the per-benchmark measurement math: trim the raw timings by the
-///     configured <see cref="OutlierMode" />, compute the <see cref="StatsSummary" />,
-///     and average allocation deltas. The single entry point the runner's success
-///     path routes through.
-/// </summary>
 internal static class StatsPipeline
 {
     public static ProcessedMeasurements Run(
@@ -16,18 +10,29 @@ internal static class StatsPipeline
         long[]? rawAllocations,
         MeasurementOptions options)
     {
-        // Preserve caller-visible RawSamples order; trim/sort works on a private copy.
         var timingsForStats = (double[])rawTimings.Clone();
-        var (trimmed, discarded) = OutlierTrim.TrimDetailed(timingsForStats, options.OutlierMode);
+        var trimResult = OutlierTrim.TrimDetailed(timingsForStats, options.OutlierMode);
 
-        Debug.Assert(IsSorted(trimmed),
+        Debug.Assert(IsSorted(trimResult.Kept),
             "OutlierTrim must produce sorted output; Percentile.Compute requires sorted input.");
 
-        var stats = StatsSummary.Compute(trimmed, options.ConfidenceLevel);
+        var stats = StatsSummary.Compute(trimResult.Kept, options.ConfidenceLevel);
         long? meanAllocs = rawAllocations is not null ? ComputeMean(rawAllocations) : null;
-        var warnings = BuildWarnings(trimmed, discarded, rawTimings.Length);
+        var warnings = BuildWarnings(trimResult.Kept, trimResult.Discarded, rawTimings.Length);
+        var outliersRemoved = rawTimings.Length - trimResult.Kept.Length;
 
-        return new ProcessedMeasurements(stats, trimmed.Length, meanAllocs) { Warnings = warnings };
+        return new ProcessedMeasurements(
+            stats,
+            trimResult.Kept.Length,
+            meanAllocs,
+            trimResult.Q1,
+            trimResult.Q3,
+            trimResult.InterquartileRange,
+            trimResult.LowerFence,
+            trimResult.UpperFence,
+            outliersRemoved,
+            rawAllocations)
+        { Warnings = warnings };
     }
 
     private static IReadOnlyList<string> BuildWarnings(double[] trimmed, double[] discarded, int totalSamples)
@@ -74,7 +79,14 @@ internal static class StatsPipeline
 internal sealed record ProcessedMeasurements(
     StatsSummary Stats,
     int MeasuredIterations,
-    long? MeanAllocatedBytes)
+    long? MeanAllocatedBytes,
+    double Q1,
+    double Q3,
+    double InterquartileRange,
+    double? LowerFence,
+    double? UpperFence,
+    int OutliersRemoved,
+    long[]? RawAllocations)
 {
     public IReadOnlyList<string> Warnings { get; init; } = [];
 }

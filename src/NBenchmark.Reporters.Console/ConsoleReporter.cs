@@ -7,6 +7,13 @@ public sealed class ConsoleReporter : IReporter
 {
     public string Name => "console";
 
+    public ReportDetail Detail { get; set; }
+
+    public ConsoleReporter(ReportDetail detail = ReportDetail.Simple)
+    {
+        Detail = detail;
+    }
+
     public Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)
@@ -87,7 +94,7 @@ public sealed class ConsoleReporter : IReporter
             var significanceCol = row.SignificanceLabel switch
             {
                 "✓" => " [green]✓[/]",
-                "~" => " [grey]~[/]",
+                "✗" => " [red]✗[/]",
                 _ => "",
             };
 
@@ -108,7 +115,7 @@ public sealed class ConsoleReporter : IReporter
                 $"{nameCol}{significanceCol}",
                 BenchmarkFormatter.FormatNs(row.Median),
                 BenchmarkFormatter.FormatNs(row.Mean),
-                $"[grey]±{BenchmarkFormatter.FormatNs(row.MarginOfError)}[/]",
+                $"[grey]±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}%)[/]",
                 BenchmarkFormatter.FormatNs(row.StandardDeviation),
                 BenchmarkFormatter.FormatNs(row.P95),
                 BenchmarkFormatter.FormatNs(row.P99),
@@ -125,6 +132,23 @@ public sealed class ConsoleReporter : IReporter
         }
 
         AnsiConsole.Write(consoleTable);
+
+        if (Detail == ReportDetail.Advanced)
+        {
+            foreach (var row in benchTable.Rows.Where(r => !r.Errored))
+            {
+                var statsBlock = BenchmarkTable.RenderStatsBlock(row, Detail);
+                if (!string.IsNullOrEmpty(statsBlock))
+                {
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine($"[grey]{EscapeMarkup(row.Name)} details:[/]");
+                    foreach (var line in statsBlock.Split('\n'))
+                    {
+                        AnsiConsole.MarkupLine($"  [grey]{EscapeMarkup(line)}[/]");
+                    }
+                }
+            }
+        }
 
         var warnings = benchTable.Rows
             .Where(r => !r.Errored && r.Warnings.Count > 0)
@@ -171,7 +195,8 @@ public sealed class ConsoleReporter : IReporter
             + $"Outliers: {FormatOutlierMode(benchTable.OutlierMode)}[/]");
 
         AnsiConsole.MarkupLine(
-            $"[grey]Error = ±{benchTable.ConfidenceLevel * 100:0.#}% confidence interval half-width on the mean.[/]");
+            $"[grey]Error = ±{benchTable.ConfidenceLevel * 100:0.#}% confidence interval half-width on the mean. "
+            + $"Detail: {Detail}[/]");
 
         AnsiConsole.WriteLine();
         return Task.CompletedTask;
@@ -182,7 +207,7 @@ public sealed class ConsoleReporter : IReporter
         ReporterRegistry.Register(
             "console",
             "Console output (Spectre.Console table + bar chart)",
-            _ => new ConsoleReporter());
+            (_, detail) => new ConsoleReporter(detail));
 
     private static string FormatOutlierMode(OutlierMode mode)
     {
@@ -191,7 +216,7 @@ public sealed class ConsoleReporter : IReporter
             OutlierMode.None => "none",
             OutlierMode.RemoveTop5Percent => "top 5%",
             OutlierMode.RemoveTopAndBottom5Percent => "top & bottom 5%",
-            OutlierMode.IqrFence => "IQR fence (1.5×)",
+            OutlierMode.IqrFence => "IQR fence (1.5x)",
             _ => "auto",
         };
     }

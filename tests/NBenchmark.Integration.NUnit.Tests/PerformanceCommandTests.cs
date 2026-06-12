@@ -26,6 +26,17 @@ public sealed class PerformanceCommandTests
             WarmupIterations = 0,
             Errored = true,
             ErrorMessage = "Something exploded",
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 0,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
         };
 
         var violations = PerformanceCommand.ValidateResult(errored, data);
@@ -50,6 +61,17 @@ public sealed class PerformanceCommandTests
             StandardDeviation = 10,
             MeasuredIterations = 100,
             WarmupIterations = 25,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 100,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
         };
 
         var violations = PerformanceCommand.ValidateResult(ok, data);

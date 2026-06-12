@@ -78,7 +78,7 @@ What to look at:
 
 - The comparison table with Ratio and Sig columns.
 - The bar chart rendered below the table.
-- The significance indicator (✓ or ~) - does the difference appear real?
+- The significance indicator (✓ or ✗) - does the difference appear real?
 
 ---
 

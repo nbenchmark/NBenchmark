@@ -15,6 +15,7 @@ public sealed class BenchmarkSuite(string name)
     private RunOrder _runOrder = RunOrder.Random;
     private Action? _suiteSetup;
     private Action? _suiteTeardown;
+    private ReportDetail _detail;
 
     /// <summary>The display name of this suite.</summary>
     public string Name { get; } = name;
@@ -129,7 +130,16 @@ public sealed class BenchmarkSuite(string name)
 
     public BenchmarkSuite WithReporter(IReporter reporter)
     {
+        reporter.Detail = _detail;
         _reporters.Add(reporter);
+        return this;
+    }
+
+    public BenchmarkSuite WithDetail(ReportDetail detail)
+    {
+        _detail = detail;
+        foreach (var reporter in _reporters)
+            reporter.Detail = detail;
         return this;
     }
 

@@ -1,3 +1,5 @@
+using NBenchmark.Reporters;
+
 namespace NBenchmark;
 
 public sealed record BenchmarkTable
@@ -64,6 +66,27 @@ public sealed record BenchmarkTable
             ConfidenceIntervalUpper = result.ConfidenceIntervalUpper,
             SignificanceLabel = ComputeSignificanceLabel(result, multiBenchmark),
             Warnings = result.Warnings,
+            Q1 = result.Q1,
+            Q3 = result.Q3,
+            InterquartileRange = result.InterquartileRange,
+            LowerFence = result.LowerFence,
+            UpperFence = result.UpperFence,
+            OutliersRemoved = result.OutliersRemoved,
+            N = result.N,
+            Skewness = result.Skewness,
+            Kurtosis = result.Kurtosis,
+            Mad = result.Mad,
+            AllocMedian = result.AllocMedian,
+            AllocP95 = result.AllocP95,
+            AllocMax = result.AllocMax,
+            Range = result.Range,
+            Min = result.Min,
+            Max = result.Max,
+            WarmupIterations = result.WarmupIterations,
+            ConfidenceLevel = result.ConfidenceLevel,
+            StandardErrorPercent = result.StandardErrorPercent,
+            MarginPercent = result.MarginPercent,
+            CoefficientOfVariationPercent = result.CoefficientOfVariationPercent,
         };
     }
 
@@ -80,7 +103,60 @@ public sealed record BenchmarkTable
         if (result.Errored || !multiBenchmark || result.IsBaseline || result.SignificanceVerdict == SignificanceVerdict.NotTested)
             return "";
 
-        return result.SignificanceVerdict == SignificanceVerdict.Significant ? "✓" : "~";
+        return result.SignificanceVerdict == SignificanceVerdict.Significant ? "✓" : "✗";
+    }
+
+    public static string RenderStatsBlock(BenchmarkRow row, ReportDetail detail)
+    {
+        if (detail == ReportDetail.Simple)
+            return "";
+
+        var lines = new List<string>();
+
+        if (row.OutliersRemoved > 0)
+        {
+            var label = row.OutliersRemoved == 1 ? "outlier" : "outliers";
+            lines.Add($"Outliers: {row.OutliersRemoved} {label} removed");
+        }
+
+        lines.Add($"Range: {BenchmarkFormatter.FormatNs(row.Range)} ({BenchmarkFormatter.FormatNs(row.Min)} -> {BenchmarkFormatter.FormatNs(row.Max)})");
+
+        lines.Add($"Quartiles: Q1 = {BenchmarkFormatter.FormatNs(row.Q1)}, Q3 = {BenchmarkFormatter.FormatNs(row.Q3)}, IQR = {BenchmarkFormatter.FormatNs(row.InterquartileRange)}");
+
+        if (row.LowerFence is not null && row.UpperFence is not null)
+        {
+            lines.Add($"Fences: [{BenchmarkFormatter.FormatNs(row.LowerFence.Value)}; {BenchmarkFormatter.FormatNs(row.UpperFence.Value)}]");
+        }
+
+        lines.Add($"Iterations: {row.N} measured (warmup: {row.WarmupIterations}, pre-trim: {row.N + row.OutliersRemoved})");
+
+        lines.Add($"CI: [{BenchmarkFormatter.FormatNs(row.ConfidenceIntervalLower)}; {BenchmarkFormatter.FormatNs(row.ConfidenceIntervalUpper)}] (CI {row.ConfidenceLevel * 100:F1}%)");
+
+        lines.Add($"Margin: ±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}% of Mean)");
+
+        lines.Add($"CV: {row.CoefficientOfVariation:F4} ({row.CoefficientOfVariationPercent:F2}%)");
+
+        var skewSuffix = row.N < 3 ? " (n too small)" : "";
+        lines.Add($"Skewness: {row.Skewness:F4}{skewSuffix}");
+
+        var kurtSuffix = row.N < 4 ? " (n too small)" : "";
+        lines.Add($"Kurtosis: {row.Kurtosis:F4}{kurtSuffix}");
+
+        lines.Add($"MAD: {BenchmarkFormatter.FormatNs(row.Mad)}");
+
+        lines.Add($"N: {row.N} samples");
+
+        if (row.AllocMedian is not null)
+        {
+            lines.Add("");
+            lines.Add("Allocations:");
+            lines.Add($"  Mean: {BenchmarkFormatter.FormatAlloc(row.MeanAllocatedBytes ?? 0)}");
+            lines.Add($"  P50:  {BenchmarkFormatter.FormatAlloc(row.AllocMedian.Value)}");
+            lines.Add($"  P95:  {BenchmarkFormatter.FormatAlloc(row.AllocP95 ?? 0)}");
+            lines.Add($"  Max:  {BenchmarkFormatter.FormatAlloc(row.AllocMax ?? 0)}");
+        }
+
+        return string.Join("\n", lines);
     }
 }
 
@@ -105,4 +181,27 @@ public record BenchmarkRow
     public long? MeanAllocatedBytes { get; init; }
     public string SignificanceLabel { get; init; } = "";
     public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public required double Q1 { get; init; }
+    public required double Q3 { get; init; }
+    public required double InterquartileRange { get; init; }
+    public double? LowerFence { get; init; }
+    public double? UpperFence { get; init; }
+    public required int OutliersRemoved { get; init; }
+    public required int N { get; init; }
+    public required double Skewness { get; init; }
+    public required double Kurtosis { get; init; }
+    public required double Mad { get; init; }
+    public long? AllocMedian { get; init; }
+    public long? AllocP95 { get; init; }
+    public long? AllocMax { get; init; }
+
+    public required double Range { get; init; }
+    public required double Min { get; init; }
+    public required double Max { get; init; }
+    public int WarmupIterations { get; init; }
+    public double ConfidenceLevel { get; init; }
+    public required double StandardErrorPercent { get; init; }
+    public required double MarginPercent { get; init; }
+    public required double CoefficientOfVariationPercent { get; init; }
 }

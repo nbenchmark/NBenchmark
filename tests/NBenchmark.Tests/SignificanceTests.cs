@@ -17,11 +17,15 @@ public class SignificanceTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "faster", Mean = 50, Median = 50, P95 = 55, P99 = 58,
                 Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -48,11 +52,15 @@ public class SignificanceTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "other", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -78,6 +86,8 @@ public class SignificanceTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -100,6 +110,8 @@ public class SignificanceTests
             {
                 Name = "solo", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -122,11 +134,15 @@ public class SignificanceTests
             {
                 Name = "fast", Mean = 50, Median = 50, P95 = 55, P99 = 58,
                 Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "slow", Mean = 200, Median = 200, P95 = 220, P99 = 240,
                 Min = 180, Max = 260, StandardDeviation = 10, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -151,8 +167,8 @@ public class SignificanceTests
     {
         var results = new List<BenchmarkResult>
         {
-            new() { Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true },
-            new() { Name = "b", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3 },
+            new() { Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null },
+            new() { Name = "b", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3, Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null },
         };
 
         var raw = new Dictionary<string, double[]> { ["a"] = [10, 11, 12], ["b"] = [1, 2, 3] };
@@ -167,7 +183,7 @@ public class SignificanceTests
     {
         var results = new List<BenchmarkResult>
         {
-            new() { Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true },
+            new() { Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null },
         };
 
         var raw = new Dictionary<string, double[]> { ["a"] = [10, 11, 12] };
@@ -186,8 +202,8 @@ public class SignificanceTests
 
         var results = new List<BenchmarkResult>
         {
-            new() { Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true },
-            new() { Name = "faster", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3 },
+            new() { Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null },
+            new() { Name = "faster", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3, Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null },
         };
 
         var raw = new Dictionary<string, double[]> { ["baseline"] = baselineSamples, ["faster"] = fasterSamples };
@@ -233,11 +249,15 @@ public class SignificanceTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "candidate", Mean = 92, Median = 92, P95 = 100, P99 = 105,
                 Min = 80, Max = 110, StandardDeviation = 5, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         ];
     }
@@ -255,5 +275,16 @@ public class SignificanceTests
             StandardDeviation = 0,
             Errored = true,
             ErrorMessage = error,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 0,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
         };
 }

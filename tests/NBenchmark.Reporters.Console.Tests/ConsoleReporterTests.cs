@@ -44,6 +44,17 @@ public class ConsoleReporterTests
                 StandardDeviation = 0,
                 Errored = true,
                 ErrorMessage = "something went wrong",
+                Q1 = 0,
+                Q3 = 0,
+                InterquartileRange = 0,
+                OutliersRemoved = 0,
+                N = 0,
+                Skewness = 0,
+                Kurtosis = 0,
+                Mad = 0,
+                AllocMedian = null,
+                AllocP95 = null,
+                AllocMax = null,
             };
 
             await reporter.ReportAsync([result]);
@@ -56,7 +67,7 @@ public class ConsoleReporterTests
     [Fact]
     public void Module_Initializer_Registers_Console_With_Global_Registry()
     {
-        var ok = ReporterRegistry.TryCreate("console", null, out var reporter);
+        var ok = ReporterRegistry.TryCreate("console", null, ReportDetail.Simple, out var reporter);
 
         Assert.True(ok);
         Assert.IsType<ConsoleReporter>(reporter);
@@ -75,6 +86,17 @@ public class ConsoleReporterTests
             Max = median * 1.3,
             StandardDeviation = median * 0.05,
             MeanAllocatedBytes = 64,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 0,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
         };
     }
 

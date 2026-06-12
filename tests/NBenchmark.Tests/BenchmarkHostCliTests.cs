@@ -265,6 +265,131 @@ public class BenchmarkHostCliTests
         }
     }
 
+    [Fact]
+    public async Task Detail_Flag_Advanced_Propagates_To_Reporter()
+    {
+        var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-host-detail-{Guid.NewGuid():N}");
+
+        try
+        {
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                await BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--reporter", "csv", "--detail", "advanced", "--output", tempDir])
+                    .AddFromAssembly<TestBenchmarks>()
+                    .WithRunOrder(RunOrder.Declaration)
+                    .RunAsync();
+            });
+
+            var csvFile = Assert.Single(Directory.GetFiles(tempDir, "*.csv"));
+            var lines = await File.ReadAllLinesAsync(csvFile);
+            Assert.Contains("Q1", lines[0]);
+            Assert.Contains("Skewness", lines[0]);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task Detail_Flag_Advanced_Applies_To_Custom_Reporter_Added_Programmatically()
+    {
+        var customReporter = new CustomNamedReporter();
+
+        await CaptureConsoleOutputAsync(async () =>
+        {
+            await BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--detail", "advanced"])
+                .AddFromAssembly<TestBenchmarks>()
+                .WithRunOrder(RunOrder.Declaration)
+                .WithReporter(customReporter)
+                .RunAsync();
+        });
+
+        Assert.Equal(1, customReporter.ReportCount);
+        Assert.Equal(ReportDetail.Advanced, customReporter.CapturedDetail);
+    }
+
+    [Fact]
+    public async Task Detail_Flag_Simple_Is_The_Default()
+    {
+        var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-host-detail-default-{Guid.NewGuid():N}");
+
+        try
+        {
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                await BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--reporter", "csv", "--output", tempDir])
+                    .AddFromAssembly<TestBenchmarks>()
+                    .WithRunOrder(RunOrder.Declaration)
+                    .RunAsync();
+            });
+
+            var csvFile = Assert.Single(Directory.GetFiles(tempDir, "*.csv"));
+            var lines = await File.ReadAllLinesAsync(csvFile);
+            Assert.DoesNotContain("Q1", lines[0]);
+            Assert.DoesNotContain("Skewness", lines[0]);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task Detail_Flag_Invalid_Sets_ExitCode()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            CaptureConsoleOutput(() =>
+            {
+                CaptureConsoleError(() =>
+                {
+                    var host = BenchmarkHost.Create(["--detail", "bogus"]);
+                    host.RunAsync().GetAwaiter().GetResult();
+                });
+            });
+
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+        }
+    }
+
+    [Fact]
+    public async Task WithDetail_Advanced_Propagates_To_Reporter_Without_Rebuilding()
+    {
+        var customReporter = new CustomNamedReporter();
+        var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-host-withdetail-{Guid.NewGuid():N}");
+
+        try
+        {
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                await BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--output", tempDir])
+                    .AddFromAssembly<TestBenchmarks>()
+                    .WithRunOrder(RunOrder.Declaration)
+                    .WithReporter(customReporter)
+                    .WithDetail(ReportDetail.Advanced)
+                    .RunAsync();
+            });
+
+            Assert.Equal(1, customReporter.ReportCount);
+            Assert.Equal(ReportDetail.Advanced, customReporter.CapturedDetail);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, true);
+        }
+    }
+
     private static string CaptureConsoleOutput(Action action)
     {
         var sw = new StringWriter();
@@ -336,7 +461,13 @@ public class BenchmarkHostCliTests
     private sealed class CustomNamedReporter : IReporter
     {
         public int ReportCount { get; private set; }
+        public ReportDetail CapturedDetail { get; private set; }
         public string Name => "custom";
+        public ReportDetail Detail
+        {
+            get => CapturedDetail;
+            set => CapturedDetail = value;
+        }
 
         public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
         {

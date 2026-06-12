@@ -18,6 +18,17 @@ public class BenchmarkResultTests
             Max = 130.0,
             StandardDeviation = 5.0,
             MarginOfError = 2.5,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 0,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
         };
 
         Assert.Equal(97.5, result.ConfidenceIntervalLower);
@@ -37,6 +48,17 @@ public class BenchmarkResultTests
             Min = 0,
             Max = 0,
             StandardDeviation = 0,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 0,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
         };
 
         Assert.Equal(OutlierMode.IqrFence, result.OutlierMode);

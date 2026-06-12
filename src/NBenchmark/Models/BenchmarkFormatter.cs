@@ -22,4 +22,6 @@ public static class BenchmarkFormatter
             _ => $"{bytes / (1024.0 * 1024):F1} MB",
         };
     }
+
+    public static string FormatAlloc(long bytes) => FormatBytes(bytes);
 }

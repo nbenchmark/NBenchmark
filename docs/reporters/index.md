@@ -136,7 +136,7 @@ For reporters that produce comparison tables, use `BenchmarkTable.Build(results)
 
 - **Baseline selection** - picks the first result marked `[Baseline]`, or falls back to the fastest (lowest median) if none is marked.
 - **Ratio computation** - `row.Ratio` is `result.Median / baseline.Median`, or `NaN` for errored results or single-benchmark runs.
-- **Significance labels** - `row.SignificanceLabel` is `"✓"` (significant), `"~"` (not significant), or `""` (not applicable).
+- **Significance labels** - `row.SignificanceLabel` is `"✓"` (significant), `"✗"` (not significant), or `""` (not applicable).
 - **Ordering** - rows are sorted by median ascending.
 - **Run metadata** - `table.RunAtUtc`, `table.WarmupIterations`, `table.MeasuredIterations`, `table.ConfidenceLevel`, `table.OutlierMode`, and `table.TotalDuration` are available for building a header without picking fields from individual results.
 

@@ -13,33 +13,37 @@ public record BenchmarkResult
     public required double Max { get; init; }
     public required double StandardDeviation { get; init; }
 
-    /// <summary>Standard error of the mean: <c>StandardDeviation / sqrt(n)</c>.</summary>
     public double StandardError { get; init; }
 
-    /// <summary>
-    ///     Half-width of the confidence interval on the mean at <see cref="ConfidenceLevel" />.
-    ///     The interval is <c>Mean ± MarginOfError</c>.
-    /// </summary>
     public double MarginOfError { get; init; }
 
-    /// <summary>The confidence level for <see cref="MarginOfError" /> (e.g. 0.95). Default 0.95.</summary>
     public double ConfidenceLevel { get; init; } = 0.95;
 
-    /// <summary>Coefficient of variation: <c>StandardDeviation / Mean</c> (0 when mean is 0).</summary>
     public double CoefficientOfVariation { get; init; }
 
-    /// <summary>Lower bound of the confidence interval on the mean.</summary>
-    public double ConfidenceIntervalLower => Mean - MarginOfError;
+    public required double Q1 { get; init; }
+    public required double Q3 { get; init; }
+    public required double InterquartileRange { get; init; }
 
-    /// <summary>Upper bound of the confidence interval on the mean.</summary>
-    public double ConfidenceIntervalUpper => Mean + MarginOfError;
+    public double? LowerFence { get; init; }
+    public double? UpperFence { get; init; }
+
+    public required int OutliersRemoved { get; init; }
+    public required int N { get; init; }
+
+    public required double Skewness { get; init; }
+    public required double Kurtosis { get; init; }
+    public required double Mad { get; init; }
+
+    public required long? AllocMedian { get; init; }
+    public required long? AllocP95 { get; init; }
+    public required long? AllocMax { get; init; }
 
     public long? MeanAllocatedBytes { get; init; }
 
     public double? PValue { get; init; }
     public SignificanceVerdict SignificanceVerdict { get; init; }
 
-    /// <summary>The significance level (alpha) the <see cref="PValue" /> was compared against.</summary>
     public double SignificanceLevel { get; init; } = 0.05;
 
     public bool Errored { get; init; }
@@ -49,33 +53,19 @@ public record BenchmarkResult
     public int WarmupIterations { get; init; }
     public DateTimeOffset RunAtUtc { get; init; } = DateTimeOffset.UtcNow;
 
-    /// <summary>
-    ///     End-to-end wall-clock cost of running this benchmark entry, including warmup,
-    ///     pre-measure <see cref="GC.Collect" />, and the measured loop. Stopped at the
-    ///     end of the measured loop, so it excludes outlier-trim and stats compute
-    ///     (microseconds, not a useful run-budget signal). Populated uniformly across
-    ///     success, dry-run, and errored paths; <see cref="TimeSpan.Zero" /> is reserved
-    ///     for failure sites that did not start a per-benchmark timer (e.g. suite setup).
-    /// </summary>
     public TimeSpan TotalDuration { get; init; } = TimeSpan.Zero;
 
-    /// <summary>
-    ///     Wall-clock cost of the measured loop only, including per-iteration
-    ///     <c>IterationSetup</c> / <c>IterationTeardown</c>, per-iteration
-    ///     <see cref="GC.Collect" />, and allocation-tracking work. Excludes warmup
-    ///     and the pre-measure <see cref="GC.Collect" />. Always
-    ///     <see cref="TimeSpan.Zero" /> when no measured loop ran (dry-run, errored
-    ///     before measurement).
-    /// </summary>
     public TimeSpan MeasuredDuration { get; init; } = TimeSpan.Zero;
 
     public bool IsBaseline { get; init; }
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
-    /// <summary>
-    ///     Non-fatal diagnostics surfaced during measurement - for example, a notice that
-    ///     trimmed outliers formed a distinct secondary cluster rather than scattered noise.
-    ///     Empty when nothing notable was detected.
-    /// </summary>
     public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public double ConfidenceIntervalLower => Mean - MarginOfError;
+    public double ConfidenceIntervalUpper => Mean + MarginOfError;
+    public double Range => Max - Min;
+    public double StandardErrorPercent => Mean > 0 ? StandardError / Mean * 100 : 0;
+    public double MarginPercent => Mean > 0 ? MarginOfError / Mean * 100 : 0;
+    public double CoefficientOfVariationPercent => CoefficientOfVariation * 100;
 }

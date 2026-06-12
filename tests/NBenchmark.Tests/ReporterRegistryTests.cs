@@ -19,7 +19,7 @@ public class ReporterRegistryTests : IDisposable
 
         try
         {
-            var ok = ReporterRegistry.TryCreate("json", dir, out var reporter);
+            var ok = ReporterRegistry.TryCreate("json", dir, ReportDetail.Simple, out var reporter);
 
             Assert.True(ok);
             Assert.IsType<JsonReporter>(reporter);
@@ -37,7 +37,7 @@ public class ReporterRegistryTests : IDisposable
 
         try
         {
-            var ok = ReporterRegistry.TryCreate("markdown", dir, out var reporter);
+            var ok = ReporterRegistry.TryCreate("markdown", dir, ReportDetail.Simple, out var reporter);
 
             Assert.True(ok);
             Assert.IsType<MarkdownReporter>(reporter);
@@ -55,7 +55,7 @@ public class ReporterRegistryTests : IDisposable
 
         try
         {
-            var ok = ReporterRegistry.TryCreate("csv", dir, out var reporter);
+            var ok = ReporterRegistry.TryCreate("csv", dir, ReportDetail.Simple, out var reporter);
 
             Assert.True(ok);
             Assert.IsType<CsvReporter>(reporter);
@@ -69,7 +69,7 @@ public class ReporterRegistryTests : IDisposable
     [Fact]
     public void TryCreate_Without_Dir_Defaults_To_Cwd()
     {
-        var ok = ReporterRegistry.TryCreate("json", null, out var reporter);
+        var ok = ReporterRegistry.TryCreate("json", null, ReportDetail.Simple, out var reporter);
 
         Assert.True(ok);
         Assert.IsType<JsonReporter>(reporter);
@@ -78,7 +78,7 @@ public class ReporterRegistryTests : IDisposable
     [Fact]
     public void TryCreate_Markdown_Without_Dir_Defaults_To_Cwd()
     {
-        var ok = ReporterRegistry.TryCreate("markdown", null, out var reporter);
+        var ok = ReporterRegistry.TryCreate("markdown", null, ReportDetail.Simple, out var reporter);
 
         Assert.True(ok);
         Assert.IsType<MarkdownReporter>(reporter);
@@ -87,7 +87,7 @@ public class ReporterRegistryTests : IDisposable
     [Fact]
     public void TryCreate_Unknown_Name_Returns_False()
     {
-        var ok = ReporterRegistry.TryCreate("bogus", null, out var reporter);
+        var ok = ReporterRegistry.TryCreate("bogus", null, ReportDetail.Simple, out var reporter);
 
         Assert.False(ok);
         Assert.Null(reporter);
@@ -96,16 +96,16 @@ public class ReporterRegistryTests : IDisposable
     [Fact]
     public void TryCreate_Is_Case_Insensitive()
     {
-        Assert.True(ReporterRegistry.TryCreate("JSON", null, out _));
-        Assert.True(ReporterRegistry.TryCreate("Json", null, out _));
-        Assert.True(ReporterRegistry.TryCreate("json", null, out _));
+        Assert.True(ReporterRegistry.TryCreate("JSON", null, ReportDetail.Simple, out _));
+        Assert.True(ReporterRegistry.TryCreate("Json", null, ReportDetail.Simple, out _));
+        Assert.True(ReporterRegistry.TryCreate("json", null, ReportDetail.Simple, out _));
     }
 
     [Fact]
     public void TryCreate_Null_Name_Throws()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            ReporterRegistry.TryCreate(null!, null, out _));
+            ReporterRegistry.TryCreate(null!, null, ReportDetail.Simple, out _));
     }
 
     [Fact]
@@ -120,10 +120,10 @@ public class ReporterRegistryTests : IDisposable
     [Fact]
     public void Register_Adds_Reporter_To_Available_And_TryCreate()
     {
-        ReporterRegistry.Register("fake", "Fake reporter for tests", _ => new StubReporter());
+        ReporterRegistry.Register("fake", "Fake reporter for tests", (_, _) => new StubReporter());
 
         Assert.Contains(ReporterRegistry.Available, r => r.Name == "fake");
-        Assert.True(ReporterRegistry.TryCreate("fake", null, out var reporter));
+        Assert.True(ReporterRegistry.TryCreate("fake", null, ReportDetail.Simple, out var reporter));
         Assert.IsType<StubReporter>(reporter);
     }
 
@@ -131,14 +131,14 @@ public class ReporterRegistryTests : IDisposable
     public void Register_Throws_On_Duplicate_Name()
     {
         Assert.Throws<InvalidOperationException>(() =>
-            ReporterRegistry.Register("json", "Duplicate", _ => new JsonReporter()));
+            ReporterRegistry.Register("json", "Duplicate", (_, _) => new JsonReporter()));
     }
 
     [Fact]
     public void Register_Is_Case_Insensitive_For_Duplicate_Check()
     {
         Assert.Throws<InvalidOperationException>(() =>
-            ReporterRegistry.Register("JSON", "Duplicate uppercase", _ => new JsonReporter()));
+            ReporterRegistry.Register("JSON", "Duplicate uppercase", (_, _) => new JsonReporter()));
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class ReporterRegistryTests : IDisposable
     {
         string? captured = null;
 
-        ReporterRegistry.Register("capturing", "Captures outputDir", dir =>
+        ReporterRegistry.Register("capturing", "Captures outputDir", (dir, _) =>
         {
             captured = dir;
             return new StubReporter();
@@ -156,7 +156,7 @@ public class ReporterRegistryTests : IDisposable
 
         try
         {
-            ReporterRegistry.TryCreate("capturing", dir, out _);
+            ReporterRegistry.TryCreate("capturing", dir, ReportDetail.Simple, out _);
 
             Assert.Equal(dir, captured);
         }
@@ -182,7 +182,7 @@ public class ReporterRegistryTests : IDisposable
     [Fact]
     public void Reset_Removes_Post_Reset_Registrations_While_Preserving_Initial_State()
     {
-        ReporterRegistry.Register("temp", "Temporary", _ => new StubReporter());
+        ReporterRegistry.Register("temp", "Temporary", (_, _) => new StubReporter());
         Assert.Contains(ReporterRegistry.Available, r => r.Name == "temp");
 
         ReporterRegistry.Reset();
@@ -196,6 +196,7 @@ public class ReporterRegistryTests : IDisposable
     private sealed class StubReporter : IReporter
     {
         public string Name => "stub";
+        public ReportDetail Detail { get; set; } = ReportDetail.Simple;
         public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

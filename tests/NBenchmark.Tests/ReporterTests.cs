@@ -102,6 +102,35 @@ public class ReporterTests
     }
 
     [Fact]
+    public async Task MarkdownReporter_Advanced_Appends_Details_Without_Breaking_Table()
+    {
+        var tempDir = MakeSubDir("nb-md-advanced");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Advanced);
+            var first = MakeResult("alpha", 100);
+            var second = MakeResult("beta", 150);
+
+            await reporter.ReportAsync([first, second]);
+
+            var filePath = Path.Combine(tempDir, "out.md");
+            Assert.True(File.Exists(filePath));
+
+            var content = await File.ReadAllTextAsync(filePath);
+            Assert.Contains("| alpha |", content);
+            Assert.Contains("| beta |", content);
+            Assert.Contains("### Per-benchmark details", content);
+            Assert.Contains("#### alpha", content);
+            Assert.Contains("#### beta", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
     public async Task MarkdownReporter_Auto_Names_File_When_No_FileName()
     {
         var tempDir = MakeSubDir("nb-md-auto");
@@ -165,6 +194,28 @@ public class ReporterTests
             var content = await File.ReadAllTextAsync(filePath);
             Assert.Contains("Name,Median,Mean", content);
             Assert.Contains("\"alpha\"", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task CsvReporter_Writes_Lowercase_Detail_Value()
+    {
+        var tempDir = MakeSubDir("nb-csv-detail");
+
+        try
+        {
+            var reporter = new CsvReporter(tempDir, "out.csv", ReportDetail.Advanced);
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            var filePath = Path.Combine(tempDir, "out.csv");
+            var lines = await File.ReadAllLinesAsync(filePath);
+            Assert.Contains(",advanced,", lines[1]);
         }
         finally
         {
@@ -378,6 +429,17 @@ public class ReporterTests
             Max = median * 1.3,
             StandardDeviation = median * 0.05,
             MeanAllocatedBytes = 64,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 0,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
         };
     }
 }

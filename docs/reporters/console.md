@@ -65,7 +65,9 @@ When there are two or more benchmarks, a bar chart of median timings is also dis
 
 An optional **Description** column appears if any benchmark has a `Description` set.
 
-A **✓** next to the name indicates the difference from the baseline is statistically significant (p < 0.05). A **~** indicates it is not.
+A **✓** next to the name indicates the difference from the baseline is statistically significant (p < 0.05). A **✗** indicates it is not.
+
+In Advanced mode (`--detail advanced`), each benchmark row is followed by an indented stats block.
 
 ## Adding progress display
 

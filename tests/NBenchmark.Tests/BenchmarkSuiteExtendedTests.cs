@@ -139,6 +139,42 @@ public class BenchmarkSuiteExtendedTests
     }
 
     [Fact]
+    public async Task RunAsync_With_Detail_Advanced_Propagates_To_Reporter()
+    {
+        var stub = new StubReporter(_ => { });
+
+        var results = await new BenchmarkSuite("detail-suite")
+            .Add("a", () => Thread.SpinWait(100))
+            .WithWarmup(1)
+            .WithIterations(2)
+            .WithOutlierMode(OutlierMode.None)
+            .WithReporter(stub)
+            .WithDetail(ReportDetail.Advanced)
+            .RunAsync();
+
+        Assert.Single(results);
+        Assert.Equal(ReportDetail.Advanced, stub.CapturedDetail);
+    }
+
+    [Fact]
+    public async Task RunAsync_With_Detail_Set_Before_Reporter_Still_Propagates()
+    {
+        var stub = new StubReporter(_ => { });
+
+        var results = await new BenchmarkSuite("detail-order-suite")
+            .Add("a", () => Thread.SpinWait(100))
+            .WithWarmup(1)
+            .WithIterations(2)
+            .WithOutlierMode(OutlierMode.None)
+            .WithDetail(ReportDetail.Advanced)
+            .WithReporter(stub)
+            .RunAsync();
+
+        Assert.Single(results);
+        Assert.Equal(ReportDetail.Advanced, stub.CapturedDetail);
+    }
+
+    [Fact]
     public async Task RunAsync_With_Significance_Disabled()
     {
         var results = await new BenchmarkSuite("no-sig")
@@ -182,6 +218,8 @@ public class BenchmarkSuiteExtendedTests
         }
 
         public string Name => "stub";
+        public ReportDetail Detail { get; set; } = ReportDetail.Simple;
+        public ReportDetail CapturedDetail => Detail;
 
         public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
         {

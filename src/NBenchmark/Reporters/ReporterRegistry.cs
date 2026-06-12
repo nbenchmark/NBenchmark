@@ -9,9 +9,9 @@ public static class ReporterRegistry
 {
     private static readonly Entry[] _seed =
     [
-        new("json", "JSON file output (one file per run)", dir => new JsonReporter(dir ?? ".")),
-        new("markdown", "Markdown table output", dir => new MarkdownReporter(dir ?? ".")),
-        new("csv", "CSV file output", dir => new CsvReporter(dir ?? ".")),
+        new("json", "JSON file output (one file per run)", (dir, detail) => new JsonReporter(dir ?? ".", null, detail)),
+        new("markdown", "Markdown table output", (dir, detail) => new MarkdownReporter(dir ?? ".", null, detail)),
+        new("csv", "CSV file output", (dir, detail) => new CsvReporter(dir ?? ".", null, detail)),
     ];
 
     private static readonly object _lock = new();
@@ -36,7 +36,7 @@ public static class ReporterRegistry
         }
     }
 
-    public static void Register(string name, string description, Func<string?, IReporter> factory)
+    public static void Register(string name, string description, Func<string?, ReportDetail, IReporter> factory)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(description);
@@ -52,7 +52,7 @@ public static class ReporterRegistry
         }
     }
 
-    public static bool TryCreate(string name, string? outputDir, [NotNullWhen(true)] out IReporter? reporter)
+    public static bool TryCreate(string name, string? outputDir, ReportDetail detail, [NotNullWhen(true)] out IReporter? reporter)
     {
         ArgumentNullException.ThrowIfNull(name);
 
@@ -67,7 +67,7 @@ public static class ReporterRegistry
 
         if (entry is not null)
         {
-            reporter = entry.Factory(outputDir);
+            reporter = entry.Factory(outputDir, detail);
             return true;
         }
 
@@ -102,7 +102,6 @@ public static class ReporterRegistry
             }
             catch
             {
-                // Optional extension assembly load failures should not block core reporter usage.
             }
         }
     }
@@ -117,5 +116,5 @@ public static class ReporterRegistry
         }
     }
 
-    private sealed record Entry(string Name, string Description, Func<string?, IReporter> Factory);
+    private sealed record Entry(string Name, string Description, Func<string?, ReportDetail, IReporter> Factory);
 }

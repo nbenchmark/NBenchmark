@@ -14,11 +14,15 @@ public class ThresholdCheckTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "slow", Mean = 120, Median = 120, P95 = 130, P99 = 135,
                 Min = 100, Max = 140, StandardDeviation = 8, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -38,11 +42,15 @@ public class ThresholdCheckTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "slow", Mean = 110, Median = 110, P95 = 120, P99 = 125,
                 Min = 95, Max = 125, StandardDeviation = 5, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -61,6 +69,8 @@ public class ThresholdCheckTests
             {
                 Name = "solo", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -80,6 +90,8 @@ public class ThresholdCheckTests
                 Name = "broken", Mean = 0, Median = 0, P95 = 0, P99 = 0,
                 Min = 0, Max = 0, StandardDeviation = 0, Errored = true,
                 ErrorMessage = "error",
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -98,11 +110,15 @@ public class ThresholdCheckTests
             {
                 Name = "baseline", Mean = 0, Median = 0, P95 = 0, P99 = 0,
                 Min = 0, Max = 0, StandardDeviation = 0, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "candidate", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -122,11 +138,15 @@ public class ThresholdCheckTests
             {
                 Name = "baseline", Mean = 0, Median = 0, P95 = 0, P99 = 0,
                 Min = 0, Max = 0, StandardDeviation = 0, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "candidate", Mean = 0, Median = 0, P95 = 0, P99 = 0,
                 Min = 0, Max = 0, StandardDeviation = 0, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -145,11 +165,15 @@ public class ThresholdCheckTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "slow", Mean = 120, Median = 120, P95 = 130, P99 = 135,
                 Min = 100, Max = 140, StandardDeviation = 8, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -165,6 +189,8 @@ public class ThresholdCheckTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -180,11 +206,15 @@ public class ThresholdCheckTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "faster", Mean = 50, Median = 50, P95 = 55, P99 = 58,
                 Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -203,16 +233,22 @@ public class ThresholdCheckTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "slow_one", Mean = 150, Median = 150, P95 = 160, P99 = 165,
                 Min = 130, Max = 170, StandardDeviation = 7, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "slow_two", Mean = 200, Median = 200, P95 = 220, P99 = 240,
                 Min = 180, Max = 260, StandardDeviation = 10, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -233,11 +269,15 @@ public class ThresholdCheckTests
             {
                 Name = "fast", Mean = 50, Median = 50, P95 = 55, P99 = 58,
                 Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "slow", Mean = 200, Median = 200, P95 = 220, P99 = 240,
                 Min = 180, Max = 260, StandardDeviation = 10, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 
@@ -257,17 +297,23 @@ public class ThresholdCheckTests
             {
                 Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "broken", Mean = 0, Median = 0, P95 = 0, P99 = 0,
                 Min = 0, Max = 0, StandardDeviation = 0, Errored = true,
                 ErrorMessage = "error",
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
                 Name = "slow", Mean = 150, Median = 150, P95 = 160, P99 = 165,
                 Min = 130, Max = 170, StandardDeviation = 7, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
 

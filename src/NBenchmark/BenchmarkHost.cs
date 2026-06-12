@@ -17,6 +17,7 @@ public sealed class BenchmarkHost
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
+    private ReportDetail _detail;
 
     private BenchmarkHost()
     {
@@ -29,6 +30,7 @@ public sealed class BenchmarkHost
         var cliArgs = CliArgs.Parse(args);
         var host = new BenchmarkHost();
         host._cliArgs = cliArgs;
+        host._detail = cliArgs.Detail;
         host._reporters.InsertRange(0, cliArgs.CliReporters);
         return host;
     }
@@ -47,6 +49,7 @@ public sealed class BenchmarkHost
 
     public BenchmarkHost WithReporter(IReporter reporter)
     {
+        reporter.Detail = _detail;
         _reporters.Add(reporter);
         return this;
     }
@@ -60,6 +63,14 @@ public sealed class BenchmarkHost
     public BenchmarkHost WithRunOrder(RunOrder order)
     {
         _runOrder = order;
+        return this;
+    }
+
+    public BenchmarkHost WithDetail(ReportDetail detail)
+    {
+        _detail = detail;
+        foreach (var reporter in _reporters)
+            reporter.Detail = detail;
         return this;
     }
 
@@ -322,7 +333,7 @@ public sealed class BenchmarkHost
     {
         for (var i = 0; i < _reporters.Count; i++)
         {
-            if (ReporterRegistry.TryCreate(_reporters[i].Name, outputDir, out var rebuilt))
+            if (ReporterRegistry.TryCreate(_reporters[i].Name, outputDir, _detail, out var rebuilt))
                 _reporters[i] = rebuilt;
         }
     }

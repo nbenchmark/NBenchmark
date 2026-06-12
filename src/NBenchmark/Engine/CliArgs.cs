@@ -18,15 +18,10 @@ internal sealed record CliArgs
     public double? ConfidenceLevel { get; init; }
     public double? Alpha { get; init; }
     public IReadOnlyList<IReporter> CliReporters { get; init; } = [];
+    public ReportDetail Detail { get; init; } = ReportDetail.Simple;
 
-    /// <summary>
-    ///     Internal: when set, the host runs only this single benchmark (by full name)
-    ///     in-process and writes its serialized result to <see cref="IsolatedOutput" />.
-    ///     Set by the parent process when dispatching an <c>[IsolatedProcess]</c> benchmark.
-    /// </summary>
     public string? IsolatedRun { get; init; }
 
-    /// <summary>Internal: file path the isolated child writes its serialized result to.</summary>
     public string? IsolatedOutput { get; init; }
 
     public static CliArgs Parse(string[] args)
@@ -42,7 +37,8 @@ internal sealed record CliArgs
         int? iterations = null;
         int? warmupIterations = null;
         double? confidenceLevel = null;
-        var cliReporters = new List<IReporter>();
+        var reporterNames = new List<string>();
+        var detail = ReportDetail.Simple;
 
         double? alpha = null;
         string? isolatedRun = null;
@@ -90,18 +86,7 @@ internal sealed record CliArgs
                     outputDir = PathValidation.ValidateOutputPath(args[++i]);
                     break;
                 case "--reporter" when i + 1 < args.Length:
-                    var name = args[++i];
-
-                    if (ReporterRegistry.TryCreate(name, null, out var reporter))
-                        cliReporters.Add(reporter);
-                    else
-                    {
-                        Console.Error.WriteLine(
-                            $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
-
-                        Environment.ExitCode = 1;
-                    }
-
+                    reporterNames.Add(args[++i]);
                     break;
                 case "--confidence" when i + 1 < args.Length:
                     if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var conf)
@@ -168,6 +153,21 @@ internal sealed record CliArgs
                     }
 
                     break;
+                case "--detail" when i + 1 < args.Length:
+                    var detailStr = args[++i];
+                    if (string.Equals(detailStr, "simple", StringComparison.OrdinalIgnoreCase))
+                        detail = ReportDetail.Simple;
+                    else if (string.Equals(detailStr, "advanced", StringComparison.OrdinalIgnoreCase))
+                        detail = ReportDetail.Advanced;
+                    else
+                    {
+                        Console.Error.WriteLine(
+                            $"Invalid --detail value '{detailStr}'. Must be 'simple' or 'advanced'.");
+
+                        Environment.ExitCode = 1;
+                    }
+
+                    break;
                 case "--list":
                     listOnly = true;
                     break;
@@ -182,7 +182,7 @@ internal sealed record CliArgs
                     break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--confidence" or "--order" or "--threshold-pct" or "--seed" or "--alpha"
-                    or "--nb-isolated-run" or "--nb-isolated-output":
+                    or "--nb-isolated-run" or "--nb-isolated-output" or "--detail":
                     Console.Error.WriteLine($"Missing value for '{args[i]}'.");
                     Environment.ExitCode = 1;
                     break;
@@ -190,6 +190,20 @@ internal sealed record CliArgs
                     Console.Error.WriteLine($"Unknown flag: '{args[i]}'. Use --help to see available options.");
                     Environment.ExitCode = 1;
                     break;
+            }
+        }
+
+        var cliReporters = new List<IReporter>();
+        foreach (var name in reporterNames)
+        {
+            if (ReporterRegistry.TryCreate(name, null, detail, out var reporter))
+                cliReporters.Add(reporter);
+            else
+            {
+                Console.Error.WriteLine(
+                    $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
+
+                Environment.ExitCode = 1;
             }
         }
 
@@ -208,6 +222,7 @@ internal sealed record CliArgs
             ConfidenceLevel = confidenceLevel,
             Alpha = alpha,
             CliReporters = cliReporters,
+            Detail = detail,
             IsolatedRun = isolatedRun,
             IsolatedOutput = isolatedOutput,
         };
@@ -228,6 +243,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
         Console.WriteLine("  --seed <n>             Seed for deterministic random ordering");
+        Console.WriteLine("  --detail <level>       Report detail: simple or advanced (default: simple)");
         Console.WriteLine("  --threshold-pct <n>    Fail with exit code 1 if any benchmark regresses");
         Console.WriteLine("                        >N% vs baseline (median-based comparison; n >= 1).");
         Console.WriteLine("  --help, -h             Show this help text");

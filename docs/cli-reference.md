@@ -135,6 +135,24 @@ Has no effect when `--order declaration` is used.
 
 ---
 
+### `--detail <level>`
+
+Set the report detail level. Controls how much information reporters display.
+
+| Value | Behaviour |
+|---|---|
+| `simple` | 10-column table with the essential statistics. **(default)** |
+| `advanced` | Same table plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, and allocation percentiles. |
+
+```bash
+dotnet run -- --detail advanced
+dotnet run -- --detail simple
+```
+
+The `--detail` flag affects all registered reporters. File-based reporters emit different column sets. Console reporter prints the stats block below each row; Markdown reporter appends a per-benchmark details section after the table. JSON always emits the full record regardless of detail level.
+
+---
+
 ### `--list`
 
 List all discovered benchmarks without running them. Useful for verifying that your classes and methods are being found.
@@ -194,7 +212,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`), invalid format (`--confidence`, `--seed`), unknown reporter name (`--reporter`), or a benchmark exceeded the `--threshold-pct` regression limit. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`), invalid format (`--confidence`, `--seed`), unknown reporter name (`--reporter`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
 When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 

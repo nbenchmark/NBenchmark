@@ -130,6 +130,17 @@ public sealed class RegressionBaselineTests
             StandardDeviation = mean * 0.1,
             MeasuredIterations = 100,
             WarmupIterations = 25,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 100,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
         };
     }
 }

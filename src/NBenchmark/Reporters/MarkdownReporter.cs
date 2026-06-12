@@ -2,13 +2,22 @@ using System.Text;
 
 namespace NBenchmark.Reporters;
 
-public sealed class MarkdownReporter(string outputDirectory = ".", string? name = null) : IReporter
+public sealed class MarkdownReporter : IReporter
 {
     private static int _fileCounter;
+    private readonly string _outputDirectory;
+    private readonly string? _name;
 
-    private readonly string _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
+    public MarkdownReporter(string outputDirectory = ".", string? name = null, ReportDetail detail = ReportDetail.Simple)
+    {
+        _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
+        _name = name;
+        Detail = detail;
+    }
 
     public string Name => "markdown";
+
+    public ReportDetail Detail { get; set; }
 
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
@@ -16,7 +25,7 @@ public sealed class MarkdownReporter(string outputDirectory = ".", string? name 
     {
         Directory.CreateDirectory(_outputDirectory);
 
-        var fileName = name
+        var fileName = _name
                        ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.md";
 
         var filePath = Path.Combine(_outputDirectory, fileName);
@@ -44,13 +53,18 @@ public sealed class MarkdownReporter(string outputDirectory = ".", string? name 
         sb.AppendLine("| Benchmark | Median | Mean | Error | StdDev | P95 | P99 | Ratio | Sig | Alloc/op |");
         sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
 
+        var detailedRows = Detail == ReportDetail.Advanced
+            ? new List<(string Name, string Block)>()
+            : null;
+
         foreach (var row in table.Rows)
         {
             var error = row.Errored
                 ? "-"
-                : $"±{BenchmarkFormatter.FormatNs(row.MarginOfError)}";
+                : $"±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}%)";
 
             var sigLabel = string.IsNullOrEmpty(row.SignificanceLabel) ? "-" : row.SignificanceLabel;
+            var ratio = row.Errored || double.IsNaN(row.Ratio) ? "-" : $"{row.Ratio:F2}x";
 
             sb.AppendLine(
                 $"| {row.Name} " +
@@ -60,10 +74,35 @@ public sealed class MarkdownReporter(string outputDirectory = ".", string? name 
                 $"| {BenchmarkFormatter.FormatNs(row.StandardDeviation)} " +
                 $"| {BenchmarkFormatter.FormatNs(row.P95)} " +
                 $"| {BenchmarkFormatter.FormatNs(row.P99)} " +
-                $"| {(row.Errored ? "-" : $"{row.Ratio:F2}x")} " +
+                $"| {ratio} " +
                 $"| {sigLabel} " +
                 $"| {(row.MeanAllocatedBytes.HasValue ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value) : "-")} |"
             );
+
+            if (Detail == ReportDetail.Advanced && !row.Errored)
+            {
+                var statsBlock = BenchmarkTable.RenderStatsBlock(row, Detail);
+                if (!string.IsNullOrEmpty(statsBlock))
+                    detailedRows!.Add((row.Name, statsBlock));
+            }
+        }
+
+        if (detailedRows is not null && detailedRows.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("### Per-benchmark details");
+            sb.AppendLine();
+
+            foreach (var (name, block) in detailedRows)
+            {
+                sb.AppendLine($"#### {name}");
+                sb.AppendLine();
+
+                foreach (var line in block.Split('\n'))
+                    sb.AppendLine($"- {line}");
+
+                sb.AppendLine();
+            }
         }
 
         var confidencePct = table.ConfidenceLevel * 100;

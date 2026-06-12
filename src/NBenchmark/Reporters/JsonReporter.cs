@@ -1,19 +1,23 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace NBenchmark.Reporters;
 
-public sealed class JsonReporter(string outputDirectory = ".", string? name = null) : IReporter
+public sealed class JsonReporter(string outputDirectory = ".", string? name = null, ReportDetail detail = ReportDetail.Simple) : IReporter
 {
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
     private static int _fileCounter;
     private readonly string _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
 
     public string Name => "json";
+
+    public ReportDetail Detail { get; set; } = detail;
 
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
@@ -29,6 +33,7 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
         var envelope = new ResultEnvelope
         {
             GeneratedAt = DateTimeOffset.UtcNow,
+            Detail = Detail,
             Results = results,
         };
 
@@ -39,6 +44,7 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
     private sealed class ResultEnvelope
     {
         public DateTimeOffset GeneratedAt { get; init; }
+        public ReportDetail Detail { get; init; }
         public IReadOnlyList<BenchmarkResult> Results { get; init; } = [];
     }
 }
