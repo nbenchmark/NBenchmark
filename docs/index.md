@@ -15,7 +15,7 @@ var result = Benchmark.Run(() => JsonSerializer.Deserialize<MyDto>(json));
 result.Print();
 ```
 
-[<img src="https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/console-results.png" width="640" alt="NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark">](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/console.png)
+[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/console.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/console.png)
 
 ## Why NBenchmark?
 
