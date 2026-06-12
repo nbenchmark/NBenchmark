@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace NBenchmark.Reporters.Console;
 
@@ -8,6 +9,8 @@ public sealed class ConsoleReporter : IReporter
     public string Name => "console";
 
     public ReportDetail Detail { get; set; }
+
+    private const int BarWidth = 12;
 
     public ConsoleReporter(ReportDetail detail = ReportDetail.Simple)
     {
@@ -24,43 +27,78 @@ public sealed class ConsoleReporter : IReporter
             return Task.CompletedTask;
         }
 
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[bold]Benchmark Results[/]");
-
         var benchTable = BenchmarkTable.Build(results);
 
         if (benchTable.Rows.All(r => r.Errored))
         {
             foreach (var row in benchTable.Rows)
             {
-                AnsiConsole.MarkupLine($"[red]Error: {EscapeMarkup(row.Name)}: {EscapeMarkup(row.ErrorMessage)}[/]");
+                AnsiConsole.MarkupLine($"[red]Error: {Esc(row.Name)}: {Esc(row.ErrorMessage)}[/]");
             }
 
             return Task.CompletedTask;
         }
 
-        AnsiConsole.MarkupLine($"[grey]Run at {benchTable.RunAtUtc} UTC - "
-                               + $"{benchTable.WarmupIterations} warmup / "
-                               + $"{benchTable.MeasuredIterations} measured[/]");
+        AnsiConsole.WriteLine();
+        RenderHeader(benchTable);
+        AnsiConsole.WriteLine();
+        RenderComparisonTable(benchTable, results);
+        AnsiConsole.WriteLine();
+        RenderTimingDetail(benchTable);
 
+        if (Detail == ReportDetail.Advanced)
+        {
+            AnsiConsole.WriteLine();
+            RenderAdvancedDetails(benchTable);
+        }
+
+        RenderWarnings(benchTable);
+        RenderFooter(benchTable, results.Count);
         AnsiConsole.WriteLine();
 
-        var consoleTable = new Table()
-            .Border(TableBorder.Rounded)
-            .AddColumn("Benchmark")
-            .AddColumn(new TableColumn("Median").Centered())
-            .AddColumn(new TableColumn("Mean").Centered())
-            .AddColumn(new TableColumn("Error").Centered())
-            .AddColumn(new TableColumn("StdDev").Centered())
-            .AddColumn(new TableColumn("P95").Centered())
-            .AddColumn(new TableColumn("P99").Centered())
-            .AddColumn(new TableColumn("Ratio").Centered())
-            .AddColumn(new TableColumn("Alloc/op").Centered());
+        return Task.CompletedTask;
+    }
+
+    private static void RenderHeader(BenchmarkTable benchTable)
+    {
+        var headerGrid = new Grid()
+            .AddColumn(new GridColumn().NoWrap())
+            .AddColumn(new GridColumn().NoWrap())
+            .AddColumn(new GridColumn().NoWrap())
+            .AddColumn(new GridColumn().NoWrap());
+
+        headerGrid.AddRow(
+            "[bold steelblue1]BENCHMARK RESULTS[/]",
+            $"[grey]{benchTable.RunAtUtc} UTC[/]",
+            $"[grey]{benchTable.WarmupIterations} warmup / {benchTable.MeasuredIterations} measured[/]",
+            $"[grey]Outliers: {FormatOutlierMode(benchTable.OutlierMode)}[/]"
+        );
+
+        var panel = new Panel(headerGrid)
+            .Border(BoxBorder.Heavy)
+            .BorderColor(Color.SteelBlue1)
+            .Padding(1, 0);
+
+        AnsiConsole.Write(panel);
+    }
+
+    private static void RenderComparisonTable(BenchmarkTable benchTable, IReadOnlyList<BenchmarkResult> results)
+    {
+        var successfulRows = benchTable.Rows.Where(r => !r.Errored).ToList();
+        var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
+
+        var table = new Table()
+            .Border(TableBorder.Simple)
+            .BorderColor(Color.Grey)
+            .AddColumn(new TableColumn("[bold]Benchmark[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Median[/]").RightAligned().NoWrap())
+            .AddColumn(new TableColumn("[bold]Mean[/]").RightAligned().NoWrap())
+            .AddColumn(new TableColumn("[bold]vs Baseline[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Alloc/op[/]").RightAligned().NoWrap());
 
         var hasDescriptions = results.Any(r => !string.IsNullOrEmpty(r.Description));
-
         if (hasDescriptions)
-            consoleTable.AddColumn("Description");
+            table.AddColumn(new TableColumn("[bold]Description[/]"));
 
         foreach (var row in benchTable.Rows)
         {
@@ -68,138 +106,199 @@ public sealed class ConsoleReporter : IReporter
             {
                 var errorCols = new List<string>
                 {
-                    $"[red][[Error]] {EscapeMarkup(row.Name)}[/]",
-                    "[red]-[/]", "[red]-[/]", "[red]-[/]",
-                    "[red]-[/]", "[red]-[/]", "[red]-[/]", "[red]-[/]", "[red]-[/]",
+                    $"[red]✗ {Esc(row.Name)}[/]",
+                    "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
                 };
-
-                if (hasDescriptions)
-                    errorCols.Add("[red]-[/]");
-
-                consoleTable.AddRow(errorCols.ToArray());
-                AnsiConsole.MarkupLine($"[red]  Error: {EscapeMarkup(row.ErrorMessage)}[/]");
+                if (hasDescriptions) errorCols.Add("[dim]-[/]");
+                table.AddRow(errorCols.ToArray());
                 continue;
             }
 
-            var ratioCol = double.IsNaN(row.Ratio)
-                ? "[grey]N/A[/]"
-                : row.IsBaseline
-                    ? "[grey]1.00x[/]"
-                    : row.Ratio <= 1.05
-                        ? $"[green]{row.Ratio:F2}x[/]"
-                        : row.Ratio <= 1.5
-                            ? $"[yellow]{row.Ratio:F2}x[/]"
-                            : $"[red]{row.Ratio:F2}x[/]";
-
-            var significanceCol = row.SignificanceLabel switch
+            var (ratioText, ratioColor) = FormatRatio(row);
+            var sigIcon = row.SignificanceLabel switch
             {
-                "✓" => " [green]✓[/]",
-                "✗" => " [red]✗[/]",
-                _ => "",
+                "✓" => "[green]✓[/] ",
+                "✗" => "[red]✗[/] ",
+                _ => "  ",
             };
 
-            var safeName = EscapeMarkup(row.Name);
+            var nameText = row.IsBaseline
+                ? $"[bold]{Esc(row.Name)}[/] [dim italic](baseline)[/]"
+                : $"[{ratioColor}]{Esc(row.Name)}[/]";
 
-            var nameCol = row.IsBaseline
-                ? $"[bold]{safeName}[/] [grey](baseline)[/]"
-                : double.IsNaN(row.Ratio)
-                    ? $"[grey]{safeName}[/]"
-                    : row.Ratio <= 1.05
-                        ? $"[green]{safeName}[/]"
-                        : row.Ratio <= 1.5
-                            ? $"[yellow]{safeName}[/]"
-                            : $"[red]{safeName}[/]";
+            var bar = RenderBar(row.Median, maxMedian, ratioColor);
+            var ratioAndBar = row.IsBaseline
+                ? $"{bar} [dim]{ratioText}[/]"
+                : $"{bar} [{ratioColor}]{ratioText}[/]";
+
+            var allocText = row.MeanAllocatedBytes.HasValue
+                ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
+                : "[dim]-[/]";
 
             var rowCols = new List<string>
             {
-                $"{nameCol}{significanceCol}",
-                BenchmarkFormatter.FormatNs(row.Median),
+                $"{sigIcon}{nameText}",
+                $"[bold]{BenchmarkFormatter.FormatNs(row.Median)}[/]",
                 BenchmarkFormatter.FormatNs(row.Mean),
-                $"[grey]±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}%)[/]",
-                BenchmarkFormatter.FormatNs(row.StandardDeviation),
-                BenchmarkFormatter.FormatNs(row.P95),
-                BenchmarkFormatter.FormatNs(row.P99),
-                ratioCol,
-                row.MeanAllocatedBytes.HasValue
-                    ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
-                    : "[grey]-[/]",
+                ratioAndBar,
+                allocText,
             };
 
             if (hasDescriptions)
-                rowCols.Add(string.IsNullOrEmpty(row.Description) ? "" : EscapeMarkup(row.Description));
+                rowCols.Add(string.IsNullOrEmpty(row.Description) ? "" : Esc(row.Description));
 
-            consoleTable.AddRow(rowCols.ToArray());
+            table.AddRow(rowCols.ToArray());
         }
 
-        AnsiConsole.Write(consoleTable);
+        AnsiConsole.Write(table);
+    }
 
-        if (Detail == ReportDetail.Advanced)
+    private static void RenderTimingDetail(BenchmarkTable benchTable)
+    {
+        var rows = benchTable.Rows.Where(r => !r.Errored).ToList();
+        if (rows.Count == 0) return;
+
+        var rule = new Rule("[dim]Precision & Tail Latency[/]")
+            .LeftJustified()
+            .RuleStyle(Style.Parse("grey"));
+        AnsiConsole.Write(rule);
+        AnsiConsole.WriteLine();
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey42)
+            .AddColumn(new TableColumn("[dim]Benchmark[/]").NoWrap())
+            .AddColumn(new TableColumn("[dim]Error (±CI)[/]").RightAligned())
+            .AddColumn(new TableColumn("[dim]StdDev[/]").RightAligned())
+            .AddColumn(new TableColumn("[dim]CV[/]").RightAligned())
+            .AddColumn(new TableColumn("[dim]P95[/]").RightAligned())
+            .AddColumn(new TableColumn("[dim]P99[/]").RightAligned());
+
+        foreach (var row in rows)
         {
-            foreach (var row in benchTable.Rows.Where(r => !r.Errored))
+            var cvColor = row.CoefficientOfVariationPercent switch
             {
-                var statsBlock = BenchmarkTable.RenderStatsBlock(row, Detail);
-                if (!string.IsNullOrEmpty(statsBlock))
-                {
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[grey]{EscapeMarkup(row.Name)} details:[/]");
-                    foreach (var line in statsBlock.Split('\n'))
-                    {
-                        AnsiConsole.MarkupLine($"  [grey]{EscapeMarkup(line)}[/]");
-                    }
-                }
+                <= 2.0 => "green",
+                <= 5.0 => "yellow",
+                _ => "red",
+            };
+
+            table.AddRow(
+                $"[dim]{Esc(row.Name)}[/]",
+                $"±{BenchmarkFormatter.FormatNs(row.MarginOfError)} [dim]({row.MarginPercent:F2}%)[/]",
+                BenchmarkFormatter.FormatNs(row.StandardDeviation),
+                $"[{cvColor}]{row.CoefficientOfVariationPercent:F2}%[/]",
+                BenchmarkFormatter.FormatNs(row.P95),
+                BenchmarkFormatter.FormatNs(row.P99)
+            );
+        }
+
+        AnsiConsole.Write(table);
+    }
+
+    private static void RenderAdvancedDetails(BenchmarkTable benchTable)
+    {
+        var rows = benchTable.Rows.Where(r => !r.Errored).ToList();
+        if (rows.Count == 0) return;
+
+        var rule = new Rule("[dim]Distribution Details[/]")
+            .LeftJustified()
+            .RuleStyle(Style.Parse("grey"));
+        AnsiConsole.Write(rule);
+        AnsiConsole.WriteLine();
+
+        var grid = new Grid();
+        foreach (var _ in rows)
+            grid.AddColumn(new GridColumn().PadRight(2));
+
+        // Render each benchmark's details as a panel in a horizontal grid
+        var panels = new List<IRenderable>();
+        foreach (var row in rows)
+        {
+            var statsBlock = BenchmarkTable.RenderStatsBlock(row, ReportDetail.Advanced);
+            if (string.IsNullOrEmpty(statsBlock)) continue;
+
+            var panel = new Panel(Markup.Escape(statsBlock))
+                .Header($"[bold]{Esc(row.Name)}[/]")
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey42)
+                .Padding(1, 0)
+                .Expand();
+
+            panels.Add(panel);
+        }
+
+        if (panels.Count <= 3)
+        {
+            // Side-by-side panels for up to 3 benchmarks
+            var columns = new Columns(panels);
+            columns.Expand = true;
+            AnsiConsole.Write(columns);
+        }
+        else
+        {
+            // Stack vertically for many benchmarks
+            foreach (var panel in panels)
+            {
+                AnsiConsole.Write(panel);
+                AnsiConsole.WriteLine();
             }
         }
+    }
 
+    private static void RenderWarnings(BenchmarkTable benchTable)
+    {
         var warnings = benchTable.Rows
             .Where(r => !r.Errored && r.Warnings.Count > 0)
             .ToList();
 
-        if (warnings.Count > 0)
-        {
-            AnsiConsole.WriteLine();
-
-            foreach (var row in warnings)
-            {
-                foreach (var warning in row.Warnings)
-                {
-                    AnsiConsole.MarkupLine(
-                        $"[yellow]! {EscapeMarkup(row.Name)}: {EscapeMarkup(warning)}[/]");
-                }
-            }
-        }
-
-        var successfulRows = benchTable.Rows.Where(r => !r.Errored).ToList();
-
-        if (successfulRows.Count > 1)
-        {
-            AnsiConsole.WriteLine();
-
-            var chart = new BarChart()
-                .Width(60)
-                .Label("[bold]Median (ns)[/]")
-                .CenterLabel();
-
-            foreach (var row in successfulRows)
-            {
-                chart.AddItem(row.Name, Math.Round(row.Median, 1), Color.SteelBlue1);
-            }
-
-            AnsiConsole.Write(chart);
-        }
+        if (warnings.Count == 0) return;
 
         AnsiConsole.WriteLine();
+        foreach (var row in warnings)
+        {
+            foreach (var warning in row.Warnings)
+            {
+                AnsiConsole.MarkupLine($"[yellow]⚠ {Esc(row.Name)}:[/] [dim]{Esc(warning)}[/]");
+            }
+        }
+    }
 
-        AnsiConsole.MarkupLine(
-            $"[grey]Ran {results.Count} benchmark(s) in {benchTable.TotalDuration.TotalSeconds:F1}s - "
-            + $"Significance: Mann-Whitney U (p < {benchTable.SignificanceLevel:0.###}) - "
-            + $"Outliers: {FormatOutlierMode(benchTable.OutlierMode)}[/]");
-
-        AnsiConsole.MarkupLine(
-            $"[grey]Error = ±{benchTable.ConfidenceLevel * 100:0.#}% confidence interval half-width on the mean. "
-            + $"Detail: {Detail}[/]");
-
+    private static void RenderFooter(BenchmarkTable benchTable, int count)
+    {
         AnsiConsole.WriteLine();
-        return Task.CompletedTask;
+        var footer = $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · "
+                     + $"Mann-Whitney U (p < {benchTable.SignificanceLevel:0.###}) · "
+                     + $"CI {benchTable.ConfidenceLevel * 100:0.#}%[/]";
+        AnsiConsole.MarkupLine(footer);
+    }
+
+    private static string RenderBar(double value, double max, string color)
+    {
+        if (max <= 0) return "";
+        var filled = (int)Math.Round(value / max * BarWidth);
+        filled = Math.Clamp(filled, 1, BarWidth);
+        var empty = BarWidth - filled;
+        return $"[{color}]{new string('█', filled)}[/][dim]{new string('░', empty)}[/]";
+    }
+
+    private static (string Text, string Color) FormatRatio(BenchmarkRow row)
+    {
+        if (double.IsNaN(row.Ratio))
+            return ("-", "dim");
+
+        if (row.IsBaseline)
+            return ("baseline", "dim");
+
+        var text = $"{row.Ratio:F2}x";
+        var color = row.Ratio switch
+        {
+            <= 1.05 => "green",
+            <= 1.5 => "yellow",
+            _ => "red",
+        };
+
+        return (text, color);
     }
 
     [ModuleInitializer]
@@ -216,10 +315,10 @@ public sealed class ConsoleReporter : IReporter
             OutlierMode.None => "none",
             OutlierMode.RemoveTop5Percent => "top 5%",
             OutlierMode.RemoveTopAndBottom5Percent => "top & bottom 5%",
-            OutlierMode.IqrFence => "IQR fence (1.5x)",
+            OutlierMode.IqrFence => "IQR fence (1.5×)",
             _ => "auto",
         };
     }
 
-    private static string EscapeMarkup(string? text) => text?.Replace("[", "[[").Replace("]", "]]") ?? "";
+    private static string Esc(string? text) => Markup.Escape(text ?? "");
 }

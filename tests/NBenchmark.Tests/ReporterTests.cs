@@ -118,11 +118,11 @@ public class ReporterTests
             Assert.True(File.Exists(filePath));
 
             var content = await File.ReadAllTextAsync(filePath);
-            Assert.Contains("| alpha |", content);
-            Assert.Contains("| beta |", content);
-            Assert.Contains("### Per-benchmark details", content);
-            Assert.Contains("#### alpha", content);
-            Assert.Contains("#### beta", content);
+            Assert.Contains("| alpha", content);
+            Assert.Contains("| beta", content);
+            Assert.Contains("### Distribution Details", content);
+            Assert.Contains("<summary><strong>alpha</strong></summary>", content);
+            Assert.Contains("<summary><strong>beta</strong></summary>", content);
         }
         finally
         {
