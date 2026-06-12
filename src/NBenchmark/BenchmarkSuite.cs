@@ -154,7 +154,7 @@ public sealed class BenchmarkSuite(string name)
         CancellationToken cancellationToken = default)
     {
         if (!_progressExplicitlySet)
-            _progress = NullBenchmarkProgress.Instance;
+            _progress = new DefaultConsoleProgress();
 
         if (_baselineName is not null && !_benchmarks.Any(b => b.Name == _baselineName))
         {

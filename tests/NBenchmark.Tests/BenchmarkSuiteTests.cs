@@ -162,6 +162,7 @@ public class BenchmarkSuiteTests
         public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
         public Task OnWarmupCompleted(string name) => Task.CompletedTask;
         public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
+        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
         public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
 
         public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
@@ -192,6 +193,8 @@ public class BenchmarkSuiteTests
             BenchmarkStarts.Add((name, index, total));
             return Task.CompletedTask;
         }
+
+        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
 
         public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
 

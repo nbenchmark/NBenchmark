@@ -48,7 +48,7 @@ using NBenchmark.Attributes;
 await BenchmarkHost.Create(args)
     .AddFromAssembly<StringBenchmarks>()
     .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress(200, 25))
+    .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 ```
 

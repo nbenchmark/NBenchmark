@@ -67,12 +67,12 @@ public sealed class BenchmarkRunner
                 return dryRun;
             }
 
+            progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             ForceFullGc();
 
-            var (timings, allocations, measuredDuration) = MeasureSyncVoid(body, spec, ct);
+            var (timings, allocations, measuredDuration) = MeasureSyncVoid(name, body, spec, ct);
             var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
 
-            progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -113,12 +113,12 @@ public sealed class BenchmarkRunner
                 return dryRun;
             }
 
+            progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             ForceFullGc();
 
-            var (timings, allocations, measuredDuration) = MeasureSyncReturning<T>(body, spec, ct);
+            var (timings, allocations, measuredDuration) = MeasureSyncReturning<T>(name, body, spec, ct);
             var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
 
-            progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -158,12 +158,12 @@ public sealed class BenchmarkRunner
                 return dryRun;
             }
 
+            await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             ForceFullGc();
 
-            var (timings, allocations, measuredDuration) = await MeasureAsyncVoid(body, spec, ct).ConfigureAwait(false);
+            var (timings, allocations, measuredDuration) = await MeasureAsyncVoid(name, body, spec, ct).ConfigureAwait(false);
             var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
 
-            await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -201,12 +201,12 @@ public sealed class BenchmarkRunner
                 return dryRun;
             }
 
+            await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             ForceFullGc();
 
-            var (timings, allocations, measuredDuration) = await MeasureAsyncReturning<T>(body, spec, ct).ConfigureAwait(false);
+            var (timings, allocations, measuredDuration) = await MeasureAsyncReturning<T>(name, body, spec, ct).ConfigureAwait(false);
             var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
 
-            await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -221,12 +221,14 @@ public sealed class BenchmarkRunner
 
     // ---------- Measurement loops ----------
 
-    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncVoid(Action body, RunSpec spec, CancellationToken ct)
+    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncVoid(string name, Action body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
+        var progress = spec.Progress;
+        var progressInterval = ComputeProgressInterval(iterations);
         var loopStartTimestamp = _clock.GetTimestamp();
 
         for (var i = 0; i < iterations; i++)
@@ -252,17 +254,22 @@ public sealed class BenchmarkRunner
 
             spec.IterationTeardown?.Invoke();
             timings[i] = elapsedNs;
+
+            if ((i + 1) % progressInterval == 0)
+                progress.OnIterationCompleted(name, i + 1, iterations).GetAwaiter().GetResult();
         }
 
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncReturning<T>(Func<T> body, RunSpec spec, CancellationToken ct)
+    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncReturning<T>(string name, Func<T> body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
+        var progress = spec.Progress;
+        var progressInterval = ComputeProgressInterval(iterations);
         var loopStartTimestamp = _clock.GetTimestamp();
 
         for (var i = 0; i < iterations; i++)
@@ -288,17 +295,22 @@ public sealed class BenchmarkRunner
 
             spec.IterationTeardown?.Invoke();
             timings[i] = elapsedNs;
+
+            if ((i + 1) % progressInterval == 0)
+                progress.OnIterationCompleted(name, i + 1, iterations).GetAwaiter().GetResult();
         }
 
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncVoid(Func<Task> body, RunSpec spec, CancellationToken ct)
+    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncVoid(string name, Func<Task> body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
+        var progress = spec.Progress;
+        var progressInterval = ComputeProgressInterval(iterations);
         var loopStartTimestamp = _clock.GetTimestamp();
 
         for (var i = 0; i < iterations; i++)
@@ -324,18 +336,23 @@ public sealed class BenchmarkRunner
 
             spec.IterationTeardown?.Invoke();
             timings[i] = elapsedNs;
+
+            if ((i + 1) % progressInterval == 0)
+                await progress.OnIterationCompleted(name, i + 1, iterations).ConfigureAwait(false);
         }
 
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(Func<Task<T>> body, RunSpec spec,
+    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(string name, Func<Task<T>> body, RunSpec spec,
         CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
         var timings = new double[iterations];
         var allocations = options.MeasureAllocations ? new long[iterations] : null;
+        var progress = spec.Progress;
+        var progressInterval = ComputeProgressInterval(iterations);
         var loopStartTimestamp = _clock.GetTimestamp();
 
         for (var i = 0; i < iterations; i++)
@@ -361,6 +378,9 @@ public sealed class BenchmarkRunner
 
             spec.IterationTeardown?.Invoke();
             timings[i] = elapsedNs;
+
+            if ((i + 1) % progressInterval == 0)
+                await progress.OnIterationCompleted(name, i + 1, iterations).ConfigureAwait(false);
         }
 
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
@@ -462,6 +482,13 @@ public sealed class BenchmarkRunner
     }
 
     // ---------- GC helpers ----------
+
+    private static int ComputeProgressInterval(int totalIterations)
+    {
+        // Report progress ~20 times during a run, but at least every 50 iterations
+        var interval = Math.Max(1, totalIterations / 20);
+        return Math.Min(interval, 50);
+    }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ForceGen0Collection() => GC.Collect(0, GCCollectionMode.Forced, true);

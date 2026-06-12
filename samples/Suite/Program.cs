@@ -13,5 +13,5 @@ var results = await new BenchmarkSuite("sorting")
     .WithIterations(50)
     .WithOutlierMode(OutlierMode.RemoveTop5Percent)
     .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress(50, 3))
+    .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();

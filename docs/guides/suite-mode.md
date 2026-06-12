@@ -95,7 +95,7 @@ await new BenchmarkSuite("name")
     .WithSuiteTeardown(() => { })   // runs once after all benchmarks
     .WithReporter(new ConsoleReporter())
     .WithReporter(new MarkdownReporter("results/"))
-    .WithProgress(new ConsoleBenchmarkProgress(200, 25))
+    .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 ```
 
@@ -147,7 +147,7 @@ suite
 `ConsoleBenchmarkProgress` (from `NBenchmark.Reporters.Console`) shows warmup and measurement progress for each benchmark:
 
 ```csharp
-.WithProgress(new ConsoleBenchmarkProgress(measuredIterations: 200, warmupIterations: 25))
+.WithProgress(new ConsoleBenchmarkProgress())
 ```
 
 Pass the same values you gave to `WithIterations` and `WithWarmup` so the progress display is accurate.

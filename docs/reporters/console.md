@@ -80,7 +80,7 @@ await new BenchmarkSuite("name")
     .WithIterations(200)
     .WithWarmup(25)
     .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress(measuredIterations: 200, warmupIterations: 25))
+    .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 ```
 

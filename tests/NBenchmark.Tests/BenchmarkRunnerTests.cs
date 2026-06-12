@@ -729,6 +729,8 @@ public class BenchmarkRunnerTests
             return Task.CompletedTask;
         }
 
+        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
+
         public Task OnBenchmarkCompleted(BenchmarkResult result)
         {
             BenchmarkCompletedCount++;

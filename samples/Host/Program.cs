@@ -5,7 +5,7 @@ using NBenchmark.Reporters.Console;
 await BenchmarkHost.Create(args)
     .AddFromAssembly<HostBenchmarks>()
     .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress(100, 5))
+    .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 
 public class HostBenchmarks

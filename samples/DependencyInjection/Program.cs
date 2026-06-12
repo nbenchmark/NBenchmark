@@ -13,7 +13,7 @@ var services = new ServiceCollection()
 await BenchmarkHost.Create(args)
     .UseDependencyInjection<DependencyInjectionBenchmarks>(services)
     .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress(100, 5))
+    .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 
 public interface IDataStore

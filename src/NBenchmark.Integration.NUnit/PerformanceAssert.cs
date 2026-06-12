@@ -14,7 +14,7 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
-        var result = Benchmark.Run(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken);
+        var result = Benchmark.Run(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken);
         Validate(result, resolvedOptions);
         return result;
     }
@@ -28,7 +28,7 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
-        var result = Benchmark.Run(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken);
+        var result = Benchmark.Run(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken);
         Validate(result, resolvedOptions);
         return result;
     }
@@ -43,7 +43,7 @@ public static class PerformanceAssert
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
 
-        var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken)
+        var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         Validate(result, resolvedOptions);
@@ -60,7 +60,7 @@ public static class PerformanceAssert
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
 
-        var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken)
+        var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         Validate(result, resolvedOptions);

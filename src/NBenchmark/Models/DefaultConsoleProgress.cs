@@ -1,10 +1,14 @@
 using System.Diagnostics;
-using Spectre.Console;
-using SysConsole = System.Console;
 
-namespace NBenchmark.Reporters.Console;
+namespace NBenchmark;
 
-public class ConsoleBenchmarkProgress : IBenchmarkProgress
+/// <summary>
+///     A lightweight console progress reporter that works without Spectre.Console.
+///     Uses ANSI escape sequences to render inline progress bars with ETA.
+///     This is the default progress when no explicit progress is set and the
+///     output is a terminal.
+/// </summary>
+public sealed class DefaultConsoleProgress : IBenchmarkProgress
 {
     private int _suiteTotal;
     private int _completedBenchmarks;
@@ -14,7 +18,6 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
     private int _currentIndex;
     private int _currentIteration;
     private int _currentTotalIterations;
-    private int _currentWarmupIterations;
     private bool _inWarmup;
 
     public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
@@ -22,17 +25,13 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         _suiteTotal = total;
         _completedBenchmarks = 0;
         _suiteStopwatch.Restart();
-
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Rule($"[steelblue1]Running {total} benchmark(s)[/]").LeftJustified().RuleStyle(Style.Parse("grey")));
-        AnsiConsole.WriteLine();
-
+        Console.WriteLine($"  Running {total} benchmark(s)...");
+        Console.WriteLine();
         return Task.CompletedTask;
     }
 
     public Task OnWarmupStarting(string name, int totalWarmupIterations)
     {
-        _currentWarmupIterations = totalWarmupIterations;
         _inWarmup = true;
         _currentIteration = 0;
         _currentTotalIterations = totalWarmupIterations;
@@ -69,16 +68,13 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         _completedBenchmarks++;
         _benchmarkStopwatch.Stop();
 
-        // Clear the status line
-        SysConsole.Write("\r\x1b[2K");
-
-        var elapsed = _benchmarkStopwatch.Elapsed;
-        var icon = result.Errored ? "[red]✗[/]" : "[green]✓[/]";
+        // Clear status line and print result
+        Console.Write("\r\x1b[2K");
+        var icon = result.Errored ? "✗" : "✓";
         var timing = result.Errored
-            ? $"[red]{Esc(result.ErrorMessage)}[/]"
-            : $"[dim]{BenchmarkFormatter.FormatNs(result.Median)}[/]";
-
-        AnsiConsole.MarkupLine($"  {icon} [bold]{Esc(result.Name)}[/] {timing} [dim]({elapsed.TotalSeconds:F1}s)[/]");
+            ? result.ErrorMessage
+            : BenchmarkFormatter.FormatNs(result.Median);
+        Console.WriteLine($"  {icon} {result.Name}  {timing}  ({_benchmarkStopwatch.Elapsed.TotalSeconds:F1}s)");
 
         return Task.CompletedTask;
     }
@@ -86,9 +82,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
     public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
     {
         _suiteStopwatch.Stop();
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Rule($"[steelblue1]Completed in {_suiteStopwatch.Elapsed.TotalSeconds:F1}s[/]").LeftJustified().RuleStyle(Style.Parse("grey")));
-        AnsiConsole.WriteLine();
+        Console.WriteLine();
         return Task.CompletedTask;
     }
 
@@ -99,17 +93,16 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
             ? (int)Math.Round(100.0 * _currentIteration / _currentTotalIterations)
             : 0;
 
-        var barWidth = 20;
+        const int barWidth = 20;
         var filled = (int)Math.Round(barWidth * _currentIteration / (double)Math.Max(1, _currentTotalIterations));
         filled = Math.Clamp(filled, 0, barWidth);
         var empty = barWidth - filled;
-        var bar = $"{new string('█', filled)}{new string('░', empty)}";
+        var bar = $"{new string('\u2588', filled)}{new string('\u2591', empty)}";
 
         var eta = ComputeEta();
         var etaText = eta.HasValue ? $" ETA {FormatTimeSpan(eta.Value)}" : "";
 
-        // \r returns to start of line, \x1b[2K clears the line, then we rewrite
-        SysConsole.Write($"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] \x1b[1m{_currentName}\x1b[0m \x1b[38;5;75m{bar}\x1b[0m \x1b[90m{pct}% {phase} ({_currentIteration}/{_currentTotalIterations}){etaText}\x1b[0m");
+        Console.Write($"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] {_currentName}  {bar} {pct}% {phase} ({_currentIteration}/{_currentTotalIterations}){etaText}");
     }
 
     private TimeSpan? ComputeEta()
@@ -118,17 +111,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
             return null;
 
         var elapsed = _benchmarkStopwatch.Elapsed;
-        var totalEstimatedForPhase = elapsed / _currentIteration * _currentTotalIterations;
-        var remaining = totalEstimatedForPhase - elapsed;
-
-        if (_inWarmup)
-        {
-            // Warmup remaining + rough estimate for measurement phase
-            // Use warmup pace to estimate measurement (they often have similar per-iteration cost)
-            var perIter = elapsed / _currentIteration;
-            var warmupRemaining = perIter * (_currentTotalIterations - _currentIteration);
-            return warmupRemaining + perIter * _currentTotalIterations; // rough guess for measure phase
-        }
+        var remaining = elapsed / _currentIteration * (_currentTotalIterations - _currentIteration);
 
         return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
@@ -139,6 +122,4 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         if (ts.TotalSeconds < 60) return $"{ts.TotalSeconds:F0}s";
         return $"{(int)ts.TotalMinutes}m {ts.Seconds:D2}s";
     }
-
-    private static string Esc(string? text) => Markup.Escape(text ?? "");
 }

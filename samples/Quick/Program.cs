@@ -9,4 +9,4 @@ var result = Benchmark.Run(() =>
 });
 
 result.Print();
-await result.PrintAsync();
+// Or for rich Spectre.Console output: await result.PrintAsync();

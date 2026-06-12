@@ -131,7 +131,7 @@ public sealed class BenchmarkHost
         }
 
         if (!_progressExplicitlySet)
-            _progress = NullBenchmarkProgress.Instance;
+            _progress = new DefaultConsoleProgress();
 
         var allResults = new List<BenchmarkResult>();
         var rawSamples = new Dictionary<string, double[]>();
