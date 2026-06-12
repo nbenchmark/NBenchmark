@@ -68,6 +68,6 @@ The `--detail` flag affects all registered reporters. JSON always emits the full
 
 ## See also
 
-- [Reporters](../reporters/) — available reporters and how to attach them
-- [CLI Reference: `--detail`](../reference/cli.md#--detail-level) — full flag documentation
-- [Descriptive Statistics](../statistics/descriptive.md) — what each field measures
+- [Reporters](../reporters/) - available reporters and how to attach them
+- [CLI Reference: `--detail`](../reference/cli.md#--detail-level) - full flag documentation
+- [Descriptive Statistics](../statistics/descriptive.md) - what each field measures

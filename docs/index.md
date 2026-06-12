@@ -1,43 +1,100 @@
 ---
 title: NBenchmark
-description: A lightweight, async-native .NET benchmarking library with a great developer experience.
+description: Zero-ceremony .NET benchmarking. Low-overhead measurement with built-in statistical analysis, confidence intervals, and significance testing.
 order: 0
 ---
 
 # NBenchmark
 
-NBenchmark is a lightweight benchmarking library for .NET. It is designed around three principles:
+**Zero-ceremony benchmarking for .NET.**
 
-- **Excellent developer experience.** Go from nothing to your first measurement in one line of code.
-- **High performance.** No reflection overhead in the measurement loop, accurate timers, proper GC handling.
-- **Statistically honest output.** Confidence intervals, outlier trimming, and a [non-parametric significance test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) are on by default so you know whether a difference is real.
+NBenchmark provides a low-overhead measurement engine with built-in statistical analysis. It moves beyond raw averages by providing confidence intervals, outlier trimming, and significance testing out of the box - allowing you to differentiate between a real performance gain and background noise.
+
+```csharp
+var result = Benchmark.Run(() => JsonSerializer.Deserialize<MyDto>(json));
+result.Print();
+```
+
+[<img src="https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/console-results.png" width="640" alt="NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark">](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/console.png)
+
+## Why NBenchmark?
+
+- **Zero-ceremony measurements.** `Benchmark.Run(() => ...)` requires no attributes, no class structures, and no dedicated project. Run a reliable benchmark directly in your existing code or scratchpad.
+- **Statistical rigor by default.** Includes 25 warmup iterations, 200 measured iterations, IQR-fence outlier trimming, and 95% confidence intervals. It also includes a Mann-Whitney U significance test to validate A/B comparisons.
+- **Low-overhead execution.** The measurement loop is reflection-free. The engine uses typed delegates to avoid virtual dispatch and boxing during timing, ensuring the JIT optimizes your benchmark body just as it would in production.
+- **Async-native.** Measures the true duration of `Task` and `Task<T>` async work without sync-over-async wrappers.
+- **Automated A/B comparisons.** `BenchmarkSuite` runs implementations side-by-side, calculates ratios, and flags whether differences are statistically significant.
+- **Pragmatic package structure.** The core `NBenchmark` package is zero-dependency. Opt-in to additional features like Spectre.Console tables, Dependency Injection, or test framework integration as needed.
+- **Compile-time analysis.** The optional `NBenchmark.Analyzers` package catches common benchmark authoring mistakes (dead code elimination, implicit order dependence, missing return values) as Roslyn diagnostics during build, before you ever run a measurement.
+
+## Three modes, one engine
+
+### 1. Quick Mode (Ad-hoc)
+
+The fastest way to get a reliable number. No setup required.
+
+```csharp
+var result = Benchmark.Run(() => MyMethod());
+var result = await Benchmark.RunAsync(async () => await FetchAsync());
+```
+
+### 2. Suite Mode (Comparison)
+
+Compare implementations side-by-side with ratios and significance testing.
+
+```csharp
+var results = await new BenchmarkSuite("sorting")
+    .Add("Array.Sort", () => { var a = data.ToArray(); Array.Sort(a); })
+    .Add("LINQ OrderBy", () => { _ = data.OrderBy(x => x).ToArray(); })
+    .WithBaseline("Array.Sort")
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+```
+
+### 3. Host Mode (CLI)
+
+Attribute-based discovery with a built-in CLI. Designed for dedicated benchmark projects.
+
+```csharp
+public class StringBenchmarks
+{
+    [Benchmark(Baseline = true)]
+    public string Concat() => "a" + "b" + "c";
+
+    [Benchmark]
+    public string Interpolate() => $"{"a"}{"b"}{"c"}";
+}
+
+await BenchmarkHost.Create(args).AddFromAssembly<StringBenchmarks>().RunAsync();
+```
+
+## Performance Gates (CI/CD)
+
+Enforce performance SLAs directly in your test suite. If a benchmark exceeds the threshold, the test fails.
+
+```csharp
+[PerformanceFact(MaxMeanNs = 500_000, MaxAllocatedBytes = 1024)]
+public void CriticalPath_ShouldBeFast() => ProcessOrder(testOrder);
+```
 
 ## Packages
 
-| Package | Description |
+| Package | Purpose |
 |---|---|
-| `NBenchmark` | Zero-dependency core - all measurement, statistics, and file reporters. |
-| `NBenchmark.Analyzers` | Roslyn analyzers that catch common benchmark authoring mistakes at compile time. See the [Analyzers page](./reference/analyzers.md) for the full diagnostic list. |
-| `NBenchmark.DependencyInjection` | Resolves benchmark classes from an `IServiceProvider` so they can have constructor dependencies. |
-| `NBenchmark.Reporters.Console` | Adds a rich terminal table via [Spectre.Console](https://spectreconsole.net/). |
-| `NBenchmark.Integration.xUnit` | Run NBenchmark benchmarks as xUnit tests with configurable performance thresholds. |
-| `NBenchmark.Integration.NUnit` | Run NBenchmark benchmarks as NUnit tests with configurable performance thresholds. |
-| `NBenchmark.Integration.MSTest` | Run NBenchmark benchmarks as MSTest tests with configurable performance thresholds. |
+| `NBenchmark` | Zero-dependency core engine and statistics |
+| `NBenchmark.Reporters.Console` | Rich terminal tables via Spectre.Console |
+| `NBenchmark.Analyzers` | Compile-time checks for benchmark correctness |
+| `NBenchmark.DependencyInjection` | Constructor injection for benchmark classes |
+| `NBenchmark.Integration.xUnit` | xUnit performance assertions |
+| `NBenchmark.Integration.NUnit` | NUnit performance assertions |
+| `NBenchmark.Integration.MSTest` | MSTest performance assertions |
 
-## Pick a starting point
-
-Not sure where to begin? Start here:
+## Getting Started
 
 - **[Installation](./getting-started/installation.md)** - add the NuGet packages
 - **[Quick Start](./getting-started/quick-start.md)** - your first benchmark in 60 seconds
-- **[Key Concepts](./getting-started/key-concepts.md)** - what warmup, outliers, and the Error column mean
-
-Already comfortable with the basics?
-
-- **[Guides](./guides/)** - detailed walkthroughs for each usage mode
-- **[Dependency Injection](./guides/dependency-injection.md)** - benchmark classes with constructor dependencies
-- **[Integration](./integration/)** - enforce performance thresholds as xUnit, NUnit, or MSTest tests, and more
+- **[Key Concepts](./getting-started/key-concepts.md)** - warmup, outliers, and statistics
+- **[Guides](./guides/index.md)** - detailed walkthroughs for each mode
 - **[Configuration](./reference/configuration.md)** - every option explained
-- **[CLI Reference](./reference/cli.md)** - all command-line flags for `BenchmarkHost`
-- **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics for NBenchmark (NB0001-NB0010)
-- **[Statistics](./statistics/)** - how the numbers are calculated
+- **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0010)
+- **[Statistics](./statistics/index.md)** - how the numbers are calculated

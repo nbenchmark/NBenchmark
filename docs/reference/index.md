@@ -10,6 +10,6 @@ Complete technical reference for NBenchmark.
 
 ## In this section
 
-- **[Configuration](./configuration.md)** — all `MeasurementOptions` settings with their defaults and valid ranges.
-- **[CLI Reference](./cli.md)** — all command-line flags accepted by `BenchmarkHost`.
-- **[Analyzers](./analyzers.md)** — compile-time Roslyn diagnostics (NB0001–NB0010).
+- **[Configuration](./configuration.md)** - all `MeasurementOptions` settings with their defaults and valid ranges.
+- **[CLI Reference](./cli.md)** - all command-line flags accepted by `BenchmarkHost`.
+- **[Analyzers](./analyzers.md)** - compile-time Roslyn diagnostics (NB0001–NB0010).
