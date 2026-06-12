@@ -70,7 +70,7 @@ var results = await new BenchmarkSuite("sorting")
     .WithIterations(50)
     .WithOutlierMode(OutlierMode.RemoveTop5Percent)
     .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress(50, 3))
+    .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 ```
 
@@ -105,7 +105,7 @@ using NBenchmark.Attributes;
 await BenchmarkHost.Create(args)
     .AddFromAssembly<HostBenchmarks>()
     .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress(100, 5))
+    .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 
 public class HostBenchmarks
@@ -154,7 +154,7 @@ var services = new ServiceCollection()
 await BenchmarkHost.Create(args)
     .UseDependencyInjection<DependencyInjectionBenchmarks>(services)
     .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress(100, 5))
+    .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 
 public sealed class DependencyInjectionBenchmarks(OrderRepository repository)
