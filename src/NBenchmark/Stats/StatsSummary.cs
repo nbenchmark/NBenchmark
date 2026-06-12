@@ -22,10 +22,26 @@ public sealed class StatsSummary
     public double Kurtosis { get; init; }
     public double Mad { get; init; }
 
+    /// <summary>
+    ///     Computes the full descriptive-statistics summary for <paramref name="samples" />.
+    ///     The input does not need to be pre-sorted: order-dependent statistics
+    ///     (median, percentiles, min/max, MAD) are computed on a sorted copy when the
+    ///     input is unsorted. The input array is never mutated.
+    /// </summary>
     public static StatsSummary Compute(double[] samples, double confidenceLevel = 0.95)
     {
         if (samples.Length == 0)
             return new StatsSummary { ConfidenceLevel = confidenceLevel };
+
+        // The engine always passes sorted (trimmed) samples, so the common case is a
+        // single O(n) verification pass. Public callers may pass raw, unsorted samples
+        // (e.g. MeasurementOutcome.RawSamples) - sort a copy so every order-dependent
+        // statistic stays correct.
+        if (!IsSorted(samples))
+        {
+            samples = (double[])samples.Clone();
+            Array.Sort(samples);
+        }
 
         var n = samples.Length;
         var sum = 0.0;
@@ -91,6 +107,17 @@ public sealed class StatsSummary
             Kurtosis = kurtosis,
             Mad = mad,
         };
+    }
+
+    private static bool IsSorted(double[] values)
+    {
+        for (var i = 1; i < values.Length; i++)
+        {
+            if (values[i] < values[i - 1])
+                return false;
+        }
+
+        return true;
     }
 
     private static double ComputeMad(double[] sorted)

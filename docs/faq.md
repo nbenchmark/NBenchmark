@@ -62,6 +62,12 @@ Any allocations by the benchmark framework itself (setup/teardown delegates, etc
 
 Yes. Use `Benchmark.RunAsync`, the `Func<Task>` overload of `BenchmarkSuite.Add`, or a `Task`-returning `[Benchmark]` method. The timer captures the full async duration including all awaited work.
 
+### What happens when a benchmark throws an exception?
+
+The exception is captured and the benchmark is reported as an **errored result** (`Errored = true`, with the message in `ErrorMessage`); the rest of the run continues. This includes `OperationCanceledException` thrown by the benchmark body itself (e.g. an `HttpClient` timeout) - a misbehaving benchmark never aborts the whole run.
+
+The only exception that propagates is a cancellation triggered through the `CancellationToken` you passed to `RunAsync` - that means *you* asked the run to stop. Suite teardown still runs in that case.
+
 ---
 
 ## Statistics

@@ -45,7 +45,7 @@ internal static class SuiteRunner
             {
                 outcome = await envelope.RunAsync(spec, cancellationToken).ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }

@@ -51,4 +51,32 @@ public class TimingSanityTests
         // resolution on slow runners.
         Assert.InRange(outcome.Result.Min, targetNanos * 0.7, targetNanos * 10.0);
     }
+
+    [Fact]
+    public void Engine_Preserves_SubHundredNanosecond_Timer_Resolution()
+    {
+        // Per-iteration timings must use the platform timer's native resolution,
+        // not TimeSpan's 100 ns ticks. On a 1 GHz Stopwatch (macOS/Linux), an
+        // empty body takes tens of nanoseconds - quantizing through TimeSpan
+        // would round every sample to 0 or 100. Only meaningful where the timer
+        // is finer than 100 ns.
+        if (Stopwatch.Frequency <= TimeSpan.TicksPerSecond)
+            return;
+
+        var outcome = BenchmarkRunner.Instance.Run(
+            "empty",
+            static () => { },
+            new RunSpec
+            {
+                Options = new MeasurementOptions
+                {
+                    WarmupIterations = 5,
+                    Iterations = 100,
+                    OutlierMode = OutlierMode.None,
+                    ForceGcBeforeEachIteration = false,
+                },
+            });
+
+        Assert.Contains(outcome.RawSamples, t => t % 100.0 != 0.0);
+    }
 }

@@ -172,11 +172,21 @@ public sealed class BenchmarkSuite(string name)
             .Select(b => b with { IsBaseline = _baselineName is not null && b.Name == _baselineName })
             .ToList();
 
-        var (results, rawSamples) = await SuiteRunner.RunAsync(
-            envelopes, _runOrder, null, _options, 0,
-            _benchmarks.Count, _progress, cancellationToken).ConfigureAwait(false);
+        List<BenchmarkResult> results;
+        Dictionary<string, double[]> rawSamples;
 
-        _suiteTeardown?.Invoke();
+        try
+        {
+            (results, rawSamples) = await SuiteRunner.RunAsync(
+                envelopes, _runOrder, null, _options, 0,
+                _benchmarks.Count, _progress, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // Teardown is guaranteed once setup has succeeded - including on
+            // cancellation - mirroring host mode's per-class lifecycle.
+            _suiteTeardown?.Invoke();
+        }
 
         await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
 

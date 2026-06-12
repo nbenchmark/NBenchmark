@@ -75,8 +75,11 @@ public sealed class BenchmarkRunner
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            // Our token: the caller asked to stop - propagate. A user-code
+            // OperationCanceledException (e.g. an HttpClient timeout inside the
+            // body) falls through to the generic handler and errors the result.
             throw;
         }
         catch (Exception ex)
@@ -118,7 +121,7 @@ public sealed class BenchmarkRunner
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
             return outcome;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
@@ -163,7 +166,7 @@ public sealed class BenchmarkRunner
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
@@ -206,7 +209,7 @@ public sealed class BenchmarkRunner
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
             return outcome;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
@@ -242,13 +245,13 @@ public sealed class BenchmarkRunner
 
             var timestamp = _clock.GetTimestamp();
             body();
-            var elapsed = _clock.GetElapsedTime(timestamp);
+            var elapsedNs = _clock.GetElapsedNanoseconds(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
                 allocations[i] = ComputeAllocationDelta(allocBefore);
 
             spec.IterationTeardown?.Invoke();
-            timings[i] = TicksToNanoseconds(elapsed);
+            timings[i] = elapsedNs;
         }
 
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
@@ -278,13 +281,13 @@ public sealed class BenchmarkRunner
 
             var timestamp = _clock.GetTimestamp();
             Consume(body());
-            var elapsed = _clock.GetElapsedTime(timestamp);
+            var elapsedNs = _clock.GetElapsedNanoseconds(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
                 allocations[i] = ComputeAllocationDelta(allocBefore);
 
             spec.IterationTeardown?.Invoke();
-            timings[i] = TicksToNanoseconds(elapsed);
+            timings[i] = elapsedNs;
         }
 
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
@@ -314,13 +317,13 @@ public sealed class BenchmarkRunner
 
             var timestamp = _clock.GetTimestamp();
             await body().ConfigureAwait(false);
-            var elapsed = _clock.GetElapsedTime(timestamp);
+            var elapsedNs = _clock.GetElapsedNanoseconds(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
                 allocations[i] = ComputeAllocationDelta(allocBefore);
 
             spec.IterationTeardown?.Invoke();
-            timings[i] = TicksToNanoseconds(elapsed);
+            timings[i] = elapsedNs;
         }
 
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
@@ -351,13 +354,13 @@ public sealed class BenchmarkRunner
 
             var timestamp = _clock.GetTimestamp();
             Consume(await body().ConfigureAwait(false));
-            var elapsed = _clock.GetElapsedTime(timestamp);
+            var elapsedNs = _clock.GetElapsedNanoseconds(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
                 allocations[i] = ComputeAllocationDelta(allocBefore);
 
             spec.IterationTeardown?.Invoke();
-            timings[i] = TicksToNanoseconds(elapsed);
+            timings[i] = elapsedNs;
         }
 
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
@@ -459,9 +462,6 @@ public sealed class BenchmarkRunner
     }
 
     // ---------- GC helpers ----------
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double TicksToNanoseconds(TimeSpan elapsed) => elapsed.Ticks * 100.0;
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ForceGen0Collection() => GC.Collect(0, GCCollectionMode.Forced, true);

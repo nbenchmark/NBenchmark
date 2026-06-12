@@ -113,6 +113,38 @@ public class BenchmarkRunnerTests
             await BenchmarkRunner.Instance.RunAsync("cancelled", () => Task.CompletedTask, spec, cts.Token));
     }
 
+    [Fact]
+    public void Run_UserCode_OperationCanceledException_Becomes_Errored_Result()
+    {
+        // A body-thrown OCE (e.g. an HttpClient timeout) must not abort the whole
+        // run when the runner's own token was never cancelled.
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 2, OutlierMode = OutlierMode.None },
+        };
+
+        var outcome = BenchmarkRunner.Instance.Run("user-oce",
+            () => throw new OperationCanceledException("internal timeout"), spec);
+
+        Assert.True(outcome.Result.Errored);
+        Assert.Contains("internal timeout", outcome.Result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task RunAsync_UserCode_TaskCanceledException_Becomes_Errored_Result()
+    {
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 2, OutlierMode = OutlierMode.None },
+        };
+
+        var outcome = await BenchmarkRunner.Instance.RunAsync("user-tce",
+            () => Task.FromException(new TaskCanceledException("client timeout")), spec);
+
+        Assert.True(outcome.Result.Errored);
+        Assert.Contains("client timeout", outcome.Result.ErrorMessage);
+    }
+
     // ---------- JIT-elision Consume wrap ----------
 
     [Fact]

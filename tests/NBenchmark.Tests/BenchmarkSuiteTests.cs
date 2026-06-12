@@ -74,6 +74,24 @@ public class BenchmarkSuiteTests
     }
 
     [Fact]
+    public async Task RunAsync_Cancellation_Still_Runs_Suite_Teardown()
+    {
+        var teardownRan = false;
+        using var cts = new CancellationTokenSource();
+
+        var suite = new BenchmarkSuite("cancel-teardown")
+            .Add("self-cancelling", () => cts.Cancel())
+            .WithWarmup(0)
+            .WithIterations(5)
+            .WithOutlierMode(OutlierMode.None)
+            .WithSuiteTeardown(() => teardownRan = true);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => suite.RunAsync(cts.Token));
+
+        Assert.True(teardownRan, "Suite teardown must run even when the run is cancelled.");
+    }
+
+    [Fact]
     public async Task RunAsync_Emits_OnBenchmarkStarting_For_Each_Benchmark()
     {
         var progress = new CapturingProgress();

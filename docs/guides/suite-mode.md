@@ -120,6 +120,8 @@ await new BenchmarkSuite("http")
     .RunAsync();
 ```
 
+Once suite setup has succeeded, suite teardown is **guaranteed to run** - even when the run is cancelled through a `CancellationToken` - so resources opened in setup are always released.
+
 ## Run order
 
 By default benchmarks run in a **random** order (Fisher-Yates shuffle). This guards against systematic bias where the first benchmark always benefits from a warm CPU cache.

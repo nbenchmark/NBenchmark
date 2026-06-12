@@ -27,6 +27,32 @@ public class StatsSummaryTests
     }
 
     [Fact]
+    public void Compute_Unsorted_Input_Produces_Same_Results_As_Sorted_And_Does_Not_Mutate()
+    {
+        // RawSamples is documented as execution-order (unsorted); Compute must not
+        // silently mis-report order-dependent statistics for such input.
+        var unsorted = new double[] { 5, 1, 4, 2, 3 };
+        var original = (double[])unsorted.Clone();
+
+        var stats = StatsSummary.Compute(unsorted);
+
+        Assert.Equal(3.0, stats.Median, 10);
+        Assert.Equal(1.0, stats.Min, 10);
+        Assert.Equal(5.0, stats.Max, 10);
+        Assert.Equal(5.0, stats.P95, 10);
+        Assert.Equal(original, unsorted);
+
+        var sorted = new double[] { 1, 2, 3, 4, 5 };
+        var expected = StatsSummary.Compute(sorted);
+
+        Assert.Equal(expected.Mean, stats.Mean, 10);
+        Assert.Equal(expected.StandardDeviation, stats.StandardDeviation, 10);
+        Assert.Equal(expected.Mad, stats.Mad, 10);
+        Assert.Equal(expected.Skewness, stats.Skewness, 10);
+        Assert.Equal(expected.Kurtosis, stats.Kurtosis, 10);
+    }
+
+    [Fact]
     public void Compute_Confidence_Interval_Is_Symmetric_And_Positive()
     {
         var samples = Enumerable.Range(1, 50).Select(i => (double)i).ToArray();
