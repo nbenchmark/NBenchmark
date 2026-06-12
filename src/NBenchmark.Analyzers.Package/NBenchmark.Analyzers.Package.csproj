@@ -17,9 +17,6 @@
     <Authors>NBenchmark</Authors>
     <Copyright>Copyright (c) NBenchmark</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/nbenchmark/nbenchmark</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/nbenchmark/nbenchmark.git</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
 
     <!-- Analyzer Configuration -->
     <DevelopmentDependency>true</DevelopmentDependency>

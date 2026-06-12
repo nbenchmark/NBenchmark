@@ -10,7 +10,7 @@
     <Authors>NBenchmark</Authors>
     <Copyright>Copyright (c) NBenchmark</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/nbenchmark/nbenchmark</PackageProjectUrl>
+    <PackageProjectUrl>https://www.nbenchmark.net</PackageProjectUrl>
     <RepositoryUrl>https://github.com/nbenchmark/nbenchmark.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>

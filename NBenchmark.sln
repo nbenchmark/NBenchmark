@@ -50,6 +50,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Integration.MSTe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Integration.Abstractions", "src\NBenchmark.Integration.Abstractions\NBenchmark.Integration.Abstractions.csproj", "{E553F31F-9EA9-4B75-9445-1F7C715F618B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuiteAdvanced", "samples\SuiteAdvanced\SuiteAdvanced.csproj", "{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -312,6 +314,18 @@ Global
 		{E553F31F-9EA9-4B75-9445-1F7C715F618B}.Release|x64.Build.0 = Release|Any CPU
 		{E553F31F-9EA9-4B75-9445-1F7C715F618B}.Release|x86.ActiveCfg = Release|Any CPU
 		{E553F31F-9EA9-4B75-9445-1F7C715F618B}.Release|x86.Build.0 = Release|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Debug|x64.Build.0 = Debug|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Debug|x86.Build.0 = Debug|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Release|x64.ActiveCfg = Release|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Release|x64.Build.0 = Release|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Release|x86.ActiveCfg = Release|Any CPU
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -333,5 +347,6 @@ Global
 		{64EDC57A-69CD-4661-AEEF-0724C6F1775D} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{95955AF8-DA78-4669-9CFB-A5203E2DE6A5} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 									{E553F31F-9EA9-4B75-9445-1F7C715F618B} = {6DACAAB3-5C61-4CFC-81B3-170A35BEA7E9}
+		{F7A9C30B-9497-4A75-B8B0-3798687DC2B8} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 EndGlobal
