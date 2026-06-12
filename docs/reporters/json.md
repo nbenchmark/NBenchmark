@@ -1,7 +1,7 @@
 ---
 title: JsonReporter
 description: Save benchmark results to a JSON file for programmatic consumption.
-order: 5
+order: 4
 ---
 
 # JsonReporter

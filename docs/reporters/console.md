@@ -1,7 +1,7 @@
 ---
 title: ConsoleReporter
 description: Rich terminal output with colour-coded tables, significance indicators, and a bar chart.
-order: 2
+order: 1
 ---
 
 # ConsoleReporter

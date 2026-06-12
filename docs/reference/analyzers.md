@@ -1,7 +1,7 @@
 ---
 title: Analyzers
 description: Compile-time diagnostics that catch common NBenchmark configuration errors before you run your benchmarks.
-order: 7
+order: 2
 ---
 
 # Analyzers

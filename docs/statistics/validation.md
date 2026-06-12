@@ -1,7 +1,7 @@
 ---
 title: Validation & Accuracy
 description: How NBenchmark's statistical results are verified against reference implementations.
-order: 2
+order: 6
 ---
 
 # Validation & Accuracy

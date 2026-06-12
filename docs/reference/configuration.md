@@ -1,7 +1,7 @@
 ---
 title: Configuration
 description: All MeasurementOptions settings with their defaults and valid ranges.
-order: 3
+order: 0
 ---
 
 # Configuration
@@ -60,7 +60,7 @@ Iterations = 200   // default
 
 The number of measured iterations per benchmark. Valid range: `0` to `100 000`.
 
-A value of `0` (combined with `WarmupIterations = 0`) is the dry-run signal: the body is not invoked and no measurements are taken. See [CLI Reference: `--dry-run`](./cli-reference.md#--dry-run).
+A value of `0` (combined with `WarmupIterations = 0`) is the dry-run signal: the body is not invoked and no measurements are taken. See [CLI Reference: `--dry-run`](./cli.md#--dry-run).
 
 More iterations produce a tighter confidence interval (smaller Error column) at the cost of a longer run time. The default of 200 is a good balance for most benchmarks.
 
@@ -75,7 +75,7 @@ WarmupIterations = 25   // default
 
 The number of warmup iterations before measurement begins. Valid range: `0` to `10 000`.
 
-Warmup lets the JIT compiler optimise your code and brings data into CPU caches. See [Key Concepts: Warmup](./getting-started/key-concepts.md#warmup) for more detail.
+Warmup lets the JIT compiler optimise your code and brings data into CPU caches. See [Key Concepts: Warmup](../getting-started/key-concepts.md#warmup) for more detail.
 
 CLI flag: `--warmup <n>`
 
@@ -200,4 +200,4 @@ Values outside the valid range throw `ArgumentOutOfRangeException`.
 
 ---
 
-**Still having issues?** See the [Troubleshooting guide](./troubleshooting.md) for symptom-to-configuration mappings for common measurement problems.
+**Still having issues?** See the [Troubleshooting guide](../troubleshooting.md) for symptom-to-configuration mappings for common measurement problems.

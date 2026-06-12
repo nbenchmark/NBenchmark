@@ -272,6 +272,6 @@ dotnet run -- --dry-run
 
 ## Next steps
 
-- [CLI Reference](../cli-reference.md) - all command-line flags
-- [Configuration](../configuration.md) - options reference
+- [CLI Reference](../reference/cli.md) - all command-line flags
+- [Configuration](../reference/configuration.md) - options reference
 - [Reporters](../reporters/) - all reporters

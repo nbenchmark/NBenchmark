@@ -36,19 +36,19 @@ Use `MarkdownReporter`, `CsvReporter`, or `JsonReporter`. They require only the 
 
 Change the number of iterations, warmup iterations, outlier mode, or confidence level.
 
-→ [Configuration](../configuration.md)
+→ [Configuration](../reference/configuration.md)
 
 ## I want to understand the statistics
 
 A full technical explanation of how every number in the output is calculated.
 
-→ [Advanced: Statistics](../advanced/statistics.md)
+→ [Statistics](../statistics/)
 
 ## I want to run benchmarks from the command line without recompiling
 
 Use `BenchmarkHost`, which parses CLI arguments automatically. You can filter benchmarks, change reporter, set output directories, and more.
 
-→ [CLI Reference](../cli-reference.md)
+→ [CLI Reference](../reference/cli.md)
 
 ## My benchmark class needs dependencies (a repository, `DbContext`, logger, etc.)
 

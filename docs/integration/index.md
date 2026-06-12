@@ -85,7 +85,7 @@ All three packages share the same set of threshold properties. A threshold of `-
 | `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
 | `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |
 
-See [Configuration](../configuration.md) for a full explanation of each option.
+See [Configuration](../reference/configuration.md) for a full explanation of each option.
 
 ## Baseline regression checks
 
@@ -105,7 +105,7 @@ The test fails if:
 - The benchmark name is not found in the file.
 - The measured median exceeds `baseline.median × MaxSlowdownRatio`.
 
-See [Advanced: Statistics](../advanced/statistics.md) for how the comparison is performed.
+See [Statistics: Significance Testing](../statistics/significance.md) for how the comparison is performed.
 
 ## Per-framework reference
 

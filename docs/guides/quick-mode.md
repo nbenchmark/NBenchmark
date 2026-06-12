@@ -71,7 +71,7 @@ var options = new MeasurementOptions
 var result = Benchmark.Run(() => MyMethod(), options: options);
 ```
 
-See [Configuration](../configuration.md) for the full list of options.
+See [Configuration](../reference/configuration.md) for the full list of options.
 
 ## Naming the benchmark
 
@@ -140,5 +140,5 @@ if (result.MeanAllocatedBytes.HasValue)
 ## Next steps
 
 - [Suite mode: BenchmarkSuite](./suite-mode.md) - compare two or more implementations
-- [Configuration](../configuration.md) - full options reference
+- [Configuration](../reference/configuration.md) - full options reference
 - [Reporters](../reporters/) - save results to files

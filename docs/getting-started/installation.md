@@ -54,7 +54,7 @@ The analyzers package adds compile-time diagnostics that catch common NBenchmark
 dotnet add package NBenchmark.Analyzers
 ```
 
-The analyzers run automatically in the IDE and during `dotnet build`. See the [Analyzers](../analyzers.md) page for the full diagnostic reference.
+The analyzers run automatically in the IDE and during `dotnet build`. See the [Analyzers](../reference/analyzers.md) page for the full diagnostic reference.
 
 ### Test framework integration packages (optional)
 

@@ -1,7 +1,7 @@
 ---
 title: Troubleshooting
 description: Symptom, cause, and fix for common measurement problems.
-order: 9
+order: 8
 ---
 
 # Troubleshooting
@@ -12,10 +12,10 @@ This page maps symptoms you may see in benchmark output to their likely causes a
 
 | Symptom | Likely cause | Configuration fix |
 |---|---|---|
-| Large Error (wide CI) | Too few iterations | Increase with `.WithIterations(500)` or `--iterations 500` - see [Configuration](./configuration.md#iterations) |
-| Large Error (wide CI) | OS scheduling / context-switch noise | Switch outlier mode to `.WithOutlierMode(OutlierMode.IqrFence)` - see [Configuration](./configuration.md#outliermode) |
-| Large Error (wide CI) | Thermal throttling on laptops | Increase warmup with `.WithWarmup(50)` to let the CPU stabilise, or reduce iterations to shorten the run. Run plugged in. - see [Configuration](./configuration.md#warmupiterations) |
-| High StdDev | GC pressure or allocation noise | Enable allocation tracking with `.WithAllocations()` to diagnose - see [Configuration](./configuration.md#measureallocations). If your benchmark intentionally exercises GC, you can disable `ForceGcBeforeEachIteration` - see [Configuration](./configuration.md#forcegcbeforeeachiteration) |
+| Large Error (wide CI) | Too few iterations | Increase with `.WithIterations(500)` or `--iterations 500` - see [Configuration](./reference/configuration.md#iterations) |
+| Large Error (wide CI) | OS scheduling / context-switch noise | Switch outlier mode to `.WithOutlierMode(OutlierMode.IqrFence)` - see [Configuration](./reference/configuration.md#outliermode) |
+| Large Error (wide CI) | Thermal throttling on laptops | Increase warmup with `.WithWarmup(50)` to let the CPU stabilise, or reduce iterations to shorten the run. Run plugged in. - see [Configuration](./reference/configuration.md#warmupiterations) |
+| High StdDev | GC pressure or allocation noise | Enable allocation tracking with `.WithAllocations()` to diagnose - see [Configuration](./reference/configuration.md#measureallocations). If your benchmark intentionally exercises GC, you can disable `ForceGcBeforeEachIteration` - see [Configuration](./reference/configuration.md#forcegcbeforeeachiteration) |
 
 ### Quick reference: Outlier modes
 
@@ -41,11 +41,11 @@ This page maps symptoms you may see in benchmark output to their likely causes a
 |---|---|---|
 | `[Benchmark]` method not discovered | Method is static, class is abstract, or assembly not registered | Use `--list` to verify what the host finds - see [Host mode: listing](./guides/host-mode.md#listing-benchmarks-without-running). Check the class is public, not abstract, and the method is an instance method |
 | "Could not instantiate MyClass" | No public parameterless constructor | Add one, use `[BenchmarkSetup]`, or add `NBenchmark.DependencyInjection` - see [FAQ: instantiation](./faq.md#the-host-throws-could-not-instantiate-myclass-how-do-i-fix-it) |
-| Benchmarks run in different order each time | Random order is the default (prevents systematic bias) | Use `--order declaration` or `.WithRunOrder(RunOrder.Declaration)` for source order - see [Configuration](./configuration.md#forcegcbetweenbenchmarks) |
+| Benchmarks run in different order each time | Random order is the default (prevents systematic bias) | Use `--order declaration` or `.WithRunOrder(RunOrder.Declaration)` for source order - see [Configuration](./reference/configuration.md#forcegcbetweenbenchmarks) |
 
 ## Still stuck?
 
-- [Configuration](./configuration.md) - full options reference
-- [CLI Reference](./cli-reference.md) - all command-line flags
+- [Configuration](./reference/configuration.md) - full options reference
+- [CLI Reference](./reference/cli.md) - all command-line flags
 - [Key Concepts](./getting-started/key-concepts.md) - how warmup, outliers, and CIs work
 - [FAQ](./faq.md) - frequently asked questions

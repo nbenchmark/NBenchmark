@@ -99,7 +99,7 @@ await new BenchmarkSuite("name")
     .RunAsync();
 ```
 
-See [Configuration](../configuration.md) for details on every option.
+See [Configuration](../reference/configuration.md) for details on every option.
 
 ## Setting a baseline
 
@@ -168,5 +168,5 @@ Errored benchmarks have `result.Errored == true` and a message in `result.ErrorM
 ## Next steps
 
 - [Host mode: BenchmarkHost](./host-mode.md) - attribute-based discovery and CLI control
-- [Configuration](../configuration.md) - full options reference
+- [Configuration](../reference/configuration.md) - full options reference
 - [Reporters](../reporters/) - all available reporters

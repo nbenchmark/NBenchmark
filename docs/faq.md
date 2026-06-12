@@ -1,7 +1,7 @@
 ---
 title: FAQ
 description: Frequently asked questions about NBenchmark.
-order: 8
+order: 7
 ---
 
 # FAQ
@@ -10,7 +10,7 @@ order: 8
 
 ### How is NBenchmark different from BenchmarkDotNet?
 
-NBenchmark brings serious statistical rigor - non-parametric significance testing, confidence intervals, and percentile analysis - directly into your daily development cycle with zero configuration and zero external dependencies. Its numerical core is dependency-free and cross-validated against SciPy and NumPy to machine precision (see [Validation & Accuracy](./advanced/validation.md)).
+NBenchmark brings serious statistical rigor - non-parametric significance testing, confidence intervals, and percentile analysis - directly into your daily development cycle with zero configuration and zero external dependencies. Its numerical core is dependency-free and cross-validated against SciPy and NumPy to machine precision (see [Validation & Accuracy](./statistics/validation.md)).
 
 NBenchmark takes a different trade-off from tools like BenchmarkDotNet: **no out-of-process compilation, no XML configuration, minimal dependencies, and three lines of code to get started**.
 
@@ -76,7 +76,7 @@ The only exception that propagates is a cancellation triggered through the `Canc
 
 It shows the result of a **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** comparing the benchmark to the baseline. A **✓** means the difference is statistically significant (p < 0.05) - unlikely to be random noise. A **✗** means it is not significant.
 
-See [Statistical Significance](./getting-started/key-concepts.md#statistical-significance) and the [Statistics Deep Dive](./advanced/statistics.md) for full details.
+See [Statistical Significance](./getting-started/key-concepts.md#statistical-significance) and the [Statistics Deep Dive](./statistics/) for full details.
 
 ### Why is significance sometimes blank?
 
