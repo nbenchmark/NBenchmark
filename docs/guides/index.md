@@ -50,6 +50,22 @@ public class MyBenchmarks
 }
 ```
 
+## When to switch modes
+
+The modes are designed as an evolutionary path. Start simple, upgrade when your needs grow:
+
+1. **Start with Quick mode** for a one-off measurement - a single `Benchmark.Run` call gives you a statistically rigorous result in three lines of code.
+
+2. **Graduate to Suite mode** when you find yourself writing two `Benchmark.Run` calls to compare an old implementation against a new one. Suite mode handles the comparison automatically - ratios, confidence intervals, and significance testing against a baseline - so you don't have to mentally diff two separate outputs.
+
+3. **Graduate to Host mode** when your suite requires complex setup: mocked databases, loggers, `HttpClient`, or any dependency-injected service. Host mode discovers benchmarks by attribute, parses CLI flags, and supports constructor injection via the optional `NBenchmark.DependencyInjection` package.
+
+Because all three modes produce the same `BenchmarkResult` type, upgrading from one mode to the next is seamless - your reporters, file output, and analysis code work unchanged.
+
+## [Report Detail Levels](./report-detail-levels.md)
+
+Control how much statistical information is included in your reports. **Simple** mode (default) provides a compact 10-column table; **Advanced** mode adds per-benchmark statistics including quartiles, confidence intervals, and distribution shape.
+
 ## [Dependency Injection](./dependency-injection.md)
 
 Optional companion package that lets benchmark classes have **constructor dependencies** resolved from an `IServiceProvider`. Adds support for repositories, loggers, `HttpClient`, EF Core `DbContext`, and any other registered service.
@@ -64,19 +80,3 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
     [Benchmark] public int CountOrders() => repository.Count();
 }
 ```
-
----
-
-The three modes share the same measurement engine and produce the same `BenchmarkResult` type, so you can mix them in the same project and use the same reporters and configuration across all of them.
-
-## When to switch modes
-
-The modes are designed as an evolutionary path. Start simple, upgrade when your needs grow:
-
-1. **Start with Quick mode** for a one-off measurement - a single `Benchmark.Run` call gives you a statistically rigorous result in three lines of code.
-
-2. **Graduate to Suite mode** when you find yourself writing two `Benchmark.Run` calls to compare an old implementation against a new one. Suite mode handles the comparison automatically - ratios, confidence intervals, and significance testing against a baseline - so you don't have to mentally diff two separate outputs.
-
-3. **Graduate to Host mode** when your suite requires complex setup: mocked databases, loggers, `HttpClient`, or any dependency-injected service. Host mode discovers benchmarks by attribute, parses CLI flags, and supports constructor injection via the optional `NBenchmark.DependencyInjection` package.
-
-Because all three modes produce the same `BenchmarkResult` type, upgrading from one mode to the next is seamless - your reporters, file output, and analysis code work unchanged.
