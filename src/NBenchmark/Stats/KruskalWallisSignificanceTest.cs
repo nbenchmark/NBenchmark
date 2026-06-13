@@ -3,9 +3,8 @@ namespace NBenchmark.Stats;
 /// <summary>
 ///     An omnibus significance strategy: runs a single <see cref="KruskalWallis" /> H test
 ///     across all groups and reports one verdict for the whole comparison ("is at least one
-///     of these benchmarks different?"). This is the engine default when three or more
-///     benchmarks are compared, because a single omnibus test controls the false-positive
-///     rate that pairwise testing would inflate.
+///     of these benchmarks different?"). It is the omnibus stage used by
+///     <see cref="DefaultSignificanceTest" /> when three or more benchmarks are compared.
 /// </summary>
 public sealed class KruskalWallisSignificanceTest : ISignificanceTest
 {

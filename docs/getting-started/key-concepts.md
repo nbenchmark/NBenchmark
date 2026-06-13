@@ -98,7 +98,7 @@ NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E
 
 The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** - it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
 
-When you compare **three or more** benchmarks, NBenchmark switches to the **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus test** - it tests whether *any* of the groups differ and prints a single verdict below the table, avoiding the false positives that many pairwise tests would introduce. Both tests are the default; you can swap in your own via `ISignificanceTest` (see [Significance Testing](../statistics/significance.md#custom-significance-tests)).
+When you compare **three or more** benchmarks, NBenchmark first runs the **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus test**. If the omnibus is significant (at least one group differs), it follows up with pairwise Mann-Whitney U tests (candidate versus baseline) with Holm-Bonferroni correction, and the per-row Sig column shows the corrected verdicts. If the omnibus is not significant, no post-hoc comparisons run and the per-row Sig column stays blank. The default strategy is `DefaultSignificanceTest`; you can swap in your own via `ISignificanceTest` (see [Significance Testing](../statistics/significance.md#custom-significance-tests)).
 
 > [!NOTE]
 > Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Always look at the Ratio column alongside significance.

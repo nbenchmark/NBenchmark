@@ -33,7 +33,7 @@ This page maps symptoms you may see in benchmark output to their likely causes a
 | Result shows `0 ns` | Dead code elimination - the compiler removed your benchmark body because it has no observable side effects | Use the `Func<T>` overload that returns a value, or add a side effect. See [FAQ: `0 ns`](./faq.md#my-benchmark-produces-0-ns-whats-happening) |
 | All results zeroed | Dry-run mode active (`--dry-run`, `Iterations=0`, `WarmupIterations=0`) | Remove `--dry-run` flag or set `Iterations` > 0 |
 | `MarginOfError` is `±0 ns` | Only one sample (`n < 2`) or all measurements identical (timer resolution coarser than the benchmark duration) | Increase iterations. If the timer is too coarse, run on a machine with a higher-resolution timer |
-| `Sig` column is blank | Too few samples for the [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) (requires ≥2 per group), **or** three-plus benchmarks are compared (the per-row Sig column is blank because the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus verdict is shown on its own line below the table) | Increase iterations or combine more runs - see [FAQ: significance](./faq.md#why-is-significance-sometimes-blank) |
+| `Sig` column is blank | Too few samples for the [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) (requires ≥2 per group), **or** the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus was not significant (three-plus benchmarks compared, no post-hoc ran) | Increase iterations or combine more runs - see [FAQ: significance](./faq.md#why-is-significance-sometimes-blank) |
 
 ## Discovery and setup errors
 

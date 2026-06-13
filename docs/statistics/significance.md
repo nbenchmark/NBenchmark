@@ -1,6 +1,6 @@
 ---
 title: Significance Testing
-description: How NBenchmark decides whether benchmark differences are statistically real - the Mann-Whitney U test for two groups and the Kruskal-Wallis test for three or more.
+description: How NBenchmark decides whether benchmark differences are statistically real - the Mann-Whitney U test for two groups and the Kruskal-Wallis omnibus test (with post-hoc pairwise Mann-Whitney U and Holm-Bonferroni correction) for three or more.
 order: 4
 ---
 
@@ -11,9 +11,9 @@ When two or more benchmarks have been run, NBenchmark tests whether their differ
 | Groups | Default test | What it answers |
 |---|---|---|
 | Exactly 2 | [Mann-Whitney U](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) (pairwise) | Does the candidate differ from the baseline? |
-| 3 or more | [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) (omnibus) | Do *any* of the groups differ? |
+| 3 or more | [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) (omnibus) + post-hoc Mann-Whitney U with [Holm-Bonferroni](https://en.wikipedia.org/wiki/Holm%E2%80%93Bonferroni_method) correction | Does each candidate differ from the baseline? (gated on the omnibus) |
 
-Both are **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** rank-based tests, chosen because benchmark timings are right-skewed and rarely normal. The Mann-Whitney U test compares exactly two samples, so for three or more groups NBenchmark runs the Kruskal-Wallis **omnibus** test - a generalization of Mann-Whitney U to *k* groups that reports a single verdict for the whole comparison. Both default choices are made by `DefaultSignificanceTest`; you can override the strategy entirely (see [Custom significance tests](#custom-significance-tests)).
+Both are **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** rank-based tests, chosen because benchmark timings are right-skewed and rarely normal. The Mann-Whitney U test compares exactly two samples. For three or more groups NBenchmark first runs the Kruskal-Wallis **omnibus** test - a generalization of Mann-Whitney U to *k* groups. If the omnibus is significant (at least one group differs), it follows up with pairwise Mann-Whitney U tests (candidate versus baseline) and applies a Holm-Bonferroni correction over the tested candidate comparisons (finite p-values) to control the family-wise error rate. If the omnibus is not significant, no post-hoc comparisons run and per-row verdicts stay `NotTested`. Both default choices are made by `DefaultSignificanceTest`; you can override the strategy entirely (see [Custom significance tests](#custom-significance-tests)).
 
 ## Mann-Whitney U test (two groups)
 
@@ -51,7 +51,7 @@ The test requires at least **2 samples in each group**. With fewer samples the U
 
 ## Kruskal-Wallis test (three or more groups)
 
-When three or more benchmarks are compared, running a series of pairwise Mann-Whitney U tests would inflate the false-positive rate (the [multiple-comparisons problem](https://en.wikipedia.org/wiki/Multiple_comparisons_problem)). Instead NBenchmark runs the **Kruskal-Wallis H test** once across all groups - the rank-based generalization of one-way [ANOVA](https://en.wikipedia.org/wiki/Analysis_of_variance) - and reports a single **omnibus** verdict: *are any of these groups drawn from different distributions?*
+When three or more benchmarks are compared, running a series of pairwise Mann-Whitney U tests would inflate the false-positive rate (the [multiple-comparisons problem](https://en.wikipedia.org/wiki/Multiple_comparisons_problem)). Instead NBenchmark first runs the **Kruskal-Wallis H test** once across all groups - the rank-based generalization of one-way [ANOVA](https://en.wikipedia.org/wiki/Analysis_of_variance) - and reports a single **omnibus** verdict: *are any of these groups drawn from different distributions?*
 
 ### Algorithm
 
@@ -74,8 +74,24 @@ Omnibus Kruskal-Wallis across 3 groups: H(2) = 7.20, p = 0.027 → significant
 
 (For three groups `{1,2,3}`, `{4,5,6}`, `{7,8,9}` the statistic is `H = 7.2` on `2` degrees of freedom, `p ≈ 0.027`.) When every value is identical (`H = 0`, `p = 1`) or fewer than two groups have data, the test reports "not tested".
 
+### Post-hoc pairwise comparisons
+
+If the Kruskal-Wallis omnibus is significant, NBenchmark follows up with a **pairwise Mann-Whitney U test** for each candidate versus the baseline. To control the family-wise error rate across the `m` tested candidate comparisons (finite p-values), the raw p-values are adjusted with the **Holm-Bonferroni** step-down procedure:
+
+1. Sort the `m` raw p-values ascending: $p_{(1)} \le p_{(2)} \le \dots \le p_{(m)}$.
+2. For each step `j` (0-indexed), compute the adjusted p-value:
+   $$p_{(j)}^{\text{adj}} = \max\left(\min\left((m - j) \cdot p_{(j)}, 1\right), p_{(j-1)}^{\text{adj}}\right)$$
+   where $p_{(-1)}^{\text{adj}} = 0$.
+3. A candidate is marked **significant** (✓) when its adjusted p-value is below the configured significance level (alpha).
+
+Candidates whose pairwise test cannot be computed (for example, fewer than 2 samples in either group) keep `PValue = null` and `SignificanceVerdict = NotTested`, and are excluded from `m`.
+
+The per-row `PValue` field on `BenchmarkResult` stores the **raw** Mann-Whitney U p-value (not the adjusted one), so you can inspect the original test statistic. The verdict in `SignificanceVerdict` reflects the Holm-Bonferroni-corrected decision and is the authoritative signal for significance - always read `SignificanceVerdict` rather than comparing `PValue` to alpha yourself, since the raw p-value and the corrected verdict can disagree when the Holm adjustment flips a candidate across the threshold.
+
+If the omnibus is **not** significant, no post-hoc comparisons run. The per-row `PValue` and `SignificanceVerdict` stay at their defaults (`null` and `NotTested`), and the omnibus verdict is attached to every result's `Omnibus` field.
+
 > [!NOTE]
-> The omnibus verdict is attached to every row's `BenchmarkResult.Omnibus`. The per-row pairwise `PValue` / `SignificanceVerdict` are left untested in the 3+ group case, because a significant omnibus result does not localize the difference to any single pair. If you need pairwise verdicts across many groups, supply a custom post-hoc test (next section).
+> The post-hoc step only runs when the omnibus is significant. This two-stage procedure (omnibus gate then pairwise correction) preserves the family-wise error rate while giving you per-benchmark significance indicators in the table.
 
 ## Custom significance tests
 

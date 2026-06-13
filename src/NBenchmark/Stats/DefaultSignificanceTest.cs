@@ -9,10 +9,10 @@ namespace NBenchmark.Stats;
 ///             <see cref="MannWhitneyUSignificanceTest" />, producing a pairwise verdict;
 ///         </item>
 ///         <item>
-///             three or more groups - the omnibus <see cref="KruskalWallisSignificanceTest" />,
-///             producing a single verdict across all benchmarks. A single omnibus test is
-///             used instead of many pairwise comparisons to avoid inflating the
-///             false-positive rate.
+///             three or more groups - the omnibus <see cref="KruskalWallisSignificanceTest" />
+///             first; if the omnibus is significant, a post-hoc pairwise Mann-Whitney U
+///             (candidate versus baseline) with Holm-Bonferroni correction over the tested
+///             candidates follows, so each benchmark gets a per-row verdict.
 ///         </item>
 ///     </list>
 ///     Override it with <see cref="MeasurementOptions.SignificanceTest" /> or
@@ -24,20 +24,62 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
     public static readonly DefaultSignificanceTest Instance = new();
 
     /// <summary>
-    ///     The pairwise test name. The two-group path uses Mann-Whitney U; the omnibus path
-    ///     describes itself through <see cref="OmnibusComparison.TestName" />.
+    ///     The label used when no omnibus verdict overrides it in reporters (for example,
+    ///     the two-group path).
     /// </summary>
     public string Name => "Mann-Whitney U";
 
     /// <inheritdoc />
     public SignificanceReport Analyze(SignificanceContext context)
     {
-        // Three or more groups (at least two candidates against the baseline) call for a
-        // single omnibus test; two groups use the pairwise two-sample test.
         var candidateCount = context.Groups.Count - 1;
 
-        return candidateCount >= 2
-            ? KruskalWallisSignificanceTest.Instance.Analyze(context)
-            : MannWhitneyUSignificanceTest.Instance.Analyze(context);
+        // Two groups (one candidate against the baseline): pairwise Mann-Whitney U.
+        if (candidateCount <= 1)
+            return MannWhitneyUSignificanceTest.Instance.Analyze(context);
+
+        // Three or more groups: run the Kruskal-Wallis omnibus first.
+        var omnibusReport = KruskalWallisSignificanceTest.Instance.Analyze(context);
+
+        // If the omnibus is not significant, skip post-hoc: no group differs from the rest.
+        if (omnibusReport.Omnibus is not { } omnibus
+            || omnibus.Verdict != SignificanceVerdict.Significant)
+        {
+            return omnibusReport;
+        }
+
+        // Omnibus is significant: run pairwise Mann-Whitney U (candidate vs baseline)
+        // and apply Holm-Bonferroni over the tested candidates.
+        var baseline = context.Baseline;
+        var rawPValues = new List<double>(candidateCount);
+        var order = new List<string>(candidateCount);
+
+        foreach (var candidate in context.Candidates)
+        {
+            rawPValues.Add(MannWhitneyU.Test(baseline.Samples, candidate.Samples));
+            order.Add(candidate.Name);
+        }
+
+        var adjusted = MultipleComparisons.HolmBonferroni(rawPValues);
+        var pairwise = new List<PairwiseComparison>(candidateCount);
+
+        for (var i = 0; i < order.Count; i++)
+        {
+            var p = rawPValues[i];
+
+            if (double.IsNaN(p))
+            {
+                pairwise.Add(new PairwiseComparison(order[i], null, SignificanceVerdict.NotTested));
+                continue;
+            }
+
+            var verdict = adjusted[i] < context.SignificanceLevel
+                ? SignificanceVerdict.Significant
+                : SignificanceVerdict.NotSignificant;
+
+            pairwise.Add(new PairwiseComparison(order[i], p, verdict));
+        }
+
+        return new SignificanceReport { Pairwise = pairwise, Omnibus = omnibus };
     }
 }

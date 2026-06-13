@@ -193,7 +193,7 @@ CLI flag: `--alpha 0.01`
 SignificanceTest = null   // default - DefaultSignificanceTest (group-count aware)
 ```
 
-A custom `ISignificanceTest` (from `NBenchmark.Stats`) that replaces the built-in strategy. When `null`, `ResolveSignificanceTest()` returns `DefaultSignificanceTest`, which picks Mann-Whitney U for two groups and Kruskal-Wallis for three or more. Implement the interface to supply a bootstrap, Bayesian, post-hoc, or domain-specific rule:
+A custom `ISignificanceTest` (from `NBenchmark.Stats`) that replaces the built-in strategy. When `null`, `ResolveSignificanceTest()` returns `DefaultSignificanceTest`, which picks Mann-Whitney U for two groups and Kruskal-Wallis + post-hoc Mann-Whitney U (Holm-Bonferroni corrected) for three or more. Implement the interface to supply a bootstrap, Bayesian, post-hoc, or domain-specific rule:
 
 ```csharp
 using NBenchmark.Stats;

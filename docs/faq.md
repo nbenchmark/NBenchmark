@@ -76,13 +76,13 @@ The only exception that propagates is a cancellation triggered through the `Canc
 
 It shows the result of a **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** comparing the benchmark to the baseline. A **✓** means the difference is statistically significant (p < 0.05) - unlikely to be random noise. A **✗** means it is not significant.
 
-When you compare **three or more** benchmarks, the per-row Sig column is left blank and a single **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus** verdict is printed on its own line below the table instead - it answers "do *any* of these groups differ?" rather than localizing the difference to one pair.
+When you compare **three or more** benchmarks, NBenchmark first runs a **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus** test. If the omnibus is significant (at least one group differs), post-hoc pairwise Mann-Whitney U tests run with Holm-Bonferroni correction, and the per-row Sig column is populated with the corrected verdicts. If the omnibus is not significant, the Sig column stays blank.
 
 See [Statistical Significance](./getting-started/key-concepts.md#statistical-significance) and the [Statistics Deep Dive](./statistics/) for full details.
 
 ### Why is significance sometimes blank?
 
-Significance requires at least **5 samples in each group**. With fewer samples the test cannot produce a reliable result.
+Significance requires at least **2 samples in each group**. With fewer samples the test cannot produce a reliable result.
 
 It is also absent on the baseline itself and when `EnableSignificance` is set to `false`.
 

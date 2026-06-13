@@ -29,7 +29,7 @@ public class SignificanceStrategyTests
     }
 
     [Fact]
-    public void Default_ThreeGroups_UsesKruskalWallisOmnibus()
+    public void Default_ThreeGroups_RunsOmnibusAndPostHocPairwise()
     {
         var context = new SignificanceContext
         {
@@ -45,16 +45,43 @@ public class SignificanceStrategyTests
 
         var report = DefaultSignificanceTest.Instance.Analyze(context);
 
-        Assert.Empty(report.Pairwise);
         Assert.NotNull(report.Omnibus);
         Assert.Equal("Kruskal-Wallis", report.Omnibus!.TestName);
         Assert.Equal(3, report.Omnibus.GroupCount);
         Assert.Equal(2, report.Omnibus.DegreesOfFreedom);
         Assert.Equal(SignificanceVerdict.Significant, report.Omnibus.Verdict);
+
+        // Post-hoc pairwise entries should be present (one per candidate).
+        Assert.Equal(2, report.Pairwise.Count);
+        Assert.Contains(report.Pairwise, p => p.Name == "b");
+        Assert.Contains(report.Pairwise, p => p.Name == "c");
+        Assert.All(report.Pairwise, p => Assert.Equal(SignificanceVerdict.Significant, p.Verdict));
     }
 
     [Fact]
-    public void ComputeSignificance_ThreeGroups_AttachesOmnibusToEveryResult()
+    public void Default_ThreeGroups_OmnibusNotSignificant_SkipsPostHoc()
+    {
+        var context = new SignificanceContext
+        {
+            Groups =
+            [
+                new SampleGroup("a", Cluster(10), true),
+                new SampleGroup("b", Cluster(10), false),
+                new SampleGroup("c", Cluster(10), false),
+            ],
+            BaselineIndex = 0,
+            SignificanceLevel = 0.05,
+        };
+
+        var report = DefaultSignificanceTest.Instance.Analyze(context);
+
+        Assert.NotNull(report.Omnibus);
+        Assert.Equal(SignificanceVerdict.NotSignificant, report.Omnibus!.Verdict);
+        Assert.Empty(report.Pairwise);
+    }
+
+    [Fact]
+    public void ComputeSignificance_ThreeGroupsOmnibusSignificant_SetsPerRowVerdictsFromPostHoc()
     {
         var results = new List<BenchmarkResult>
         {
@@ -74,8 +101,60 @@ public class SignificanceStrategyTests
 
         Assert.All(results, r => Assert.NotNull(r.Omnibus));
         Assert.Equal("Kruskal-Wallis", results[0].Omnibus!.TestName);
-        // Omnibus comparisons leave per-row pairwise verdicts untested.
+        // Post-hoc pairwise verdicts should be set on each candidate.
+        Assert.Equal(SignificanceVerdict.NotTested, results[0].SignificanceVerdict); // baseline
+        Assert.Equal(SignificanceVerdict.Significant, results[1].SignificanceVerdict);
+        Assert.Equal(SignificanceVerdict.Significant, results[2].SignificanceVerdict);
+    }
+
+    [Fact]
+    public void ComputeSignificance_ThreeGroupsOmnibusNotSignificant_LeavesVerdictsUntested()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            Result("a", isBaseline: true),
+            Result("b"),
+            Result("c"),
+        };
+
+        var rawSamples = new Dictionary<string, double[]>
+        {
+            ["a"] = Cluster(10),
+            ["b"] = Cluster(10),
+            ["c"] = Cluster(10),
+        };
+
+        Significance.ComputeSignificance(results, rawSamples);
+
+        Assert.All(results, r => Assert.NotNull(r.Omnibus));
+        Assert.Equal(SignificanceVerdict.NotSignificant, results[0].Omnibus!.Verdict);
+        // Post-hoc skipped; per-row verdicts stay NotTested.
         Assert.All(results, r => Assert.Equal(SignificanceVerdict.NotTested, r.SignificanceVerdict));
+    }
+
+    [Fact]
+    public void Default_ThreeGroups_CandidateWithTooFewSamples_ReportsNullPValueAndNotTested()
+    {
+        var context = new SignificanceContext
+        {
+            Groups =
+            [
+                new SampleGroup("a", Cluster(10), true),
+                new SampleGroup("b", Cluster(50), false),
+                new SampleGroup("c", [1.0], false), // too few for Mann-Whitney U
+            ],
+            BaselineIndex = 0,
+            SignificanceLevel = 0.05,
+        };
+
+        var report = DefaultSignificanceTest.Instance.Analyze(context);
+
+        Assert.NotNull(report.Omnibus);
+        Assert.Equal(SignificanceVerdict.Significant, report.Omnibus!.Verdict);
+
+        var c = report.Pairwise.Single(p => p.Name == "c");
+        Assert.Null(c.PValue);
+        Assert.Equal(SignificanceVerdict.NotTested, c.Verdict);
     }
 
     [Fact]

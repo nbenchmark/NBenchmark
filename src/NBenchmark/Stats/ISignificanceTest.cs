@@ -10,8 +10,9 @@ namespace NBenchmark.Stats;
 ///         The default strategy (<see cref="DefaultSignificanceTest" />) selects the
 ///         appropriate built-in test by group count: the two-sample
 ///         <see cref="MannWhitneyUSignificanceTest" /> for a single candidate versus the
-///         baseline, and the omnibus <see cref="KruskalWallisSignificanceTest" /> for three
-///         or more groups.
+///         baseline, and for three or more groups an omnibus
+///         <see cref="KruskalWallisSignificanceTest" /> gate followed by post-hoc
+///         pairwise Mann-Whitney U with Holm-Bonferroni correction.
 ///     </para>
 /// </summary>
 public interface ISignificanceTest

@@ -105,7 +105,7 @@ See [Configuration](../reference/configuration.md) for details on every option.
 
 ## Custom statistics
 
-The suite uses the same pluggable statistics as the rest of the engine. By default it trims outliers with the IQR fence and tests significance with `DefaultSignificanceTest` - Mann-Whitney U for two benchmarks, the Kruskal-Wallis omnibus test for three or more. Override either when your data needs it:
+The suite uses the same pluggable statistics as the rest of the engine. By default it trims outliers with the IQR fence and tests significance with `DefaultSignificanceTest` - Mann-Whitney U for two benchmarks, the Kruskal-Wallis omnibus test (followed by post-hoc pairwise Mann-Whitney U with Holm-Bonferroni correction) for three or more. Override either when your data needs it:
 
 ```csharp
 using NBenchmark.Stats;

@@ -49,7 +49,7 @@ Error = ±95% confidence interval half-width on the mean.
 
 When there are two or more benchmarks, a bar chart of median timings is also displayed below the table.
 
-When **three or more** benchmarks are compared, the per-row Sig column is blank and a single omnibus line is printed above the footer instead, summarising the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
+When **three or more** benchmarks are compared, the per-row Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and a single omnibus line is printed above the footer, summarising the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
 
 ```
 Omnibus Kruskal-Wallis across 3 groups: H(2) = 7.20, p = 0.027 → significant
