@@ -212,6 +212,47 @@ public class CliArgsTests
         }
     }
 
+    [Theory]
+    [InlineData("none", OutlierMode.None)]
+    [InlineData("top5", OutlierMode.RemoveTop5Percent)]
+    [InlineData("both5", OutlierMode.RemoveTopAndBottom5Percent)]
+    [InlineData("iqr", OutlierMode.IqrFence)]
+    [InlineData("mad", OutlierMode.MedianAbsoluteDeviation)]
+    public void Parse_Outlier_Valid_SetsOutlierMode(string value, OutlierMode expected)
+    {
+        var result = CliArgs.Parse(["--outlier", value]);
+        Assert.Equal(expected, result.OutlierMode);
+    }
+
+    [Fact]
+    public void Parse_Outlier_Default_IsNull()
+    {
+        var result = CliArgs.Parse([]);
+        Assert.Null(result.OutlierMode);
+    }
+
+    [Fact]
+    public void Parse_Outlier_Invalid_PrintsError()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            CliArgs? result = null;
+            var stderr = CaptureConsoleError(() => result = CliArgs.Parse(["--outlier", "bogus"]));
+
+            Assert.NotNull(result);
+            Assert.Null(result!.OutlierMode);
+            Assert.Contains("Invalid --outlier", stderr);
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+        }
+    }
+
     [Fact]
     public void Parse_MissingValue_PrintsErrorAndSetsExitCode()
     {

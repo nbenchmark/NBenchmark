@@ -49,6 +49,16 @@ Error = ±95% confidence interval half-width on the mean.
 
 When there are two or more benchmarks, a bar chart of median timings is also displayed below the table.
 
+When **three or more** benchmarks are compared, the per-row Sig column is blank and a single omnibus line is printed above the footer instead, summarising the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
+
+```
+Omnibus Kruskal-Wallis across 3 groups: H(2) = 7.20, p = 0.027 → significant
+
+Ran 3 benchmark(s) in 0.0s - Significance: Kruskal-Wallis (p < 0.05) - Outliers: MAD (3×)
+```
+
+The footer's outlier label reflects the active detector (`IQR fence (1.5×)`, `MAD (3×)`, or a custom detector's name), and the significance label reflects the active test.
+
 ## Columns
 
 | Column | Description |

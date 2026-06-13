@@ -132,8 +132,8 @@ Reported as `0` when `n < 1$.
 | `Q1` | Nearest-rank P25 | [First quartile](https://en.wikipedia.org/wiki/Quartile). |
 | `Q3` | Nearest-rank P75 | [Third quartile](https://en.wikipedia.org/wiki/Quartile). |
 | `InterquartileRange` | Q3 - Q1 | [Spread of the middle 50% of samples](https://en.wikipedia.org/wiki/Interquartile_range). |
-| `LowerFence` | Q1 - 1.5 $\times$ IQR | [Lower outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences) (only when `OutlierMode == IqrFence`). |
-| `UpperFence` | Q3 + 1.5 $\times$ IQR | [Upper outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences) (only when `OutlierMode == IqrFence`). |
+| `LowerFence` | Detector-dependent | [Lower outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences); set only by fence-based detectors. `IqrFence`: $Q1 - k \times \text{IQR}$ (default $k = 1.5$). `MedianAbsoluteDeviation`: $m - t \times \text{scaledMAD}$ (default $t = 3$). `null` otherwise. |
+| `UpperFence` | Detector-dependent | [Upper outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences); set only by fence-based detectors. `IqrFence`: $Q3 + k \times \text{IQR}$ (default $k = 1.5$). `MedianAbsoluteDeviation`: $m + t \times \text{scaledMAD}$ (default $t = 3$). `null` otherwise. |
 | `OutliersRemoved` | Count of discarded samples | [Number of samples removed by outlier trimming](https://en.wikipedia.org/wiki/Outlier). |
 | `N` | Post-trim length | Sample count after outlier removal. |
 | `StandardDeviation` | $s = \sqrt{\frac{1}{n-1}\sum(x_i-\bar{x})^2}$ | Spread of measurements (Bessel). |
@@ -145,8 +145,11 @@ Reported as `0` when `n < 1$.
 | `Skewness` | $g_1 = \frac{n \sum (x_i - \bar{x})^3}{(n-1)(n-2) s^3}$ | [Sample skewness](https://en.wikipedia.org/wiki/Skewness). Zero for $n < 3$. |
 | `Kurtosis` | $g_2 = \frac{n(n+1)\sum (x_i-\bar{x})^4}{(n-1)(n-2)(n-3)s^4} - \frac{3(n-1)^2}{(n-2)(n-3)}$ | [Excess kurtosis](https://en.wikipedia.org/wiki/Kurtosis). Zero for $n < 4$. |
 | `Mad` | $\text{median}(\lvert x_i - \text{median}(x) \rvert) \times 1.4826$ | [Median absolute deviation](https://en.wikipedia.org/wiki/Median_absolute_deviation) (scaled to $\sigma$). Zero for $n < 1$. |
-| `PValue` | Mann-Whitney U | Two-tailed p-value vs. baseline. |
-| `SignificanceVerdict` | $p < \alpha$ | Whether the difference is real (`Significant`, `NotSignificant`, or `NotTested`). |
+| `PValue` | Mann-Whitney U | Two-tailed pairwise p-value vs. baseline. `null` for the omnibus case (three or more groups - see `Omnibus`). |
+| `SignificanceVerdict` | $p < \alpha$ | Whether the pairwise difference is real (`Significant`, `NotSignificant`, or `NotTested`). |
+| `Omnibus` | Kruskal-Wallis | The across-all-groups verdict when three or more benchmarks are compared; `null` otherwise. Holds `TestName`, `Statistic`, `DegreesOfFreedom`, `GroupCount`, `PValue`, and `Verdict`. |
+| `SignificanceTestName` | - | Display name of the pairwise significance test used (e.g. `"Mann-Whitney U"`). |
+| `OutlierDetector` | - | Display name of the outlier detector applied (e.g. `"IQR fence (1.5×)"` or `"MAD (3×)"`). |
 | `MeanAllocatedBytes` | Mean of iteration deltas | Mean heap allocation per iteration. |
 | `AllocMedian` | Nearest-rank P50 of iteration deltas | Median allocation per iteration (only when `MeasureAllocations = true`). |
 | `AllocP95` | Nearest-rank P95 of iteration deltas | P95 allocation per iteration (only when `MeasureAllocations = true`). |

@@ -116,10 +116,33 @@ Controls which samples are discarded before statistics are computed.
 | `OutlierMode.RemoveTop5Percent` | The slowest 5% of samples are removed. |
 | `OutlierMode.RemoveTopAndBottom5Percent` | The slowest and fastest 5% are removed. |
 | `OutlierMode.IqrFence` | Samples beyond 1.5× the [IQR (inter-quartile range)](https://en.wikipedia.org/wiki/Interquartile_range) are removed. **(default)** |
+| `OutlierMode.MedianAbsoluteDeviation` | Samples more than 3× the scaled [MAD](https://en.wikipedia.org/wiki/Median_absolute_deviation) from the median are removed - a robust alternative to `IqrFence` for heavily skewed data. |
 
 `IqrFence` adapts to the actual spread of each benchmark instead of always discarding a fixed 5%: a clean run keeps nearly every sample, while a noisy run trims more. When the discarded slow samples form a tight secondary cluster (rather than scattered scheduling noise), NBenchmark adds a bimodal-distribution warning to the result so you can investigate the tail latency.
 
-BenchmarkSuite fluent method: `.WithOutlierMode(mode)`
+BenchmarkSuite fluent method: `.WithOutlierMode(mode)`  
+CLI flag: `--outlier <none|top5|both5|iqr|mad>`
+
+See [Outlier Trimming](../statistics/outliers.md) for the full algorithms.
+
+### OutlierDetector
+
+```csharp
+OutlierDetector = null   // default - falls back to OutlierMode
+```
+
+A custom `IOutlierDetector` (from `NBenchmark.Stats`) that **takes priority over `OutlierMode`** when set. Use it to plug in a trimming rule that the built-in modes do not cover - a tail-preserving filter, a fixed physical threshold, and so on. `MeasurementOptions.ResolveOutlierDetector()` returns this detector when present, otherwise the detector mapped from `OutlierMode`.
+
+```csharp
+using NBenchmark.Stats;
+
+new MeasurementOptions { OutlierDetector = new KeepFastestDetector(0.90) };
+```
+
+BenchmarkSuite fluent method: `.WithOutlierDetector(detector)`
+
+> [!NOTE]
+> The `--outlier` CLI flag always wins: passing it clears any programmatic `OutlierDetector` so the command line stays authoritative. See [Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors).
 
 ### ConfidenceLevel
 
@@ -146,7 +169,7 @@ CLI flag: `--confidence 0.99`
 EnableSignificance = true   // default
 ```
 
-When `true` and there are two or more benchmarks, NBenchmark runs a [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) to determine whether the difference in medians is statistically significant. For small, tie-free samples (combined n ≤ 20) the exact permutation p-value is used; larger samples use the normal approximation with tie and continuity corrections.
+When `true` and there are two or more benchmarks, NBenchmark tests whether the differences are statistically significant. With exactly two benchmarks it runs a [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) (exact permutation p-value for small, tie-free samples; normal approximation with tie and continuity corrections otherwise). With **three or more** benchmarks it runs the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus test instead, reporting a single verdict across all groups.
 
 Disable it if you don't need significance testing and want to reduce overhead:
 
@@ -163,6 +186,24 @@ SignificanceLevel = 0.05   // default
 The significance threshold (alpha) a result's p-value is compared against. A result is flagged significant when `p < SignificanceLevel`. Must be strictly between `0` and `1`. Lower it (e.g. `0.01`) to demand stronger evidence before calling a difference real.
 
 CLI flag: `--alpha 0.01`
+
+### SignificanceTest
+
+```csharp
+SignificanceTest = null   // default - DefaultSignificanceTest (group-count aware)
+```
+
+A custom `ISignificanceTest` (from `NBenchmark.Stats`) that replaces the built-in strategy. When `null`, `ResolveSignificanceTest()` returns `DefaultSignificanceTest`, which picks Mann-Whitney U for two groups and Kruskal-Wallis for three or more. Implement the interface to supply a bootstrap, Bayesian, post-hoc, or domain-specific rule:
+
+```csharp
+using NBenchmark.Stats;
+
+new MeasurementOptions { SignificanceTest = new MedianRatioSignificanceTest(25) };
+```
+
+BenchmarkSuite fluent method: `.WithSignificanceTest(test)`
+
+See [Custom significance tests](../statistics/significance.md#custom-significance-tests).
 
 ### ForceGcBetweenBenchmarks
 
@@ -193,7 +234,9 @@ public void MyExpensiveBenchmark() => SlowOperation();
 | `ForceGcBeforeEachIteration` | `bool` | `true` | - |
 | `MeasureAllocations` | `bool` | `false` | - |
 | `OutlierMode` | `enum` | `IqrFence` | See above |
+| `OutlierDetector` | `IOutlierDetector?` | `null` | Overrides `OutlierMode` when set |
 | `EnableSignificance` | `bool` | `true` | - |
+| `SignificanceTest` | `ISignificanceTest?` | `null` | Defaults to `DefaultSignificanceTest` |
 | `ForceGcBetweenBenchmarks` | `bool` | `true` | - |
 
 Values outside the valid range throw `ArgumentOutOfRangeException`.

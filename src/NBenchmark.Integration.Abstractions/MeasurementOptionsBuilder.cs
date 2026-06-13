@@ -30,6 +30,7 @@ public static class MeasurementOptionsBuilder
             or OutlierMode.RemoveTop5Percent
             or OutlierMode.RemoveTopAndBottom5Percent
             or OutlierMode.IqrFence
+            or OutlierMode.MedianAbsoluteDeviation
             ? mode
             : OutlierMode.IqrFence;
     }

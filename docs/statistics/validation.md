@@ -7,8 +7,8 @@ order: 6
 # Validation & Accuracy
 
 NBenchmark's numerical core is dependency-free - it ships its own implementations
-of the [Student's t quantile](https://en.wikipedia.org/wiki/Student%27s_t-distribution), the normal quantile, percentiles, and the
-[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test). This page documents how those implementations are verified,
+of the [Student's t quantile](https://en.wikipedia.org/wiki/Student%27s_t-distribution), the normal quantile, percentiles, the
+[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test), and the [Kruskal-Wallis test](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test). This page documents how those implementations are verified,
 and to what tolerance, so you can trust the numbers in the output.
 
 The verification lives in the test suite (`tests/NBenchmark.Tests`) and runs on
@@ -49,6 +49,8 @@ listed below so they can be regenerated.
 | `StudentT.NormalQuantile` | `scipy.stats.norm.ppf` | ≤ 1.15e-8 absolute |
 | `MannWhitneyU.Test` (small, tie-free, combined n ≤ 20) | `scipy.stats.mannwhitneyu(method='exact')` | ≤ 1e-9 relative |
 | `MannWhitneyU.Test` (otherwise) | `scipy.stats.mannwhitneyu(method='asymptotic', use_continuity=True)` | < 1e-6 absolute |
+| `ChiSquared.SurvivalFunction` | Closed forms (df = 2: $e^{-x/2}$; df = 4) and `scipy.stats.chi2.sf` | \u2264 1e-9 on closed forms; \u2264 1e-4 on spot values |
+| `KruskalWallis.Test` (H, p) | `scipy.stats.kruskal` (with tie correction) | H \u2264 1e-9; p \u2264 1e-6 |
 
 Reference values were generated with:
 
@@ -65,6 +67,8 @@ stats.mannwhitneyu(a, b, alternative='two-sided',
                    method='exact')                          # exact p-value (small samples)
 stats.mannwhitneyu(a, b, alternative='two-sided',
                    method='asymptotic', use_continuity=True)  # [p-value](https://en.wikipedia.org/wiki/P-value) (large samples)
+stats.chi2.sf(x, df)                         # chi-squared survival function
+stats.kruskal(*groups)                       # Kruskal-Wallis H and p-value
 ```
 
 ### Exact vs. approximate Mann-Whitney U

@@ -69,6 +69,12 @@ _Run at 2026-06-06 03:40:00 UTC - 25 warmup / 190 measured_
 _Error = ±95% confidence interval half-width on the mean._
 ```
 
+When **three or more** benchmarks are compared, the Sig column is blank and the reporter appends an omnibus line summarising the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
+
+```markdown
+**Omnibus (Kruskal-Wallis)** across 3 groups: H(2) = 7.20, p = 0.027 → significant
+```
+
 ## Columns
 
 | Column | Description |
