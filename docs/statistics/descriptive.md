@@ -83,24 +83,58 @@ $$\text{CV} = \frac{s}{\bar{x}}$$
 
 A dimensionless relative measure of variability. A CV of 0.05 means the standard deviation is 5% of the mean - the benchmark is fairly stable. A CV of 0.5 or higher indicates high variability and the results should be treated with caution.
 
+## Distribution shape
+
+Three fields describe the *shape* of the sample distribution, not just its central tendency or spread.
+
+### [Skewness](https://en.wikipedia.org/wiki/Skewness)
+
+$$g_1 = \frac{n \sum (x_i - \bar{x})^3}{(n-1)(n-2) s^3}$$
+
+- **Positive skew** (right-tailed): a few slow outliers pull the mean above the median. Common in benchmarks where scheduler preemption or GC adds occasional spikes.
+- **Negative skew** (left-tailed): most samples are slow and a few are fast - unusual in benchmarking, but can appear after compiler warmup where early iterations are slower.
+- **Near zero**: roughly symmetric distribution.
+
+Skewness is reported as `0` when `n < 3`.
+
+### [Kurtosis](https://en.wikipedia.org/wiki/Kurtosis) (excess)
+
+$$g_2 = \frac{n(n+1)\sum (x_i-\bar{x})^4}{(n-1)(n-2)(n-3)s^4} - \frac{3(n-1)^2}{(n-2)(n-3)}$$
+
+This is **excess kurtosis** (kurtosis minus 3), so the normal distribution benchmarks at `0`.
+
+- **Positive excess kurtosis** (leptokurtic): heavier tails than a normal distribution. More extreme outliers than expected under normality. A benchmark with occasional GC pauses or page faults often shows this.
+- **Negative excess kurtosis** (platykurtic): lighter tails, fewer extremes. Rare in benchmarking; can occur when samples are tightly clamped by hardware limits.
+- **Near zero**: tail weight similar to a normal distribution.
+
+Excess kurtosis is reported as `0` when `n < 4`.
+
+### [Median absolute deviation](https://en.wikipedia.org/wiki/Median_absolute_deviation) (MAD, scaled)
+
+$$\text{MAD} = \text{median}(\lvert x_i - \text{median}(x) \rvert) \times 1.4826$$
+
+MAD is a **robust** measure of spread - it uses the median rather than the mean, so it is far less sensitive to outliers than the standard deviation. The scaling factor `1.4826` makes MAD consistent with the standard deviation $\sigma$ for normally distributed data, which means the two can be compared directly: if MAD is noticeably smaller than the standard deviation, outliers are inflating the standard deviation more than the bulk of the data warrant.
+
+Reported as `0` when `n < 1$.
+
 ## Summary of all reported fields
 
 ### Core fields on BenchmarkResult
 
 | Field | Formula / method | Description |
 |---|---|---|
-| `Median` | Nearest-rank P50 | Robust central tendency. |
-| `Mean` | $\bar{x} = \frac{1}{n}\sum x_i$ | Arithmetic average. |
+| `Median` | Nearest-rank P50 | [Robust central tendency](https://en.wikipedia.org/wiki/Median). |
+| `Mean` | $\bar{x} = \frac{1}{n}\sum x_i$ | [Arithmetic average](https://en.wikipedia.org/wiki/Arithmetic_mean). |
 | `P95` | Nearest-rank P95 | 95th percentile. |
 | `P99` | Nearest-rank P99 | 99th percentile. |
-| `Min` | $x_1$ (sorted) | Fastest measured sample. |
-| `Max` | $x_n$ (sorted) | Slowest measured sample. |
-| `Q1` | Nearest-rank P25 | First quartile. |
-| `Q3` | Nearest-rank P75 | Third quartile. |
-| `InterquartileRange` | Q3 - Q1 | Spread of the middle 50% of samples. |
-| `LowerFence` | Q1 - 1.5 $\times$ IQR | Lower outlier boundary (only when `OutlierMode == IqrFence`). |
-| `UpperFence` | Q3 + 1.5 $\times$ IQR | Upper outlier boundary (only when `OutlierMode == IqrFence`). |
-| `OutliersRemoved` | Count of discarded samples | Number of samples removed by outlier trimming. |
+| `Min` | $x_1$ (sorted) | [Fastest measured sample](https://en.wikipedia.org/wiki/Sample_maximum_and_minimum). |
+| `Max` | $x_n$ (sorted) | [Slowest measured sample](https://en.wikipedia.org/wiki/Sample_maximum_and_minimum). |
+| `Q1` | Nearest-rank P25 | [First quartile](https://en.wikipedia.org/wiki/Quartile). |
+| `Q3` | Nearest-rank P75 | [Third quartile](https://en.wikipedia.org/wiki/Quartile). |
+| `InterquartileRange` | Q3 - Q1 | [Spread of the middle 50% of samples](https://en.wikipedia.org/wiki/Interquartile_range). |
+| `LowerFence` | Q1 - 1.5 $\times$ IQR | [Lower outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences) (only when `OutlierMode == IqrFence`). |
+| `UpperFence` | Q3 + 1.5 $\times$ IQR | [Upper outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences) (only when `OutlierMode == IqrFence`). |
+| `OutliersRemoved` | Count of discarded samples | [Number of samples removed by outlier trimming](https://en.wikipedia.org/wiki/Outlier). |
 | `N` | Post-trim length | Sample count after outlier removal. |
 | `StandardDeviation` | $s = \sqrt{\frac{1}{n-1}\sum(x_i-\bar{x})^2}$ | Spread of measurements (Bessel). |
 | `StandardError` | $s/\sqrt{n}$ | Precision of the mean estimate. |
@@ -108,9 +142,9 @@ A dimensionless relative measure of variability. A CV of 0.05 means the standard
 | `ConfidenceIntervalLower` | $\bar{x} - \text{MoE}$ | Lower CI bound. |
 | `ConfidenceIntervalUpper` | $\bar{x} + \text{MoE}$ | Upper CI bound. |
 | `CoefficientOfVariation` | $s / \bar{x}$ | Relative variability. |
-| `Skewness` | $g_1 = \frac{n \sum (x_i - \bar{x})^3}{(n-1)(n-2) s^3}$ | Sample skewness. Zero for $n < 3$. |
-| `Kurtosis` | $g_2 = \frac{n(n+1)\sum (x_i-\bar{x})^4}{(n-1)(n-2)(n-3)s^4} - \frac{3(n-1)^2}{(n-2)(n-3)}$ | Excess kurtosis. Zero for $n < 4$. |
-| `Mad` | $\text{median}(\lvert x_i - \text{median}(x) \rvert) \times 1.4826$ | Median absolute deviation (scaled to $\sigma$). Zero for $n < 1$. |
+| `Skewness` | $g_1 = \frac{n \sum (x_i - \bar{x})^3}{(n-1)(n-2) s^3}$ | [Sample skewness](https://en.wikipedia.org/wiki/Skewness). Zero for $n < 3$. |
+| `Kurtosis` | $g_2 = \frac{n(n+1)\sum (x_i-\bar{x})^4}{(n-1)(n-2)(n-3)s^4} - \frac{3(n-1)^2}{(n-2)(n-3)}$ | [Excess kurtosis](https://en.wikipedia.org/wiki/Kurtosis). Zero for $n < 4$. |
+| `Mad` | $\text{median}(\lvert x_i - \text{median}(x) \rvert) \times 1.4826$ | [Median absolute deviation](https://en.wikipedia.org/wiki/Median_absolute_deviation) (scaled to $\sigma$). Zero for $n < 1$. |
 | `PValue` | Mann-Whitney U | Two-tailed p-value vs. baseline. |
 | `SignificanceVerdict` | $p < \alpha$ | Whether the difference is real (`Significant`, `NotSignificant`, or `NotTested`). |
 | `MeanAllocatedBytes` | Mean of iteration deltas | Mean heap allocation per iteration. |
@@ -122,7 +156,7 @@ A dimensionless relative measure of variability. A CV of 0.05 means the standard
 
 | Property | Formula | Description |
 |---|---|---|
-| `Range` | Max - Min | Full spread of trimmed samples. |
+| `Range` | Max - Min | [Full spread of trimmed samples](https://en.wikipedia.org/wiki/Range_(statistics)). |
 | `StandardErrorPercent` | $\text{SEM} / \bar{x} \times 100$ | Standard error as a percentage of the mean. |
 | `MarginPercent` | $\text{MoE} / \bar{x} \times 100$ | Margin of error as a percentage of the mean. |
 | `CoefficientOfVariationPercent` | $\text{CV} \times 100$ | Coefficient of variation as a percentage. |
