@@ -89,7 +89,7 @@ _Error = ±95% confidence interval half-width on the mean._
 - Results are sorted by median (fastest first).
 - Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, StdDev, P95, and P99 columns show `0.0 ns`.
 - The output directory is created automatically if it does not exist.
-- In Advanced mode (`--detail advanced`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown.
+- In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown.
 
 ## Using with Benchmark (Quick mode)
 

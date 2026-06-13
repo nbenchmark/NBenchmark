@@ -36,7 +36,7 @@ Even with warmup and forced GC, occasional **OS scheduling interrupts**, context
 
 By default, NBenchmark trims samples beyond an **[IQR fence](https://en.wikipedia.org/wiki/Interquartile_range)** before computing statistics (`OutlierMode.IqrFence`): anything below `Q1 - 1.5 × IQR` or above `Q3 + 1.5 × IQR`. Unlike a fixed quota, this adapts to the run - a clean run keeps almost every sample, while a noisy run trims more. If the discarded slow samples cluster tightly (a possible second execution profile rather than random noise), NBenchmark adds a bimodal-distribution warning to the result.
 
-The fence values (`LowerFence`, `UpperFence`) are now first-class fields on `BenchmarkResult` and are visible in Advanced detail mode (`--detail advanced`).
+The fence values (`LowerFence`, `UpperFence`) are now first-class fields on `BenchmarkResult` and are visible in Advanced detail mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`).
 
 Available modes:
 

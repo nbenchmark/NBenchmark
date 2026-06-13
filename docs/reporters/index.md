@@ -98,7 +98,7 @@ If you reference an unknown reporter name, the host prints the list of available
 
 ## Detail levels
 
-Reporters support two detail levels - **Simple** (default) and **Advanced** - that control how much statistical information is included in the output. See the [Report Detail Levels guide](../guides/report-detail-levels.md) for the full column reference and how to enable Advanced mode.
+Reporters support two detail levels - **Simple** (default) and **Advanced** - that control how much statistical information is included in the output. Set the level via `WithDetail(ReportDetail.Advanced)` on both `BenchmarkHost` and `BenchmarkSuite`, or via the `--detail advanced` CLI flag in host mode. See the [Report Detail Levels guide](../guides/report-detail-levels.md) for the full column reference.
 
 ## Writing a custom reporter
 

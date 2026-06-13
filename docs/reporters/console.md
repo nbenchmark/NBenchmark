@@ -67,7 +67,7 @@ An optional **Description** column appears if any benchmark has a `Description` 
 
 A **✓** next to the name indicates the difference from the baseline is statistically significant (p < 0.05). A **✗** indicates it is not.
 
-In Advanced mode (`--detail advanced`), each benchmark row is followed by an indented stats block.
+In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), each benchmark row is followed by an indented stats block.
 
 ## Adding progress display
 

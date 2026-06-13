@@ -43,6 +43,24 @@ Advanced mode shows the same 10-column table **plus** a per-benchmark stats bloc
 
 ## Setting the detail level
 
+### `WithDetail()` (Host and Suite modes)
+
+Both `BenchmarkHost` and `BenchmarkSuite` expose a `WithDetail(ReportDetail)` method. The detail level is stamped onto all registered reporters, so calling `WithDetail` before or after `WithReporter` works in either order.
+
+```csharp
+// Host mode
+var host = BenchmarkHost.Create(args);
+host.WithDetail(ReportDetail.Advanced)
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+
+// Suite mode
+var suite = new BenchmarkSuite("MySuite");
+suite.WithDetail(ReportDetail.Advanced)
+     .WithReporter(new ConsoleReporter())
+     .RunAsync();
+```
+
 ### `--detail` flag (Host mode)
 
 ```bash
@@ -56,6 +74,10 @@ dotnet run -- --detail simple
 | `advanced` | Same table plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, and allocation percentiles. |
 
 The `--detail` flag affects all registered reporters. JSON always emits the full record regardless of detail level.
+
+### Quick mode
+
+Quick mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail and does not support `WithDetail()`.
 
 ## Reporter behaviour
 

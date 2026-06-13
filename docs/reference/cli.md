@@ -151,7 +151,9 @@ dotnet run -- --detail simple
 
 The `--detail` flag affects all registered reporters. File-based reporters emit different column sets. Console reporter prints the stats block below each row; Markdown reporter appends a per-benchmark details section after the table. JSON always emits the full record regardless of detail level.
 
-See [Report Detail Levels](../guides/report-detail-levels.md) for the full column reference.
+In host mode you can also set the detail level programmatically with `WithDetail(ReportDetail.Advanced)` before calling `RunAsync`.
+
+See [Report Detail Levels](../guides/report-detail-levels.md) for the full column reference and `WithDetail()` examples for suite mode.
 
 ---
 
