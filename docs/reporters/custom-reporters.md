@@ -48,7 +48,8 @@ For reporters that produce comparison tables, use `BenchmarkTable.Build(results)
 - **Ratio computation** - `row.Ratio` is `result.Median / baseline.Median`, or `NaN` for errored results or single-benchmark runs.
 - **Significance labels** - `row.SignificanceLabel` is `"✓"` (significant), `"✗"` (not significant), or `""` (not applicable).
 - **Ordering** - rows are sorted by median ascending.
-- **Run metadata** - `table.RunAtUtc`, `table.WarmupIterations`, `table.MeasuredIterations`, `table.ConfidenceLevel`, `table.OutlierMode`, and `table.TotalDuration` are available for building a header without picking fields from individual results.
+- **Run metadata** - `table.RunAtUtc`, `table.WarmupIterations`, `table.MeasuredIterations`, `table.ConfidenceLevel`, `table.OutlierDetector` (the detector's display name, e.g. `"IQR fence (1.5×)"` or `"MAD (3×)"`), `table.SignificanceTestName` (the pairwise test's name), and `table.TotalDuration` are available for building a header without picking fields from individual results.
+- **Omnibus verdict** - `table.Omnibus` is non-`null` when an omnibus test ran (Kruskal-Wallis across three or more groups). It exposes `TestName`, `Statistic`, `DegreesOfFreedom`, `GroupCount`, `PValue`, and `Verdict` so you can render a single across-all-groups line.
 
 ```csharp
 public async Task ReportAsync(

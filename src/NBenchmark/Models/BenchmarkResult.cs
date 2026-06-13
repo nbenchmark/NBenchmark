@@ -1,3 +1,5 @@
+using NBenchmark.Stats;
+
 namespace NBenchmark;
 
 public record BenchmarkResult
@@ -44,6 +46,20 @@ public record BenchmarkResult
     public double? PValue { get; init; }
     public SignificanceVerdict SignificanceVerdict { get; init; }
 
+    /// <summary>
+    ///     The omnibus significance verdict (e.g. Kruskal-Wallis) shared across all
+    ///     benchmarks in the comparison, when an omnibus test was run (three or more groups).
+    ///     <c>null</c> for pairwise comparisons.
+    /// </summary>
+    public OmnibusComparison? Omnibus { get; init; }
+
+    /// <summary>
+    ///     The display name of the significance strategy used (e.g. <c>"Mann-Whitney U"</c>).
+    ///     Reflects a custom <see cref="MeasurementOptions.SignificanceTest" /> when one is
+    ///     configured.
+    /// </summary>
+    public string SignificanceTestName { get; init; } = DefaultSignificanceTest.Instance.Name;
+
     public double SignificanceLevel { get; init; } = 0.05;
 
     public bool Errored { get; init; }
@@ -59,6 +75,13 @@ public record BenchmarkResult
 
     public bool IsBaseline { get; init; }
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
+
+    /// <summary>
+    ///     The display name of the outlier detector that produced this result (e.g.
+    ///     <c>"IQR fence (1.5×)"</c>). Reflects a custom
+    ///     <see cref="MeasurementOptions.OutlierDetector" /> when one is configured.
+    /// </summary>
+    public string OutlierDetector { get; init; } = OutlierDetectors.IqrFence.Name;
 
     public IReadOnlyList<string> Warnings { get; init; } = [];
 

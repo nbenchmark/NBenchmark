@@ -6,4 +6,5 @@ public enum OutlierMode
     RemoveTop5Percent,
     RemoveTopAndBottom5Percent,
     IqrFence,
+    MedianAbsoluteDeviation,
 }

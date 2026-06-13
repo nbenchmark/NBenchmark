@@ -138,6 +138,8 @@ internal static class OutcomeBuilder
                 MeasuredDuration = measuredDuration,
                 IsBaseline = isBaseline,
                 OutlierMode = options.OutlierMode,
+                OutlierDetector = options.ResolveOutlierDetector().Name,
+                SignificanceTestName = options.ResolveSignificanceTest().Name,
                 SignificanceLevel = options.SignificanceLevel,
                 Warnings = warnings,
             },

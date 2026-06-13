@@ -46,6 +46,7 @@ Available modes:
 | `RemoveTop5Percent` | The slowest 5% of samples. |
 | `RemoveTopAndBottom5Percent` | The slowest and fastest 5%. |
 | `IqrFence` | Any sample beyond 1.5× the [inter-quartile range](https://en.wikipedia.org/wiki/Interquartile_range). **(default)** |
+| `MedianAbsoluteDeviation` | Any sample beyond 3× the scaled [median absolute deviation](https://en.wikipedia.org/wiki/Median_absolute_deviation) - more robust to heavy skew than `IqrFence`. |
 
 ## Median vs. mean
 
@@ -96,6 +97,8 @@ NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E
 - The test requires at least **2 samples** in each group; with fewer it returns no result.
 
 The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** - it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
+
+When you compare **three or more** benchmarks, NBenchmark switches to the **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus test** - it tests whether *any* of the groups differ and prints a single verdict below the table, avoiding the false positives that many pairwise tests would introduce. Both tests are the default; you can swap in your own via `ISignificanceTest` (see [Significance Testing](../statistics/significance.md#custom-significance-tests)).
 
 > [!NOTE]
 > Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Always look at the Ratio column alongside significance.

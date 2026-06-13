@@ -46,7 +46,7 @@ public sealed class MarkdownReporter : IReporter
             return;
         }
 
-        sb.AppendLine($"> **{table.RunAtUtc} UTC** · {table.WarmupIterations} warmup · {table.MeasuredIterations} measured · Outliers: {FormatOutlierMode(table.OutlierMode)}");
+        sb.AppendLine($"> **{table.RunAtUtc} UTC** · {table.WarmupIterations} warmup · {table.MeasuredIterations} measured · Outliers: {table.OutlierDetector}");
         sb.AppendLine();
 
         // Primary comparison table
@@ -140,7 +140,25 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine();
         sb.AppendLine("---");
         sb.AppendLine();
-        sb.AppendLine($"_{results.Count} benchmark(s) · {table.TotalDuration.TotalSeconds:F1}s total · Mann-Whitney U (p < {table.SignificanceLevel:0.###}) · CI {table.ConfidenceLevel * 100:0.#}%_");
+
+        if (table.Omnibus is { } omnibus)
+        {
+            var verdict = omnibus.Verdict switch
+            {
+                SignificanceVerdict.Significant => "**significant**",
+                SignificanceVerdict.NotSignificant => "not significant",
+                _ => "not tested",
+            };
+
+            sb.AppendLine(
+                $"**Omnibus ({omnibus.TestName})** across {omnibus.GroupCount} groups: "
+                + $"H({omnibus.DegreesOfFreedom}) = {omnibus.Statistic:F2}, p = {FormatP(omnibus.PValue)} → {verdict} "
+                + $"(α = {table.SignificanceLevel:0.###}).");
+            sb.AppendLine();
+        }
+
+        var testName = table.Omnibus?.TestName ?? table.SignificanceTestName;
+        sb.AppendLine($"_{results.Count} benchmark(s) · {table.TotalDuration.TotalSeconds:F1}s total · {testName} (p < {table.SignificanceLevel:0.###}) · CI {table.ConfidenceLevel * 100:0.#}%_");
 
         await File.WriteAllTextAsync(filePath, sb.ToString(), cancellationToken);
     }
@@ -165,15 +183,5 @@ public sealed class MarkdownReporter : IReporter
         return $"**{row.Ratio:F2}x**";
     }
 
-    private static string FormatOutlierMode(OutlierMode mode)
-    {
-        return mode switch
-        {
-            OutlierMode.None => "none",
-            OutlierMode.RemoveTop5Percent => "top 5%",
-            OutlierMode.RemoveTopAndBottom5Percent => "top & bottom 5%",
-            OutlierMode.IqrFence => "IQR fence (1.5×)",
-            _ => "auto",
-        };
-    }
+    private static string FormatP(double p) => p < 0.001 ? "<0.001" : p.ToString("0.###");
 }

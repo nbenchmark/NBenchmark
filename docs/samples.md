@@ -6,7 +6,7 @@ order: 6
 
 # Samples
 
-The repository includes four sample projects in the `samples/` directory that demonstrate each usage mode. Run any of them with `dotnet run`.
+The repository includes several sample projects in the `samples/` directory that demonstrate each usage mode. Run any of them with `dotnet run`.
 
 ## Quick - Quick mode
 
@@ -169,3 +169,51 @@ What to look at:
 - The benchmark class takes an `OrderRepository` in its primary constructor - no parameterless constructor anywhere.
 - `UseDependencyInjection<T>` combines assembly discovery and DI wiring in one call.
 - A scoped variant (`UseScopedDependencyInjection<T>`) is also available for `DbContext`-style lifetimes.
+
+---
+
+## ExtensibleStats - Custom statistics
+
+**`samples/ExtensibleStats/`**
+
+A `BenchmarkSuite` comparing three hash algorithms (`SHA256`, `SHA1`, `MD5`) twice. The first run uses the built-in Median Absolute Deviation outlier mode; because there are three groups it automatically reports a **Kruskal-Wallis** omnibus verdict. The second run swaps in a custom `IOutlierDetector` and a custom `ISignificanceTest`.
+
+```bash
+cd samples/ExtensibleStats
+dotnet run
+```
+
+```csharp
+using NBenchmark;
+using NBenchmark.Reporters.Console;
+using NBenchmark.Stats;
+
+// Built-in: MAD trimming + Kruskal-Wallis (3 groups -> omnibus test)
+await new BenchmarkSuite("hashing")
+    .Add("sha256", () => SHA256.HashData(payload))
+    .Add("sha1", () => SHA1.HashData(payload))
+    .Add("md5", () => MD5.HashData(payload))
+    .WithBaseline("md5")
+    .WithOutlierMode(OutlierMode.MedianAbsoluteDeviation)
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+
+// Custom: plug in your own detector and significance rule
+await new BenchmarkSuite("hashing-custom")
+    .Add("sha256", () => SHA256.HashData(payload))
+    .Add("sha1", () => SHA1.HashData(payload))
+    .Add("md5", () => MD5.HashData(payload))
+    .WithBaseline("md5")
+    .WithOutlierDetector(new KeepFastestDetector(0.90))
+    .WithSignificanceTest(new MedianRatioSignificanceTest(thresholdPercent: 25))
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+```
+
+What to look at:
+
+- The `Outliers: MAD` header on the first run and the `Omnibus Kruskal-Wallis across 3 groups: H(2) = ... → significant` line below the table.
+- The custom detector's name (`keep fastest 90%`) in the header and the custom test's name (`median ratio (>25%)`) in the footer of the second run.
+- The `KeepFastestDetector : IOutlierDetector` and `MedianRatioSignificanceTest : ISignificanceTest` implementations in `Program.cs` - templates for your own statistics.
+
+See [Custom outlier detectors](./statistics/outliers.md#custom-outlier-detectors) and [Custom significance tests](./statistics/significance.md#custom-significance-tests).

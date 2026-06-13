@@ -11,7 +11,7 @@ internal static class StatsPipeline
         MeasurementOptions options)
     {
         var timingsForStats = (double[])rawTimings.Clone();
-        var trimResult = OutlierTrim.TrimDetailed(timingsForStats, options.OutlierMode);
+        var trimResult = OutlierTrim.TrimDetailed(timingsForStats, options.ResolveOutlierDetector());
 
         Debug.Assert(IsSorted(trimResult.Kept),
             "OutlierTrim must produce sorted output; Percentile.Compute requires sorted input.");

@@ -53,6 +53,7 @@ public sealed class ConsoleReporter : IReporter
         }
 
         RenderWarnings(benchTable);
+        RenderOmnibus(benchTable);
         RenderFooter(benchTable, results.Count);
         AnsiConsole.WriteLine();
 
@@ -71,7 +72,7 @@ public sealed class ConsoleReporter : IReporter
             "[bold steelblue1]BENCHMARK RESULTS[/]",
             $"[grey]{benchTable.RunAtUtc} UTC[/]",
             $"[grey]{benchTable.WarmupIterations} warmup / {benchTable.MeasuredIterations} measured[/]",
-            $"[grey]Outliers: {FormatOutlierMode(benchTable.OutlierMode)}[/]"
+            $"[grey]Outliers: {Esc(benchTable.OutlierDetector)}[/]"
         );
 
         var panel = new Panel(headerGrid)
@@ -267,11 +268,33 @@ public sealed class ConsoleReporter : IReporter
     private static void RenderFooter(BenchmarkTable benchTable, int count)
     {
         AnsiConsole.WriteLine();
+        var testName = benchTable.Omnibus?.TestName ?? benchTable.SignificanceTestName;
         var footer = $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · "
-                     + $"Mann-Whitney U (p < {benchTable.SignificanceLevel:0.###}) · "
+                     + $"{Esc(testName)} (p < {benchTable.SignificanceLevel:0.###}) · "
                      + $"CI {benchTable.ConfidenceLevel * 100:0.#}%[/]";
         AnsiConsole.MarkupLine(footer);
     }
+
+    private static void RenderOmnibus(BenchmarkTable benchTable)
+    {
+        if (benchTable.Omnibus is not { } omnibus)
+            return;
+
+        var (verdict, color) = omnibus.Verdict switch
+        {
+            SignificanceVerdict.Significant => ("significant", "green"),
+            SignificanceVerdict.NotSignificant => ("not significant", "yellow"),
+            _ => ("not tested", "dim"),
+        };
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine(
+            $"[grey]Omnibus[/] [bold]{Esc(omnibus.TestName)}[/][grey] across {omnibus.GroupCount} groups: "
+            + $"H({omnibus.DegreesOfFreedom}) = {omnibus.Statistic:F2}, p = {FormatP(omnibus.PValue)} → [/]"
+            + $"[{color}]{verdict}[/] [grey](α = {benchTable.SignificanceLevel:0.###})[/]");
+    }
+
+    private static string FormatP(double p) => p < 0.001 ? "<0.001" : p.ToString("0.###");
 
     private static string RenderBar(double value, double max, string color)
     {
@@ -307,18 +330,6 @@ public sealed class ConsoleReporter : IReporter
             "console",
             "Console output (Spectre.Console table + bar chart)",
             (_, detail) => new ConsoleReporter(detail));
-
-    private static string FormatOutlierMode(OutlierMode mode)
-    {
-        return mode switch
-        {
-            OutlierMode.None => "none",
-            OutlierMode.RemoveTop5Percent => "top 5%",
-            OutlierMode.RemoveTopAndBottom5Percent => "top & bottom 5%",
-            OutlierMode.IqrFence => "IQR fence (1.5×)",
-            _ => "auto",
-        };
-    }
 
     private static string Esc(string? text) => Markup.Escape(text ?? "");
 }

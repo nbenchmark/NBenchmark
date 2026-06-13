@@ -631,4 +631,59 @@ public class BenchmarkTableTests
 
         Assert.Equal(["Fastest", "Middle", "Slowest"], table.Rows.Select(r => r.Name));
     }
+
+    [Fact]
+    public void Build_CopiesOutlierDetectorName_FromResults()
+    {
+        var results = new[]
+        {
+            new BenchmarkResult
+            {
+                Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                OutlierDetector = "MAD (3×)",
+                RunAtUtc = DateTimeOffset.UtcNow,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+            },
+        };
+
+        var table = BenchmarkTable.Build(results);
+
+        Assert.Equal("MAD (3×)", table.OutlierDetector);
+    }
+
+    [Fact]
+    public void Build_SurfacesOmnibus_WhenPresentOnResults()
+    {
+        var omnibus = new OmnibusComparison
+        {
+            TestName = "Kruskal-Wallis",
+            Statistic = 7.2,
+            PValue = 0.027,
+            DegreesOfFreedom = 2,
+            GroupCount = 3,
+            Verdict = SignificanceVerdict.Significant,
+        };
+
+        var results = new[]
+        {
+            new BenchmarkResult
+            {
+                Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Omnibus = omnibus,
+                RunAtUtc = DateTimeOffset.UtcNow,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+            },
+        };
+
+        var table = BenchmarkTable.Build(results);
+
+        Assert.NotNull(table.Omnibus);
+        Assert.Equal("Kruskal-Wallis", table.Omnibus!.TestName);
+        Assert.Equal(3, table.Omnibus.GroupCount);
+    }
 }
+

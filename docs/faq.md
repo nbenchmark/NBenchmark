@@ -76,6 +76,8 @@ The only exception that propagates is a cancellation triggered through the `Canc
 
 It shows the result of a **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** comparing the benchmark to the baseline. A **✓** means the difference is statistically significant (p < 0.05) - unlikely to be random noise. A **✗** means it is not significant.
 
+When you compare **three or more** benchmarks, the per-row Sig column is left blank and a single **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus** verdict is printed on its own line below the table instead - it answers "do *any* of these groups differ?" rather than localizing the difference to one pair.
+
 See [Statistical Significance](./getting-started/key-concepts.md#statistical-significance) and the [Statistics Deep Dive](./statistics/) for full details.
 
 ### Why is significance sometimes blank?

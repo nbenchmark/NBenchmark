@@ -1,5 +1,6 @@
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
+using NBenchmark.Stats;
 
 namespace NBenchmark;
 
@@ -92,6 +93,18 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>
+    ///     Uses a custom <see cref="IOutlierDetector" /> for trimming, overriding
+    ///     <see cref="WithOutlierMode" />. Pass one of the built-ins from
+    ///     <see cref="OutlierDetectors" /> or your own implementation.
+    /// </summary>
+    public BenchmarkSuite WithOutlierDetector(IOutlierDetector detector)
+    {
+        ArgumentNullException.ThrowIfNull(detector);
+        _options = _options with { OutlierDetector = detector };
+        return this;
+    }
+
     public BenchmarkSuite WithConfidenceLevel(double level)
     {
         _options = _options with { ConfidenceLevel = level };
@@ -107,6 +120,18 @@ public sealed class BenchmarkSuite(string name)
     public BenchmarkSuite WithSignificanceLevel(double level)
     {
         _options = _options with { SignificanceLevel = level };
+        return this;
+    }
+
+    /// <summary>
+    ///     Uses a custom <see cref="ISignificanceTest" /> strategy, overriding the engine
+    ///     default (Mann-Whitney U for two groups, Kruskal-Wallis for three or more). Pass
+    ///     one of the built-ins from <see cref="NBenchmark.Stats" /> or your own implementation.
+    /// </summary>
+    public BenchmarkSuite WithSignificanceTest(ISignificanceTest test)
+    {
+        ArgumentNullException.ThrowIfNull(test);
+        _options = _options with { SignificanceTest = test };
         return this;
     }
 

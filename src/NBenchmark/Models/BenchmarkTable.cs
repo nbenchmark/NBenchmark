@@ -1,4 +1,5 @@
 using NBenchmark.Reporters;
+using NBenchmark.Stats;
 
 namespace NBenchmark;
 
@@ -9,9 +10,18 @@ public sealed record BenchmarkTable
     public required int WarmupIterations { get; init; }
     public required int MeasuredIterations { get; init; }
     public required double ConfidenceLevel { get; init; }
-    public required OutlierMode OutlierMode { get; init; }
+    public required string OutlierDetector { get; init; }
     public required TimeSpan TotalDuration { get; init; }
     public double SignificanceLevel { get; init; } = 0.05;
+
+    /// <summary>The display name of the pairwise significance strategy used (e.g. Mann-Whitney U).</summary>
+    public string SignificanceTestName { get; init; } = DefaultSignificanceTest.Instance.Name;
+
+    /// <summary>
+    ///     The omnibus significance verdict (e.g. Kruskal-Wallis) across all benchmarks, when
+    ///     an omnibus test was run (three or more groups); otherwise <c>null</c>.
+    /// </summary>
+    public OmnibusComparison? Omnibus { get; init; }
 
     public static BenchmarkTable Build(IReadOnlyList<BenchmarkResult> results)
     {
@@ -37,9 +47,11 @@ public sealed record BenchmarkTable
             WarmupIterations = headerSource?.WarmupIterations ?? 0,
             MeasuredIterations = headerSource?.MeasuredIterations ?? 0,
             ConfidenceLevel = headerSource?.ConfidenceLevel ?? 0.95,
-            OutlierMode = results.FirstOrDefault()?.OutlierMode ?? OutlierMode.IqrFence,
+            OutlierDetector = results.FirstOrDefault()?.OutlierDetector ?? OutlierDetectors.IqrFence.Name,
             TotalDuration = results.Aggregate(TimeSpan.Zero, (a, r) => a + r.TotalDuration),
             SignificanceLevel = headerSource?.SignificanceLevel ?? 0.05,
+            SignificanceTestName = headerSource?.SignificanceTestName ?? DefaultSignificanceTest.Instance.Name,
+            Omnibus = results.FirstOrDefault(r => r.Omnibus is not null)?.Omnibus,
         };
     }
 

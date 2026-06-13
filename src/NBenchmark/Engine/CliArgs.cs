@@ -17,6 +17,7 @@ internal sealed record CliArgs
     public int? WarmupIterations { get; init; }
     public double? ConfidenceLevel { get; init; }
     public double? Alpha { get; init; }
+    public OutlierMode? OutlierMode { get; init; }
     public IReadOnlyList<IReporter> CliReporters { get; init; } = [];
     public ReportDetail Detail { get; init; } = ReportDetail.Simple;
 
@@ -43,6 +44,7 @@ internal sealed record CliArgs
         double? alpha = null;
         string? isolatedRun = null;
         string? isolatedOutput = null;
+        OutlierMode? outlierMode = null;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -109,6 +111,19 @@ internal sealed record CliArgs
                     {
                         Console.Error.WriteLine(
                             $"Invalid --alpha value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.05).");
+
+                        Environment.ExitCode = 1;
+                    }
+
+                    break;
+                case "--outlier" when i + 1 < args.Length:
+                    var outlierStr = args[++i];
+                    if (TryParseOutlierMode(outlierStr, out var parsedOutlier))
+                        outlierMode = parsedOutlier;
+                    else
+                    {
+                        Console.Error.WriteLine(
+                            $"Invalid --outlier value '{outlierStr}'. Must be one of: none, top5, both5, iqr, mad.");
 
                         Environment.ExitCode = 1;
                     }
@@ -182,7 +197,7 @@ internal sealed record CliArgs
                     break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--confidence" or "--order" or "--threshold-pct" or "--seed" or "--alpha"
-                    or "--nb-isolated-run" or "--nb-isolated-output" or "--detail":
+                    or "--outlier" or "--nb-isolated-run" or "--nb-isolated-output" or "--detail":
                     Console.Error.WriteLine($"Missing value for '{args[i]}'.");
                     Environment.ExitCode = 1;
                     break;
@@ -221,11 +236,37 @@ internal sealed record CliArgs
             WarmupIterations = warmupIterations,
             ConfidenceLevel = confidenceLevel,
             Alpha = alpha,
+            OutlierMode = outlierMode,
             CliReporters = cliReporters,
             Detail = detail,
             IsolatedRun = isolatedRun,
             IsolatedOutput = isolatedOutput,
         };
+    }
+
+    private static bool TryParseOutlierMode(string value, out OutlierMode mode)
+    {
+        switch (value.ToLowerInvariant())
+        {
+            case "none":
+                mode = NBenchmark.OutlierMode.None;
+                return true;
+            case "top5":
+                mode = NBenchmark.OutlierMode.RemoveTop5Percent;
+                return true;
+            case "both5":
+                mode = NBenchmark.OutlierMode.RemoveTopAndBottom5Percent;
+                return true;
+            case "iqr":
+                mode = NBenchmark.OutlierMode.IqrFence;
+                return true;
+            case "mad":
+                mode = NBenchmark.OutlierMode.MedianAbsoluteDeviation;
+                return true;
+            default:
+                mode = NBenchmark.OutlierMode.IqrFence;
+                return false;
+        }
     }
     internal static void PrintHelp()
     {
@@ -238,7 +279,8 @@ internal sealed record CliArgs
         Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
-        Console.WriteLine("  --alpha <0-1>          Significance level for the Mann-Whitney U test (default: 0.05)");
+        Console.WriteLine("  --alpha <0-1>          Significance level for the significance test (default: 0.05)");
+        Console.WriteLine("  --outlier <mode>       Outlier trimming: none, top5, both5, iqr (default), mad");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");

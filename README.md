@@ -21,7 +21,9 @@ result.Print();
 
 - **Zero-ceremony measurements.** `Benchmark.Run(() => ...)` requires no attributes, no class structures, and no dedicated project. Run a reliable benchmark directly in your existing code or scratchpad.
 
-- **Statistical rigor by default.** Includes 25 warmup iterations, 200 measured iterations, IQR-fence outlier trimming, and 95% confidence intervals. It also includes a Mann-Whitney U significance test to validate A/B comparisons.
+- **Statistical rigor by default.** Includes 25 warmup iterations, 200 measured iterations, IQR-fence outlier trimming, and 95% confidence intervals. It validates A/B comparisons with a Mann-Whitney U test, and automatically switches to the Kruskal-Wallis omnibus test when comparing three or more implementations.
+
+- **Pluggable statistics.** Swap in your own outlier detector (`IOutlierDetector`) or significance test (`ISignificanceTest`) when the built-in IQR/MAD trimming and rank-based tests don't fit your domain.
 
 - **Low-overhead execution.** The measurement loop is reflection-free. The engine uses typed delegates to avoid virtual dispatch and boxing during timing, ensuring the JIT optimizes your benchmark body just as it would in production.
 

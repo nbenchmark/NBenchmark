@@ -372,6 +372,9 @@ public sealed class BenchmarkHost
         if (cliArgs.Alpha.HasValue)
             result = result with { SignificanceLevel = cliArgs.Alpha.Value };
 
+        if (cliArgs.OutlierMode.HasValue)
+            result = result with { OutlierMode = cliArgs.OutlierMode.Value, OutlierDetector = null };
+
         return result;
     }
 
@@ -410,6 +413,19 @@ public sealed class BenchmarkHost
         {
             args.Add("--alpha");
             args.Add(cliArgs.Alpha.Value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (cliArgs.OutlierMode.HasValue)
+        {
+            args.Add("--outlier");
+            args.Add(cliArgs.OutlierMode.Value switch
+            {
+                NBenchmark.OutlierMode.None => "none",
+                NBenchmark.OutlierMode.RemoveTop5Percent => "top5",
+                NBenchmark.OutlierMode.RemoveTopAndBottom5Percent => "both5",
+                NBenchmark.OutlierMode.MedianAbsoluteDeviation => "mad",
+                _ => "iqr",
+            });
         }
 
         return args;

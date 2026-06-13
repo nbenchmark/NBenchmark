@@ -103,6 +103,7 @@ internal static class PerformanceAttributeParser
             or OutlierMode.RemoveTop5Percent
             or OutlierMode.RemoveTopAndBottom5Percent
             or OutlierMode.IqrFence
+            or OutlierMode.MedianAbsoluteDeviation
             ? value
             : OutlierMode.IqrFence;
     }

@@ -87,9 +87,11 @@ await new BenchmarkSuite("name")
     .WithWarmup(25)                 // default: 25
     .WithAllocations()              // enable allocation tracking
     .WithOutlierMode(OutlierMode.IqrFence)   // default
+    .WithOutlierDetector(new MyDetector())   // custom IOutlierDetector (overrides WithOutlierMode)
     .WithConfidenceLevel(0.99)      // default: 0.95
     .WithSignificanceLevel(0.05)    // alpha for the significance test; default: 0.05
-    .WithSignificance(false)        // disable [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)
+    .WithSignificance(false)        // disable significance testing
+    .WithSignificanceTest(new MyTest())   // custom ISignificanceTest
     .WithRunOrder(RunOrder.Declaration)   // default: RunOrder.Random
     .WithSuiteSetup(() => { })      // runs once before all benchmarks
     .WithSuiteTeardown(() => { })   // runs once after all benchmarks
@@ -100,6 +102,24 @@ await new BenchmarkSuite("name")
 ```
 
 See [Configuration](../reference/configuration.md) for details on every option.
+
+## Custom statistics
+
+The suite uses the same pluggable statistics as the rest of the engine. By default it trims outliers with the IQR fence and tests significance with `DefaultSignificanceTest` - Mann-Whitney U for two benchmarks, the Kruskal-Wallis omnibus test for three or more. Override either when your data needs it:
+
+```csharp
+using NBenchmark.Stats;
+
+await new BenchmarkSuite("latency")
+    .Add("a", RunA)
+    .Add("b", RunB)
+    .Add("c", RunC)
+    .WithOutlierDetector(new KeepFastestDetector(0.90))   // custom trimming
+    .WithSignificanceTest(new MedianRatioSignificanceTest(25))   // custom significance rule
+    .RunAsync();
+```
+
+`WithOutlierDetector` takes priority over `WithOutlierMode`. See [Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors) and [Custom significance tests](../statistics/significance.md#custom-significance-tests) for the interfaces and contracts.
 
 ## Setting a baseline
 
