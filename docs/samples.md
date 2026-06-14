@@ -217,3 +217,26 @@ What to look at:
 - The `KeepFastestDetector : IOutlierDetector` and `MedianRatioSignificanceTest : ISignificanceTest` implementations in `Program.cs` - templates for your own statistics.
 
 See [Custom outlier detectors](./statistics/outliers.md#custom-outlier-detectors) and [Custom significance tests](./statistics/significance.md#custom-significance-tests).
+
+---
+
+## IsolatedRuns - Advanced isolation sample
+
+**`samples/IsolatedRuns/`**
+
+Demonstrates advanced isolation APIs for both Quick and Suite modes:
+
+- `Benchmark.RunIsolated(...)`
+- `Benchmark.RunIsolatedAsync(...)`
+- `BenchmarkSuite.RunIsolatedAsync()`
+
+```bash
+cd samples/IsolatedRuns
+dotnet run
+```
+
+What to look at:
+
+- The quick in-process result beside the quick isolated result.
+- The isolated suite comparison where each benchmark runs in a fresh child process.
+- The tradeoff between cleaner measurements and additional process-launch overhead.

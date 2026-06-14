@@ -80,3 +80,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
     [Benchmark] public int CountOrders() => repository.Count();
 }
 ```
+
+## [Isolated Runs (Advanced)](./isolated-runs.md)
+
+Run Quick, Suite, and Host benchmarks in clean child processes when runtime state contamination matters more than raw execution speed.
