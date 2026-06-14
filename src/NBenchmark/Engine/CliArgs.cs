@@ -118,6 +118,7 @@ internal sealed record CliArgs
                     break;
                 case "--outlier" when i + 1 < args.Length:
                     var outlierStr = args[++i];
+
                     if (TryParseOutlierMode(outlierStr, out var parsedOutlier))
                         outlierMode = parsedOutlier;
                     else
@@ -170,6 +171,7 @@ internal sealed record CliArgs
                     break;
                 case "--detail" when i + 1 < args.Length:
                     var detailStr = args[++i];
+
                     if (string.Equals(detailStr, "simple", StringComparison.OrdinalIgnoreCase))
                         detail = ReportDetail.Simple;
                     else if (string.Equals(detailStr, "advanced", StringComparison.OrdinalIgnoreCase))
@@ -209,6 +211,7 @@ internal sealed record CliArgs
         }
 
         var cliReporters = new List<IReporter>();
+
         foreach (var name in reporterNames)
         {
             if (ReporterRegistry.TryCreate(name, null, detail, out var reporter))
@@ -268,6 +271,7 @@ internal sealed record CliArgs
                 return false;
         }
     }
+
     internal static void PrintHelp()
     {
         Console.WriteLine("Usage: myapp.exe [options]");

@@ -69,7 +69,9 @@ public sealed class PerformanceAttributeIntegrationTests
 
 internal sealed class RunOnlyCommand : TestCommand
 {
-    public RunOnlyCommand(Test test) : base(test) { }
+    public RunOnlyCommand(Test test) : base(test)
+    {
+    }
 
     public override TestResult Execute(TestExecutionContext context) => context.CurrentResult;
 }
@@ -86,7 +88,9 @@ internal static class AttributeBuilder
 public sealed class VoidFixture
 {
     [Performance(Iterations = 3, WarmupIterations = 1)]
-    public void VoidMethod() { }
+    public void VoidMethod()
+    {
+    }
 }
 
 public sealed class AsyncTaskFixture
@@ -122,8 +126,5 @@ public sealed class BodyInvokedFixture
     public static int InvocationCount { get; set; }
 
     [Performance(Iterations = 3, WarmupIterations = 1)]
-    public void BodyMethod()
-    {
-        InvocationCount++;
-    }
+    public void BodyMethod() => InvocationCount++;
 }

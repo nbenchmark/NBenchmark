@@ -35,6 +35,7 @@ internal static class IsolatedProcessRunner
                 StartInfo = BuildStartInfo(
                     [.. originalArgs, "--nb-isolated-run", fullName, "--nb-isolated-output", outputPath]),
             };
+
             var stderr = new StringBuilder();
 
             process.ErrorDataReceived += (_, e) =>
@@ -129,9 +130,7 @@ internal static class IsolatedProcessRunner
             psi.FileName = processPath ?? "dotnet";
 
             if (!string.IsNullOrEmpty(entryAssembly))
-            {
                 psi.ArgumentList.Add(entryAssembly);
-            }
             else
             {
                 throw new InvalidOperationException(
@@ -140,9 +139,7 @@ internal static class IsolatedProcessRunner
             }
         }
         else
-        {
             psi.FileName = processPath!;
-        }
 
         foreach (var arg in args)
         {
@@ -150,7 +147,9 @@ internal static class IsolatedProcessRunner
         }
 
         foreach (var (name, value) in environmentVariables)
+        {
             psi.Environment[name] = value;
+        }
 
         return psi;
     }

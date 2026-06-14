@@ -1,7 +1,7 @@
 using System.Reflection;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NBenchmark.Engine;
 using NBenchmark.Integration.Abstractions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace NBenchmark.Integration.MSTest.Tests;
 
@@ -12,6 +12,7 @@ public sealed class PerformanceTestMethodTests
     public void ValidateResult_Fails_When_Benchmark_Errored()
     {
         var thresholds = NewDefaultThresholds();
+
         var errored = new BenchmarkResult
         {
             Name = "Broken",
@@ -48,6 +49,7 @@ public sealed class PerformanceTestMethodTests
     public void ValidateResult_Passes_When_Benchmark_Succeeds_And_No_Thresholds_Set()
     {
         var thresholds = NewDefaultThresholds();
+
         var ok = new BenchmarkResult
         {
             Name = "Fine",
@@ -136,10 +138,7 @@ public sealed class PerformanceTestMethodTests
 
         Assert.IsTrue(result.Errored);
 
-        var ex = Assert.ThrowsException<AssertFailedException>(() =>
-        {
-            PerformanceAssert.Validate(result);
-        });
+        var ex = Assert.ThrowsException<AssertFailedException>(() => { PerformanceAssert.Validate(result); });
 
         Assert.IsTrue(ex.Message.Contains("Benchmark errored"));
     }
@@ -158,13 +157,19 @@ public sealed class PerformanceTestMethodTests
         Assert.IsTrue(result.MeanAllocatedBytes > 0);
     }
 
-    private static void VoidMethod() { }
+    private static void VoidMethod()
+    {
+    }
+
     private static Task TaskMethod() => Task.CompletedTask;
     private static ValueTask ValueTaskMethod() => default;
     private static Task<int> TaskIntMethod() => Task.FromResult(42);
     private static async ValueTask<int> ValueTaskIntMethod() => await Task.FromResult(42);
 
-    private static void SimpleWork() { }
+    private static void SimpleWork()
+    {
+    }
+
     private static void SlowWork() => Thread.Sleep(1);
     private static byte[] AllocatingWork() => new byte[1024];
     private static void ThrowingWork() => throw new InvalidOperationException("test failure");

@@ -6,16 +6,16 @@ namespace NBenchmark.Reporters.Console;
 
 public sealed class ConsoleReporter : IReporter
 {
-    public string Name => "console";
-
-    public ReportDetail Detail { get; set; }
-
     private const int BarWidth = 12;
 
     public ConsoleReporter(ReportDetail detail = ReportDetail.Simple)
     {
         Detail = detail;
     }
+
+    public string Name => "console";
+
+    public ReportDetail Detail { get; set; }
 
     public Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
@@ -99,6 +99,7 @@ public sealed class ConsoleReporter : IReporter
             .AddColumn(new TableColumn("[bold]Alloc/op[/]").RightAligned().NoWrap());
 
         var hasDescriptions = results.Any(r => !string.IsNullOrEmpty(r.Description));
+
         if (hasDescriptions)
             table.AddColumn(new TableColumn("[bold]Description[/]"));
 
@@ -111,12 +112,16 @@ public sealed class ConsoleReporter : IReporter
                     $"[red]✗ {Esc(row.Name)}[/]",
                     "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
                 };
-                if (hasDescriptions) errorCols.Add("[dim]-[/]");
+
+                if (hasDescriptions)
+                    errorCols.Add("[dim]-[/]");
+
                 table.AddRow(errorCols.ToArray());
                 continue;
             }
 
             var (ratioText, ratioColor) = FormatRatio(row);
+
             var sigIcon = row.SignificanceLabel switch
             {
                 "✓" => "[green]✓[/]",
@@ -129,6 +134,7 @@ public sealed class ConsoleReporter : IReporter
                 : $"[{ratioColor}]{Esc(row.Name)}[/]";
 
             var bar = RenderBar(row.Median, maxMedian, ratioColor);
+
             var ratioAndBar = row.IsBaseline
                 ? $"{bar} [dim]{ratioText}[/]"
                 : $"{bar} [{ratioColor}]{ratioText}[/]";
@@ -159,11 +165,14 @@ public sealed class ConsoleReporter : IReporter
     private static void RenderTimingDetail(BenchmarkTable benchTable)
     {
         var rows = benchTable.Rows.Where(r => !r.Errored).ToList();
-        if (rows.Count == 0) return;
+
+        if (rows.Count == 0)
+            return;
 
         var rule = new Rule("[dim]Precision & Tail Latency[/]")
             .LeftJustified()
             .RuleStyle(Style.Parse("grey"));
+
         AnsiConsole.Write(rule);
         AnsiConsole.WriteLine();
 
@@ -202,24 +211,33 @@ public sealed class ConsoleReporter : IReporter
     private static void RenderAdvancedDetails(BenchmarkTable benchTable)
     {
         var rows = benchTable.Rows.Where(r => !r.Errored).ToList();
-        if (rows.Count == 0) return;
+
+        if (rows.Count == 0)
+            return;
 
         var rule = new Rule("[dim]Distribution Details[/]")
             .LeftJustified()
             .RuleStyle(Style.Parse("grey"));
+
         AnsiConsole.Write(rule);
         AnsiConsole.WriteLine();
 
         var grid = new Grid();
+
         foreach (var _ in rows)
+        {
             grid.AddColumn(new GridColumn().PadRight(2));
+        }
 
         // Render each benchmark's details as a panel in a horizontal grid
         var panels = new List<IRenderable>();
+
         foreach (var row in rows)
         {
             var statsBlock = BenchmarkTable.RenderStatsBlock(row, ReportDetail.Advanced);
-            if (string.IsNullOrEmpty(statsBlock)) continue;
+
+            if (string.IsNullOrEmpty(statsBlock))
+                continue;
 
             var panel = new Panel(Markup.Escape(statsBlock))
                 .Header($"[bold]{Esc(row.Name)}[/]")
@@ -255,9 +273,11 @@ public sealed class ConsoleReporter : IReporter
             .Where(r => !r.Errored && r.Warnings.Count > 0)
             .ToList();
 
-        if (warnings.Count == 0) return;
+        if (warnings.Count == 0)
+            return;
 
         AnsiConsole.WriteLine();
+
         foreach (var row in warnings)
         {
             foreach (var warning in row.Warnings)
@@ -271,9 +291,11 @@ public sealed class ConsoleReporter : IReporter
     {
         AnsiConsole.WriteLine();
         var testName = benchTable.Omnibus?.TestName ?? benchTable.SignificanceTestName;
+
         var footer = $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · "
                      + $"{Esc(testName)} (p < {benchTable.SignificanceLevel:0.###}) · "
                      + $"CI {benchTable.ConfidenceLevel * 100:0.#}%[/]";
+
         AnsiConsole.MarkupLine(footer);
     }
 
@@ -290,6 +312,7 @@ public sealed class ConsoleReporter : IReporter
         };
 
         AnsiConsole.WriteLine();
+
         AnsiConsole.MarkupLine(
             $"[grey]Omnibus[/] [bold]{Esc(omnibus.TestName)}[/][grey] across {omnibus.GroupCount} groups: "
             + $"H({omnibus.DegreesOfFreedom}) = {omnibus.Statistic:F2}, p = {FormatP(omnibus.PValue)} → [/]"
@@ -300,7 +323,9 @@ public sealed class ConsoleReporter : IReporter
 
     private static string RenderBar(double value, double max, string color)
     {
-        if (max <= 0) return "";
+        if (max <= 0)
+            return "";
+
         var filled = (int)Math.Round(value / max * BarWidth);
         filled = Math.Clamp(filled, 1, BarWidth);
         var empty = BarWidth - filled;
@@ -316,6 +341,7 @@ public sealed class ConsoleReporter : IReporter
             return ("baseline", "dim");
 
         var text = $"{row.Ratio:F2}x";
+
         var color = row.Ratio switch
         {
             <= 1.05 => "green",

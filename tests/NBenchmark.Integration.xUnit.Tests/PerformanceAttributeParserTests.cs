@@ -1,7 +1,5 @@
-using NBenchmark.Integration.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
-using Xunit.Sdk;
 
 namespace NBenchmark.Integration.xUnit.Tests;
 
@@ -141,15 +139,9 @@ public sealed class PerformanceAttributeParserTests
             _namedArguments = namedArguments ?? new Dictionary<string, object?>();
         }
 
-        public IEnumerable<object> GetConstructorArguments()
-        {
-            return [];
-        }
+        public IEnumerable<object> GetConstructorArguments() => [];
 
-        public IEnumerable<IAttributeInfo> GetCustomAttributes(string assemblyQualifiedAttributeTypeName)
-        {
-            return [];
-        }
+        public IEnumerable<IAttributeInfo> GetCustomAttributes(string assemblyQualifiedAttributeTypeName) => [];
 
         public TValue GetNamedArgument<TValue>(string argumentName)
         {

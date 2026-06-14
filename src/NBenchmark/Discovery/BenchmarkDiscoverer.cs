@@ -159,8 +159,8 @@ public sealed class BenchmarkDiscoverer
             ResultConsumer = resultConsumer,
             IterationSetupDelegate = iterSetupDel,
             IterationTeardownDelegate = iterTeardownDel,
-            IsolatedProcess = method.GetCustomAttribute<IsolatedProcessAttribute>(inherit: true) is not null
-                              || method.DeclaringType?.GetCustomAttribute<IsolatedProcessAttribute>(inherit: true) is not null,
+            IsolatedProcess = method.GetCustomAttribute<IsolatedProcessAttribute>(true) is not null
+                              || method.DeclaringType?.GetCustomAttribute<IsolatedProcessAttribute>(true) is not null,
         };
     }
 

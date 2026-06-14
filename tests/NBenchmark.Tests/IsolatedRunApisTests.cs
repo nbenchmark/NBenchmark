@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using NBenchmark.Engine;
 using Xunit;
@@ -40,13 +41,13 @@ public class IsolatedRunApisTests
             var result = await IsolatedRunContext.WithActiveRequestForTestingAsync(request, outputPath, () =>
                 Task.FromResult(Benchmark.RunIsolated(
                     () => Thread.SpinWait(64),
-                    options: new MeasurementOptions
+                    new MeasurementOptions
                     {
                         WarmupIterations = 0,
                         Iterations = 1,
                         OutlierMode = OutlierMode.None,
                     },
-                    name: "quick-child",
+                    "quick-child",
                     callerFilePath: callerFile,
                     callerLineNumber: callerLine,
                     callerMemberName: callerMember)));
@@ -93,13 +94,13 @@ public class IsolatedRunApisTests
         var result = await IsolatedRunContext.WithActiveRequestForTestingAsync(request, outputPath, () =>
             Task.FromResult(Benchmark.RunIsolated(
                 () => Thread.SpinWait(64),
-                options: new MeasurementOptions
+                new MeasurementOptions
                 {
                     WarmupIterations = 0,
                     Iterations = 2,
                     OutlierMode = OutlierMode.None,
                 },
-                name: "quick-target",
+                "quick-target",
                 callerFilePath: callerFile,
                 callerLineNumber: callerLine,
                 callerMemberName: callerMember)));
@@ -141,13 +142,13 @@ public class IsolatedRunApisTests
         var result = await IsolatedRunContext.WithActiveRequestForTestingAsync(request, outputPath, () =>
             Task.FromResult(Benchmark.RunIsolated(
                 () => Thread.SpinWait(64),
-                options: new MeasurementOptions
+                new MeasurementOptions
                 {
                     WarmupIterations = 0,
                     Iterations = 2,
                     OutlierMode = OutlierMode.None,
                 },
-                name: "quick-target",
+                "quick-target",
                 callerFilePath: callerFile,
                 callerLineNumber: callerLine,
                 callerMemberName: callerMember)));
@@ -195,10 +196,10 @@ public class IsolatedRunApisTests
         {
             var results = await IsolatedRunContext.WithActiveRequestForTestingAsync(request, outputPath, () =>
                 suite.RunIsolatedAsync(
-                    cancellationToken: CancellationToken.None,
-                    callerFilePath: callerFile,
-                    callerLineNumber: callerLine,
-                    callerMemberName: callerMember));
+                    CancellationToken.None,
+                    callerFile,
+                    callerLine,
+                    callerMember));
 
             var only = Assert.Single(results);
             Assert.Equal("b", only.Name);
@@ -257,13 +258,13 @@ public class IsolatedRunApisTests
 
             var result = Benchmark.RunIsolated(
                 () => Thread.SpinWait(64),
-                options: new MeasurementOptions
+                new MeasurementOptions
                 {
                     WarmupIterations = 0,
                     Iterations = 1,
                     OutlierMode = OutlierMode.None,
                 },
-                name: "env-quick",
+                "env-quick",
                 callerFilePath: callerFile,
                 callerLineNumber: callerLine,
                 callerMemberName: callerMember);
@@ -288,5 +289,5 @@ public class IsolatedRunApisTests
         }
     }
 
-    private static string CurrentFilePath([System.Runtime.CompilerServices.CallerFilePath] string path = "") => path;
+    private static string CurrentFilePath([CallerFilePath] string path = "") => path;
 }

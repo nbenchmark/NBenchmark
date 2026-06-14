@@ -91,7 +91,7 @@ internal static class OutcomeBuilder
         TimeSpan measuredDuration,
         IReadOnlyList<string> warnings)
     {
-        var allocStats = (stats is not null && rawAllocations is not null)
+        var allocStats = stats is not null && rawAllocations is not null
             ? StatsSummary.ComputeAllocations(rawAllocations)
             : (AllocationStats?)null;
 

@@ -67,11 +67,11 @@ public sealed class PerformanceTestMethodIntegrationTests
     private static TestResult ExecuteAttribute(Type testClass, string methodName, object[]? arguments = null)
     {
         var method = testClass.GetMethod(
-            methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance)
-            ?? throw new InvalidOperationException($"Method {methodName} not found on {testClass.Name}.");
+                         methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance)
+                     ?? throw new InvalidOperationException($"Method {methodName} not found on {testClass.Name}.");
 
         var attribute = method.GetCustomAttribute<PerformanceTestMethodAttribute>()
-            ?? throw new InvalidOperationException($"Method {methodName} is missing [PerformanceTestMethod].");
+                        ?? throw new InvalidOperationException($"Method {methodName} is missing [PerformanceTestMethod].");
 
         var testMethod = new StubTestMethod(testClass, method, attribute, arguments);
         var results = attribute.Execute(testMethod);
@@ -95,21 +95,26 @@ public sealed class PerformanceTestMethodIntegrationTests
             Arguments = arguments ?? [];
         }
 
+        public string DisplayName => $"{TestClassName}.{TestMethodName}";
+        public TestMethodAttribute TestMethodAttribute { get; }
+
         public string TestClassName { get; }
         public string TestMethodName { get; }
         public MethodInfo MethodInfo { get; }
         public object[] Arguments { get; }
-        public System.Type ReturnType => MethodInfo.ReturnType;
+        public Type ReturnType => MethodInfo.ReturnType;
         public ParameterInfo[] ParameterTypes => MethodInfo.GetParameters();
-        public System.Collections.Generic.IEnumerable<Attribute> GetAllAttributes() =>
-            MethodInfo.GetCustomAttributes();
+
         public Attribute[] GetAllAttributes(bool inherit) =>
             MethodInfo.GetCustomAttributes(inherit).Cast<Attribute>().ToArray();
-        public TAttributeType[] GetAttributes<TAttributeType>(bool inherit) where TAttributeType : System.Attribute
+
+        public TAttributeType[] GetAttributes<TAttributeType>(bool inherit) where TAttributeType : Attribute
             => MethodInfo.GetCustomAttributes<TAttributeType>(inherit).ToArray();
-        public string DisplayName => $"{TestClassName}.{TestMethodName}";
-        public TestMethodAttribute TestMethodAttribute { get; }
+
         public TestResult Invoke(object[]? args) => throw new NotSupportedException();
+
+        public IEnumerable<Attribute> GetAllAttributes() =>
+            MethodInfo.GetCustomAttributes();
     }
 }
 

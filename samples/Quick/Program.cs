@@ -1,5 +1,4 @@
 using NBenchmark;
-using NBenchmark.Reporters.Console;
 
 var result = Benchmark.Run(() =>
 {
@@ -9,4 +8,5 @@ var result = Benchmark.Run(() =>
 });
 
 result.Print();
+
 // Or for rich Spectre.Console output: await result.PrintAsync();

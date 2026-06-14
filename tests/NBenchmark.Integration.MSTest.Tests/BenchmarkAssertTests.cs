@@ -1,5 +1,5 @@
-using NBenchmark.Integration.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NBenchmark.Integration.Abstractions;
 
 namespace NBenchmark.Integration.MSTest.Tests;
 
@@ -9,7 +9,8 @@ public sealed class BenchmarkAssertTests
     [TestMethod]
     public void Validate_Returns_No_Violations_When_All_Thresholds_Are_Met()
     {
-        var result = CreateResult(mean: 500, p95: 800, allocations: 1000);
+        var result = CreateResult(500, 800, 1000);
+
         var thresholds = new PerformanceThresholds
         {
             MaxMeanNs = 1000,
@@ -25,7 +26,7 @@ public sealed class BenchmarkAssertTests
     [TestMethod]
     public void Validate_Returns_Violation_When_Mean_Exceeds_Threshold()
     {
-        var result = CreateResult(mean: 1500);
+        var result = CreateResult(1500);
         var thresholds = new PerformanceThresholds { MaxMeanNs = 1000 };
 
         var violations = BenchmarkAssert.Validate(result, thresholds);
@@ -62,7 +63,7 @@ public sealed class BenchmarkAssertTests
     [TestMethod]
     public void Validate_Returns_No_Violations_When_Thresholds_Are_Null()
     {
-        var result = CreateResult(mean: 100000);
+        var result = CreateResult(100000);
         var thresholds = new PerformanceThresholds();
 
         var violations = BenchmarkAssert.Validate(result, thresholds);
@@ -84,7 +85,8 @@ public sealed class BenchmarkAssertTests
     [TestMethod]
     public void Validate_Returns_Multiple_Violations_When_Several_Thresholds_Exceeded()
     {
-        var result = CreateResult(mean: 2000, p95: 3000, allocations: 10000);
+        var result = CreateResult(2000, 3000, 10000);
+
         var thresholds = new PerformanceThresholds
         {
             MaxMeanNs = 1000,

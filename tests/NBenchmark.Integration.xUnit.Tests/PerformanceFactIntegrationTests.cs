@@ -123,16 +123,18 @@ public sealed class PerformanceFactIntegrationTests
     public void PerformanceFact_With_Baseline_Regression_Passes()
     {
         var baselinePath = Path.GetTempFileName();
+
         try
         {
             var baselineJson = """
-            {
-              "generatedAt": "2025-01-01T00:00:00Z",
-              "results": [
-                { "name": "BaselineTest", "mean": 100 }
-              ]
-            }
-            """;
+                               {
+                                 "generatedAt": "2025-01-01T00:00:00Z",
+                                 "results": [
+                                   { "name": "BaselineTest", "mean": 100 }
+                                 ]
+                               }
+                               """;
+
             File.WriteAllText(baselinePath, baselineJson);
 
             var spec = new RunSpec
@@ -171,14 +173,19 @@ public sealed class PerformanceFactIntegrationTests
         Assert.Equal(OutlierMode.None, outcome.Result.OutlierMode);
     }
 
-    private static void SimpleWork() { }
+    private static void SimpleWork()
+    {
+    }
 
     private static void SlowWork() => Thread.Sleep(1);
 
     private static void JitteryWork()
     {
         Thread.Sleep(1);
-        for (var i = 0; i < 1000; i++) { }
+
+        for (var i = 0; i < 1000; i++)
+        {
+        }
     }
 
     private static byte[] AllocatingWork() => new byte[1024];
@@ -207,6 +214,7 @@ public sealed class PerformanceFactIntegrationTests
     public void ValidateResult_Fails_When_Benchmark_Errored()
     {
         var data = NewDefaultData();
+
         var errored = new BenchmarkResult
         {
             Name = "Broken",
@@ -243,6 +251,7 @@ public sealed class PerformanceFactIntegrationTests
     public void ValidateResult_Passes_When_Benchmark_Succeeds_And_No_Thresholds_Set()
     {
         var data = NewDefaultData();
+
         var ok = new BenchmarkResult
         {
             Name = "Fine",
@@ -275,18 +284,21 @@ public sealed class PerformanceFactIntegrationTests
 
     private static PerformanceTestData NewDefaultData() =>
         new(
-            maxMeanNs: -1,
-            maxP95Ns: -1,
-            maxAllocatedBytes: -1,
-            baselinePath: null,
-            maxSlowdownRatio: 1.2,
-            iterations: 0,
-            warmupIterations: 0,
-            measureAllocations: false,
-            outlierMode: OutlierMode.RemoveTop5Percent,
-            confidenceLevel: 0.95);
+            -1,
+            -1,
+            -1,
+            null,
+            1.2,
+            0,
+            0,
+            false,
+            OutlierMode.RemoveTop5Percent,
+            0.95);
 
-    private static void VoidMethod() { }
+    private static void VoidMethod()
+    {
+    }
+
     private static Task TaskMethod() => Task.CompletedTask;
     private static ValueTask ValueTaskMethod() => default;
     private static Task<int> TaskIntMethod() => Task.FromResult(42);

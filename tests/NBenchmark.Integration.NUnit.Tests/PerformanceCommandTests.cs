@@ -2,7 +2,6 @@ using System.Reflection;
 using NBenchmark.Engine;
 using NBenchmark.Integration.Abstractions;
 using NUnit.Framework;
-using NUnit.Framework.Internal;
 
 namespace NBenchmark.Integration.NUnit.Tests;
 
@@ -12,6 +11,7 @@ public sealed class PerformanceCommandTests
     public void ValidateResult_Fails_When_Benchmark_Errored()
     {
         var data = NewDefaultThresholds();
+
         var errored = new BenchmarkResult
         {
             Name = "Broken",
@@ -49,6 +49,7 @@ public sealed class PerformanceCommandTests
     public void ValidateResult_Passes_When_Benchmark_Succeeds_And_No_Thresholds_Set()
     {
         var data = NewDefaultThresholds();
+
         var ok = new BenchmarkResult
         {
             Name = "Fine",
@@ -96,7 +97,10 @@ public sealed class PerformanceCommandTests
         Assert.That(body, Is.Not.Null);
     }
 
-    private static void VoidMethod() { }
+    private static void VoidMethod()
+    {
+    }
+
     private static Task TaskMethod() => Task.CompletedTask;
     private static ValueTask ValueTaskMethod() => default;
     private static Task<int> TaskIntMethod() => Task.FromResult(42);
@@ -174,10 +178,7 @@ public sealed class PerformanceAssertIntegrationTests
 
         Assert.That(result.Errored, Is.True);
 
-        var ex = Assert.Throws<AssertionException>(() =>
-        {
-            PerformanceAssert.Validate(result);
-        });
+        var ex = Assert.Throws<AssertionException>(() => { PerformanceAssert.Validate(result); });
 
         Assert.That(ex!.Message, Does.Contain("Benchmark errored"));
     }
@@ -196,7 +197,10 @@ public sealed class PerformanceAssertIntegrationTests
         Assert.That(result.MeanAllocatedBytes, Is.GreaterThan(0));
     }
 
-    private static void SimpleWork() { }
+    private static void SimpleWork()
+    {
+    }
+
     private static void SlowWork() => Thread.Sleep(1);
     private static byte[] AllocatingWork() => new byte[1024];
     private static void ThrowingWork() => throw new InvalidOperationException("test failure");

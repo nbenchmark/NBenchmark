@@ -26,6 +26,7 @@ public static class RegressionBaseline
         var json = File.ReadAllText(baselinePath);
 
         BaselineEnvelope? envelope;
+
         try
         {
             envelope = JsonSerializer.Deserialize<BaselineEnvelope>(json, JsonOptions);
@@ -50,6 +51,7 @@ public static class RegressionBaseline
             violations.Add(
                 $"Benchmark '{result.Name}' not found in baseline file '{baselinePath}'. " +
                 $"Available: {string.Join(", ", envelope.Results.Select(r => r.Name))}");
+
             return violations;
         }
 

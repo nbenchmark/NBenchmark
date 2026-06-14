@@ -54,7 +54,9 @@ public static class ChiSquared
         var t = x + 7.5;
 
         for (var i = 1; i < LanczosCoefficients.Length; i++)
+        {
             a += LanczosCoefficients[i] / (x + i);
+        }
 
         return 0.5 * Math.Log(2.0 * Math.PI) + (x + 0.5) * Math.Log(t) - t + Math.Log(a);
     }

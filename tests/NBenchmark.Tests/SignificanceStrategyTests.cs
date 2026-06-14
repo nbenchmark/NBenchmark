@@ -85,7 +85,7 @@ public class SignificanceStrategyTests
     {
         var results = new List<BenchmarkResult>
         {
-            Result("a", isBaseline: true),
+            Result("a", true),
             Result("b"),
             Result("c"),
         };
@@ -101,6 +101,7 @@ public class SignificanceStrategyTests
 
         Assert.All(results, r => Assert.NotNull(r.Omnibus));
         Assert.Equal("Kruskal-Wallis", results[0].Omnibus!.TestName);
+
         // Post-hoc pairwise verdicts should be set on each candidate.
         Assert.Equal(SignificanceVerdict.NotTested, results[0].SignificanceVerdict); // baseline
         Assert.Equal(SignificanceVerdict.Significant, results[1].SignificanceVerdict);
@@ -112,7 +113,7 @@ public class SignificanceStrategyTests
     {
         var results = new List<BenchmarkResult>
         {
-            Result("a", isBaseline: true),
+            Result("a", true),
             Result("b"),
             Result("c"),
         };
@@ -128,6 +129,7 @@ public class SignificanceStrategyTests
 
         Assert.All(results, r => Assert.NotNull(r.Omnibus));
         Assert.Equal(SignificanceVerdict.NotSignificant, results[0].Omnibus!.Verdict);
+
         // Post-hoc skipped; per-row verdicts stay NotTested.
         Assert.All(results, r => Assert.Equal(SignificanceVerdict.NotTested, r.SignificanceVerdict));
     }
@@ -162,7 +164,7 @@ public class SignificanceStrategyTests
     {
         var results = new List<BenchmarkResult>
         {
-            Result("baseline", isBaseline: true),
+            Result("baseline", true),
             Result("candidate"),
         };
 
@@ -184,7 +186,7 @@ public class SignificanceStrategyTests
     {
         var results = new List<BenchmarkResult>
         {
-            Result("baseline", isBaseline: true),
+            Result("baseline", true),
             Result("candidate"),
         };
 
@@ -194,7 +196,7 @@ public class SignificanceStrategyTests
             ["candidate"] = Cluster(11),
         };
 
-        var custom = new FixedSignificanceTest("candidate", pValue: 0.001);
+        var custom = new FixedSignificanceTest("candidate", 0.001);
 
         Significance.ComputeSignificance(results, rawSamples, custom);
 
@@ -207,7 +209,7 @@ public class SignificanceStrategyTests
     {
         var results = new List<BenchmarkResult>
         {
-            Result("baseline", isBaseline: true),
+            Result("baseline", true),
             Result("present"),
             Result("missing"),
         };
@@ -224,6 +226,7 @@ public class SignificanceStrategyTests
 
         var missing = results.Single(r => r.Name == "missing");
         Assert.Contains(missing.Warnings, w => w.Contains("missing") && w.Contains("excluded"));
+
         // The two benchmarks that did have samples were still compared.
         Assert.Empty(results.Single(r => r.Name == "present").Warnings);
     }
@@ -233,7 +236,7 @@ public class SignificanceStrategyTests
     {
         var results = new List<BenchmarkResult>
         {
-            Result("baseline", isBaseline: true),
+            Result("baseline", true),
             Result("candidate"),
         };
 

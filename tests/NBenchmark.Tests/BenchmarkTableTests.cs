@@ -686,4 +686,3 @@ public class BenchmarkTableTests
         Assert.Equal(3, table.Omnibus.GroupCount);
     }
 }
-

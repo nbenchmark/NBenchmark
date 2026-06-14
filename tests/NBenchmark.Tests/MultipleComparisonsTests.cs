@@ -17,6 +17,7 @@ public class MultipleComparisonsTests
     public void HolmBonferroni_TwoValues_AppliesCorrection()
     {
         var result = MultipleComparisons.HolmBonferroni([0.01, 0.03]);
+
         // m=2: adjusted[0] = 2 * 0.01 = 0.02, adjusted[1] = max(1 * 0.03, 0.02) = 0.03
         Assert.Equal(0.02, result[0], 9);
         Assert.Equal(0.03, result[1], 9);
@@ -26,6 +27,7 @@ public class MultipleComparisonsTests
     public void HolmBonferroni_ThreeValues_Monotonicity()
     {
         var result = MultipleComparisons.HolmBonferroni([0.01, 0.02, 0.05]);
+
         // m=3: adj[0] = 3*0.01 = 0.03
         //      adj[1] = max(2*0.02=0.04, 0.03) = 0.04
         //      adj[2] = max(1*0.05=0.05, 0.04) = 0.05
@@ -38,6 +40,7 @@ public class MultipleComparisonsTests
     public void HolmBonferroni_ClampsToOne()
     {
         var result = MultipleComparisons.HolmBonferroni([0.6, 0.7]);
+
         // m=2: adj[0] = 2*0.6 = 1.2 -> clamped to 1.0
         //      adj[1] = max(1*0.7=0.7, 1.0) = 1.0
         Assert.Equal(1.0, result[0]);
@@ -48,6 +51,7 @@ public class MultipleComparisonsTests
     public void HolmBonferroni_IgnoresNaNInFamilySize_AndPreservesNaN()
     {
         var result = MultipleComparisons.HolmBonferroni([0.01, double.NaN, 0.03]);
+
         // Only testable hypotheses participate in the family size (m=2).
         // adj[0] = 2*0.01 = 0.02
         // adj[2] = max(1*0.03=0.03, 0.02) = 0.03

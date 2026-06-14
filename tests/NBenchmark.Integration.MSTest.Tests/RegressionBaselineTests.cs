@@ -1,6 +1,6 @@
 using System.Text.Json;
-using NBenchmark.Integration.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NBenchmark.Integration.Abstractions;
 
 namespace NBenchmark.Integration.MSTest.Tests;
 
@@ -10,7 +10,7 @@ public sealed class RegressionBaselineTests
     [TestMethod]
     public void Check_Returns_Violation_When_File_Does_Not_Exist()
     {
-        var result = CreateResult("MyBenchmark", mean: 500);
+        var result = CreateResult("MyBenchmark", 500);
 
         var violations = RegressionBaseline.Check(result, "/nonexistent/baseline.json", 1.2);
 
@@ -22,7 +22,7 @@ public sealed class RegressionBaselineTests
     public void Check_Returns_Violation_When_Benchmark_Not_Found_In_Baseline()
     {
         var baselinePath = WriteBaselineJson("OtherBenchmark", 400);
-        var result = CreateResult("MyBenchmark", mean: 500);
+        var result = CreateResult("MyBenchmark", 500);
 
         var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
 
@@ -34,7 +34,7 @@ public sealed class RegressionBaselineTests
     public void Check_Passes_When_Slowdown_Within_Ratio()
     {
         var baselinePath = WriteBaselineJson("MyBenchmark", 400);
-        var result = CreateResult("MyBenchmark", mean: 440);
+        var result = CreateResult("MyBenchmark", 440);
 
         var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
 
@@ -45,7 +45,7 @@ public sealed class RegressionBaselineTests
     public void Check_Fails_When_Slowdown_Exceeds_Ratio()
     {
         var baselinePath = WriteBaselineJson("MyBenchmark", 400);
-        var result = CreateResult("MyBenchmark", mean: 600);
+        var result = CreateResult("MyBenchmark", 600);
 
         var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
 
@@ -60,7 +60,7 @@ public sealed class RegressionBaselineTests
         var path = Path.GetTempFileName();
         File.WriteAllText(path, "not valid json");
 
-        var result = CreateResult("MyBenchmark", mean: 500);
+        var result = CreateResult("MyBenchmark", 500);
         var violations = RegressionBaseline.Check(result, path, 1.2);
 
         Assert.AreEqual(1, violations.Count);
@@ -73,7 +73,7 @@ public sealed class RegressionBaselineTests
     public void Check_Fails_When_Baseline_Mean_Is_Zero_And_Current_Mean_Is_Positive()
     {
         var baselinePath = WriteBaselineJson("MyBenchmark", 0);
-        var result = CreateResult("MyBenchmark", mean: 500);
+        var result = CreateResult("MyBenchmark", 500);
 
         var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
 
@@ -85,7 +85,7 @@ public sealed class RegressionBaselineTests
     public void Check_Passes_When_Baseline_And_Current_Mean_Are_Zero()
     {
         var baselinePath = WriteBaselineJson("MyBenchmark", 0);
-        var result = CreateResult("MyBenchmark", mean: 0);
+        var result = CreateResult("MyBenchmark", 0);
 
         var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
 
@@ -96,7 +96,7 @@ public sealed class RegressionBaselineTests
     public void Check_Uses_Case_Insensitive_Name_Matching()
     {
         var baselinePath = WriteBaselineJson("mybenchmark", 400);
-        var result = CreateResult("MyBenchmark", mean: 420);
+        var result = CreateResult("MyBenchmark", 420);
 
         var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
 
@@ -106,6 +106,7 @@ public sealed class RegressionBaselineTests
     private static string WriteBaselineJson(string name, double mean)
     {
         var path = Path.GetTempFileName();
+
         var json = JsonSerializer.Serialize(new
         {
             results = new[]
@@ -113,6 +114,7 @@ public sealed class RegressionBaselineTests
                 new { name, mean },
             },
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
         File.WriteAllText(path, json);
         return path;
     }

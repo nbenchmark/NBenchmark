@@ -10,10 +10,10 @@ public static class OutlierDetectors
     public static IOutlierDetector None { get; } = new NoOutlierDetector();
 
     /// <summary>Trims the slowest 5% (<see cref="OutlierMode.RemoveTop5Percent" />).</summary>
-    public static IOutlierDetector RemoveTop5Percent { get; } = new TopPercentileOutlierDetector(0.05);
+    public static IOutlierDetector RemoveTop5Percent { get; } = new TopPercentileOutlierDetector();
 
     /// <summary>Trims the fastest and slowest 5% (<see cref="OutlierMode.RemoveTopAndBottom5Percent" />).</summary>
-    public static IOutlierDetector RemoveTopAndBottom5Percent { get; } = new TwoSidedPercentileOutlierDetector(0.05);
+    public static IOutlierDetector RemoveTopAndBottom5Percent { get; } = new TwoSidedPercentileOutlierDetector();
 
     /// <summary>Tukey's 1.5×IQR fence (<see cref="OutlierMode.IqrFence" />).</summary>
     public static IOutlierDetector IqrFence { get; } = new IqrFenceOutlierDetector();
@@ -196,8 +196,11 @@ public sealed class MadOutlierDetector(double threshold = 3.0) : IOutlierDetecto
         var median = Percentile.Compute(sortedSamples, 0.50);
 
         var absDeviations = new double[sortedSamples.Length];
+
         for (var i = 0; i < sortedSamples.Length; i++)
+        {
             absDeviations[i] = Math.Abs(sortedSamples[i] - median);
+        }
 
         Array.Sort(absDeviations);
         var scaledMad = Percentile.Compute(absDeviations, 0.50) * NormalConsistencyFactor;

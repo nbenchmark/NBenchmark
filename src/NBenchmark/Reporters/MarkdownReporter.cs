@@ -4,11 +4,10 @@ namespace NBenchmark.Reporters;
 
 public sealed class MarkdownReporter : IReporter
 {
-    private static int _fileCounter;
-    private readonly string _outputDirectory;
-    private readonly string? _name;
-
     private const int BarWidth = 15;
+    private static int _fileCounter;
+    private readonly string? _name;
+    private readonly string _outputDirectory;
 
     public MarkdownReporter(string outputDirectory = ".", string? name = null, ReportDetail detail = ReportDetail.Simple)
     {
@@ -46,7 +45,9 @@ public sealed class MarkdownReporter : IReporter
             return;
         }
 
-        sb.AppendLine($"> **{table.RunAtUtc} UTC** · {table.WarmupIterations} warmup · {table.MeasuredIterations} measured · Outliers: {table.OutlierDetector}");
+        sb.AppendLine(
+            $"> **{table.RunAtUtc} UTC** · {table.WarmupIterations} warmup · {table.MeasuredIterations} measured · Outliers: {table.OutlierDetector}");
+
         sb.AppendLine();
 
         // Primary comparison table
@@ -79,6 +80,7 @@ public sealed class MarkdownReporter : IReporter
 
             var ratioText = FormatRatioText(row);
             var bar = RenderMarkdownBar(row.Median, maxMedian);
+
             var allocText = row.MeanAllocatedBytes.HasValue
                 ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
                 : "-";
@@ -124,9 +126,11 @@ public sealed class MarkdownReporter : IReporter
             foreach (var row in table.Rows.Where(r => !r.Errored))
             {
                 var statsBlock = BenchmarkTable.RenderStatsBlock(row, Detail);
-                if (string.IsNullOrEmpty(statsBlock)) continue;
 
-                sb.AppendLine($"<details>");
+                if (string.IsNullOrEmpty(statsBlock))
+                    continue;
+
+                sb.AppendLine("<details>");
                 sb.AppendLine($"<summary><strong>{row.Name}</strong></summary>");
                 sb.AppendLine();
                 sb.AppendLine("```");
@@ -155,18 +159,23 @@ public sealed class MarkdownReporter : IReporter
                 $"**Omnibus ({omnibus.TestName})** across {omnibus.GroupCount} groups: "
                 + $"H({omnibus.DegreesOfFreedom}) = {omnibus.Statistic:F2}, p = {FormatP(omnibus.PValue)} → {verdict} "
                 + $"(α = {table.SignificanceLevel:0.###}).");
+
             sb.AppendLine();
         }
 
         var testName = table.Omnibus?.TestName ?? table.SignificanceTestName;
-        sb.AppendLine($"_{results.Count} benchmark(s) · {table.TotalDuration.TotalSeconds:F1}s total · {testName} (p < {table.SignificanceLevel:0.###}) · CI {table.ConfidenceLevel * 100:0.#}%_");
+
+        sb.AppendLine(
+            $"_{results.Count} benchmark(s) · {table.TotalDuration.TotalSeconds:F1}s total · {testName} (p < {table.SignificanceLevel:0.###}) · CI {table.ConfidenceLevel * 100:0.#}%_");
 
         await File.WriteAllTextAsync(filePath, sb.ToString(), cancellationToken);
     }
 
     private static string RenderMarkdownBar(double value, double max)
     {
-        if (max <= 0) return "";
+        if (max <= 0)
+            return "";
+
         var filled = (int)Math.Round(value / max * BarWidth);
         filled = Math.Clamp(filled, 1, BarWidth);
         var empty = BarWidth - filled;

@@ -13,10 +13,7 @@ public class ChiSquaredTests
     }
 
     [Fact]
-    public void SurvivalFunction_NegativeStatistic_IsOne()
-    {
-        Assert.Equal(1.0, ChiSquared.SurvivalFunction(-3, 2), 10);
-    }
+    public void SurvivalFunction_NegativeStatistic_IsOne() => Assert.Equal(1.0, ChiSquared.SurvivalFunction(-3, 2), 10);
 
     [Fact]
     public void SurvivalFunction_InvalidDegreesOfFreedom_IsNaN()
@@ -30,7 +27,9 @@ public class ChiSquaredTests
     {
         // The chi-squared distribution with 2 df is Exp(mean = 2), so SF(x) = e^(-x/2).
         foreach (var x in new[] { 0.5, 1.0, 2.0, 4.0, 6.0, 9.0 })
+        {
             Numerics.AssertRelativeClose(Math.Exp(-x / 2.0), ChiSquared.SurvivalFunction(x, 2), 1e-9);
+        }
     }
 
     [Fact]
@@ -52,15 +51,14 @@ public class ChiSquaredTests
     }
 
     [Theory]
+
     // Standard 0.05 critical values: SF(crit, df) == 0.05.
     [InlineData(3.8415, 1)]
     [InlineData(5.9915, 2)]
     [InlineData(7.8147, 3)]
     [InlineData(9.4877, 4)]
-    public void SurvivalFunction_AtCriticalValue_IsFivePercent(double critical, int df)
-    {
+    public void SurvivalFunction_AtCriticalValue_IsFivePercent(double critical, int df) =>
         Numerics.AssertRelativeClose(0.05, ChiSquared.SurvivalFunction(critical, df), 1e-3);
-    }
 
     [Fact]
     public void SurvivalFunction_IsMonotonicallyDecreasing()
