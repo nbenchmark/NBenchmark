@@ -31,7 +31,7 @@ Run with `dotnet run` and you'll see:
     95% CI: 1.19 µs … 1.29 µs (±50 ns)
 ```
 
-That's it. NBenchmark ran 25 warmup iterations (to let the JIT compile your code), then 200 measured iterations, trimmed the noisiest 5%, and printed a summary.
+That's it. NBenchmark ran 25 warmup iterations (to let the JIT compile your code), then 200 measured iterations, trimmed outliers using the IQR fence rule, and printed a summary.
 
 ## Measuring async code
 
@@ -72,18 +72,18 @@ var results = await new BenchmarkSuite("string concat")
 The console output will look like:
 
 ```
-╭──────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬───────┬──────────╮
-│ Benchmark        │ Median │  Mean  │ Error  │ StdDev │  P95   │  P99   │ Ratio │ Alloc/op │
-├──────────────────┼────────┼────────┼────────┼────────┼────────┼────────┼───────┼──────────┤
-│ interpolation  ✓ │ 8.0 ns │ 8.1 ns │ ±1 ns  │ 6 ns   │ 10 ns  │ 11 ns  │ 0.95x │    -     │
-│ plus operator    │ 8.5 ns │ 8.4 ns │ ±1 ns  │ 5 ns   │ 10 ns  │ 10 ns  │ 1.00x │    -     │
-╰──────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┴──────────╯
+╭────────────────┬────────┬────────┬───────┬────────┬───────┬───────┬───────┬─────┬──────────╮
+│ Benchmark      │ Median │  Mean  │ Error │ StdDev │  P95  │  P99  │ Ratio │ Sig │ Alloc/op │
+├────────────────┼────────┼────────┼───────┼────────┼───────┼───────┼───────┼─────┼──────────┤
+│ interpolation  │ 8.0 ns │ 8.1 ns │ ±1 ns │ 6 ns   │ 10 ns │ 11 ns │ 0.95x │  ✓  │    -     │
+│ plus operator  │ 8.5 ns │ 8.4 ns │ ±1 ns │ 5 ns   │ 10 ns │ 10 ns │ 1.00x │  -  │    -     │
+╰────────────────┴────────┴────────┴───────┴────────┴───────┴───────┴───────┴─────┴──────────╯
 
 Ran 2 benchmark(s) - Significance: Mann-Whitney U (p < 0.05) - Outliers: IQR fence (1.5×)
 Error = ±95% confidence interval half-width on the mean.
 ```
 
-The **Ratio** column shows speed relative to the baseline. The **✓** next to a benchmark name means the difference is statistically significant - it's unlikely to be random noise.
+The **Ratio** column shows speed relative to the baseline. The **Sig** column shows **✓** when the difference is statistically significant and **✗** when it's not. No symbol means the benchmark is the baseline or significance wasn't tested.
 
 ## Saving results to a file
 
@@ -107,7 +107,7 @@ await result.ToJsonAsync("results/");   // directory
 | **StdDev** | How spread out the measurements are. High StdDev = unpredictable timing. |
 | **P95 / P99** | Worst-case timing 95% / 99% of the time. Useful for latency budgets. |
 | **Ratio** | Speed relative to the baseline. `0.75x` = 25% faster; `2.0x` = twice as slow. |
-| **Sig ✓** | Difference from the baseline is statistically significant ([p < 0.05](https://en.wikipedia.org/wiki/P-value)). |
+| **Sig** | **✓** = difference from baseline is statistically significant; **✗** = not significant ([p < 0.05](https://en.wikipedia.org/wiki/P-value)). |
 
 See [Key Concepts](./key-concepts.md) for a deeper explanation of what these mean and how they are calculated.
 

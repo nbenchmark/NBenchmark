@@ -93,7 +93,7 @@ public class ReporterTests
             Assert.True(File.Exists(filePath));
             var content = await File.ReadAllTextAsync(filePath);
             Assert.Contains("alpha", content);
-            Assert.Contains("| Benchmark | Median |", content);
+            Assert.Contains("| Benchmark | Sig | Median |", content);
         }
         finally
         {

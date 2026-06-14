@@ -36,12 +36,12 @@ No explicit `.WithReporter(new ConsoleReporter())` call is needed when using the
 Benchmark Results
 Run at 2026-06-06 03:40:00 UTC - 25 warmup / 190 measured
 
-╭──────────────────────┬─────────┬─────────┬────────┬─────────┬─────────┬─────────┬───────┬──────────╮
-│ Benchmark            │ Median  │  Mean   │ Error  │ StdDev  │   P95   │   P99   │ Ratio │ Alloc/op │
-├──────────────────────┼─────────┼─────────┼────────┼─────────┼─────────┼─────────┼───────┼──────────┤
-│ Compute ✓            │ 300 ns  │ 275 ns  │ ±16 ns │  86 ns  │ 500 ns  │ 500 ns  │ 0.75x │    -     │
-│ Baseline (baseline)  │ 400 ns  │ 376 ns  │ ±22 ns │ 114 ns  │ 500 ns  │ 900 ns  │ 1.00x │    -     │
-╰──────────────────────┴─────────┴─────────┴────────┴─────────┴─────────┴─────────┴───────┴──────────╯
+╭──────────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬───────┬─────┬──────────╮
+│ Benchmark            │ Median │  Mean  │ Error  │ StdDev │  P95   │  P99   │ Ratio │ Sig │ Alloc/op │
+├──────────────────────┼────────┼────────┼────────┼────────┼────────┼────────┼───────┼─────┼──────────┤
+│ Compute              │ 300 ns │ 275 ns │ ±16 ns │  86 ns │ 500 ns │ 500 ns │ 0.75x │  ✓  │    -     │
+│ Baseline (baseline)  │ 400 ns │ 376 ns │ ±22 ns │ 114 ns │ 500 ns │ 900 ns │ 1.00x │  -  │    -     │
+╰──────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┴─────┴──────────╯
 
 Ran 2 benchmark(s) in 0.0s - Significance: Mann-Whitney U (p < 0.05) - Outliers: IQR fence (1.5×)
 Error = ±95% confidence interval half-width on the mean.
@@ -62,7 +62,7 @@ The footer's outlier label reflects the active detector (`IQR fence (1.5×)`, `M
 ## Columns
 
 | Column | Description |
-|---|---|
+|---|---|---|
 | **Benchmark** | Name of the benchmark. Colour-coded: green (≤ 5% slower than baseline), yellow (≤ 50% slower), red (> 50% slower). Baseline is shown in bold. |
 | **Median** | Median timing. |
 | **Mean** | Arithmetic mean. |
@@ -71,11 +71,10 @@ The footer's outlier label reflects the active detector (`IQR fence (1.5×)`, `M
 | **P95** | 95th percentile. |
 | **P99** | 99th percentile. |
 | **Ratio** | Speed relative to the baseline. Green for faster, yellow for moderately slower, red for significantly slower. |
+| **Sig** | **✓** = difference from baseline is statistically significant; **✗** = not significant; **-** = not applicable (baseline or significance not tested). |
 | **Alloc/op** | Mean heap bytes per iteration (only visible when allocation tracking is enabled). |
 
 An optional **Description** column appears if any benchmark has a `Description` set.
-
-A **✓** next to the name indicates the difference from the baseline is statistically significant (p < 0.05). A **✗** indicates it is not.
 
 In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), each benchmark row is followed by an indented stats block.
 

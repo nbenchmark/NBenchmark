@@ -55,14 +55,14 @@ public sealed class MarkdownReporter : IReporter
 
         sb.AppendLine("### Comparison");
         sb.AppendLine();
-        sb.AppendLine("| | Benchmark | Median | Mean | Ratio | Scale | Alloc/op |");
-        sb.AppendLine("|:---:|---|---:|---:|:---:|---|---:|");
+        sb.AppendLine("| | Benchmark | Median | Mean | Ratio | Scale | Sig | Alloc/op |");
+        sb.AppendLine("|:---:|---|---:|---:|:---:|---|---:|---:|");
 
         foreach (var row in table.Rows)
         {
             if (row.Errored)
             {
-                sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - |");
+                sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - |");
                 continue;
             }
 
@@ -70,7 +70,7 @@ public sealed class MarkdownReporter : IReporter
             {
                 "✓" => "✓",
                 "✗" => "✗",
-                _ => row.IsBaseline ? "★" : "",
+                _ => "-",
             };
 
             var nameText = row.IsBaseline
@@ -84,12 +84,13 @@ public sealed class MarkdownReporter : IReporter
                 : "-";
 
             sb.AppendLine(
-                $"| {sigIcon} " +
+                $"| " +
                 $"| {nameText} " +
                 $"| {BenchmarkFormatter.FormatNs(row.Median)} " +
                 $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
                 $"| {ratioText} " +
                 $"| {bar} " +
+                $"| {sigIcon} " +
                 $"| {allocText} |"
             );
         }

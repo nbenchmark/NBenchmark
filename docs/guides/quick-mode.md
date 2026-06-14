@@ -20,7 +20,7 @@ var result = Benchmark.Run(() =>
 });
 ```
 
-`Benchmark.Run` runs 25 warmup iterations, then 200 measured iterations, trims the top 5% of [outliers](https://en.wikipedia.org/wiki/Outlier), and returns a `BenchmarkResult`.
+`Benchmark.Run` runs 25 warmup iterations, then 200 measured iterations, trims outliers using the IQR fence rule, and returns a `BenchmarkResult`.
 
 ## Overloads
 
@@ -30,8 +30,7 @@ var result = Benchmark.Run(() =>
 // Action - for code with no return value
 var result = Benchmark.Run(() => DoWork());
 
-// Func<T> - for code that returns a value
-// The result is consumed by a sink to prevent the compiler optimising the call away.
+// Func<T> - returns a value so the runner can prevent dead-code elimination
 var result = Benchmark.Run(() => ComputeHash(data));
 ```
 

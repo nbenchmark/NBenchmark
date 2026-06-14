@@ -95,6 +95,7 @@ public sealed class ConsoleReporter : IReporter
             .AddColumn(new TableColumn("[bold]Median[/]").RightAligned().NoWrap())
             .AddColumn(new TableColumn("[bold]Mean[/]").RightAligned().NoWrap())
             .AddColumn(new TableColumn("[bold]vs Baseline[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Sig[/]").Centered().NoWrap())
             .AddColumn(new TableColumn("[bold]Alloc/op[/]").RightAligned().NoWrap());
 
         var hasDescriptions = results.Any(r => !string.IsNullOrEmpty(r.Description));
@@ -108,7 +109,7 @@ public sealed class ConsoleReporter : IReporter
                 var errorCols = new List<string>
                 {
                     $"[red]✗ {Esc(row.Name)}[/]",
-                    "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
+                    "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
                 };
                 if (hasDescriptions) errorCols.Add("[dim]-[/]");
                 table.AddRow(errorCols.ToArray());
@@ -118,9 +119,9 @@ public sealed class ConsoleReporter : IReporter
             var (ratioText, ratioColor) = FormatRatio(row);
             var sigIcon = row.SignificanceLabel switch
             {
-                "✓" => "[green]✓[/] ",
-                "✗" => "[red]✗[/] ",
-                _ => "  ",
+                "✓" => "[green]✓[/]",
+                "✗" => "[red]✗[/]",
+                _ => "[dim]-[/]",
             };
 
             var nameText = row.IsBaseline
@@ -138,10 +139,11 @@ public sealed class ConsoleReporter : IReporter
 
             var rowCols = new List<string>
             {
-                $"{sigIcon}{nameText}",
+                nameText,
                 $"[bold]{BenchmarkFormatter.FormatNs(row.Median)}[/]",
                 BenchmarkFormatter.FormatNs(row.Mean),
                 ratioAndBar,
+                sigIcon,
                 allocText,
             };
 
