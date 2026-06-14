@@ -30,7 +30,11 @@ internal static class IsolatedProcessRunner
 
         try
         {
-            using var process = new Process { StartInfo = BuildStartInfo(fullName, originalArgs, outputPath) };
+            using var process = new Process
+            {
+                StartInfo = BuildStartInfo(
+                    [.. originalArgs, "--nb-isolated-run", fullName, "--nb-isolated-output", outputPath]),
+            };
             var stderr = new StringBuilder();
 
             process.ErrorDataReceived += (_, e) =>
@@ -98,10 +102,9 @@ internal static class IsolatedProcessRunner
         };
     }
 
-    private static ProcessStartInfo BuildStartInfo(
-        string fullName,
-        IReadOnlyList<string> originalArgs,
-        string outputPath)
+    internal static ProcessStartInfo BuildStartInfo(
+        IReadOnlyList<string> args,
+        params (string Name, string Value)[] environmentVariables)
     {
         var processPath = Environment.ProcessPath;
         var entryAssembly = Assembly.GetEntryAssembly()?.Location;
@@ -126,22 +129,28 @@ internal static class IsolatedProcessRunner
             psi.FileName = processPath ?? "dotnet";
 
             if (!string.IsNullOrEmpty(entryAssembly))
+            {
                 psi.ArgumentList.Add(entryAssembly);
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    "Unable to resolve the managed entry assembly for isolated child execution. "
+                    + "File-based program replay is not supported in this context.");
+            }
         }
         else
         {
             psi.FileName = processPath!;
         }
 
-        foreach (var arg in originalArgs)
+        foreach (var arg in args)
         {
             psi.ArgumentList.Add(arg);
         }
 
-        psi.ArgumentList.Add("--nb-isolated-run");
-        psi.ArgumentList.Add(fullName);
-        psi.ArgumentList.Add("--nb-isolated-output");
-        psi.ArgumentList.Add(outputPath);
+        foreach (var (name, value) in environmentVariables)
+            psi.Environment[name] = value;
 
         return psi;
     }

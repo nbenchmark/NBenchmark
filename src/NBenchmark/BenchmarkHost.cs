@@ -89,13 +89,20 @@ public sealed class BenchmarkHost
 
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
     {
+        return await IsolatedRunContext
+            .WithCurrentRequestAsync(() => RunCoreAsync(cancellationToken))
+            .ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(CancellationToken cancellationToken)
+    {
         if (_cliArgs.ShowHelp)
         {
             CliArgs.PrintHelp();
             return Array.Empty<BenchmarkResult>();
         }
 
-        if (_cliArgs.IsolatedRun is not null)
+        if (_cliArgs.IsolatedRun is not null && !IsolatedRunContext.IsActive)
             return await RunIsolatedChildAsync(cancellationToken).ConfigureAwait(false);
 
         Console.WriteLine($"Timer resolution: {Stopwatch.Frequency:N0} ticks/s "
