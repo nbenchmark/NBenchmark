@@ -11,11 +11,11 @@ order: 0
 NBenchmark provides a low-overhead measurement engine with built-in statistical analysis. It moves beyond raw averages by providing confidence intervals, outlier trimming, and significance testing out of the box - allowing you to differentiate between a real performance gain and background noise.
 
 ```csharp
-var result = Benchmark.Run(() => JsonSerializer.Deserialize<MyDto>(json));
+var result = Benchmark.Run(() => MandelbrotCalculation(name: "Mandelbrot calculation"));
 result.Print();
 ```
 
-[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/console.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/console.png)
+[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-quick.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-quick.png)
 
 ## Why NBenchmark?
 
@@ -51,6 +51,8 @@ var results = await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
+[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)
+
 ### 3. Host Mode (CLI)
 
 Attribute-based discovery with a built-in CLI. Designed for dedicated benchmark projects.
@@ -63,10 +65,21 @@ public class StringBenchmarks
 
     [Benchmark]
     public string Interpolate() => $"{"a"}{"b"}{"c"}";
+
+    [Benchmark]
+    public string Format() => string.Format("{0}{1}{2}", "a", "b", "c");
+
+    [Benchmark]
+    public string Join() => string.Join("", "a", "b", "c");
+
+    [Benchmark]
+    public string Create() => new string(new[] { 'a', 'b', 'c' });
 }
 
 await BenchmarkHost.Create(args).AddFromAssembly<StringBenchmarks>().RunAsync();
 ```
+
+[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-host.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-host.png)
 
 ## Performance Gates (CI/CD)
 
