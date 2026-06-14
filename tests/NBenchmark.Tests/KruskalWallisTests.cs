@@ -80,7 +80,11 @@ public class KruskalWallisTests
     public void OverlappingGroups_YieldLargePValue()
     {
         var rng = new Random(7);
-        double[] Sample() => Enumerable.Range(0, 30).Select(_ => (double)rng.Next(90, 110)).ToArray();
+
+        double[] Sample()
+        {
+            return Enumerable.Range(0, 30).Select(_ => (double)rng.Next(90, 110)).ToArray();
+        }
 
         var result = KruskalWallis.Test([Sample(), Sample(), Sample()]);
 

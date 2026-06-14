@@ -44,9 +44,7 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
         // If the omnibus is not significant, skip post-hoc: no group differs from the rest.
         if (omnibusReport.Omnibus is not { } omnibus
             || omnibus.Verdict != SignificanceVerdict.Significant)
-        {
             return omnibusReport;
-        }
 
         // Omnibus is significant: run pairwise Mann-Whitney U (candidate vs baseline)
         // and apply Holm-Bonferroni over the tested candidates.

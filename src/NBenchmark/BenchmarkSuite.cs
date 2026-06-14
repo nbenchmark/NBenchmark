@@ -1,7 +1,7 @@
+using System.Runtime.CompilerServices;
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
-using System.Runtime.CompilerServices;
 
 namespace NBenchmark;
 
@@ -11,13 +11,13 @@ public sealed class BenchmarkSuite(string name)
 
     private readonly List<IReporter> _reporters = [];
     private string? _baselineName;
+    private ReportDetail _detail;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
     private Action? _suiteSetup;
     private Action? _suiteTeardown;
-    private ReportDetail _detail;
 
     /// <summary>The display name of this suite.</summary>
     public string Name { get; } = name;
@@ -166,8 +166,12 @@ public sealed class BenchmarkSuite(string name)
     public BenchmarkSuite WithDetail(ReportDetail detail)
     {
         _detail = detail;
+
         foreach (var reporter in _reporters)
+        {
             reporter.Detail = detail;
+        }
+
         return this;
     }
 
@@ -257,9 +261,7 @@ public sealed class BenchmarkSuite(string name)
                     callerLineNumber,
                     callerMemberName,
                     suiteName: Name))
-            {
                 return await RunRequestedIsolatedChildAsync(cancellationToken).ConfigureAwait(false);
-            }
 
             if (IsolatedRunContext.IsActive)
             {
@@ -376,8 +378,8 @@ public sealed class BenchmarkSuite(string name)
             var missingOutcome = OutcomeBuilder.Build(
                 new RunOutcome.Errored(new InvalidOperationException(message), message),
                 request.BenchmarkName,
-                description: null,
-                isBaseline: false,
+                null,
+                false,
                 options,
                 TimeSpan.Zero,
                 TimeSpan.Zero);

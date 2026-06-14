@@ -12,12 +12,12 @@ public sealed class BenchmarkHost
     private readonly List<Assembly> _assemblies = [];
     private readonly List<IReporter> _reporters = [];
     private CliArgs _cliArgs = new();
+    private ReportDetail _detail;
     private Func<Type, object>? _instanceFactory;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
-    private ReportDetail _detail;
 
     private BenchmarkHost()
     {
@@ -69,8 +69,12 @@ public sealed class BenchmarkHost
     public BenchmarkHost WithDetail(ReportDetail detail)
     {
         _detail = detail;
+
         foreach (var reporter in _reporters)
+        {
             reporter.Detail = detail;
+        }
+
         return this;
     }
 
@@ -273,6 +277,7 @@ public sealed class BenchmarkHost
     private async Task<IReadOnlyList<BenchmarkResult>> RunIsolatedChildAsync(CancellationToken cancellationToken)
     {
         var fullName = _cliArgs.IsolatedRun!;
+
         var options = _cliArgs.DryRun
             ? _options with { Iterations = 0, WarmupIterations = 0 }
             : MergeCliOptions(_options, _cliArgs);
@@ -304,9 +309,7 @@ public sealed class BenchmarkHost
                 var (setupSuccess, setupErrors) = PerClassLifecycle.TryRunSetup(singleSuite, instance, options);
 
                 if (!setupSuccess)
-                {
                     outcome = new MeasurementOutcome { Result = setupErrors![0], RawSamples = [] };
-                }
                 else
                 {
                     var envelope = BenchmarkEnvelope.FromDiscovered(match, suite.Type.Name, instance);
@@ -425,12 +428,13 @@ public sealed class BenchmarkHost
         if (cliArgs.OutlierMode.HasValue)
         {
             args.Add("--outlier");
+
             args.Add(cliArgs.OutlierMode.Value switch
             {
-                NBenchmark.OutlierMode.None => "none",
-                NBenchmark.OutlierMode.RemoveTop5Percent => "top5",
-                NBenchmark.OutlierMode.RemoveTopAndBottom5Percent => "both5",
-                NBenchmark.OutlierMode.MedianAbsoluteDeviation => "mad",
+                OutlierMode.None => "none",
+                OutlierMode.RemoveTop5Percent => "top5",
+                OutlierMode.RemoveTopAndBottom5Percent => "both5",
+                OutlierMode.MedianAbsoluteDeviation => "mad",
                 _ => "iqr",
             });
         }

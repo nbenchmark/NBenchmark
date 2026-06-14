@@ -20,7 +20,7 @@ public interface IOutlierDetector
     ///     A short, human-readable label shown in reports (for example
     ///     <c>"IQR fence (1.5×)"</c> or <c>"MAD (3×)"</c>).
     /// </summary>
-    string Name { get; }
+    public string Name { get; }
 
     /// <summary>
     ///     Partitions <paramref name="sortedSamples" /> into kept (inlier) and discarded
@@ -34,7 +34,7 @@ public interface IOutlierDetector
     ///         engine always has data to summarize.
     ///     </para>
     /// </summary>
-    OutlierClassification Classify(double[] sortedSamples);
+    public OutlierClassification Classify(double[] sortedSamples);
 }
 
 /// <summary>

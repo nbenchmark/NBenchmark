@@ -21,7 +21,9 @@ public sealed class KruskalWallisSignificanceTest : ISignificanceTest
         var samples = new double[groups.Count][];
 
         for (var i = 0; i < groups.Count; i++)
+        {
             samples[i] = groups[i].Samples;
+        }
 
         var result = KruskalWallis.Test(samples);
 

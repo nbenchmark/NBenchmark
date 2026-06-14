@@ -81,11 +81,12 @@ public sealed class StatsSummary
         var cv = mean != 0 ? sampleStdDev / mean : 0.0;
 
         var skewness = n > 2 && sampleStdDev > 0
-            ? (n * sumCube) / ((n - 1.0) * (n - 2.0) * sampleStdDev * sampleStdDev * sampleStdDev)
+            ? n * sumCube / ((n - 1.0) * (n - 2.0) * sampleStdDev * sampleStdDev * sampleStdDev)
             : 0.0;
+
         var kurtosis = n > 3 && sampleStdDev > 0
-            ? (n * (n + 1.0) * sumFourth) / ((n - 1.0) * (n - 2.0) * (n - 3.0) * sampleStdDev * sampleStdDev * sampleStdDev * sampleStdDev)
-              - (3.0 * (n - 1.0) * (n - 1.0)) / ((n - 2.0) * (n - 3.0))
+            ? n * (n + 1.0) * sumFourth / ((n - 1.0) * (n - 2.0) * (n - 3.0) * sampleStdDev * sampleStdDev * sampleStdDev * sampleStdDev)
+              - 3.0 * (n - 1.0) * (n - 1.0) / ((n - 2.0) * (n - 3.0))
             : 0.0;
 
         var mad = ComputeMad(samples);
@@ -148,8 +149,11 @@ public sealed class StatsSummary
         Array.Sort(sorted);
 
         double sum = 0;
+
         for (var i = 0; i < sorted.Length; i++)
+        {
             sum += sorted[i];
+        }
 
         var asDoubles = Array.ConvertAll(sorted, v => (double)v);
         var mean = (long)(sum / sorted.Length);

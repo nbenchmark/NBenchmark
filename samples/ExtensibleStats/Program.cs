@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using NBenchmark;
 using NBenchmark.Reporters.Console;
 using NBenchmark.Stats;
@@ -23,9 +24,9 @@ Console.WriteLine(">> Built-in: MAD trimming + Kruskal-Wallis (3 groups)");
 Console.WriteLine();
 
 await new BenchmarkSuite("hashing")
-    .Add("sha256", () => System.Security.Cryptography.SHA256.HashData(Payload))
-    .Add("sha1", () => System.Security.Cryptography.SHA1.HashData(Payload))
-    .Add("md5", () => System.Security.Cryptography.MD5.HashData(Payload))
+    .Add("sha256", () => SHA256.HashData(Payload))
+    .Add("sha1", () => SHA1.HashData(Payload))
+    .Add("md5", () => MD5.HashData(Payload))
     .WithBaseline("md5")
     .WithWarmup(5)
     .WithIterations(60)
@@ -41,14 +42,14 @@ Console.WriteLine(">> Custom: KeepFastest detector + median-ratio significance")
 Console.WriteLine();
 
 await new BenchmarkSuite("hashing-custom")
-    .Add("sha256", () => System.Security.Cryptography.SHA256.HashData(Payload))
-    .Add("sha1", () => System.Security.Cryptography.SHA1.HashData(Payload))
-    .Add("md5", () => System.Security.Cryptography.MD5.HashData(Payload))
+    .Add("sha256", () => SHA256.HashData(Payload))
+    .Add("sha1", () => SHA1.HashData(Payload))
+    .Add("md5", () => MD5.HashData(Payload))
     .WithBaseline("md5")
     .WithWarmup(5)
     .WithIterations(60)
     .WithOutlierDetector(new KeepFastestDetector(0.90))
-    .WithSignificanceTest(new MedianRatioSignificanceTest(thresholdPercent: 25))
+    .WithSignificanceTest(new MedianRatioSignificanceTest(25))
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();

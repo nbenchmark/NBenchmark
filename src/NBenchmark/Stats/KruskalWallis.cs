@@ -62,7 +62,9 @@ public static class KruskalWallis
         for (var g = 0; g < k; g++)
         {
             foreach (var value in groups[g])
+            {
                 combined[index++] = (value, g);
+            }
         }
 
         Array.Sort(combined, (a, b) => a.Value.CompareTo(b.Value));
@@ -76,7 +78,9 @@ public static class KruskalWallis
             var j = i + 1;
 
             while (j < total && combined[j].Value == combined[i].Value)
+            {
                 j++;
+            }
 
             // Tied observations (positions i..j-1, 1-based ranks i+1..j) share the average rank.
             var meanRank = (i + j + 1) / 2.0;
@@ -86,7 +90,9 @@ public static class KruskalWallis
                 tieCorrectionSum += (double)tieSize * tieSize * tieSize - tieSize;
 
             for (var t = i; t < j; t++)
+            {
                 rankSums[combined[t].Group] += meanRank;
+            }
 
             i = j;
         }
@@ -94,7 +100,9 @@ public static class KruskalWallis
         var h = 0.0;
 
         for (var g = 0; g < k; g++)
+        {
             h += rankSums[g] * rankSums[g] / groups[g].Length;
+        }
 
         h = 12.0 / (total * (total + 1.0)) * h - 3.0 * (total + 1.0);
 

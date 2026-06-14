@@ -262,7 +262,8 @@ public sealed class BenchmarkRunner
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncReturning<T>(string name, Func<T> body, RunSpec spec, CancellationToken ct)
+    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncReturning<T>(string name, Func<T> body, RunSpec spec,
+        CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
@@ -303,7 +304,8 @@ public sealed class BenchmarkRunner
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncVoid(string name, Func<Task> body, RunSpec spec, CancellationToken ct)
+    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncVoid(string name, Func<Task> body, RunSpec spec,
+        CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
@@ -344,7 +346,8 @@ public sealed class BenchmarkRunner
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(string name, Func<Task<T>> body, RunSpec spec,
+    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(string name, Func<Task<T>> body,
+        RunSpec spec,
         CancellationToken ct)
     {
         var options = spec.Options;

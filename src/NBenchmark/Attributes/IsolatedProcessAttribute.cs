@@ -13,5 +13,5 @@ namespace NBenchmark.Attributes;
 ///         benchmark it declares.
 ///     </para>
 /// </summary>
-[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public sealed class IsolatedProcessAttribute : Attribute;

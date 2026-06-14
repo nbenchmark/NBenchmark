@@ -1,5 +1,5 @@
-using NBenchmark.Engine;
 using System.Runtime.CompilerServices;
+using NBenchmark.Engine;
 
 namespace NBenchmark;
 
@@ -231,7 +231,7 @@ public static class Benchmark
                     callerFilePath,
                     callerLineNumber,
                     callerMemberName,
-                    benchmarkName: name))
+                    name))
             {
                 var outcome = await runRawAsync(resolvedOptions, resolvedProgress, cancellationToken)
                     .ConfigureAwait(false);

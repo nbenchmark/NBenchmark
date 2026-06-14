@@ -10,15 +10,15 @@ namespace NBenchmark;
 /// </summary>
 public sealed class DefaultConsoleProgress : IBenchmarkProgress
 {
-    private int _suiteTotal;
-    private int _completedBenchmarks;
-    private readonly Stopwatch _suiteStopwatch = new();
     private readonly Stopwatch _benchmarkStopwatch = new();
-    private string _currentName = "";
+    private readonly Stopwatch _suiteStopwatch = new();
+    private int _completedBenchmarks;
     private int _currentIndex;
     private int _currentIteration;
+    private string _currentName = "";
     private int _currentTotalIterations;
     private bool _inWarmup;
+    private int _suiteTotal;
 
     public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
     {
@@ -71,9 +71,11 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
         // Clear status line and print result
         Console.Write("\r\x1b[2K");
         var icon = result.Errored ? "✗" : "✓";
+
         var timing = result.Errored
             ? result.ErrorMessage
             : BenchmarkFormatter.FormatNs(result.Median);
+
         Console.WriteLine($"  {icon} {result.Name}  {timing}  ({_benchmarkStopwatch.Elapsed.TotalSeconds:F1}s)");
 
         return Task.CompletedTask;
@@ -89,6 +91,7 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
     private void RenderStatus()
     {
         var phase = _inWarmup ? "warmup" : "measuring";
+
         var pct = _currentTotalIterations > 0
             ? (int)Math.Round(100.0 * _currentIteration / _currentTotalIterations)
             : 0;
@@ -102,7 +105,8 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
         var eta = ComputeEta();
         var etaText = eta.HasValue ? $" ETA {FormatTimeSpan(eta.Value)}" : "";
 
-        Console.Write($"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] {_currentName}  {bar} {pct}% {phase} ({_currentIteration}/{_currentTotalIterations}){etaText}");
+        Console.Write(
+            $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] {_currentName}  {bar} {pct}% {phase} ({_currentIteration}/{_currentTotalIterations}){etaText}");
     }
 
     private TimeSpan? ComputeEta()
@@ -118,8 +122,12 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
 
     private static string FormatTimeSpan(TimeSpan ts)
     {
-        if (ts.TotalSeconds < 1) return "<1s";
-        if (ts.TotalSeconds < 60) return $"{ts.TotalSeconds:F0}s";
+        if (ts.TotalSeconds < 1)
+            return "<1s";
+
+        if (ts.TotalSeconds < 60)
+            return $"{ts.TotalSeconds:F0}s";
+
         return $"{(int)ts.TotalMinutes}m {ts.Seconds:D2}s";
     }
 }

@@ -45,14 +45,6 @@ public record MeasurementOptions
     public IOutlierDetector? OutlierDetector { get; init; }
 
     /// <summary>
-    ///     Resolves the effective outlier detector: the custom
-    ///     <see cref="OutlierDetector" /> when supplied, otherwise the built-in detector for
-    ///     the configured <see cref="OutlierMode" />.
-    /// </summary>
-    public IOutlierDetector ResolveOutlierDetector() =>
-        OutlierDetector ?? OutlierDetectors.ForMode(OutlierMode);
-
-    /// <summary>
     ///     Confidence level for the interval reported on the mean (e.g. 0.95 for 95%).
     ///     Must be strictly between 0 and 1.
     /// </summary>
@@ -76,14 +68,6 @@ public record MeasurementOptions
     public ISignificanceTest? SignificanceTest { get; init; }
 
     /// <summary>
-    ///     Resolves the effective significance test: the custom
-    ///     <see cref="SignificanceTest" /> when supplied, otherwise
-    ///     <see cref="DefaultSignificanceTest" />.
-    /// </summary>
-    public ISignificanceTest ResolveSignificanceTest() =>
-        SignificanceTest ?? DefaultSignificanceTest.Instance;
-
-    /// <summary>
     ///     The significance level (alpha) a benchmark's p-value must fall below to be
     ///     reported as a statistically significant change versus the baseline. Must be
     ///     strictly between 0 and 1. Default 0.05. Tighten (e.g. 0.001) to gate releases
@@ -99,4 +83,20 @@ public record MeasurementOptions
     }
 
     public bool ForceGcBetweenBenchmarks { get; init; } = true;
+
+    /// <summary>
+    ///     Resolves the effective outlier detector: the custom
+    ///     <see cref="OutlierDetector" /> when supplied, otherwise the built-in detector for
+    ///     the configured <see cref="OutlierMode" />.
+    /// </summary>
+    public IOutlierDetector ResolveOutlierDetector() =>
+        OutlierDetector ?? OutlierDetectors.ForMode(OutlierMode);
+
+    /// <summary>
+    ///     Resolves the effective significance test: the custom
+    ///     <see cref="SignificanceTest" /> when supplied, otherwise
+    ///     <see cref="DefaultSignificanceTest" />.
+    /// </summary>
+    public ISignificanceTest ResolveSignificanceTest() =>
+        SignificanceTest ?? DefaultSignificanceTest.Instance;
 }

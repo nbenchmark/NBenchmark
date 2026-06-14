@@ -62,6 +62,7 @@ internal static class Significance
                 // on the result instead of dropping it from the comparison silently.
                 AppendWarning(results, result.Name,
                     $"No raw samples were captured for '{result.Name}', so it was excluded from significance testing.");
+
                 continue;
             }
 
@@ -140,4 +141,3 @@ internal static class Significance
         }
     }
 }
-

@@ -34,9 +34,12 @@ internal static class IsolatedRunContext
     private static int SuiteInvocationSequence;
     private static readonly AsyncLocal<IsolatedRunScope?> Scope = new();
 
+    public static bool IsActive => Scope.Value is not null;
+
     public static bool TryGetActiveRequest(out IsolatedRunRequest request)
     {
         var scope = Scope.Value;
+
         if (scope is null)
         {
             request = null!;
@@ -46,8 +49,6 @@ internal static class IsolatedRunContext
         request = scope.Request;
         return true;
     }
-
-    public static bool IsActive => Scope.Value is not null;
 
     public static int NextInvocationOrdinal(IsolatedRunMode mode)
         => mode switch
@@ -180,6 +181,7 @@ internal static class IsolatedRunContext
         ArgumentNullException.ThrowIfNull(action);
 
         var requestPath = Environment.GetEnvironmentVariable(RequestPathEnvVar);
+
         if (string.IsNullOrWhiteSpace(requestPath))
             return await action().ConfigureAwait(false);
 
@@ -238,6 +240,7 @@ internal static class IsolatedRunContext
             if (process.ExitCode != 0 || !File.Exists(outputPath))
             {
                 var detail = stderr.Length > 0 ? $" {stderr.ToString().Trim()}" : "";
+
                 var noPayloadHint = process.ExitCode == 0 && !File.Exists(outputPath)
                     ? " The child exited successfully but produced no payload; this usually indicates that the requested isolated callsite was not replayed in the child process."
                     : "";
@@ -294,8 +297,8 @@ internal static class IsolatedRunContext
         return OutcomeBuilder.Build(
             new RunOutcome.Errored(new InvalidOperationException(message), message),
             name,
-            description: null,
-            isBaseline: false,
+            null,
+            false,
             options,
             TimeSpan.Zero,
             TimeSpan.Zero);

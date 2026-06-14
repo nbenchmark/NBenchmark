@@ -1,3 +1,7 @@
 namespace NBenchmark.Reporters;
 
-public enum ReportDetail { Simple, Advanced }
+public enum ReportDetail
+{
+    Simple,
+    Advanced,
+}

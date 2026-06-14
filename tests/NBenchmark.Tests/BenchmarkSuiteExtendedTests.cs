@@ -217,9 +217,10 @@ public class BenchmarkSuiteExtendedTests
             _callback = callback;
         }
 
+        public ReportDetail CapturedDetail => Detail;
+
         public string Name => "stub";
         public ReportDetail Detail { get; set; } = ReportDetail.Simple;
-        public ReportDetail CapturedDetail => Detail;
 
         public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
         {

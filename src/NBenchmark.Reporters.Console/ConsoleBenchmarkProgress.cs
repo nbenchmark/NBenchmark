@@ -6,16 +6,16 @@ namespace NBenchmark.Reporters.Console;
 
 public class ConsoleBenchmarkProgress : IBenchmarkProgress
 {
-    private int _suiteTotal;
-    private int _completedBenchmarks;
-    private readonly Stopwatch _suiteStopwatch = new();
     private readonly Stopwatch _benchmarkStopwatch = new();
-    private string _currentName = "";
+    private readonly Stopwatch _suiteStopwatch = new();
+    private int _completedBenchmarks;
     private int _currentIndex;
     private int _currentIteration;
+    private string _currentName = "";
     private int _currentTotalIterations;
     private int _currentWarmupIterations;
     private bool _inWarmup;
+    private int _suiteTotal;
 
     public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
     {
@@ -74,6 +74,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
 
         var elapsed = _benchmarkStopwatch.Elapsed;
         var icon = result.Errored ? "[red]✗[/]" : "[green]✓[/]";
+
         var timing = result.Errored
             ? $"[red]{Esc(result.ErrorMessage)}[/]"
             : $"[dim]{BenchmarkFormatter.FormatNs(result.Median)}[/]";
@@ -95,6 +96,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
     private void RenderStatus()
     {
         var phase = _inWarmup ? "warmup" : "measuring";
+
         var pct = _currentTotalIterations > 0
             ? (int)Math.Round(100.0 * _currentIteration / _currentTotalIterations)
             : 0;
@@ -109,7 +111,8 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         var etaText = eta.HasValue ? $" ETA {FormatTimeSpan(eta.Value)}" : "";
 
         // \r returns to start of line, \x1b[2K clears the line, then we rewrite
-        SysConsole.Write($"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] \x1b[1m{_currentName}\x1b[0m \x1b[38;5;75m{bar}\x1b[0m \x1b[90m{pct}% {phase} ({_currentIteration}/{_currentTotalIterations}){etaText}\x1b[0m");
+        SysConsole.Write(
+            $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] \x1b[1m{_currentName}\x1b[0m \x1b[38;5;75m{bar}\x1b[0m \x1b[90m{pct}% {phase} ({_currentIteration}/{_currentTotalIterations}){etaText}\x1b[0m");
     }
 
     private TimeSpan? ComputeEta()
@@ -135,8 +138,12 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
 
     private static string FormatTimeSpan(TimeSpan ts)
     {
-        if (ts.TotalSeconds < 1) return "<1s";
-        if (ts.TotalSeconds < 60) return $"{ts.TotalSeconds:F0}s";
+        if (ts.TotalSeconds < 1)
+            return "<1s";
+
+        if (ts.TotalSeconds < 60)
+            return $"{ts.TotalSeconds:F0}s";
+
         return $"{(int)ts.TotalMinutes}m {ts.Seconds:D2}s";
     }
 

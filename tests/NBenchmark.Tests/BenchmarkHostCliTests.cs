@@ -463,6 +463,7 @@ public class BenchmarkHostCliTests
         public int ReportCount { get; private set; }
         public ReportDetail CapturedDetail { get; private set; }
         public string Name => "custom";
+
         public ReportDetail Detail
         {
             get => CapturedDetail;

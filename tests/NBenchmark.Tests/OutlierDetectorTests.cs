@@ -97,6 +97,7 @@ public class OutlierDetectorTests
 
         Assert.Equal([500d], result.Discarded);
         Assert.Equal(5, result.Kept.Length);
+
         // Quartiles are still computed by the engine regardless of the trimming strategy.
         Assert.True(result.InterquartileRange > 0);
     }
@@ -122,10 +123,7 @@ public class OutlierDetectorTests
     [Theory]
     [InlineData(0)]
     [InlineData(-3)]
-    public void Mad_Throws_WhenThresholdIsNotPositive(double threshold)
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new MadOutlierDetector(threshold));
-    }
+    public void Mad_Throws_WhenThresholdIsNotPositive(double threshold) => Assert.Throws<ArgumentOutOfRangeException>(() => new MadOutlierDetector(threshold));
 
     /// <summary>A trivial custom detector that rejects any sample above a fixed cut-off.</summary>
     private sealed class ThresholdOutlierDetector(double cutoff) : IOutlierDetector

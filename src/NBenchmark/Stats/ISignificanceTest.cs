@@ -18,14 +18,14 @@ namespace NBenchmark.Stats;
 public interface ISignificanceTest
 {
     /// <summary>A short, human-readable label shown in reports (e.g. <c>"Mann-Whitney U"</c>).</summary>
-    string Name { get; }
+    public string Name { get; }
 
     /// <summary>
     ///     Analyzes the pre-trim raw samples in <paramref name="context" /> and returns the
     ///     pairwise verdicts (candidate versus baseline) and/or an omnibus verdict across all
     ///     groups.
     /// </summary>
-    SignificanceReport Analyze(SignificanceContext context);
+    public SignificanceReport Analyze(SignificanceContext context);
 }
 
 /// <summary>A named set of raw measurements for one benchmark.</summary>

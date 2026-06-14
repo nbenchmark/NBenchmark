@@ -22,17 +22,17 @@ internal static class StatsPipeline
         var outliersRemoved = rawTimings.Length - trimResult.Kept.Length;
 
         return new ProcessedMeasurements(
-            stats,
-            trimResult.Kept.Length,
-            meanAllocs,
-            trimResult.Q1,
-            trimResult.Q3,
-            trimResult.InterquartileRange,
-            trimResult.LowerFence,
-            trimResult.UpperFence,
-            outliersRemoved,
-            rawAllocations)
-        { Warnings = warnings };
+                stats,
+                trimResult.Kept.Length,
+                meanAllocs,
+                trimResult.Q1,
+                trimResult.Q3,
+                trimResult.InterquartileRange,
+                trimResult.LowerFence,
+                trimResult.UpperFence,
+                outliersRemoved,
+                rawAllocations)
+            { Warnings = warnings };
     }
 
     private static IReadOnlyList<string> BuildWarnings(double[] trimmed, double[] discarded, int totalSamples)

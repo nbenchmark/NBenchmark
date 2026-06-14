@@ -12,13 +12,13 @@ Console.WriteLine("Quick mode: in-process vs isolated");
 
 var inProcess = Benchmark.Run(
     () => Thread.SpinWait(5_000),
-    options: quickOptions,
-    name: "quick/in-process");
+    quickOptions,
+    "quick/in-process");
 
 var isolatedQuick = Benchmark.RunIsolated(
     () => Thread.SpinWait(5_000),
-    options: quickOptions,
-    name: "quick/isolated");
+    quickOptions,
+    "quick/isolated");
 
 await inProcess.PrintAsync();
 await isolatedQuick.PrintAsync();
