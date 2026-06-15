@@ -23,19 +23,24 @@ public sealed class MannWhitneyUSignificanceTest : ISignificanceTest
 
         foreach (var candidate in context.Candidates)
         {
-            var pValue = MannWhitneyU.Test(baseline.Samples, candidate.Samples);
+            var result = MannWhitneyU.Test(baseline.Samples, candidate.Samples);
 
-            if (double.IsNaN(pValue))
+            if (double.IsNaN(result.PValue))
             {
                 pairwise.Add(new PairwiseComparison(candidate.Name, null, SignificanceVerdict.NotTested));
                 continue;
             }
 
-            var verdict = pValue < context.SignificanceLevel
+            var verdict = result.PValue < context.SignificanceLevel
                 ? SignificanceVerdict.Significant
                 : SignificanceVerdict.NotSignificant;
 
-            pairwise.Add(new PairwiseComparison(candidate.Name, pValue, verdict));
+            EffectSize? effect = null;
+
+            if (!double.IsNaN(result.CliffsDelta))
+                effect = EffectSizeFactory.ForCliffsDelta(result.CliffsDelta);
+
+            pairwise.Add(new PairwiseComparison(candidate.Name, result.PValue, verdict, effect));
         }
 
         return new SignificanceReport { Pairwise = pairwise };

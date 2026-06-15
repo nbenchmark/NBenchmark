@@ -80,5 +80,64 @@ public sealed record SignificanceReport
     public OmnibusComparison? Omnibus { get; init; }
 }
 
+/// <summary>
+///     Relative direction of an effect size compared to the baseline sample.
+/// </summary>
+public enum EffectDirection
+{
+    None = 0,
+    CandidateHigher,
+    CandidateLower,
+}
+
+/// <summary>
+///     Optional effect-size payload returned by a significance test strategy.
+///     <para>
+///         <see cref="Metric" /> identifies the statistic (for example, Cliff's delta,
+///         Vargha-Delaney A12, rank-biserial correlation, or a domain-specific score).
+///         <see cref="Magnitude" /> is a strategy-defined qualitative label (for example,
+///         <c>small</c>, <c>large</c>, or <c>strong</c>), and <see cref="Direction" />
+///         conveys whether the candidate tends to be higher or lower than the baseline.
+///     </para>
+///     <para>
+///         <see cref="PracticalValue" /> is an optional normalized [0, 1] value used by
+///         <see cref="MeasurementOptions.MinimumPracticalEffect" />. When supplied,
+///         values below the configured threshold are treated as practically insignificant.
+///     </para>
+/// </summary>
+public readonly record struct EffectSize(
+    string Metric,
+    double? Value,
+    string? Magnitude = null,
+    EffectDirection Direction = EffectDirection.None,
+    double? PracticalValue = null);
+
+public static class EffectSizeFactory
+{
+    /// <summary>
+    ///     Creates the built-in Cliff's-delta effect payload with Romano magnitude labels.
+    /// </summary>
+    public static EffectSize ForCliffsDelta(double cliffsDelta)
+    {
+        var magnitude = MagnitudeLabelExtensions.Classify(Math.Abs(cliffsDelta)).ToShortString();
+
+        return new EffectSize(
+            Metric: EffectMetrics.CliffsDelta,
+            Value: cliffsDelta,
+            Magnitude: magnitude,
+            Direction: cliffsDelta switch
+            {
+                > 0 => EffectDirection.CandidateHigher,
+                < 0 => EffectDirection.CandidateLower,
+                _ => EffectDirection.None,
+            },
+            PracticalValue: Math.Abs(cliffsDelta));
+    }
+}
+
 /// <summary>A single candidate-versus-baseline significance verdict.</summary>
-public readonly record struct PairwiseComparison(string Name, double? PValue, SignificanceVerdict Verdict);
+public readonly record struct PairwiseComparison(
+    string Name,
+    double? PValue,
+    SignificanceVerdict Verdict,
+    EffectSize? Effect = null);

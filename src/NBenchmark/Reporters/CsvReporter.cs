@@ -1,4 +1,5 @@
 using System.Text;
+using NBenchmark.Stats;
 
 namespace NBenchmark.Reporters;
 
@@ -29,12 +30,12 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         if (Detail == ReportDetail.Simple)
         {
             sb.AppendLine(
-                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,AllocPerOp,MarginPercent,OutliersRemoved,Detail");
+                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail");
         }
         else
         {
             sb.AppendLine(
-                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations");
+                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations");
         }
 
         var table = BenchmarkTable.Build(results);
@@ -50,6 +51,8 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
 
             var safeName = row.Name.Replace("\"", "\"\"");
             var safeSig = sig.Replace("\"", "\"\"");
+            var safeEffectMetric = (row.Effect?.Metric ?? string.Empty).Replace("\"", "\"\"");
+            var safeMagnitude = (row.Effect?.Magnitude ?? string.Empty).Replace("\"", "\"\"");
 
             if (Detail == ReportDetail.Simple)
             {
@@ -68,6 +71,9 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{row.P99:F1}," +
                     $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
                     $"\"{safeSig}\"," +
+                    $"\"{safeEffectMetric}\"," +
+                    $"{row.Effect?.Value?.ToString("F4") ?? ""}," +
+                    $"\"{safeMagnitude}\"," +
                     $"{row.MeanAllocatedBytes?.ToString() ?? "null"}," +
                     $"{row.MarginPercent:F2}," +
                     $"{row.OutliersRemoved}," +
@@ -96,6 +102,9 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{row.P99:F1}," +
                     $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
                     $"\"{safeSig}\"," +
+                    $"\"{safeEffectMetric}\"," +
+                    $"{row.Effect?.Value?.ToString("F4") ?? ""}," +
+                    $"\"{safeMagnitude}\"," +
                     $"{row.MeanAllocatedBytes?.ToString() ?? "null"}," +
                     $"{row.MarginPercent:F2}," +
                     $"{row.OutliersRemoved}," +

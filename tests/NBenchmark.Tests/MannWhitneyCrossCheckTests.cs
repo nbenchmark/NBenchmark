@@ -49,11 +49,11 @@ public class MannWhitneyCrossCheckTests
         double[] a, double[] b, double asymptoticP, double exactP)
     {
         _ = asymptoticP;
-        var p = MannWhitneyU.Test(a, b);
+        var result = MannWhitneyU.Test(a, b);
 
         // Combined n <= 20 and tie-free, so NBenchmark takes the exact path and
         // must reproduce SciPy's exact p-value to within floating-point noise.
-        Numerics.AssertRelativeClose(exactP, p, 1e-9);
+        Numerics.AssertRelativeClose(exactP, result.PValue, 1e-9);
     }
 
     [Theory]
@@ -80,8 +80,8 @@ public class MannWhitneyCrossCheckTests
         // NBenchmark's bounded-partition DP must agree with a brute-force
         // rank-assignment enumerator on these small, tie-free samples.
         Assert.True(
-            Math.Abs(nbenchmark - enumerated) < 1e-9,
-            $"|nbenchmark {nbenchmark} − enumerated {enumerated}| = {Math.Abs(nbenchmark - enumerated)} >= 1e-9.");
+            Math.Abs(nbenchmark.PValue - enumerated) < 1e-9,
+            $"|nbenchmark {nbenchmark.PValue} − enumerated {enumerated}| = {Math.Abs(nbenchmark.PValue - enumerated)} >= 1e-9.");
     }
 
     // Exact two-sided Mann-Whitney p-value by full enumeration of which combined

@@ -18,6 +18,37 @@ public class MeasurementOptionsTests
         Assert.True(opts.EnableSignificance);
         Assert.Equal(0.05, opts.SignificanceLevel);
         Assert.True(opts.ForceGcBetweenBenchmarks);
+        Assert.Null(opts.MinimumPracticalEffect);
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(0.147)]
+    [InlineData(0.5)]
+    [InlineData(1.0)]
+    public void MinimumPracticalEffect_Accepts_Valid_Values(double value)
+    {
+        var opts = new MeasurementOptions { MinimumPracticalEffect = value };
+        Assert.Equal(value, opts.MinimumPracticalEffect);
+    }
+
+    [Fact]
+    public void MinimumPracticalEffect_Rejects_Invalid_Values()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { MinimumPracticalEffect = -0.01 });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { MinimumPracticalEffect = 1.01 });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { MinimumPracticalEffect = double.NaN });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { MinimumPracticalEffect = double.PositiveInfinity });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { MinimumPracticalEffect = double.NegativeInfinity });
     }
 
     [Theory]

@@ -284,6 +284,104 @@ public class SignificanceStrategyTests
         Assert.Null(comparison.PValue);
     }
 
+    [Fact]
+    public void ComputeSignificance_MinimumPracticalEffect_DowngradesVerdictAndForcesNegligibleMagnitude()
+    {
+        // Construct a synthetic case where the engine sees a Significant
+        // verdict with |CliffsDelta| below the threshold. With the threshold
+        // set above the observed |delta|, the verdict must be downgraded to
+        // NotSignificant and the Magnitude label forced to Negligible.
+        var results = new List<BenchmarkResult>
+        {
+            Result("baseline", true),
+            Result("candidate"),
+        };
+
+        var rawSamples = new Dictionary<string, double[]>
+        {
+            ["baseline"] = Cluster(10),
+            ["candidate"] = Cluster(10),
+        };
+
+        // A custom test reports Significant with |delta| = 0.1, which the
+        // engine must downgrade to NotSignificant because 0.1 < 0.5.
+        var custom = new DeltaReportingSignificanceTest("candidate", delta: 0.1, pValue: 0.001);
+
+        Significance.ComputeSignificance(
+            results,
+            rawSamples,
+            test: custom,
+            significanceLevel: 0.05,
+            minimumPracticalEffect: 0.5);
+
+        var candidateResult = results.Single(r => r.Name == "candidate");
+        Assert.Equal(SignificanceVerdict.NotSignificant, candidateResult.SignificanceVerdict);
+        Assert.Equal("neg", candidateResult.Effect?.Magnitude);
+    }
+
+    [Fact]
+    public void ComputeSignificance_MinimumPracticalEffect_NullIsNoOp()
+    {
+        // With a null threshold, the existing p-value-only Sig semantics are
+        // preserved: a Significant verdict stays Significant and Magnitude
+        // stays at whatever the test reported.
+        var results = new List<BenchmarkResult>
+        {
+            Result("baseline", true),
+            Result("candidate"),
+        };
+
+        var rawSamples = new Dictionary<string, double[]>
+        {
+            ["baseline"] = Cluster(10),
+            ["candidate"] = Cluster(10),
+        };
+
+        var custom = new DeltaReportingSignificanceTest("candidate", delta: 0.1, pValue: 0.001);
+
+        Significance.ComputeSignificance(
+            results,
+            rawSamples,
+            test: custom,
+            significanceLevel: 0.05,
+            minimumPracticalEffect: null);
+
+        var candidateResult = results.Single(r => r.Name == "candidate");
+        Assert.Equal(SignificanceVerdict.Significant, candidateResult.SignificanceVerdict);
+        Assert.Equal("neg", candidateResult.Effect?.Magnitude);
+    }
+
+    [Fact]
+    public void ComputeSignificance_MinimumPracticalEffect_DeltaAboveThreshold_KeepsVerdict()
+    {
+        // Sanity check: when |delta| exceeds the threshold, the engine does
+        // not touch the verdict or magnitude.
+        var results = new List<BenchmarkResult>
+        {
+            Result("baseline", true),
+            Result("candidate"),
+        };
+
+        var rawSamples = new Dictionary<string, double[]>
+        {
+            ["baseline"] = Cluster(10),
+            ["candidate"] = Cluster(10),
+        };
+
+        var custom = new DeltaReportingSignificanceTest("candidate", delta: 0.8, pValue: 0.001);
+
+        Significance.ComputeSignificance(
+            results,
+            rawSamples,
+            test: custom,
+            significanceLevel: 0.05,
+            minimumPracticalEffect: 0.5);
+
+        var candidate = results.Single(r => r.Name == "candidate");
+        Assert.Equal(SignificanceVerdict.Significant, candidate.SignificanceVerdict);
+        Assert.Equal("large", candidate.Effect?.Magnitude);
+    }
+
     private static double[] Cluster(double center)
     {
         var rng = new Random((int)center + 1);
@@ -321,6 +419,33 @@ public class SignificanceStrategyTests
         public SignificanceReport Analyze(SignificanceContext context) => new()
         {
             Pairwise = [new PairwiseComparison(candidate, pValue, SignificanceVerdict.Significant)],
+        };
+    }
+
+    private sealed class DeltaReportingSignificanceTest(string candidate, double delta, double pValue) : ISignificanceTest
+    {
+        public string Name => "delta-reporting";
+
+        public SignificanceReport Analyze(SignificanceContext context) => new()
+        {
+            Pairwise =
+            [
+                new PairwiseComparison(
+                    candidate,
+                    pValue,
+                    SignificanceVerdict.Significant,
+                    Effect: new EffectSize(
+                        Metric: "custom-delta",
+                        Value: delta,
+                        Magnitude: MagnitudeLabelExtensions.Classify(Math.Abs(delta)).ToShortString(),
+                        Direction: delta switch
+                        {
+                            > 0 => EffectDirection.CandidateHigher,
+                            < 0 => EffectDirection.CandidateLower,
+                            _ => EffectDirection.None,
+                        },
+                        PracticalValue: Math.Abs(delta))),
+            ],
         };
     }
 }

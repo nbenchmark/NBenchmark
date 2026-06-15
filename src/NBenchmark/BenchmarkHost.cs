@@ -92,6 +92,17 @@ public sealed class BenchmarkHost
     }
 
     /// <summary>
+    ///     Requires a minimum strategy-defined practical effect in [0, 1] for a candidate
+    ///     to be considered practically significant. Values below the threshold are reported
+    ///     as NotSignificant with a <c>neg</c> magnitude label.
+    /// </summary>
+    public BenchmarkHost WithMinimumPracticalEffect(double minimumDelta)
+    {
+        _options = _options with { MinimumPracticalEffect = minimumDelta };
+        return this;
+    }
+
+    /// <summary>
     ///     Controls Host mode's isolated-by-default execution. When enabled (the default),
     ///     each discovered class runs in its own clean-room child process unless a benchmark
     ///     or its class opts out with <c>[InProcess]</c>. When disabled, every benchmark

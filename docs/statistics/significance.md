@@ -1,6 +1,6 @@
 ---
 title: Significance Testing
-description: How NBenchmark decides whether benchmark differences are statistically real - the Mann-Whitney U test for two groups and the Kruskal-Wallis omnibus test (with post-hoc pairwise Mann-Whitney U and Holm-Bonferroni correction) for three or more.
+description: How NBenchmark decides whether benchmark differences are statistically real - the Mann-Whitney U test for two groups and the Kruskal-Wallis omnibus test (with post-hoc pairwise Mann-Whitney U and Holm-Bonferroni correction) for three or more. Plus Cliff's delta effect size and the opt-in MinimumPracticalEffect practical-significance gate.
 order: 4
 ---
 
@@ -40,7 +40,7 @@ $$U_1 = R_1 - \frac{n_1(n_1+1)}{2}, \quad U_2 = n_1 n_2 - U_1, \quad U = \min(U_
 
 A [p-value](https://en.wikipedia.org/wiki/P-value) below the configured significance level (alpha, default **0.05**) is considered significant (✓ in the Sig column). Set it with `MeasurementOptions.SignificanceLevel`, the `.WithSignificanceLevel(...)` fluent method, or the `--alpha` CLI flag.
 
-Using the exact test for small samples removes the main source of error in the old normal-approximation-only approach, where the asymptotic p-value could differ from the exact permutation p-value by up to ≈ 0.05. For larger samples the continuity-corrected normal approximation is accurate and matches SciPy's asymptotic method closely; the exact and approximate paths are cross-checked against SciPy in [Validation & Accuracy](./validation.md).
+For small samples, using the exact test avoids approximation error: the asymptotic p-value can differ from the exact permutation p-value by up to ≈ 0.05. For larger samples the continuity-corrected normal approximation is accurate and matches SciPy's asymptotic method closely; the exact and approximate paths are cross-checked against SciPy in [Validation & Accuracy](./validation.md).
 
 > [!NOTE]
 > NBenchmark uses the **pre-trim raw samples** (before outlier removal) for significance testing. This gives the test more data to work with. However it means that significance is assessed on the full distribution including extreme measurements.
@@ -93,6 +93,56 @@ If the omnibus is **not** significant, no post-hoc comparisons run. The per-row 
 > [!NOTE]
 > The post-hoc step only runs when the omnibus is significant. This two-stage procedure (omnibus gate then pairwise correction) preserves the family-wise error rate while giving you per-benchmark significance indicators in the table.
 
+## Effect size: Cliff's delta
+
+A p-value tells you whether a difference is unlikely under the null, but not *how large* the difference is. With many iterations a tiny 0.1 ns shift can be "statistically significant" while being practically meaningless. NBenchmark reports the effect size alongside the p-value as a **Magnitude** column (Negligible / Small / Medium / Large) classified from **Cliff's delta**.
+
+### What Cliff's delta measures
+
+Cliff's delta is a non-parametric effect size that quantifies how often one sample's value exceeds the other's:
+
+$$\delta = \frac{\#(b > a) - \#(b < a)}{n_1 \cdot n_2}$$
+
+with `a` = baseline and `b` = candidate samples. It ranges over `[-1, 1]`:
+
+| delta | Interpretation |
+|---|---|
+| `+1` | Every candidate sample exceeds every baseline sample (candidate is uniformly slower). |
+| `0` | The two distributions overlap completely (no shift). |
+| `-1` | Every baseline sample exceeds every candidate sample (candidate is uniformly faster). |
+
+The sign convention is: **positive delta = candidate tends to be slower than baseline**. The console reporter color-codes the cell to make this readable at a glance - red when the candidate is slower, green when faster.
+
+### Romano magnitude thresholds
+
+The **Magnitude** column classifies `|delta|` using the [Romano et al. (2006)](https://en.wikipedia.org/wiki/Effect_size) thresholds:
+
+| `\|delta\|` range | Magnitude label |
+|---|---|
+| `[0, 0.147)` | Negligible |
+| `[0.147, 0.33)` | Small |
+| `[0.33, 0.474)` | Medium |
+| `[0.474, 1.0]` | Large |
+
+These are the same thresholds used in the educational-assessment literature. They are guidelines, not laws - your domain may call for stricter or looser cutoffs (see [Practical-significance gate](#practical-significance-gate) below).
+
+### Practical-significance gate
+
+Set `MeasurementOptions.MinimumPracticalEffect` (or use `BenchmarkSuite.WithMinimumPracticalEffect(...)` / `BenchmarkHost.WithMinimumPracticalEffect(...)`) to require a minimum practical-effect score in `[0, 1]` for a comparison to count as meaningful. Built-in Mann-Whitney tests map this score to `|delta|`; custom tests can map any effect metric by returning `EffectSize.PracticalValue` in `PairwiseComparison`.
+
+- Comparisons with practical effect below the threshold are reported with `Magnitude = neg` (so a sub-threshold result is never labelled `large`).
+- The Sig verdict is downgraded from `Significant` to `NotSignificant` even when the p-value is below alpha.
+- The configured value must be in the range `[0, 1]`.
+
+The engine enforces the gate in `Significance.ApplyReport` after the test runs, so it works for any `ISignificanceTest` implementation - not just the built-in ones. Custom tests that return an `EffectSize` with `PracticalValue` are gated automatically; tests that do not return a practical value are unaffected.
+
+```csharp
+// Reject statistical significance below |delta| = 0.33 (the "small" threshold)
+.WithMinimumPracticalEffect(0.33)
+```
+
+Leave it `null` (the default) to keep p-value-only Sig semantics, in which case the Magnitude column is purely informational.
+
 ## Custom significance tests
 
 The whole strategy is pluggable through `ISignificanceTest`. Implement it to swap in a bootstrap comparison, a Bayesian test, a post-hoc procedure, or a domain-specific rule:
@@ -117,7 +167,22 @@ public sealed class MedianRatioSignificanceTest(double thresholdPercent) : ISign
                 : SignificanceVerdict.NotSignificant;
 
             // No p-value for this rule, so report null.
-            pairwise.Add(new PairwiseComparison(candidate.Name, PValue: null, verdict));
+            pairwise.Add(new PairwiseComparison(
+                candidate.Name,
+                PValue: null,
+                Verdict: verdict,
+                Effect: new EffectSize(
+                    Metric: "median-ratio",
+                    Value: deltaPercent,
+                    Magnitude: deltaPercent switch
+                    {
+                        < 5 => "neg",
+                        < 15 => "small",
+                        < 30 => "med",
+                        _ => "large",
+                    },
+                    Direction: EffectDirection.None,
+                    PracticalValue: Math.Min(1.0, deltaPercent / 100.0))));
         }
 
         return new SignificanceReport { Pairwise = pairwise };
@@ -139,7 +204,8 @@ new MeasurementOptions { SignificanceTest = new MedianRatioSignificanceTest(25) 
 
 `Analyze` receives a `SignificanceContext` (the comparable `Groups`, the `BaselineIndex`, the `Baseline` group, the non-baseline `Candidates`, and the `SignificanceLevel`) and returns a `SignificanceReport` containing:
 
-- **`Pairwise`** - one `PairwiseComparison(name, pValue, verdict)` per candidate. Use `PValue: null` for rules that do not produce a p-value.
+- **`Pairwise`** - one `PairwiseComparison(name, pValue, verdict, effect)` per candidate. Use `PValue: null` for rules that do not produce a p-value.
+- **`Effect`** (`EffectSize`) - optional strategy-defined effect metadata (`Metric`, numeric `Value`, string `Magnitude`, `Direction`, and optional normalized `PracticalValue` used by `MinimumPracticalEffect`).
 - **`Omnibus`** - an optional single verdict across all groups. Set it for omnibus tests like Kruskal-Wallis; leave it `null` for purely pairwise tests.
 
 The built-in strategies - `MannWhitneyUSignificanceTest`, `KruskalWallisSignificanceTest`, and the group-count-aware `DefaultSignificanceTest` - all implement this same interface, so you can also wrap or compose them.

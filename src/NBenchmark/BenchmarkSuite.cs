@@ -139,6 +139,17 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>
+    ///     Requires a minimum strategy-defined practical effect in [0, 1] for a candidate
+    ///     to be considered practically significant. Values below the threshold are reported
+    ///     as NotSignificant with a <c>neg</c> magnitude label.
+    /// </summary>
+    public BenchmarkSuite WithMinimumPracticalEffect(double minimumDelta)
+    {
+        _options = _options with { MinimumPracticalEffect = minimumDelta };
+        return this;
+    }
+
     public BenchmarkSuite WithRunOrder(RunOrder order)
     {
         _runOrder = order;

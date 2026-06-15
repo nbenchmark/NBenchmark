@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using NBenchmark.Stats;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
@@ -54,6 +55,7 @@ public sealed class ConsoleReporter : IReporter
 
         RenderWarnings(benchTable);
         RenderOmnibus(benchTable);
+        RenderContext(benchTable);
         RenderFooter(benchTable, results.Count);
         AnsiConsole.WriteLine();
 
@@ -65,14 +67,12 @@ public sealed class ConsoleReporter : IReporter
         var headerGrid = new Grid()
             .AddColumn(new GridColumn().NoWrap())
             .AddColumn(new GridColumn().NoWrap())
-            .AddColumn(new GridColumn().NoWrap())
             .AddColumn(new GridColumn().NoWrap());
 
         headerGrid.AddRow(
             "[bold steelblue1]BENCHMARK RESULTS[/]",
             $"[grey]{benchTable.RunAtUtc} UTC[/]",
-            $"[grey]{benchTable.WarmupIterations} warmup / {benchTable.MeasuredIterations} measured[/]",
-            $"[grey]Outliers: {Esc(benchTable.OutlierDetector)}[/]"
+            $"[grey]{benchTable.WarmupIterations} warmup / {benchTable.MeasuredIterations} measured[/]"
         );
 
         var panel = new Panel(headerGrid)
@@ -96,6 +96,7 @@ public sealed class ConsoleReporter : IReporter
             .AddColumn(new TableColumn("[bold]Mean[/]").RightAligned().NoWrap())
             .AddColumn(new TableColumn("[bold]vs Baseline[/]").NoWrap())
             .AddColumn(new TableColumn("[bold]Sig[/]").Centered().NoWrap())
+            .AddColumn(new TableColumn("[bold]Magnitude[/]").Centered().NoWrap())
             .AddColumn(new TableColumn("[bold]Alloc/op[/]").RightAligned().NoWrap());
 
         var hasDescriptions = results.Any(r => !string.IsNullOrEmpty(r.Description));
@@ -110,7 +111,7 @@ public sealed class ConsoleReporter : IReporter
                 var errorCols = new List<string>
                 {
                     $"[red]✗ {Esc(row.Name)}[/]",
-                    "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
+                    "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
                 };
 
                 if (hasDescriptions)
@@ -143,6 +144,8 @@ public sealed class ConsoleReporter : IReporter
                 ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
                 : "[dim]-[/]";
 
+            var magnitudeText = RenderMagnitude(row.Effect);
+
             var rowCols = new List<string>
             {
                 nameText,
@@ -150,6 +153,7 @@ public sealed class ConsoleReporter : IReporter
                 BenchmarkFormatter.FormatNs(row.Mean),
                 ratioAndBar,
                 sigIcon,
+                magnitudeText,
                 allocText,
             };
 
@@ -319,7 +323,49 @@ public sealed class ConsoleReporter : IReporter
             + $"[{color}]{verdict}[/] [grey](α = {benchTable.SignificanceLevel:0.###})[/]");
     }
 
+    private static void RenderContext(BenchmarkTable benchTable)
+    {
+        AnsiConsole.WriteLine();
+
+        AnsiConsole.MarkupLine($"[grey]Outliers:[/] [dim]{Esc(benchTable.OutlierDetector)}[/]");
+        AnsiConsole.MarkupLine(
+            "[grey]Effect metric:[/] [dim]strategy-defined (built-in Mann-Whitney uses Cliff's \u03b4 with Romano neg/small/med/large labels)[/]");
+    }
+
     private static string FormatP(double p) => p < 0.001 ? "<0.001" : p.ToString("0.###");
+
+    private static string RenderMagnitude(EffectSize? effect)
+    {
+        if (effect is not { } value)
+            return "[dim]-[/]";
+
+        var magnitude = string.IsNullOrWhiteSpace(value.Magnitude)
+            ? value.Value?.ToString("F3") ?? "-"
+            : value.Magnitude;
+
+        if (string.Equals(magnitude, "neg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(magnitude, "negligible", StringComparison.OrdinalIgnoreCase))
+            return "[dim]neg[/]";
+
+        if (string.Equals(magnitude, "small", StringComparison.OrdinalIgnoreCase))
+            return "[yellow]small[/]";
+
+        if (string.Equals(magnitude, "med", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(magnitude, "medium", StringComparison.OrdinalIgnoreCase))
+            return "[orange1]med[/]";
+
+        if (string.Equals(magnitude, "large", StringComparison.OrdinalIgnoreCase))
+        {
+            return value.Direction switch
+            {
+                EffectDirection.CandidateHigher => "[bold red]large[/]",
+                EffectDirection.CandidateLower => "[bold green]large[/]",
+                _ => "[bold]large[/]",
+            };
+        }
+
+        return $"[cyan]{Esc(magnitude)}[/]";
+    }
 
     private static string RenderBar(double value, double max, string color)
     {
