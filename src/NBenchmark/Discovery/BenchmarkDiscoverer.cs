@@ -159,9 +159,30 @@ public sealed class BenchmarkDiscoverer
             ResultConsumer = resultConsumer,
             IterationSetupDelegate = iterSetupDel,
             IterationTeardownDelegate = iterTeardownDel,
-            IsolatedProcess = method.GetCustomAttribute<IsolatedProcessAttribute>(true) is not null
-                              || method.DeclaringType?.GetCustomAttribute<IsolatedProcessAttribute>(true) is not null,
+            Isolation = ResolveIsolationMode(method),
         };
+    }
+
+    // Resolves the declared isolation intent with method attributes taking precedence
+    // over class attributes, and [InProcess] taking precedence over [IsolatedProcess] at
+    // the same level. The global --in-process flag is layered on later, by the host.
+    private static IsolationMode ResolveIsolationMode(MethodInfo method)
+    {
+        if (method.GetCustomAttribute<InProcessAttribute>(true) is not null)
+            return IsolationMode.InProcess;
+
+        if (method.GetCustomAttribute<IsolatedProcessAttribute>(true) is not null)
+            return IsolationMode.PerBenchmark;
+
+        var declaringType = method.DeclaringType;
+
+        if (declaringType?.GetCustomAttribute<InProcessAttribute>(true) is not null)
+            return IsolationMode.InProcess;
+
+        if (declaringType?.GetCustomAttribute<IsolatedProcessAttribute>(true) is not null)
+            return IsolationMode.PerBenchmark;
+
+        return IsolationMode.Default;
     }
 
     private static object?[] ConvertArguments(object[] arguments, ParameterInfo[] parameters)

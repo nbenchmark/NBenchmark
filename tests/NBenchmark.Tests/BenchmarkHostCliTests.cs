@@ -61,7 +61,7 @@ public class BenchmarkHostCliTests
                     "--warmup", "3",
                 ]);
 
-                host.AddFromAssembly<TestBenchmarks>().WithRunOrder(RunOrder.Declaration)
+                host.AddFromAssembly<TestBenchmarks>().WithRunOrder(RunOrder.Declaration).WithIsolation(false)
                     .RunAsync().GetAwaiter().GetResult();
             });
 
@@ -94,7 +94,7 @@ public class BenchmarkHostCliTests
                         "--warmup", "3",
                     ]);
 
-                    host.AddFromAssembly<SlowVsBaselineBenchmarks>().WithRunOrder(RunOrder.Declaration)
+                    host.AddFromAssembly<SlowVsBaselineBenchmarks>().WithRunOrder(RunOrder.Declaration).WithIsolation(false)
                         .RunAsync().GetAwaiter().GetResult();
                 });
             });
@@ -116,6 +116,7 @@ public class BenchmarkHostCliTests
             await BenchmarkHost.Create(["--filter", "TestBenchmarks.*"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
                 .RunAsync()
         );
 
@@ -136,6 +137,7 @@ public class BenchmarkHostCliTests
                 .WithProgress(new OrderingProgress(
                     () => events.Add("onSuiteStarting"),
                     () => events.Add("onSuiteCompleted")))
+                .WithIsolation(false)
                 .RunAsync();
         });
 
@@ -156,6 +158,7 @@ public class BenchmarkHostCliTests
                 await BenchmarkHost.Create(["--filter", "TestBenchmarks.*"])
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
+                    .WithIsolation(false)
                     .RunAsync();
             });
 
@@ -165,6 +168,7 @@ public class BenchmarkHostCliTests
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
                     .WithReporter(new JsonReporter(tempDir))
+                    .WithIsolation(false)
                     .RunAsync();
             });
 
@@ -193,6 +197,7 @@ public class BenchmarkHostCliTests
                     await BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--reporter", name, "--output", tempDir])
                         .AddFromAssembly<TestBenchmarks>()
                         .WithRunOrder(RunOrder.Declaration)
+                        .WithIsolation(false)
                         .RunAsync();
                 });
 
@@ -253,6 +258,7 @@ public class BenchmarkHostCliTests
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
                     .WithReporter(customReporter)
+                    .WithIsolation(false)
                     .RunAsync();
             });
 
@@ -277,6 +283,7 @@ public class BenchmarkHostCliTests
                 await BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--reporter", "csv", "--detail", "advanced", "--output", tempDir])
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
+                    .WithIsolation(false)
                     .RunAsync();
             });
 
@@ -303,6 +310,7 @@ public class BenchmarkHostCliTests
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithReporter(customReporter)
+                .WithIsolation(false)
                 .RunAsync();
         });
 
@@ -322,6 +330,7 @@ public class BenchmarkHostCliTests
                 await BenchmarkHost.Create(["--filter", "TestBenchmarks.*", "--reporter", "csv", "--output", tempDir])
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
+                    .WithIsolation(false)
                     .RunAsync();
             });
 
@@ -377,6 +386,7 @@ public class BenchmarkHostCliTests
                     .WithRunOrder(RunOrder.Declaration)
                     .WithReporter(customReporter)
                     .WithDetail(ReportDetail.Advanced)
+                    .WithIsolation(false)
                     .RunAsync();
             });
 

@@ -1,39 +1,132 @@
-using System.Diagnostics;
-using System.Text;
-using System.Text.Json;
-
 namespace NBenchmark.Engine;
 
-internal enum IsolatedRunMode
+/// <summary>
+///     Distinguishes the two kinds of isolated run that share the unified child launcher.
+/// </summary>
+internal enum IsolatedRunKind
 {
-    Quick,
+    /// <summary>A suite launched via <c>BenchmarkSuite.WithIsolation()</c>.</summary>
     Suite,
+
+    /// <summary>A discovered Host-mode class running under isolated-by-default execution.</summary>
+    Host,
 }
 
+/// <summary>
+///     The resolved per-benchmark isolation decision in Host mode, after layering the
+///     global <c>--in-process</c> flag on top of the discovered <c>IsolationMode</c>.
+/// </summary>
+internal enum IsolationDecision
+{
+    /// <summary>Run in the host process.</summary>
+    InProcess,
+
+    /// <summary>Run with the rest of its declaring class in one shared child process.</summary>
+    PerClass,
+
+    /// <summary>Run alone in its own dedicated child process.</summary>
+    PerBenchmark,
+}
+
+/// <summary>
+///     The scalar measurement overrides forwarded to a Host-mode child. The child rebuilds
+///     its base <see cref="MeasurementOptions" /> by re-running the same entry point (so
+///     custom detectors and significance tests survive), then applies these CLI-derived
+///     scalars on top - mirroring what the parent applies in-process.
+/// </summary>
+internal sealed record MeasurementOverrides
+{
+    public int? Iterations { get; init; }
+    public int? WarmupIterations { get; init; }
+    public double? ConfidenceLevel { get; init; }
+    public double? SignificanceLevel { get; init; }
+    public OutlierMode? OutlierMode { get; init; }
+
+    public static MeasurementOverrides FromCliArgs(CliArgs cliArgs) => new()
+    {
+        Iterations = cliArgs.Iterations,
+        WarmupIterations = cliArgs.WarmupIterations,
+        ConfidenceLevel = cliArgs.ConfidenceLevel,
+        SignificanceLevel = cliArgs.Alpha,
+        OutlierMode = cliArgs.OutlierMode,
+    };
+
+    public MeasurementOptions Apply(MeasurementOptions options)
+    {
+        var result = options;
+
+        if (Iterations.HasValue)
+            result = result with { Iterations = Iterations.Value };
+
+        if (WarmupIterations.HasValue)
+            result = result with { WarmupIterations = WarmupIterations.Value };
+
+        if (ConfidenceLevel.HasValue)
+            result = result with { ConfidenceLevel = ConfidenceLevel.Value };
+
+        if (SignificanceLevel.HasValue)
+            result = result with { SignificanceLevel = SignificanceLevel.Value };
+
+        if (OutlierMode.HasValue)
+            result = result with { OutlierMode = OutlierMode.Value, OutlierDetector = null };
+
+        return result;
+    }
+}
+
+/// <summary>
+///     The serialized request a parent writes for its child. A Suite request carries the
+///     callsite identity used to replay exactly the right <c>RunAsync</c> call; a Host
+///     request carries the declaring type plus the benchmark names to run. Both carry the
+///     benchmark display names (for naming child results and any errored fallbacks).
+/// </summary>
 internal sealed record IsolatedRunRequest
 {
-    public required IsolatedRunMode Mode { get; init; }
-    public required int InvocationOrdinal { get; init; }
-    public required string CallerFilePath { get; init; }
-    public required int CallerLineNumber { get; init; }
-    public required string CallerMemberName { get; init; }
-    public required string BenchmarkName { get; init; }
+    public required IsolatedRunKind Kind { get; init; }
 
+    // Suite callsite-replay identity.
+    public int InvocationOrdinal { get; init; }
+    public string? CallerFilePath { get; init; }
+    public int CallerLineNumber { get; init; }
+    public string? CallerMemberName { get; init; }
     public string? SuiteName { get; init; }
 
-    public required MeasurementOptions Options { get; init; }
+    // Host discovery identity.
+    public string? DeclaringTypeFullName { get; init; }
+
+    // Shared: which benchmarks to expect results for and how to name them. For Host the
+    // names also select which discovered benchmarks the child runs.
+    public string DisplayPrefix { get; init; } = "";
+    public IReadOnlyList<string> BenchmarkDisplayNames { get; init; } = [];
+
+    // Host-only scalar measurement overrides (Suite children rebuild their own options).
+    public MeasurementOverrides Overrides { get; init; } = new();
 }
 
+/// <summary>A single benchmark result plus its raw per-iteration samples, as shipped from a child.</summary>
+internal sealed record IsolatedResultItem
+{
+    public required BenchmarkResult Result { get; init; }
+    public required double[] RawSamples { get; init; }
+}
+
+/// <summary>The full set of results a child writes back to its parent.</summary>
+internal sealed record IsolatedPayload
+{
+    public required IReadOnlyList<IsolatedResultItem> Items { get; init; }
+}
+
+/// <summary>
+///     The child-side half of isolation: tracks whether the current process is running as
+///     an isolated child, what it was asked to run, and where to write its results. The
+///     parent-side process launch lives in <see cref="ChildProcessLauncher" />.
+/// </summary>
 internal static class IsolatedRunContext
 {
-    private const string RequestPathEnvVar = "NBENCHMARK_ISOLATED_REQUEST_PATH";
-    private const string OutputPathEnvVar = "NBENCHMARK_ISOLATED_OUTPUT_PATH";
-    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = false };
-
-    private static int QuickInvocationSequence;
     private static int SuiteInvocationSequence;
     private static readonly AsyncLocal<IsolatedRunScope?> Scope = new();
 
+    /// <summary>True when the current process is executing as an isolated child.</summary>
     public static bool IsActive => Scope.Value is not null;
 
     public static bool TryGetActiveRequest(out IsolatedRunRequest request)
@@ -50,109 +143,90 @@ internal static class IsolatedRunContext
         return true;
     }
 
-    public static int NextInvocationOrdinal(IsolatedRunMode mode)
-        => mode switch
-        {
-            IsolatedRunMode.Quick => Interlocked.Increment(ref QuickInvocationSequence),
-            IsolatedRunMode.Suite => Interlocked.Increment(ref SuiteInvocationSequence),
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown isolated run mode."),
-        };
+    /// <summary>
+    ///     Returns the next ordinal for a suite <c>RunAsync</c> call. Parent and child
+    ///     re-run the same entry point, so incrementing on every call keeps their ordinals
+    ///     in lock-step and lets the child identify the requested callsite unambiguously.
+    /// </summary>
+    public static int NextSuiteInvocationOrdinal() => Interlocked.Increment(ref SuiteInvocationSequence);
 
-    internal static void ResetInvocationOrdinalsForTesting()
-    {
-        Interlocked.Exchange(ref QuickInvocationSequence, 0);
-        Interlocked.Exchange(ref SuiteInvocationSequence, 0);
-    }
+    internal static void ResetInvocationOrdinalsForTesting() => Interlocked.Exchange(ref SuiteInvocationSequence, 0);
 
-    public static bool IsRequestMatch(
-        IsolatedRunMode mode,
+    public static bool IsSuiteRequestMatch(
         int invocationOrdinal,
         string callerFilePath,
         int callerLineNumber,
         string callerMemberName,
-        string? benchmarkName = null,
-        string? suiteName = null)
+        string suiteName)
     {
         if (!TryGetActiveRequest(out var request))
             return false;
 
-        if (request.Mode != mode)
-            return false;
-
-        if (request.InvocationOrdinal != invocationOrdinal)
-            return false;
-
-        if (!PathEquals(request.CallerFilePath, callerFilePath))
-            return false;
-
-        if (request.CallerLineNumber != callerLineNumber)
-            return false;
-
-        if (!string.Equals(request.CallerMemberName, callerMemberName, StringComparison.Ordinal))
-            return false;
-
-        if (benchmarkName is not null
-            && !string.Equals(request.BenchmarkName, benchmarkName, StringComparison.Ordinal))
-            return false;
-
-        if (suiteName is not null
-            && !string.Equals(request.SuiteName, suiteName, StringComparison.Ordinal))
-            return false;
-
-        return true;
+        return request.Kind == IsolatedRunKind.Suite
+               && request.InvocationOrdinal == invocationOrdinal
+               && PathEquals(request.CallerFilePath, callerFilePath)
+               && request.CallerLineNumber == callerLineNumber
+               && string.Equals(request.CallerMemberName, callerMemberName, StringComparison.Ordinal)
+               && string.Equals(request.SuiteName, suiteName, StringComparison.Ordinal);
     }
 
-    public static bool IsRequestedInvocation(IsolatedRunMode mode, int invocationOrdinal)
-        => TryGetActiveRequest(out var request)
-           && request.Mode == mode
-           && request.InvocationOrdinal == invocationOrdinal;
-
-    public static MeasurementOutcome BuildCallsiteMismatchOutcome(
-        string name,
-        MeasurementOptions options,
-        IsolatedRunRequest request,
-        string actualCallerFilePath,
-        int actualCallerLineNumber,
-        string actualCallerMemberName,
-        int actualInvocationOrdinal,
-        string? actualSuiteName = null)
-    {
-        var expectedSuite = request.SuiteName is null ? "(none)" : request.SuiteName;
-        var actualSuite = actualSuiteName is null ? "(none)" : actualSuiteName;
-
-        var message =
-            $"Isolated replay mismatch for '{name}'. "
-            + $"Requested invocation #{request.InvocationOrdinal} at "
-            + $"{request.CallerFilePath}:{request.CallerLineNumber} ({request.CallerMemberName}), "
-            + $"suite={expectedSuite}; "
-            + $"child executed invocation #{actualInvocationOrdinal} at "
-            + $"{actualCallerFilePath}:{actualCallerLineNumber} ({actualCallerMemberName}), "
-            + $"suite={actualSuite}. "
-            + "The replayed call order or callsite identity differs between parent and child.";
-
-        return BuildErroredOutcome(name, options, message);
-    }
-
-    public static MeasurementOptions ResolveOptions(MeasurementOptions fallback)
-    {
-        return TryGetActiveRequest(out var request)
-            ? request.Options
-            : fallback;
-    }
-
-    public static async Task WriteChildOutcomeIfRequestedAsync(
-        MeasurementOutcome outcome,
+    /// <summary>
+    ///     Writes the child's results to the output file the parent supplied. A no-op when
+    ///     the current process is not an isolated child (or has no output path), so the
+    ///     same in-process run helper can be reused by the parent.
+    /// </summary>
+    public static async Task WriteChildPayloadIfRequestedAsync(
+        IReadOnlyList<BenchmarkResult> results,
+        IReadOnlyDictionary<string, double[]> rawSamples,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(outcome);
+        ArgumentNullException.ThrowIfNull(results);
+        ArgumentNullException.ThrowIfNull(rawSamples);
 
-        var outputPath = Scope.Value?.OutputPath
-                         ?? Environment.GetEnvironmentVariable(OutputPathEnvVar);
+        var outputPath = Scope.Value?.OutputPath;
 
         if (string.IsNullOrWhiteSpace(outputPath))
             return;
 
-        await IsolatedProcessRunner.WriteResultAsync(outputPath, outcome, cancellationToken).ConfigureAwait(false);
+        var items = results
+            .Select(r => new IsolatedResultItem
+            {
+                Result = r,
+                RawSamples = rawSamples.TryGetValue(r.Name, out var samples) ? samples : [],
+            })
+            .ToList();
+
+        await ChildProcessLauncher.WritePayloadAsync(outputPath, items, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Child entry wrapper. If the request/output environment variables are set this
+    ///     process is an isolated child: read the request, establish the scope, and run the
+    ///     action. Otherwise run the action unchanged (the common, parent path).
+    /// </summary>
+    public static async Task<T> WithCurrentRequestAsync<T>(Func<Task<T>> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        var requestPath = Environment.GetEnvironmentVariable(ChildProcessLauncher.RequestPathEnvVar);
+
+        if (string.IsNullOrWhiteSpace(requestPath))
+            return await action().ConfigureAwait(false);
+
+        var request = await ChildProcessLauncher.ReadRequestAsync(requestPath).ConfigureAwait(false);
+        var outputPath = Environment.GetEnvironmentVariable(ChildProcessLauncher.OutputPathEnvVar);
+
+        var prior = Scope.Value;
+        Scope.Value = new IsolatedRunScope(request, outputPath);
+
+        try
+        {
+            return await action().ConfigureAwait(false);
+        }
+        finally
+        {
+            Scope.Value = prior;
+        }
     }
 
     internal static async Task<T> WithActiveRequestForTestingAsync<T>(
@@ -164,7 +238,7 @@ internal static class IsolatedRunContext
         ArgumentNullException.ThrowIfNull(action);
 
         var prior = Scope.Value;
-        Scope.Value = new IsolatedRunScope(null, request, outputPath);
+        Scope.Value = new IsolatedRunScope(request, outputPath);
 
         try
         {
@@ -176,135 +250,7 @@ internal static class IsolatedRunContext
         }
     }
 
-    public static async Task<T> WithCurrentRequestAsync<T>(Func<Task<T>> action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-
-        var requestPath = Environment.GetEnvironmentVariable(RequestPathEnvVar);
-
-        if (string.IsNullOrWhiteSpace(requestPath))
-            return await action().ConfigureAwait(false);
-
-        var request = await ReadRequestAsync(requestPath).ConfigureAwait(false);
-        var outputPath = Environment.GetEnvironmentVariable(OutputPathEnvVar);
-
-        var prior = Scope.Value;
-        Scope.Value = new IsolatedRunScope(requestPath, request, outputPath);
-
-        try
-        {
-            return await action().ConfigureAwait(false);
-        }
-        finally
-        {
-            Scope.Value = prior;
-        }
-    }
-
-    public static async Task<MeasurementOutcome> RunInIsolatedProcessAsync(
-        IsolatedRunRequest request,
-        CancellationToken cancellationToken)
-    {
-        var requestPath = Path.Combine(Path.GetTempPath(), $"nbench-isolated-request-{Guid.NewGuid():N}.json");
-        var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-isolated-output-{Guid.NewGuid():N}.json");
-
-        try
-        {
-            await WriteRequestAsync(requestPath, request, cancellationToken).ConfigureAwait(false);
-
-            // Quick/Suite isolated replay always launches the current entry process and
-            // carries request/output paths via env vars instead of CLI switches.
-            using var process = new Process
-            {
-                StartInfo = IsolatedProcessRunner.BuildStartInfo(
-                    [],
-                    (RequestPathEnvVar, requestPath),
-                    (OutputPathEnvVar, outputPath)),
-            };
-
-            var stderr = new StringBuilder();
-
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data is not null)
-                    stderr.AppendLine(e.Data);
-            };
-
-            process.OutputDataReceived += (_, _) => { };
-
-            process.Start();
-            process.BeginErrorReadLine();
-            process.BeginOutputReadLine();
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-
-            if (process.ExitCode != 0 || !File.Exists(outputPath))
-            {
-                var detail = stderr.Length > 0 ? $" {stderr.ToString().Trim()}" : "";
-
-                var noPayloadHint = process.ExitCode == 0 && !File.Exists(outputPath)
-                    ? " The child exited successfully but produced no payload; this usually indicates that the requested isolated callsite was not replayed in the child process."
-                    : "";
-
-                var message =
-                    $"Isolated process for '{request.BenchmarkName}' exited with code {process.ExitCode}.{detail}{noPayloadHint}";
-
-                return BuildErroredOutcome(request.BenchmarkName, request.Options, message);
-            }
-
-            return await IsolatedProcessRunner.ReadResultAsync(outputPath, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return BuildErroredOutcome(
-                request.BenchmarkName,
-                request.Options,
-                $"Failed to run '{request.BenchmarkName}' in an isolated process: {ex.Message}");
-        }
-        finally
-        {
-            TryDelete(requestPath);
-            TryDelete(outputPath);
-        }
-    }
-
-    private static async Task WriteRequestAsync(
-        string requestPath,
-        IsolatedRunRequest request,
-        CancellationToken cancellationToken)
-    {
-        await using var stream = File.Create(requestPath);
-        await JsonSerializer.SerializeAsync(stream, request, SerializerOptions, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static async Task<IsolatedRunRequest> ReadRequestAsync(string requestPath)
-    {
-        await using var stream = File.OpenRead(requestPath);
-
-        var request = await JsonSerializer.DeserializeAsync<IsolatedRunRequest>(stream, SerializerOptions)
-            .ConfigureAwait(false);
-
-        if (request is null)
-            throw new InvalidOperationException("Isolated request payload was unreadable.");
-
-        return request;
-    }
-
-    private static MeasurementOutcome BuildErroredOutcome(
-        string name,
-        MeasurementOptions options,
-        string message)
-    {
-        return OutcomeBuilder.Build(
-            new RunOutcome.Errored(new InvalidOperationException(message), message),
-            name,
-            null,
-            false,
-            options,
-            TimeSpan.Zero,
-            TimeSpan.Zero);
-    }
-
-    private static bool PathEquals(string left, string right)
+    private static bool PathEquals(string? left, string? right)
     {
         if (OperatingSystem.IsWindows())
             return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
@@ -312,18 +258,5 @@ internal static class IsolatedRunContext
         return string.Equals(left, right, StringComparison.Ordinal);
     }
 
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-        catch
-        {
-            // Best effort temp-file cleanup.
-        }
-    }
-
-    private sealed record IsolatedRunScope(string? RequestPath, IsolatedRunRequest Request, string? OutputPath);
+    private sealed record IsolatedRunScope(IsolatedRunRequest Request, string? OutputPath);
 }

@@ -83,4 +83,4 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 
 ## [Isolated Runs (Advanced)](./isolated-runs.md)
 
-Run Quick, Suite, and Host benchmarks in clean child processes when runtime state contamination matters more than raw execution speed.
+Run Suite and Host benchmarks in clean child processes when runtime state contamination matters more than raw execution speed. Host mode is isolated by default; suites opt in with `WithIsolation()`.

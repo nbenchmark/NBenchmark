@@ -147,20 +147,34 @@ public class DatabaseBenchmarks
 
 ### `[IsolatedProcess]`
 
-Runs a benchmark in a freshly spawned child process instead of in-process. Apply it to a single method, or to a class to isolate every benchmark it declares.
+Host mode is **isolated by default**: every benchmark class runs in its own freshly spawned child process, so it is not influenced by JIT, GC, or thread-pool state warmed up by other classes. You don't need any attribute to get this behavior.
+
+Use the isolation attributes to change the granularity:
+
+- **`[IsolatedProcess]`** on a method gives that single benchmark its **own dedicated** child process - the finest granularity, isolated even from sibling benchmarks in the same class.
+- **`[InProcess]`** on a method (or class) opts that benchmark back into the **host process**.
 
 ```csharp
 public class StartupBenchmarks
 {
     [Benchmark]
+    public int Warm() => RunWarmWork();           // shares one per-class child
+
+    [Benchmark]
     [IsolatedProcess]
-    public int ColdPath() => RunColdSensitiveWork();
+    public int ColdPath() => RunColdSensitiveWork();  // its own dedicated child
+
+    [Benchmark]
+    [InProcess]
+    public int InHost() => RunHostObservableWork();   // runs in the host process
 }
 ```
 
-Each isolated benchmark runs in a clean CLR, so it is not influenced by JIT, GC, or thread-pool state warmed up by sibling benchmarks running in the same process. The host re-runs the same entry assembly for the child, executes only that one benchmark, and reads its result back through a temporary file (never stdout, so the child's own console output cannot corrupt the data).
+When a class mixes these, NBenchmark runs the in-process benchmarks in the host, the per-class benchmarks together in one child, and each `[IsolatedProcess]` benchmark in its own child. The host re-runs the same entry assembly for each child, executes only the requested benchmarks, and reads results back through a temporary file (never stdout, so the child's own console output cannot corrupt the data).
 
-Isolation trades wall-clock cost - a process launch per benchmark - for measurement cleanliness. Reach for it when a benchmark is sensitive to runtime warmup state; leave it off for ordinary microbenchmarks where the in-process path is faster and accurate enough. In-process and isolated benchmarks can coexist in the same suite and are run separately.
+To disable isolation for the **whole run**, pass `--in-process` on the command line or call `WithIsolation(false)` in code. `--dry-run` also always runs in-process. Isolation trades wall-clock cost - a process launch per child - for measurement cleanliness; leave it off for ordinary microbenchmarks where the in-process path is faster and accurate enough.
+
+See [Isolated Runs](./isolated-runs.md) for the full isolation model across all modes.
 
 ## Class requirements
 

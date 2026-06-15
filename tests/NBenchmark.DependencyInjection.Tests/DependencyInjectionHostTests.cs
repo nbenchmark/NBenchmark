@@ -22,6 +22,7 @@ public class DependencyInjectionHostTests
                 .AddFromAssembly<DependentBenchmark>()
                 .WithServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
                 .RunAsync();
         });
 
@@ -43,6 +44,7 @@ public class DependencyInjectionHostTests
                 .AddFromAssembly<ScopedDependentBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
                 .RunAsync();
         });
 
@@ -66,6 +68,7 @@ public class DependencyInjectionHostTests
                 .AddFromAssembly<DisposableBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
                 .RunAsync();
         });
 
@@ -84,6 +87,7 @@ public class DependencyInjectionHostTests
             await BenchmarkHost.Create(["--filter", "UnresolvableBenchmark.*", "--dry-run"])
                 .AddFromAssembly<UnresolvableBenchmark>()
                 .WithScopedServiceProvider(services)
+                .WithIsolation(false)
                 .RunAsync();
         });
     }
@@ -103,6 +107,7 @@ public class DependencyInjectionHostTests
             await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .UseDependencyInjection<DependentBenchmark>(services)
                 .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
                 .RunAsync();
         });
 
@@ -124,6 +129,7 @@ public class DependencyInjectionHostTests
             await BenchmarkHost.Create(["--filter", "DisposableBenchmark.*", "--dry-run"])
                 .UseScopedDependencyInjection<DisposableBenchmark>(services)
                 .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
                 .RunAsync();
         });
 
@@ -140,6 +146,7 @@ public class DependencyInjectionHostTests
             await BenchmarkHost.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<ParameterlessBenchmark>()
                 .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
                 .RunAsync();
         });
 
@@ -161,6 +168,7 @@ public class DependencyInjectionHostTests
                     return Activator.CreateInstance(type)!;
                 })
                 .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
                 .RunAsync();
         });
 

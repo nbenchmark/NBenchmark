@@ -30,8 +30,18 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(IsolatedMethodBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(IsolatedMethodBenchmarks));
 
-        Assert.True(suite.Benchmarks.First(b => b.Method.Name == "Isolated").IsolatedProcess);
-        Assert.False(suite.Benchmarks.First(b => b.Method.Name == "InProcess").IsolatedProcess);
+        Assert.Equal(IsolationMode.PerBenchmark, suite.Benchmarks.First(b => b.Method.Name == "Isolated").Isolation);
+        Assert.Equal(IsolationMode.Default, suite.Benchmarks.First(b => b.Method.Name == "Plain").Isolation);
+    }
+
+    [Fact]
+    public void Discovers_Method_Level_InProcess_Attribute()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(InProcessMethodBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(InProcessMethodBenchmarks));
+
+        Assert.Equal(IsolationMode.InProcess, suite.Benchmarks.First(b => b.Method.Name == "Forced").Isolation);
+        Assert.Equal(IsolationMode.Default, suite.Benchmarks.First(b => b.Method.Name == "Plain").Isolation);
     }
 
     [Fact]
@@ -40,7 +50,27 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(IsolatedClassBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(IsolatedClassBenchmarks));
 
-        Assert.All(suite.Benchmarks, b => Assert.True(b.IsolatedProcess));
+        Assert.All(suite.Benchmarks, b => Assert.Equal(IsolationMode.PerBenchmark, b.Isolation));
+    }
+
+    [Fact]
+    public void Class_Level_InProcess_Attribute_Applies_To_All_Benchmarks()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(InProcessClassBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(InProcessClassBenchmarks));
+
+        Assert.All(suite.Benchmarks, b => Assert.Equal(IsolationMode.InProcess, b.Isolation));
+    }
+
+    [Fact]
+    public void Method_Level_Isolation_Overrides_Class_Level_Isolation()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(MixedIsolationBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(MixedIsolationBenchmarks));
+
+        // Class is [IsolatedProcess]; method [InProcess] opts a single benchmark back out.
+        Assert.Equal(IsolationMode.InProcess, suite.Benchmarks.First(b => b.Method.Name == "OptedOut").Isolation);
+        Assert.Equal(IsolationMode.PerBenchmark, suite.Benchmarks.First(b => b.Method.Name == "Inherited").Isolation);
     }
 
     [Fact]
@@ -49,7 +79,7 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(DerivedIsolatedBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(DerivedIsolatedBenchmarks));
 
-        Assert.All(suite.Benchmarks, b => Assert.True(b.IsolatedProcess));
+        Assert.All(suite.Benchmarks, b => Assert.Equal(IsolationMode.PerBenchmark, b.Isolation));
     }
 
     [Fact]
@@ -193,7 +223,17 @@ public class IsolatedMethodBenchmarks
     public int Isolated() => 1;
 
     [Benchmark]
-    public int InProcess() => 2;
+    public int Plain() => 2;
+}
+
+public class InProcessMethodBenchmarks
+{
+    [Benchmark]
+    [InProcess]
+    public int Forced() => 1;
+
+    [Benchmark]
+    public int Plain() => 2;
 }
 
 [IsolatedProcess]
@@ -204,6 +244,27 @@ public class IsolatedClassBenchmarks
 
     [Benchmark]
     public int B() => 2;
+}
+
+[InProcess]
+public class InProcessClassBenchmarks
+{
+    [Benchmark]
+    public int A() => 1;
+
+    [Benchmark]
+    public int B() => 2;
+}
+
+[IsolatedProcess]
+public class MixedIsolationBenchmarks
+{
+    [Benchmark]
+    [InProcess]
+    public int OptedOut() => 1;
+
+    [Benchmark]
+    public int Inherited() => 2;
 }
 
 [IsolatedProcess]

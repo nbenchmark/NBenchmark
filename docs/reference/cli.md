@@ -155,6 +155,18 @@ Has no effect when `--order declaration` is used.
 
 ---
 
+### `--in-process`
+
+Disable process isolation for the whole run. Host mode is isolated by default - each benchmark class runs in its own child process - and this flag forces every benchmark to run in the host process instead. It overrides `[IsolatedProcess]` and is equivalent to calling `WithIsolation(false)` in code.
+
+```bash
+dotnet run -- --in-process
+```
+
+`--dry-run` also always runs in-process. See [Isolated Runs](../guides/isolated-runs.md) for the full isolation model.
+
+---
+
 ### `--detail <level>`
 
 Set the report detail level. Controls how much information reporters display.
