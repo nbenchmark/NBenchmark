@@ -61,10 +61,10 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 
 _Run at 2026-06-06 03:40:00 UTC - 25 warmup / 190 measured_
 
-| Benchmark | Median | Mean | Error | StdDev | P95 | P99 | Ratio | Sig | Alloc/op |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Compute | 300.0 ns | 275.3 ns | ±16.2 ns | 85.9 ns | 500.0 ns | 500.0 ns | 0.75x | ✓ | - |
-| Baseline | 400.0 ns | 375.8 ns | ±21.6 ns | 114.3 ns | 500.0 ns | 900.0 ns | 1.00x | - | - |
+| Benchmark | Median | Mean | Error | StdDev | P95 | P99 | Ratio | Sig | Magnitude | Alloc/op |
+|---|---:|---:|---:|---:|---:|---:|:---:|---:|---:|---:|
+| Compute | 300.0 ns | 275.3 ns | ±16.2 ns | 85.9 ns | 500.0 ns | 500.0 ns | 0.75x | ✓ | large | - |
+| Baseline | 400.0 ns | 375.8 ns | ±21.6 ns | 114.3 ns | 500.0 ns | 900.0 ns | 1.00x | - | - | - |
 
 _Error = ±95% confidence interval half-width on the mean._
 ```
@@ -88,6 +88,7 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 | **P99** | 99th percentile. |
 | **Ratio** | Speed relative to the baseline. |
 | **Sig** | `✓` = significant, `✗` = not significant, `-` = not applicable. |
+| **Magnitude** | Strategy-defined qualitative effect label. With the built-in Mann-Whitney tests this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `small` (< 0.33), `med` (< 0.474), `large` (≥ 0.474). `-` for the baseline or when significance is not tested. See [Effect size: Cliff's delta](../statistics/significance.md#effect-size-cliffs-delta). |
 | **Alloc/op** | Mean bytes allocated per iteration, or `-` if not measured. |
 
 ## Notes

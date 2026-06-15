@@ -36,7 +36,7 @@ Even with warmup and forced GC, occasional **OS scheduling interrupts**, context
 
 By default, NBenchmark trims samples beyond an **[IQR fence](https://en.wikipedia.org/wiki/Interquartile_range)** before computing statistics (`OutlierMode.IqrFence`): anything below `Q1 - 1.5 × IQR` or above `Q3 + 1.5 × IQR`. Unlike a fixed quota, this adapts to the run - a clean run keeps almost every sample, while a noisy run trims more. If the discarded slow samples cluster tightly (a possible second execution profile rather than random noise), NBenchmark adds a bimodal-distribution warning to the result.
 
-The fence values (`LowerFence`, `UpperFence`) are now first-class fields on `BenchmarkResult` and are visible in Advanced detail mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`).
+The fence values (`LowerFence`, `UpperFence`) are first-class fields on `BenchmarkResult` and are visible in Advanced detail mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`).
 
 Available modes:
 
@@ -100,8 +100,10 @@ The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonp
 
 When you compare **three or more** benchmarks, NBenchmark first runs the **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus test**. If the omnibus is significant (at least one group differs), it follows up with pairwise Mann-Whitney U tests (candidate versus baseline) with Holm-Bonferroni correction, and the per-row Sig column shows the corrected verdicts. If the omnibus is not significant, no post-hoc comparisons run and the per-row Sig column stays blank. The default strategy is `DefaultSignificanceTest`; you can swap in your own via `ISignificanceTest` (see [Significance Testing](../statistics/significance.md#custom-significance-tests)).
 
+Statistical significance is reported with a standardized magnitude: the **Magnitude** column shows Cliff's delta classified as Negligible / Small / Medium / Large. See [Effect size: Cliff's delta](../statistics/significance.md#effect-size-cliffs-delta) for the thresholds, the sign convention, and the opt-in `MinimumPracticalEffect` gate.
+
 > [!NOTE]
-> Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Always look at the Ratio column alongside significance.
+> Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Read the Magnitude column alongside Sig and the Ratio column.
 
 ## Allocation tracking
 

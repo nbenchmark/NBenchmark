@@ -29,13 +29,13 @@ public static class MannWhitneyU
     /// <summary>Minimum samples required in each group to attempt the test.</summary>
     private const int MinPerGroup = 2;
 
-    public static double Test(double[] sampleA, double[] sampleB)
+    public static MannWhitneyUResult Test(double[] sampleA, double[] sampleB)
     {
         var n1 = sampleA.Length;
         var n2 = sampleB.Length;
 
         if (n1 < MinPerGroup || n2 < MinPerGroup)
-            return double.NaN;
+            return new MannWhitneyUResult(double.NaN, double.NaN);
 
         var combined = new (double Value, int Group)[n1 + n2];
 
@@ -86,13 +86,22 @@ public static class MannWhitneyU
         }
 
         var u1 = r1 - (double)n1 * (n1 + 1) / 2.0;
+        var u2 = (double)n1 * n2 - u1;
+        // Cliff's delta: δ = P(B > A) - P(B < A) = (U2 - U1) / (n1 * n2).
+        // Positive δ means the candidate (group B) tends to be larger (slower) than
+        // the baseline (group A).
+        var cliffsDelta = (u2 - u1) / ((double)n1 * n2);
 
         // Exact enumeration is only valid without ties (mid-ranks shift the discrete
         // distribution). For small, tie-free samples it is both exact and cheap.
         if (!hasTies && n1 + n2 <= ExactMaxCombinedSamples)
-            return ExactTwoSided(n1, n2, u1);
+        {
+            var pValue = ExactTwoSided(n1, n2, u1);
+            return new MannWhitneyUResult(pValue, cliffsDelta);
+        }
 
-        return AsymptoticTwoSided(combined, n1, n2, u1);
+        var asymptoticPValue = AsymptoticTwoSided(combined, n1, n2, u1);
+        return new MannWhitneyUResult(asymptoticPValue, cliffsDelta);
     }
 
     /// <summary>
@@ -230,3 +239,16 @@ public static class MannWhitneyU
         return 0.5 * (1.0 + sign * y);
     }
 }
+
+/// <summary>
+///     The result of a two-sided Mann-Whitney U test, including the p-value and
+///     Cliff's delta effect size.
+/// </summary>
+/// <param name="PValue">The two-sided p-value, or <c>NaN</c> when the test could not run.</param>
+/// <param name="CliffsDelta">
+///     Cliff's delta: <c>(U2 - U1) / (n1 * n2)</c>, equivalent to
+///     <c>P(B &gt; A) - P(B &lt; A)</c> with A = baseline, B = candidate. Positive means
+///     samples in group B (the candidate) tend to be larger (slower) than group A (the
+///     baseline). <c>NaN</c> when the test could not run.
+/// </param>
+public readonly record struct MannWhitneyUResult(double PValue, double CliffsDelta);

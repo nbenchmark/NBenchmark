@@ -1,4 +1,5 @@
 using NBenchmark.Reporters;
+using NBenchmark.Stats;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -194,6 +195,7 @@ public class ReporterTests
             Assert.True(File.Exists(filePath));
             var content = await File.ReadAllTextAsync(filePath);
             Assert.Contains("Name,Median,Mean", content);
+            Assert.Contains("EffectMetric,EffectValue,Magnitude", content);
             Assert.Contains("\"alpha\"", content);
         }
         finally
@@ -217,6 +219,38 @@ public class ReporterTests
             var filePath = Path.Combine(tempDir, "out.csv");
             var lines = await File.ReadAllLinesAsync(filePath);
             Assert.Contains(",advanced,", lines[1]);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task CsvReporter_Writes_Generic_Effect_Columns()
+    {
+        var tempDir = MakeSubDir("nb-csv-effect");
+
+        try
+        {
+            var reporter = new CsvReporter(tempDir, "out.csv");
+            var result = MakeResult("alpha", 100) with
+            {
+                Effect = new EffectSize(
+                    Metric: "median-ratio",
+                    Value: 0.42,
+                    Magnitude: "small",
+                    Direction: EffectDirection.CandidateHigher,
+                    PracticalValue: 0.42),
+            };
+
+            await reporter.ReportAsync([result]);
+
+            var filePath = Path.Combine(tempDir, "out.csv");
+            var lines = await File.ReadAllLinesAsync(filePath);
+
+            Assert.Contains("EffectMetric,EffectValue,Magnitude", lines[0]);
+            Assert.Contains("\"median-ratio\",0.4200,\"small\"", lines[1]);
         }
         finally
         {

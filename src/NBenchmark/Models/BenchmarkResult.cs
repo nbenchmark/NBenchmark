@@ -47,6 +47,13 @@ public record BenchmarkResult
     public SignificanceVerdict SignificanceVerdict { get; init; }
 
     /// <summary>
+    ///     Optional effect-size payload produced by the active significance strategy.
+    ///     Built-in Mann-Whitney strategies populate this with Cliff's delta and a
+    ///     Romano magnitude label.
+    /// </summary>
+    public EffectSize? Effect { get; init; }
+
+    /// <summary>
     ///     The omnibus significance verdict (e.g. Kruskal-Wallis) shared across all
     ///     benchmarks in the comparison, when an omnibus test was run (three or more groups).
     ///     <c>null</c> for pairwise comparisons.

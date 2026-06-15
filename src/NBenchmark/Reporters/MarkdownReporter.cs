@@ -1,4 +1,5 @@
 using System.Text;
+using NBenchmark.Stats;
 
 namespace NBenchmark.Reporters;
 
@@ -56,14 +57,14 @@ public sealed class MarkdownReporter : IReporter
 
         sb.AppendLine("### Comparison");
         sb.AppendLine();
-        sb.AppendLine("| | Benchmark | Median | Mean | Ratio | Scale | Sig | Alloc/op |");
-        sb.AppendLine("|:---:|---|---:|---:|:---:|---|---:|---:|");
+        sb.AppendLine("| | Benchmark | Median | Mean | Ratio | Scale | Sig | Magnitude | Alloc/op |");
+        sb.AppendLine("|:---:|---|---:|---:|:---:|---|---:|---:|---:|");
 
         foreach (var row in table.Rows)
         {
             if (row.Errored)
             {
-                sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - |");
+                sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - |");
                 continue;
             }
 
@@ -85,6 +86,8 @@ public sealed class MarkdownReporter : IReporter
                 ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
                 : "-";
 
+            var magnitudeText = row.Effect?.Magnitude ?? "-";
+
             sb.AppendLine(
                 $"| " +
                 $"| {nameText} " +
@@ -93,6 +96,7 @@ public sealed class MarkdownReporter : IReporter
                 $"| {ratioText} " +
                 $"| {bar} " +
                 $"| {sigIcon} " +
+                $"| {magnitudeText} " +
                 $"| {allocText} |"
             );
         }

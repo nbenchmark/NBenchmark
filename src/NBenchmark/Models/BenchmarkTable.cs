@@ -77,6 +77,7 @@ public sealed record BenchmarkTable
             ConfidenceIntervalLower = result.ConfidenceIntervalLower,
             ConfidenceIntervalUpper = result.ConfidenceIntervalUpper,
             SignificanceLabel = ComputeSignificanceLabel(result, multiBenchmark),
+            Effect = result.Effect,
             Warnings = result.Warnings,
             Q1 = result.Q1,
             Q3 = result.Q3,
@@ -156,6 +157,27 @@ public sealed record BenchmarkTable
 
         lines.Add($"MAD: {BenchmarkFormatter.FormatNs(row.Mad)}");
 
+        if (row.Effect is { } effect && string.Equals(effect.Metric, EffectMetrics.CliffsDelta, StringComparison.Ordinal))
+        {
+            var magnitudeText = effect.Magnitude ?? "?";
+            var deltaText = effect.Value.HasValue ? effect.Value.Value.ToString("F4") : "?";
+
+            var directionText = effect.Direction switch
+            {
+                EffectDirection.CandidateHigher => "slower than baseline",
+                EffectDirection.CandidateLower => "faster than baseline",
+                _ => "similar to baseline",
+            };
+
+            lines.Add($"Cliff's \u03b4: {deltaText} ({magnitudeText}) \u2014 candidate tends to be {directionText}");
+        }
+        else if (row.Effect is { } genericEffect)
+        {
+            var valueText = genericEffect.Value.HasValue ? genericEffect.Value.Value.ToString("F4") : "?";
+            var magnitudeText = string.IsNullOrWhiteSpace(genericEffect.Magnitude) ? "?" : genericEffect.Magnitude;
+            lines.Add($"Effect ({genericEffect.Metric}): {valueText} ({magnitudeText})");
+        }
+
         lines.Add($"N: {row.N} samples");
 
         if (row.AllocMedian is not null)
@@ -192,6 +214,7 @@ public record BenchmarkRow
     public required double ConfidenceIntervalUpper { get; init; }
     public long? MeanAllocatedBytes { get; init; }
     public string SignificanceLabel { get; init; } = "";
+    public EffectSize? Effect { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     public required double Q1 { get; init; }

@@ -49,21 +49,24 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
         // Omnibus is significant: run pairwise Mann-Whitney U (candidate vs baseline)
         // and apply Holm-Bonferroni over the tested candidates.
         var baseline = context.Baseline;
-        var rawPValues = new List<double>(candidateCount);
         var order = new List<string>(candidateCount);
+
+        var rawResults = new List<MannWhitneyUResult>(candidateCount);
 
         foreach (var candidate in context.Candidates)
         {
-            rawPValues.Add(MannWhitneyU.Test(baseline.Samples, candidate.Samples));
+            rawResults.Add(MannWhitneyU.Test(baseline.Samples, candidate.Samples));
             order.Add(candidate.Name);
         }
 
+        var rawPValues = rawResults.Select(r => r.PValue).ToList();
         var adjusted = MultipleComparisons.HolmBonferroni(rawPValues);
         var pairwise = new List<PairwiseComparison>(candidateCount);
 
         for (var i = 0; i < order.Count; i++)
         {
             var p = rawPValues[i];
+            var mwResult = rawResults[i];
 
             if (double.IsNaN(p))
             {
@@ -75,7 +78,12 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
                 ? SignificanceVerdict.Significant
                 : SignificanceVerdict.NotSignificant;
 
-            pairwise.Add(new PairwiseComparison(order[i], p, verdict));
+            EffectSize? effect = null;
+
+            if (!double.IsNaN(mwResult.CliffsDelta))
+                effect = EffectSizeFactory.ForCliffsDelta(mwResult.CliffsDelta);
+
+            pairwise.Add(new PairwiseComparison(order[i], p, verdict, effect));
         }
 
         return new SignificanceReport { Pairwise = pairwise, Omnibus = omnibus };

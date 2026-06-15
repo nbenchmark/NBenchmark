@@ -15,7 +15,7 @@ internal static class Significance
         if (results.Count(r => !r.Errored) < 2)
             return;
 
-        ComputeSignificance(results, rawSamples, options.ResolveSignificanceTest(), options.SignificanceLevel);
+        ComputeSignificance(results, rawSamples, options.ResolveSignificanceTest(), options.SignificanceLevel, options.MinimumPracticalEffect);
     }
 
     /// <summary>
@@ -27,8 +27,9 @@ internal static class Significance
     public static void ComputeSignificance(
         List<BenchmarkResult> results,
         Dictionary<string, double[]> rawSamples,
-        double significanceLevel = 0.05) =>
-        ComputeSignificance(results, rawSamples, DefaultSignificanceTest.Instance, significanceLevel);
+        double significanceLevel = 0.05,
+        double? minimumPracticalEffect = null) =>
+        ComputeSignificance(results, rawSamples, DefaultSignificanceTest.Instance, significanceLevel, minimumPracticalEffect);
 
     /// <summary>
     ///     Runs <paramref name="test" /> over the successful results and updates
@@ -41,7 +42,8 @@ internal static class Significance
         List<BenchmarkResult> results,
         Dictionary<string, double[]> rawSamples,
         ISignificanceTest test,
-        double significanceLevel = 0.05)
+        double significanceLevel = 0.05,
+        double? minimumPracticalEffect = null)
     {
         var successful = results.Where(r => !r.Errored).ToList();
 
@@ -97,10 +99,13 @@ internal static class Significance
 
         var report = test.Analyze(context);
 
-        ApplyReport(results, report);
+        ApplyReport(results, report, minimumPracticalEffect);
     }
 
-    private static void ApplyReport(List<BenchmarkResult> results, SignificanceReport report)
+    private static void ApplyReport(
+        List<BenchmarkResult> results,
+        SignificanceReport report,
+        double? minimumPracticalEffect)
     {
         if (report.Pairwise.Count > 0)
         {
@@ -110,10 +115,30 @@ internal static class Significance
             {
                 if (byName.TryGetValue(results[i].Name, out var comparison))
                 {
+                    // Apply MinimumPracticalEffect uniformly across all ISignificanceTest
+                    // implementations: when the reported practical effect is below the
+                    // configured threshold, the Sig verdict is downgraded to
+                    // NotSignificant and the effect magnitude is forced to "neg" so a
+                    // sub-threshold result is not reported as practically large.
+                    var verdict = comparison.Verdict;
+                    var effect = comparison.Effect;
+
+                    if (minimumPracticalEffect.HasValue
+                        && comparison.Effect is { PracticalValue: { } practicalValue }
+                        && !double.IsNaN(practicalValue)
+                        && practicalValue < minimumPracticalEffect.Value)
+                    {
+                        if (verdict == SignificanceVerdict.Significant)
+                            verdict = SignificanceVerdict.NotSignificant;
+
+                        effect = comparison.Effect.Value with { Magnitude = "neg" };
+                    }
+
                     results[i] = results[i] with
                     {
                         PValue = comparison.PValue,
-                        SignificanceVerdict = comparison.Verdict,
+                        SignificanceVerdict = verdict,
+                        Effect = effect,
                     };
                 }
             }

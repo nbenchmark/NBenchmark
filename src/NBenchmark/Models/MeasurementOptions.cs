@@ -10,6 +10,7 @@ public record MeasurementOptions
     public static readonly MeasurementOptions Default = new();
     private readonly double _confidenceLevel = 0.95;
     private readonly int _iterations = 200;
+    private readonly double? _minimumPracticalEffect;
     private readonly double _significanceLevel = 0.05;
     private readonly int _warmupIterations = 25;
 
@@ -83,6 +84,37 @@ public record MeasurementOptions
     }
 
     public bool ForceGcBetweenBenchmarks { get; init; } = true;
+
+    /// <summary>
+    ///     The minimum practical effect in [0, 1] required for a benchmark to be considered
+    ///     meaningfully different. The active significance strategy can map its own effect
+    ///     metric to this normalized value via <see cref="EffectSize.PracticalValue" />.
+    ///     When set and the reported practical value is below this threshold, the Sig verdict
+    ///     is downgraded to NotSignificant and the magnitude label is forced to <c>neg</c>.
+    ///     Leave null to keep p-value-only Sig semantics.
+    /// </summary>
+    public double? MinimumPracticalEffect
+    {
+        get => _minimumPracticalEffect;
+        init
+        {
+            if (!value.HasValue)
+            {
+                _minimumPracticalEffect = null;
+                return;
+            }
+
+            var delta = value.Value;
+
+            if (double.IsNaN(delta) || double.IsInfinity(delta) || delta < 0 || delta > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    "MinimumPracticalEffect must be between 0 and 1 inclusive.");
+            }
+
+            _minimumPracticalEffect = delta;
+        }
+    }
 
     /// <summary>
     ///     Resolves the effective outlier detector: the custom
