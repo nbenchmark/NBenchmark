@@ -53,10 +53,9 @@ public sealed class ConsoleReporter : IReporter
             RenderAdvancedDetails(benchTable);
         }
 
+        AnsiConsole.WriteLine();
+        RenderInterpretation(benchTable, results.Count);
         RenderWarnings(benchTable);
-        RenderOmnibus(benchTable);
-        RenderContext(benchTable);
-        RenderFooter(benchTable, results.Count);
         AnsiConsole.WriteLine();
 
         return Task.CompletedTask;
@@ -282,6 +281,13 @@ public sealed class ConsoleReporter : IReporter
 
         AnsiConsole.WriteLine();
 
+        var rule = new Rule("[yellow]Warnings[/]")
+            .LeftJustified()
+            .RuleStyle(Style.Parse("yellow"));
+
+        AnsiConsole.Write(rule);
+        AnsiConsole.WriteLine();
+
         foreach (var row in warnings)
         {
             foreach (var warning in row.Warnings)
@@ -291,45 +297,68 @@ public sealed class ConsoleReporter : IReporter
         }
     }
 
-    private static void RenderFooter(BenchmarkTable benchTable, int count)
+    private static void RenderInterpretation(BenchmarkTable benchTable, int count)
     {
+        var rule = new Rule("[dim]Interpretation[/]")
+            .LeftJustified()
+            .RuleStyle(Style.Parse("grey"));
+
+        AnsiConsole.Write(rule);
         AnsiConsole.WriteLine();
+
+        if (benchTable.Omnibus is { } omnibus)
+        {
+            var (verdict, color) = omnibus.Verdict switch
+            {
+                SignificanceVerdict.Significant => ("significant", "green"),
+                SignificanceVerdict.NotSignificant => ("not significant", "yellow"),
+                _ => ("not tested", "dim"),
+            };
+
+            AnsiConsole.MarkupLine(
+                $"[grey]Omnibus:[/] [bold]{Esc(omnibus.TestName)}[/][grey] across {omnibus.GroupCount} groups: "
+                + $"H({omnibus.DegreesOfFreedom}) = {omnibus.Statistic:F2}, p = {FormatP(omnibus.PValue)} → [/]"
+                + $"[{color}]{verdict}[/] [grey](α = {benchTable.SignificanceLevel:0.###})[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[grey]Omnibus:[/] [dim]not run (fewer than 3 comparable groups)[/]");
+        }
+
         var testName = benchTable.Omnibus?.TestName ?? benchTable.SignificanceTestName;
 
-        var footer = $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · "
-                     + $"{Esc(testName)} (p < {benchTable.SignificanceLevel:0.###}) · "
-                     + $"CI {benchTable.ConfidenceLevel * 100:0.#}%[/]";
-
-        AnsiConsole.MarkupLine(footer);
-    }
-
-    private static void RenderOmnibus(BenchmarkTable benchTable)
-    {
-        if (benchTable.Omnibus is not { } omnibus)
-            return;
-
-        var (verdict, color) = omnibus.Verdict switch
-        {
-            SignificanceVerdict.Significant => ("significant", "green"),
-            SignificanceVerdict.NotSignificant => ("not significant", "yellow"),
-            _ => ("not tested", "dim"),
-        };
-
-        AnsiConsole.WriteLine();
-
         AnsiConsole.MarkupLine(
-            $"[grey]Omnibus[/] [bold]{Esc(omnibus.TestName)}[/][grey] across {omnibus.GroupCount} groups: "
-            + $"H({omnibus.DegreesOfFreedom}) = {omnibus.Statistic:F2}, p = {FormatP(omnibus.PValue)} → [/]"
-            + $"[{color}]{verdict}[/] [grey](α = {benchTable.SignificanceLevel:0.###})[/]");
-    }
-
-    private static void RenderContext(BenchmarkTable benchTable)
-    {
-        AnsiConsole.WriteLine();
+            $"[grey]Significance:[/] [dim]{Esc(testName)} (p < {benchTable.SignificanceLevel:0.###})[/]");
 
         AnsiConsole.MarkupLine($"[grey]Outliers:[/] [dim]{Esc(benchTable.OutlierDetector)}[/]");
         AnsiConsole.MarkupLine(
-            "[grey]Effect metric:[/] [dim]strategy-defined (built-in Mann-Whitney uses Cliff's \u03b4 with Romano neg/small/med/large labels)[/]");
+            $"[grey]Effect metric:[/] [dim]{Esc(GetEffectMetricSummary(benchTable.Rows))}[/]");
+
+        AnsiConsole.MarkupLine(
+            $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · CI {benchTable.ConfidenceLevel * 100:0.#}%[/]");
+    }
+
+    private static string GetEffectMetricSummary(IReadOnlyList<BenchmarkRow> rows)
+    {
+        var metrics = rows
+            .Where(r => !r.Errored)
+            .Select(r => r.Effect?.Metric)
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (metrics.Count == 0)
+            return "not reported by active significance strategy";
+
+        if (metrics.Count == 1)
+        {
+            if (string.Equals(metrics[0], EffectMetrics.CliffsDelta, StringComparison.Ordinal))
+                return "Cliff's δ (Romano neg/small/med/large labels)";
+
+            return $"{metrics[0]} (strategy-defined labels)";
+        }
+
+        return $"mixed metrics ({string.Join(", ", metrics)})";
     }
 
     private static string FormatP(double p) => p < 0.001 ? "<0.001" : p.ToString("0.###");

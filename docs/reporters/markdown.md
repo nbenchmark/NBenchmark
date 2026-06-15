@@ -59,17 +59,36 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 ```markdown
 ## Benchmark Results
 
-_Run at 2026-06-06 03:40:00 UTC - 25 warmup / 190 measured_
+> **2026-06-06 03:40:00 UTC** · 25 warmup · 190 measured
+
+### Comparison
 
 | Benchmark | Median | Mean | Error | StdDev | P95 | P99 | Ratio | Sig | Magnitude | Alloc/op |
 |---|---:|---:|---:|---:|---:|---:|:---:|---:|---:|---:|
 | Compute | 300.0 ns | 275.3 ns | ±16.2 ns | 85.9 ns | 500.0 ns | 500.0 ns | 0.75x | ✓ | large | - |
 | Baseline | 400.0 ns | 375.8 ns | ±21.6 ns | 114.3 ns | 500.0 ns | 900.0 ns | 1.00x | - | - | - |
 
-_Error = ±95% confidence interval half-width on the mean._
+### Precision & Tail Latency
+
+| Benchmark | Error (±CI) | StdDev | CV | P95 | P99 |
+|---|---:|---:|---:|---:|---:|
+| Compute | ±16.2 ns (5.89%) | 85.9 ns | 31.22% | 500.0 ns | 500.0 ns |
+| Baseline | ±21.6 ns (5.75%) | 114.3 ns | 30.43% | 500.0 ns | 900.0 ns |
+
+---
+
+### Interpretation
+
+**Omnibus**: not run (fewer than 3 comparable groups).
+
+- Significance: Mann-Whitney U (p < 0.05)
+- Outliers: IQR fence (1.5×)
+- Effect metric: Cliff's δ (Romano neg/small/med/large labels)
+
+_2 benchmark(s) · 0.0s total · Mann-Whitney U (p < 0.05) · CI 95%_
 ```
 
-When **three or more** benchmarks are compared, the Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and the reporter appends an omnibus line summarising the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
+When **three or more** benchmarks are compared, the Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and the **Interpretation** section includes an omnibus line summarising the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
 
 ```markdown
 **Omnibus (Kruskal-Wallis)** across 3 groups: H(2) = 7.20, p = 0.027 → significant
@@ -96,6 +115,7 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 - Results are sorted by median (fastest first).
 - Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, StdDev, P95, and P99 columns show `0.0 ns`.
 - The output directory is created automatically if it does not exist.
+- The report order is: Comparison -> Precision & Tail Latency -> (optional) Distribution Details -> Interpretation -> (optional) Warnings -> final summary line.
 - In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown.
 
 ## Using with Benchmark (Quick mode)
