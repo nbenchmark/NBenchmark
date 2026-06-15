@@ -1,18 +1,20 @@
 ---
 title: "Isolated Runs (Advanced)"
-description: Run Quick, Suite, and Host benchmarks in clean child processes to avoid runtime cross-contamination.
+description: Run benchmarks in clean child processes to avoid runtime cross-contamination.
 order: 6
 ---
 
 # Isolated Runs (Advanced)
 
-NBenchmark normally runs benchmarks in-process for speed and DX. For advanced scenarios where runtime state can bias measurements, use isolated runs.
+Process isolation runs benchmarks in a freshly spawned child process so their measurements are not biased by runtime state - JIT warmup, heap and GC pressure, or thread-pool and process-level state - left behind by earlier work in the same process.
 
-Isolation is available in all three usage modes:
+How you reach for isolation depends on the mode:
 
-- Quick mode via `Benchmark.RunIsolated*`
-- Suite mode via `BenchmarkSuite.RunIsolated*`
-- Host mode via `[IsolatedProcess]`
+| Mode | Isolation | Granularity |
+| --- | --- | --- |
+| **Quick** (`Benchmark.Run` / `RunAsync`) | Not available - always in-process | - |
+| **Suite** (`BenchmarkSuite`) | Opt in with `WithIsolation()` | The whole suite runs in one child process |
+| **Host** (`BenchmarkHost`) | **On by default** | Per class, with per-benchmark and opt-out controls |
 
 Isolation is useful when you want to reduce contamination from:
 
@@ -20,25 +22,20 @@ Isolation is useful when you want to reduce contamination from:
 - heap and GC pressure left by unrelated work
 - thread-pool and process-level runtime state
 
-## Quick mode isolation
+## Quick mode
 
-Use `RunIsolated` and `RunIsolatedAsync` when you want a single benchmark in a fresh child process:
+Quick mode is intentionally simple and always runs **in-process** - there is no isolated variant. When you need a clean process, use Suite or Host mode.
 
 ```csharp
 using NBenchmark;
 
-var result = Benchmark.RunIsolated(
-    () => ColdStartSensitivePath(),
-    name: "cold path");
-
-var asyncResult = await Benchmark.RunIsolatedAsync(
-    async () => await LoadDataAsync(),
-    name: "cold async path");
+// Always in-process - fast and simple.
+var result = Benchmark.Run(() => ColdStartSensitivePath(), name: "cold path");
 ```
 
-## Suite mode isolation
+## Suite mode
 
-Use `RunIsolatedAsync` (or `RunIsolated`) on `BenchmarkSuite` to run each benchmark in its own child process:
+Call `WithIsolation()` on a `BenchmarkSuite` to run the **entire suite** inside a single clean child process. All benchmarks in the suite are measured there, so they compare against each other in the same fresh CLR:
 
 ```csharp
 using NBenchmark;
@@ -49,12 +46,15 @@ var results = await new BenchmarkSuite("isolated-comparison")
     .Add("candidate", () => Candidate())
     .WithBaseline("baseline")
     .WithReporter(new ConsoleReporter())
-    .RunIsolatedAsync();
+    .WithIsolation()        // run the whole suite in one child process
+    .RunAsync();
 ```
 
-## Host mode isolation
+`WithIsolation(false)` is the default and keeps the suite in-process. Suite setup and teardown (`WithSuiteSetup` / `WithSuiteTeardown`) run inside the child, and your custom `IOutlierDetector` / `ISignificanceTest` are preserved because the child rebuilds the suite from your own `Main` rather than deserializing options.
 
-In Host mode, apply `[IsolatedProcess]` to a benchmark method (or to the benchmark class) to run discovered benchmarks in child processes:
+## Host mode
+
+Host mode is **isolated by default**: each benchmark class runs in its own clean child process. You usually don't configure anything - `BenchmarkHost.Create(args)...RunAsync()` already isolates per class.
 
 ```csharp
 using NBenchmark.Attributes;
@@ -62,24 +62,45 @@ using NBenchmark.Attributes;
 public sealed class StartupBenchmarks
 {
     [Benchmark]
-    [IsolatedProcess]
-    public int ColdPath() => RunColdSensitiveWork();
+    public int ColdPath() => RunColdSensitiveWork();   // isolated per class by default
 }
 ```
 
-This works with normal host execution (`BenchmarkHost.Create(args)...RunAsync()`) and all regular CLI options.
+You can tune the granularity:
+
+- **`[IsolatedProcess]`** on a method (finest granularity) gives that one benchmark its own dedicated child process, isolated even from siblings in the same class.
+- **`[InProcess]`** on a method (or class) opts that benchmark back into the host process.
+- **`--in-process`** on the command line, or **`WithIsolation(false)`** in code, disables isolation for the whole run.
+
+```csharp
+public sealed class MixedBenchmarks
+{
+    [Benchmark]
+    public int Default() => Work();              // shares one per-class child
+
+    [Benchmark]
+    [IsolatedProcess]
+    public int OwnProcess() => ColdWork();        // its own dedicated child
+
+    [Benchmark]
+    [InProcess]
+    public int InHost() => HostObservableWork();  // runs in the host process
+}
+```
+
+When isolation resolves to a mix, NBenchmark runs the in-process benchmarks in the host, the per-class benchmarks together in one child, and each `[IsolatedProcess]` benchmark in its own child. The host re-runs the same entry assembly for each child, executes only the requested benchmarks, and reads their results back through a temporary file (never stdout, so the child's own console output cannot corrupt the data).
+
+See [Host mode](./host-mode.md#isolatedprocess) for the full attribute reference.
 
 ## Important behavior notes
 
-- Isolation adds overhead: one process launch per benchmark.
-- In isolated suite runs, `WithSuiteSetup` and `WithSuiteTeardown` execute inside each benchmark child process.
-- Quick and Suite isolated APIs replay the benchmark callsite in the child process and return a serialized result payload to the parent.
-- Quick and Suite replay matching uses caller metadata plus isolated-call invocation order; reordering isolated calls in startup paths can change replay targeting.
-- If multiple `RunIsolated*` callsites run during the same child startup path, only the requested invocation is the isolated target; non-target callsites run in-process in that child CLR.
-- Host mode isolation (`[IsolatedProcess]`) re-runs the host entry assembly in a child and executes only the targeted discovered benchmark.
-- For ordinary microbenchmarks, in-process mode is usually faster and sufficient.
+- Isolation adds overhead: one process launch per child. For ordinary microbenchmarks the in-process path is faster and accurate enough.
+- Isolated children always run in **declaration** order; run-order randomization applies only to in-process runs.
+- `--dry-run` (equivalent to `--iterations 0 --warmup 0`) always runs in-process - no child is spawned.
+- Children rebuild their measurement configuration by re-running your `Main`, so custom detectors and significance tests are preserved. Host mode additionally forwards scalar CLI overrides (iterations, warmup, confidence, and so on) to each child.
 
 ## Related
 
-- See [Host mode](./host-mode.md) for `[IsolatedProcess]` on attribute-discovered benchmarks.
+- See [Host mode](./host-mode.md#isolatedprocess) for `[IsolatedProcess]` and `[InProcess]` on attribute-discovered benchmarks.
+- See [Suite mode](./suite-mode.md) for the full `BenchmarkSuite` fluent API.
 - See [Samples](../samples.md) for a runnable isolated-runs sample project.

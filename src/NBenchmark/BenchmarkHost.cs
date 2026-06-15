@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Reflection;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
@@ -14,6 +13,7 @@ public sealed class BenchmarkHost
     private CliArgs _cliArgs = new();
     private ReportDetail _detail;
     private Func<Type, object>? _instanceFactory;
+    private bool _isolationEnabled = true;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
@@ -91,6 +91,18 @@ public sealed class BenchmarkHost
         return this;
     }
 
+    /// <summary>
+    ///     Controls Host mode's isolated-by-default execution. When enabled (the default),
+    ///     each discovered class runs in its own clean-room child process unless a benchmark
+    ///     or its class opts out with <c>[InProcess]</c>. When disabled, every benchmark
+    ///     runs in the host process - equivalent to passing <c>--in-process</c> on the CLI.
+    /// </summary>
+    public BenchmarkHost WithIsolation(bool enabled = true)
+    {
+        _isolationEnabled = enabled;
+        return this;
+    }
+
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
     {
         return await IsolatedRunContext
@@ -100,14 +112,21 @@ public sealed class BenchmarkHost
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(CancellationToken cancellationToken)
     {
+        // Isolated child entry: serve only the class the parent requested, write its
+        // samples back, and return. A child belonging to a sibling suite (not this host)
+        // does nothing here, so it neither recurses nor duplicates output.
+        if (IsolatedRunContext.TryGetActiveRequest(out var activeRequest))
+        {
+            return activeRequest.Kind == IsolatedRunKind.Host
+                ? await RunHostChildAsync(activeRequest, cancellationToken).ConfigureAwait(false)
+                : Array.Empty<BenchmarkResult>();
+        }
+
         if (_cliArgs.ShowHelp)
         {
             CliArgs.PrintHelp();
             return Array.Empty<BenchmarkResult>();
         }
-
-        if (_cliArgs.IsolatedRun is not null && !IsolatedRunContext.IsActive)
-            return await RunIsolatedChildAsync(cancellationToken).ConfigureAwait(false);
 
         Console.WriteLine($"Timer resolution: {Stopwatch.Frequency:N0} ticks/s "
                           + $"({1_000_000_000.0 / Stopwatch.Frequency:F2} ns per tick)");
@@ -159,39 +178,57 @@ public sealed class BenchmarkHost
 
         await _progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
 
+        // Under --dry-run, --in-process, or WithIsolation(false), nothing is spawned. A
+        // dry run never invokes a body, so isolation would only add process overhead.
+        var inProcessGlobal = _cliArgs.InProcess || !_isolationEnabled || _cliArgs.DryRun;
+
         var runningIndex = 0;
 
         foreach (var suite in filtered)
         {
-            var inProcess = suite.Benchmarks.Where(b => !b.IsolatedProcess).ToList();
-            var isolated = suite.Benchmarks.Where(b => b.IsolatedProcess).ToList();
+            var inProcess = new List<BenchmarkMethodDefinition>();
+            var perClass = new List<BenchmarkMethodDefinition>();
+            var perBenchmark = new List<BenchmarkMethodDefinition>();
+
+            foreach (var benchmark in suite.Benchmarks)
+            {
+                switch (ResolveIsolation(benchmark, inProcessGlobal))
+                {
+                    case IsolationDecision.InProcess:
+                        inProcess.Add(benchmark);
+                        break;
+                    case IsolationDecision.PerBenchmark:
+                        perBenchmark.Add(benchmark);
+                        break;
+                    default:
+                        perClass.Add(benchmark);
+                        break;
+                }
+            }
 
             if (inProcess.Count > 0)
             {
                 await RunInProcessSuiteAsync(
                     suite with { Benchmarks = inProcess }, suiteOptions, runningIndex, totalBenchmarks,
                     allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+
+                runningIndex += inProcess.Count;
             }
 
-            runningIndex += inProcess.Count;
-
-            foreach (var benchmark in isolated)
+            if (perClass.Count > 0)
             {
-                var name = $"{suite.Type.Name}.{benchmark.DisplayName}";
+                await RunIsolatedGroupAsync(
+                    suite, perClass, runningIndex, totalBenchmarks,
+                    allResults, rawSamples, cancellationToken).ConfigureAwait(false);
 
-                await _progress.OnBenchmarkStarting(name, runningIndex + 1, totalBenchmarks).ConfigureAwait(false);
+                runningIndex += perClass.Count;
+            }
 
-                var outcome = _cliArgs.DryRun
-                    ? OutcomeBuilder.Build(
-                        new RunOutcome.DryRun(), name, benchmark.Attribute.Description, benchmark.Attribute.Baseline,
-                        suiteOptions, TimeSpan.Zero, TimeSpan.Zero)
-                    : await IsolatedProcessRunner.RunAsync(name, BuildIsolatedChildArgs(_cliArgs), cancellationToken)
-                        .ConfigureAwait(false);
-
-                allResults.Add(outcome.Result);
-                rawSamples[name] = outcome.RawSamples;
-
-                await _progress.OnBenchmarkCompleted(outcome.Result).ConfigureAwait(false);
+            foreach (var benchmark in perBenchmark)
+            {
+                await RunIsolatedGroupAsync(
+                    suite, [benchmark], runningIndex, totalBenchmarks,
+                    allResults, rawSamples, cancellationToken).ConfigureAwait(false);
 
                 runningIndex++;
             }
@@ -270,57 +307,139 @@ public sealed class BenchmarkHost
     }
 
     /// <summary>
-    ///     Child-process entry point: run exactly one benchmark (identified by full name)
-    ///     in this fresh CLR and write its serialized outcome to the output file the parent
-    ///     supplied. No banner, progress, or reporters - the parent owns presentation.
+    ///     Resolves how a single benchmark should run, layering the global in-process
+    ///     switch over the isolation intent declared by its attributes.
     /// </summary>
-    private async Task<IReadOnlyList<BenchmarkResult>> RunIsolatedChildAsync(CancellationToken cancellationToken)
+    private static IsolationDecision ResolveIsolation(BenchmarkMethodDefinition benchmark, bool inProcessGlobal)
     {
-        var fullName = _cliArgs.IsolatedRun!;
+        if (inProcessGlobal)
+            return IsolationDecision.InProcess;
 
-        var options = _cliArgs.DryRun
-            ? _options with { Iterations = 0, WarmupIterations = 0 }
-            : MergeCliOptions(_options, _cliArgs);
+        return benchmark.Isolation switch
+        {
+            IsolationMode.InProcess => IsolationDecision.InProcess,
+            IsolationMode.PerBenchmark => IsolationDecision.PerBenchmark,
+            _ => IsolationDecision.PerClass,
+        };
+    }
+
+    /// <summary>
+    ///     Runs a group of benchmarks from one class in a single child process and folds
+    ///     the results back into the parent. A per-class group shares one child; a
+    ///     per-benchmark benchmark is passed here as a group of one.
+    /// </summary>
+    private async Task RunIsolatedGroupAsync(
+        BenchmarkSuiteDefinition suite,
+        IReadOnlyList<BenchmarkMethodDefinition> benchmarks,
+        int startIndex,
+        int totalBenchmarks,
+        List<BenchmarkResult> allResults,
+        Dictionary<string, double[]> rawSamples,
+        CancellationToken cancellationToken)
+    {
+        for (var i = 0; i < benchmarks.Count; i++)
+        {
+            var name = $"{suite.Type.Name}.{benchmarks[i].DisplayName}";
+            await _progress.OnBenchmarkStarting(name, startIndex + i + 1, totalBenchmarks).ConfigureAwait(false);
+        }
+
+        var request = new IsolatedRunRequest
+        {
+            Kind = IsolatedRunKind.Host,
+            DeclaringTypeFullName = suite.Type.FullName,
+            DisplayPrefix = suite.Type.Name,
+            BenchmarkDisplayNames = benchmarks.Select(b => b.DisplayName).ToList(),
+            Overrides = MeasurementOverrides.FromCliArgs(_cliArgs),
+        };
+
+        var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
+        var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
+
+        foreach (var benchmark in benchmarks)
+        {
+            var name = $"{suite.Type.Name}.{benchmark.DisplayName}";
+
+            BenchmarkResult result;
+            double[] raw;
+
+            if (byName.TryGetValue(name, out var item))
+            {
+                result = item.Result;
+                raw = item.RawSamples;
+            }
+            else
+            {
+                var message = $"Isolated child did not return a result for '{name}'.";
+
+                result = OutcomeBuilder.Build(
+                    new RunOutcome.Errored(new InvalidOperationException(message), message),
+                    name, benchmark.Attribute.Description, benchmark.Attribute.Baseline,
+                    _options, TimeSpan.Zero, TimeSpan.Zero).Result;
+
+                raw = [];
+            }
+
+            allResults.Add(result);
+            rawSamples[name] = raw;
+
+            await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Child-process entry point: run the class the parent requested (one or more of
+    ///     its benchmarks) in this fresh CLR and write the serialized samples to the output
+    ///     file the parent supplied. No banner, progress, or reporters - the parent owns
+    ///     presentation and computes significance over the returned samples.
+    /// </summary>
+    private async Task<IReadOnlyList<BenchmarkResult>> RunHostChildAsync(
+        IsolatedRunRequest request,
+        CancellationToken cancellationToken)
+    {
+        var options = request.Overrides.Apply(_options);
+        var requested = new HashSet<string>(request.BenchmarkDisplayNames, StringComparer.Ordinal);
 
         var discoverer = new BenchmarkDiscoverer();
 
         foreach (var suite in _assemblies.SelectMany(discoverer.Discover))
         {
-            var match = suite.Benchmarks
-                .FirstOrDefault(b => $"{suite.Type.Name}.{b.DisplayName}" == fullName);
+            if (suite.Type.FullName != request.DeclaringTypeFullName)
+                continue;
 
-            if (match is null)
+            var selected = suite.Benchmarks.Where(b => requested.Contains(b.DisplayName)).ToList();
+
+            if (selected.Count == 0)
                 continue;
 
             var instance = PerClassLifecycle.TryCreateInstance(suite.Type, _instanceFactory);
 
             if (instance is null)
             {
+                // In the child: a non-zero exit code is what the parent's launcher reads as failure.
                 Environment.ExitCode = 1;
                 return Array.Empty<BenchmarkResult>();
             }
 
             var instanceFromFactory = _instanceFactory is not null;
-            MeasurementOutcome outcome;
+            List<BenchmarkResult> results;
+            var samples = new Dictionary<string, double[]>();
 
             try
             {
-                var singleSuite = suite with { Benchmarks = [match] };
-                var (setupSuccess, setupErrors) = PerClassLifecycle.TryRunSetup(singleSuite, instance, options);
+                var selectedSuite = suite with { Benchmarks = selected };
+                var (setupSuccess, setupErrors) = PerClassLifecycle.TryRunSetup(selectedSuite, instance, options);
 
                 if (!setupSuccess)
-                    outcome = new MeasurementOutcome { Result = setupErrors![0], RawSamples = [] };
+                    results = setupErrors!.ToList();
                 else
                 {
-                    var envelope = BenchmarkEnvelope.FromDiscovered(match, suite.Type.Name, instance);
+                    var envelopes = selected
+                        .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, instance))
+                        .ToList();
 
-                    var (results, samples) = await SuiteRunner.RunAsync(
-                        [envelope], RunOrder.Declaration, _cliArgs.Seed, options,
-                        0, 1, NullBenchmarkProgress.Instance, cancellationToken).ConfigureAwait(false);
-
-                    var result = results[0];
-                    var raw = samples.TryGetValue(result.Name, out var rs) ? rs : [];
-                    outcome = new MeasurementOutcome { Result = result, RawSamples = raw };
+                    (results, samples) = await SuiteRunner.RunAsync(
+                        envelopes, RunOrder.Declaration, null, options,
+                        0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken).ConfigureAwait(false);
                 }
             }
             finally
@@ -328,13 +447,15 @@ public sealed class BenchmarkHost
                 await PerClassLifecycle.RunTeardown(suite, instance, instanceFromFactory, PostSuiteCleanup);
             }
 
-            if (_cliArgs.IsolatedOutput is not null)
-                await IsolatedProcessRunner.WriteResultAsync(_cliArgs.IsolatedOutput, outcome, cancellationToken).ConfigureAwait(false);
+            await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, samples, cancellationToken)
+                .ConfigureAwait(false);
 
-            return [outcome.Result];
+            return results;
         }
 
-        Console.Error.WriteLine($"Isolated benchmark '{fullName}' was not found.");
+        Console.Error.WriteLine($"Isolated class '{request.DeclaringTypeFullName}' was not found.");
+
+        // In the child: a non-zero exit code is what the parent's launcher reads as failure.
         Environment.ExitCode = 1;
         return Array.Empty<BenchmarkResult>();
     }
@@ -367,78 +488,5 @@ public sealed class BenchmarkHost
     }
 
     private static MeasurementOptions MergeCliOptions(MeasurementOptions options, CliArgs cliArgs)
-    {
-        var result = options;
-
-        if (cliArgs.Iterations.HasValue)
-            result = result with { Iterations = cliArgs.Iterations.Value };
-
-        if (cliArgs.WarmupIterations.HasValue)
-            result = result with { WarmupIterations = cliArgs.WarmupIterations.Value };
-
-        if (cliArgs.ConfidenceLevel.HasValue)
-            result = result with { ConfidenceLevel = cliArgs.ConfidenceLevel.Value };
-
-        if (cliArgs.Alpha.HasValue)
-            result = result with { SignificanceLevel = cliArgs.Alpha.Value };
-
-        if (cliArgs.OutlierMode.HasValue)
-            result = result with { OutlierMode = cliArgs.OutlierMode.Value, OutlierDetector = null };
-
-        return result;
-    }
-
-    /// <summary>
-    ///     Builds the minimal argument list forwarded to an isolated child process.
-    ///     Only the flags the child actually consumes (those that shape the measurement)
-    ///     are reconstructed from the parsed args - never the raw user args. Forwarding
-    ///     presentation/discovery flags such as <c>--reporter</c>, <c>--output</c>, or
-    ///     <c>--filter</c> would risk the child failing to re-parse them (for example a
-    ///     reporter assembly that is not loaded in the child) and exiting with a non-zero
-    ///     code, which the parent would surface as a misleading benchmark error.
-    /// </summary>
-    private static List<string> BuildIsolatedChildArgs(CliArgs cliArgs)
-    {
-        var args = new List<string>();
-
-        if (cliArgs.Iterations.HasValue)
-        {
-            args.Add("--iterations");
-            args.Add(cliArgs.Iterations.Value.ToString(CultureInfo.InvariantCulture));
-        }
-
-        if (cliArgs.WarmupIterations.HasValue)
-        {
-            args.Add("--warmup");
-            args.Add(cliArgs.WarmupIterations.Value.ToString(CultureInfo.InvariantCulture));
-        }
-
-        if (cliArgs.ConfidenceLevel.HasValue)
-        {
-            args.Add("--confidence");
-            args.Add(cliArgs.ConfidenceLevel.Value.ToString(CultureInfo.InvariantCulture));
-        }
-
-        if (cliArgs.Alpha.HasValue)
-        {
-            args.Add("--alpha");
-            args.Add(cliArgs.Alpha.Value.ToString(CultureInfo.InvariantCulture));
-        }
-
-        if (cliArgs.OutlierMode.HasValue)
-        {
-            args.Add("--outlier");
-
-            args.Add(cliArgs.OutlierMode.Value switch
-            {
-                OutlierMode.None => "none",
-                OutlierMode.RemoveTop5Percent => "top5",
-                OutlierMode.RemoveTopAndBottom5Percent => "both5",
-                OutlierMode.MedianAbsoluteDeviation => "mad",
-                _ => "iqr",
-            });
-        }
-
-        return args;
-    }
+        => MeasurementOverrides.FromCliArgs(cliArgs).Apply(options);
 }

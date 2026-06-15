@@ -95,6 +95,7 @@ await new BenchmarkSuite("name")
     .WithRunOrder(RunOrder.Declaration)   // default: RunOrder.Random
     .WithSuiteSetup(() => { })      // runs once before all benchmarks
     .WithSuiteTeardown(() => { })   // runs once after all benchmarks
+    .WithIsolation()                // run the whole suite in one clean child process
     .WithReporter(new ConsoleReporter())
     .WithReporter(new MarkdownReporter("results/"))
     .WithProgress(new ConsoleBenchmarkProgress())
@@ -141,6 +142,21 @@ await new BenchmarkSuite("http")
 ```
 
 Once suite setup has succeeded, suite teardown is **guaranteed to run** - even when the run is cancelled through a `CancellationToken` - so resources opened in setup are always released.
+
+## Process isolation
+
+Call `WithIsolation()` to run the **entire suite** in a single freshly spawned child process, so runtime state (JIT warmup, GC pressure, thread-pool state) from the host can't bias the measurements:
+
+```csharp
+await new BenchmarkSuite("sorting")
+    .Add("bubble", () => BubbleSort(data))
+    .Add("array", () => Array.Sort(data))
+    .WithBaseline("bubble")
+    .WithIsolation()        // whole suite runs in one clean child process
+    .RunAsync();
+```
+
+`WithIsolation(false)` is the default (in-process). The child rebuilds the suite from your own `Main`, so custom `IOutlierDetector` / `ISignificanceTest` instances and suite setup/teardown are preserved. Isolated runs always execute in declaration order. See [Isolated Runs](./isolated-runs.md) for the full model.
 
 ## Run order
 

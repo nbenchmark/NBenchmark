@@ -21,9 +21,11 @@ internal sealed record CliArgs
     public IReadOnlyList<IReporter> CliReporters { get; init; } = [];
     public ReportDetail Detail { get; init; } = ReportDetail.Simple;
 
-    public string? IsolatedRun { get; init; }
-
-    public string? IsolatedOutput { get; init; }
+    /// <summary>
+    ///     When true, every benchmark runs in the host process, overriding Host mode's
+    ///     isolated-by-default execution and any <c>[IsolatedProcess]</c> attributes.
+    /// </summary>
+    public bool InProcess { get; init; }
 
     public static CliArgs Parse(string[] args)
     {
@@ -42,8 +44,7 @@ internal sealed record CliArgs
         var detail = ReportDetail.Simple;
 
         double? alpha = null;
-        string? isolatedRun = null;
-        string? isolatedOutput = null;
+        var inProcess = false;
         OutlierMode? outlierMode = null;
 
         for (var i = 0; i < args.Length; i++)
@@ -191,15 +192,12 @@ internal sealed record CliArgs
                 case "--dry-run":
                     dryRun = true;
                     break;
-                case "--nb-isolated-run" when i + 1 < args.Length:
-                    isolatedRun = args[++i];
-                    break;
-                case "--nb-isolated-output" when i + 1 < args.Length:
-                    isolatedOutput = args[++i];
+                case "--in-process":
+                    inProcess = true;
                     break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--confidence" or "--order" or "--threshold-pct" or "--seed" or "--alpha"
-                    or "--outlier" or "--nb-isolated-run" or "--nb-isolated-output" or "--detail":
+                    or "--outlier" or "--detail":
                     Console.Error.WriteLine($"Missing value for '{args[i]}'.");
                     Environment.ExitCode = 1;
                     break;
@@ -242,8 +240,7 @@ internal sealed record CliArgs
             OutlierMode = outlierMode,
             CliReporters = cliReporters,
             Detail = detail,
-            IsolatedRun = isolatedRun,
-            IsolatedOutput = isolatedOutput,
+            InProcess = inProcess,
         };
     }
 
@@ -287,6 +284,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --outlier <mode>       Outlier trimming: none, top5, both5, iqr (default), mad");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
+        Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
         Console.WriteLine("  --seed <n>             Seed for deterministic random ordering");
         Console.WriteLine("  --detail <level>       Report detail: simple or advanced (default: simple)");

@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using NBenchmark.Engine;
 using Xunit;
 
@@ -11,203 +10,48 @@ public class IsolatedRunApisTests
     private const string OutputPathEnvVar = "NBENCHMARK_ISOLATED_OUTPUT_PATH";
 
     [Fact]
-    public async Task RunIsolated_ActiveQuickRequest_RunsAndWritesOutcome()
-    {
-        IsolatedRunContext.ResetInvocationOrdinalsForTesting();
-
-        var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-quick-child-{Guid.NewGuid():N}.json");
-        var callerFile = CurrentFilePath();
-        const int callerLine = 1234;
-        const string callerMember = "quick-member";
-
-        var request = new IsolatedRunRequest
-        {
-            Mode = IsolatedRunMode.Quick,
-            InvocationOrdinal = 1,
-            CallerFilePath = callerFile,
-            CallerLineNumber = callerLine,
-            CallerMemberName = callerMember,
-            BenchmarkName = "quick-child",
-            Options = new MeasurementOptions
-            {
-                WarmupIterations = 0,
-                Iterations = 3,
-                OutlierMode = OutlierMode.None,
-            },
-        };
-
-        try
-        {
-            var result = await IsolatedRunContext.WithActiveRequestForTestingAsync(request, outputPath, () =>
-                Task.FromResult(Benchmark.RunIsolated(
-                    () => Thread.SpinWait(64),
-                    new MeasurementOptions
-                    {
-                        WarmupIterations = 0,
-                        Iterations = 1,
-                        OutlierMode = OutlierMode.None,
-                    },
-                    "quick-child",
-                    callerFilePath: callerFile,
-                    callerLineNumber: callerLine,
-                    callerMemberName: callerMember)));
-
-            Assert.False(result.Errored);
-
-            var outcome = await IsolatedProcessRunner.ReadResultAsync(outputPath, CancellationToken.None);
-            Assert.Equal("quick-child", outcome.Result.Name);
-            Assert.Equal(3, outcome.Result.MeasuredIterations);
-        }
-        finally
-        {
-            if (File.Exists(outputPath))
-                File.Delete(outputPath);
-        }
-    }
-
-    [Fact]
-    public async Task RunIsolated_ActiveQuickRequest_RequestedInvocationMismatch_WritesErroredPayload()
-    {
-        IsolatedRunContext.ResetInvocationOrdinalsForTesting();
-
-        var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-quick-mismatch-{Guid.NewGuid():N}.json");
-        var callerFile = CurrentFilePath();
-        const int callerLine = 2345;
-        const string callerMember = "quick-mismatch-member";
-
-        var request = new IsolatedRunRequest
-        {
-            Mode = IsolatedRunMode.Quick,
-            InvocationOrdinal = 1,
-            CallerFilePath = callerFile,
-            CallerLineNumber = callerLine,
-            CallerMemberName = callerMember,
-            BenchmarkName = "some-other-name",
-            Options = new MeasurementOptions
-            {
-                WarmupIterations = 0,
-                Iterations = 2,
-                OutlierMode = OutlierMode.None,
-            },
-        };
-
-        var result = await IsolatedRunContext.WithActiveRequestForTestingAsync(request, outputPath, () =>
-            Task.FromResult(Benchmark.RunIsolated(
-                () => Thread.SpinWait(64),
-                new MeasurementOptions
-                {
-                    WarmupIterations = 0,
-                    Iterations = 2,
-                    OutlierMode = OutlierMode.None,
-                },
-                "quick-target",
-                callerFilePath: callerFile,
-                callerLineNumber: callerLine,
-                callerMemberName: callerMember)));
-
-        Assert.True(result.Errored);
-        Assert.True(File.Exists(outputPath));
-
-        var outcome = await IsolatedProcessRunner.ReadResultAsync(outputPath, CancellationToken.None);
-        Assert.True(outcome.Result.Errored);
-        Assert.Contains("Isolated replay mismatch", outcome.Result.ErrorMessage);
-    }
-
-    [Fact]
-    public async Task RunIsolated_ActiveQuickRequest_DifferentInvocation_RunsInProcessWithoutPayload()
-    {
-        IsolatedRunContext.ResetInvocationOrdinalsForTesting();
-
-        var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-quick-non-target-{Guid.NewGuid():N}.json");
-        var callerFile = CurrentFilePath();
-        const int callerLine = 2468;
-        const string callerMember = "quick-non-target-member";
-
-        var request = new IsolatedRunRequest
-        {
-            Mode = IsolatedRunMode.Quick,
-            InvocationOrdinal = 99,
-            CallerFilePath = callerFile,
-            CallerLineNumber = callerLine,
-            CallerMemberName = callerMember,
-            BenchmarkName = "some-other-name",
-            Options = new MeasurementOptions
-            {
-                WarmupIterations = 0,
-                Iterations = 2,
-                OutlierMode = OutlierMode.None,
-            },
-        };
-
-        var result = await IsolatedRunContext.WithActiveRequestForTestingAsync(request, outputPath, () =>
-            Task.FromResult(Benchmark.RunIsolated(
-                () => Thread.SpinWait(64),
-                new MeasurementOptions
-                {
-                    WarmupIterations = 0,
-                    Iterations = 2,
-                    OutlierMode = OutlierMode.None,
-                },
-                "quick-target",
-                callerFilePath: callerFile,
-                callerLineNumber: callerLine,
-                callerMemberName: callerMember)));
-
-        Assert.False(result.Errored);
-        Assert.False(File.Exists(outputPath));
-    }
-
-    [Fact]
-    public async Task RunIsolatedAsync_ActiveSuiteRequest_RunsTargetBenchmarkAndWritesOutcome()
+    public async Task ActiveSuiteRequest_MatchingCallsite_RunsAllBenchmarks_AndWritesPayload()
     {
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
         var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-suite-child-{Guid.NewGuid():N}.json");
         var callerFile = CurrentFilePath();
         const int callerLine = 3456;
-        const string callerMember = "suite-member";
+        const string callerMember = "suite-target";
 
-        var suite = new BenchmarkSuite("suite-child")
+        var suite = new BenchmarkSuite("suite-child-match")
             .Add("a", () => Thread.SpinWait(64))
             .Add("b", () => Thread.SpinWait(128))
             .WithBaseline("a")
             .WithWarmup(0)
-            .WithIterations(1)
-            .WithOutlierMode(OutlierMode.None);
+            .WithIterations(5)
+            .WithOutlierMode(OutlierMode.None)
+            .WithIsolation();
 
         var request = new IsolatedRunRequest
         {
-            Mode = IsolatedRunMode.Suite,
+            Kind = IsolatedRunKind.Suite,
             InvocationOrdinal = 1,
             CallerFilePath = callerFile,
             CallerLineNumber = callerLine,
             CallerMemberName = callerMember,
-            BenchmarkName = "b",
             SuiteName = suite.Name,
-            Options = new MeasurementOptions
-            {
-                WarmupIterations = 0,
-                Iterations = 4,
-                OutlierMode = OutlierMode.None,
-            },
         };
 
         try
         {
             var results = await IsolatedRunContext.WithActiveRequestForTestingAsync(request, outputPath, () =>
-                suite.RunIsolatedAsync(
-                    CancellationToken.None,
-                    callerFile,
-                    callerLine,
-                    callerMember));
+                suite.RunAsync(CancellationToken.None, callerFile, callerLine, callerMember));
 
-            var only = Assert.Single(results);
-            Assert.Equal("b", only.Name);
-            Assert.Equal(4, only.MeasuredIterations);
+            Assert.Equal(2, results.Count);
+            Assert.Contains(results, r => r.Name == "a");
+            Assert.Contains(results, r => r.Name == "b");
+            Assert.All(results, r => Assert.Equal(5, r.MeasuredIterations));
 
-            var outcome = await IsolatedProcessRunner.ReadResultAsync(outputPath, CancellationToken.None);
-            Assert.Equal("b", outcome.Result.Name);
-            Assert.Equal(4, outcome.Result.MeasuredIterations);
+            var items = await ChildProcessLauncher.ReadPayloadAsync(outputPath, CancellationToken.None);
+            Assert.Equal(2, items.Count);
+            Assert.Contains(items, i => i.Result.Name == "a");
+            Assert.Contains(items, i => i.Result.Name == "b");
         }
         finally
         {
@@ -217,30 +61,71 @@ public class IsolatedRunApisTests
     }
 
     [Fact]
-    public async Task RunIsolated_EnvironmentRequestPath_RunsAndWritesOutcome()
+    public async Task ActiveSuiteRequest_NonMatchingCallsite_RunsInProcess_WithoutWritingPayload()
+    {
+        IsolatedRunContext.ResetInvocationOrdinalsForTesting();
+
+        var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-suite-nontarget-{Guid.NewGuid():N}.json");
+        var callerFile = CurrentFilePath();
+        const int callerLine = 4567;
+        const string callerMember = "suite-nontarget";
+
+        var suite = new BenchmarkSuite("suite-child-nontarget")
+            .Add("a", () => Thread.SpinWait(64))
+            .Add("b", () => Thread.SpinWait(128))
+            .WithBaseline("a")
+            .WithWarmup(0)
+            .WithIterations(3)
+            .WithOutlierMode(OutlierMode.None)
+            .WithIsolation();
+
+        // A request whose invocation ordinal does not match the call below, simulating a
+        // sibling suite's child: the suite still runs in-process, but writes no payload.
+        var request = new IsolatedRunRequest
+        {
+            Kind = IsolatedRunKind.Suite,
+            InvocationOrdinal = 99,
+            CallerFilePath = callerFile,
+            CallerLineNumber = callerLine,
+            CallerMemberName = callerMember,
+            SuiteName = suite.Name,
+        };
+
+        var results = await IsolatedRunContext.WithActiveRequestForTestingAsync(request, outputPath, () =>
+            suite.RunAsync(CancellationToken.None, callerFile, callerLine, callerMember));
+
+        Assert.Equal(2, results.Count);
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public async Task EnvironmentRequestPath_SuiteChild_ReadsRequest_AndWritesPayload()
     {
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
         var requestPath = Path.Combine(Path.GetTempPath(), $"nbench-request-{Guid.NewGuid():N}.json");
         var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-output-{Guid.NewGuid():N}.json");
         var callerFile = CurrentFilePath();
-        const int callerLine = 4567;
-        const string callerMember = "env-member";
+        const int callerLine = 5678;
+        const string callerMember = "suite-env";
+
+        var suite = new BenchmarkSuite("suite-child-env")
+            .Add("a", () => Thread.SpinWait(64))
+            .Add("b", () => Thread.SpinWait(128))
+            .WithBaseline("a")
+            .WithWarmup(0)
+            .WithIterations(4)
+            .WithOutlierMode(OutlierMode.None)
+            .WithIsolation();
 
         var request = new IsolatedRunRequest
         {
-            Mode = IsolatedRunMode.Quick,
+            Kind = IsolatedRunKind.Suite,
             InvocationOrdinal = 1,
             CallerFilePath = callerFile,
             CallerLineNumber = callerLine,
             CallerMemberName = callerMember,
-            BenchmarkName = "env-quick",
-            Options = new MeasurementOptions
-            {
-                WarmupIterations = 0,
-                Iterations = 3,
-                OutlierMode = OutlierMode.None,
-            },
+            SuiteName = suite.Name,
         };
 
         var priorRequestPath = Environment.GetEnvironmentVariable(RequestPathEnvVar);
@@ -248,33 +133,19 @@ public class IsolatedRunApisTests
 
         try
         {
-            await using (var stream = File.Create(requestPath))
-            {
-                await JsonSerializer.SerializeAsync(stream, request, cancellationToken: CancellationToken.None);
-            }
+            await ChildProcessLauncher.WriteRequestAsync(requestPath, request, CancellationToken.None);
 
             Environment.SetEnvironmentVariable(RequestPathEnvVar, requestPath);
             Environment.SetEnvironmentVariable(OutputPathEnvVar, outputPath);
 
-            var result = Benchmark.RunIsolated(
-                () => Thread.SpinWait(64),
-                new MeasurementOptions
-                {
-                    WarmupIterations = 0,
-                    Iterations = 1,
-                    OutlierMode = OutlierMode.None,
-                },
-                "env-quick",
-                callerFilePath: callerFile,
-                callerLineNumber: callerLine,
-                callerMemberName: callerMember);
+            var results = await suite.RunAsync(CancellationToken.None, callerFile, callerLine, callerMember);
 
-            Assert.False(result.Errored);
+            Assert.Equal(2, results.Count);
+            Assert.All(results, r => Assert.Equal(4, r.MeasuredIterations));
             Assert.True(File.Exists(outputPath));
 
-            var outcome = await IsolatedProcessRunner.ReadResultAsync(outputPath, CancellationToken.None);
-            Assert.Equal("env-quick", outcome.Result.Name);
-            Assert.Equal(3, outcome.Result.MeasuredIterations);
+            var items = await ChildProcessLauncher.ReadPayloadAsync(outputPath, CancellationToken.None);
+            Assert.Equal(2, items.Count);
         }
         finally
         {

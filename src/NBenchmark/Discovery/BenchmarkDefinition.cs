@@ -35,9 +35,25 @@ public sealed record BenchmarkMethodDefinition(
     public Action<object>? IterationTeardownDelegate { get; init; }
 
     /// <summary>
-    ///     When true, the host runs this benchmark in a dedicated child process for a
-    ///     clean-room CLR, rather than in-process. Set by <c>[IsolatedProcess]</c> on the
-    ///     method or its declaring class.
+    ///     The isolation intent declared by attributes on this benchmark or its class,
+    ///     before the global <c>--in-process</c> flag is applied. Host mode treats
+    ///     <see cref="IsolationMode.Default" /> as per-class isolation.
     /// </summary>
-    public bool IsolatedProcess { get; init; }
+    internal IsolationMode Isolation { get; init; }
+}
+
+/// <summary>
+///     The isolation intent a discovered benchmark declares through attributes, before
+///     the host layers on the global <c>--in-process</c> flag.
+/// </summary>
+internal enum IsolationMode
+{
+    /// <summary>No attribute - Host mode isolates this benchmark with its class siblings.</summary>
+    Default,
+
+    /// <summary><c>[InProcess]</c> - run in the host process, never a child.</summary>
+    InProcess,
+
+    /// <summary><c>[IsolatedProcess]</c> - run alone in a dedicated child process.</summary>
+    PerBenchmark,
 }

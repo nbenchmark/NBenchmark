@@ -12,6 +12,7 @@ public sealed class BenchmarkSuite(string name)
     private readonly List<IReporter> _reporters = [];
     private string? _baselineName;
     private ReportDetail _detail;
+    private bool _isolated;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
@@ -182,21 +183,88 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
-    public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    ///     Runs the whole suite in a dedicated child process for a clean-room reading,
+    ///     rather than in the current process. The suite's setup, every benchmark, and the
+    ///     suite's teardown all execute together in that one child; the parent process
+    ///     reads the per-benchmark samples back and computes significance and reports as
+    ///     usual. Defaults to enabled when called with no argument.
+    /// </summary>
+    public BenchmarkSuite WithIsolation(bool enabled = true)
     {
+        _isolated = enabled;
+        return this;
+    }
+
+    /// <summary>
+    ///     Runs every benchmark in the suite and returns their results. When
+    ///     <see cref="WithIsolation" /> is enabled the suite runs in a dedicated child
+    ///     process; otherwise it runs in the current process.
+    /// </summary>
+    public Task<IReadOnlyList<BenchmarkResult>> RunAsync(
+        CancellationToken cancellationToken = default,
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0,
+        [CallerMemberName] string callerMemberName = "")
+        => IsolatedRunContext.WithCurrentRequestAsync(() =>
+            RunCoreAsync(callerFilePath, callerLineNumber, callerMemberName, cancellationToken));
+
+    private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(
+        string callerFilePath,
+        int callerLineNumber,
+        string callerMemberName,
+        CancellationToken cancellationToken)
+    {
+        ValidateBaseline();
+
+        var invocationOrdinal = IsolatedRunContext.NextSuiteInvocationOrdinal();
+
+        // Inside an isolated child: run the suite in-process and quietly. Only the suite
+        // call the parent requested writes its samples back; any other suite call sharing
+        // this child runs without emitting output or a payload.
+        if (IsolatedRunContext.IsActive)
+        {
+            var isTarget = IsolatedRunContext.IsSuiteRequestMatch(
+                invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, Name);
+
+            return await RunInProcessCoreAsync(
+                NullBenchmarkProgress.Instance,
+                RunOrder.Declaration,
+                applySignificance: false,
+                applyReporters: false,
+                writeChildPayload: isTarget,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (_isolated)
+        {
+            return await RunIsolatedParentAsync(
+                invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         if (!_progressExplicitlySet)
             _progress = new DefaultConsoleProgress();
 
-        if (_baselineName is not null && !_benchmarks.Any(b => b.Name == _baselineName))
-        {
-            throw new InvalidOperationException(
-                $"Baseline '{_baselineName}' was not found in the suite. Registered names: " +
-                string.Join(", ", _benchmarks.Select(b => b.Name)));
-        }
+        return await RunInProcessCoreAsync(
+            _progress,
+            _runOrder,
+            applySignificance: true,
+            applyReporters: true,
+            writeChildPayload: false,
+            cancellationToken).ConfigureAwait(false);
+    }
 
+    private async Task<IReadOnlyList<BenchmarkResult>> RunInProcessCoreAsync(
+        IBenchmarkProgress progress,
+        RunOrder order,
+        bool applySignificance,
+        bool applyReporters,
+        bool writeChildPayload,
+        CancellationToken cancellationToken)
+    {
         var envelopeNames = _benchmarks.Select(b => b.Name).ToList();
-        await _progress.OnSuiteStarting(envelopeNames, _benchmarks.Count).ConfigureAwait(false);
+        await progress.OnSuiteStarting(envelopeNames, _benchmarks.Count).ConfigureAwait(false);
 
         _suiteSetup?.Invoke();
 
@@ -210,8 +278,8 @@ public sealed class BenchmarkSuite(string name)
         try
         {
             (results, rawSamples) = await SuiteRunner.RunAsync(
-                envelopes, _runOrder, null, _options, 0,
-                _benchmarks.Count, _progress, cancellationToken).ConfigureAwait(false);
+                envelopes, order, null, _options, 0,
+                _benchmarks.Count, progress, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -220,136 +288,90 @@ public sealed class BenchmarkSuite(string name)
             _suiteTeardown?.Invoke();
         }
 
-        await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
+        await progress.OnSuiteCompleted(results).ConfigureAwait(false);
 
-        Significance.ApplyIfEnabled(results, rawSamples, _options);
-
-        foreach (var reporter in _reporters)
+        if (writeChildPayload)
         {
-            await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
+            await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, rawSamples, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (applySignificance)
+            Significance.ApplyIfEnabled(results, rawSamples, _options);
+
+        if (applyReporters)
+        {
+            foreach (var reporter in _reporters)
+            {
+                await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         return results;
     }
 
-    /// <summary>
-    ///     Runs each benchmark in this suite in a dedicated child process.
-    /// </summary>
-    /// <remarks>
-    ///     In isolated suite mode, suite setup/teardown execute inside each benchmark's
-    ///     child process rather than once for the whole suite.
-    ///     <para>
-    ///         If multiple <c>RunIsolated*</c> callsites execute on the same child startup
-    ///         path, only the requested invocation runs as the isolated target. Non-target
-    ///         callsites still execute in-process in that child CLR and can influence that
-    ///         child's runtime state.
-    ///     </para>
-    /// </remarks>
-    public Task<IReadOnlyList<BenchmarkResult>> RunIsolatedAsync(
-        CancellationToken cancellationToken = default,
-        [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0,
-        [CallerMemberName] string callerMemberName = "")
-        => IsolatedRunContext.WithCurrentRequestAsync(async () =>
-        {
-            var invocationOrdinal = IsolatedRunContext.NextInvocationOrdinal(IsolatedRunMode.Suite);
-
-            if (IsolatedRunContext.IsRequestMatch(
-                    IsolatedRunMode.Suite,
-                    invocationOrdinal,
-                    callerFilePath,
-                    callerLineNumber,
-                    callerMemberName,
-                    suiteName: Name))
-                return await RunRequestedIsolatedChildAsync(cancellationToken).ConfigureAwait(false);
-
-            if (IsolatedRunContext.IsActive)
-            {
-                if (IsolatedRunContext.IsRequestedInvocation(IsolatedRunMode.Suite, invocationOrdinal)
-                    && IsolatedRunContext.TryGetActiveRequest(out var request))
-                {
-                    var mismatch = IsolatedRunContext.BuildCallsiteMismatchOutcome(
-                        Name,
-                        IsolatedRunContext.ResolveOptions(_options),
-                        request,
-                        callerFilePath,
-                        callerLineNumber,
-                        callerMemberName,
-                        invocationOrdinal,
-                        Name);
-
-                    await IsolatedRunContext.WriteChildOutcomeIfRequestedAsync(mismatch, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    return (IReadOnlyList<BenchmarkResult>)[mismatch.Result];
-                }
-
-                return await RunAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            return await RunIsolatedEntryAsync(
-                    callerFilePath,
-                    callerLineNumber,
-                    callerMemberName,
-                    invocationOrdinal,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        });
-
-    /// <summary>
-    ///     Synchronous wrapper for <see cref="RunIsolatedAsync" />.
-    /// </summary>
-    /// <remarks>
-    ///     This synchronous overload blocks the calling thread until all child processes
-    ///     complete.
-    /// </remarks>
-    public IReadOnlyList<BenchmarkResult> RunIsolated(
-        CancellationToken cancellationToken = default,
-        [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0,
-        [CallerMemberName] string callerMemberName = "")
-        => RunIsolatedAsync(cancellationToken, callerFilePath, callerLineNumber, callerMemberName).GetAwaiter().GetResult();
-
-    private async Task<IReadOnlyList<BenchmarkResult>> RunIsolatedEntryAsync(
+    private async Task<IReadOnlyList<BenchmarkResult>> RunIsolatedParentAsync(
+        int invocationOrdinal,
         string callerFilePath,
         int callerLineNumber,
         string callerMemberName,
-        int invocationOrdinal,
         CancellationToken cancellationToken)
     {
         if (!_progressExplicitlySet)
             _progress = new DefaultConsoleProgress();
 
-        if (_baselineName is not null && !_benchmarks.Any(b => b.Name == _baselineName))
+        var displayNames = _benchmarks.Select(b => b.Name).ToList();
+        await _progress.OnSuiteStarting(displayNames, _benchmarks.Count).ConfigureAwait(false);
+
+        var request = new IsolatedRunRequest
         {
-            throw new InvalidOperationException(
-                $"Baseline '{_baselineName}' was not found in the suite. Registered names: " +
-                string.Join(", ", _benchmarks.Select(b => b.Name)));
+            Kind = IsolatedRunKind.Suite,
+            InvocationOrdinal = invocationOrdinal,
+            CallerFilePath = callerFilePath,
+            CallerLineNumber = callerLineNumber,
+            CallerMemberName = callerMemberName,
+            SuiteName = Name,
+            BenchmarkDisplayNames = displayNames,
+        };
+
+        var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
+        var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
+
+        var results = new List<BenchmarkResult>(_benchmarks.Count);
+        var rawSamples = new Dictionary<string, double[]>(_benchmarks.Count);
+
+        for (var i = 0; i < _benchmarks.Count; i++)
+        {
+            var envelope = _benchmarks[i];
+            var isBaseline = _baselineName is not null && envelope.Name == _baselineName;
+
+            await _progress.OnBenchmarkStarting(envelope.Name, i + 1, _benchmarks.Count).ConfigureAwait(false);
+
+            BenchmarkResult result;
+            double[] raw;
+
+            if (byName.TryGetValue(envelope.Name, out var item))
+            {
+                result = item.Result with { IsBaseline = isBaseline, Description = envelope.Description };
+                raw = item.RawSamples;
+            }
+            else
+            {
+                var message = $"Isolated child did not return a result for '{envelope.Name}'.";
+
+                result = OutcomeBuilder.Build(
+                    new RunOutcome.Errored(new InvalidOperationException(message), message),
+                    envelope.Name, envelope.Description, isBaseline,
+                    _options, TimeSpan.Zero, TimeSpan.Zero).Result;
+
+                raw = [];
+            }
+
+            results.Add(result);
+            rawSamples[envelope.Name] = raw;
+
+            await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
         }
-
-        var envelopeNames = _benchmarks.Select(b => b.Name).ToList();
-        await _progress.OnSuiteStarting(envelopeNames, _benchmarks.Count).ConfigureAwait(false);
-
-        var envelopes = _benchmarks
-            .Select(b => b with { IsBaseline = _baselineName is not null && b.Name == _baselineName })
-            .ToList();
-
-        List<BenchmarkResult> results;
-        Dictionary<string, double[]> rawSamples;
-
-        (results, rawSamples) = await SuiteRunner.RunIsolatedAsync(
-            envelopes,
-            _runOrder,
-            _options,
-            0,
-            _benchmarks.Count,
-            _progress,
-            Name,
-            callerFilePath,
-            callerLineNumber,
-            callerMemberName,
-            invocationOrdinal,
-            cancellationToken).ConfigureAwait(false);
 
         await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
 
@@ -363,77 +385,13 @@ public sealed class BenchmarkSuite(string name)
         return results;
     }
 
-    private async Task<IReadOnlyList<BenchmarkResult>> RunRequestedIsolatedChildAsync(CancellationToken cancellationToken)
+    private void ValidateBaseline()
     {
-        if (!IsolatedRunContext.TryGetActiveRequest(out var request))
-            return await RunAsync(cancellationToken).ConfigureAwait(false);
-
-        var options = IsolatedRunContext.ResolveOptions(_options);
-        var envelope = _benchmarks.FirstOrDefault(b => b.Name == request.BenchmarkName);
-
-        if (envelope is null)
+        if (_baselineName is not null && _benchmarks.All(b => b.Name != _baselineName))
         {
-            var message = $"Isolated suite benchmark '{request.BenchmarkName}' was not found in suite '{Name}'.";
-
-            var missingOutcome = OutcomeBuilder.Build(
-                new RunOutcome.Errored(new InvalidOperationException(message), message),
-                request.BenchmarkName,
-                null,
-                false,
-                options,
-                TimeSpan.Zero,
-                TimeSpan.Zero);
-
-            await IsolatedRunContext.WriteChildOutcomeIfRequestedAsync(missingOutcome, cancellationToken)
-                .ConfigureAwait(false);
-
-            return [missingOutcome.Result];
+            throw new InvalidOperationException(
+                $"Baseline '{_baselineName}' was not found in the suite. Registered names: " +
+                string.Join(", ", _benchmarks.Select(b => b.Name)));
         }
-
-        var isBaseline = _baselineName is not null && envelope.Name == _baselineName;
-
-        var spec = new RunSpec
-        {
-            Options = options,
-            Description = envelope.Description,
-            IsBaseline = isBaseline,
-            Progress = NullBenchmarkProgress.Instance,
-        };
-
-        MeasurementOutcome outcome;
-
-        _suiteSetup?.Invoke();
-
-        try
-        {
-            try
-            {
-                outcome = await envelope.RunAsync(spec, cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                outcome = OutcomeBuilder.Build(
-                    new RunOutcome.Errored(ex),
-                    envelope.Name,
-                    envelope.Description,
-                    isBaseline,
-                    spec.Options,
-                    TimeSpan.Zero,
-                    TimeSpan.Zero);
-            }
-        }
-        finally
-        {
-            _suiteTeardown?.Invoke();
-        }
-
-        await IsolatedRunContext.WriteChildOutcomeIfRequestedAsync(outcome, cancellationToken)
-            .ConfigureAwait(false);
-
-        return [outcome.Result];
     }
 }

@@ -224,11 +224,10 @@ See [Custom outlier detectors](./statistics/outliers.md#custom-outlier-detectors
 
 **`samples/IsolatedRuns/`**
 
-Demonstrates advanced isolation APIs for both Quick and Suite modes:
+Demonstrates process isolation:
 
-- `Benchmark.RunIsolated(...)`
-- `Benchmark.RunIsolatedAsync(...)`
-- `BenchmarkSuite.RunIsolatedAsync()`
+- Quick mode is always in-process (`Benchmark.Run`).
+- Suite mode opts into a single clean child process with `WithIsolation()`.
 
 ```bash
 cd samples/IsolatedRuns
@@ -237,6 +236,6 @@ dotnet run
 
 What to look at:
 
-- The quick in-process result beside the quick isolated result.
-- The isolated suite comparison where each benchmark runs in a fresh child process.
+- The quick in-process result.
+- The isolated suite comparison, where the whole suite runs in one fresh child process.
 - The tradeoff between cleaner measurements and additional process-launch overhead.
