@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NBenchmark.Engine;
 using NBenchmark.Integration.Abstractions;
@@ -20,7 +21,7 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; init; } = 0.95;
 
-    public override TestResult[] Execute(ITestMethod testMethod)
+    public override Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
         var methodInfo = testMethod.MethodInfo;
         var name = $"{testMethod.TestClassName}.{testMethod.TestMethodName}";
@@ -50,7 +51,7 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
                         result = outcome.Result;
                     }
                     else
-                        return [CreateErrorResult($"Unsupported async body type for method {methodInfo.Name}.")];
+                        return Task.FromResult<TestResult[]>([CreateErrorResult($"Unsupported async body type for method {methodInfo.Name}.")]);
                 }
                 else
                 {
@@ -62,15 +63,15 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
                         result = outcome.Result;
                     }
                     else
-                        return [CreateErrorResult($"Unsupported sync body type for method {methodInfo.Name}.")];
+                        return Task.FromResult<TestResult[]>([CreateErrorResult($"Unsupported sync body type for method {methodInfo.Name}.")]);
                 }
             }
             else
-                return [CreateErrorResult($"Could not build body for method {methodInfo.Name}.")];
+                return Task.FromResult<TestResult[]>([CreateErrorResult($"Could not build body for method {methodInfo.Name}.")]);
         }
         catch (Exception ex)
         {
-            return [CreateErrorResult(ex)];
+            return Task.FromResult<TestResult[]>([CreateErrorResult(ex)]);
         }
 
         var violations = ValidateResult(result, this);
@@ -95,7 +96,7 @@ public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerfo
         else
             testResult.Outcome = UnitTestOutcome.Passed;
 
-        return [testResult];
+        return Task.FromResult<TestResult[]>([testResult]);
     }
 
     internal static IReadOnlyList<string> ValidateResult(BenchmarkResult result, IPerformanceThresholds thresholds)

@@ -80,7 +80,7 @@ public sealed class PerformanceTestMethodTests
         Assert.AreEqual(0, violations.Count);
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(nameof(VoidMethod), false)]
     [DataRow(nameof(TaskMethod), true)]
     [DataRow(nameof(ValueTaskMethod), true)]
@@ -115,7 +115,7 @@ public sealed class PerformanceTestMethodTests
     [TestMethod]
     public void PerformanceAssert_Run_Fails_When_Mean_Exceeds_Threshold()
     {
-        var ex = Assert.ThrowsException<AssertFailedException>(() =>
+        var ex = Assert.ThrowsExactly<AssertFailedException>(() =>
         {
             PerformanceAssert.Run(SlowWork, new PerformanceAssertionOptions
             {
@@ -138,7 +138,7 @@ public sealed class PerformanceTestMethodTests
 
         Assert.IsTrue(result.Errored);
 
-        var ex = Assert.ThrowsException<AssertFailedException>(() => { PerformanceAssert.Validate(result); });
+        var ex = Assert.ThrowsExactly<AssertFailedException>(() => { PerformanceAssert.Validate(result); });
 
         Assert.IsTrue(ex.Message.Contains("Benchmark errored"));
     }

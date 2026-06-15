@@ -74,7 +74,7 @@ public sealed class PerformanceTestMethodIntegrationTests
                         ?? throw new InvalidOperationException($"Method {methodName} is missing [PerformanceTestMethod].");
 
         var testMethod = new StubTestMethod(testClass, method, attribute, arguments);
-        var results = attribute.Execute(testMethod);
+        var results = attribute.ExecuteAsync(testMethod).GetAwaiter().GetResult();
 
         Assert.AreEqual(1, results.Length);
         return results[0];
@@ -105,16 +105,19 @@ public sealed class PerformanceTestMethodIntegrationTests
         public Type ReturnType => MethodInfo.ReturnType;
         public ParameterInfo[] ParameterTypes => MethodInfo.GetParameters();
 
+        public Attribute[] GetAllAttributes() =>
+            MethodInfo.GetCustomAttributes(true).Cast<Attribute>().ToArray();
+
         public Attribute[] GetAllAttributes(bool inherit) =>
             MethodInfo.GetCustomAttributes(inherit).Cast<Attribute>().ToArray();
 
         public TAttributeType[] GetAttributes<TAttributeType>(bool inherit) where TAttributeType : Attribute
             => MethodInfo.GetCustomAttributes<TAttributeType>(inherit).ToArray();
 
-        public TestResult Invoke(object[]? args) => throw new NotSupportedException();
+        public TAttributeType[] GetAttributes<TAttributeType>() where TAttributeType : Attribute
+            => MethodInfo.GetCustomAttributes<TAttributeType>(true).ToArray();
 
-        public IEnumerable<Attribute> GetAllAttributes() =>
-            MethodInfo.GetCustomAttributes();
+        public Task<TestResult> InvokeAsync(object[]? args) => throw new NotSupportedException();
     }
 }
 

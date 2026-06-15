@@ -155,7 +155,7 @@ public sealed class PerformanceAssertIntegrationTests
     [Test]
     public void PerformanceAssert_Run_Fails_When_Mean_Exceeds_Threshold()
     {
-        var ex = Assert.Throws<AssertionException>(() =>
+        var ex = Assert.Throws<AssertionException>((Action)(() =>
         {
             PerformanceAssert.Run(SlowWork, new PerformanceAssertionOptions
             {
@@ -163,7 +163,7 @@ public sealed class PerformanceAssertIntegrationTests
                 WarmupIterations = 5,
                 MaxMeanNs = 1,
             });
-        });
+        }));
 
         Assert.That(ex!.Message, Does.Contain("Mean"));
     }
@@ -178,7 +178,7 @@ public sealed class PerformanceAssertIntegrationTests
 
         Assert.That(result.Errored, Is.True);
 
-        var ex = Assert.Throws<AssertionException>(() => { PerformanceAssert.Validate(result); });
+        var ex = Assert.Throws<AssertionException>((Action)(() => { PerformanceAssert.Validate(result); }));
 
         Assert.That(ex!.Message, Does.Contain("Benchmark errored"));
     }
