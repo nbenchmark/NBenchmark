@@ -47,7 +47,7 @@ public sealed class MarkdownReporter : IReporter
         }
 
         sb.AppendLine(
-            $"> **{table.RunAtUtc} UTC** · {table.WarmupIterations} warmup · {table.MeasuredIterations} measured · Outliers: {table.OutlierDetector}");
+            $"> **{table.RunAtUtc} UTC** · {table.WarmupIterations} warmup · {table.MeasuredIterations} measured");
 
         sb.AppendLine();
 
@@ -150,6 +150,9 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine("---");
         sb.AppendLine();
 
+        sb.AppendLine("### Interpretation");
+        sb.AppendLine();
+
         if (table.Omnibus is { } omnibus)
         {
             var verdict = omnibus.Verdict switch
@@ -166,8 +169,38 @@ public sealed class MarkdownReporter : IReporter
 
             sb.AppendLine();
         }
+        else
+        {
+            sb.AppendLine("**Omnibus**: not run (fewer than 3 comparable groups).");
+            sb.AppendLine();
+        }
 
         var testName = table.Omnibus?.TestName ?? table.SignificanceTestName;
+
+        sb.AppendLine($"- Significance: {testName} (p < {table.SignificanceLevel:0.###})");
+        sb.AppendLine($"- Outliers: {table.OutlierDetector}");
+        sb.AppendLine($"- Effect metric: {GetEffectMetricSummary(table.Rows)}");
+        sb.AppendLine();
+
+        var warnings = table.Rows
+            .Where(r => !r.Errored && r.Warnings.Count > 0)
+            .ToList();
+
+        if (warnings.Count > 0)
+        {
+            sb.AppendLine("### Warnings");
+            sb.AppendLine();
+
+            foreach (var row in warnings)
+            {
+                foreach (var warning in row.Warnings)
+                {
+                    sb.AppendLine($"- **{row.Name}**: {warning}");
+                }
+            }
+
+            sb.AppendLine();
+        }
 
         sb.AppendLine(
             $"_{results.Count} benchmark(s) · {table.TotalDuration.TotalSeconds:F1}s total · {testName} (p < {table.SignificanceLevel:0.###}) · CI {table.ConfidenceLevel * 100:0.#}%_");
@@ -198,4 +231,27 @@ public sealed class MarkdownReporter : IReporter
     }
 
     private static string FormatP(double p) => p < 0.001 ? "<0.001" : p.ToString("0.###");
+
+    private static string GetEffectMetricSummary(IReadOnlyList<BenchmarkRow> rows)
+    {
+        var metrics = rows
+            .Where(r => !r.Errored)
+            .Select(r => r.Effect?.Metric)
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (metrics.Count == 0)
+            return "not reported by active significance strategy";
+
+        if (metrics.Count == 1)
+        {
+            if (string.Equals(metrics[0], EffectMetrics.CliffsDelta, StringComparison.Ordinal))
+                return "Cliff's δ (Romano neg/small/med/large labels)";
+
+            return $"{metrics[0]} (strategy-defined labels)";
+        }
+
+        return $"mixed metrics ({string.Join(", ", metrics)})";
+    }
 }

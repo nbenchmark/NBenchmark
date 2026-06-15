@@ -43,11 +43,19 @@ Run at 2026-06-06 03:40:00 UTC - 25 warmup / 190 measured
 │ Baseline (baseline)  │ 400 ns │ 376 ns │ ±22 ns │ 114 ns │ 500 ns │ 900 ns │ 1.00x │  -  │     -     │    -     │
 ╰──────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┴─────┴───────────┴──────────╯
 
+Precision & Tail Latency
+... (error/stddev/cv/p95/p99 table)
+
+Interpretation
+Omnibus: not run (fewer than 3 comparable groups)
+Significance: Mann-Whitney U (p < 0.05)
 Outliers: IQR fence (1.5×)
-Effect metric: strategy-defined (built-in Mann-Whitney uses Cliff's δ with Romano neg/small/med/large labels)
+Effect metric: Cliff's δ (Romano neg/small/med/large labels)
+
+Warnings
+... (only shown when present)
 
 2 benchmark(s) · 0.0s total · Mann-Whitney U (p < 0.05) · CI 95%
-Error = ±95% confidence interval half-width on the mean.
 ```
 
 When there are two or more benchmarks, a bar chart of median timings is also displayed below the table.
@@ -57,13 +65,14 @@ When **three or more** benchmarks are compared, the per-row Sig column shows the
 ```
 Omnibus Kruskal-Wallis across 3 groups: H(2) = 7.20, p = 0.027 → significant
 
+Significance: Kruskal-Wallis (p < 0.05)
 Outliers: MAD (3×)
-Effect metric: strategy-defined (built-in Mann-Whitney uses Cliff's δ with Romano neg/small/med/large labels)
+Effect metric: Cliff's δ (Romano neg/small/med/large labels)
 
 3 benchmark(s) · 0.0s total · Kruskal-Wallis (p < 0.05) · CI 95%
 ```
 
-The context lines below the table show the active outlier detector (`IQR fence (1.5×)`, `MAD (3×)`, or a custom detector's name) and effect-metric semantics. The final summary line shows benchmark count, total run time, active significance test, and confidence interval.
+After the comparison and precision tables, ConsoleReporter prints an **Interpretation** section with omnibus/significance context, outlier mode, and effect-metric semantics. If warnings exist, they are shown in a separate **Warnings** section below Interpretation. The final summary line then shows benchmark count, total run time, active significance test, and confidence interval.
 
 ## Columns
 
