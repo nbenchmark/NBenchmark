@@ -24,11 +24,21 @@ If you skipped warmup, your first measurements would include JIT compilation tim
 
 ## Garbage collection
 
-By default, NBenchmark forces a gen-0 GC collection (`GC.Collect(0)`) **before each iteration**. This ensures that heap allocations from the previous iteration don't influence the next one.
+NBenchmark uses a **measurement profile** to control how GC interacts with your benchmarks. The default profile is **Realistic**, which does not force a GC between iterations. Numbers reflect natural GC pressure, which is what your code sees in production.
 
-Without this, allocation patterns from earlier iterations can trigger GC mid-measurement, adding noise to your timings. Forcing GC before each iteration keeps measurements independent.
+The alternative is the **Independent** profile, which forces a gen-0 GC before every iteration and a full GC between benchmarks. This keeps measurements independent of each other but suppresses the natural GC pressure your code would experience in production.
 
-This behaviour is controlled by `ForceGcBeforeEachIteration` (default: `true`). You can disable it if your benchmark intentionally tests GC pressure.
+The profile is set via `WithMeasurementProfile(MeasurementProfile.Independent)` in code or `--profile independent` on the CLI. See [Measurement Profiles](../statistics/measurement.md#measurement-profiles) for a worked example.
+
+The profile controls three behaviours:
+
+| Behaviour | Realistic (default) | Independent |
+|---|---|---|
+| Per-iteration Gen0 GC | Off | On |
+| Between-benchmark full GC | Off | On |
+| Allocation tracking | On | Off |
+
+Each behaviour can be overridden individually via the `*Override` fields on `MeasurementOptions` or the `--force-gc` / `--no-allocations` CLI flags.
 
 ## Outlier trimming
 
@@ -111,7 +121,7 @@ When `MeasureAllocations` is enabled, NBenchmark samples `GC.GetAllocatedBytesFo
 
 This is useful for detecting unexpected heap allocations - boxing of value types, LINQ overhead, string formatting, etc. Zero allocations in the hot path typically means less GC pressure and more predictable latency.
 
-Allocation tracking is off by default because it adds a small measurement overhead.
+Allocation tracking is **on by default** under the `Realistic` profile. It can be disabled with `--no-allocations` on the CLI or `MeasureAllocationsOverride = false` in code. Under the `Independent` profile it is off by default but can be re-enabled.
 
 ## Next steps
 

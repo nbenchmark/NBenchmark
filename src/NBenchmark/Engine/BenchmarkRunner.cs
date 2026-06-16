@@ -68,7 +68,9 @@ public sealed class BenchmarkRunner
             }
 
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
-            ForceFullGc();
+
+            if (options.ForceGcBetweenBenchmarks)
+                ForceFullGc();
 
             var (timings, allocations, measuredDuration) = MeasureSyncVoid(name, body, spec, ct);
             var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
@@ -114,7 +116,9 @@ public sealed class BenchmarkRunner
             }
 
             progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
-            ForceFullGc();
+
+            if (options.ForceGcBetweenBenchmarks)
+                ForceFullGc();
 
             var (timings, allocations, measuredDuration) = MeasureSyncReturning<T>(name, body, spec, ct);
             var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
@@ -159,7 +163,9 @@ public sealed class BenchmarkRunner
             }
 
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
-            ForceFullGc();
+
+            if (options.ForceGcBetweenBenchmarks)
+                ForceFullGc();
 
             var (timings, allocations, measuredDuration) = await MeasureAsyncVoid(name, body, spec, ct).ConfigureAwait(false);
             var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
@@ -202,7 +208,9 @@ public sealed class BenchmarkRunner
             }
 
             await progress.OnWarmupCompleted(name).ConfigureAwait(false);
-            ForceFullGc();
+
+            if (options.ForceGcBetweenBenchmarks)
+                ForceFullGc();
 
             var (timings, allocations, measuredDuration) = await MeasureAsyncReturning<T>(name, body, spec, ct).ConfigureAwait(false);
             var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);

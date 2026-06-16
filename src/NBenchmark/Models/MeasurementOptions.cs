@@ -32,9 +32,36 @@ public record MeasurementOptions
                 $"Iterations must be between 0 and {MaxIterations}");
     }
 
-    public bool ForceGcBeforeEachIteration { get; init; } = true;
+    /// <summary>
+    ///     The authoritative measurement profile. The resolved booleans
+    ///     (<see cref="ForceGcBeforeEachIteration" />, <see cref="ForceGcBetweenBenchmarks" />,
+    ///     <see cref="MeasureAllocations" />) derive from this unless an explicit override is set.
+    /// </summary>
+    public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
 
-    public bool MeasureAllocations { get; init; } = false;
+    /// <summary>Overrides <see cref="ForceGcBeforeEachIteration" />. When <c>null</c>, the value derives from <see cref="Profile" />.</summary>
+    public bool? ForceGcBeforeEachIterationOverride { get; init; }
+
+    /// <summary>Overrides <see cref="ForceGcBetweenBenchmarks" />. When <c>null</c>, the value derives from <see cref="Profile" />.</summary>
+    public bool? ForceGcBetweenBenchmarksOverride { get; init; }
+
+    /// <summary>Overrides <see cref="MeasureAllocations" />. When <c>null</c>, the value derives from <see cref="Profile" />.</summary>
+    public bool? MeasureAllocationsOverride { get; init; }
+
+    /// <summary>Whether a Gen0 GC is forced before each measured iteration. Forced under <see cref="MeasurementProfile.Independent" />, unless overridden.</summary>
+    public bool ForceGcBeforeEachIteration =>
+        ForceGcBeforeEachIterationOverride ?? (Profile == MeasurementProfile.Independent);
+
+    /// <summary>Whether a full GC runs between benchmarks. Forced under <see cref="MeasurementProfile.Independent" />, unless overridden.</summary>
+    public bool ForceGcBetweenBenchmarks =>
+        ForceGcBetweenBenchmarksOverride ?? (Profile == MeasurementProfile.Independent);
+
+    /// <summary>Whether per-iteration allocations are sampled and reported. On under <see cref="MeasurementProfile.Realistic" />, unless overridden.</summary>
+    public bool MeasureAllocations =>
+        MeasureAllocationsOverride ?? (Profile == MeasurementProfile.Realistic);
+
+    /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
+    public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };
 
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
@@ -82,8 +109,6 @@ public record MeasurementOptions
             : throw new ArgumentOutOfRangeException(nameof(value), value,
                 "SignificanceLevel must be strictly between 0 and 1 (e.g. 0.05).");
     }
-
-    public bool ForceGcBetweenBenchmarks { get; init; } = true;
 
     /// <summary>
     ///     The minimum practical effect in [0, 1] required for a benchmark to be considered

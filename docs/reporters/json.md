@@ -59,6 +59,8 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 ```json
 {
   "generatedAt": "2026-06-06T03:40:00.000Z",
+  "detail": "simple",
+  "profile": "realistic",
   "results": [
     {
       "name": "Compute",
@@ -97,7 +99,7 @@ All timing values are in **nanoseconds**. Property names use camelCase.
 
 `totalDuration` is end-to-end wall-clock (warmup + pre-measure GC + measured loop); `measuredDuration` is the measured loop only. `measuredDuration <= totalDuration` always; the gap is dominated by warmup iterations and the pre-measure `GC.Collect`.
 
-The `detail` field in the envelope reports the active detail level. The result records always contain all available fields regardless of detail level.
+The `detail` and `profile` fields in the envelope report the active detail level and measurement profile. The result records always contain all available fields regardless of detail level.
 
 ## Notes
 

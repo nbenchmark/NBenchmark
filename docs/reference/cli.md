@@ -167,6 +167,47 @@ dotnet run -- --in-process
 
 ---
 
+### `--profile <mode>`
+
+Set the measurement profile. Controls per-iteration GC, between-benchmark GC, and allocation tracking as a bundle.
+
+| Value | Behaviour |
+|---|---|
+| `realistic` | No per-iteration GC, no between-benchmark GC, allocation tracking on. **(default)** |
+| `independent` | Per-iteration Gen0 GC, between-benchmark full GC, allocation tracking off. |
+
+```bash
+dotnet run -- --profile independent
+```
+
+Individual behaviours can be overridden with `--force-gc` and `--no-allocations`. See [Measurement Profiles](../statistics/measurement.md#measurement-profiles) for a worked example.
+
+---
+
+### `--force-gc`
+
+Override the profile to force a Gen0 GC before every measured iteration. Under the default `Realistic` profile, this enables per-iteration GC without switching to the `Independent` profile.
+
+```bash
+dotnet run -- --profile realistic --force-gc
+```
+
+There is no `--no-force-gc` flag because `Realistic` already disables per-iteration GC; users who want per-iteration GC under `Realistic` use `--force-gc`.
+
+---
+
+### `--no-allocations`
+
+Override the profile to disable allocation tracking. Under the default `Realistic` profile, this suppresses the `Alloc/op` column without switching to the `Independent` profile.
+
+```bash
+dotnet run -- --profile realistic --no-allocations
+```
+
+There is no `--allocations` flag because `Realistic` already enables allocation tracking; users who want to disable it use `--no-allocations`.
+
+---
+
 ### `--detail <level>`
 
 Set the report detail level. Controls how much information reporters display.

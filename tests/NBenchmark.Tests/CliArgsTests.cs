@@ -446,6 +446,72 @@ public class CliArgsTests
         }
     }
 
+    [Theory]
+    [InlineData("realistic", MeasurementProfile.Realistic)]
+    [InlineData("independent", MeasurementProfile.Independent)]
+    public void Parse_Profile_Valid_SetsProfile(string value, MeasurementProfile expected)
+    {
+        var result = CliArgs.Parse(["--profile", value]);
+        Assert.Equal(expected, result.Profile);
+    }
+
+    [Fact]
+    public void Parse_Profile_Default_IsNull()
+    {
+        var result = CliArgs.Parse([]);
+        Assert.Null(result.Profile);
+    }
+
+    [Fact]
+    public void Parse_Profile_Invalid_PrintsError()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            CliArgs? result = null;
+            var stderr = CaptureConsoleError(() => result = CliArgs.Parse(["--profile", "bogus"]));
+
+            Assert.NotNull(result);
+            Assert.Null(result!.Profile);
+            Assert.Contains("Invalid --profile", stderr);
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+        }
+    }
+
+    [Fact]
+    public void Parse_ForceGc_SetsForceGc()
+    {
+        var result = CliArgs.Parse(["--force-gc"]);
+        Assert.True(result.ForceGc);
+    }
+
+    [Fact]
+    public void Parse_ForceGc_Default_IsNull()
+    {
+        var result = CliArgs.Parse([]);
+        Assert.Null(result.ForceGc);
+    }
+
+    [Fact]
+    public void Parse_NoAllocations_SetsNoAllocations()
+    {
+        var result = CliArgs.Parse(["--no-allocations"]);
+        Assert.True(result.NoAllocations);
+    }
+
+    [Fact]
+    public void Parse_NoAllocations_Default_IsNull()
+    {
+        var result = CliArgs.Parse([]);
+        Assert.Null(result.NoAllocations);
+    }
+
     [Fact]
     public void PrintHelp_WritesUsageToStdout()
     {

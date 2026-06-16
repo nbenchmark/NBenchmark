@@ -41,6 +41,9 @@ internal sealed record MeasurementOverrides
     public double? ConfidenceLevel { get; init; }
     public double? SignificanceLevel { get; init; }
     public OutlierMode? OutlierMode { get; init; }
+    public MeasurementProfile? Profile { get; init; }
+    public bool? ForceGc { get; init; }
+    public bool? NoAllocations { get; init; }
 
     public static MeasurementOverrides FromCliArgs(CliArgs cliArgs) => new()
     {
@@ -49,6 +52,9 @@ internal sealed record MeasurementOverrides
         ConfidenceLevel = cliArgs.ConfidenceLevel,
         SignificanceLevel = cliArgs.Alpha,
         OutlierMode = cliArgs.OutlierMode,
+        Profile = cliArgs.Profile,
+        ForceGc = cliArgs.ForceGc,
+        NoAllocations = cliArgs.NoAllocations,
     };
 
     public MeasurementOptions Apply(MeasurementOptions options)
@@ -69,6 +75,15 @@ internal sealed record MeasurementOverrides
 
         if (OutlierMode.HasValue)
             result = result with { OutlierMode = OutlierMode.Value, OutlierDetector = null };
+
+        if (Profile.HasValue)
+            result = result with { Profile = Profile.Value };
+
+        if (ForceGc.HasValue)
+            result = result with { ForceGcBeforeEachIterationOverride = ForceGc.Value };
+
+        if (NoAllocations.HasValue)
+            result = result with { MeasureAllocationsOverride = !NoAllocations.Value };
 
         return result;
     }

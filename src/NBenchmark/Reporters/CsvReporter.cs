@@ -30,15 +30,16 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         if (Detail == ReportDetail.Simple)
         {
             sb.AppendLine(
-                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail");
+                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
         }
         else
         {
             sb.AppendLine(
-                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations");
+                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations");
         }
 
         var table = BenchmarkTable.Build(results);
+        var profile = table.Profile.ToString().ToLowerInvariant();
 
         foreach (var row in table.Rows)
         {
@@ -77,7 +78,8 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{row.MeanAllocatedBytes?.ToString() ?? "null"}," +
                     $"{row.MarginPercent:F2}," +
                     $"{row.OutliersRemoved}," +
-                    $"{detail}");
+                    $"{detail}," +
+                    $"{profile}");
             }
             else
             {
@@ -109,6 +111,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{row.MarginPercent:F2}," +
                     $"{row.OutliersRemoved}," +
                     $"{detail}," +
+                    $"{profile}," +
                     $"{row.Q1:F1}," +
                     $"{row.Q3:F1}," +
                     $"{row.InterquartileRange:F1}," +

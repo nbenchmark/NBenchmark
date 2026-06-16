@@ -450,7 +450,7 @@ public class BenchmarkRunnerTests
             {
                 WarmupIterations = 1,
                 Iterations = 10,
-                MeasureAllocations = true,
+                MeasureAllocationsOverride = true,
                 OutlierMode = OutlierMode.None,
             },
         };
@@ -487,8 +487,8 @@ public class BenchmarkRunnerTests
                 {
                     WarmupIterations = 1,
                     Iterations = 30,
-                    MeasureAllocations = true,
-                    ForceGcBeforeEachIteration = false,
+                    MeasureAllocationsOverride = true,
+                    ForceGcBeforeEachIterationOverride = false,
                     OutlierMode = OutlierMode.None,
                 },
             };
@@ -524,7 +524,7 @@ public class BenchmarkRunnerTests
             {
                 WarmupIterations = 1,
                 Iterations = 10,
-                MeasureAllocations = true,
+                MeasureAllocationsOverride = true,
                 OutlierMode = OutlierMode.None,
             },
         };
@@ -571,8 +571,8 @@ public class BenchmarkRunnerTests
                 {
                     WarmupIterations = 1,
                     Iterations = 30,
-                    MeasureAllocations = true,
-                    ForceGcBeforeEachIteration = false,
+                    MeasureAllocationsOverride = true,
+                    ForceGcBeforeEachIterationOverride = false,
                     OutlierMode = OutlierMode.RemoveTop5Percent,
                 },
             };
@@ -687,7 +687,7 @@ public class BenchmarkRunnerTests
                 WarmupIterations = 0,
                 Iterations = 2,
                 OutlierMode = OutlierMode.None,
-                MeasureAllocations = false,
+                MeasureAllocationsOverride = false,
             },
         };
     }

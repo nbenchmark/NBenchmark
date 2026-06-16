@@ -15,7 +15,7 @@ This page maps symptoms you may see in benchmark output to their likely causes a
 | Large Error (wide CI) | Too few iterations | Increase with `.WithIterations(500)` or `--iterations 500` - see [Configuration](./reference/configuration.md#iterations) |
 | Large Error (wide CI) | OS scheduling / context-switch noise | Switch outlier mode to `.WithOutlierMode(OutlierMode.IqrFence)` - see [Configuration](./reference/configuration.md#outliermode) |
 | Large Error (wide CI) | Thermal throttling on laptops | Increase warmup with `.WithWarmup(50)` to let the CPU stabilise, or reduce iterations to shorten the run. Run plugged in. - see [Configuration](./reference/configuration.md#warmupiterations) |
-| High StdDev | GC pressure or allocation noise | Enable allocation tracking with `.WithAllocations()` to diagnose - see [Configuration](./reference/configuration.md#measureallocations). If your benchmark intentionally exercises GC, you can disable `ForceGcBeforeEachIteration` - see [Configuration](./reference/configuration.md#forcegcbeforeeachiteration) |
+| High StdDev | GC pressure or allocation noise | Enable allocation tracking with `.WithAllocations()` to diagnose - see [Configuration](./reference/configuration.md#measureallocations). Under the default `Realistic` profile, natural GC pauses are included in the timing; switch to the `Independent` profile (`--profile independent`) to force per-iteration GC and isolate iterations from GC noise - see [Measurement Profiles](./statistics/measurement.md#measurement-profiles) |
 
 ### Quick reference: Outlier modes
 

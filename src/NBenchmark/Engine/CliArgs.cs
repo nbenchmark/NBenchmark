@@ -27,6 +27,12 @@ internal sealed record CliArgs
     /// </summary>
     public bool InProcess { get; init; }
 
+    public MeasurementProfile? Profile { get; init; }
+
+    public bool? ForceGc { get; init; }
+
+    public bool? NoAllocations { get; init; }
+
     public static CliArgs Parse(string[] args)
     {
         var showHelp = false;
@@ -46,6 +52,9 @@ internal sealed record CliArgs
         double? alpha = null;
         var inProcess = false;
         OutlierMode? outlierMode = null;
+        MeasurementProfile? profile = null;
+        bool? forceGc = null;
+        bool? noAllocations = null;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -195,9 +204,31 @@ internal sealed record CliArgs
                 case "--in-process":
                     inProcess = true;
                     break;
+                case "--profile" when i + 1 < args.Length:
+                    var profileStr = args[++i];
+
+                    if (string.Equals(profileStr, "realistic", StringComparison.OrdinalIgnoreCase))
+                        profile = MeasurementProfile.Realistic;
+                    else if (string.Equals(profileStr, "independent", StringComparison.OrdinalIgnoreCase))
+                        profile = MeasurementProfile.Independent;
+                    else
+                    {
+                        Console.Error.WriteLine(
+                            $"Invalid --profile value '{profileStr}'. Must be 'realistic' or 'independent'.");
+
+                        Environment.ExitCode = 1;
+                    }
+
+                    break;
+                case "--force-gc":
+                    forceGc = true;
+                    break;
+                case "--no-allocations":
+                    noAllocations = true;
+                    break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--confidence" or "--order" or "--threshold-pct" or "--seed" or "--alpha"
-                    or "--outlier" or "--detail":
+                    or "--outlier" or "--detail" or "--profile":
                     Console.Error.WriteLine($"Missing value for '{args[i]}'.");
                     Environment.ExitCode = 1;
                     break;
@@ -241,6 +272,9 @@ internal sealed record CliArgs
             CliReporters = cliReporters,
             Detail = detail,
             InProcess = inProcess,
+            Profile = profile,
+            ForceGc = forceGc,
+            NoAllocations = noAllocations,
         };
     }
 
@@ -290,6 +324,9 @@ internal sealed record CliArgs
         Console.WriteLine("  --detail <level>       Report detail: simple or advanced (default: simple)");
         Console.WriteLine("  --threshold-pct <n>    Fail with exit code 1 if any benchmark regresses");
         Console.WriteLine("                        >N% vs baseline (median-based comparison; n >= 1).");
+        Console.WriteLine("  --profile <mode>       Measurement profile: realistic (default) or independent");
+        Console.WriteLine("  --force-gc             Force Gen0 GC before every iteration (overrides profile)");
+        Console.WriteLine("  --no-allocations       Disable allocation tracking (overrides profile)");
         Console.WriteLine("  --help, -h             Show this help text");
     }
 }

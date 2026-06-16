@@ -11,14 +11,103 @@ public class MeasurementOptionsTests
 
         Assert.Equal(25, opts.WarmupIterations);
         Assert.Equal(200, opts.Iterations);
-        Assert.True(opts.ForceGcBeforeEachIteration);
-        Assert.False(opts.MeasureAllocations);
+        Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
+        Assert.False(opts.ForceGcBeforeEachIteration);
+        Assert.False(opts.ForceGcBetweenBenchmarks);
+        Assert.True(opts.MeasureAllocations);
         Assert.Equal(OutlierMode.IqrFence, opts.OutlierMode);
         Assert.Equal(0.95, opts.ConfidenceLevel);
         Assert.True(opts.EnableSignificance);
         Assert.Equal(0.05, opts.SignificanceLevel);
-        Assert.True(opts.ForceGcBetweenBenchmarks);
         Assert.Null(opts.MinimumPracticalEffect);
+    }
+
+    [Fact]
+    public void Independent_ForcesGcAndDisablesAlloc()
+    {
+        var opts = MeasurementOptions.For(MeasurementProfile.Independent);
+
+        Assert.Equal(MeasurementProfile.Independent, opts.Profile);
+        Assert.True(opts.ForceGcBeforeEachIteration);
+        Assert.True(opts.ForceGcBetweenBenchmarks);
+        Assert.False(opts.MeasureAllocations);
+    }
+
+    [Fact]
+    public void WithProfile_ResolvesOptionBundle()
+    {
+        var opts = new MeasurementOptions() with { Profile = MeasurementProfile.Independent };
+
+        Assert.Equal(MeasurementProfile.Independent, opts.Profile);
+        Assert.True(opts.ForceGcBeforeEachIteration);
+        Assert.True(opts.ForceGcBetweenBenchmarks);
+        Assert.False(opts.MeasureAllocations);
+    }
+
+    [Fact]
+    public void ExplicitOverrideWinsOverProfile()
+    {
+        var opts = new MeasurementOptions() with
+        {
+            Profile = MeasurementProfile.Realistic,
+            ForceGcBeforeEachIterationOverride = true,
+        };
+
+        Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
+        Assert.True(opts.ForceGcBeforeEachIteration);
+        Assert.False(opts.ForceGcBetweenBenchmarks);
+        Assert.True(opts.MeasureAllocations);
+    }
+
+    [Fact]
+    public void OverrideSurvivesWithProfileChange()
+    {
+        var opts = MeasurementOptions.For(MeasurementProfile.Independent) with
+        {
+            Profile = MeasurementProfile.Realistic,
+            ForceGcBeforeEachIterationOverride = true,
+        };
+
+        Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
+        Assert.True(opts.ForceGcBeforeEachIteration);
+        Assert.False(opts.ForceGcBetweenBenchmarks);
+        Assert.True(opts.MeasureAllocations);
+    }
+
+    [Fact]
+    public void NoAllocationsOverrideDisablesUnderRealistic()
+    {
+        var opts = new MeasurementOptions() with
+        {
+            Profile = MeasurementProfile.Realistic,
+            MeasureAllocationsOverride = false,
+        };
+
+        Assert.False(opts.MeasureAllocations);
+    }
+
+    [Fact]
+    public void ForceGcOverrideEnablesUnderRealistic()
+    {
+        var opts = new MeasurementOptions() with
+        {
+            Profile = MeasurementProfile.Realistic,
+            ForceGcBeforeEachIterationOverride = true,
+        };
+
+        Assert.True(opts.ForceGcBeforeEachIteration);
+    }
+
+    [Fact]
+    public void ForceGcBetweenBenchmarksOverrideEnablesUnderRealistic()
+    {
+        var opts = new MeasurementOptions() with
+        {
+            Profile = MeasurementProfile.Realistic,
+            ForceGcBetweenBenchmarksOverride = true,
+        };
+
+        Assert.True(opts.ForceGcBetweenBenchmarks);
     }
 
     [Theory]

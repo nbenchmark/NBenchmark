@@ -87,7 +87,19 @@ public sealed class BenchmarkSuite(string name)
 
     public BenchmarkSuite WithAllocations(bool enabled = true)
     {
-        _options = _options with { MeasureAllocations = enabled };
+        _options = _options with { MeasureAllocationsOverride = enabled };
+        return this;
+    }
+
+    /// <summary>
+    ///     Sets the measurement profile, which bundles per-iteration GC, between-benchmark GC, and
+    ///     allocation tracking. <see cref="MeasurementProfile.Realistic" /> (the default) keeps natural
+    ///     GC pressure in the timing; <see cref="MeasurementProfile.Independent" /> isolates iterations
+    ///     for pure-CPU measurement.
+    /// </summary>
+    public BenchmarkSuite WithMeasurementProfile(MeasurementProfile profile)
+    {
+        _options = _options with { Profile = profile };
         return this;
     }
 
