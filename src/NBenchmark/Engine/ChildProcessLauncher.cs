@@ -33,76 +33,89 @@ internal static class ChildProcessLauncher
     };
 
     /// <summary>
-    ///     Launches a child process for <paramref name="request" />, waits for it to
-    ///     complete, and returns the result items it produced. On any failure a single
-    ///     errored item per expected benchmark is returned instead of throwing, so the
-    ///     parent can surface the failure as ordinary errored benchmark results.
+    ///     The active launcher. Defaults to the real process-spawning implementation.
+    ///     Tests replace this with a fake to avoid spawning real child processes.
     /// </summary>
-    public static async Task<IReadOnlyList<IsolatedResultItem>> LaunchAsync(
+    internal static IProcessLauncher Current { get; set; } = new DefaultLauncher();
+
+    /// <summary>
+    ///     Launches a child process for <paramref name="request" />, waits for it to
+    ///     complete, and returns the result items it produced. Delegates to
+    ///     <see cref="Current" /> so tests can swap the launcher.
+    /// </summary>
+    public static Task<IReadOnlyList<IsolatedResultItem>> LaunchAsync(
         IsolatedRunRequest request,
         CancellationToken cancellationToken)
+        => Current.LaunchAsync(request, cancellationToken);
+
+    private sealed class DefaultLauncher : IProcessLauncher
     {
-        var requestPath = Path.Combine(Path.GetTempPath(), $"nbench-request-{Guid.NewGuid():N}.json");
-        var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-output-{Guid.NewGuid():N}.json");
-
-        try
+        public async Task<IReadOnlyList<IsolatedResultItem>> LaunchAsync(
+            IsolatedRunRequest request,
+            CancellationToken cancellationToken)
         {
-            await WriteRequestAsync(requestPath, request, cancellationToken).ConfigureAwait(false);
+            var requestPath = Path.Combine(Path.GetTempPath(), $"nbench-request-{Guid.NewGuid():N}.json");
+            var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-output-{Guid.NewGuid():N}.json");
 
-            using var process = new Process
+            try
             {
-                StartInfo = BuildStartInfo(
-                    (RequestPathEnvVar, requestPath),
-                    (OutputPathEnvVar, outputPath)),
-            };
+                await WriteRequestAsync(requestPath, request, cancellationToken).ConfigureAwait(false);
 
-            var stderr = new StringBuilder();
-            var stdoutTail = new Queue<string>(StdoutTailLines + 1);
+                using var process = new Process
+                {
+                    StartInfo = BuildStartInfo(
+                        (RequestPathEnvVar, requestPath),
+                        (OutputPathEnvVar, outputPath)),
+                };
 
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data is not null)
-                    stderr.AppendLine(e.Data);
-            };
+                var stderr = new StringBuilder();
+                var stdoutTail = new Queue<string>(StdoutTailLines + 1);
 
-            // Keep only the tail of stdout: enough to diagnose a crash without buffering a
-            // chatty child's entire output, while still draining the pipe so it cannot
-            // fill and deadlock.
-            process.OutputDataReceived += (_, e) =>
-            {
-                if (e.Data is null)
-                    return;
+                process.ErrorDataReceived += (_, e) =>
+                {
+                    if (e.Data is not null)
+                        stderr.AppendLine(e.Data);
+                };
 
-                stdoutTail.Enqueue(e.Data);
+                // Keep only the tail of stdout: enough to diagnose a crash without buffering a
+                // chatty child's entire output, while still draining the pipe so it cannot
+                // fill and deadlock.
+                process.OutputDataReceived += (_, e) =>
+                {
+                    if (e.Data is null)
+                        return;
 
-                if (stdoutTail.Count > StdoutTailLines)
-                    stdoutTail.Dequeue();
-            };
+                    stdoutTail.Enqueue(e.Data);
 
-            process.Start();
-            process.BeginErrorReadLine();
-            process.BeginOutputReadLine();
+                    if (stdoutTail.Count > StdoutTailLines)
+                        stdoutTail.Dequeue();
+                };
 
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                process.Start();
+                process.BeginErrorReadLine();
+                process.BeginOutputReadLine();
 
-            if (process.ExitCode != 0 || !File.Exists(outputPath))
+                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+                if (process.ExitCode != 0 || !File.Exists(outputPath))
+                {
+                    return ErroredItems(
+                        request,
+                        BuildFailureMessage(request, process.ExitCode, outputPath, stderr, stdoutTail));
+                }
+
+                return await ReadPayloadAsync(outputPath, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return ErroredItems(
-                    request,
-                    BuildFailureMessage(request, process.ExitCode, outputPath, stderr, stdoutTail));
+                    request, $"Failed to launch an isolated child process for {Describe(request)}: {ex.Message}");
             }
-
-            return await ReadPayloadAsync(outputPath, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return ErroredItems(
-                request, $"Failed to launch an isolated child process for {Describe(request)}: {ex.Message}");
-        }
-        finally
-        {
-            TryDelete(requestPath);
-            TryDelete(outputPath);
+            finally
+            {
+                TryDelete(requestPath);
+                TryDelete(outputPath);
+            }
         }
     }
 
