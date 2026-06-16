@@ -50,7 +50,8 @@ public class OutcomeBuilderTests
             true,
             options,
             total,
-            measured);
+            measured,
+            resolvedWarmup: 5);
 
         Assert.Equal(rawTimings, outcome.RawSamples);
         var r = outcome.Result;
@@ -150,6 +151,50 @@ public class OutcomeBuilderTests
 
         var after = DateTimeOffset.UtcNow.AddSeconds(5);
         Assert.InRange(outcome.Result.RunAtUtc, before, after);
+    }
+
+    [Fact]
+    public void Build_Success_Flows_ResolvedWarmup_And_AutoTune_Diagnostic()
+    {
+        var stats = new StatsSummary { Mean = 1 };
+        var diagnostic = new AutoTuneDiagnostic
+        {
+            ResolvedWarmup = 12,
+            ResolvedSamples = 47,
+            OpsPerSample = 8,
+            TotalBodyInvocations = (12 + 47) * 8,
+            WarmupStop = WarmupStopReason.Settled,
+            SampleStop = SampleStopReason.CiTargetMet,
+            AchievedRelativeCiWidth = 0.018,
+            TuningWallClock = TimeSpan.FromMilliseconds(33),
+        };
+
+        var outcome = OutcomeBuilder.Build(
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, 47, null, 0, 0, 0, null, null, 0, null),
+                [1, 2, 3]),
+            "b", null, false,
+            new MeasurementOptions(),
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1),
+            resolvedWarmup: 12,
+            autoTune: diagnostic);
+
+        Assert.Equal(12, outcome.Result.WarmupIterations);
+        Assert.Equal(diagnostic, outcome.Result.AutoTune);
+    }
+
+    [Fact]
+    public void Build_DryRun_Leaves_AutoTune_Null()
+    {
+        var outcome = OutcomeBuilder.Build(
+            new RunOutcome.DryRun(),
+            "dry", null, false,
+            new MeasurementOptions(),
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1));
+
+        Assert.Null(outcome.Result.AutoTune);
     }
 
     // ---------- Dry-run path ----------
@@ -253,7 +298,8 @@ public class OutcomeBuilderTests
             "bad", "with desc", true,
             options,
             total,
-            measured);
+            measured,
+            resolvedWarmup: 4);
 
         Assert.Empty(outcome.RawSamples);
         var r = outcome.Result;

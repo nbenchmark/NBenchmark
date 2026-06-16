@@ -10,7 +10,7 @@ You don't need to be a statistician to use NBenchmark, but understanding what it
 
 ## Warmup
 
-Before any measurements are recorded, each benchmark runs for a number of **warmup iterations** (default: 25).
+Before any measurements are recorded, each benchmark runs a number of **warmup samples** that are discarded.
 
 Warmup exists because the first few runs of .NET code are artificially slow:
 
@@ -19,8 +19,18 @@ Warmup exists because the first few runs of .NET code are artificially slow:
 
 If you skipped warmup, your first measurements would include JIT compilation time, which is not representative of steady-state performance. After warmup, subsequent runs use the compiled, cached version of your code.
 
+By default NBenchmark **auto-detects** how much warmup each benchmark needs: it watches the per-sample timings and stops once they stop improving (a plateau). A method that JITs quickly gets a short warmup; one that keeps speeding up gets a longer one. Pin an exact count with `WithWarmup(n)` / `WarmupIterations = n` when you want a fixed budget.
+
 > [!TIP]
-> If your benchmark is a one-shot operation where you specifically want to measure cold-start time, set `WithWarmup(0)` or `WarmupIterations = 1`.
+> If your benchmark is a one-shot operation where you specifically want to measure cold-start time, set `WithWarmup(0)` to skip warmup entirely.
+
+## Samples and ops
+
+NBenchmark records one **sample** per measured timing. For a fast method, a single call can be quicker than the cost of reading the timer, so a per-call measurement would be mostly noise.
+
+To handle this, NBenchmark times a batch of **K** back-to-back invocations (**ops per sample**) as one sample, then divides by K to report a per-operation number. K is **auto-calibrated** so each sample spans roughly 1 µs - long enough that timer overhead is negligible. A method that takes microseconds gets K = 1; a method that takes nanoseconds gets a larger K.
+
+You rarely need to touch this, but you can pin K with `WithOpsPerSample(n)` / `OpsPerSample = n`. Calibration is skipped (K stays 1) when per-iteration setup/teardown is configured, since a batch would then no longer represent a single call. See [Configuration: OpsPerSample](../reference/configuration.md#opspersample).
 
 ## Garbage collection
 
@@ -84,11 +94,11 @@ A low StdDev means your benchmark is stable and the mean is trustworthy.
 
 The **Error** column shows the **[margin of error](https://en.wikipedia.org/wiki/Margin_of_error)** on the mean at a given confidence level (default: 95%) in the format `±X (Y%)` -- the absolute margin in nanoseconds followed by the margin as a percentage of the mean in parentheses.
 
-Concretely: with 200 samples and a 95% confidence level, the true mean is likely within `Mean ± Error`. If the Error is `±50 ns (4.2%)` and the mean is `1.20 µs`, you can be 95% confident the true mean is somewhere between `1.15 µs` and `1.25 µs`.
+Concretely, at a 95% confidence level the true mean is likely within `Mean ± Error`. If the Error is `±50 ns (4.2%)` and the mean is `1.20 µs`, you can be 95% confident the true mean is somewhere between `1.15 µs` and `1.25 µs`.
 
 **How it's calculated:** NBenchmark computes the [standard error of the mean](https://en.wikipedia.org/wiki/Standard_error) (`StdDev / √n`), then multiplies by the critical value of [Student's t-distribution](https://en.wikipedia.org/wiki/Student%27s_t-distribution) at the configured confidence level and `n-1` degrees of freedom. For large sample counts this converges to the familiar `z = 1.96` you might know from normal-distribution CIs.
 
-**What a large Error means:** your measurements are highly variable, or you have too few iterations. Consider increasing `WithIterations(...)` or checking whether something external is interfering (e.g. background processes on your machine).
+**What a large Error means:** your measurements are highly variable. In the default auto-sampling mode NBenchmark keeps collecting samples until the Error meets the precision target, so a wide interval usually points to genuine run-to-run variability - check whether something external is interfering (e.g. background processes on your machine), or demand a tighter target with the `Thorough` preset. If you have pinned `Iterations`, raising it (or returning to auto mode) narrows the interval.
 
 ## Percentiles (P95, P99)
 

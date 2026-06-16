@@ -13,8 +13,8 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
     private int _currentIteration;
     private string _currentName = "";
     private int _currentTotalIterations;
-    private int _currentWarmupIterations;
     private bool _inWarmup;
+    private int _pulse;
     private int _suiteTotal;
 
     public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
@@ -32,7 +32,6 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
 
     public Task OnWarmupStarting(string name, int totalWarmupIterations)
     {
-        _currentWarmupIterations = totalWarmupIterations;
         _inWarmup = true;
         _currentIteration = 0;
         _currentTotalIterations = totalWarmupIterations;
@@ -52,6 +51,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         _currentIndex = index;
         _suiteTotal = total;
         _currentIteration = 0;
+        _pulse = 0;
         _benchmarkStopwatch.Restart();
         return Task.CompletedTask;
     }
@@ -97,6 +97,17 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
     {
         var phase = _inWarmup ? "warmup" : "measuring";
 
+        if (_currentTotalIterations <= 0)
+        {
+            // An auto-resolved count has no honest denominator, so show a moving indicator and the
+            // live sample count instead of a fake percentage and ETA.
+            var indeterminate = IndeterminateBar(20);
+            var count = _currentIteration > 0 ? $" ({_currentIteration} samples)" : "";
+            SysConsole.Write(
+                $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] \x1b[1m{_currentName}\x1b[0m \x1b[38;5;75m{indeterminate}\x1b[0m \x1b[90m{phase}{count}\x1b[0m");
+            return;
+        }
+
         var pct = _currentTotalIterations > 0
             ? (int)Math.Round(100.0 * _currentIteration / _currentTotalIterations)
             : 0;
@@ -113,6 +124,23 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         // \r returns to start of line, \x1b[2K clears the line, then we rewrite
         SysConsole.Write(
             $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] \x1b[1m{_currentName}\x1b[0m \x1b[38;5;75m{bar}\x1b[0m \x1b[90m{pct}% {phase} ({_currentIteration}/{_currentTotalIterations}){etaText}\x1b[0m");
+    }
+
+    private string IndeterminateBar(int width)
+    {
+        // A short lit segment that bounces across the track to signal ongoing work.
+        const int segment = 3;
+        var span = Math.Max(1, width - segment);
+        var period = span * 2;
+        var pos = _pulse++ % period;
+        if (pos > span)
+            pos = period - pos;
+
+        var chars = new char[width];
+        for (var i = 0; i < width; i++)
+            chars[i] = i >= pos && i < pos + segment ? '█' : '░';
+
+        return new string(chars);
     }
 
     private TimeSpan? ComputeEta()

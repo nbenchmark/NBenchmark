@@ -13,6 +13,7 @@ public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
 {
     private const int MaxIterations = 100_000;
     private const int MaxWarmupIterations = 10_000;
+    private const int MaxOpsPerSampleLimit = 1 << 24;
 
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticIds.MeasurementOptionsRange,
@@ -127,6 +128,16 @@ public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
                     context.ReportDiagnostic(Diagnostic.Create(Rule,
                         assignment.GetLocation(),
                         $"WarmupIterations = {warmup} is out of range. Must be 0-{MaxWarmupIterations}."));
+                }
+
+                break;
+
+            case "OpsPerSample":
+                if (TryConvertToInt(constant.Value, out var ops) && (ops < 1 || ops > MaxOpsPerSampleLimit))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(Rule,
+                        assignment.GetLocation(),
+                        $"OpsPerSample = {ops} is out of range. Must be 1-{MaxOpsPerSampleLimit}."));
                 }
 
                 break;

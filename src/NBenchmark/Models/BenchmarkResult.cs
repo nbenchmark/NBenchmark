@@ -95,6 +95,13 @@ public record BenchmarkResult
 
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
+    /// <summary>
+    ///     Diagnostics from the adaptive measurement loop: the resolved warmup and sample counts,
+    ///     the calibrated ops-per-sample, why each phase stopped, and the achieved CI width.
+    ///     <c>null</c> for dry-run and errored results.
+    /// </summary>
+    public AutoTuneDiagnostic? AutoTune { get; init; }
+
     public double ConfidenceIntervalLower => Mean - MarginOfError;
     public double ConfidenceIntervalUpper => Mean + MarginOfError;
     public double Range => Max - Min;

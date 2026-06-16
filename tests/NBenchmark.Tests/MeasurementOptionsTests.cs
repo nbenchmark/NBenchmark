@@ -9,8 +9,10 @@ public class MeasurementOptionsTests
     {
         var opts = MeasurementOptions.Default;
 
-        Assert.Equal(25, opts.WarmupIterations);
-        Assert.Equal(200, opts.Iterations);
+        Assert.Null(opts.WarmupIterations);
+        Assert.Null(opts.Iterations);
+        Assert.Null(opts.OpsPerSample);
+        Assert.Equal(AutoTuneOptions.Default, opts.AutoTune);
         Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
         Assert.False(opts.ForceGcBeforeEachIteration);
         Assert.False(opts.ForceGcBetweenBenchmarks);

@@ -18,6 +18,7 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
     private string _currentName = "";
     private int _currentTotalIterations;
     private bool _inWarmup;
+    private int _pulse;
     private int _suiteTotal;
 
     public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
@@ -51,6 +52,7 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
         _currentIndex = index;
         _suiteTotal = total;
         _currentIteration = 0;
+        _pulse = 0;
         _benchmarkStopwatch.Restart();
         return Task.CompletedTask;
     }
@@ -92,6 +94,17 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
     {
         var phase = _inWarmup ? "warmup" : "measuring";
 
+        if (_currentTotalIterations <= 0)
+        {
+            // An auto-resolved count has no honest denominator, so show a moving indicator and the
+            // live sample count instead of a fake percentage and ETA.
+            var indeterminate = IndeterminateBar(20);
+            var count = _currentIteration > 0 ? $" ({_currentIteration} samples)" : "";
+            Console.Write(
+                $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] {_currentName}  {indeterminate} {phase}{count}");
+            return;
+        }
+
         var pct = _currentTotalIterations > 0
             ? (int)Math.Round(100.0 * _currentIteration / _currentTotalIterations)
             : 0;
@@ -107,6 +120,23 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
 
         Console.Write(
             $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] {_currentName}  {bar} {pct}% {phase} ({_currentIteration}/{_currentTotalIterations}){etaText}");
+    }
+
+    private string IndeterminateBar(int width)
+    {
+        // A short lit segment that bounces across the track to signal ongoing work.
+        const int segment = 3;
+        var span = Math.Max(1, width - segment);
+        var period = span * 2;
+        var pos = _pulse++ % period;
+        if (pos > span)
+            pos = period - pos;
+
+        var chars = new char[width];
+        for (var i = 0; i < width; i++)
+            chars[i] = i >= pos && i < pos + segment ? '\u2588' : '\u2591';
+
+        return new string(chars);
     }
 
     private TimeSpan? ComputeEta()

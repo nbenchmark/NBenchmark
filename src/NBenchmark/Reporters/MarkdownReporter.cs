@@ -139,6 +139,10 @@ public sealed class MarkdownReporter : IReporter
                 sb.AppendLine();
                 sb.AppendLine("```");
                 sb.AppendLine(statsBlock);
+
+                if (row.AutoTune is { } diagnostic)
+                    sb.AppendLine(BenchmarkTable.FormatAutoTuneSummary(diagnostic));
+
                 sb.AppendLine("```");
                 sb.AppendLine();
                 sb.AppendLine("</details>");

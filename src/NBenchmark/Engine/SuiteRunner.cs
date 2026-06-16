@@ -58,7 +58,9 @@ internal static class SuiteRunner
                     envelope.IsBaseline,
                     spec.Options,
                     TimeSpan.Zero,
-                    TimeSpan.Zero);
+                    TimeSpan.Zero,
+                    0,
+                    null);
             }
 
             results.Add(outcome.Result);

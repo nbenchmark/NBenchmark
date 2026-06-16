@@ -105,7 +105,7 @@ public sealed class PerformanceFactIntegrationTests
     }
 
     [Fact]
-    public void PerformanceFact_Custom_Iterations_Default_To_Standard_Values()
+    public void PerformanceFact_Default_Options_Auto_Resolve_Measurement()
     {
         var spec = new RunSpec
         {
@@ -115,8 +115,10 @@ public sealed class PerformanceFactIntegrationTests
         var outcome = BenchmarkRunner.Instance.Run("DefaultTest", SimpleWork, spec);
 
         var result = outcome.Result;
-        Assert.Equal(200, result.MeasuredIterations);
-        Assert.Equal(25, result.WarmupIterations);
+        Assert.False(result.Errored);
+        Assert.NotNull(result.AutoTune);
+        Assert.True(result.MeasuredIterations >= AutoTuneOptions.Default.MinSamples);
+        Assert.True(result.WarmupIterations >= AutoTuneOptions.Default.MinWarmup);
     }
 
     [Fact]

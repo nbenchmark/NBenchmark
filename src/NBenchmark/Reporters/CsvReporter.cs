@@ -35,7 +35,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         else
         {
             sb.AppendLine(
-                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations");
+                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs");
         }
 
         var table = BenchmarkTable.Build(results);
@@ -89,6 +89,14 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                 var allocP95 = row.AllocP95?.ToString() ?? "";
                 var allocMax = row.AllocMax?.ToString() ?? "";
 
+                var autoTune = row.AutoTune;
+                var atWarmup = autoTune?.ResolvedWarmup.ToString() ?? "";
+                var atSamples = autoTune?.ResolvedSamples.ToString() ?? "";
+                var atOps = autoTune?.OpsPerSample.ToString() ?? "";
+                var atSampleStop = autoTune?.SampleStop.ToString() ?? "";
+                var atCiWidth = autoTune is null ? "" : autoTune.AchievedRelativeCiWidth.ToString("F4");
+                var atTuningMs = autoTune is null ? "" : autoTune.TuningWallClock.TotalMilliseconds.ToString("F1");
+
                 sb.AppendLine(
                     $"\"{safeName}\"," +
                     $"{row.Median:F1}," +
@@ -127,7 +135,13 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{allocMax}," +
                     $"{row.StandardErrorPercent:F2}," +
                     $"{row.CoefficientOfVariationPercent:F2}," +
-                    $"{table.WarmupIterations}");
+                    $"{table.WarmupIterations}," +
+                    $"{atWarmup}," +
+                    $"{atSamples}," +
+                    $"{atOps}," +
+                    $"{atSampleStop}," +
+                    $"{atCiWidth}," +
+                    $"{atTuningMs}");
             }
         }
 

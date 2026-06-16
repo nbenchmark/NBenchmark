@@ -21,7 +21,9 @@ result.Print();
 
 - **Zero-ceremony measurements.** `Benchmark.Run(() => ...)` requires no attributes, no class structures, and no dedicated project. Run a reliable benchmark directly in your existing code or scratchpad.
 
-- **Statistical rigor by default.** Includes 25 warmup iterations, 200 measured iterations, IQR-fence outlier trimming, and 95% confidence intervals. It validates A/B comparisons with a Mann-Whitney U test, reports Cliff's delta effect size as a Magnitude column (Negligible / Small / Medium / Large), and automatically switches to the Kruskal-Wallis omnibus test when comparing three or more implementations.
+- **Adaptive, self-tuning measurements.** No iteration counts to guess. NBenchmark calibrates ops-per-sample for fast bodies, detects when warmup has plateaued, and streams samples until the confidence interval hits its target - then stops. Pin any dimension when you want a fixed, reproducible run.
+
+- **Statistical rigor by default.** The adaptive loop auto-sizes warmup, sample count, and ops-per-batch for each benchmark, stopping once the 95% confidence interval is tight enough. Combined with IQR-fence outlier trimming, it validates A/B comparisons with a Mann-Whitney U test, reports Cliff's delta effect size as a Magnitude column (Negligible / Small / Medium / Large), and automatically switches to the Kruskal-Wallis omnibus test when comparing three or more implementations.
 
 - **Pluggable statistics.** Swap in your own outlier detector (`IOutlierDetector`) or significance test (`ISignificanceTest`) when the built-in IQR/MAD trimming and rank-based tests don't fit your domain.
 

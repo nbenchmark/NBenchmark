@@ -84,18 +84,30 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
       "errored": false,
       "errorMessage": null,
       "measuredIterations": 190,
-      "warmupIterations": 25,
+      "warmupIterations": 40,
       "runAt": "2026-06-06T03:40:00.000Z",
       "totalDuration": "00:00:00.050",
       "measuredDuration": "00:00:00.040",
       "isBaseline": false,
-      "outlierMode": "iqrFence"
+      "outlierMode": "iqrFence",
+      "autoTune": {
+        "resolvedWarmup": 40,
+        "resolvedSamples": 190,
+        "opsPerSample": 1,
+        "totalBodyInvocations": 230,
+        "warmupStop": "settled",
+        "sampleStop": "ciTargetMet",
+        "achievedRelativeCiWidth": 0.0184,
+        "tuningWallClock": "00:00:00.050"
+      }
     }
   ]
 }
 ```
 
 All timing values are in **nanoseconds**. Property names use camelCase.
+
+The `autoTune` object records what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) decided for this benchmark: the resolved warmup length (`resolvedWarmup`), measured-sample count (`resolvedSamples`), ops-per-sample K (`opsPerSample`), total body invocations, why each phase stopped (`warmupStop`, `sampleStop` - one of `settled` / `ciTargetMet` / `maxCeiling` / `explicitCount` / `wallClockCap`), the raw relative CI half-width achieved (`achievedRelativeCiWidth`), and the wall-clock tuning time. It is `null` on dry-run and errored results.
 
 `totalDuration` is end-to-end wall-clock (warmup + pre-measure GC + measured loop); `measuredDuration` is the measured loop only. `measuredDuration <= totalDuration` always; the gap is dominated by warmup iterations and the pre-measure `GC.Collect`.
 
@@ -105,6 +117,7 @@ The `detail` and `profile` fields in the envelope report the active detail level
 
 - The output directory is created automatically if it does not exist.
 - `BenchmarkResult` is serialised with all properties, including `ConfidenceIntervalLower` and `ConfidenceIntervalUpper` (computed from `Mean ± MarginOfError`).
+- The `autoTune` object is `null` for dry-run and errored results; for pinned runs the stop reasons are `explicitCount`.
 
 ## Using with Benchmark (Quick mode)
 

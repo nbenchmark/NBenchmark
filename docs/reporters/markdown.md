@@ -59,7 +59,7 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 ```markdown
 ## Benchmark Results
 
-> **2026-06-06 03:40:00 UTC** · 25 warmup · 190 measured · realistic profile
+> **2026-06-06 03:40:00 UTC** · 40 warmup · 190 measured · realistic profile
 
 ### Comparison
 
@@ -116,7 +116,7 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 - Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, StdDev, P95, and P99 columns show `0.0 ns`.
 - The output directory is created automatically if it does not exist.
 - The report order is: Comparison -> Precision & Tail Latency -> (optional) Distribution Details -> Interpretation -> (optional) Warnings -> final summary line.
-- In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown.
+- In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown, followed by an `auto-tuned: …` line summarising the adaptive loop's decisions (resolved samples × ops-per-sample, warmup length, achieved CI half-width).
 
 ## Using with Benchmark (Quick mode)
 

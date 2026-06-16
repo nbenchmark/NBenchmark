@@ -31,7 +31,7 @@ Run with `dotnet run` and you'll see:
     95% CI: 1.19 µs … 1.29 µs (±50 ns)
 ```
 
-That's it. NBenchmark ran 25 warmup iterations (to let the JIT compile your code), then 200 measured iterations, trimmed outliers using the IQR fence rule, and printed a summary.
+That's it. NBenchmark warmed up until the timings plateaued (to let the JIT compile your code), collected enough measured samples to tighten the confidence interval, trimmed outliers using the IQR fence rule, and printed a summary.
 
 ## Measuring async code
 

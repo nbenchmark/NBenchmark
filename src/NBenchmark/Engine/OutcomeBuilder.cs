@@ -12,7 +12,9 @@ internal static class OutcomeBuilder
         bool isBaseline,
         MeasurementOptions options,
         TimeSpan totalDuration,
-        TimeSpan measuredDuration)
+        TimeSpan measuredDuration,
+        int resolvedWarmup = 0,
+        AutoTuneDiagnostic? autoTune = null)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -35,7 +37,9 @@ internal static class OutcomeBuilder
                 null,
                 totalDuration,
                 measuredDuration,
-                s.Result.Warnings),
+                s.Result.Warnings,
+                resolvedWarmup,
+                autoTune),
 
             RunOutcome.DryRun => Build(
                 name, description, isBaseline, options,
@@ -49,7 +53,9 @@ internal static class OutcomeBuilder
                 null,
                 totalDuration,
                 TimeSpan.Zero,
-                []),
+                [],
+                resolvedWarmup,
+                null),
 
             RunOutcome.Errored e => Build(
                 name, description, isBaseline, options,
@@ -63,7 +69,9 @@ internal static class OutcomeBuilder
                 e.ErrorMessageOverride ?? Unwrap(e.Error).ToString(),
                 totalDuration,
                 measuredDuration,
-                []),
+                [],
+                resolvedWarmup,
+                null),
 
             _ => throw new ArgumentOutOfRangeException(nameof(input), input, "Unknown RunOutcome case."),
         };
@@ -89,7 +97,9 @@ internal static class OutcomeBuilder
         string? errorMessage,
         TimeSpan totalDuration,
         TimeSpan measuredDuration,
-        IReadOnlyList<string> warnings)
+        IReadOnlyList<string> warnings,
+        int resolvedWarmup,
+        AutoTuneDiagnostic? autoTune)
     {
         var allocStats = stats is not null && rawAllocations is not null
             ? StatsSummary.ComputeAllocations(rawAllocations)
@@ -132,7 +142,7 @@ internal static class OutcomeBuilder
                 Errored = errored,
                 ErrorMessage = errorMessage,
                 MeasuredIterations = measuredIterations,
-                WarmupIterations = options.WarmupIterations,
+                WarmupIterations = resolvedWarmup,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 TotalDuration = totalDuration,
                 MeasuredDuration = measuredDuration,
@@ -143,6 +153,7 @@ internal static class OutcomeBuilder
                 SignificanceLevel = options.SignificanceLevel,
                 Profile = options.Profile,
                 Warnings = warnings,
+                AutoTune = autoTune,
             },
         };
     }

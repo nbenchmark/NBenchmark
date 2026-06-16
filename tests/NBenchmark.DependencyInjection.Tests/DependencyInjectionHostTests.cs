@@ -18,7 +18,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1"])
                 .AddFromAssembly<DependentBenchmark>()
                 .WithServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -104,7 +104,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1"])
                 .UseDependencyInjection<DependentBenchmark>(services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)

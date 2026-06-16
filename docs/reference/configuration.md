@@ -55,29 +55,96 @@ dotnet run -- --iterations 500 --warmup 50
 ### Iterations
 
 ```csharp
-Iterations = 200   // default
+Iterations = null   // default - auto-resolved from a CI-width target
 ```
 
-The number of measured iterations per benchmark. Valid range: `0` to `100 000`.
+The number of measured samples per benchmark, typed as `int?`:
 
-A value of `0` (combined with `WarmupIterations = 0`) is the dry-run signal: the body is not invoked and no measurements are taken. See [CLI Reference: `--dry-run`](./cli.md#--dry-run).
+| Value | Behaviour |
+|---|---|
+| `null` **(default)** | Auto-resolved. NBenchmark streams samples until the confidence interval on the mean is tight enough (the `AutoTune.CiTarget` half-width), bounded by `AutoTune.MinSamples` and `AutoTune.MaxSamples`. |
+| `0` | Dry-run. The body is not invoked and no measurements are taken. See [CLI Reference: `--dry-run`](./cli.md#--dry-run). |
+| `> 0` | Pins an exact measured-sample count, disabling auto-sampling. Valid range: `1` to `100 000`. |
 
-More iterations produce a tighter confidence interval (smaller Error column) at the cost of a longer run time. The default of 200 is a good balance for most benchmarks.
+Pinning an exact count makes a run deterministic in sample size - useful for reproducible CI gates. Leaving it `null` lets each benchmark collect exactly as many samples as it needs to hit the precision target and no more.
 
 > [!TIP]
-> If you see a large Error (margin of error) relative to the mean, try increasing iterations to `500` or `1000`.
+> In auto mode a large Error resolves itself: NBenchmark keeps sampling until the interval is tight. To demand tighter intervals, lower `AutoTune.CiTarget` (or use the `Thorough` preset). To cap a long run, lower `AutoTune.MaxSamples` or `AutoTune.MaxTuningTime`.
+
+CLI flag: `--iterations <n>` (pins the count). The auto-mode bounds map to `--ci-target`, `--min-samples`, and `--max-samples`.
 
 ### WarmupIterations
 
 ```csharp
-WarmupIterations = 25   // default
+WarmupIterations = null   // default - auto-detected with a plateau rule
 ```
 
-The number of warmup iterations before measurement begins. Valid range: `0` to `10 000`.
+The number of warmup samples discarded before measurement begins, typed as `int?`:
 
-Warmup lets the JIT compiler optimise your code and brings data into CPU caches. See [Key Concepts: Warmup](../getting-started/key-concepts.md#warmup) for more detail.
+| Value | Behaviour |
+|---|---|
+| `null` **(default)** | Auto-detected. NBenchmark watches the per-sample timings and stops warmup once they plateau (stop improving), bounded by `AutoTune.MinWarmup` and `AutoTune.MaxWarmup`. |
+| `0` | Skips warmup entirely - the first measured sample includes any cold-start cost. |
+| `> 0` | Pins an exact warmup count. Valid range: `1` to `10 000`. |
 
-CLI flag: `--warmup <n>`
+Warmup lets the JIT compiler optimise your code and brings data into CPU caches. The plateau rule spends just enough warmup to reach steady state instead of a fixed budget. See [Key Concepts: Warmup](../getting-started/key-concepts.md#warmup) for more detail.
+
+CLI flag: `--warmup <n>` (pins the count). The auto-mode bounds map to `--min-warmup` and `--max-warmup`.
+
+### OpsPerSample
+
+```csharp
+OpsPerSample = null   // default - auto-calibrated (K)
+```
+
+The number of back-to-back body invocations timed together as one sample, called **K**. Typed as `int?`:
+
+| Value | Behaviour |
+|---|---|
+| `null` **(default)** | Auto-calibrated. NBenchmark doubles K until one sample spans roughly `AutoTune.TargetSampleDurationNs` (1 µs by default), so a single timer read covers enough work to be meaningful. Reported per-op timings divide the batch time by K. |
+| `> 0` | Pins an exact K (always honoured). Valid range: `1` to `16 777 216`. |
+
+Calibration matters for **fast bodies**: a method that runs in a few nanoseconds is dominated by the cost of reading the timer. Timing K invocations as a batch amortises that fixed overhead, then NBenchmark divides back down to a per-operation number.
+
+Auto-calibration is skipped (K stays `1`) when per-iteration `IterationSetup`/`IterationTeardown` is configured, or when `ForceGcBeforeEachIteration` is on, since those make a batch unrepresentative of a single call. An explicit `OpsPerSample` is always honoured.
+
+BenchmarkSuite/BenchmarkHost fluent method: `.WithOpsPerSample(64)`  
+CLI flag: `--ops-per-sample <n>` (pins K). The calibration target is `AutoTune.TargetSampleDurationNs`.
+
+Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per method via `[Benchmark]` - it is set suite- or host-wide only (`.WithOpsPerSample(n)` or `--ops-per-sample n`).
+
+### AutoTune
+
+```csharp
+AutoTune = AutoTuneOptions.Default   // default
+```
+
+Bounds and steers the adaptive measurement loop - the warmup plateau rule, the CI-width sample-count rule, and ops-per-sample calibration. Three named presets trade measurement time for precision:
+
+| Preset | MinWarmup | MinSamples | CiTarget | Use it for |
+|---|---|---|---|---|
+| `AutoTuneOptions.Quick` | 4 | 15 | 0.05 (±5%) | Fast inner-loop feedback. |
+| `AutoTuneOptions.Default` | 8 | 30 | 0.025 (±2.5%) | The balanced default. |
+| `AutoTuneOptions.Thorough` | 16 | 100 | 0.01 (±1%) | Publication-grade numbers. |
+
+Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/host) or `--auto-tune thorough` on the CLI, or build your own `AutoTuneOptions` record. The individual knobs:
+
+| Knob | Default | Meaning |
+|---|---|---|
+| `MinWarmup` / `MaxWarmup` | `8` / `10 000` | Floor and ceiling for auto-detected warmup length. |
+| `WarmupEpsilon` | `0.02` | Minimum relative improvement a warmup batch must show to count as "still warming up". |
+| `PlateauPatience` | `3` | Consecutive non-improving batches that end warmup. |
+| `MinSamples` / `MaxSamples` | `30` / `100 000` | Floor and ceiling for the auto-resolved measured-sample count. |
+| `CiTarget` | `0.025` | Target relative half-width of the confidence interval; sampling stops once it is met. |
+| `TargetSampleDurationNs` | `1 000` | Per-sample duration that ops-per-sample calibration aims for. |
+| `MaxOpsPerSample` | `1 048 576` | Ceiling on auto-calibrated K. |
+| `BatchSize` | `8` | Warmup batch size and the cadence on which the CI-width rule is evaluated. |
+| `MaxTuningTime` | `20 s` | Per-benchmark safety cap on cumulative in-body sample time (calibration + warmup + measurement). Setup, teardown, and GC are excluded, so real wall-clock can exceed it. |
+
+The interval's confidence level is `ConfidenceLevel` (below) - the CI-width rule targets that same level, so it is not duplicated on `AutoTune`.
+
+BenchmarkSuite/BenchmarkHost fluent method: `.WithAutoTune(AutoTunePreset.Quick)` or `.WithAutoTune(customOptions)`  
+CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`.
 
 ### Profile
 
@@ -254,12 +321,17 @@ In Host mode, the `[Benchmark]` attribute accepts per-method overrides that take
 public void MyExpensiveBenchmark() => SlowOperation();
 ```
 
+> [!NOTE]
+> Only `Iterations` and `WarmupIterations` are pinnable per method. `OpsPerSample` is not exposed on `[Benchmark]` - pin it host-wide with `.WithOpsPerSample(n)` or `--ops-per-sample n`.
+
 ## Valid ranges summary
 
 | Option | Type | Default | Valid range |
 |---|---|---|---|
-| `Iterations` | `int` | `200` | `0` – `100 000` |
-| `WarmupIterations` | `int` | `25` | `0` – `10 000` |
+| `Iterations` | `int?` | `null` (auto) | `0` – `100 000` when set (`0` = dry-run) |
+| `WarmupIterations` | `int?` | `null` (auto) | `0` – `10 000` when set |
+| `OpsPerSample` | `int?` | `null` (auto) | `1` – `16 777 216` when set |
+| `AutoTune` | `AutoTuneOptions` | `AutoTuneOptions.Default` | See [AutoTune](#autotune) |
 | `ConfidenceLevel` | `double` | `0.95` | `>0` and `<1` |
 | `SignificanceLevel` | `double` | `0.05` | `>0` and `<1` |
 | `Profile` | `enum` | `Realistic` | `Realistic` or `Independent` |

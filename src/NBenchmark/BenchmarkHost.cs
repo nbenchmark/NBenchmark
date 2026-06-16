@@ -128,6 +128,35 @@ public sealed class BenchmarkHost
     }
 
     /// <summary>
+    ///     Tunes the adaptive measurement loop (warmup plateau, CI-width sample count, and
+    ///     ops-per-sample calibration). Use <see cref="AutoTuneOptions.Quick" /> for fast feedback
+    ///     or <see cref="AutoTuneOptions.Thorough" /> for tighter intervals.
+    /// </summary>
+    public BenchmarkHost WithAutoTune(AutoTuneOptions autoTune)
+    {
+        ArgumentNullException.ThrowIfNull(autoTune);
+        _options = _options with { AutoTune = autoTune };
+        return this;
+    }
+
+    /// <summary>Selects an adaptive-tuning preset (Default, Quick, or Thorough).</summary>
+    public BenchmarkHost WithAutoTune(AutoTunePreset preset)
+    {
+        _options = _options with { AutoTune = AutoTuneOptions.FromPreset(preset) };
+        return this;
+    }
+
+    /// <summary>
+    ///     Pins the number of back-to-back body invocations timed as one sample (<c>K</c>),
+    ///     overriding auto-calibration. Honoured even with per-iteration setup/teardown.
+    /// </summary>
+    public BenchmarkHost WithOpsPerSample(int opsPerSample)
+    {
+        _options = _options with { OpsPerSample = opsPerSample };
+        return this;
+    }
+
+    /// <summary>
     ///     Controls Host mode's isolated-by-default execution. When enabled (the default),
     ///     each discovered class runs in its own clean-room child process unless a benchmark
     ///     or its class opts out with <c>[InProcess]</c>. When disabled, every benchmark
@@ -387,7 +416,7 @@ public sealed class BenchmarkHost
                 var errored = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException("Could not instantiate benchmark class"), "Instance creation failed"),
                     $"{suite.Type.Name}.{benchmark.DisplayName}", benchmark.Attribute.Description, benchmark.Attribute.Baseline,
-                    suiteOptions, TimeSpan.Zero, TimeSpan.Zero).Result;
+                    suiteOptions, TimeSpan.Zero, TimeSpan.Zero, 0, null).Result;
 
                 allResults.Add(errored);
                 startIndex++;
@@ -520,7 +549,7 @@ public sealed class BenchmarkHost
                 result = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException(message), message),
                     name, benchmark.Attribute.Description, benchmark.Attribute.Baseline,
-                    _options, TimeSpan.Zero, TimeSpan.Zero).Result;
+                    _options, TimeSpan.Zero, TimeSpan.Zero, 0, null).Result;
 
                 raw = [];
             }
