@@ -7,30 +7,77 @@ public record MeasurementOptions
     public const int MinIterations = 0;
     public const int MaxIterations = 100_000;
     public const int MaxWarmupIterations = 10_000;
+    public const int MaxOpsPerSampleLimit = 1 << 24;
     public static readonly MeasurementOptions Default = new();
     private readonly double _confidenceLevel = 0.95;
-    private readonly int _iterations = 200;
+    private readonly int? _iterations;
     private readonly double? _minimumPracticalEffect;
+    private readonly int? _opsPerSample;
     private readonly double _significanceLevel = 0.05;
-    private readonly int _warmupIterations = 25;
+    private readonly int? _warmupIterations;
 
-    public int WarmupIterations
+    /// <summary>
+    ///     The number of warmup samples to discard before measurement. <c>null</c> (the default)
+    ///     auto-detects warmup length with a plateau rule; <c>0</c> skips warmup; a positive value
+    ///     pins an exact count. Must be between 0 and <see cref="MaxWarmupIterations" /> when set.
+    /// </summary>
+    public int? WarmupIterations
     {
         get => _warmupIterations;
-        init => _warmupIterations = value is >= 0 and <= MaxWarmupIterations
-            ? value
-            : throw new ArgumentOutOfRangeException(nameof(value), value,
-                $"WarmupIterations must be between 0 and {MaxWarmupIterations}");
+        init
+        {
+            if (value is { } count && count is < 0 or > MaxWarmupIterations)
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    $"WarmupIterations must be null (auto) or between 0 and {MaxWarmupIterations}.");
+
+            _warmupIterations = value;
+        }
     }
 
-    public int Iterations
+    /// <summary>
+    ///     The number of measured samples to collect. <c>null</c> (the default) auto-detects the
+    ///     count from a confidence-interval-width target; <c>0</c> is a dry-run; a positive value
+    ///     pins an exact count. Must be between 0 and <see cref="MaxIterations" /> when set.
+    /// </summary>
+    public int? Iterations
     {
         get => _iterations;
-        init => _iterations = value is >= 0 and <= MaxIterations
-            ? value
-            : throw new ArgumentOutOfRangeException(nameof(value), value,
-                $"Iterations must be between 0 and {MaxIterations}");
+        init
+        {
+            if (value is { } count && count is < 0 or > MaxIterations)
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    $"Iterations must be null (auto) or between 0 and {MaxIterations} (0 = dry-run).");
+
+            _iterations = value;
+        }
     }
+
+    /// <summary>
+    ///     The number of back-to-back body invocations timed as one sample (<c>K</c>). <c>null</c>
+    ///     (the default) auto-calibrates <c>K</c> so a sample spans roughly
+    ///     <see cref="AutoTuneOptions.TargetSampleDurationNs" />, amortising timer overhead on fast
+    ///     bodies; a value of <c>1</c> or more pins <c>K</c> (always honoured, even with
+    ///     per-iteration setup/teardown). Must be between 1 and <see cref="MaxOpsPerSampleLimit" />
+    ///     when set.
+    /// </summary>
+    public int? OpsPerSample
+    {
+        get => _opsPerSample;
+        init
+        {
+            if (value is { } count && count is < 1 or > MaxOpsPerSampleLimit)
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    $"OpsPerSample must be null (auto) or between 1 and {MaxOpsPerSampleLimit}.");
+
+            _opsPerSample = value;
+        }
+    }
+
+    /// <summary>
+    ///     Tuning knobs for the adaptive measurement loop (warmup plateau, CI-width sample count,
+    ///     and ops-per-sample calibration). Defaults to <see cref="AutoTuneOptions.Default" />.
+    /// </summary>
+    public AutoTuneOptions AutoTune { get; init; } = AutoTuneOptions.Default;
 
     /// <summary>
     ///     The authoritative measurement profile. The resolved booleans

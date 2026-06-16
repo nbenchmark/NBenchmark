@@ -77,6 +77,7 @@ public class EnvelopeTests
             {
                 Iterations = 5,
                 WarmupIterations = 1,
+                OpsPerSample = 1,
                 OutlierMode = OutlierMode.None,
             },
         }, CancellationToken.None);

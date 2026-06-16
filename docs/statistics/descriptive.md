@@ -54,7 +54,7 @@ $$\bar{x} \pm \text{MoE} = [\bar{x} - \text{MoE},\; \bar{x} + \text{MoE}]$$
 
 The [normal distribution](https://en.wikipedia.org/wiki/Normal_distribution)'s critical value (e.g. 1.96 for 95%) assumes the population standard deviation is known. In benchmarking it is not - we estimate it from the sample. Student's t compensates by using wider critical values for small sample sizes, shrinking towards the normal as `n` grows.
 
-With the default 200 iterations (slightly fewer after outlier trimming), the t critical value at 95% is approximately **1.973** - very close to the normal 1.960, so the practical difference is small.
+With a typical auto-resolved sample count (tens to low hundreds), the t critical value at 95% sits around **1.97-1.98** - very close to the normal 1.960, so the practical difference is small.
 
 ### Honest caveats
 

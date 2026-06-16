@@ -20,7 +20,7 @@ result.Print();
 ## Why NBenchmark?
 
 - **Zero-ceremony measurements.** `Benchmark.Run(() => ...)` requires no attributes, no class structures, and no dedicated project. Run a reliable benchmark directly in your existing code or scratchpad.
-- **Statistical rigor by default.** Includes 25 warmup iterations, 200 measured iterations, IQR-fence outlier trimming, and 95% confidence intervals. It also includes a Mann-Whitney U significance test to validate A/B comparisons.
+- **Statistical rigor by default.** An adaptive measurement loop auto-sizes warmup, sample count, and ops-per-batch for each benchmark, applies IQR-fence outlier trimming, and reports 95% confidence intervals. It also includes a Mann-Whitney U significance test to validate A/B comparisons.
 - **Low-overhead execution.** The measurement loop is reflection-free. The engine uses typed delegates to avoid virtual dispatch and boxing during timing, ensuring the JIT optimizes your benchmark body just as it would in production.
 - **Async-native.** Measures the true duration of `Task` and `Task<T>` async work without sync-over-async wrappers.
 - **Automated A/B comparisons.** `BenchmarkSuite` runs implementations side-by-side, calculates ratios, and flags whether differences are statistically significant.

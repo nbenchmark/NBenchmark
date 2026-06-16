@@ -38,6 +38,7 @@ internal sealed record MeasurementOverrides
 {
     public int? Iterations { get; init; }
     public int? WarmupIterations { get; init; }
+    public int? OpsPerSample { get; init; }
     public double? ConfidenceLevel { get; init; }
     public double? SignificanceLevel { get; init; }
     public OutlierMode? OutlierMode { get; init; }
@@ -45,16 +46,34 @@ internal sealed record MeasurementOverrides
     public bool? ForceGc { get; init; }
     public bool? NoAllocations { get; init; }
 
+    // Auto-tune scalar overrides. AutoTuneOptions is rebuilt by the child re-running its entry
+    // point, so only these CLI-derived deltas travel; the object itself is never serialized.
+    public AutoTunePreset? Preset { get; init; }
+    public double? CiTarget { get; init; }
+    public int? MinSamples { get; init; }
+    public int? MaxSamples { get; init; }
+    public int? MinWarmup { get; init; }
+    public int? MaxWarmup { get; init; }
+    public TimeSpan? MaxTuningTime { get; init; }
+
     public static MeasurementOverrides FromCliArgs(CliArgs cliArgs) => new()
     {
         Iterations = cliArgs.Iterations,
         WarmupIterations = cliArgs.WarmupIterations,
+        OpsPerSample = cliArgs.OpsPerSample,
         ConfidenceLevel = cliArgs.ConfidenceLevel,
         SignificanceLevel = cliArgs.Alpha,
         OutlierMode = cliArgs.OutlierMode,
         Profile = cliArgs.Profile,
         ForceGc = cliArgs.ForceGc,
         NoAllocations = cliArgs.NoAllocations,
+        Preset = cliArgs.AutoTunePreset,
+        CiTarget = cliArgs.CiTarget,
+        MinSamples = cliArgs.MinSamples,
+        MaxSamples = cliArgs.MaxSamples,
+        MinWarmup = cliArgs.MinWarmup,
+        MaxWarmup = cliArgs.MaxWarmup,
+        MaxTuningTime = cliArgs.MaxTuningTime,
     };
 
     public MeasurementOptions Apply(MeasurementOptions options)
@@ -84,6 +103,52 @@ internal sealed record MeasurementOverrides
 
         if (NoAllocations.HasValue)
             result = result with { MeasureAllocationsOverride = !NoAllocations.Value };
+
+        // Layer auto-tune scalars: start from the preset when given, else the current knobs.
+        var autoTune = Preset.HasValue ? AutoTuneOptions.FromPreset(Preset.Value) : result.AutoTune;
+        var autoTuneChanged = Preset.HasValue;
+
+        if (CiTarget.HasValue)
+        {
+            autoTune = autoTune with { CiTarget = CiTarget.Value };
+            autoTuneChanged = true;
+        }
+
+        if (MinSamples.HasValue)
+        {
+            autoTune = autoTune with { MinSamples = MinSamples.Value };
+            autoTuneChanged = true;
+        }
+
+        if (MaxSamples.HasValue)
+        {
+            autoTune = autoTune with { MaxSamples = MaxSamples.Value };
+            autoTuneChanged = true;
+        }
+
+        if (MinWarmup.HasValue)
+        {
+            autoTune = autoTune with { MinWarmup = MinWarmup.Value };
+            autoTuneChanged = true;
+        }
+
+        if (MaxWarmup.HasValue)
+        {
+            autoTune = autoTune with { MaxWarmup = MaxWarmup.Value };
+            autoTuneChanged = true;
+        }
+
+        if (MaxTuningTime.HasValue)
+        {
+            autoTune = autoTune with { MaxTuningTime = MaxTuningTime.Value };
+            autoTuneChanged = true;
+        }
+
+        if (autoTuneChanged)
+            result = result with { AutoTune = autoTune };
+
+        if (OpsPerSample.HasValue)
+            result = result with { OpsPerSample = OpsPerSample.Value };
 
         return result;
     }

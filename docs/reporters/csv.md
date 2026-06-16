@@ -93,7 +93,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `Detail` | string | Active detail level (`simple` or `advanced`). |
 | `Profile` | string | Active measurement profile (`realistic` or `independent`). |
 
-### Advanced mode (38 columns - all simple columns plus the following)
+### Advanced mode (44 columns - all simple columns plus the following)
 
 | Column | Type | Description |
 |---|---|---|
@@ -112,14 +112,20 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `AllocMax` | integer or empty | Max allocation per iteration. Empty if allocation tracking is disabled. |
 | `StandardErrorPercent` | float | `StdErr / Mean * 100`. |
 | `CoefficientOfVariationPercent` | float | `CoefficientOfVariation * 100`. |
-| `WarmupIterations` | integer | Number of warmup iterations (excluded from stats). |
+| `WarmupIterations` | integer | Resolved warmup samples (excluded from stats). |
+| `AutoTuneWarmup` | integer or empty | Resolved warmup length from the adaptive loop. Empty on dry-run/errored. |
+| `AutoTuneSamples` | integer or empty | Resolved measured-sample count (pre-trim). Empty on dry-run/errored. |
+| `AutoTuneOpsPerSample` | integer or empty | Resolved ops-per-sample (K). Empty on dry-run/errored. |
+| `AutoTuneSampleStop` | string or empty | Why measurement stopped: `CiTargetMet`, `MaxCeiling`, `ExplicitCount`, or `WallClockCap`. Empty on dry-run/errored. |
+| `AutoTuneCiWidth` | float or empty | Raw relative CI half-width achieved at stop. Empty on dry-run/errored. |
+| `AutoTuneTuningMs` | float or empty | Wall-clock time spent in the adaptive loop, in milliseconds. Empty on dry-run/errored. |
 
 ## Notes
 
 - Results are sorted by median (fastest first).
 - The output directory is created automatically if it does not exist.
 - Names containing double-quotes are escaped by doubling the quote character (standard CSV escaping).
-- Simple mode CSV has 22 columns. Advanced mode CSV has 38 columns and is selected via the `--detail advanced` flag or `WithDetail(ReportDetail.Advanced)`.
+- Simple mode CSV has 22 columns. Advanced mode CSV has 44 columns and is selected via the `--detail advanced` flag or `WithDetail(ReportDetail.Advanced)`.
 
 ## Using with Benchmark (Quick mode)
 

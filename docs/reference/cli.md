@@ -38,20 +38,50 @@ dotnet run -- --filter StringBenchmarks.Concat   # exact match
 
 ### `--iterations <n>`
 
-Number of measured iterations per benchmark. Valid range: `0` to `100 000`. Default: `200`. Use `--dry-run` to skip measurement entirely rather than setting this to `0` manually.
+Pin the measured-sample count per benchmark, disabling auto-sampling. Valid range: `0` to `100 000`. Default: **auto** (sampling stops when the confidence interval meets `--ci-target`). Use `--dry-run` to skip measurement entirely rather than setting this to `0` manually.
 
 ```bash
 dotnet run -- --iterations 1000
 ```
 
+This is the deterministic gate: pass it when a run must collect an exact, reproducible number of samples (for example, in CI). Leave it off to let each benchmark self-size.
+
 ---
 
 ### `--warmup <n>`
 
-Number of warmup iterations per benchmark. Valid range: `0` to `10 000`. Default: `25`.
+Pin the warmup-sample count per benchmark, disabling the plateau rule. Valid range: `0` to `10 000`. Default: **auto** (warmup stops once timings plateau).
 
 ```bash
 dotnet run -- --warmup 50
+```
+
+---
+
+### Adaptive tuning flags
+
+In auto mode NBenchmark resolves warmup length, measured-sample count, and ops-per-sample (K) at runtime. These flags steer that resolution without pinning an exact count. See [Configuration: AutoTune](./configuration.md#autotune) for the full model.
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--auto-tune <preset>` | `default` | Apply a preset bundle: `default`, `quick` (fewer samples, ±5% CI), or `thorough` (more samples, ±1% CI). |
+| `--ops-per-sample <n>` | auto | Pin K - the number of body invocations timed as one sample. Auto-calibrated otherwise. |
+| `--ci-target <0-1>` | `0.025` | Target relative CI half-width for auto sampling. Sampling stops once it is met. |
+| `--min-samples <n>` | `30` | Floor on auto-resolved measured samples. |
+| `--max-samples <n>` | `100000` | Ceiling on auto-resolved measured samples. |
+| `--min-warmup <n>` | `8` | Floor on auto-detected warmup samples. |
+| `--max-warmup <n>` | `10000` | Ceiling on auto-detected warmup samples. |
+| `--max-tuning-time <s>` | `20` | Per-benchmark wall-clock safety cap, in seconds, for the whole adaptive loop. |
+
+```bash
+# Quick feedback: fewer samples, looser CI
+dotnet run -- --auto-tune quick
+
+# Publication-grade: tighter CI, capped at 60s per benchmark
+dotnet run -- --auto-tune thorough --max-tuning-time 60
+
+# Pin K for a fast body, let sampling auto-resolve
+dotnet run -- --ops-per-sample 256 --ci-target 0.01
 ```
 
 ---
@@ -289,7 +319,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`), invalid format (`--confidence`, `--seed`), unknown outlier mode (`--outlier`), unknown reporter name (`--reporter`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown reporter name (`--reporter`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
 When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 

@@ -104,6 +104,7 @@ public sealed record BenchmarkTable
             StandardErrorPercent = result.StandardErrorPercent,
             MarginPercent = result.MarginPercent,
             CoefficientOfVariationPercent = result.CoefficientOfVariationPercent,
+            AutoTune = result.AutoTune,
         };
     }
 
@@ -196,6 +197,16 @@ public sealed record BenchmarkTable
 
         return string.Join("\n", lines);
     }
+
+    /// <summary>
+    ///     Formats the adaptive measurement diagnostic into a single human-readable summary line
+    ///     (e.g. <c>auto-tuned: 240 samples × 64 ops, warmup 40, CI ±1.8%</c>).
+    /// </summary>
+    public static string FormatAutoTuneSummary(AutoTuneDiagnostic diagnostic)
+    {
+        return $"auto-tuned: {diagnostic.ResolvedSamples:N0} samples × {diagnostic.OpsPerSample:N0} ops, "
+               + $"warmup {diagnostic.ResolvedWarmup:N0}, CI ±{diagnostic.AchievedRelativeCiWidth * 100:F1}%";
+    }
 }
 
 public record BenchmarkRow
@@ -243,4 +254,5 @@ public record BenchmarkRow
     public required double StandardErrorPercent { get; init; }
     public required double MarginPercent { get; init; }
     public required double CoefficientOfVariationPercent { get; init; }
+    public AutoTuneDiagnostic? AutoTune { get; init; }
 }

@@ -73,15 +73,52 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>
+    ///     Pins an exact measured-sample count, overriding the default confidence-interval-driven
+    ///     auto-detection. Pass <c>0</c> for a dry-run.
+    /// </summary>
     public BenchmarkSuite WithIterations(int iterations)
     {
         _options = _options with { Iterations = iterations };
         return this;
     }
 
+    /// <summary>
+    ///     Pins an exact warmup-sample count, overriding the default plateau-driven auto-detection.
+    ///     Pass <c>0</c> to skip warmup.
+    /// </summary>
     public BenchmarkSuite WithWarmup(int iterations)
     {
         _options = _options with { WarmupIterations = iterations };
+        return this;
+    }
+
+    /// <summary>
+    ///     Tunes the adaptive measurement loop (warmup plateau, CI-width sample count, and
+    ///     ops-per-sample calibration). Use <see cref="AutoTuneOptions.Quick" /> for fast feedback
+    ///     or <see cref="AutoTuneOptions.Thorough" /> for tighter intervals.
+    /// </summary>
+    public BenchmarkSuite WithAutoTune(AutoTuneOptions autoTune)
+    {
+        ArgumentNullException.ThrowIfNull(autoTune);
+        _options = _options with { AutoTune = autoTune };
+        return this;
+    }
+
+    /// <summary>Selects an adaptive-tuning preset (Default, Quick, or Thorough).</summary>
+    public BenchmarkSuite WithAutoTune(AutoTunePreset preset)
+    {
+        _options = _options with { AutoTune = AutoTuneOptions.FromPreset(preset) };
+        return this;
+    }
+
+    /// <summary>
+    ///     Pins the number of back-to-back body invocations timed as one sample (<c>K</c>),
+    ///     overriding auto-calibration. Honoured even with per-iteration setup/teardown.
+    /// </summary>
+    public BenchmarkSuite WithOpsPerSample(int opsPerSample)
+    {
+        _options = _options with { OpsPerSample = opsPerSample };
         return this;
     }
 
@@ -385,7 +422,7 @@ public sealed class BenchmarkSuite(string name)
                 result = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException(message), message),
                     envelope.Name, envelope.Description, isBaseline,
-                    _options, TimeSpan.Zero, TimeSpan.Zero).Result;
+                    _options, TimeSpan.Zero, TimeSpan.Zero, 0, null).Result;
 
                 raw = [];
             }

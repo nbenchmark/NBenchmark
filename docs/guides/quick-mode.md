@@ -20,7 +20,7 @@ var result = Benchmark.Run(() =>
 });
 ```
 
-`Benchmark.Run` runs 25 warmup iterations, then 200 measured iterations, trims outliers using the IQR fence rule, and returns a `BenchmarkResult`.
+`Benchmark.Run` warms up until the timings plateau, collects measured samples until the confidence interval is tight enough, trims outliers using the IQR fence rule, and returns a `BenchmarkResult`.
 
 ## Overloads
 

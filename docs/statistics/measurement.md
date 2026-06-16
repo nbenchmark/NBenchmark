@@ -8,22 +8,45 @@ order: 1
 
 ## The measurement loop
 
-For each benchmark, NBenchmark runs the following sequence:
+NBenchmark uses an **adaptive streaming loop**. Rather than running a fixed number of iterations, it resolves three dimensions at runtime - how many invocations to time per sample (**K**), how long to warm up, and how many measured samples to collect - and stops each as soon as it has enough. Every dimension can be pinned to an exact value (see [Configuration](../reference/configuration.md)); pinning all three reproduces a classic fixed-count run.
 
-1. **Warmup** - run the action `WarmupIterations` times (default: 25) without recording timings.
-2. **Post-warmup GC** - if `ForceGcBetweenBenchmarks` is true (the `Independent` profile), force a full gen-2 GC collection to establish a clean heap baseline. Under the `Realistic` profile (the default), this step is skipped and the benchmark inherits the warmup's heap state.
-3. **Measurement loop** - for each of the `Iterations` (default: 200) measured runs:
-   - If `ForceGcBeforeEachIteration` is true (the `Independent` profile), force a gen-0 collection.
-   - Call `iterationSetup` if provided.
-   - Record `Stopwatch.GetTimestamp()`.
-   - Invoke the benchmark action.
-   - Read the timestamp again and convert the raw tick delta to nanoseconds at the timer's **native resolution** (`delta × 10⁹ / Stopwatch.Frequency`).
-   - Record allocation delta if `MeasureAllocations` is true (the `Realistic` profile).
-   - Call `iterationTeardown` if provided.
+For each benchmark the loop runs in three phases:
 
-**Important:** the timer is read immediately after the action returns, before teardown runs. Teardown time is not included in the measurement.
+### Phase 1 - Ops-per-sample calibration (K)
 
-The raw timing data (in nanoseconds) is stored in a `double[]` of length `Iterations`.
+If `OpsPerSample` is `null` (the default) and the body is eligible, NBenchmark times a single invocation, then doubles K - timing 1, 2, 4, 8, … invocations as one batch - until a batch spans at least `AutoTune.TargetSampleDurationNs` (1 µs by default). The resolved K is reused for warmup and measurement, and every reported timing divides the batch time by K to give a per-operation number.
+
+Calibration is skipped (K = 1) when `IterationSetup`/`IterationTeardown` is set or `ForceGcBeforeEachIteration` is on, because a batch would no longer represent one isolated call. A pinned `OpsPerSample` is always honoured.
+
+### Phase 2 - Warmup (plateau detection)
+
+If `WarmupIterations` is `null`, NBenchmark collects warmup samples in batches of `AutoTune.BatchSize` and tracks the best (fastest) batch mean seen so far. Once `AutoTune.PlateauPatience` consecutive batches fail to improve on the best by at least `AutoTune.WarmupEpsilon`, the code is considered warm and warmup stops - never before `AutoTune.MinWarmup` samples, never after `AutoTune.MaxWarmup`. A pinned `WarmupIterations` runs exactly that many warmup samples.
+
+If `ForceGcBetweenBenchmarks` is true (the `Independent` profile), a full gen-2 GC runs after warmup to establish a clean heap baseline. Under `Realistic` (the default) this is skipped and the benchmark inherits the warmup's heap state.
+
+### Phase 3 - Measurement (CI-width target)
+
+If `Iterations` is `null`, NBenchmark streams measured samples and, every `AutoTune.BatchSize` samples, recomputes the confidence interval on the mean. Sampling stops once the interval's relative half-width falls below `AutoTune.CiTarget` (±2.5% by default) - never before `AutoTune.MinSamples`, never after `AutoTune.MaxSamples`. A pinned `Iterations` collects exactly that many samples. A per-benchmark `AutoTune.MaxTuningTime` wall-clock cap bounds the whole loop so a pathological body can never run away.
+
+Each measured sample does the following:
+
+- If `ForceGcBeforeEachIteration` is true (the `Independent` profile), force a gen-0 collection.
+- Call `IterationSetup` if provided.
+- Record `Stopwatch.GetTimestamp()`.
+- Invoke the benchmark action K times.
+- Read the timestamp again and convert the raw tick delta to nanoseconds at the timer's **native resolution** (`delta × 10⁹ / Stopwatch.Frequency`), then divide by K.
+- Record the allocation delta (divided by K) if `MeasureAllocations` is true (the `Realistic` profile).
+- Call `IterationTeardown` if provided.
+
+**Important:** the timer is read immediately after the K-batch returns, before teardown runs. Teardown time is not included in the measurement.
+
+### Raw vs. trimmed statistics
+
+The CI-width stop rule evaluates the **raw** (untrimmed) sample stream as it arrives. After the loop ends, the collected per-op samples pass through [outlier trimming](./outliers.md) and the reported statistics - including the Error column - are computed on the **trimmed** set. The two confidence intervals are close but need not be identical: the diagnostic's `AchievedRelativeCiWidth` reflects the raw stop value, while the reported interval reflects the trimmed result.
+
+### What the loop decided
+
+Every measured result carries an `AutoTune` diagnostic (`BenchmarkResult.AutoTune`) recording the resolved K, warmup length, sample count, why each phase stopped, the achieved CI half-width, and the wall-clock time spent tuning. Reporters surface it as an `auto-tuned: …` line (console, Markdown), dedicated columns (CSV advanced), or an `autoTune` object (JSON). It is `null` on dry-run and errored results.
 
 ## Measurement profiles
 
@@ -97,6 +120,8 @@ Per-iteration timings are computed directly from raw `Stopwatch` ticks - deliber
 
 > [!NOTE] Timer-call overhead
 > Each sample includes the cost of one timestamp read (typically ~10-30 ns).
-> For bodies in the low-nanosecond range this overhead is a meaningful fraction
-> of the measurement, so treat absolute values at that scale as upper bounds and
-> prefer comparing benchmarks against a baseline measured the same way.
+> Ops-per-sample calibration (Phase 1 above) amortises this across K invocations
+> for fast bodies, so the per-op number stays meaningful even in the low-nanosecond
+> range. When K is pinned to 1 - or when setup/teardown forces it - the read cost is
+> a fixed addend on every sample, so treat absolute values at that scale as upper
+> bounds and compare against a baseline measured the same way.

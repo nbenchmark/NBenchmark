@@ -83,8 +83,8 @@ await new BenchmarkSuite("name")
     .Add(...)
     .Add(...)
     .WithBaseline("name")           // which benchmark is the 1.00x reference
-    .WithIterations(200)            // default: 200
-    .WithWarmup(25)                 // default: 25
+    .WithIterations(200)            // pin measured samples (default: auto)
+    .WithWarmup(25)                 // pin warmup samples (default: auto)
     .WithAllocations()              // enable allocation tracking
     .WithOutlierMode(OutlierMode.IqrFence)   // default
     .WithOutlierDetector(new MyDetector())   // custom IOutlierDetector (overrides WithOutlierMode)

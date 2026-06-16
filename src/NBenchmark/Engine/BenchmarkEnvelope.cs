@@ -31,7 +31,10 @@ internal sealed record BenchmarkEnvelope(
             var instance = instanceFactory();
             var specWithOverride = spec;
 
-            if (spec.Options.Iterations > 0)
+            // Apply per-method [Benchmark] count overrides unless this is a dry-run (Iterations == 0),
+            // which must stay a dry-run regardless of attribute values. Auto mode (null) still
+            // honours method-level overrides.
+            if (spec.Options.Iterations is not 0)
             {
                 var overriddenOptions = spec.Options;
 

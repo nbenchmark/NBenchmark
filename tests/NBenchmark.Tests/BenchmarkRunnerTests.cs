@@ -99,6 +99,21 @@ public class BenchmarkRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_Errored_Result_Reports_Pinned_Warmup_Count()
+    {
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions { WarmupIterations = 7, Iterations = 2, OutlierMode = OutlierMode.None },
+        };
+
+        var outcome = await BenchmarkRunner.Instance.RunAsync("bad",
+            () => throw new InvalidOperationException("nope"), spec);
+
+        Assert.True(outcome.Result.Errored);
+        Assert.Equal(7, outcome.Result.WarmupIterations);
+    }
+
+    [Fact]
     public async Task RunAsync_Propagates_OperationCanceledException_Untouched()
     {
         var spec = new RunSpec
@@ -282,6 +297,7 @@ public class BenchmarkRunnerTests
     {
         var clock = new FakeClock([
             TimeSpan.FromTicks(120), // total
+            TimeSpan.FromTicks(100), // tuning span
             TimeSpan.FromTicks(80), // measured loop
             TimeSpan.FromTicks(10), // sample 1
             TimeSpan.FromTicks(30), // sample 2
@@ -303,6 +319,7 @@ public class BenchmarkRunnerTests
     {
         var clock = new FakeClock([
             TimeSpan.FromTicks(520), // total
+            TimeSpan.FromTicks(500), // tuning span
             TimeSpan.FromTicks(480), // measured loop
             TimeSpan.FromTicks(30), // sample 1
             TimeSpan.FromTicks(10), // sample 2
@@ -323,6 +340,7 @@ public class BenchmarkRunnerTests
     {
         var clock = new FakeClock([
             TimeSpan.FromTicks(220), // total
+            TimeSpan.FromTicks(200), // tuning span
             TimeSpan.FromTicks(180), // measured loop
             TimeSpan.FromTicks(40), // sample 1
             TimeSpan.FromTicks(20), // sample 2
@@ -344,6 +362,7 @@ public class BenchmarkRunnerTests
     {
         var clock = new FakeClock([
             TimeSpan.FromTicks(320), // total
+            TimeSpan.FromTicks(300), // tuning span
             TimeSpan.FromTicks(280), // measured loop
             TimeSpan.FromTicks(15), // sample 1
             TimeSpan.FromTicks(25), // sample 2
@@ -365,6 +384,7 @@ public class BenchmarkRunnerTests
     {
         var clock = new FakeClock([
             TimeSpan.FromTicks(420), // total
+            TimeSpan.FromTicks(400), // tuning span
             TimeSpan.FromTicks(380), // measured loop
             TimeSpan.FromTicks(55), // sample 1
             TimeSpan.FromTicks(35), // sample 2
@@ -686,6 +706,7 @@ public class BenchmarkRunnerTests
             {
                 WarmupIterations = 0,
                 Iterations = 2,
+                OpsPerSample = 1,
                 OutlierMode = OutlierMode.None,
                 MeasureAllocationsOverride = false,
             },

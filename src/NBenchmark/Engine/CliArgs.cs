@@ -33,6 +33,22 @@ internal sealed record CliArgs
 
     public bool? NoAllocations { get; init; }
 
+    public int? OpsPerSample { get; init; }
+
+    public AutoTunePreset? AutoTunePreset { get; init; }
+
+    public double? CiTarget { get; init; }
+
+    public int? MinSamples { get; init; }
+
+    public int? MaxSamples { get; init; }
+
+    public int? MinWarmup { get; init; }
+
+    public int? MaxWarmup { get; init; }
+
+    public TimeSpan? MaxTuningTime { get; init; }
+
     /// <summary>
     ///     Pure parse: tokenises <paramref name="args" />, validates ranges, and returns
     ///     both the structured result and any error messages. No console I/O, no
@@ -60,6 +76,14 @@ internal sealed record CliArgs
         MeasurementProfile? profile = null;
         bool? forceGc = null;
         bool? noAllocations = null;
+        int? opsPerSample = null;
+        AutoTunePreset? autoTunePreset = null;
+        double? ciTarget = null;
+        int? minSamples = null;
+        int? maxSamples = null;
+        int? minWarmup = null;
+        int? maxWarmup = null;
+        TimeSpan? maxTuningTime = null;
 
         var errors = new List<string>();
 
@@ -185,9 +209,75 @@ internal sealed record CliArgs
                 case "--no-allocations":
                     noAllocations = true;
                     break;
+                case "--auto-tune" when i + 1 < args.Length:
+                    var presetStr = args[++i];
+
+                    if (string.Equals(presetStr, "default", StringComparison.OrdinalIgnoreCase))
+                        autoTunePreset = NBenchmark.AutoTunePreset.Default;
+                    else if (string.Equals(presetStr, "quick", StringComparison.OrdinalIgnoreCase))
+                        autoTunePreset = NBenchmark.AutoTunePreset.Quick;
+                    else if (string.Equals(presetStr, "thorough", StringComparison.OrdinalIgnoreCase))
+                        autoTunePreset = NBenchmark.AutoTunePreset.Thorough;
+                    else
+                        errors.Add($"Invalid --auto-tune value '{presetStr}'. Must be 'default', 'quick', or 'thorough'.");
+
+                    break;
+                case "--ops-per-sample" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var ops)
+                        && ops >= 1
+                        && ops <= MeasurementOptions.MaxOpsPerSampleLimit)
+                        opsPerSample = ops;
+                    else
+                        errors.Add($"Invalid --ops-per-sample value '{args[i]}'. Must be 1–{MeasurementOptions.MaxOpsPerSampleLimit}.");
+
+                    break;
+                case "--ci-target" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var cit) && cit is > 0 and < 1)
+                        ciTarget = cit;
+                    else
+                        errors.Add($"Invalid --ci-target value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.025).");
+
+                    break;
+                case "--min-samples" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var mins) && mins >= 1 && mins <= MeasurementOptions.MaxIterations)
+                        minSamples = mins;
+                    else
+                        errors.Add($"Invalid --min-samples value '{args[i]}'. Must be 1–{MeasurementOptions.MaxIterations}.");
+
+                    break;
+                case "--max-samples" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var maxs) && maxs >= 1 && maxs <= MeasurementOptions.MaxIterations)
+                        maxSamples = maxs;
+                    else
+                        errors.Add($"Invalid --max-samples value '{args[i]}'. Must be 1–{MeasurementOptions.MaxIterations}.");
+
+                    break;
+                case "--min-warmup" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var minw) && minw >= 0 && minw <= MeasurementOptions.MaxWarmupIterations)
+                        minWarmup = minw;
+                    else
+                        errors.Add($"Invalid --min-warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupIterations}.");
+
+                    break;
+                case "--max-warmup" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var maxw) && maxw >= 1 && maxw <= MeasurementOptions.MaxWarmupIterations)
+                        maxWarmup = maxw;
+                    else
+                        errors.Add($"Invalid --max-warmup value '{args[i]}'. Must be 1–{MeasurementOptions.MaxWarmupIterations}.");
+
+                    break;
+                case "--max-tuning-time" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var secs) && secs > 0)
+                        maxTuningTime = TimeSpan.FromSeconds(secs);
+                    else
+                        errors.Add($"Invalid --max-tuning-time value '{args[i]}'. Must be a positive number of seconds.");
+
+                    break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--confidence" or "--order" or "--threshold-pct" or "--seed" or "--alpha"
-                    or "--outlier" or "--detail" or "--profile":
+                    or "--outlier" or "--detail" or "--profile" or "--auto-tune" or "--ops-per-sample"
+                    or "--ci-target" or "--min-samples" or "--max-samples" or "--min-warmup" or "--max-warmup"
+                    or "--max-tuning-time":
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -217,6 +307,14 @@ internal sealed record CliArgs
             Profile = profile,
             ForceGc = forceGc,
             NoAllocations = noAllocations,
+            OpsPerSample = opsPerSample,
+            AutoTunePreset = autoTunePreset,
+            CiTarget = ciTarget,
+            MinSamples = minSamples,
+            MaxSamples = maxSamples,
+            MinWarmup = minWarmup,
+            MaxWarmup = maxWarmup,
+            MaxTuningTime = maxTuningTime,
         }, errors);
     }
 
@@ -277,13 +375,21 @@ internal sealed record CliArgs
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  --filter <pattern>     Run suites/methods matching glob (e.g., String*, *.Contains*)");
-        Console.WriteLine("  --iterations <n>       Number of measured iterations (default: 200)");
-        Console.WriteLine("  --warmup <n>           Number of warmup iterations (default: 25)");
+        Console.WriteLine("  --iterations <n>       Pin measured sample count (default: auto, CI-driven)");
+        Console.WriteLine("  --warmup <n>           Pin warmup sample count (default: auto, plateau-driven)");
         Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
         Console.WriteLine("  --alpha <0-1>          Significance level for the significance test (default: 0.05)");
         Console.WriteLine("  --outlier <mode>       Outlier trimming: none, top5, both5, iqr (default), mad");
+        Console.WriteLine("  --auto-tune <preset>   Adaptive tuning preset: default, quick, or thorough");
+        Console.WriteLine("  --ops-per-sample <n>   Pin ops-per-sample K (default: auto-calibrated)");
+        Console.WriteLine("  --ci-target <0-1>      Target relative CI half-width for auto sampling (default: 0.025)");
+        Console.WriteLine("  --min-samples <n>      Minimum measured samples in auto mode (default: 30)");
+        Console.WriteLine("  --max-samples <n>      Maximum measured samples in auto mode (default: 100000)");
+        Console.WriteLine("  --min-warmup <n>       Minimum warmup samples in auto mode (default: 8)");
+        Console.WriteLine("  --max-warmup <n>       Maximum warmup samples in auto mode (default: 10000)");
+        Console.WriteLine("  --max-tuning-time <s>  Wall-clock cap per benchmark, in seconds (default: 20)");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");

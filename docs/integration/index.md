@@ -79,8 +79,8 @@ All three packages share the same set of threshold properties. A threshold of `-
 | `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
 | `BaselinePath` | `string?` | null | Path to a JSON baseline file. Fails if the benchmark regresses beyond `MaxSlowdownRatio`. |
 | `MaxSlowdownRatio` | `double` | 1.2 | Maximum allowed slowdown relative to the baseline (1.2 = 20% regression). |
-| `Iterations` | `int` | 0 (use default) | Override the number of measured iterations. `0` uses the framework default (200). |
-| `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup iterations. `0` uses the framework default (25). |
+| `Iterations` | `int` | 0 (use default) | Override the number of measured samples. `0` uses the framework default (auto-resolved). |
+| `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup samples. `0` uses the framework default (auto-detected). |
 | `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
 | `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
 | `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |

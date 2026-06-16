@@ -46,6 +46,7 @@ public sealed class ConsoleReporter : IReporter
         RenderComparisonTable(benchTable, results);
         AnsiConsole.WriteLine();
         RenderTimingDetail(benchTable);
+        RenderAutoTune(benchTable);
 
         if (Detail == ReportDetail.Advanced)
         {
@@ -221,6 +222,21 @@ public sealed class ConsoleReporter : IReporter
         }
 
         AnsiConsole.Write(table);
+    }
+
+    private static void RenderAutoTune(BenchmarkTable benchTable)
+    {
+        var rows = benchTable.Rows.Where(r => !r.Errored && r.AutoTune is not null).ToList();
+
+        if (rows.Count == 0)
+            return;
+
+        AnsiConsole.WriteLine();
+
+        foreach (var row in rows)
+        {
+            AnsiConsole.MarkupLine($"[grey]{Esc(row.Name)}: {Esc(BenchmarkTable.FormatAutoTuneSummary(row.AutoTune!))}[/]");
+        }
     }
 
     private static void RenderAdvancedDetails(BenchmarkTable benchTable)
