@@ -11,7 +11,7 @@ public class EnvelopeTests
     public async Task FromDiscovered_Sync_Void_Method_Runs_To_Completion()
     {
         var method = TestReflectionHelper.ResolveMethod(typeof(PublicBenchmarks), nameof(PublicBenchmarks.ReturnsNothing));
-        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(PublicBenchmarks), new PublicBenchmarks());
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(PublicBenchmarks), () => new PublicBenchmarks());
 
         var outcome = await envelope.RunAsync(MinimalSpec(), CancellationToken.None);
 
@@ -24,7 +24,7 @@ public class EnvelopeTests
     public async Task FromDiscovered_Sync_Returning_Method_Captures_Result()
     {
         var method = TestReflectionHelper.ResolveMethod(typeof(PublicBenchmarks), nameof(PublicBenchmarks.ReturnsInt));
-        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(PublicBenchmarks), new PublicBenchmarks());
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(PublicBenchmarks), () => new PublicBenchmarks());
 
         var outcome = await envelope.RunAsync(MinimalSpec(), CancellationToken.None);
 
@@ -35,7 +35,7 @@ public class EnvelopeTests
     public async Task FromDiscovered_Async_NonGeneric_RunAsync_Can_Be_Awaited()
     {
         var method = TestReflectionHelper.ResolveMethod(typeof(AsyncBenchmarks), nameof(AsyncBenchmarks.ReturnsTask));
-        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AsyncBenchmarks), new AsyncBenchmarks());
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AsyncBenchmarks), () => new AsyncBenchmarks());
 
         var outcome = await envelope.RunAsync(MinimalSpec(), CancellationToken.None);
 
@@ -46,7 +46,7 @@ public class EnvelopeTests
     public async Task FromDiscovered_Async_Generic_With_ResultConsumer_Consumes_Result()
     {
         var method = TestReflectionHelper.ResolveMethod(typeof(AsyncBenchmarks), nameof(AsyncBenchmarks.ReturnsValueAsync));
-        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AsyncBenchmarks), new AsyncBenchmarks());
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AsyncBenchmarks), () => new AsyncBenchmarks());
 
         var outcome = await envelope.RunAsync(MinimalSpec(), CancellationToken.None);
 
@@ -57,7 +57,7 @@ public class EnvelopeTests
     public void FromDiscovered_Prefixes_Name_With_Class_And_Reads_Baseline()
     {
         var method = TestReflectionHelper.ResolveMethod(typeof(BaselineBenchmarks), nameof(BaselineBenchmarks.Fast));
-        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(BaselineBenchmarks), new BaselineBenchmarks());
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(BaselineBenchmarks), () => new BaselineBenchmarks());
 
         Assert.Equal($"{nameof(BaselineBenchmarks)}.Fast", envelope.Name);
         Assert.True(envelope.IsBaseline);
@@ -69,7 +69,7 @@ public class EnvelopeTests
     {
         var instance = new AttributeOverrideBenchmarks();
         var method = TestReflectionHelper.ResolveMethod(typeof(AttributeOverrideBenchmarks), nameof(AttributeOverrideBenchmarks.Work));
-        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AttributeOverrideBenchmarks), instance);
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AttributeOverrideBenchmarks), () => instance);
 
         var outcome = await envelope.RunAsync(new RunSpec
         {
@@ -91,7 +91,7 @@ public class EnvelopeTests
     {
         var instance = new AttributeOverrideBenchmarks();
         var method = TestReflectionHelper.ResolveMethod(typeof(AttributeOverrideBenchmarks), nameof(AttributeOverrideBenchmarks.Work));
-        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AttributeOverrideBenchmarks), instance);
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(AttributeOverrideBenchmarks), () => instance);
 
         var outcome = await envelope.RunAsync(new RunSpec
         {

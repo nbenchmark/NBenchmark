@@ -8,7 +8,10 @@ public sealed record BenchmarkSuiteDefinition(
     IReadOnlyList<BenchmarkMethodDefinition> Benchmarks,
     Action<object>? SetupDelegate = null,
     Action<object>? TeardownDelegate = null
-);
+)
+{
+    public InstanceLifetime Lifetime { get; init; } = InstanceLifetime.PerMethod;
+}
 
 public sealed record BenchmarkMethodDefinition(
     MethodInfo Method,

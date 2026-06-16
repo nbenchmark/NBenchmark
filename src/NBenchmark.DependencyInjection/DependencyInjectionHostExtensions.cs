@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using NBenchmark.Engine;
 
 namespace NBenchmark.DependencyInjection;
 
@@ -11,7 +12,7 @@ public static class DependencyInjectionHostExtensions
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(serviceProvider);
 
-        return host.WithInstanceFactory(serviceProvider.GetRequiredService);
+        return host.WithInstanceFactory(type => InstanceHandle.NoTeardown(serviceProvider.GetRequiredService(type)));
     }
 
     public static BenchmarkHost WithScopedServiceProvider(
@@ -21,10 +22,25 @@ public static class DependencyInjectionHostExtensions
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(serviceProvider);
 
-        var scope = serviceProvider.CreateScope();
+        // Create a scope per benchmark-class instance and bundle its disposal into the
+        // returned handle. Host mode will call that teardown after [BenchmarkTeardown]
+        // runs for the instance, which preserves ordering and avoids host-level hooks.
+        host.WithInstanceFactory(type =>
+        {
+            var scope = serviceProvider.CreateScope();
 
-        host.WithInstanceFactory(type => scope.ServiceProvider.GetRequiredService(type));
-        host.PostSuiteCleanup = scope.Dispose;
+            try
+            {
+                return new InstanceHandle(
+                    scope.ServiceProvider.GetRequiredService(type),
+                    scope.Dispose);
+            }
+            catch
+            {
+                scope.Dispose();
+                throw;
+            }
+        });
 
         return host;
     }

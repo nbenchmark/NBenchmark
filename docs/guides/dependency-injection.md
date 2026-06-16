@@ -85,14 +85,32 @@ await BenchmarkHost.Create(args)
 
 ## Lifetime and disposal semantics
 
-The DI integration matches how `BenchmarkHost` already manages benchmark instances: **one instance per suite**, used for every `[Benchmark]` method in that class.
+The DI integration matches how `BenchmarkHost` manages benchmark instances: **a fresh instance per `[Benchmark]` method**. This is the same lifetime the host uses for plain parameterless classes, so DI users get a one-to-one mapping between methods and instances.
 
 | Method | Instance lifetime | Scope lifetime |
 |---|---|---|
-| `WithServiceProvider` | Resolved from the root provider. Re-used across all `[Benchmark]` methods in the suite. | None. The root provider lives as long as your application. |
-| `WithScopedServiceProvider` | Resolved from a fresh scope. The scope is disposed **after** the suite's teardown runs, so any `IDisposable` / `IAsyncDisposable` services (e.g. `DbContext`) are cleaned up. | One scope per suite. Disposed in the `finally` block. |
+| `WithServiceProvider` | One fresh instance per `[Benchmark]` method, resolved from the root provider. | None. The root provider lives as long as your application. |
+| `WithScopedServiceProvider` | One fresh instance per `[Benchmark]` method. | One fresh scope per method, disposed in per-method teardown. |
+| `WithServiceProvider` + `[InstanceLifetime(PerClass)]` | Resolved from the root provider. Re-used across all `[Benchmark]` methods. | None. |
+| `WithScopedServiceProvider` + `[InstanceLifetime(PerClass)]` | Resolved from a fresh scope. The scope is disposed **after** the suite's teardown runs, so any `IDisposable` / `IAsyncDisposable` services (e.g. `DbContext`) are cleaned up. | One scope per suite. Disposed in the `finally` block. |
 
 The host **does not** auto-dispose the benchmark instance when a service provider is configured - the scope's disposal already handles that. This avoids double-disposal of `IDisposable` benchmarks that come from a scope.
+
+### Worked example: EF Core with per-method instances
+
+```csharp
+var services = new ServiceCollection()
+    .AddDbContext<MyDbContext>(opts => opts.UseInMemoryDatabase("benchmarks"))
+    .AddTransient<OrderBenchmarks>()
+    .BuildServiceProvider();
+
+await BenchmarkHost.Create(args)
+    .AddFromAssembly<OrderBenchmarks>()
+    .UseScopedDependencyInjection<OrderBenchmarks>(services)
+    .RunAsync();
+```
+
+`UseScopedDependencyInjection` is `WithScopedServiceProvider` under the hood. With `PerMethod`, each `[Benchmark]` method gets a fresh `MyDbContext` - no shared state, no cache contamination between methods. If you need one `DbContext` shared across all benchmark methods in a class, add `[InstanceLifetime(InstanceLifetime.PerClass)]`; the NB0011 analyzer warns on this combination.
 
 ## Constructor injection
 
@@ -148,7 +166,7 @@ host.WithInstanceFactory(type =>
 });
 ```
 
-This is what the `NBenchmark.DependencyInjection` package does internally. The factory is called once per suite, and the returned instance is used for all `[Benchmark]` methods in that suite.
+This is what the `NBenchmark.DependencyInjection` package does internally. Under `PerMethod`, the factory is called once per `[Benchmark]` method and the returned instance is used for that one method only. If you need one instance shared across all benchmark methods in a class, add `[InstanceLifetime(InstanceLifetime.PerClass)]`.
 
 ## A note on Quick mode and Suite mode
 

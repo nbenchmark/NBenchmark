@@ -125,6 +125,32 @@ public class BenchmarkHostCliTests
     }
 
     [Fact]
+    public async Task RunAsync_With_Random_Order_Shuffles_PerMethod_Benchmarks()
+    {
+        var ordered = await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHost.Create(["--filter", "HostOrderBenchmarks.*", "--seed", "7"])
+                .AddFromAssembly<HostOrderBenchmarks>()
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync());
+
+        var randomized = await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHost.Create(["--filter", "HostOrderBenchmarks.*", "--seed", "7"])
+                .AddFromAssembly<HostOrderBenchmarks>()
+                .WithRunOrder(RunOrder.Random)
+                .WithInstanceLifetime(InstanceLifetime.PerMethod)
+                .WithIsolation(false)
+                .RunAsync());
+
+        Assert.Equal(2, ordered.Count);
+        Assert.Equal(2, randomized.Count);
+        Assert.Equal("HostOrderBenchmarks.A", ordered[0].Name);
+        Assert.Equal("HostOrderBenchmarks.B", ordered[1].Name);
+        Assert.Equal("HostOrderBenchmarks.B", randomized[0].Name);
+        Assert.Equal("HostOrderBenchmarks.A", randomized[1].Name);
+    }
+
+    [Fact]
     public async Task RunAsync_Emits_OnSuiteStarting_Before_Per_Class_Setup_And_OnSuiteCompleted_After_Per_Class_Teardown()
     {
         var events = new List<string>();
@@ -544,4 +570,13 @@ public class SlowVsBaselineBenchmarks
 
         return sum;
     }
+}
+
+public class HostOrderBenchmarks
+{
+    [Benchmark]
+    public int A() => 1;
+
+    [Benchmark]
+    public int B() => 2;
 }

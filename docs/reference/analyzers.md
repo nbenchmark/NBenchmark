@@ -30,6 +30,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0008 | `[Benchmark]` property value out of range | Error | `Iterations` or `WarmupIterations` on `[Benchmark]` is outside the valid range (0-100000 for iterations, 0-10000 for warmup, or -1 for the default). |
 | NB0009 | `MeasurementOptions` property value out of range | Error | `Iterations`, `WarmupIterations`, or `ConfidenceLevel` in a `MeasurementOptions` object initializer or `with` expression is outside the valid range. |
 | NB0010 | Benchmark body is throwaway | Warning | A lambda passed to the `Action` overloads of `Benchmark.Run()` or `Benchmark.RunRaw()` has no observable side effects. The JIT may eliminate it, producing 0 ns results. |
+| NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that looks scoped (for example `DbContext`, `UnitOfWork`, or a disposable service), which can leak warmed state across benchmark methods. |
 
 ### NB0001 - Missing parameterless constructor
 
@@ -160,6 +161,25 @@ Benchmark.Run(() => Compute());  // method call
 
 Note: NB0010 inspects only overloads whose first parameter is an `Action` (void delegate). `Benchmark.Run<T>`, `Benchmark.RunAsync`, `Benchmark.RunAsync<T>`, and `RunRaw` overloads that accept value-returning delegates are not flagged.
 
+### NB0011 - `PerClass` lifetime with scoped service
+
+When a class uses `[InstanceLifetime(InstanceLifetime.PerClass)]`, all `[Benchmark]` methods in that class share one object instance. If the class constructor takes a dependency that looks like a scoped or stateful service, one method can warm caches that the next method reads, which distorts timing.
+
+```csharp
+// Warning NB0011
+[InstanceLifetime(InstanceLifetime.PerClass)]
+public sealed class OrderBenchmarks(MyDbContext db)
+{
+    [Benchmark] public int A() => db.Orders.Count();
+    [Benchmark] public int B() => db.Orders.Where(o => o.Total > 100).Count();
+}
+```
+
+Typical fixes:
+
+1. Remove the attribute so the class uses `PerMethod`
+2. Keep `PerClass` and suppress with `#pragma warning disable NB0011` when sharing state is intentional
+
 ## Disabling a rule
 
 Use a `#pragma` directive to suppress a specific diagnostic:
@@ -183,4 +203,4 @@ dotnet_diagnostic.NB0004.severity = none
 
 ## Severity
 
-Most diagnostics have the default severity listed in the table above. The NB0002 and NB0003 diagnostics are `Error` because they prevent discovery entirely. NB0006, NB0007, NB0008, and NB0009 are `Error` because they represent definite configuration mistakes. NB0001 and NB0010 are `Warning` because the code will still run (the issue is caught later at runtime). NB0004 is `Info` because the heuristic is conservative and may have false positives.
+Most diagnostics have the default severity listed in the table above. The NB0002 and NB0003 diagnostics are `Error` because they prevent discovery entirely. NB0006, NB0007, NB0008, and NB0009 are `Error` because they represent definite configuration mistakes. NB0001, NB0010, and NB0011 are `Warning` because the code can still run but the measurements may be invalid. NB0004 is `Info` because the heuristic is conservative and may have false positives.

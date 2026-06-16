@@ -2,14 +2,21 @@ using NBenchmark.Discovery;
 
 namespace NBenchmark.Engine;
 
-internal static class PerClassLifecycle
+internal static class BenchmarkLifecycle
 {
-    public static object? TryCreateInstance(
-        Type type, Func<Type, object>? instanceFactory)
+    public static (object Instance, Action InstanceTeardown)? CreateInstance(
+        Type type, Func<Type, InstanceHandle>? instanceFactory)
     {
         try
         {
-            return instanceFactory?.Invoke(type) ?? Activator.CreateInstance(type);
+            if (instanceFactory is null)
+            {
+                var instance = Activator.CreateInstance(type);
+                return instance is null ? null : (instance, () => { });
+            }
+
+            var handle = instanceFactory(type);
+            return (handle.Instance, handle.Teardown);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -52,7 +59,7 @@ internal static class PerClassLifecycle
 
     public static async Task RunTeardown(
         BenchmarkSuiteDefinition suite, object instance,
-        bool instanceFromFactory, Action? postSuiteCleanup)
+        bool instanceFromFactory, Action instanceTeardown, Action? postSuiteCleanup)
     {
         try
         {
@@ -61,6 +68,15 @@ internal static class PerClassLifecycle
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Console.WriteLine($"[Warning] Teardown failed for {suite.Type.Name}: {ex.Message}");
+        }
+
+        try
+        {
+            instanceTeardown();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Console.WriteLine($"[Warning] Instance teardown failed for {suite.Type.Name}: {ex.Message}");
         }
 
         postSuiteCleanup?.Invoke();

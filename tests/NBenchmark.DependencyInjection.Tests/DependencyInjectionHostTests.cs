@@ -176,6 +176,107 @@ public class DependencyInjectionHostTests
         Assert.True(ParameterlessBenchmark.Invoked);
     }
 
+    [Fact]
+    public async Task WithScopedServiceProvider_PerMethod_Disposes_One_Scope_Per_Method()
+    {
+        // The fix for the unbounded-hook-list leak: each [Benchmark] method gets its
+        // own scope, and the scope is disposed when that method's runAsync finishes.
+        // Under --dry-run the body is not invoked, so the scope is created but the
+        // instance is still resolved and then disposed in the post-run teardown.
+        var services = new ServiceCollection()
+            .AddSingleton(new DisposableTracker())
+            .AddTransient<PerMethodScopeBenchmark>()
+            .BuildServiceProvider();
+
+        await CaptureAndSuppressConsoleOutputAsync(async () =>
+        {
+            await BenchmarkHost.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+                .AddFromAssembly<PerMethodScopeBenchmark>()
+                .WithScopedServiceProvider(services)
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync();
+        });
+
+        var tracker = services.GetRequiredService<DisposableTracker>();
+        Assert.Equal(PerMethodScopeBenchmark.MethodCount, tracker.DisposeCount);
+    }
+
+    [Fact]
+    public async Task WithScopedServiceProvider_Leaves_No_Hooks_Bound_To_Host()
+    {
+        // Regression: the previous design accumulated a closure in a host-level
+        // list every time the factory was called. For a suite with N methods the
+        // list grew to N entries. With the InstanceHandle model each method's
+        // scope is wired into the handle the envelope returns, so the host holds
+        // zero per-call references. We assert this by running a run that should
+        // not retain scope closures - validated by the disposal count matching
+        // the method count rather than a runaway total.
+        var services = new ServiceCollection()
+            .AddSingleton(new DisposableTracker())
+            .AddTransient<PerMethodScopeBenchmark>()
+            .BuildServiceProvider();
+
+        await CaptureAndSuppressConsoleOutputAsync(async () =>
+        {
+            await BenchmarkHost.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+                .AddFromAssembly<PerMethodScopeBenchmark>()
+                .WithScopedServiceProvider(services)
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync();
+        });
+
+        var tracker = services.GetRequiredService<DisposableTracker>();
+        Assert.True(tracker.DisposeCount > 0, "Scope should have been disposed at least once.");
+        Assert.Equal(PerMethodScopeBenchmark.MethodCount, tracker.DisposeCount);
+    }
+
+    [Fact]
+    public async Task WithScopedServiceProvider_PerClass_Disposes_One_Scope_Per_Suite()
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(new DisposableTracker())
+            .AddTransient<PerClassScopeBenchmark>()
+            .BuildServiceProvider();
+
+        await CaptureAndSuppressConsoleOutputAsync(async () =>
+        {
+            await BenchmarkHost.Create(["--filter", "PerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+                .AddFromAssembly<PerClassScopeBenchmark>()
+                .WithScopedServiceProvider(services)
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync();
+        });
+
+        var tracker = services.GetRequiredService<DisposableTracker>();
+        Assert.Equal(1, tracker.DisposeCount);
+    }
+
+    [Fact]
+    public async Task WithScopedServiceProvider_And_WithInstanceLifetime_PerClass_Disposes_One_Scope_Per_Suite()
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(new DisposableTracker())
+            .AddTransient<HostPerClassScopeBenchmark>()
+            .BuildServiceProvider();
+
+        await CaptureAndSuppressConsoleOutputAsync(async () =>
+        {
+            await BenchmarkHost.Create(["--filter", "HostPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+                .AddFromAssembly<HostPerClassScopeBenchmark>()
+                .WithScopedServiceProvider(services)
+                .WithInstanceLifetime(InstanceLifetime.PerClass)
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync();
+        });
+
+        var tracker = services.GetRequiredService<DisposableTracker>();
+        Assert.Equal(1, tracker.DisposeCount);
+    }
+
     private static async Task CaptureAndSuppressConsoleOutputAsync(Func<Task> action)
     {
         var sw = new StringWriter();
@@ -279,4 +380,61 @@ public sealed class ParameterlessBenchmark
         Invoked = true;
         return 1;
     }
+}
+
+public sealed class PerMethodScopeBenchmark : IDisposable
+{
+    public const int MethodCount = 2;
+
+    private readonly DisposableTracker _tracker;
+
+    public PerMethodScopeBenchmark(DisposableTracker tracker)
+    {
+        _tracker = tracker;
+    }
+
+    public void Dispose() => _tracker.DisposeCount++;
+
+    [Benchmark]
+    public int First() => 1;
+
+    [Benchmark]
+    public int Second() => 2;
+}
+
+[InstanceLifetime(InstanceLifetime.PerClass)]
+public sealed class PerClassScopeBenchmark : IDisposable
+{
+    private readonly DisposableTracker _tracker;
+
+    public PerClassScopeBenchmark(DisposableTracker tracker)
+    {
+        _tracker = tracker;
+    }
+
+    public void Dispose() => _tracker.DisposeCount++;
+
+    [Benchmark]
+    public int First() => 1;
+
+    [Benchmark]
+    public int Second() => 2;
+}
+
+public sealed class HostPerClassScopeBenchmark : IDisposable
+{
+    private readonly DisposableTracker _tracker;
+
+    public HostPerClassScopeBenchmark(DisposableTracker tracker)
+    {
+        _tracker = tracker;
+    }
+
+    public void Dispose() => _tracker.DisposeCount++;
+
+    [Benchmark]
+    public int First() => 1;
+
+    [Benchmark]
+    public int Second() => 2;
 }

@@ -5,36 +5,47 @@ using Xunit;
 
 namespace NBenchmark.Tests;
 
-public class PerClassLifecycleTests
+public class BenchmarkLifecycleTests
 {
     [Fact]
-    public void TryCreateInstance_Success_Activator()
+    public void CreateInstance_Success_Activator()
     {
-        var instance = PerClassLifecycle.TryCreateInstance(typeof(SimpleType), null);
-        Assert.NotNull(instance);
-        Assert.IsType<SimpleType>(instance);
+        var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType), null);
+        Assert.NotNull(created);
+        Assert.IsType<SimpleType>(created!.Value.Instance);
     }
 
     [Fact]
-    public void TryCreateInstance_Success_Factory()
+    public void CreateInstance_Success_Factory()
     {
-        var instance = PerClassLifecycle.TryCreateInstance(typeof(SimpleType), _ => new SimpleType());
-        Assert.NotNull(instance);
-        Assert.IsType<SimpleType>(instance);
+        var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType), _ => InstanceHandle.NoTeardown(new SimpleType()));
+        Assert.NotNull(created);
+        Assert.IsType<SimpleType>(created!.Value.Instance);
     }
 
     [Fact]
-    public void TryCreateInstance_ActivatorFailure_ReturnsNull()
+    public void CreateInstance_ActivatorFailure_ReturnsNull()
     {
-        var instance = PerClassLifecycle.TryCreateInstance(typeof(NoDefaultCtor), null);
-        Assert.Null(instance);
+        var created = BenchmarkLifecycle.CreateInstance(typeof(NoDefaultCtor), null);
+        Assert.Null(created);
     }
 
     [Fact]
-    public void TryCreateInstance_FactoryFailure_ReturnsNull()
+    public void CreateInstance_FactoryFailure_ReturnsNull()
     {
-        var instance = PerClassLifecycle.TryCreateInstance(typeof(SimpleType), _ => throw new InvalidOperationException("factory failed"));
-        Assert.Null(instance);
+        var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType), _ => throw new InvalidOperationException("factory failed"));
+        Assert.Null(created);
+    }
+
+    [Fact]
+    public void CreateInstance_InvokesPerInstanceTeardown()
+    {
+        var teardownFired = false;
+        var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType),
+            _ => new InstanceHandle(new SimpleType(), () => teardownFired = true));
+        Assert.NotNull(created);
+        created!.Value.InstanceTeardown();
+        Assert.True(teardownFired);
     }
 
     [Fact]
@@ -47,7 +58,7 @@ public class PerClassLifecycleTests
             [],
             _ => { flag = true; });
 
-        var (success, errors) = PerClassLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default);
+        var (success, errors) = BenchmarkLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default);
 
         Assert.True(success);
         Assert.Null(errors);
@@ -61,7 +72,7 @@ public class PerClassLifecycleTests
             typeof(SimpleType),
             []);
 
-        var (success, errors) = PerClassLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default);
+        var (success, errors) = BenchmarkLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default);
 
         Assert.True(success);
         Assert.Null(errors);
@@ -79,7 +90,7 @@ public class PerClassLifecycleTests
             ],
             _ => throw new InvalidOperationException("setup failed"));
 
-        var (success, errors) = PerClassLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default);
+        var (success, errors) = BenchmarkLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default);
 
         Assert.False(success);
         Assert.NotNull(errors);
@@ -98,7 +109,7 @@ public class PerClassLifecycleTests
             [],
             TeardownDelegate: _ => { teardownCalled = true; });
 
-        await PerClassLifecycle.RunTeardown(suite, new SimpleType(), false, null);
+        await BenchmarkLifecycle.RunTeardown(suite, new SimpleType(), false, () => { }, null);
 
         Assert.True(teardownCalled);
     }
@@ -109,7 +120,7 @@ public class PerClassLifecycleTests
         var disposable = new DisposableSpy();
         var suite = new BenchmarkSuiteDefinition(typeof(DisposableSpy), []);
 
-        await PerClassLifecycle.RunTeardown(suite, disposable, false, null);
+        await BenchmarkLifecycle.RunTeardown(suite, disposable, false, () => { }, null);
 
         Assert.True(disposable.Disposed);
     }
@@ -120,7 +131,7 @@ public class PerClassLifecycleTests
         var disposable = new DisposableSpy();
         var suite = new BenchmarkSuiteDefinition(typeof(DisposableSpy), []);
 
-        await PerClassLifecycle.RunTeardown(suite, disposable, true, null);
+        await BenchmarkLifecycle.RunTeardown(suite, disposable, true, () => { }, null);
 
         Assert.False(disposable.Disposed);
     }
@@ -131,7 +142,7 @@ public class PerClassLifecycleTests
         var cleanupCalled = false;
         var suite = new BenchmarkSuiteDefinition(typeof(SimpleType), []);
 
-        await PerClassLifecycle.RunTeardown(suite, new SimpleType(), false, () => cleanupCalled = true);
+        await BenchmarkLifecycle.RunTeardown(suite, new SimpleType(), false, () => { }, () => cleanupCalled = true);
 
         Assert.True(cleanupCalled);
     }
@@ -145,7 +156,7 @@ public class PerClassLifecycleTests
             TeardownDelegate: _ => throw new InvalidOperationException("teardown failed"));
 
         var ex = await Record.ExceptionAsync(() =>
-            PerClassLifecycle.RunTeardown(suite, new SimpleType(), false, null));
+            BenchmarkLifecycle.RunTeardown(suite, new SimpleType(), false, () => { }, null));
 
         Assert.Null(ex);
     }
@@ -156,16 +167,51 @@ public class PerClassLifecycleTests
         var disposable = new AsyncDisposableSpy();
         var suite = new BenchmarkSuiteDefinition(typeof(AsyncDisposableSpy), []);
 
-        await PerClassLifecycle.RunTeardown(suite, disposable, false, null);
+        await BenchmarkLifecycle.RunTeardown(suite, disposable, false, () => { }, null);
 
         Assert.True(disposable.Disposed);
     }
 
     [Fact]
-    public void TryCreateInstance_Propagates_OperationCanceledException()
+    public async Task RunTeardown_Invokes_InstanceTeardown_After_ClassTeardown()
+    {
+        var order = new List<string>();
+        var suite = new BenchmarkSuiteDefinition(
+            typeof(SimpleType),
+            [],
+            TeardownDelegate: _ => order.Add("class"));
+
+        await BenchmarkLifecycle.RunTeardown(
+            suite,
+            new SimpleType(),
+            false,
+            () => order.Add("instance"),
+            null);
+
+        Assert.Equal(["class", "instance"], order);
+    }
+
+    [Fact]
+    public async Task RunTeardown_InstanceTeardownFailure_DoesNotThrow()
+    {
+        var suite = new BenchmarkSuiteDefinition(typeof(SimpleType), []);
+
+        var ex = await Record.ExceptionAsync(() =>
+            BenchmarkLifecycle.RunTeardown(
+                suite,
+                new SimpleType(),
+                false,
+                () => throw new InvalidOperationException("instance teardown failed"),
+                null));
+
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void CreateInstance_Propagates_OperationCanceledException()
     {
         Assert.Throws<OperationCanceledException>(() =>
-            PerClassLifecycle.TryCreateInstance(typeof(SimpleType),
+            BenchmarkLifecycle.CreateInstance(typeof(SimpleType),
                 _ => throw new OperationCanceledException()));
     }
 
@@ -178,7 +224,7 @@ public class PerClassLifecycleTests
             _ => throw new OperationCanceledException());
 
         Assert.Throws<OperationCanceledException>(() =>
-            PerClassLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default));
+            BenchmarkLifecycle.TryRunSetup(suite, new SimpleType(), MeasurementOptions.Default));
     }
 
     [Fact]
@@ -190,7 +236,7 @@ public class PerClassLifecycleTests
             TeardownDelegate: _ => throw new OperationCanceledException());
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            PerClassLifecycle.RunTeardown(suite, new SimpleType(), false, null));
+            BenchmarkLifecycle.RunTeardown(suite, new SimpleType(), false, () => { }, null));
     }
 
     private sealed class SimpleType

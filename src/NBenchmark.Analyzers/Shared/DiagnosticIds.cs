@@ -12,4 +12,5 @@ public static class DiagnosticIds
     public const string BenchmarkAttributeRange = "NB0008";
     public const string MeasurementOptionsRange = "NB0009";
     public const string ThrowawayBody = "NB0010";
+    public const string PerClassWithScopedService = "NB0011";
 }

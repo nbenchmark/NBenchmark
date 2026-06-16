@@ -75,9 +75,19 @@ internal static class TestSources
                                     public sealed class BenchmarkIterationSetupAttribute : System.Attribute {}
                                     [System.AttributeUsage(System.AttributeTargets.Method)]
                                     public sealed class BenchmarkIterationTeardownAttribute : System.Attribute {}
+                                    [System.AttributeUsage(System.AttributeTargets.Class)]
+                                    public sealed class InstanceLifetimeAttribute : System.Attribute
+                                    {
+                                        public InstanceLifetimeAttribute(NBenchmark.InstanceLifetime lifetime) {}
+                                    }
                                 }
                                 namespace NBenchmark
                                 {
+                                    public enum InstanceLifetime
+                                    {
+                                        PerMethod = 0,
+                                        PerClass = 1,
+                                    }
                                     public sealed class BenchmarkResult {}
                                     public sealed class MeasurementOutcome {}
 
@@ -111,7 +121,9 @@ public static class NBAnalyzerVerifier<TAnalyzer>
     public static async Task VerifyAnalyzerAsync(string source, string diagnosticId)
     {
         var analyzerDiagnostics = await GetDiagnosticsAsync(source);
-        Assert.True(analyzerDiagnostics.Length > 0, $"Expected diagnostic '{diagnosticId}' but found none.");
+        var msg = string.Join("\n", analyzerDiagnostics.Select(d => $"  [{d.Id}] {d.GetMessage()}"));
+        Assert.True(analyzerDiagnostics.Length > 0,
+            $"Expected diagnostic '{diagnosticId}' but found none.\nAll diagnostics: {msg}");
         Assert.Contains(analyzerDiagnostics, d => d.Id == diagnosticId);
     }
 

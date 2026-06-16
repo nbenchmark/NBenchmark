@@ -121,6 +121,8 @@ public sealed class PerformanceTestMethodIntegrationTests
     }
 }
 
+#pragma warning disable MSTEST0030 // Fixture types intentionally host PerformanceTestMethod methods without MSTest discovery semantics.
+
 public static class StaticVoidBenchmark
 {
     [PerformanceTestMethod(Iterations = 3, WarmupIterations = 1)]
@@ -170,3 +172,5 @@ public sealed class ParameterizedBenchmark
             nameof(RunWithArgument), increment, (_, value) => value + increment);
     }
 }
+
+#pragma warning restore MSTEST0030
