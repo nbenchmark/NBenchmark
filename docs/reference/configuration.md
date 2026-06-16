@@ -79,23 +79,62 @@ Warmup lets the JIT compiler optimise your code and brings data into CPU caches.
 
 CLI flag: `--warmup <n>`
 
+### Profile
+
+```csharp
+Profile = MeasurementProfile.Realistic   // default
+```
+
+The measurement profile is the authoritative setting that controls three behaviours: per-iteration Gen0 GC, between-benchmark full GC, and allocation tracking. The resolved booleans (`ForceGcBeforeEachIteration`, `ForceGcBetweenBenchmarks`, `MeasureAllocations`) are computed from `Profile` unless explicitly overridden via the corresponding `*Override` field.
+
+| Profile | ForceGcBeforeEachIteration | ForceGcBetweenBenchmarks | MeasureAllocations |
+|---|---|---|---|
+| `Realistic` (default) | `false` | `false` | `true` |
+| `Independent` | `true` | `true` | `false` |
+
+Each resolved boolean can be overridden individually:
+
+```csharp
+// Enable per-iteration GC under Realistic
+options with { ForceGcBeforeEachIterationOverride = true }
+
+// Disable allocation tracking under Realistic
+options with { MeasureAllocationsOverride = false }
+```
+
+BenchmarkHost fluent method: `.WithMeasurementProfile(MeasurementProfile.Independent)`
+BenchmarkSuite fluent method: `.WithMeasurementProfile(MeasurementProfile.Independent)`
+CLI flag: `--profile independent`
+
 ### ForceGcBeforeEachIteration
 
 ```csharp
-ForceGcBeforeEachIteration = true   // default
+ForceGcBeforeEachIteration => ForceGcBeforeEachIterationOverride ?? (Profile == MeasurementProfile.Independent)
 ```
 
-When `true`, a gen-0 GC collection is triggered before each measured iteration. This keeps allocation side-effects from previous iterations out of your measurement.
+This is a **computed property** derived from `Profile` (or the `ForceGcBeforeEachIterationOverride` field when set). When `true`, a gen-0 GC collection is triggered before each measured iteration. This keeps allocation side-effects from previous iterations out of your measurement.
 
-Disable it if your benchmark intentionally tests GC pressure or allocation-heavy paths where the cumulative effect is the point.
+Under the `Realistic` profile (the default), this resolves to `false`. To enable per-iteration GC under `Realistic`, set `ForceGcBeforeEachIterationOverride = true` or use `--force-gc` on the CLI.
+
+### ForceGcBetweenBenchmarks
+
+```csharp
+ForceGcBetweenBenchmarks => ForceGcBetweenBenchmarksOverride ?? (Profile == MeasurementProfile.Independent)
+```
+
+A **computed property** derived from `Profile` (or the `ForceGcBetweenBenchmarksOverride` field when set). When `true`, a full Gen2 GC (with finalizer wait) runs after warmup and before the measurement loop begins.
+
+Under the `Realistic` profile (the default), this resolves to `false`. The benchmark body inherits whatever heap state the warmup left behind, matching production behaviour.
 
 ### MeasureAllocations
 
 ```csharp
-MeasureAllocations = false   // default
+MeasureAllocations => MeasureAllocationsOverride ?? (Profile == MeasurementProfile.Realistic)
 ```
 
-When `true`, NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` around each iteration and reports the mean bytes allocated per operation in the **Alloc/op** column (with a process-wide fallback for async thread hops).
+A **computed property** derived from `Profile` (or the `MeasureAllocationsOverride` field when set). When `true`, NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` around each iteration and reports the mean bytes allocated per operation in the **Alloc/op** column (with a process-wide fallback for async thread hops).
+
+Under the `Realistic` profile (the default), this resolves to `true`. To disable allocation tracking under `Realistic`, set `MeasureAllocationsOverride = false` or use `--no-allocations` on the CLI.
 
 BenchmarkSuite fluent method: `.WithAllocations()`
 
@@ -205,14 +244,6 @@ BenchmarkSuite fluent method: `.WithSignificanceTest(test)`
 
 See [Custom significance tests](../statistics/significance.md#custom-significance-tests).
 
-### ForceGcBetweenBenchmarks
-
-```csharp
-ForceGcBetweenBenchmarks = true   // default
-```
-
-When `true`, a full gen-2 GC collection runs between benchmarks to clean up any heap allocations from the previous benchmark before the next one begins.
-
 ## Applying options per-method (Host mode)
 
 In Host mode, the `[Benchmark]` attribute accepts per-method overrides that take priority over the host-level options:
@@ -231,13 +262,14 @@ public void MyExpensiveBenchmark() => SlowOperation();
 | `WarmupIterations` | `int` | `25` | `0` – `10 000` |
 | `ConfidenceLevel` | `double` | `0.95` | `>0` and `<1` |
 | `SignificanceLevel` | `double` | `0.05` | `>0` and `<1` |
-| `ForceGcBeforeEachIteration` | `bool` | `true` | - |
-| `MeasureAllocations` | `bool` | `false` | - |
+| `Profile` | `enum` | `Realistic` | `Realistic` or `Independent` |
+| `ForceGcBeforeEachIteration` | `bool` (computed) | `false` | Derives from `Profile`; override via `ForceGcBeforeEachIterationOverride` |
+| `MeasureAllocations` | `bool` (computed) | `true` | Derives from `Profile`; override via `MeasureAllocationsOverride` |
+| `ForceGcBetweenBenchmarks` | `bool` (computed) | `false` | Derives from `Profile`; override via `ForceGcBetweenBenchmarksOverride` |
 | `OutlierMode` | `enum` | `IqrFence` | See above |
 | `OutlierDetector` | `IOutlierDetector?` | `null` | Overrides `OutlierMode` when set |
 | `EnableSignificance` | `bool` | `true` | - |
 | `SignificanceTest` | `ISignificanceTest?` | `null` | Defaults to `DefaultSignificanceTest` |
-| `ForceGcBetweenBenchmarks` | `bool` | `true` | - |
 
 Values outside the valid range throw `ArgumentOutOfRangeException`.
 

@@ -59,7 +59,7 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 ```markdown
 ## Benchmark Results
 
-> **2026-06-06 03:40:00 UTC** · 25 warmup · 190 measured
+> **2026-06-06 03:40:00 UTC** · 25 warmup · 190 measured · realistic profile
 
 ### Comparison
 

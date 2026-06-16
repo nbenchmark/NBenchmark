@@ -78,7 +78,7 @@ public sealed class PerformanceFactIntegrationTests
             {
                 Iterations = 10,
                 WarmupIterations = 3,
-                MeasureAllocations = true,
+                MeasureAllocationsOverride = true,
             },
         };
 
@@ -109,7 +109,7 @@ public sealed class PerformanceFactIntegrationTests
     {
         var spec = new RunSpec
         {
-            Options = MeasurementOptions.Default with { MeasureAllocations = true, OutlierMode = OutlierMode.None },
+            Options = MeasurementOptions.Default with { MeasureAllocationsOverride = true, OutlierMode = OutlierMode.None },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("DefaultTest", SimpleWork, spec);

@@ -17,6 +17,9 @@ public sealed record BenchmarkTable
     /// <summary>The display name of the pairwise significance strategy used (e.g. Mann-Whitney U).</summary>
     public string SignificanceTestName { get; init; } = DefaultSignificanceTest.Instance.Name;
 
+    /// <summary>The measurement profile under which the run was produced.</summary>
+    public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
+
     /// <summary>
     ///     The omnibus significance verdict (e.g. Kruskal-Wallis) across all benchmarks, when
     ///     an omnibus test was run (three or more groups); otherwise <c>null</c>.
@@ -51,6 +54,7 @@ public sealed record BenchmarkTable
             TotalDuration = results.Aggregate(TimeSpan.Zero, (a, r) => a + r.TotalDuration),
             SignificanceLevel = headerSource?.SignificanceLevel ?? 0.05,
             SignificanceTestName = headerSource?.SignificanceTestName ?? DefaultSignificanceTest.Instance.Name,
+            Profile = results.FirstOrDefault()?.Profile ?? MeasurementProfile.Realistic,
             Omnibus = results.FirstOrDefault(r => r.Omnibus is not null)?.Omnibus,
         };
     }

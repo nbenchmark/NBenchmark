@@ -57,16 +57,16 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 ## Output format
 
 ```csv
-Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail
-"Compute",300.0,275.3,85.9,6.1,16.2,259.1,291.5,0.95,0.3122,500.0,500.0,0.75,"true","Cliff's δ",0.6234,"large",null,5.89,2,"simple"
-"Baseline",400.0,375.8,114.3,8.1,21.6,354.2,397.4,0.95,0.3043,500.0,900.0,1.00,"","","","",null,5.75,0,"simple"
+Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile
+"Compute",300.0,275.3,85.9,6.1,16.2,259.1,291.5,0.95,0.3122,500.0,500.0,0.75,"true","Cliff's δ",0.6234,"large",96,5.89,2,simple,realistic
+"Baseline",400.0,375.8,114.3,8.1,21.6,354.2,397.4,0.95,0.3043,500.0,900.0,1.00,"","","","",120,5.75,0,simple,realistic
 ```
 
 All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magnitude` reflect the active significance strategy's effect output. With built-in Mann-Whitney tests, `EffectMetric` is `Cliff's δ`, `EffectValue` is signed (positive = candidate slower), and `Magnitude` is one of `neg`, `small`, `med`, `large` per the [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size) thresholds.
 
 ## Column reference
 
-### Simple mode (21 columns)
+### Simple mode (22 columns)
 
 | Column | Type | Description |
 |---|---|---|
@@ -91,8 +91,9 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `MarginPercent` | float | `MarginOfError / Mean * 100`. |
 | `OutliersRemoved` | integer | Number of samples removed by outlier trimming. |
 | `Detail` | string | Active detail level (`simple` or `advanced`). |
+| `Profile` | string | Active measurement profile (`realistic` or `independent`). |
 
-### Advanced mode (37 columns - all simple columns plus the following)
+### Advanced mode (38 columns - all simple columns plus the following)
 
 | Column | Type | Description |
 |---|---|---|
@@ -118,7 +119,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 - Results are sorted by median (fastest first).
 - The output directory is created automatically if it does not exist.
 - Names containing double-quotes are escaped by doubling the quote character (standard CSV escaping).
-- Simple mode CSV has 21 columns. Advanced mode CSV has 37 columns and is selected via the `--detail advanced` flag or `WithDetail(ReportDetail.Advanced)`.
+- Simple mode CSV has 22 columns. Advanced mode CSV has 38 columns and is selected via the `--detail advanced` flag or `WithDetail(ReportDetail.Advanced)`.
 
 ## Using with Benchmark (Quick mode)
 

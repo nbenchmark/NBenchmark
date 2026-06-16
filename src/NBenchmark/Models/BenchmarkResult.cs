@@ -90,6 +90,9 @@ public record BenchmarkResult
     /// </summary>
     public string OutlierDetector { get; init; } = OutlierDetectors.IqrFence.Name;
 
+    /// <summary>The measurement profile under which this result was produced.</summary>
+    public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
+
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     public double ConfidenceIntervalLower => Mean - MarginOfError;

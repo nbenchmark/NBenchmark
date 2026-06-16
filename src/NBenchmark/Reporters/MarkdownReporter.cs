@@ -47,7 +47,7 @@ public sealed class MarkdownReporter : IReporter
         }
 
         sb.AppendLine(
-            $"> **{table.RunAtUtc} UTC** · {table.WarmupIterations} warmup · {table.MeasuredIterations} measured");
+            $"> **{table.RunAtUtc} UTC** · {table.WarmupIterations} warmup · {table.MeasuredIterations} measured · {table.Profile.ToString().ToLowerInvariant()} profile");
 
         sb.AppendLine();
 

@@ -141,6 +141,7 @@ internal static class OutcomeBuilder
                 OutlierDetector = options.ResolveOutlierDetector().Name,
                 SignificanceTestName = options.ResolveSignificanceTest().Name,
                 SignificanceLevel = options.SignificanceLevel,
+                Profile = options.Profile,
                 Warnings = warnings,
             },
         };

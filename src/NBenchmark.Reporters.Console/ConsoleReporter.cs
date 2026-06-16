@@ -63,6 +63,12 @@ public sealed class ConsoleReporter : IReporter
 
     private static void RenderHeader(BenchmarkTable benchTable)
     {
+        var profileLabel = benchTable.Profile switch
+        {
+            MeasurementProfile.Independent => "independent (per-iteration GC, between-benchmark GC, no alloc tracking)",
+            _ => "realistic (no per-iteration GC, no between-benchmark GC, alloc tracking on)",
+        };
+
         var headerGrid = new Grid()
             .AddColumn(new GridColumn().NoWrap())
             .AddColumn(new GridColumn().NoWrap())
@@ -72,6 +78,12 @@ public sealed class ConsoleReporter : IReporter
             "[bold steelblue1]BENCHMARK RESULTS[/]",
             $"[grey]{benchTable.RunAtUtc} UTC[/]",
             $"[grey]{benchTable.WarmupIterations} warmup / {benchTable.MeasuredIterations} measured[/]"
+        );
+
+        headerGrid.AddRow(
+            "",
+            $"[grey]Profile: {profileLabel}[/]",
+            ""
         );
 
         var panel = new Panel(headerGrid)

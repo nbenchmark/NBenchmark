@@ -34,6 +34,7 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
         {
             GeneratedAt = DateTimeOffset.UtcNow,
             Detail = Detail,
+            Profile = results.FirstOrDefault()?.Profile ?? MeasurementProfile.Realistic,
             Results = results,
         };
 
@@ -45,6 +46,7 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
     {
         public DateTimeOffset GeneratedAt { get; init; }
         public ReportDetail Detail { get; init; }
+        public MeasurementProfile Profile { get; init; }
         public IReadOnlyList<BenchmarkResult> Results { get; init; } = [];
     }
 }

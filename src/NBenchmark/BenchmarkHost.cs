@@ -110,6 +110,18 @@ public sealed class BenchmarkHost
     }
 
     /// <summary>
+    ///     Sets the measurement profile, which bundles per-iteration GC, between-benchmark GC, and
+    ///     allocation tracking. <see cref="MeasurementProfile.Realistic" /> (the default) keeps natural
+    ///     GC pressure in the timing; <see cref="MeasurementProfile.Independent" /> isolates iterations
+    ///     for pure-CPU measurement.
+    /// </summary>
+    public BenchmarkHost WithMeasurementProfile(MeasurementProfile profile)
+    {
+        _options = _options with { Profile = profile };
+        return this;
+    }
+
+    /// <summary>
     ///     Controls Host mode's isolated-by-default execution. When enabled (the default),
     ///     each discovered class runs in its own clean-room child process unless a benchmark
     ///     or its class opts out with <c>[InProcess]</c>. When disabled, every benchmark
