@@ -253,7 +253,8 @@ public sealed class BenchmarkSuite(string name)
             return await RunInProcessCoreAsync(
                 NullBenchmarkProgress.Instance,
                 RunOrder.Declaration,
-                emitResults: false,
+                applySignificance: false,
+                applyReporters: false,
                 writeChildPayload: isTarget,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -271,7 +272,8 @@ public sealed class BenchmarkSuite(string name)
         return await RunInProcessCoreAsync(
             _progress,
             _runOrder,
-            emitResults: true,
+            applySignificance: true,
+            applyReporters: true,
             writeChildPayload: false,
             cancellationToken).ConfigureAwait(false);
     }
@@ -279,7 +281,8 @@ public sealed class BenchmarkSuite(string name)
     private async Task<IReadOnlyList<BenchmarkResult>> RunInProcessCoreAsync(
         IBenchmarkProgress progress,
         RunOrder order,
-        bool emitResults,
+        bool applySignificance,
+        bool applyReporters,
         bool writeChildPayload,
         CancellationToken cancellationToken)
     {
@@ -316,10 +319,15 @@ public sealed class BenchmarkSuite(string name)
                 .ConfigureAwait(false);
         }
 
-        if (emitResults)
+        if (applySignificance)
+            Significance.ApplyIfEnabled(results, rawSamples, _options);
+
+        if (applyReporters)
         {
-            await ResultsTail.ApplyAsync(
-                results, rawSamples, _options, _reporters, cancellationToken).ConfigureAwait(false);
+            foreach (var reporter in _reporters)
+            {
+                await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         return results;
@@ -390,8 +398,12 @@ public sealed class BenchmarkSuite(string name)
 
         await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
 
-        await ResultsTail.ApplyAsync(
-            results, rawSamples, _options, _reporters, cancellationToken).ConfigureAwait(false);
+        Significance.ApplyIfEnabled(results, rawSamples, _options);
+
+        foreach (var reporter in _reporters)
+        {
+            await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
+        }
 
         return results;
     }
