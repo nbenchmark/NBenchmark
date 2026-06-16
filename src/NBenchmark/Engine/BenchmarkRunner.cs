@@ -29,20 +29,20 @@ public sealed class BenchmarkRunner
     public static BenchmarkRunner Instance { get; } = new();
 
     public MeasurementOutcome Run(string name, Action body, RunSpec spec, CancellationToken ct = default)
-        => RunSyncVoid(name, body, spec, ct);
+        => RunSyncCore(name, spec, ct, body);
 
     public MeasurementOutcome Run<T>(string name, Func<T> body, RunSpec spec, CancellationToken ct = default)
-        => RunSyncReturning(name, body, spec, ct);
+        => RunSyncCore(name, spec, ct, () => Consume(body()));
 
     public Task<MeasurementOutcome> RunAsync(string name, Func<Task> body, RunSpec spec, CancellationToken ct = default)
-        => RunAsyncVoid(name, body, spec, ct);
+        => RunAsyncCore(name, spec, ct, body);
 
     public Task<MeasurementOutcome> RunAsync<T>(string name, Func<Task<T>> body, RunSpec spec, CancellationToken ct = default)
-        => RunAsyncReturning(name, body, spec, ct);
+        => RunAsyncCore(name, spec, ct, async () => { Consume(await body().ConfigureAwait(false)); });
 
-    // ---------- Sync cores ----------
+    // ---------- Unified run cores ----------
 
-    private MeasurementOutcome RunSyncVoid(string name, Action body, RunSpec spec, CancellationToken ct)
+    private MeasurementOutcome RunSyncCore(string name, RunSpec spec, CancellationToken ct, Action body)
     {
         var totalStartTimestamp = _clock.GetTimestamp();
         var options = spec.Options;
@@ -51,14 +51,7 @@ public sealed class BenchmarkRunner
         try
         {
             progress.OnWarmupStarting(name, options.WarmupIterations).GetAwaiter().GetResult();
-
-            for (var i = 0; i < options.WarmupIterations; i++)
-            {
-                ct.ThrowIfCancellationRequested();
-                spec.IterationSetup?.Invoke();
-                body();
-                spec.IterationTeardown?.Invoke();
-            }
+            RunWarmupSync(body, spec, options, ct);
 
             if (options.Iterations == 0)
             {
@@ -72,58 +65,8 @@ public sealed class BenchmarkRunner
             if (options.ForceGcBetweenBenchmarks)
                 ForceFullGc();
 
-            var (timings, allocations, measuredDuration) = MeasureSyncVoid(name, body, spec, ct);
-            var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
-
-            return outcome;
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            // Our token: the caller asked to stop - propagate. A user-code
-            // OperationCanceledException (e.g. an HttpClient timeout inside the
-            // body) falls through to the generic handler and errors the result.
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
-        }
-    }
-
-    private MeasurementOutcome RunSyncReturning<T>(string name, Func<T> body, RunSpec spec, CancellationToken ct)
-    {
-        var totalStartTimestamp = _clock.GetTimestamp();
-        var options = spec.Options;
-        var progress = spec.Progress;
-
-        try
-        {
-            progress.OnWarmupStarting(name, options.WarmupIterations).GetAwaiter().GetResult();
-
-            for (var i = 0; i < options.WarmupIterations; i++)
-            {
-                ct.ThrowIfCancellationRequested();
-                spec.IterationSetup?.Invoke();
-                Consume(body());
-                spec.IterationTeardown?.Invoke();
-            }
-
-            if (options.Iterations == 0)
-            {
-                var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
-                progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
-                return dryRun;
-            }
-
-            progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
-
-            if (options.ForceGcBetweenBenchmarks)
-                ForceFullGc();
-
-            var (timings, allocations, measuredDuration) = MeasureSyncReturning<T>(name, body, spec, ct);
-            var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
-
-            return outcome;
+            var (timings, allocations, measuredDuration) = MeasureSync(name, body, spec, ct);
+            return BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -135,9 +78,7 @@ public sealed class BenchmarkRunner
         }
     }
 
-    // ---------- Async cores ----------
-
-    private async Task<MeasurementOutcome> RunAsyncVoid(string name, Func<Task> body, RunSpec spec, CancellationToken ct)
+    private async Task<MeasurementOutcome> RunAsyncCore(string name, RunSpec spec, CancellationToken ct, Func<Task> body)
     {
         var totalStartTimestamp = _clock.GetTimestamp();
         var options = spec.Options;
@@ -146,14 +87,7 @@ public sealed class BenchmarkRunner
         try
         {
             await progress.OnWarmupStarting(name, options.WarmupIterations).ConfigureAwait(false);
-
-            for (var i = 0; i < options.WarmupIterations; i++)
-            {
-                ct.ThrowIfCancellationRequested();
-                spec.IterationSetup?.Invoke();
-                await body().ConfigureAwait(false);
-                spec.IterationTeardown?.Invoke();
-            }
+            await RunWarmupAsync(body, spec, options, ct).ConfigureAwait(false);
 
             if (options.Iterations == 0)
             {
@@ -167,10 +101,8 @@ public sealed class BenchmarkRunner
             if (options.ForceGcBetweenBenchmarks)
                 ForceFullGc();
 
-            var (timings, allocations, measuredDuration) = await MeasureAsyncVoid(name, body, spec, ct).ConfigureAwait(false);
-            var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
-
-            return outcome;
+            var (timings, allocations, measuredDuration) = await MeasureAsync(name, body, spec, ct).ConfigureAwait(false);
+            return BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -182,54 +114,34 @@ public sealed class BenchmarkRunner
         }
     }
 
-    private async Task<MeasurementOutcome> RunAsyncReturning<T>(string name, Func<Task<T>> body, RunSpec spec, CancellationToken ct)
+    // ---------- Warmup loops ----------
+
+    private static void RunWarmupSync(Action body, RunSpec spec, MeasurementOptions options, CancellationToken ct)
     {
-        var totalStartTimestamp = _clock.GetTimestamp();
-        var options = spec.Options;
-        var progress = spec.Progress;
-
-        try
+        for (var i = 0; i < options.WarmupIterations; i++)
         {
-            await progress.OnWarmupStarting(name, options.WarmupIterations).ConfigureAwait(false);
-
-            for (var i = 0; i < options.WarmupIterations; i++)
-            {
-                ct.ThrowIfCancellationRequested();
-                spec.IterationSetup?.Invoke();
-                Consume(await body().ConfigureAwait(false));
-                spec.IterationTeardown?.Invoke();
-            }
-
-            if (options.Iterations == 0)
-            {
-                var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
-                await progress.OnWarmupCompleted(name).ConfigureAwait(false);
-                return dryRun;
-            }
-
-            await progress.OnWarmupCompleted(name).ConfigureAwait(false);
-
-            if (options.ForceGcBetweenBenchmarks)
-                ForceFullGc();
-
-            var (timings, allocations, measuredDuration) = await MeasureAsyncReturning<T>(name, body, spec, ct).ConfigureAwait(false);
-            var outcome = BuildSuccessOutcome(name, spec, totalStartTimestamp, timings, allocations, measuredDuration);
-
-            return outcome;
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
+            ct.ThrowIfCancellationRequested();
+            spec.IterationSetup?.Invoke();
+            body();
+            spec.IterationTeardown?.Invoke();
         }
     }
 
-    // ---------- Measurement loops ----------
+    private static async Task RunWarmupAsync(Func<Task> body, RunSpec spec, MeasurementOptions options, CancellationToken ct)
+    {
+        for (var i = 0; i < options.WarmupIterations; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            spec.IterationSetup?.Invoke();
+            await body().ConfigureAwait(false);
+            spec.IterationTeardown?.Invoke();
+        }
+    }
 
-    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncVoid(string name, Action body, RunSpec spec, CancellationToken ct)
+    // ---------- Unified measurement loops ----------
+
+    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSync(
+        string name, Action body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
@@ -270,50 +182,8 @@ public sealed class BenchmarkRunner
         return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
     }
 
-    private (double[] timings, long[]? allocations, TimeSpan measuredDuration) MeasureSyncReturning<T>(string name, Func<T> body, RunSpec spec,
-        CancellationToken ct)
-    {
-        var options = spec.Options;
-        var iterations = options.Iterations;
-        var timings = new double[iterations];
-        var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var progress = spec.Progress;
-        var progressInterval = ComputeProgressInterval(iterations);
-        var loopStartTimestamp = _clock.GetTimestamp();
-
-        for (var i = 0; i < iterations; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (options.ForceGcBeforeEachIteration)
-                ForceGen0Collection();
-
-            spec.IterationSetup?.Invoke();
-
-            AllocationSnapshot allocBefore = default;
-
-            if (options.MeasureAllocations)
-                allocBefore = CaptureAllocationSnapshot();
-
-            var timestamp = _clock.GetTimestamp();
-            Consume(body());
-            var elapsedNs = _clock.GetElapsedNanoseconds(timestamp);
-
-            if (options.MeasureAllocations && allocations is not null)
-                allocations[i] = ComputeAllocationDelta(allocBefore);
-
-            spec.IterationTeardown?.Invoke();
-            timings[i] = elapsedNs;
-
-            if ((i + 1) % progressInterval == 0)
-                progress.OnIterationCompleted(name, i + 1, iterations).GetAwaiter().GetResult();
-        }
-
-        return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
-    }
-
-    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncVoid(string name, Func<Task> body, RunSpec spec,
-        CancellationToken ct)
+    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsync(
+        string name, Func<Task> body, RunSpec spec, CancellationToken ct)
     {
         var options = spec.Options;
         var iterations = options.Iterations;
@@ -339,49 +209,6 @@ public sealed class BenchmarkRunner
 
             var timestamp = _clock.GetTimestamp();
             await body().ConfigureAwait(false);
-            var elapsedNs = _clock.GetElapsedNanoseconds(timestamp);
-
-            if (options.MeasureAllocations && allocations is not null)
-                allocations[i] = ComputeAllocationDelta(allocBefore);
-
-            spec.IterationTeardown?.Invoke();
-            timings[i] = elapsedNs;
-
-            if ((i + 1) % progressInterval == 0)
-                await progress.OnIterationCompleted(name, i + 1, iterations).ConfigureAwait(false);
-        }
-
-        return (timings, allocations, _clock.GetElapsedTime(loopStartTimestamp));
-    }
-
-    private async Task<(double[] timings, long[]? allocations, TimeSpan measuredDuration)> MeasureAsyncReturning<T>(string name, Func<Task<T>> body,
-        RunSpec spec,
-        CancellationToken ct)
-    {
-        var options = spec.Options;
-        var iterations = options.Iterations;
-        var timings = new double[iterations];
-        var allocations = options.MeasureAllocations ? new long[iterations] : null;
-        var progress = spec.Progress;
-        var progressInterval = ComputeProgressInterval(iterations);
-        var loopStartTimestamp = _clock.GetTimestamp();
-
-        for (var i = 0; i < iterations; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (options.ForceGcBeforeEachIteration)
-                ForceGen0Collection();
-
-            spec.IterationSetup?.Invoke();
-
-            AllocationSnapshot allocBefore = default;
-
-            if (options.MeasureAllocations)
-                allocBefore = CaptureAllocationSnapshot();
-
-            var timestamp = _clock.GetTimestamp();
-            Consume(await body().ConfigureAwait(false));
             var elapsedNs = _clock.GetElapsedNanoseconds(timestamp);
 
             if (options.MeasureAllocations && allocations is not null)
