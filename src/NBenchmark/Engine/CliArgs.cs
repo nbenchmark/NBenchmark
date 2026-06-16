@@ -18,7 +18,7 @@ internal sealed record CliArgs
     public double? ConfidenceLevel { get; init; }
     public double? Alpha { get; init; }
     public OutlierMode? OutlierMode { get; init; }
-    public IReadOnlyList<IReporter> CliReporters { get; init; } = [];
+    public IReadOnlyList<string> ReporterNames { get; init; } = [];
     public ReportDetail Detail { get; init; } = ReportDetail.Simple;
 
     /// <summary>
@@ -33,7 +33,12 @@ internal sealed record CliArgs
 
     public bool? NoAllocations { get; init; }
 
-    public static CliArgs Parse(string[] args)
+    /// <summary>
+    ///     Pure parse: tokenises <paramref name="args" />, validates ranges, and returns
+    ///     both the structured result and any error messages. No console I/O, no
+    ///     <c>Environment.ExitCode</c> mutation.
+    /// </summary>
+    public static (CliArgs Args, IReadOnlyList<string> Errors) ParseCore(string[] args)
     {
         var showHelp = false;
         var listOnly = false;
@@ -56,6 +61,8 @@ internal sealed record CliArgs
         bool? forceGc = null;
         bool? noAllocations = null;
 
+        var errors = new List<string>();
+
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -72,12 +79,7 @@ internal sealed record CliArgs
                         && iters <= MeasurementOptions.MaxIterations)
                         iterations = iters;
                     else
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid --iterations value '{args[i]}'. Must be {MeasurementOptions.MinIterations}–{MeasurementOptions.MaxIterations}.");
-
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --iterations value '{args[i]}'. Must be {MeasurementOptions.MinIterations}–{MeasurementOptions.MaxIterations}.");
 
                     break;
                 case "--warmup" when i + 1 < args.Length:
@@ -86,12 +88,7 @@ internal sealed record CliArgs
                         && warmup <= MeasurementOptions.MaxWarmupIterations)
                         warmupIterations = warmup;
                     else
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid --warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupIterations}.");
-
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupIterations}.");
 
                     break;
                 case "--output" when i + 1 < args.Length:
@@ -105,12 +102,7 @@ internal sealed record CliArgs
                         && conf is > 0 and < 1)
                         confidenceLevel = conf;
                     else
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid --confidence value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.95).");
-
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --confidence value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.95).");
 
                     break;
                 case "--alpha" when i + 1 < args.Length:
@@ -118,12 +110,7 @@ internal sealed record CliArgs
                         && a is > 0 and < 1)
                         alpha = a;
                     else
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid --alpha value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.05).");
-
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --alpha value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.05).");
 
                     break;
                 case "--outlier" when i + 1 < args.Length:
@@ -132,12 +119,7 @@ internal sealed record CliArgs
                     if (TryParseOutlierMode(outlierStr, out var parsedOutlier))
                         outlierMode = parsedOutlier;
                     else
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid --outlier value '{outlierStr}'. Must be one of: none, top5, both5, iqr, mad.");
-
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --outlier value '{outlierStr}'. Must be one of: none, top5, both5, iqr, mad.");
 
                     break;
                 case "--order" when i + 1 < args.Length:
@@ -148,12 +130,7 @@ internal sealed record CliArgs
                     else if (string.Equals(order, "random", StringComparison.OrdinalIgnoreCase))
                         runOrder = NBenchmark.RunOrder.Random;
                     else
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid --order value '{order}'. Must be 'random' or 'declaration'.");
-
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --order value '{order}'. Must be 'random' or 'declaration'.");
 
                     break;
                 case "--threshold-pct" when i + 1 < args.Length:
@@ -161,22 +138,14 @@ internal sealed record CliArgs
                         && tPct > 0)
                         thresholdPct = tPct;
                     else
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid --threshold-pct value '{args[i]}'. Must be a positive integer (1 or greater).");
-
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --threshold-pct value '{args[i]}'. Must be a positive integer (1 or greater).");
 
                     break;
                 case "--seed" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var seedVal))
                         seed = seedVal;
                     else
-                    {
-                        Console.Error.WriteLine($"Invalid --seed value '{args[i]}'. Must be an integer.");
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --seed value '{args[i]}'. Must be an integer.");
 
                     break;
                 case "--detail" when i + 1 < args.Length:
@@ -187,12 +156,7 @@ internal sealed record CliArgs
                     else if (string.Equals(detailStr, "advanced", StringComparison.OrdinalIgnoreCase))
                         detail = ReportDetail.Advanced;
                     else
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid --detail value '{detailStr}'. Must be 'simple' or 'advanced'.");
-
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --detail value '{detailStr}'. Must be 'simple' or 'advanced'.");
 
                     break;
                 case "--list":
@@ -212,12 +176,7 @@ internal sealed record CliArgs
                     else if (string.Equals(profileStr, "independent", StringComparison.OrdinalIgnoreCase))
                         profile = MeasurementProfile.Independent;
                     else
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid --profile value '{profileStr}'. Must be 'realistic' or 'independent'.");
-
-                        Environment.ExitCode = 1;
-                    }
+                        errors.Add($"Invalid --profile value '{profileStr}'. Must be 'realistic' or 'independent'.");
 
                     break;
                 case "--force-gc":
@@ -229,32 +188,15 @@ internal sealed record CliArgs
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--confidence" or "--order" or "--threshold-pct" or "--seed" or "--alpha"
                     or "--outlier" or "--detail" or "--profile":
-                    Console.Error.WriteLine($"Missing value for '{args[i]}'.");
-                    Environment.ExitCode = 1;
+                    errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
-                    Console.Error.WriteLine($"Unknown flag: '{args[i]}'. Use --help to see available options.");
-                    Environment.ExitCode = 1;
+                    errors.Add($"Unknown flag: '{args[i]}'. Use --help to see available options.");
                     break;
             }
         }
 
-        var cliReporters = new List<IReporter>();
-
-        foreach (var name in reporterNames)
-        {
-            if (ReporterRegistry.TryCreate(name, null, detail, out var reporter))
-                cliReporters.Add(reporter);
-            else
-            {
-                Console.Error.WriteLine(
-                    $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
-
-                Environment.ExitCode = 1;
-            }
-        }
-
-        return new CliArgs
+        return (new CliArgs
         {
             ShowHelp = showHelp,
             ListOnly = listOnly,
@@ -269,13 +211,39 @@ internal sealed record CliArgs
             ConfidenceLevel = confidenceLevel,
             Alpha = alpha,
             OutlierMode = outlierMode,
-            CliReporters = cliReporters,
+            ReporterNames = reporterNames,
             Detail = detail,
             InProcess = inProcess,
             Profile = profile,
             ForceGc = forceGc,
             NoAllocations = noAllocations,
-        };
+        }, errors);
+    }
+
+    /// <summary>
+    ///     Parses <paramref name="args" /> and emits validation errors to stderr.
+    ///     Sets <c>Environment.ExitCode = 1</c> when any errors are found.
+    /// </summary>
+    public static CliArgs Parse(string[] args)
+    {
+        var (cliArgs, errors) = ParseCore(args);
+        var allErrors = new List<string>(errors);
+
+        foreach (var name in cliArgs.ReporterNames)
+        {
+            if (!ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out _))
+                allErrors.Add($"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
+        }
+
+        foreach (var error in allErrors)
+        {
+            Console.Error.WriteLine(error);
+        }
+
+        if (allErrors.Count > 0)
+            Environment.ExitCode = 1;
+
+        return cliArgs;
     }
 
     private static bool TryParseOutlierMode(string value, out OutlierMode mode)

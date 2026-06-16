@@ -32,7 +32,13 @@ public sealed class BenchmarkHost
         var host = new BenchmarkHost();
         host._cliArgs = cliArgs;
         host._detail = cliArgs.Detail;
-        host._reporters.InsertRange(0, cliArgs.CliReporters);
+
+        foreach (var name in cliArgs.ReporterNames)
+        {
+            if (ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out var reporter))
+                host._reporters.Add(reporter);
+        }
+
         return host;
     }
 
