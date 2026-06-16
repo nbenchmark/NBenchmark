@@ -272,7 +272,11 @@ public sealed class BenchmarkHost
 
         await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
 
-        Significance.ApplyIfEnabled(allResults, rawSamples, suiteOptions);
+        if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
+            ApplyOutputDirectory(_cliArgs.OutputDir);
+
+        await ResultsTail.ApplyAsync(
+            allResults, rawSamples, suiteOptions, _reporters, cancellationToken).ConfigureAwait(false);
 
         if (_cliArgs.ThresholdPct.HasValue
             && ThresholdCheck.HasRegression(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
@@ -282,14 +286,6 @@ public sealed class BenchmarkHost
                 + $"Regressed benchmarks: {string.Join(", ", regressed)}");
 
             Environment.ExitCode = 1;
-        }
-
-        if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
-            ApplyOutputDirectory(_cliArgs.OutputDir);
-
-        foreach (var reporter in _reporters)
-        {
-            await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
         }
 
         return allResults;
