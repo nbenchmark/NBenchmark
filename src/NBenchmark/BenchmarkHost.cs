@@ -12,7 +12,8 @@ public sealed class BenchmarkHost
     private readonly List<IReporter> _reporters = [];
     private CliArgs _cliArgs = new();
     private ReportDetail _detail;
-    private Func<Type, object>? _instanceFactory;
+    private Func<Type, InstanceHandle>? _instanceFactory;
+    private InstanceLifetime _defaultInstanceLifetime = InstanceLifetime.PerMethod;
     private bool _isolationEnabled = true;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
@@ -87,6 +88,12 @@ public sealed class BenchmarkHost
 
     public BenchmarkHost WithInstanceFactory(Func<Type, object> factory)
     {
+        _instanceFactory = type => InstanceHandle.NoTeardown(factory(type));
+        return this;
+    }
+
+    internal BenchmarkHost WithInstanceFactory(Func<Type, InstanceHandle> factory)
+    {
         _instanceFactory = factory;
         return this;
     }
@@ -111,6 +118,12 @@ public sealed class BenchmarkHost
     public BenchmarkHost WithIsolation(bool enabled = true)
     {
         _isolationEnabled = enabled;
+        return this;
+    }
+
+    public BenchmarkHost WithInstanceLifetime(InstanceLifetime lifetime)
+    {
+        _defaultInstanceLifetime = lifetime;
         return this;
     }
 
@@ -144,7 +157,7 @@ public sealed class BenchmarkHost
 
         Console.WriteLine();
 
-        var discoverer = new BenchmarkDiscoverer();
+        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
         var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
 
         if (allSuites.Count == 0)
@@ -279,16 +292,34 @@ public sealed class BenchmarkHost
         Dictionary<string, double[]> rawSamples,
         CancellationToken cancellationToken)
     {
-        var instance = PerClassLifecycle.TryCreateInstance(suite.Type, _instanceFactory);
+        if (suite.Lifetime == InstanceLifetime.PerClass)
+            await RunPerClassInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
+                allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+        else
+            await RunPerMethodInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
+                allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+    }
 
-        if (instance is null)
+    private async Task RunPerClassInProcessAsync(
+        BenchmarkSuiteDefinition suite,
+        MeasurementOptions suiteOptions,
+        int startIndex,
+        int totalBenchmarks,
+        List<BenchmarkResult> allResults,
+        Dictionary<string, double[]> rawSamples,
+        CancellationToken cancellationToken)
+    {
+        var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
+
+        if (created is null)
             return;
 
+        var (instance, instanceTeardown) = created.Value;
         var instanceFromFactory = _instanceFactory is not null;
 
         try
         {
-            var (setupSuccess, setupErrors) = PerClassLifecycle.TryRunSetup(suite, instance, suiteOptions);
+            var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(suite, instance, suiteOptions);
 
             if (!setupSuccess)
             {
@@ -296,8 +327,9 @@ public sealed class BenchmarkHost
                 return;
             }
 
+            var factory = () => instance;
             var envelopes = suite.Benchmarks
-                .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, instance))
+                .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
                 .ToList();
 
             var (results, samples) = await SuiteRunner.RunAsync(
@@ -313,8 +345,93 @@ public sealed class BenchmarkHost
         }
         finally
         {
-            await PerClassLifecycle.RunTeardown(suite, instance, instanceFromFactory, PostSuiteCleanup);
+            await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, PostSuiteCleanup);
         }
+    }
+
+    private async Task RunPerMethodInProcessAsync(
+        BenchmarkSuiteDefinition suite,
+        MeasurementOptions suiteOptions,
+        int startIndex,
+        int totalBenchmarks,
+        List<BenchmarkResult> allResults,
+        Dictionary<string, double[]> rawSamples,
+        CancellationToken cancellationToken)
+    {
+        var orderedBenchmarks = OrderBenchmarksForRun(suite.Benchmarks, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed);
+
+        foreach (var benchmark in orderedBenchmarks)
+        {
+            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
+
+            if (created is null)
+            {
+                var errored = OutcomeBuilder.Build(
+                    new RunOutcome.Errored(new InvalidOperationException("Could not instantiate benchmark class"), "Instance creation failed"),
+                    $"{suite.Type.Name}.{benchmark.DisplayName}", benchmark.Attribute.Description, benchmark.Attribute.Baseline,
+                    suiteOptions, TimeSpan.Zero, TimeSpan.Zero).Result;
+
+                allResults.Add(errored);
+                startIndex++;
+                continue;
+            }
+
+            var (instance, instanceTeardown) = created.Value;
+            var instanceFromFactory = _instanceFactory is not null;
+
+            try
+            {
+                var singleBenchmarkSuite = suite with { Benchmarks = [benchmark] };
+                var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(singleBenchmarkSuite, instance, suiteOptions);
+
+                if (!setupSuccess)
+                {
+                    allResults.AddRange(setupErrors!);
+                    startIndex++;
+                    continue;
+                }
+
+                var factory = () => instance;
+                var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
+
+                var (results, samples) = await SuiteRunner.RunAsync(
+                    [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                    startIndex, totalBenchmarks, _progress, cancellationToken).ConfigureAwait(false);
+
+                allResults.AddRange(results);
+
+                foreach (var kvp in samples)
+                {
+                    rawSamples[kvp.Key] = kvp.Value;
+                }
+            }
+            finally
+            {
+                await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, null);
+            }
+
+            startIndex++;
+        }
+    }
+
+    private static IReadOnlyList<BenchmarkMethodDefinition> OrderBenchmarksForRun(
+        IReadOnlyList<BenchmarkMethodDefinition> benchmarks,
+        RunOrder order,
+        int? seed)
+    {
+        if (order != RunOrder.Random)
+            return benchmarks;
+
+        var shuffled = benchmarks.ToList();
+        var rng = new Random(seed ?? Random.Shared.Next());
+
+        for (var i = shuffled.Count - 1; i > 0; i--)
+        {
+            var j = rng.Next(i + 1);
+            (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
+        }
+
+        return shuffled;
     }
 
     /// <summary>
@@ -410,7 +527,7 @@ public sealed class BenchmarkHost
         var options = request.Overrides.Apply(_options);
         var requested = new HashSet<string>(request.BenchmarkDisplayNames, StringComparer.Ordinal);
 
-        var discoverer = new BenchmarkDiscoverer();
+        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
 
         foreach (var suite in _assemblies.SelectMany(discoverer.Discover))
         {
@@ -422,46 +539,12 @@ public sealed class BenchmarkHost
             if (selected.Count == 0)
                 continue;
 
-            var instance = PerClassLifecycle.TryCreateInstance(suite.Type, _instanceFactory);
-
-            if (instance is null)
-            {
-                // In the child: a non-zero exit code is what the parent's launcher reads as failure.
-                Environment.ExitCode = 1;
-                return Array.Empty<BenchmarkResult>();
-            }
-
-            var instanceFromFactory = _instanceFactory is not null;
-            List<BenchmarkResult> results;
-            var samples = new Dictionary<string, double[]>();
-
-            try
-            {
-                var selectedSuite = suite with { Benchmarks = selected };
-                var (setupSuccess, setupErrors) = PerClassLifecycle.TryRunSetup(selectedSuite, instance, options);
-
-                if (!setupSuccess)
-                    results = setupErrors!.ToList();
-                else
-                {
-                    var envelopes = selected
-                        .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, instance))
-                        .ToList();
-
-                    (results, samples) = await SuiteRunner.RunAsync(
-                        envelopes, RunOrder.Declaration, null, options,
-                        0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken).ConfigureAwait(false);
-                }
-            }
-            finally
-            {
-                await PerClassLifecycle.RunTeardown(suite, instance, instanceFromFactory, PostSuiteCleanup);
-            }
-
-            await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, samples, cancellationToken)
-                .ConfigureAwait(false);
-
-            return results;
+            if (suite.Lifetime == InstanceLifetime.PerClass)
+                return await RunPerClassHostChildAsync(suite, selected, options, cancellationToken)
+                    .ConfigureAwait(false);
+            else
+                return await RunPerMethodHostChildAsync(suite, selected, options, cancellationToken)
+                    .ConfigureAwait(false);
         }
 
         Console.Error.WriteLine($"Isolated class '{request.DeclaringTypeFullName}' was not found.");
@@ -469,6 +552,114 @@ public sealed class BenchmarkHost
         // In the child: a non-zero exit code is what the parent's launcher reads as failure.
         Environment.ExitCode = 1;
         return Array.Empty<BenchmarkResult>();
+    }
+
+    private async Task<IReadOnlyList<BenchmarkResult>> RunPerClassHostChildAsync(
+        BenchmarkSuiteDefinition suite,
+        IReadOnlyList<BenchmarkMethodDefinition> selected,
+        MeasurementOptions options,
+        CancellationToken cancellationToken)
+    {
+        var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
+
+        if (created is null)
+        {
+            Environment.ExitCode = 1;
+            return Array.Empty<BenchmarkResult>();
+        }
+
+        var (instance, instanceTeardown) = created.Value;
+        var instanceFromFactory = _instanceFactory is not null;
+        List<BenchmarkResult> results;
+        var samples = new Dictionary<string, double[]>();
+
+        try
+        {
+            var selectedSuite = suite with { Benchmarks = selected };
+            var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(selectedSuite, instance, options);
+
+            if (!setupSuccess)
+                results = setupErrors!.ToList();
+            else
+            {
+                var factory = () => instance;
+                var envelopes = selected
+                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
+                    .ToList();
+
+                (results, samples) = await SuiteRunner.RunAsync(
+                    envelopes, RunOrder.Declaration, null, options,
+                    0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, PostSuiteCleanup);
+        }
+
+        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, samples, cancellationToken)
+            .ConfigureAwait(false);
+
+        return results;
+    }
+
+    private async Task<IReadOnlyList<BenchmarkResult>> RunPerMethodHostChildAsync(
+        BenchmarkSuiteDefinition suite,
+        IReadOnlyList<BenchmarkMethodDefinition> selected,
+        MeasurementOptions options,
+        CancellationToken cancellationToken)
+    {
+        var results = new List<BenchmarkResult>();
+        var samples = new Dictionary<string, double[]>();
+
+        foreach (var benchmark in selected)
+        {
+            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
+
+            if (created is null)
+            {
+                Environment.ExitCode = 1;
+                return Array.Empty<BenchmarkResult>();
+            }
+
+            var (instance, instanceTeardown) = created.Value;
+            var instanceFromFactory = _instanceFactory is not null;
+
+            try
+            {
+                var singleBenchmarkSuite = suite with { Benchmarks = [benchmark] };
+                var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(singleBenchmarkSuite, instance, options);
+
+                if (!setupSuccess)
+                {
+                    results.AddRange(setupErrors!);
+                    continue;
+                }
+
+                var factory = () => instance;
+                var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
+
+                var (batchResults, batchSamples) = await SuiteRunner.RunAsync(
+                    [envelope], RunOrder.Declaration, null, options,
+                    0, 1, NullBenchmarkProgress.Instance, cancellationToken).ConfigureAwait(false);
+
+                results.AddRange(batchResults);
+
+                foreach (var kvp in batchSamples)
+                {
+                    samples[kvp.Key] = kvp.Value;
+                }
+            }
+            finally
+            {
+                await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, null);
+            }
+        }
+
+        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, samples, cancellationToken)
+            .ConfigureAwait(false);
+
+        return results;
     }
 
     private void ApplyOutputDirectory(string outputDir)

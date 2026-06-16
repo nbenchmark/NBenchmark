@@ -8,6 +8,18 @@ namespace NBenchmark.Discovery;
 
 public sealed class BenchmarkDiscoverer
 {
+    private readonly InstanceLifetime _defaultInstanceLifetime;
+
+    public BenchmarkDiscoverer()
+        : this(InstanceLifetime.PerMethod)
+    {
+    }
+
+    public BenchmarkDiscoverer(InstanceLifetime defaultInstanceLifetime)
+    {
+        _defaultInstanceLifetime = defaultInstanceLifetime;
+    }
+
     public IReadOnlyList<BenchmarkSuiteDefinition> Discover(Assembly assembly)
     {
         var suites = new List<BenchmarkSuiteDefinition>();
@@ -41,12 +53,18 @@ public sealed class BenchmarkDiscoverer
             if (benchmarks.Count == 0)
                 continue;
 
+            var instanceLifetime = type.GetCustomAttribute<InstanceLifetimeAttribute>()?.Lifetime
+                ?? _defaultInstanceLifetime;
+
             suites.Add(new BenchmarkSuiteDefinition(
                 type,
                 benchmarks,
                 setupDel,
                 teardownDel
-            ));
+            )
+            {
+                Lifetime = instanceLifetime,
+            });
         }
 
         return suites;

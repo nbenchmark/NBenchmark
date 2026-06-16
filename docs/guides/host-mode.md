@@ -114,12 +114,12 @@ Each argument set becomes a separate benchmark entry in the output, named `Metho
 
 ### Lifecycle attributes
 
-These attributes control setup and teardown at the class and iteration level. All decorated methods must have no parameters.
+These attributes control setup and teardown at the class and iteration level. All decorated methods must have no parameters. By default, the lifetime is `PerMethod` - both the instance and the lifecycle methods fire once per `[Benchmark]` method. Add `[InstanceLifetime(InstanceLifetime.PerClass)]` on the class to run setup/teardown once for the class.
 
 | Attribute | Runs | Timing |
 |---|---|---|
-| `[BenchmarkSetup]` | Once before any benchmark in the class | Not measured |
-| `[BenchmarkTeardown]` | Once after all benchmarks in the class | Not measured |
+| `[BenchmarkSetup]` | Once before each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
+| `[BenchmarkTeardown]` | Once after each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
 | `[BenchmarkIterationSetup]` | Before each individual iteration | Not measured |
 | `[BenchmarkIterationTeardown]` | After each individual iteration | Not measured |
 
@@ -142,6 +142,18 @@ public class DatabaseBenchmarks
 
     [Benchmark]
     public void RunQuery() => _conn.Execute("SELECT COUNT(*) FROM orders");
+}
+```
+
+If your `[BenchmarkSetup]` is expensive and you want to share the resulting state across all `[Benchmark]` methods in the class, opt the class into `PerClass`:
+
+```csharp
+[InstanceLifetime(InstanceLifetime.PerClass)]
+public class DatabaseBenchmarks
+{
+    [BenchmarkSetup] public void OpenConnection() { ... }
+    [Benchmark] public void A() { ... }
+    [Benchmark] public void B() { ... }
 }
 ```
 

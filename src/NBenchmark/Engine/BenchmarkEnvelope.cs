@@ -11,7 +11,7 @@ internal sealed record BenchmarkEnvelope(
     public static BenchmarkEnvelope FromDiscovered(
         BenchmarkMethodDefinition method,
         string className,
-        object instance)
+        Func<object> instanceFactory)
     {
         var name = $"{className}.{method.DisplayName}";
         var description = method.Attribute.Description;
@@ -28,6 +28,7 @@ internal sealed record BenchmarkEnvelope(
 
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync = (spec, ct) =>
         {
+            var instance = instanceFactory();
             var specWithOverride = spec;
 
             if (spec.Options.Iterations > 0)
@@ -103,4 +104,9 @@ internal sealed record BenchmarkEnvelope(
         var syncBody = () => sd(instance);
         return Task.FromResult(BenchmarkRunner.Instance.Run(name, syncBody, spec, ct));
     }
+}
+
+internal readonly record struct InstanceHandle(object Instance, Action Teardown)
+{
+    public static InstanceHandle NoTeardown(object instance) => new(instance, () => { });
 }
