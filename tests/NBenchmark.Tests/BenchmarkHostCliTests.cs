@@ -556,19 +556,17 @@ public class TestBenchmarks
 public class SlowVsBaselineBenchmarks
 {
     [Benchmark(Baseline = true)]
-    public int FastBaseline() => 2 + 2;
+    public int FastBaseline()
+    {
+        Thread.SpinWait(5_000);
+        return 1;
+    }
 
     [Benchmark]
     public int Slow()
     {
-        var sum = 0;
-
-        for (var i = 0; i < 1000; i++)
-        {
-            sum += i;
-        }
-
-        return sum;
+        Thread.SpinWait(20_000);
+        return 1;
     }
 }
 
