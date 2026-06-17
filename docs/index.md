@@ -95,6 +95,7 @@ public void CriticalPath_ShouldBeFast() => ProcessOrder(testOrder);
 | Package | Purpose |
 |---|---|
 | `NBenchmark` | Zero-dependency core engine and statistics |
+| `NBenchmark.Tool` | dotnet global tool - run benchmarks from the CLI without a project |
 | `NBenchmark.Reporters.Console` | Rich terminal tables via Spectre.Console |
 | `NBenchmark.Analyzers` | Compile-time checks for benchmark correctness |
 | `NBenchmark.DependencyInjection` | Constructor injection for benchmark classes |

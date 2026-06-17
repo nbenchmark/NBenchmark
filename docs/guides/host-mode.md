@@ -6,6 +6,8 @@ order: 3
 
 # Host mode: BenchmarkHost
 
+> **Tip:** Prefer not to create a project? Install the [global tool](./dotnet-tool.md) once and run `dotnet benchmark` against any assembly with `[Benchmark]` methods.
+
 `BenchmarkHost` discovers benchmarks by scanning assemblies for `[Benchmark]`-decorated methods. It also parses command-line arguments, so you can filter, configure, and drive runs entirely from the terminal without recompiling.
 
 This mode is designed for **dedicated benchmark projects** - a separate console project that you run against your library.

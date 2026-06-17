@@ -14,6 +14,16 @@ NBenchmark targets **net8.0**, **net9.0**, and **net10.0**. You need the [.NET 8
 
 NBenchmark ships as separate NuGet packages. Install only what you need.
 
+### Global tool
+
+The global tool lets you run benchmarks from the command line without creating a project. Install it once, then point it at any assembly with `[Benchmark]` methods.
+
+```bash
+dotnet tool install -g NBenchmark.Tool
+```
+
+After installation, run `dotnet benchmark --help` to verify. See the [Global Tool guide](../guides/dotnet-tool.md) for usage.
+
 ### Core package
 
 The core package contains all measurement, statistics, and file-based reporters (JSON, Markdown, CSV). It has **no NuGet dependencies** - only the .NET BCL.
