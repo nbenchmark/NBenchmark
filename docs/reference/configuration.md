@@ -324,6 +324,10 @@ public void MyExpensiveBenchmark() => SlowOperation();
 > [!NOTE]
 > Only `Iterations` and `WarmupIterations` are pinnable per method. `OpsPerSample` is not exposed on `[Benchmark]` - pin it host-wide with `.WithOpsPerSample(n)` or `--ops-per-sample n`.
 
+## Categories
+
+Categories are not part of `MeasurementOptions`; they are metadata declared with `[BenchmarkCategory]` and used for filtering. See the [Categories guide](../guides/categories.md) for the full feature.
+
 ## Valid ranges summary
 
 | Option | Type | Default | Valid range |

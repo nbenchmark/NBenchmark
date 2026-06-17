@@ -105,6 +105,7 @@ public sealed record BenchmarkTable
             MarginPercent = result.MarginPercent,
             CoefficientOfVariationPercent = result.CoefficientOfVariationPercent,
             AutoTune = result.AutoTune,
+            Categories = result.Categories,
         };
     }
 
@@ -255,4 +256,5 @@ public record BenchmarkRow
     public required double MarginPercent { get; init; }
     public required double CoefficientOfVariationPercent { get; init; }
     public AutoTuneDiagnostic? AutoTune { get; init; }
+    public IReadOnlyList<string> Categories { get; init; } = [];
 }

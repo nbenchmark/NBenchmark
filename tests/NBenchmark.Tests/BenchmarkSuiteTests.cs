@@ -142,6 +142,123 @@ public class BenchmarkSuiteTests
         Assert.Equal(new[] { "onSuiteStarting", "setup", "teardown", "onSuiteCompleted" }, events);
     }
 
+    [Fact]
+    public async Task Add_WithCategories_Carries_Categories_Through_To_Result()
+    {
+        var results = await new BenchmarkSuite("tagged")
+            .Add("fast", () => { }, categories: ["Fast"])
+            .Add("slow", () => { }, categories: ["Slow"])
+            .WithWarmup(0)
+            .WithIterations(1)
+            .WithOutlierMode(OutlierMode.None)
+            .RunAsync();
+
+        var fast = results.Single(r => r.Name == "fast");
+        var slow = results.Single(r => r.Name == "slow");
+
+        Assert.Equal(["Fast"], fast.Categories);
+        Assert.Equal(["Slow"], slow.Categories);
+    }
+
+    [Fact]
+    public async Task WithCategories_Applies_To_Subsequent_Adds()
+    {
+        var results = await new BenchmarkSuite("batch")
+            .WithCategories("Shared")
+            .Add("a", () => { })
+            .Add("b", () => { }, categories: ["Extra"])
+            .WithWarmup(0)
+            .WithIterations(1)
+            .WithOutlierMode(OutlierMode.None)
+            .RunAsync();
+
+        var a = results.Single(r => r.Name == "a");
+        var b = results.Single(r => r.Name == "b");
+
+        Assert.Equal(["Shared"], a.Categories);
+        Assert.Equal(["Extra"], b.Categories);
+    }
+
+    [Fact]
+    public async Task WithCategories_Trims_And_Deduplicates_CaseInsensitive()
+    {
+        var results = await new BenchmarkSuite("normalized")
+            .WithCategories(" Fast ", "fast")
+            .Add("x", () => { })
+            .WithWarmup(0)
+            .WithIterations(1)
+            .WithOutlierMode(OutlierMode.None)
+            .RunAsync();
+
+        Assert.Equal(["Fast"], results[0].Categories);
+    }
+
+    [Fact]
+    public void Add_WithBlankCategory_Throws()
+    {
+        var suite = new BenchmarkSuite("bad-categories");
+        Assert.Throws<ArgumentException>(() => suite.Add("x", () => { }, categories: [" "]));
+    }
+
+    [Fact]
+    public void WithCategoryFilter_WithBlankCategory_Throws()
+    {
+        var suite = new BenchmarkSuite("bad-filter");
+        Assert.Throws<ArgumentException>(() => suite.WithCategoryFilter(include: [" "]));
+    }
+
+    [Fact]
+    public async Task WithCategoryFilter_Include_Excludes_Untagged_And_NonMatching()
+    {
+        var results = await new BenchmarkSuite("filter")
+            .Add("fast", () => { }, categories: ["Fast"])
+            .Add("slow", () => { }, categories: ["Slow"])
+            .Add("untagged", () => { })
+            .WithCategoryFilter(include: ["Fast"])
+            .WithWarmup(0)
+            .WithIterations(1)
+            .WithOutlierMode(OutlierMode.None)
+            .RunAsync();
+
+        Assert.Single(results);
+        Assert.Equal("fast", results[0].Name);
+    }
+
+    [Fact]
+    public async Task WithCategoryFilter_Exclude_Removes_Matching()
+    {
+        var results = await new BenchmarkSuite("filter")
+            .Add("fast", () => { }, categories: ["Fast"])
+            .Add("slow", () => { }, categories: ["Slow"])
+            .Add("untagged", () => { })
+            .WithCategoryFilter(exclude: ["Slow"])
+            .WithWarmup(0)
+            .WithIterations(1)
+            .WithOutlierMode(OutlierMode.None)
+            .RunAsync();
+
+        Assert.Equal(2, results.Count);
+        Assert.DoesNotContain(results, r => r.Name == "slow");
+    }
+
+    [Fact]
+    public async Task WithCategoryFilter_Multiple_Includes_Are_OR()
+    {
+        var results = await new BenchmarkSuite("filter")
+            .Add("a", () => { }, categories: ["A"])
+            .Add("b", () => { }, categories: ["B"])
+            .Add("c", () => { }, categories: ["C"])
+            .WithCategoryFilter(include: ["A", "B"])
+            .WithWarmup(0)
+            .WithIterations(1)
+            .WithOutlierMode(OutlierMode.None)
+            .RunAsync();
+
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, r => r.Name == "a");
+        Assert.Contains(results, r => r.Name == "b");
+    }
+
     private sealed class OrderingProgress : IBenchmarkProgress
     {
         private readonly Action _onSuiteCompleted;

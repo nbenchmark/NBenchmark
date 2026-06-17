@@ -433,6 +433,98 @@ public class ReporterTests
     }
 
     [Fact]
+    public async Task JsonReporter_Emits_Categories()
+    {
+        var tempDir = MakeSubDir("nb-json-categories");
+
+        try
+        {
+            var reporter = new JsonReporter(tempDir);
+            var result = MakeResult("alpha", 100) with { Categories = ["String", "Fast"] };
+
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
+            var content = await File.ReadAllTextAsync(files[0]);
+            Assert.Contains("\"categories\":", content);
+            Assert.Contains("\"String\"", content);
+            Assert.Contains("\"Fast\"", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task CsvReporter_Advanced_Includes_Categories_Column()
+    {
+        var tempDir = MakeSubDir("nb-csv-categories");
+
+        try
+        {
+            var reporter = new CsvReporter(tempDir, detail: ReportDetail.Advanced);
+            var result = MakeResult("alpha", 100) with { Categories = ["String", "Fast"] };
+
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "*.csv");
+            var lines = await File.ReadAllLinesAsync(files[0]);
+            Assert.Contains("Categories", lines[0]);
+            Assert.Contains("String; Fast", lines[1]);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task MarkdownReporter_Advanced_Includes_Categories_Column_When_Present()
+    {
+        var tempDir = MakeSubDir("nb-md-categories");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Advanced);
+            var result = MakeResult("alpha", 100) with { Categories = ["String", "Fast"] };
+
+            await reporter.ReportAsync([result]);
+
+            var filePath = Path.Combine(tempDir, "out.md");
+            var content = await File.ReadAllTextAsync(filePath);
+            Assert.Contains("Categories", content);
+            Assert.Contains("String, Fast", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task MarkdownReporter_Simple_Does_Not_Show_Categories_Column()
+    {
+        var tempDir = MakeSubDir("nb-md-simple-no-categories");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Simple);
+            var result = MakeResult("alpha", 100) with { Categories = ["String"] };
+
+            await reporter.ReportAsync([result]);
+
+            var filePath = Path.Combine(tempDir, "out.md");
+            var content = await File.ReadAllTextAsync(filePath);
+            Assert.DoesNotContain("Categories", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
     public void PathValidation_Rejects_Path_Traversal() => Assert.Throws<ArgumentException>(() => new JsonReporter("../escaped"));
 
     [Fact]

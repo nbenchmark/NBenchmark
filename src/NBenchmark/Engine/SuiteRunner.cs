@@ -34,6 +34,7 @@ internal static class SuiteRunner
                 Options = defaultOptions,
                 Description = envelope.Description,
                 IsBaseline = envelope.IsBaseline,
+                Categories = envelope.Categories,
                 Progress = progress,
             };
 
@@ -60,7 +61,8 @@ internal static class SuiteRunner
                     TimeSpan.Zero,
                     TimeSpan.Zero,
                     0,
-                    null);
+                    null,
+                    envelope.Categories);
             }
 
             results.Add(outcome.Result);

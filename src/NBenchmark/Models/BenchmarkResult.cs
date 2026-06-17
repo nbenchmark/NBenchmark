@@ -81,6 +81,14 @@ public record BenchmarkResult
     public TimeSpan MeasuredDuration { get; init; } = TimeSpan.Zero;
 
     public bool IsBaseline { get; init; }
+
+    /// <summary>
+    ///     Categories assigned to this benchmark through class-level and method-level
+    ///     <see cref="NBenchmark.Attributes.BenchmarkCategoryAttribute" />. Empty when no
+    ///     categories were declared.
+    /// </summary>
+    public IReadOnlyList<string> Categories { get; init; } = [];
+
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
     /// <summary>

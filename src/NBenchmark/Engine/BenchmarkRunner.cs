@@ -154,7 +154,8 @@ public sealed class BenchmarkRunner
             _clock.GetElapsedTime(totalStartTimestamp),
             TimeSpan.Zero,
             spec.Options.WarmupIterations ?? 0,
-            null);
+            null,
+            spec.Categories);
     }
 
     private MeasurementOutcome BuildSuccessOutcome(
@@ -174,7 +175,8 @@ public sealed class BenchmarkRunner
             _clock.GetElapsedTime(totalStartTimestamp),
             adaptive.MeasuredDuration,
             adaptive.ResolvedWarmup,
-            adaptive.Diagnostic);
+            adaptive.Diagnostic,
+            spec.Categories);
     }
 
     private MeasurementOutcome BuildErroredOutcome(string name, RunSpec spec, long totalStartTimestamp, Exception ex)
@@ -188,7 +190,8 @@ public sealed class BenchmarkRunner
             _clock.GetElapsedTime(totalStartTimestamp),
             TimeSpan.Zero,
             spec.Options.WarmupIterations ?? 0,
-            null);
+            null,
+            spec.Categories);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

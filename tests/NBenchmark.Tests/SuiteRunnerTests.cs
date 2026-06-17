@@ -161,6 +161,7 @@ public class SuiteRunnerTests
                 "boom",
                 "boom description",
                 false,
+                [],
                 (_, _) => throw new InvalidOperationException("boom")),
             StaticEnvelope("ok", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
         };
@@ -207,6 +208,7 @@ public class SuiteRunnerTests
         name,
         null,
         false,
+        [],
         (spec, ct) =>
         {
             var outcome = BenchmarkRunner.Instance.Run(name, () => { }, spec, ct);

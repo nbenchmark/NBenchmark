@@ -35,7 +35,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         else
         {
             sb.AppendLine(
-                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs");
+                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,Categories");
         }
 
         var table = BenchmarkTable.Build(results);
@@ -97,6 +97,8 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                 var atCiWidth = autoTune is null ? "" : autoTune.AchievedRelativeCiWidth.ToString("F4");
                 var atTuningMs = autoTune is null ? "" : autoTune.TuningWallClock.TotalMilliseconds.ToString("F1");
 
+                var safeCategories = string.Join("; ", row.Categories).Replace("\"", "\"\"");
+
                 sb.AppendLine(
                     $"\"{safeName}\"," +
                     $"{row.Median:F1}," +
@@ -141,7 +143,8 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{atOps}," +
                     $"{atSampleStop}," +
                     $"{atCiWidth}," +
-                    $"{atTuningMs}");
+                    $"{atTuningMs}," +
+                    $"\"{safeCategories}\"");
             }
         }
 

@@ -15,6 +15,7 @@ public readonly record struct RunSpec
     public MeasurementOptions Options { get; init; } = MeasurementOptions.Default;
     public string? Description { get; init; }
     public bool IsBaseline { get; init; }
+    public IReadOnlyList<string> Categories { get; init; } = [];
     public Action? IterationSetup { get; init; }
     public Action? IterationTeardown { get; init; }
     public IBenchmarkProgress Progress { get; init; } = NullBenchmarkProgress.Instance;

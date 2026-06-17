@@ -65,6 +65,29 @@ suite.Add(
 > [!WARNING]
 > Setup and teardown time is **not** included in the measurement. Only the `action` is timed.
 
+### With categories
+
+Tag a benchmark with categories and filter the suite before running:
+
+```csharp
+var results = await new BenchmarkSuite("sorting")
+    .Add("bubble", () => { }, categories: ["Classic"])
+    .Add("linq", () => { }, categories: ["Modern"])
+    .WithCategoryFilter(include: ["Classic"])
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+```
+
+Use `.WithCategories(params string[])` to apply categories to every subsequent `.Add` call:
+
+```csharp
+await new BenchmarkSuite("string")
+    .WithCategories("String")
+    .Add("concat", () => "a" + "b")
+    .Add("interpolate", () => $"a { "b" }")
+    .RunAsync();
+```
+
 ### Benchmark names must be unique
 
 Each name within a suite must be distinct. The significance test keys raw samples by name, so duplicates would corrupt the results.

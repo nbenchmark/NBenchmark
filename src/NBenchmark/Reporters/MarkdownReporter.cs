@@ -54,17 +54,30 @@ public sealed class MarkdownReporter : IReporter
         // Primary comparison table
         var successfulRows = table.Rows.Where(r => !r.Errored).ToList();
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
+        var showCategories = Detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
 
         sb.AppendLine("### Comparison");
         sb.AppendLine();
-        sb.AppendLine("| | Benchmark | Median | Mean | Ratio | Scale | Sig | Magnitude | Alloc/op |");
-        sb.AppendLine("|:---:|---|---:|---:|:---:|---|---:|---:|---:|");
+
+        if (showCategories)
+        {
+            sb.AppendLine("| | Benchmark | Median | Mean | Ratio | Scale | Sig | Magnitude | Alloc/op | Categories |");
+            sb.AppendLine("|:---:|---|---:|---:|:---:|---|---:|---:|---:|---|");
+        }
+        else
+        {
+            sb.AppendLine("| | Benchmark | Median | Mean | Ratio | Scale | Sig | Magnitude | Alloc/op |");
+            sb.AppendLine("|:---:|---|---:|---:|:---:|---|---:|---:|---:|");
+        }
 
         foreach (var row in table.Rows)
         {
             if (row.Errored)
             {
-                sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - |");
+                if (showCategories)
+                    sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - | - |");
+                else
+                    sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - |");
                 continue;
             }
 
@@ -87,18 +100,39 @@ public sealed class MarkdownReporter : IReporter
                 : "-";
 
             var magnitudeText = row.Effect?.Magnitude ?? "-";
+            var categoryText = showCategories
+                ? (row.Categories.Count > 0 ? string.Join(", ", row.Categories) : "-")
+                : "";
 
-            sb.AppendLine(
-                $"| " +
-                $"| {nameText} " +
-                $"| {BenchmarkFormatter.FormatNs(row.Median)} " +
-                $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
-                $"| {ratioText} " +
-                $"| {bar} " +
-                $"| {sigIcon} " +
-                $"| {magnitudeText} " +
-                $"| {allocText} |"
-            );
+            if (showCategories)
+            {
+                sb.AppendLine(
+                    $"| " +
+                    $"| {nameText} " +
+                    $"| {BenchmarkFormatter.FormatNs(row.Median)} " +
+                    $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
+                    $"| {ratioText} " +
+                    $"| {bar} " +
+                    $"| {sigIcon} " +
+                    $"| {magnitudeText} " +
+                    $"| {allocText} " +
+                    $"| {categoryText} |"
+                );
+            }
+            else
+            {
+                sb.AppendLine(
+                    $"| " +
+                    $"| {nameText} " +
+                    $"| {BenchmarkFormatter.FormatNs(row.Median)} " +
+                    $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
+                    $"| {ratioText} " +
+                    $"| {bar} " +
+                    $"| {sigIcon} " +
+                    $"| {magnitudeText} " +
+                    $"| {allocText} |"
+                );
+            }
         }
 
         sb.AppendLine();

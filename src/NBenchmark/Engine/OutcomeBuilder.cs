@@ -14,7 +14,8 @@ internal static class OutcomeBuilder
         TimeSpan totalDuration,
         TimeSpan measuredDuration,
         int resolvedWarmup = 0,
-        AutoTuneDiagnostic? autoTune = null)
+        AutoTuneDiagnostic? autoTune = null,
+        IReadOnlyList<string>? categories = null)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -39,7 +40,8 @@ internal static class OutcomeBuilder
                 measuredDuration,
                 s.Result.Warnings,
                 resolvedWarmup,
-                autoTune),
+                autoTune,
+                categories),
 
             RunOutcome.DryRun => Build(
                 name, description, isBaseline, options,
@@ -55,7 +57,8 @@ internal static class OutcomeBuilder
                 TimeSpan.Zero,
                 [],
                 resolvedWarmup,
-                null),
+                null,
+                categories),
 
             RunOutcome.Errored e => Build(
                 name, description, isBaseline, options,
@@ -71,7 +74,8 @@ internal static class OutcomeBuilder
                 measuredDuration,
                 [],
                 resolvedWarmup,
-                null),
+                null,
+                categories),
 
             _ => throw new ArgumentOutOfRangeException(nameof(input), input, "Unknown RunOutcome case."),
         };
@@ -99,7 +103,8 @@ internal static class OutcomeBuilder
         TimeSpan measuredDuration,
         IReadOnlyList<string> warnings,
         int resolvedWarmup,
-        AutoTuneDiagnostic? autoTune)
+        AutoTuneDiagnostic? autoTune,
+        IReadOnlyList<string>? categories = null)
     {
         var allocStats = stats is not null && rawAllocations is not null
             ? StatsSummary.ComputeAllocations(rawAllocations)
@@ -154,6 +159,7 @@ internal static class OutcomeBuilder
                 Profile = options.Profile,
                 Warnings = warnings,
                 AutoTune = autoTune,
+                Categories = categories ?? [],
             },
         };
     }

@@ -10,6 +10,9 @@ public sealed class BenchmarkSuite(string name)
     private readonly List<BenchmarkEnvelope> _benchmarks = [];
 
     private readonly List<IReporter> _reporters = [];
+    private readonly List<string> _categoryFilterInclude = [];
+    private readonly List<string> _categoryFilterExclude = [];
+    private string[]? _pendingCategories;
     private string? _baselineName;
     private ReportDetail _detail;
     private bool _isolated;
@@ -24,35 +27,40 @@ public sealed class BenchmarkSuite(string name)
     public string Name { get; } = name;
 
     public BenchmarkSuite Add(string name, Action action,
-        Action? setup = null, Action? teardown = null)
-        => AddEnvelope(name, (spec, ct) =>
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+        => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
             Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
                 spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
 
     public BenchmarkSuite Add(string name, Func<Task> action,
-        Action? setup = null, Action? teardown = null)
-        => AddEnvelope(name, async (spec, ct) =>
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+        => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
             await BenchmarkRunner.Instance.RunAsync(name, action,
                 spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
 
     public BenchmarkSuite Add<T>(string name, Func<T> action,
-        Action? setup = null, Action? teardown = null)
-        => AddEnvelope(name, (spec, ct) =>
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+        => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
             Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
                 spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
 
     public BenchmarkSuite Add<T>(string name, Func<Task<T>> action,
-        Action? setup = null, Action? teardown = null)
-        => AddEnvelope(name, async (spec, ct) =>
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+        => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
             await BenchmarkRunner.Instance.RunAsync(name, action,
                 spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
 
     private BenchmarkSuite AddEnvelope(
         string name,
+        IReadOnlyList<string> categories,
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEnvelope(name, null, false, runAsync));
+        _benchmarks.Add(new BenchmarkEnvelope(name, null, false, categories, runAsync));
         return this;
     }
 
@@ -244,6 +252,33 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
+    ///     Tags every subsequent benchmark added to the suite with the supplied categories.
+    ///     <c>.WithCategories()</c> does not affect benchmarks already added.
+    /// </summary>
+    public BenchmarkSuite WithCategories(params string[] categories)
+    {
+        _pendingCategories = NormalizeCategories(categories, nameof(categories));
+        return this;
+    }
+
+    /// <summary>
+    ///     Filters the suite by category before running. Include rules are OR: a benchmark
+    ///     runs if it has any included category. Exclude rules are also OR: a benchmark is
+    ///     removed if it has any excluded category. Untagged benchmarks are excluded when
+    ///     any include filter is set.
+    /// </summary>
+    public BenchmarkSuite WithCategoryFilter(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
+    {
+        if (include is not null)
+            AddCategories(_categoryFilterInclude, include, nameof(include));
+
+        if (exclude is not null)
+            AddCategories(_categoryFilterExclude, exclude, nameof(exclude));
+
+        return this;
+    }
+
+    /// <summary>
     ///     Runs the whole suite in a dedicated child process for a clean-room reading,
     ///     rather than in the current process. The suite's setup, every benchmark, and the
     ///     suite's teardown all execute together in that one child; the parent process
@@ -281,7 +316,10 @@ public sealed class BenchmarkSuite(string name)
 
         // Inside an isolated child: run the suite in-process and quietly. Only the suite
         // call the parent requested writes its samples back; any other suite call sharing
-        // this child runs without emitting output or a payload.
+        // this child runs without emitting output or a payload. The child re-applies the
+        // category filter on top of the display-name list the parent already filtered;
+        // this is safe because the suite builder state is rebuilt deterministically in
+        // the child before this point.
         if (IsolatedRunContext.IsActive)
         {
             var isTarget = IsolatedRunContext.IsSuiteRequestMatch(
@@ -323,12 +361,13 @@ public sealed class BenchmarkSuite(string name)
         bool writeChildPayload,
         CancellationToken cancellationToken)
     {
-        var envelopeNames = _benchmarks.Select(b => b.Name).ToList();
-        await progress.OnSuiteStarting(envelopeNames, _benchmarks.Count).ConfigureAwait(false);
+        var filteredBenchmarks = ApplyCategoryFilter(_benchmarks);
+        var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
+        await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
         _suiteSetup?.Invoke();
 
-        var envelopes = _benchmarks
+        var envelopes = filteredBenchmarks
             .Select(b => b with { IsBaseline = _baselineName is not null && b.Name == _baselineName })
             .ToList();
 
@@ -339,7 +378,7 @@ public sealed class BenchmarkSuite(string name)
         {
             (results, rawSamples) = await SuiteRunner.RunAsync(
                 envelopes, order, null, _options, 0,
-                _benchmarks.Count, progress, cancellationToken).ConfigureAwait(false);
+                filteredBenchmarks.Count, progress, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -380,8 +419,9 @@ public sealed class BenchmarkSuite(string name)
         if (!_progressExplicitlySet)
             _progress = new DefaultConsoleProgress();
 
-        var displayNames = _benchmarks.Select(b => b.Name).ToList();
-        await _progress.OnSuiteStarting(displayNames, _benchmarks.Count).ConfigureAwait(false);
+        var filteredBenchmarks = ApplyCategoryFilter(_benchmarks);
+        var displayNames = filteredBenchmarks.Select(b => b.Name).ToList();
+        await _progress.OnSuiteStarting(displayNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
         var request = new IsolatedRunRequest
         {
@@ -397,15 +437,15 @@ public sealed class BenchmarkSuite(string name)
         var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
         var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
 
-        var results = new List<BenchmarkResult>(_benchmarks.Count);
-        var rawSamples = new Dictionary<string, double[]>(_benchmarks.Count);
+        var results = new List<BenchmarkResult>(filteredBenchmarks.Count);
+        var rawSamples = new Dictionary<string, double[]>(filteredBenchmarks.Count);
 
-        for (var i = 0; i < _benchmarks.Count; i++)
+        for (var i = 0; i < filteredBenchmarks.Count; i++)
         {
-            var envelope = _benchmarks[i];
+            var envelope = filteredBenchmarks[i];
             var isBaseline = _baselineName is not null && envelope.Name == _baselineName;
 
-            await _progress.OnBenchmarkStarting(envelope.Name, i + 1, _benchmarks.Count).ConfigureAwait(false);
+            await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count).ConfigureAwait(false);
 
             BenchmarkResult result;
             double[] raw;
@@ -422,7 +462,8 @@ public sealed class BenchmarkSuite(string name)
                 result = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException(message), message),
                     envelope.Name, envelope.Description, isBaseline,
-                    _options, TimeSpan.Zero, TimeSpan.Zero, 0, null).Result;
+                    _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
+                    envelope.Categories).Result;
 
                 raw = [];
             }
@@ -443,6 +484,56 @@ public sealed class BenchmarkSuite(string name)
         }
 
         return results;
+    }
+
+    private IReadOnlyList<BenchmarkEnvelope> ApplyCategoryFilter(IReadOnlyList<BenchmarkEnvelope> benchmarks)
+    {
+        if (_categoryFilterInclude.Count == 0 && _categoryFilterExclude.Count == 0)
+            return benchmarks;
+
+        return benchmarks
+            .Where(b => CategoryFilter.Matches(b.Categories, _categoryFilterInclude, _categoryFilterExclude, _categoryFilterInclude.Count > 0))
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> ResolveAddCategories(
+        IReadOnlyList<string>? explicitCategories,
+        IReadOnlyList<string>? pendingCategories)
+    {
+        if (explicitCategories is not null)
+            return NormalizeCategories(explicitCategories, "categories");
+
+        if (pendingCategories is null)
+            return [];
+
+        return pendingCategories.ToArray();
+    }
+
+    private static string[] NormalizeCategories(IEnumerable<string> categories, string paramName)
+    {
+        var normalized = new List<string>();
+
+        foreach (var category in categories)
+        {
+            if (string.IsNullOrWhiteSpace(category))
+                throw new ArgumentException("Category names cannot be null, empty, or whitespace.", paramName);
+
+            var trimmed = category.Trim();
+
+            if (!normalized.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+                normalized.Add(trimmed);
+        }
+
+        return [..normalized];
+    }
+
+    private static void AddCategories(List<string> target, IEnumerable<string> source, string paramName)
+    {
+        foreach (var category in NormalizeCategories(source, paramName))
+        {
+            if (!target.Contains(category, StringComparer.OrdinalIgnoreCase))
+                target.Add(category);
+        }
     }
 
     private void ValidateBaseline()

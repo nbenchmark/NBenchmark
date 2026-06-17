@@ -125,6 +125,109 @@ public class BenchmarkHostCliTests
     }
 
     [Fact]
+    public async Task RunAsync_Category_Filter_Includes_Only_Matching_Benchmarks()
+    {
+        var results = await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHost.Create(["--filter", "CategoryBenchmarks.*", "--category", "String", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<CategoryBenchmarks>()
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync()
+        );
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.False(r.Errored));
+        Assert.Contains(results, r => r.Name == "CategoryBenchmarks.Concat");
+        Assert.Contains(results, r => r.Name == "CategoryBenchmarks.ManyConcat");
+    }
+
+    [Fact]
+    public async Task RunAsync_ExcludeCategory_Removes_Matching_Benchmarks()
+    {
+        var results = await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHost.Create(["--filter", "CategoryBenchmarks.*", "--exclude-category", "Slow", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<CategoryBenchmarks>()
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync()
+        );
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.False(r.Errored));
+        Assert.DoesNotContain(results, r => r.Name == "CategoryBenchmarks.ManyConcat");
+        Assert.Contains(results, r => r.Name == "CategoryBenchmarks.Compute");
+    }
+
+    [Fact]
+    public async Task RunAsync_Category_Filter_And_Glob_Combine()
+    {
+        var results = await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHost.Create(["--filter", "CategoryBenchmarks.*", "--category", "String", "--exclude-category", "Slow", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<CategoryBenchmarks>()
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync()
+        );
+
+        Assert.Single(results);
+        Assert.Equal("CategoryBenchmarks.Concat", results[0].Name);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithCategoryFilter_Programmatic_And_CLI_Compose()
+    {
+        var results = await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHost.Create(["--filter", "CategoryBenchmarks.*", "--category", "String", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<CategoryBenchmarks>()
+                .WithCategoryFilter(include: ["Fast"])
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync()
+        );
+
+        Assert.Single(results);
+        Assert.Equal("CategoryBenchmarks.Concat", results[0].Name);
+    }
+
+    [Fact]
+    public void WithCategoryFilter_WithBlankCategory_Throws()
+    {
+        var host = BenchmarkHost.Create([]);
+        Assert.Throws<ArgumentException>(() => host.WithCategoryFilter(include: [" "]));
+    }
+
+    [Fact]
+    public void RunAsync_List_Output_Shows_Categories()
+    {
+        var stdout = CaptureConsoleOutput(() =>
+        {
+            BenchmarkHost.Create(["--filter", "CategoryBenchmarks.*", "--list"])
+                .AddFromAssembly<CategoryBenchmarks>()
+                .WithIsolation(false)
+                .RunAsync().GetAwaiter().GetResult();
+        });
+
+        Assert.Contains("[String, Fast]", stdout);
+        Assert.Contains("[String, Slow]", stdout);
+        Assert.Contains("[Number]", stdout);
+    }
+
+    [Fact]
+    public async Task RunAsync_CategoryFilter_Empty_Intersection_Returns_No_Benchmarks()
+    {
+        var results = await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHost.Create(["--filter", "CategoryBenchmarks.*", "--category", "String", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<CategoryBenchmarks>()
+                .WithCategoryFilter(include: ["Number"])
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync()
+        );
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
     public async Task RunAsync_With_Random_Order_Shuffles_PerMethod_Benchmarks()
     {
         var ordered = await CaptureConsoleOutputAsync(async () =>
@@ -542,6 +645,23 @@ public class BenchmarkHostCliTests
             return Task.CompletedTask;
         }
     }
+}
+
+public class CategoryBenchmarks
+{
+    [Benchmark]
+    [BenchmarkCategory("String")]
+    [BenchmarkCategory("Fast")]
+    public int Concat() => 1;
+
+    [Benchmark]
+    [BenchmarkCategory("String")]
+    [BenchmarkCategory("Slow")]
+    public int ManyConcat() => 2;
+
+    [Benchmark]
+    [BenchmarkCategory("Number")]
+    public int Compute() => 3;
 }
 
 public class TestBenchmarks

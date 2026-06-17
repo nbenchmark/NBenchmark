@@ -7,7 +7,7 @@ public class ConsoleReporterTests
     [Fact]
     public async Task ConsoleReporter_ReportAsync_Does_Not_Throw_For_Empty_Results()
     {
-        await CaptureConsoleOutputAsync(async () =>
+        await CaptureConsoleOutputAsyncVoid(async () =>
         {
             var reporter = new ConsoleReporter();
             await reporter.ReportAsync([]);
@@ -17,7 +17,7 @@ public class ConsoleReporterTests
     [Fact]
     public async Task ConsoleReporter_ReportAsync_Does_Not_Throw_For_Successful_Results()
     {
-        await CaptureConsoleOutputAsync(async () =>
+        await CaptureConsoleOutputAsyncVoid(async () =>
         {
             var reporter = new ConsoleReporter();
             var result = MakeResult("test", 100);
@@ -28,7 +28,7 @@ public class ConsoleReporterTests
     [Fact]
     public async Task ConsoleReporter_ReportAsync_Does_Not_Throw_For_Errored_Results()
     {
-        await CaptureConsoleOutputAsync(async () =>
+        await CaptureConsoleOutputAsyncVoid(async () =>
         {
             var reporter = new ConsoleReporter();
 
@@ -73,6 +73,26 @@ public class ConsoleReporterTests
         Assert.IsType<ConsoleReporter>(reporter);
     }
 
+    [Fact]
+    public async Task ConsoleReporter_Advanced_Accepts_Results_With_Categories()
+    {
+        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var result = MakeResult("tagged", 100) with { Categories = ["String", "Fast"] };
+
+        // Does not throw; categories are surfaced only in advanced detail.
+        await reporter.ReportAsync([result]);
+    }
+
+    [Fact]
+    public async Task ConsoleReporter_Simple_Accepts_Results_With_Categories()
+    {
+        var reporter = new ConsoleReporter(ReportDetail.Simple);
+        var result = MakeResult("tagged", 100) with { Categories = ["String"] };
+
+        // Does not throw; categories are hidden in simple detail to keep the table narrow.
+        await reporter.ReportAsync([result]);
+    }
+
     private static BenchmarkResult MakeResult(string name, double median)
     {
         return new BenchmarkResult
@@ -100,7 +120,25 @@ public class ConsoleReporterTests
         };
     }
 
-    private static async Task CaptureConsoleOutputAsync(Func<Task> action)
+    private static async Task<string> CaptureConsoleOutputAsync(Func<Task> action)
+    {
+        var sw = new StringWriter();
+        var original = System.Console.Out;
+        System.Console.SetOut(sw);
+
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            System.Console.SetOut(original);
+        }
+
+        return sw.ToString();
+    }
+
+    private static async Task CaptureConsoleOutputAsyncVoid(Func<Task> action)
     {
         var sw = new StringWriter();
         var original = System.Console.Out;

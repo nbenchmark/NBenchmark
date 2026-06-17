@@ -96,6 +96,53 @@ public string CurrentImpl() => Production.DoWork();
 public string NewImpl() => Candidate.DoWork();
 ```
 
+### `[BenchmarkCategory]`
+
+Tags a benchmark (or an entire class) with one or more categories. Categories can be used to include or exclude benchmarks from a run. Multiple categories are declared by applying the attribute multiple times.
+
+```csharp
+[BenchmarkCategory("String")]
+public class StringBenchmarks
+{
+    [Benchmark]
+    [BenchmarkCategory("Fast")]
+    public string Concat() => "hello" + "world";
+
+    [Benchmark]
+    [BenchmarkCategory("Slow")]
+    public string ManyConcat()
+    {
+        var s = "";
+        for (var i = 0; i < 100; i++)
+            s += (char)('a' + i % 26);
+        return s;
+    }
+}
+```
+
+Class-level categories are unioned with method-level categories, so `ManyConcat` above is tagged with both `String` and `Slow`.
+
+Filter from the CLI with `--category` and `--exclude-category`:
+
+```bash
+dotnet run -- --category String
+dotnet run -- --category String --exclude-category Slow
+dotnet run -- --category String --category Memory
+```
+
+Both flags are repeatable and use OR semantics within the include or exclude list. Untagged benchmarks are excluded when any include filter is present.
+
+Filter programmatically with `WithCategoryFilter`:
+
+```csharp
+await BenchmarkHost.Create(args)
+    .AddFromAssembly<StringBenchmarks>()
+    .WithCategoryFilter(include: ["String"], exclude: ["Slow"])
+    .RunAsync();
+```
+
+`WithCategoryFilter` composes with the CLI flags: each source's include list is applied independently, so a benchmark must match every non-empty include source. Exclude lists are unioned.
+
 ### `[BenchmarkArguments]`
 
 Runs the benchmark once for each set of arguments. The method must accept parameters matching the argument types.
@@ -267,6 +314,29 @@ BenchmarkHost.Create(args)
 CLI flags like `--iterations` always override `WithOptions` values.
 
 By default benchmarks run in **random** order to reduce systematic bias. Call `WithRunOrder(RunOrder.Declaration)` (or pass `--order declaration`) to run them in declaration order instead.
+
+## Category filtering
+
+When benchmarks are tagged with `[BenchmarkCategory]`, you can include or exclude them from the run.
+
+| Flag | Description |
+|---|---|
+| `--category <name>` | Include benchmarks tagged with this category. Repeatable (OR). |
+| `--exclude-category <name>` | Exclude benchmarks tagged with this category. Repeatable (OR). |
+
+```bash
+dotnet run -- --category String
+dotnet run -- --category String --exclude-category Slow
+dotnet run -- --category String --category Memory
+```
+
+Untagged benchmarks are excluded when any `--category` flag is present. Combine with `--filter` for finer control:
+
+```bash
+dotnet run -- --category String --filter StringBenchmarks.Con*
+```
+
+See [Suite mode](./suite-mode.md) for the programmatic `WithCategoryFilter` API.
 
 ## Listing benchmarks without running
 
