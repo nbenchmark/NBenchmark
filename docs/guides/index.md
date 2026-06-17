@@ -30,6 +30,17 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
+## [Categories](./categories.md)
+
+Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from the command line or fluent APIs in host/suite mode.
+
+```csharp
+await new BenchmarkSuite("string")
+    .Add("concat", () => "a" + "b", categories: ["Fast"])
+    .WithCategoryFilter(include: ["Fast"])
+    .RunAsync();
+```
+
 ## [Host mode - BenchmarkHost](./host-mode.md)
 
 Attribute-based discovery driven by a command-line interface. Designed for dedicated benchmark projects - similar to BenchmarkDotNet's style.

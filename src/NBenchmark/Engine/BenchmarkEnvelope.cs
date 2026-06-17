@@ -6,6 +6,7 @@ internal sealed record BenchmarkEnvelope(
     string Name,
     string? Description,
     bool IsBaseline,
+    IReadOnlyList<string> Categories,
     Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> RunAsync)
 {
     public static BenchmarkEnvelope FromDiscovered(
@@ -16,6 +17,7 @@ internal sealed record BenchmarkEnvelope(
         var name = $"{className}.{method.DisplayName}";
         var description = method.Attribute.Description;
         var isBaseline = method.Attribute.Baseline;
+        var categories = method.Categories;
         var attributeIterations = method.Attribute.Iterations;
         var attributeWarmupIterations = method.Attribute.WarmupIterations;
         var hasIterationsOverride = method.Attribute.HasIterationsOverride;
@@ -68,7 +70,7 @@ internal sealed record BenchmarkEnvelope(
             return ExecuteAsync(name, asyncDel, syncDel, resultConsumer, instance, specWithIter, ct);
         };
 
-        return new BenchmarkEnvelope(name, description, isBaseline, runAsync);
+        return new BenchmarkEnvelope(name, description, isBaseline, categories, runAsync);
     }
 
     private static Task<MeasurementOutcome> ExecuteAsync(

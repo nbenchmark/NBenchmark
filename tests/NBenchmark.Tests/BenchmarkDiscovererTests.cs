@@ -203,6 +203,103 @@ public class BenchmarkDiscovererTests
         var result = concat.SyncDelegate!(new ParameterisedBenchmarks());
         Assert.Equal("aaa", result);
     }
+
+    [Fact]
+    public void Discovers_Method_Level_Categories()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(CategorizedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(CategorizedBenchmarks));
+
+        var concat = suite.Benchmarks.First(b => b.DisplayName == "Concat");
+        Assert.Equal(["String", "Fast"], concat.Categories);
+
+        var manyConcat = suite.Benchmarks.First(b => b.DisplayName == "ManyConcat");
+        Assert.Equal(["String", "Slow"], manyConcat.Categories);
+    }
+
+    [Fact]
+    public void Class_Level_Categories_Union_With_Method_Level()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(CategorizedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(CategorizedBenchmarks));
+
+        var interpolate = suite.Benchmarks.First(b => b.DisplayName == "Interpolate");
+        Assert.Equal(["String", "Fast"], interpolate.Categories);
+    }
+
+    [Fact]
+    public void Inherited_Class_Level_Categories_Are_Applied()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(DerivedCategorizedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(DerivedCategorizedBenchmarks));
+
+        var declared = suite.Benchmarks.First(b => b.DisplayName == "Declared");
+        Assert.Contains("Base", declared.Categories);
+    }
+
+    [Fact]
+    public void Duplicate_Class_And_Method_Categories_Are_Deduplicated()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(CategorizedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(CategorizedBenchmarks));
+
+        var concat = suite.Benchmarks.First(b => b.DisplayName == "Concat");
+        Assert.Single(concat.Categories, c => string.Equals(c, "String", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Duplicate_Method_Level_Categories_Are_Deduplicated()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(MethodOnlyCategorizedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(MethodOnlyCategorizedBenchmarks));
+
+        var only = suite.Benchmarks.First(b => b.DisplayName == "Only");
+        Assert.Equal(["Fast"], only.Categories);
+    }
+
+    [Fact]
+    public void BenchmarkCategoryAttribute_Rejects_Blank_Name()
+    {
+        Assert.Throws<ArgumentException>(() => new BenchmarkCategoryAttribute("   "));
+    }
+}
+
+[BenchmarkCategory("String")]
+public class CategorizedBenchmarks
+{
+    [Benchmark]
+    [BenchmarkCategory("Fast")]
+    [BenchmarkCategory("String")]
+    public int Concat() => 1;
+
+    [Benchmark]
+    [BenchmarkCategory("Fast")]
+    public int Interpolate() => 2;
+
+    [Benchmark]
+    [BenchmarkCategory("Slow")]
+    public int ManyConcat() => 3;
+}
+
+[BenchmarkCategory("Base")]
+public class BaseCategorizedBenchmarks
+{
+    [Benchmark]
+    public int Inherited() => 1;
+}
+
+public class DerivedCategorizedBenchmarks : BaseCategorizedBenchmarks
+{
+    [Benchmark]
+    public int Declared() => 2;
+}
+
+public class MethodOnlyCategorizedBenchmarks
+{
+    [Benchmark]
+    [BenchmarkCategory(" Fast ")]
+    [BenchmarkCategory("fast")]
+    public int Only() => 1;
 }
 
 public class PublicBenchmarks

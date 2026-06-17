@@ -300,6 +300,67 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_Category_AddsToInclude()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--category", "String"]);
+        Assert.Empty(errors);
+        Assert.Equal(["String"], result.CategoryFilterInclude);
+        Assert.Empty(result.CategoryFilterExclude);
+    }
+
+    [Fact]
+    public void ParseCore_MultipleCategories_Are_OR()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--category", "String", "--category", "Memory"]);
+        Assert.Empty(errors);
+        Assert.Equal(["String", "Memory"], result.CategoryFilterInclude);
+    }
+
+    [Fact]
+    public void ParseCore_Category_Trims_And_Deduplicates_CaseInsensitive()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--category", " String ", "--category", "string"]);
+        Assert.Empty(errors);
+        Assert.Equal(["String"], result.CategoryFilterInclude);
+    }
+
+    [Fact]
+    public void ParseCore_ExcludeCategory_AddsToExclude()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--exclude-category", "Slow"]);
+        Assert.Empty(errors);
+        Assert.Equal(["Slow"], result.CategoryFilterExclude);
+    }
+
+    [Fact]
+    public void ParseCore_Category_MissingValue_ReturnsError()
+    {
+        var (_, errors) = CliArgs.ParseCore(["--category"]);
+        var error = Assert.Single(errors);
+        Assert.Contains("Missing value", error);
+    }
+
+    [Fact]
+    public void ParseCore_Category_BlankValue_ReturnsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--category", "   "]);
+
+        Assert.Empty(result.CategoryFilterInclude);
+        var error = Assert.Single(errors);
+        Assert.Contains("cannot be blank", error);
+    }
+
+    [Fact]
+    public void ParseCore_ExcludeCategory_BlankValue_ReturnsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--exclude-category", ""]);
+
+        Assert.Empty(result.CategoryFilterExclude);
+        var error = Assert.Single(errors);
+        Assert.Contains("cannot be blank", error);
+    }
+
+    [Fact]
     public void ParseCore_UnknownFlag_ReturnsError()
     {
         var (_, errors) = CliArgs.ParseCore(["--bogus-flag"]);

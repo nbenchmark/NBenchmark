@@ -10,6 +10,8 @@ public sealed class BenchmarkHost
 {
     private readonly List<Assembly> _assemblies = [];
     private readonly List<IReporter> _reporters = [];
+    private readonly List<string> _categoryFilterInclude = [];
+    private readonly List<string> _categoryFilterExclude = [];
     private CliArgs _cliArgs = new();
     private ReportDetail _detail;
     private Func<Type, InstanceHandle>? _instanceFactory;
@@ -174,6 +176,24 @@ public sealed class BenchmarkHost
         return this;
     }
 
+    /// <summary>
+    ///     Filters discovered benchmarks by category. Include rules are OR: a benchmark runs if
+    ///     it has any included category. Exclude rules are also OR: a benchmark is removed if it
+    ///     has any excluded category. Untagged benchmarks are excluded when any include filter
+    ///     is set. This programmatic filter composes with the <c>--category</c> and
+    ///     <c>--exclude-category</c> CLI flags.
+    /// </summary>
+    public BenchmarkHost WithCategoryFilter(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
+    {
+        if (include is not null)
+            AddCategories(_categoryFilterInclude, include, nameof(include));
+
+        if (exclude is not null)
+            AddCategories(_categoryFilterExclude, exclude, nameof(exclude));
+
+        return this;
+    }
+
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
     {
         return await IsolatedRunContext
@@ -213,7 +233,7 @@ public sealed class BenchmarkHost
             return Array.Empty<BenchmarkResult>();
         }
 
-        var filtered = FilterSuites(allSuites, _cliArgs.Filter);
+        var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude, _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);
 
         if (_cliArgs.ListOnly)
         {
@@ -223,8 +243,13 @@ public sealed class BenchmarkHost
 
                 foreach (var b in suite.Benchmarks)
                 {
+                    var categorySuffix = b.Categories.Count > 0
+                        ? $" [{string.Join(", ", b.Categories)}]"
+                        : "";
+
                     Console.WriteLine($"    {b.DisplayName}"
-                                      + (b.Attribute.Description is not null ? $" - {b.Attribute.Description}" : ""));
+                                      + (b.Attribute.Description is not null ? $" - {b.Attribute.Description}" : "")
+                                      + categorySuffix);
                 }
             }
 
@@ -416,7 +441,8 @@ public sealed class BenchmarkHost
                 var errored = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException("Could not instantiate benchmark class"), "Instance creation failed"),
                     $"{suite.Type.Name}.{benchmark.DisplayName}", benchmark.Attribute.Description, benchmark.Attribute.Baseline,
-                    suiteOptions, TimeSpan.Zero, TimeSpan.Zero, 0, null).Result;
+                    suiteOptions, TimeSpan.Zero, TimeSpan.Zero, 0, null,
+                    benchmark.Categories).Result;
 
                 allResults.Add(errored);
                 startIndex++;
@@ -549,7 +575,8 @@ public sealed class BenchmarkHost
                 result = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException(message), message),
                     name, benchmark.Attribute.Description, benchmark.Attribute.Baseline,
-                    _options, TimeSpan.Zero, TimeSpan.Zero, 0, null).Result;
+                    _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
+                    benchmark.Categories).Result;
 
                 raw = [];
             }
@@ -719,21 +746,70 @@ public sealed class BenchmarkHost
     }
 
     private static IReadOnlyList<BenchmarkSuiteDefinition> FilterSuites(
-        IReadOnlyList<BenchmarkSuiteDefinition> suites, string? filter)
+        IReadOnlyList<BenchmarkSuiteDefinition> suites,
+        string? filter,
+        IReadOnlyList<string> cliInclude,
+        IReadOnlyList<string> cliExclude,
+        IReadOnlyList<string> hostInclude,
+        IReadOnlyList<string> hostExclude)
     {
-        if (filter is null)
+        var hasIncludeFilter = cliInclude.Count > 0 || hostInclude.Count > 0;
+
+        if (filter is null && !hasIncludeFilter && cliExclude.Count == 0 && hostExclude.Count == 0)
             return suites;
 
-        return suites
+        var exclude = UnionCategories(cliExclude, hostExclude);
+
+        var filtered = suites
             .Select(s => s with
             {
                 Benchmarks = s.Benchmarks
-                    .Where(b => GlobMatcher.Match(filter,
-                        $"{s.Type.Name}.{b.DisplayName}"))
+                    .Where(b =>
+                    {
+                        if (filter is not null && !GlobMatcher.Match(filter, $"{s.Type.Name}.{b.DisplayName}"))
+                            return false;
+
+                        return CategoryFilter.Matches(b.Categories, cliInclude, hostInclude, exclude, hasIncludeFilter);
+                    })
                     .ToList(),
             })
             .Where(s => s.Benchmarks.Count > 0)
             .ToList();
+
+        return filtered;
+    }
+
+    private static void AddCategories(List<string> target, IEnumerable<string> source, string paramName)
+    {
+        foreach (var category in source)
+        {
+            if (string.IsNullOrWhiteSpace(category))
+                throw new ArgumentException("Category names cannot be null, empty, or whitespace.", paramName);
+
+            var normalized = category.Trim();
+
+            if (!target.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                target.Add(normalized);
+        }
+    }
+
+    private static IReadOnlyList<string> UnionCategories(IReadOnlyList<string> first, IReadOnlyList<string> second)
+    {
+        if (first.Count == 0)
+            return second;
+
+        if (second.Count == 0)
+            return first;
+
+        var merged = new List<string>(first);
+
+        foreach (var category in second)
+        {
+            if (!merged.Contains(category, StringComparer.OrdinalIgnoreCase))
+                merged.Add(category);
+        }
+
+        return merged;
     }
 
     private static MeasurementOptions MergeCliOptions(MeasurementOptions options, CliArgs cliArgs)

@@ -19,6 +19,8 @@ internal sealed record CliArgs
     public double? Alpha { get; init; }
     public OutlierMode? OutlierMode { get; init; }
     public IReadOnlyList<string> ReporterNames { get; init; } = [];
+    public IReadOnlyList<string> CategoryFilterInclude { get; init; } = [];
+    public IReadOnlyList<string> CategoryFilterExclude { get; init; } = [];
     public ReportDetail Detail { get; init; } = ReportDetail.Simple;
 
     /// <summary>
@@ -68,6 +70,8 @@ internal sealed record CliArgs
         int? warmupIterations = null;
         double? confidenceLevel = null;
         var reporterNames = new List<string>();
+        var categoryInclude = new List<string>();
+        var categoryExclude = new List<string>();
         var detail = ReportDetail.Simple;
 
         double? alpha = null;
@@ -117,6 +121,12 @@ internal sealed record CliArgs
                     break;
                 case "--output" when i + 1 < args.Length:
                     outputDir = PathValidation.ValidateOutputPath(args[++i]);
+                    break;
+                case "--category" when i + 1 < args.Length:
+                    AddCategory(args[++i], "--category", categoryInclude, errors);
+                    break;
+                case "--exclude-category" when i + 1 < args.Length:
+                    AddCategory(args[++i], "--exclude-category", categoryExclude, errors);
                     break;
                 case "--reporter" when i + 1 < args.Length:
                     reporterNames.Add(args[++i]);
@@ -274,10 +284,10 @@ internal sealed record CliArgs
 
                     break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
-                    or "--reporter" or "--confidence" or "--order" or "--threshold-pct" or "--seed" or "--alpha"
-                    or "--outlier" or "--detail" or "--profile" or "--auto-tune" or "--ops-per-sample"
-                    or "--ci-target" or "--min-samples" or "--max-samples" or "--min-warmup" or "--max-warmup"
-                    or "--max-tuning-time":
+                    or "--reporter" or "--category" or "--exclude-category" or "--confidence" or "--order"
+                    or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
+                    or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
+                    or "--min-warmup" or "--max-warmup" or "--max-tuning-time":
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -302,6 +312,8 @@ internal sealed record CliArgs
             Alpha = alpha,
             OutlierMode = outlierMode,
             ReporterNames = reporterNames,
+            CategoryFilterInclude = categoryInclude,
+            CategoryFilterExclude = categoryExclude,
             Detail = detail,
             InProcess = inProcess,
             Profile = profile,
@@ -369,12 +381,28 @@ internal sealed record CliArgs
         }
     }
 
+    private static void AddCategory(string rawValue, string flagName, List<string> target, List<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            errors.Add($"Invalid {flagName} value. Category names cannot be blank.");
+            return;
+        }
+
+        var normalized = rawValue.Trim();
+
+        if (!target.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+            target.Add(normalized);
+    }
+
     internal static void PrintHelp()
     {
         Console.WriteLine("Usage: myapp.exe [options]");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  --filter <pattern>     Run suites/methods matching glob (e.g., String*, *.Contains*)");
+        Console.WriteLine("  --category <name>      Include benchmarks tagged with this category (repeatable, OR)");
+        Console.WriteLine("  --exclude-category <name> Exclude benchmarks tagged with this category (repeatable, OR)");
         Console.WriteLine("  --iterations <n>       Pin measured sample count (default: auto, CI-driven)");
         Console.WriteLine("  --warmup <n>           Pin warmup sample count (default: auto, plateau-driven)");
         Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}");

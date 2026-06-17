@@ -43,6 +43,12 @@ public sealed record BenchmarkMethodDefinition(
     ///     <see cref="IsolationMode.Default" /> as per-class isolation.
     /// </summary>
     internal IsolationMode Isolation { get; init; }
+
+    /// <summary>
+    ///     Categories assigned to this benchmark through class-level and method-level
+    ///     <see cref="BenchmarkCategoryAttribute" />, merged by union.
+    /// </summary>
+    public IReadOnlyList<string> Categories { get; init; } = [];
 }
 
 /// <summary>

@@ -29,6 +29,7 @@ public sealed class ConsoleReporter : IReporter
         }
 
         var benchTable = BenchmarkTable.Build(results);
+        var showCategories = Detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
 
         if (benchTable.Rows.All(r => r.Errored))
         {
@@ -43,7 +44,7 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.WriteLine();
         RenderHeader(benchTable);
         AnsiConsole.WriteLine();
-        RenderComparisonTable(benchTable, results);
+        RenderComparisonTable(benchTable, results, Detail);
         AnsiConsole.WriteLine();
         RenderTimingDetail(benchTable);
         RenderAutoTune(benchTable);
@@ -95,10 +96,11 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.Write(panel);
     }
 
-    private static void RenderComparisonTable(BenchmarkTable benchTable, IReadOnlyList<BenchmarkResult> results)
+    private static void RenderComparisonTable(BenchmarkTable benchTable, IReadOnlyList<BenchmarkResult> results, ReportDetail detail)
     {
         var successfulRows = benchTable.Rows.Where(r => !r.Errored).ToList();
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
+        var showCategories = detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
 
         var table = new Table()
             .Border(TableBorder.Simple)
@@ -110,6 +112,9 @@ public sealed class ConsoleReporter : IReporter
             .AddColumn(new TableColumn("[bold]Sig[/]").Centered().NoWrap())
             .AddColumn(new TableColumn("[bold]Magnitude[/]").Centered().NoWrap())
             .AddColumn(new TableColumn("[bold]Alloc/op[/]").RightAligned().NoWrap());
+
+        if (showCategories)
+            table.AddColumn(new TableColumn("[bold]Categories[/]"));
 
         var hasDescriptions = results.Any(r => !string.IsNullOrEmpty(r.Description));
 
@@ -125,6 +130,9 @@ public sealed class ConsoleReporter : IReporter
                     $"[red]✗ {Esc(row.Name)}[/]",
                     "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
                 };
+
+                if (showCategories)
+                    errorCols.Add("[dim]-[/]");
 
                 if (hasDescriptions)
                     errorCols.Add("[dim]-[/]");
@@ -168,6 +176,9 @@ public sealed class ConsoleReporter : IReporter
                 magnitudeText,
                 allocText,
             };
+
+            if (showCategories)
+                rowCols.Add(row.Categories.Count > 0 ? Esc(string.Join(", ", row.Categories)) : "[dim]-[/]");
 
             if (hasDescriptions)
                 rowCols.Add(string.IsNullOrEmpty(row.Description) ? "" : Esc(row.Description));

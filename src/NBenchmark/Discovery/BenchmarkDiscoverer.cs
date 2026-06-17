@@ -45,9 +45,11 @@ public sealed class BenchmarkDiscoverer
             var iterSetupDel = BuildVoidDelegate(iterSetupMethod);
             var iterTeardownDel = BuildVoidDelegate(iterTeardownMethod);
 
+            var classCategories = ResolveCategories(type);
+
             var benchmarks = methods
                 .Where(m => m.GetCustomAttribute<BenchmarkAttribute>() is not null)
-                .SelectMany(m => BuildBenchmarkDefinitions(m, iterSetupDel, iterTeardownDel))
+                .SelectMany(m => BuildBenchmarkDefinitions(m, iterSetupDel, iterTeardownDel, classCategories))
                 .ToList();
 
             if (benchmarks.Count == 0)
@@ -75,7 +77,8 @@ public sealed class BenchmarkDiscoverer
     private static IEnumerable<BenchmarkMethodDefinition> BuildBenchmarkDefinitions(
         MethodInfo method,
         Action<object>? iterSetupDel,
-        Action<object>? iterTeardownDel)
+        Action<object>? iterTeardownDel,
+        IReadOnlyList<string> classCategories)
     {
         var attribute = method.GetCustomAttribute<BenchmarkAttribute>()!;
         var argumentSets = method.GetCustomAttributes<BenchmarkArgumentsAttribute>().ToArray();
@@ -92,7 +95,7 @@ public sealed class BenchmarkDiscoverer
             }
 
             yield return CreateDefinition(method, attribute, method.Name, null,
-                iterSetupDel, iterTeardownDel);
+                iterSetupDel, iterTeardownDel, classCategories);
 
             yield break;
         }
@@ -120,7 +123,7 @@ public sealed class BenchmarkDiscoverer
             var displayName = $"{method.Name}({string.Join(", ", rawArgs.Select(FormatArgument))})";
 
             yield return CreateDefinition(method, attribute, displayName, converted,
-                iterSetupDel, iterTeardownDel);
+                iterSetupDel, iterTeardownDel, classCategories);
         }
     }
 
@@ -130,7 +133,8 @@ public sealed class BenchmarkDiscoverer
         string displayName,
         object?[]? arguments,
         Action<object>? iterSetupDel,
-        Action<object>? iterTeardownDel)
+        Action<object>? iterTeardownDel,
+        IReadOnlyList<string> classCategories)
     {
         var isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
 
@@ -178,6 +182,7 @@ public sealed class BenchmarkDiscoverer
             IterationSetupDelegate = iterSetupDel,
             IterationTeardownDelegate = iterTeardownDel,
             Isolation = ResolveIsolationMode(method),
+            Categories = MergeCategories(classCategories, ResolveCategories(method)),
         };
     }
 
@@ -201,6 +206,40 @@ public sealed class BenchmarkDiscoverer
             return IsolationMode.PerBenchmark;
 
         return IsolationMode.Default;
+    }
+
+    private static IReadOnlyList<string> ResolveCategories(MemberInfo member)
+    {
+        var resolved = new List<string>();
+
+        foreach (var attribute in member.GetCustomAttributes<BenchmarkCategoryAttribute>(true))
+        {
+            if (!resolved.Contains(attribute.Name, StringComparer.OrdinalIgnoreCase))
+                resolved.Add(attribute.Name);
+        }
+
+        return resolved;
+    }
+
+    private static IReadOnlyList<string> MergeCategories(
+        IReadOnlyList<string> classCategories,
+        IReadOnlyList<string> methodCategories)
+    {
+        if (classCategories.Count == 0)
+            return methodCategories;
+
+        if (methodCategories.Count == 0)
+            return classCategories;
+
+        var merged = new List<string>(classCategories);
+
+        foreach (var category in methodCategories)
+        {
+            if (!merged.Contains(category, StringComparer.OrdinalIgnoreCase))
+                merged.Add(category);
+        }
+
+        return merged;
     }
 
     private static object?[] ConvertArguments(object[] arguments, ParameterInfo[] parameters)

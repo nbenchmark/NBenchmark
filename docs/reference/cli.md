@@ -36,6 +36,29 @@ dotnet run -- --filter StringBenchmarks.Concat   # exact match
 
 ---
 
+### `--category <name>`
+
+Include benchmarks tagged with the given category. Repeatable; multiple `--category` flags are combined with OR, so a benchmark runs if it has any of the included categories. Matching is case-insensitive and exact.
+
+```bash
+dotnet run -- --category String
+dotnet run -- --category String --category Memory
+```
+
+Untagged benchmarks are excluded when any `--category` flag is present.
+
+---
+
+### `--exclude-category <name>`
+
+Exclude benchmarks tagged with the given category. Repeatable; multiple `--exclude-category` flags are combined with OR, so a benchmark is removed if it has any of the excluded categories.
+
+```bash
+dotnet run -- --category String --exclude-category Slow
+```
+
+---
+
 ### `--iterations <n>`
 
 Pin the measured-sample count per benchmark, disabling auto-sampling. Valid range: `0` to `100 000`. Default: **auto** (sampling stops when the confidence interval meets `--ci-target`). Use `--dry-run` to skip measurement entirely rather than setting this to `0` manually.
