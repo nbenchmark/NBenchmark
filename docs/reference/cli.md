@@ -95,6 +95,7 @@ In auto mode NBenchmark resolves warmup length, measured-sample count, and ops-p
 | `--min-warmup <n>` | `8` | Floor on auto-detected warmup samples. |
 | `--max-warmup <n>` | `10000` | Ceiling on auto-detected warmup samples. |
 | `--max-tuning-time <s>` | `20` | Per-benchmark wall-clock safety cap, in seconds, for the whole adaptive loop. |
+| `--autotune-cap-behavior <mode>` | `warn` | What happens when the wall-clock cap is hit before the CI target or warmup plateau is reached: `warn` emits a warning; `error` marks the benchmark as errored. |
 
 ```bash
 # Quick feedback: fewer samples, looser CI

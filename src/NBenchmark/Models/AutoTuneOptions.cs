@@ -119,6 +119,13 @@ public sealed record AutoTuneOptions
     /// </summary>
     public TimeSpan MaxTuningTime { get; init; } = TimeSpan.FromSeconds(20);
 
+    /// <summary>
+    ///     What happens when the adaptive loop stops because it hit the wall-clock tuning cap
+    ///     before reaching the confidence-interval target or a steady warmup state. Default
+    ///     <see cref="AutoTuneCapBehavior.Warn" />.
+    /// </summary>
+    public AutoTuneCapBehavior CapBehavior { get; init; } = AutoTuneCapBehavior.Warn;
+
     /// <summary>Resolves a <see cref="AutoTunePreset" /> to its concrete options.</summary>
     public static AutoTuneOptions FromPreset(AutoTunePreset preset) => preset switch
     {

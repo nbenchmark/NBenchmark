@@ -110,7 +110,9 @@ await BenchmarkHost.Create(args)
     .RunAsync();
 ```
 
-`UseScopedDependencyInjection` is `WithScopedServiceProvider` under the hood. With `PerMethod`, each `[Benchmark]` method gets a fresh `MyDbContext` - no shared state, no cache contamination between methods. If you need one `DbContext` shared across all benchmark methods in a class, add `[InstanceLifetime(InstanceLifetime.PerClass)]`; the NB0011 analyzer warns on this combination.
+`UseScopedDependencyInjection` is `WithScopedServiceProvider` under the hood. With `PerMethod`, each `[Benchmark]` method gets a fresh `MyDbContext` - no shared state, no cache contamination between methods.
+
+> **Warning: shared state breaks statistical independence.** If you pair `WithScopedServiceProvider` with `[InstanceLifetime(InstanceLifetime.PerClass)]`, all `[Benchmark]` methods in the class share one instance. A scoped service like `DbContext` caches entities and queries in memory, so method A can warm the cache that method B reads. Method B's timings become artificially linked to method A running first, which violates the independence assumption of the Mann-Whitney U test used for significance. The NB0011 analyzer warns on this combination at compile time, but the warning is soft and can scroll past unnoticed in CI. See the [NB0011 reference](../reference/analyzers.md#nb0011---perclass-lifetime-with-scoped-service) for suppression guidance if sharing state is intentional.
 
 ## Constructor injection
 

@@ -386,6 +386,44 @@ public class CliArgsTests
         Assert.Null(result.Profile);
     }
 
+    [Theory]
+    [InlineData("warn", AutoTuneCapBehavior.Warn)]
+    [InlineData("error", AutoTuneCapBehavior.Error)]
+    [InlineData("WARN", AutoTuneCapBehavior.Warn)]
+    [InlineData("Error", AutoTuneCapBehavior.Error)]
+    public void ParseCore_AutoTuneCapBehavior_Valid_SetsBehavior(string value, AutoTuneCapBehavior expected)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--autotune-cap-behavior", value]);
+        Assert.Empty(errors);
+        Assert.Equal(expected, result.AutoTuneCapBehavior);
+    }
+
+    [Fact]
+    public void ParseCore_AutoTuneCapBehavior_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.AutoTuneCapBehavior);
+    }
+
+    [Fact]
+    public void ParseCore_AutoTuneCapBehavior_Invalid_ReturnsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--autotune-cap-behavior", "bogus"]);
+
+        Assert.Null(result.AutoTuneCapBehavior);
+        var error = Assert.Single(errors);
+        Assert.Contains("Invalid --autotune-cap-behavior", error);
+    }
+
+    [Fact]
+    public void ParseCore_AutoTuneCapBehavior_MissingValue_ReturnsError()
+    {
+        var (_, errors) = CliArgs.ParseCore(["--autotune-cap-behavior"]);
+
+        var error = Assert.Single(errors);
+        Assert.Contains("Missing value", error);
+    }
+
     [Fact]
     public void ParseCore_Profile_Invalid_ReturnsError()
     {
@@ -488,6 +526,7 @@ public class CliArgsTests
         Assert.Contains("--filter", stdout);
         Assert.Contains("--reporter", stdout);
         Assert.Contains("--seed", stdout);
+        Assert.Contains("--autotune-cap-behavior", stdout);
     }
 
     private static string CaptureConsoleOutput(Action action)

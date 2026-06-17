@@ -30,7 +30,7 @@ internal static class AdaptiveLoop
         var autoTune = o.AutoTune;
         var measureAllocations = o.MeasureAllocations;
         var forceGc = o.ForceGcBeforeEachIteration;
-        var maxTuningNs = autoTune.MaxTuningTime.TotalNanoseconds;
+        var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
         var calibrate = IsEligibleForCalibration(o, spec);
         var k = o.OpsPerSample ?? 1;
         double accumulatedNs = 0;
@@ -42,6 +42,7 @@ internal static class AdaptiveLoop
 
         // ----- Phase A: ops-per-sample calibration -----
         var calibrationCapped = false;
+        var calibrationSamples = 0;
 
         if (calibrate)
         {
@@ -67,6 +68,7 @@ internal static class AdaptiveLoop
                     var (elapsed, _) = AcquireSampleSync(body, spec, clock, probeK, false, forceGc);
                     totalBodyInvocations += probeK;
                     accumulatedNs += elapsed;
+                    calibrationSamples++;
                     if (elapsed < best)
                         best = elapsed;
                 }
@@ -91,7 +93,7 @@ internal static class AdaptiveLoop
 
         if (calibrationCapped)
         {
-            resolvedWarmup = 0;
+            resolvedWarmup = calibrationSamples;
             warmupStop = WarmupStopReason.WallClockCap;
         }
         else if (o.WarmupIterations is { } explicitWarmup)
@@ -201,7 +203,9 @@ internal static class AdaptiveLoop
         return BuildResult(
             timings, allocations, measuredDuration, resolvedWarmup, sampleCount, k,
             totalBodyInvocations, warmupStop, sampleStop, o.ConfidenceLevel,
-            clock.GetElapsedTime(tuningStartTimestamp));
+            clock.GetElapsedTime(tuningStartTimestamp),
+            calibrationCapped,
+            autoTune.MaxTuningTime);
     }
 
     public static async Task<AdaptiveResult> RunAsync(
@@ -216,7 +220,7 @@ internal static class AdaptiveLoop
         var autoTune = o.AutoTune;
         var measureAllocations = o.MeasureAllocations;
         var forceGc = o.ForceGcBeforeEachIteration;
-        var maxTuningNs = autoTune.MaxTuningTime.TotalNanoseconds;
+        var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
         var calibrate = IsEligibleForCalibration(o, spec);
         var k = o.OpsPerSample ?? 1;
         double accumulatedNs = 0;
@@ -228,6 +232,7 @@ internal static class AdaptiveLoop
 
         // ----- Phase A: ops-per-sample calibration -----
         var calibrationCapped = false;
+        var calibrationSamples = 0;
 
         if (calibrate)
         {
@@ -254,6 +259,7 @@ internal static class AdaptiveLoop
                         .ConfigureAwait(false);
                     totalBodyInvocations += probeK;
                     accumulatedNs += elapsed;
+                    calibrationSamples++;
                     if (elapsed < best)
                         best = elapsed;
                 }
@@ -278,7 +284,7 @@ internal static class AdaptiveLoop
 
         if (calibrationCapped)
         {
-            resolvedWarmup = 0;
+            resolvedWarmup = calibrationSamples;
             warmupStop = WarmupStopReason.WallClockCap;
         }
         else if (o.WarmupIterations is { } explicitWarmup)
@@ -389,7 +395,9 @@ internal static class AdaptiveLoop
         return BuildResult(
             timings, allocations, measuredDuration, resolvedWarmup, sampleCount, k,
             totalBodyInvocations, warmupStop, sampleStop, o.ConfidenceLevel,
-            clock.GetElapsedTime(tuningStartTimestamp));
+            clock.GetElapsedTime(tuningStartTimestamp),
+            calibrationCapped,
+            autoTune.MaxTuningTime);
     }
 
     private static bool IsEligibleForCalibration(MeasurementOptions o, RunSpec spec)
@@ -409,7 +417,9 @@ internal static class AdaptiveLoop
         WarmupStopReason warmupStop,
         SampleStopReason sampleStop,
         double confidenceLevel,
-        TimeSpan tuningWallClock)
+        TimeSpan tuningWallClock,
+        bool calibrationCapped,
+        TimeSpan maxTuningTime)
     {
         var timingsArray = timings.ToArray();
 
@@ -430,7 +440,50 @@ internal static class AdaptiveLoop
             TuningWallClock = tuningWallClock,
         };
 
-        return new AdaptiveResult(timingsArray, allocations?.ToArray(), measuredDuration, resolvedWarmup, diagnostic);
+        var warnings = BuildWallClockCapWarnings(warmupStop, sampleStop, calibrationCapped, maxTuningTime);
+
+        return new AdaptiveResult(timingsArray, allocations?.ToArray(), measuredDuration, resolvedWarmup, diagnostic, warnings);
+    }
+
+    private static IReadOnlyList<string> BuildWallClockCapWarnings(
+        WarmupStopReason warmupStop,
+        SampleStopReason sampleStop,
+        bool calibrationCapped,
+        TimeSpan maxTuningTime)
+    {
+        var capLabel = BenchmarkFormatter.FormatDuration(maxTuningTime);
+
+        if (calibrationCapped)
+        {
+            return
+            [
+                $"Calibration stopped at the wall-clock tuning cap ({capLabel}) "
+                + "before ops-per-sample could be resolved. The chosen K may be suboptimal. "
+                + "Consider increasing --max-tuning-time.",
+            ];
+        }
+
+        if (sampleStop == SampleStopReason.WallClockCap)
+        {
+            return
+            [
+                $"Measurement stopped at the wall-clock tuning cap ({capLabel}) "
+                + "before reaching the confidence-interval target. The reported error margin may be wider than requested. "
+                + "Consider increasing --max-tuning-time or pinning --iterations.",
+            ];
+        }
+
+        if (warmupStop == WarmupStopReason.WallClockCap)
+        {
+            return
+            [
+                $"Warmup stopped at the wall-clock tuning cap ({capLabel}) "
+                + "before the body reached a steady state. The remaining samples may be affected by JIT or cache warm-up. "
+                + "Consider increasing --max-tuning-time or pinning --warmup.",
+            ];
+        }
+
+        return [];
     }
 
     private static (double elapsedNs, long allocDelta) AcquireSampleSync(
@@ -508,10 +561,11 @@ internal static class AdaptiveLoop
     }
 }
 
-/// <summary>The output of one <see cref="AdaptiveLoop" /> pass: per-op timings/allocations and the resolved diagnostic.</summary>
+/// <summary>The output of one <see cref="AdaptiveLoop" /> pass: per-op timings/allocations, the resolved diagnostic, and any loop-level warnings.</summary>
 internal readonly record struct AdaptiveResult(
     double[] PerOpTimings,
     long[]? PerOpAllocations,
     TimeSpan MeasuredDuration,
     int ResolvedWarmup,
-    AutoTuneDiagnostic Diagnostic);
+    AutoTuneDiagnostic Diagnostic,
+    IReadOnlyList<string> Warnings);

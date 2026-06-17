@@ -175,10 +175,14 @@ public sealed class OrderBenchmarks(MyDbContext db)
 }
 ```
 
+**Why this matters.** The Mann-Whitney U test used for significance assumes samples are independent. When method A warms a shared cache that method B reads, method B's timings are artificially linked to method A running first. The shuffling math breaks and the significance verdict becomes unreliable. This is not a measurement-quality concern - it is a correctness concern for the statistical model.
+
 Typical fixes:
 
 1. Remove the attribute so the class uses `PerMethod`
 2. Keep `PerClass` and suppress with `#pragma warning disable NB0011` when sharing state is intentional
+
+> **CI note.** This is a compile-time warning, not a runtime error. In CI/CD pipelines the warning scrolls past in the build log and is easy to miss. If you suppress NB0011, verify that the shared state does not create a timing dependency between methods - for example, by running each method in isolation and comparing results.
 
 ## Disabling a rule
 

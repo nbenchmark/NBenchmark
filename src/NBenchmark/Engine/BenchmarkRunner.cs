@@ -164,10 +164,21 @@ public sealed class BenchmarkRunner
         long totalStartTimestamp,
         AdaptiveResult adaptive)
     {
+        if (spec.Options.AutoTune.CapBehavior == AutoTuneCapBehavior.Error
+            && (adaptive.Diagnostic.SampleStop == SampleStopReason.WallClockCap
+                || adaptive.Diagnostic.WarmupStop == WarmupStopReason.WallClockCap))
+        {
+            var ex = new InvalidOperationException(
+                FormatCapError(adaptive.Diagnostic, spec.Options.AutoTune.MaxTuningTime));
+            return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
+        }
+
         var pipeline = StatsPipeline.Run(adaptive.PerOpTimings, adaptive.PerOpAllocations, spec.Options);
+        var mergedWarnings = MergeWarnings(pipeline.Warnings, adaptive.Warnings);
+        var mergedPipeline = pipeline with { Warnings = mergedWarnings };
 
         return OutcomeBuilder.Build(
-            new RunOutcome.Success(pipeline, adaptive.PerOpTimings),
+            new RunOutcome.Success(mergedPipeline, adaptive.PerOpTimings),
             name,
             spec.Description,
             spec.IsBaseline,
@@ -177,6 +188,34 @@ public sealed class BenchmarkRunner
             adaptive.ResolvedWarmup,
             adaptive.Diagnostic,
             spec.Categories);
+    }
+
+    private static string FormatCapError(AutoTuneDiagnostic diagnostic, TimeSpan maxTuningTime)
+    {
+        var phase = diagnostic.WarmupStop == WarmupStopReason.WallClockCap
+            && diagnostic.SampleStop == SampleStopReason.WallClockCap
+                ? "Warmup and measurement"
+                : diagnostic.SampleStop == SampleStopReason.WallClockCap
+                    ? "Measurement"
+                    : "Warmup";
+
+        return $"{phase} stopped at the wall-clock tuning cap ({BenchmarkFormatter.FormatDuration(maxTuningTime)}) "
+               + "before reaching the requested precision. "
+               + "Use --autotune-cap-behavior warn to accept under-sampled results, "
+               + "or increase --max-tuning-time / pin --iterations / pin --warmup.";
+    }
+
+    private static IReadOnlyList<string> MergeWarnings(IReadOnlyList<string> pipelineWarnings, IReadOnlyList<string> adaptiveWarnings)
+    {
+        if (pipelineWarnings.Count == 0)
+            return adaptiveWarnings;
+        if (adaptiveWarnings.Count == 0)
+            return pipelineWarnings;
+
+        var merged = new List<string>(pipelineWarnings.Count + adaptiveWarnings.Count);
+        merged.AddRange(pipelineWarnings);
+        merged.AddRange(adaptiveWarnings);
+        return merged;
     }
 
     private MeasurementOutcome BuildErroredOutcome(string name, RunSpec spec, long totalStartTimestamp, Exception ex)

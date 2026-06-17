@@ -56,6 +56,8 @@ internal sealed record MeasurementOverrides
     public int? MaxWarmup { get; init; }
     public TimeSpan? MaxTuningTime { get; init; }
 
+    public AutoTuneCapBehavior? CapBehavior { get; init; }
+
     public static MeasurementOverrides FromCliArgs(CliArgs cliArgs) => new()
     {
         Iterations = cliArgs.Iterations,
@@ -74,6 +76,7 @@ internal sealed record MeasurementOverrides
         MinWarmup = cliArgs.MinWarmup,
         MaxWarmup = cliArgs.MaxWarmup,
         MaxTuningTime = cliArgs.MaxTuningTime,
+        CapBehavior = cliArgs.AutoTuneCapBehavior,
     };
 
     public MeasurementOptions Apply(MeasurementOptions options)
@@ -141,6 +144,12 @@ internal sealed record MeasurementOverrides
         if (MaxTuningTime.HasValue)
         {
             autoTune = autoTune with { MaxTuningTime = MaxTuningTime.Value };
+            autoTuneChanged = true;
+        }
+
+        if (CapBehavior.HasValue)
+        {
+            autoTune = autoTune with { CapBehavior = CapBehavior.Value };
             autoTuneChanged = true;
         }
 

@@ -524,7 +524,7 @@ public sealed class BenchmarkSuite(string name)
                 normalized.Add(trimmed);
         }
 
-        return [..normalized];
+        return [.. normalized];
     }
 
     private static void AddCategories(List<string> target, IEnumerable<string> source, string paramName)

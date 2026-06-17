@@ -25,11 +25,11 @@ public class AdaptiveLoopTests
 
         Assert.Equal(5, result.PerOpTimings.Length);
         Assert.All(result.PerOpTimings, t => Assert.Equal(1000.0, t));
-        Assert.Equal(3, result.ResolvedWarmup);
         Assert.Equal(2, result.Diagnostic.OpsPerSample);
         Assert.Equal(5, result.Diagnostic.ResolvedSamples);
         Assert.Equal(WarmupStopReason.ExplicitCount, result.Diagnostic.WarmupStop);
         Assert.Equal(SampleStopReason.ExplicitCount, result.Diagnostic.SampleStop);
+        Assert.Empty(result.Warnings);
         Assert.Equal((3 + 5) * 2L, result.Diagnostic.TotalBodyInvocations);
         Assert.Equal((3 + 5) * 2, bodyCalls);
     }
@@ -55,6 +55,7 @@ public class AdaptiveLoopTests
         // Constant signal: plateau settles at MinWarmup + PlateauPatience * BatchSize = 8 + 3 * 8 = 32.
         Assert.Equal(32, result.ResolvedWarmup);
         Assert.Equal(WarmupStopReason.Settled, result.Diagnostic.WarmupStop);
+        Assert.Empty(result.Warnings);
 
         // Only the 10 measured samples reach the stats; the 32-sample warmup prefix is discarded.
         Assert.Equal(10, result.PerOpTimings.Length);
@@ -88,6 +89,7 @@ public class AdaptiveLoopTests
         Assert.Equal(32, result.Diagnostic.ResolvedSamples);
         Assert.Equal(SampleStopReason.CiTargetMet, result.Diagnostic.SampleStop);
         Assert.Equal(0.0, result.Diagnostic.AchievedRelativeCiWidth, 10);
+        Assert.Empty(result.Warnings);
     }
 
     [Fact]
@@ -204,7 +206,7 @@ public class AdaptiveLoopTests
     }
 
     [Fact]
-    public void WallClock_Cap_Stops_A_Non_Converging_Measurement()
+    public void WallClock_Cap_Stops_A_Non_Converging_Measurement_And_Adds_Warning()
     {
         var options = MeasurementOptions.Default with
         {
@@ -223,6 +225,34 @@ public class AdaptiveLoopTests
         // Accumulated sample time crosses the 5000 ns cap on the 5th 1000 ns sample, far below MinSamples.
         Assert.Equal(SampleStopReason.WallClockCap, result.Diagnostic.SampleStop);
         Assert.Equal(5, result.PerOpTimings.Length);
+        Assert.Single(result.Warnings);
+        Assert.Contains("wall-clock tuning cap", result.Warnings[0]);
+        Assert.Contains("--max-tuning-time", result.Warnings[0]);
+    }
+
+    [Fact]
+    public void WallClock_Cap_During_Auto_Warmup_Adds_Warning()
+    {
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = null, // auto warmup
+            Iterations = 0,          // measurement phase exits immediately on explicit count
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50) }, // 5000 ns
+        };
+
+        // Constant 1000 ns/op signal will never settle to the plateau rule's satisfaction.
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.Equal(WarmupStopReason.WallClockCap, result.Diagnostic.WarmupStop);
+        Assert.True(result.ResolvedWarmup >= 0);
+        Assert.Single(result.Warnings);
+        Assert.Contains("Warmup stopped at the wall-clock tuning cap", result.Warnings[0]);
+        Assert.Contains("--max-tuning-time", result.Warnings[0]);
     }
 
     [Fact]
@@ -256,7 +286,79 @@ public class AdaptiveLoopTests
         Assert.Equal(4, result.PerOpTimings.Length);
         Assert.Equal(2, result.ResolvedWarmup);
         Assert.Equal(SampleStopReason.ExplicitCount, result.Diagnostic.SampleStop);
+        Assert.Empty(result.Warnings);
         Assert.Equal(2 + 4, bodyCalls); // warmup 2 + measured 4, at K = 1
+    }
+
+    [Fact]
+    public void WallClock_Cap_During_Calibration_Adds_Calibration_Warning_And_Skips_Warmup()
+    {
+        var bodyCalls = 0;
+        // Pin the calibrator so K is small and the search exhausts the cap while resolving K.
+        // Setting TargetSampleDurationNs very high makes the calibrator probe K = 1, 2, 4, 8 ...
+        // until the cap is hit before reaching the target.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = null,    // auto-calibrate K
+            WarmupIterations = null, // auto warmup (skipped if calibration is capped)
+            Iterations = 5,         // explicit measured count
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                MaxTuningTime = TimeSpan.FromTicks(50), // 5000 ns cap
+                TargetSampleDurationNs = 100_000_000,  // unreachable target so calibration probes several Ks
+            },
+        };
+
+        // Each sample takes 1000 ns; cap = 5000 ns so calibration exhausts it within ~5 probes.
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => bodyCalls++, options, clock);
+
+        // Both phases hit the shared cap: calibration exhausted the budget before settling,
+        // warmup is skipped (one budget check on the way in still trips), and the first
+        // measurement sample also trips the cap.
+        Assert.Equal(WarmupStopReason.WallClockCap, result.Diagnostic.WarmupStop);
+        Assert.Equal(SampleStopReason.WallClockCap, result.Diagnostic.SampleStop);
+        Assert.Single(result.Warnings);
+        Assert.Contains("Calibration stopped at the wall-clock tuning cap", result.Warnings[0]);
+        Assert.Contains("--max-tuning-time", result.Warnings[0]);
+        Assert.DoesNotContain("Warmup stopped", result.Warnings[0]);
+        Assert.True(result.ResolvedWarmup > 0);
+    }
+
+    [Fact]
+    public void WallClock_Cap_Warning_Shows_The_Cap_Not_The_Elapsed_Time()
+    {
+        // Auto warmup with a constant signal would normally settle at 32 samples
+        // (MinWarmup 8 + PlateauPatience 3 * BatchSize 8). Push MinWarmup + Patience high
+        // so the plateau would only settle well past the cap, and pair with a small cap
+        // so warmup exhausts the budget before plateau settles.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = null, // auto warmup
+            Iterations = 0,          // measurement exits immediately on explicit count
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                MaxTuningTime = TimeSpan.FromTicks(50), // 5000 ns cap
+                MinWarmup = 1_000,
+                PlateauPatience = 1_000,
+            },
+        };
+
+        var clock = new ScriptedClock(1000.0);
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.Equal(WarmupStopReason.WallClockCap, result.Diagnostic.WarmupStop);
+        Assert.Single(result.Warnings);
+        // The cap label (5.00 µs for a 5000 ns cap) appears in the warning; the elapsed text
+        // is not shown.
+        Assert.Contains("5.00 µs", result.Warnings[0]);
+        Assert.Contains("Warmup stopped at the wall-clock tuning cap", result.Warnings[0]);
     }
 
     private static AdaptiveResult RunSync(
@@ -275,29 +377,5 @@ public class AdaptiveLoopTests
 
         return AdaptiveLoop.Run(
             "bench", body, spec, clock, NullBenchmarkProgress.Instance, CancellationToken.None);
-    }
-
-    /// <summary>
-    ///     A lenient, fully deterministic <see cref="IClock" /> for adaptive-loop tests: each timed
-    ///     sample reads a scripted nanosecond value (by call index), and the clock never throws on
-    ///     exhaustion. Elapsed-time queries return a tick count derived from the timestamp counter,
-    ///     so measured/total durations stay monotonic without constraining the sample script.
-    /// </summary>
-    private sealed class ScriptedClock : IClock
-    {
-        private readonly Func<int, double> _sampleNs;
-        private long _timestamp;
-        private int _nsCall;
-
-        public ScriptedClock(double constantNs) => _sampleNs = _ => constantNs;
-
-        public ScriptedClock(Func<int, double> sampleNs) => _sampleNs = sampleNs;
-
-        public long GetTimestamp() => ++_timestamp;
-
-        public TimeSpan GetElapsedTime(long startTimestamp)
-            => TimeSpan.FromTicks(Math.Max(0, _timestamp - startTimestamp));
-
-        public double GetElapsedNanoseconds(long startTimestamp) => _sampleNs(_nsCall++);
     }
 }

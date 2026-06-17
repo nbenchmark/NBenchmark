@@ -298,9 +298,9 @@ public class BenchmarkRunnerTests
         var clock = new FakeClock([
             TimeSpan.FromTicks(120), // total
             TimeSpan.FromTicks(100), // tuning span
-            TimeSpan.FromTicks(80), // measured loop
-            TimeSpan.FromTicks(10), // sample 1
-            TimeSpan.FromTicks(30), // sample 2
+            TimeSpan.FromTicks(80),  // measured loop
+            TimeSpan.FromTicks(10),  // sample 1
+            TimeSpan.FromTicks(30),  // sample 2
         ]);
 
         var runner = new BenchmarkRunner(clock);
@@ -422,6 +422,92 @@ public class BenchmarkRunnerTests
         Assert.Equal(TimeSpan.FromTicks(77), outcome.Result.TotalDuration);
         Assert.Equal(TimeSpan.Zero, outcome.Result.MeasuredDuration);
         Assert.Equal(0, clock.PendingElapsedCount);
+    }
+
+    [Fact]
+    public void Run_WallClock_Cap_Warning_Flows_To_Result()
+    {
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                OpsPerSample = 1,
+                WarmupIterations = 0,
+                Iterations = null,
+                OutlierMode = OutlierMode.None,
+                MeasureAllocationsOverride = false,
+                AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50) },
+            },
+        };
+
+        var outcome = BenchmarkRunner.Instance.Run("cap", () => { }, spec);
+
+        Assert.False(outcome.Result.Errored);
+        Assert.Equal(SampleStopReason.WallClockCap, outcome.Result.AutoTune!.SampleStop);
+        Assert.Single(outcome.Result.Warnings);
+        Assert.Contains("wall-clock tuning cap", outcome.Result.Warnings[0]);
+        Assert.Contains("--max-tuning-time", outcome.Result.Warnings[0]);
+    }
+
+    [Fact]
+    public void Run_WallClock_Cap_With_Error_Behavior_Returns_Errored_Result()
+    {
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                OpsPerSample = 1,
+                WarmupIterations = 0,
+                Iterations = null,
+                OutlierMode = OutlierMode.None,
+                MeasureAllocationsOverride = false,
+                AutoTune = AutoTuneOptions.Default with
+                {
+                    MaxTuningTime = TimeSpan.FromTicks(50),
+                    CapBehavior = AutoTuneCapBehavior.Error,
+                },
+            },
+        };
+
+        var outcome = BenchmarkRunner.Instance.Run("cap-error", () => { }, spec);
+
+        Assert.True(outcome.Result.Errored);
+        Assert.NotNull(outcome.Result.ErrorMessage);
+        Assert.Contains("Measurement stopped at the wall-clock tuning cap", outcome.Result.ErrorMessage);
+        Assert.Contains("--autotune-cap-behavior warn", outcome.Result.ErrorMessage);
+        Assert.Equal(0, outcome.Result.Mean);
+        Assert.Equal(0, outcome.Result.MeasuredIterations);
+    }
+
+    [Fact]
+    public void Run_Warmup_Cap_With_Error_Behavior_Returns_Errored_Result()
+    {
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                OpsPerSample = 1,
+                WarmupIterations = null, // auto warmup
+                Iterations = 1,
+                OutlierMode = OutlierMode.None,
+                MeasureAllocationsOverride = false,
+                AutoTune = AutoTuneOptions.Default with
+                {
+                    MaxTuningTime = TimeSpan.FromTicks(50),
+                    CapBehavior = AutoTuneCapBehavior.Error,
+                },
+            },
+        };
+
+        // Use a deterministic clock so the tiny cap is reliably hit during warmup.
+        var clock = new ScriptedClock(1000.0);
+        var runner = new BenchmarkRunner(clock);
+
+        var outcome = runner.Run("warmup-cap-error", () => { }, spec);
+
+        Assert.True(outcome.Result.Errored);
+        Assert.NotNull(outcome.Result.ErrorMessage);
+        Assert.Contains("Warmup stopped at the wall-clock tuning cap", outcome.Result.ErrorMessage);
     }
 
     // ---------- Outlier mode + confidence level plumbing ----------

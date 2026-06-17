@@ -51,6 +51,8 @@ internal sealed record CliArgs
 
     public TimeSpan? MaxTuningTime { get; init; }
 
+    public AutoTuneCapBehavior? AutoTuneCapBehavior { get; init; }
+
     /// <summary>
     ///     Pure parse: tokenises <paramref name="args" />, validates ranges, and returns
     ///     both the structured result and any error messages. No console I/O, no
@@ -88,6 +90,7 @@ internal sealed record CliArgs
         int? minWarmup = null;
         int? maxWarmup = null;
         TimeSpan? maxTuningTime = null;
+        AutoTuneCapBehavior? autoTuneCapBehavior = null;
 
         var errors = new List<string>();
 
@@ -283,11 +286,22 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --max-tuning-time value '{args[i]}'. Must be a positive number of seconds.");
 
                     break;
+                case "--autotune-cap-behavior" when i + 1 < args.Length:
+                    var capBehaviorStr = args[++i];
+
+                    if (string.Equals(capBehaviorStr, "warn", StringComparison.OrdinalIgnoreCase))
+                        autoTuneCapBehavior = NBenchmark.AutoTuneCapBehavior.Warn;
+                    else if (string.Equals(capBehaviorStr, "error", StringComparison.OrdinalIgnoreCase))
+                        autoTuneCapBehavior = NBenchmark.AutoTuneCapBehavior.Error;
+                    else
+                        errors.Add($"Invalid --autotune-cap-behavior value '{capBehaviorStr}'. Must be 'warn' or 'error'.");
+
+                    break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--category" or "--exclude-category" or "--confidence" or "--order"
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
-                    or "--min-warmup" or "--max-warmup" or "--max-tuning-time":
+                    or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior":
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -327,6 +341,7 @@ internal sealed record CliArgs
             MinWarmup = minWarmup,
             MaxWarmup = maxWarmup,
             MaxTuningTime = maxTuningTime,
+            AutoTuneCapBehavior = autoTuneCapBehavior,
         }, errors);
     }
 
@@ -418,6 +433,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --min-warmup <n>       Minimum warmup samples in auto mode (default: 8)");
         Console.WriteLine("  --max-warmup <n>       Maximum warmup samples in auto mode (default: 10000)");
         Console.WriteLine("  --max-tuning-time <s>  Wall-clock cap per benchmark, in seconds (default: 20)");
+        Console.WriteLine("  --autotune-cap-behavior <mode>  Cap handling: warn (default) or error");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");
