@@ -58,6 +58,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IsolatedRuns", "samples\Iso
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MeasurementProfiles", "samples\MeasurementProfiles\MeasurementProfiles.csproj", "{FB0ED2EB-8F5D-4CA4-B252-EC30FAF5583A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Tool", "src\NBenchmark.Tool\NBenchmark.Tool.csproj", "{E4243414-45C5-4277-8021-9257A5E74EDF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -368,6 +370,18 @@ Global
 		{FB0ED2EB-8F5D-4CA4-B252-EC30FAF5583A}.Release|x64.Build.0 = Release|Any CPU
 		{FB0ED2EB-8F5D-4CA4-B252-EC30FAF5583A}.Release|x86.ActiveCfg = Release|Any CPU
 		{FB0ED2EB-8F5D-4CA4-B252-EC30FAF5583A}.Release|x86.Build.0 = Release|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Debug|x64.Build.0 = Debug|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Debug|x86.Build.0 = Debug|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Release|x64.ActiveCfg = Release|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Release|x64.Build.0 = Release|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Release|x86.ActiveCfg = Release|Any CPU
+		{E4243414-45C5-4277-8021-9257A5E74EDF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

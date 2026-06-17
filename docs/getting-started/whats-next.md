@@ -46,9 +46,9 @@ A full technical explanation of how every number in the output is calculated.
 
 ## I want to run benchmarks from the command line without recompiling
 
-Use `BenchmarkHost`, which parses CLI arguments automatically. You can filter benchmarks, change reporter, set output directories, and more.
+Use the `dotnet benchmark` global tool. It wraps Host mode into a single command, so you can run `[Benchmark]` methods from an existing assembly without creating a dedicated benchmark project.
 
-→ [CLI Reference](../reference/cli.md)
+→ [Guide: dotnet benchmark](../guides/dotnet-tool.md)
 
 ## My benchmark class needs dependencies (a repository, `DbContext`, logger, etc.)
 

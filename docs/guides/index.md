@@ -6,7 +6,7 @@ order: 2
 
 # Guides
 
-NBenchmark has three usage modes. Pick the one that matches your situation.
+NBenchmark has four usage modes. Pick the one that matches your situation.
 
 ## [Quick mode - Benchmark](./quick-mode.md)
 
@@ -50,6 +50,15 @@ public class MyBenchmarks
 }
 ```
 
+## [Global Tool - dotnet benchmark](./dotnet-tool.md)
+
+A dotnet global tool that wraps `BenchmarkHost` into a single command. Install once, then run benchmarks against any assembly without creating a project.
+
+```bash
+dotnet tool install -g NBenchmark.Tool
+dotnet benchmark --project ./MyBenchmarks --filter "*Sort*"
+```
+
 ## When to switch modes
 
 The modes are designed as an evolutionary path. Start simple, upgrade when your needs grow:
@@ -60,7 +69,9 @@ The modes are designed as an evolutionary path. Start simple, upgrade when your 
 
 3. **Graduate to Host mode** when your suite requires complex setup: mocked databases, loggers, `HttpClient`, or any dependency-injected service. Host mode discovers benchmarks by attribute, parses CLI flags, and supports constructor injection via the optional `NBenchmark.DependencyInjection` package.
 
-Because all three modes produce the same `BenchmarkResult` type, upgrading from one mode to the next is seamless - your reporters, file output, and analysis code work unchanged.
+4. **Use the Global Tool** when you already have a project with `[Benchmark]` methods and want to run them from the CLI without adding a `Program.cs`, NuGet references, or any project setup. The tool wraps Host mode into a single `dotnet benchmark` command.
+
+Because all four modes produce the same `BenchmarkResult` type, upgrading from one mode to the next is seamless - your reporters, file output, and analysis code work unchanged.
 
 ## [Report Detail Levels](./report-detail-levels.md)
 

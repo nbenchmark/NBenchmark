@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>NBenchmark.Tool</RootNamespace>
+    <AssemblyName>nbenchmark-tool</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>benchmark</ToolCommandName>
+    <PackageId>NBenchmark.Tool</PackageId>
+    <Description>dotnet global tool for running NBenchmark benchmarks from the command line. Discover and run [Benchmark] methods in any .NET assembly without creating a dedicated host project.</Description>
+    <PackageTags>benchmark;performance;measurement;microbenchmark;tool;cli</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NBenchmark\NBenchmark.csproj" />
+    <ProjectReference Include="..\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj" />
+  </ItemGroup>
+
+</Project>
