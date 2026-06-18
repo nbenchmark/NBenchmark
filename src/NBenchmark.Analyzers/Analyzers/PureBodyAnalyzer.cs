@@ -15,15 +15,15 @@ public sealed class PureBodyAnalyzer : DiagnosticAnalyzer
         "[Benchmark] body does no observable work",
         "Method '{0}' body does no observable work. The JIT may eliminate it entirely, producing 0 ns results.",
         "NBenchmark.Performance",
-        DiagnosticSeverity.Warning,
+        DiagnosticSeverity.Error,
         true);
 
     private static readonly DiagnosticDescriptor NoSideEffectRule = new(
         DiagnosticIds.NoObservableSideEffect,
         "[Benchmark] body has no observable side effects",
-        "Method '{0}' has no observable side effects in its void body. The JIT may optimize it away. Call a method or consume the result via Benchmark.Run<T>.",
+        "Method '{0}' has no observable side effects in its void body. The JIT may optimize it away. Return a value, call a side-effecting method, or suppress with #pragma warning disable NBenchmark.NB0004 if the analyzer cannot see the work.",
         "NBenchmark.Performance",
-        DiagnosticSeverity.Info,
+        DiagnosticSeverity.Error,
         true);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>

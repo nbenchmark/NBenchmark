@@ -13,7 +13,7 @@ public sealed class ThrowawayBodyAnalyzer : DiagnosticAnalyzer
     private const string BenchmarkClassName = "NBenchmark.Benchmark";
 
     private static readonly ImmutableHashSet<string> TargetMethodNames =
-        ImmutableHashSet.Create("Run", "RunRaw");
+        ImmutableHashSet.Create("Run", "RunAsync", "RunRaw", "RunRawAsync");
 
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticIds.ThrowawayBody,
@@ -64,7 +64,18 @@ public sealed class ThrowawayBodyAnalyzer : DiagnosticAnalyzer
 
         var invokeMethod = delegateType.DelegateInvokeMethod;
 
-        if (invokeMethod is null || !invokeMethod.ReturnsVoid)
+        if (invokeMethod is null)
+            return;
+
+        // The void-delegate (Action) overloads always return void. The async void-delegate
+        // overloads (Func<Task>) have a Task return type but still represent a void body for
+        // measurement purposes. T-returning overloads are handled by NBenchmark internally and
+        // should not be flagged.
+        var isVoidLike = invokeMethod.ReturnsVoid
+                         || (invokeMethod.ReturnType.IsReferenceType
+                             && invokeMethod.ReturnType.ToDisplayString() == "System.Threading.Tasks.Task");
+
+        if (!isVoidLike)
             return;
 
         var walker = new SideEffectWalker(context.SemanticModel);

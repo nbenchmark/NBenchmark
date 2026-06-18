@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using NBenchmark.Analyzers.Analyzers;
 
 namespace NBenchmark.Analyzers.Tests.Analyzers;
@@ -16,7 +17,7 @@ public sealed class PureBodyAnalyzerTests
                    """;
 
         await NBAnalyzerVerifier<PureBodyAnalyzer>
-            .VerifyAnalyzerAsync(code, "NB0005");
+            .VerifyAnalyzerAsync(code, "NB0005", DiagnosticSeverity.Error);
     }
 
     [Fact]
@@ -31,7 +32,7 @@ public sealed class PureBodyAnalyzerTests
                    """;
 
         await NBAnalyzerVerifier<PureBodyAnalyzer>
-            .VerifyAnalyzerAsync(code, "NB0004");
+            .VerifyAnalyzerAsync(code, "NB0004", DiagnosticSeverity.Error);
     }
 
     [Fact]
@@ -46,7 +47,22 @@ public sealed class PureBodyAnalyzerTests
                    """;
 
         await NBAnalyzerVerifier<PureBodyAnalyzer>
-            .VerifyAnalyzerAsync(code, "NB0004");
+            .VerifyAnalyzerAsync(code, "NB0004", DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public async Task Reports_diagnostic_when_incrementing_local()
+    {
+        var code = """
+                   using NBenchmark.Attributes;
+                   public class C {
+                       [Benchmark]
+                       public void M() { int x = 0; x++; }
+                   }
+                   """;
+
+        await NBAnalyzerVerifier<PureBodyAnalyzer>
+            .VerifyAnalyzerAsync(code, "NB0004", DiagnosticSeverity.Error);
     }
 
     [Fact]
@@ -177,18 +193,4 @@ public sealed class PureBodyAnalyzerTests
             .VerifyNoDiagnosticAsync(code, "NB0004");
     }
 
-    [Fact]
-    public async Task Reports_diagnostic_when_incrementing_local()
-    {
-        var code = """
-                   using NBenchmark.Attributes;
-                   public class C {
-                       [Benchmark]
-                       public void M() { int x = 0; x++; }
-                   }
-                   """;
-
-        await NBAnalyzerVerifier<PureBodyAnalyzer>
-            .VerifyAnalyzerAsync(code, "NB0004");
-    }
 }

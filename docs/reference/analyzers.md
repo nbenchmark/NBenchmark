@@ -23,13 +23,13 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0001 | Benchmark class must have a public parameterless constructor | Warning | A class or record with `[Benchmark]` methods has no public parameterless constructor. Add one, or use `NBenchmark.DependencyInjection`. |
 | NB0002 | `[Benchmark]` method must not be static | Error | A method is marked `[Benchmark]` but is `static`. Only instance methods are discovered. Remove the `static` keyword. |
 | NB0003 | `[BenchmarkArguments]` must match method parameters | Error | The number of `[BenchmarkArguments]` values does not match the method's parameter count, or `[BenchmarkArguments]` is present when the method has no parameters. |
-| NB0004 | `[Benchmark]` body has no observable side effects | Info | A void `[Benchmark]` method body has no observable side effects. The JIT may eliminate it, producing 0 ns results. |
-| NB0005 | `[Benchmark]` body does no observable work | Warning | A void `[Benchmark]` method has an empty body (no statements at all). The JIT will eliminate it. |
+| NB0004 | `[Benchmark]` body has no observable side effects | Error | A void `[Benchmark]` method body has no observable side effects. The JIT may eliminate it, producing 0 ns results. |
+| NB0005 | `[Benchmark]` body does no observable work | Error | A void `[Benchmark]` method has an empty body (no statements at all). The JIT will eliminate it. |
 | NB0006 | Multiple `[Benchmark(Baseline = true)]` methods in the same class | Error | Only one benchmark per class can have `Baseline = true`. Remove the attribute from all but one. |
 | NB0007 | Duplicate lifecycle method in benchmark class | Error | Two methods in the same class share the same lifecycle attribute (`[BenchmarkSetup]`, `[BenchmarkTeardown]`, `[BenchmarkIterationSetup]`, `[BenchmarkIterationTeardown]`). Remove the duplicate. |
 | NB0008 | `[Benchmark]` property value out of range | Error | `Iterations` or `WarmupIterations` on `[Benchmark]` is outside the valid range (0-100000 for iterations, 0-10000 for warmup, or -1 for the default). |
 | NB0009 | `MeasurementOptions` property value out of range | Error | `Iterations`, `WarmupIterations`, or `ConfidenceLevel` in a `MeasurementOptions` object initializer or `with` expression is outside the valid range. |
-| NB0010 | Benchmark body is throwaway | Warning | A lambda passed to the `Action` overloads of `Benchmark.Run()` or `Benchmark.RunRaw()` has no observable side effects. The JIT may eliminate it, producing 0 ns results. |
+| NB0010 | Benchmark body is throwaway | Warning | A lambda passed to the `Action` overloads of `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, or `Benchmark.RunRawAsync()` has no observable side effects. The JIT may eliminate it, producing 0 ns results. |
 | NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that looks scoped (for example `DbContext`, `UnitOfWork`, or a disposable service), which can leak warmed state across benchmark methods. |
 
 ### NB0001 - Missing parameterless constructor
@@ -97,14 +97,44 @@ If a `[Benchmark]` method body contains only pure operations (local variable ass
 - No `await` expressions
 - No object or array allocations
 
+These diagnostics are `Error` severity in host mode because a benchmark with no observable work is not a measurement issue - it is an invalid benchmark definition. The build fails so the problem is caught in CI/CD before the suite runs.
+
 ```csharp
-// Bad - JIT will eliminate this
+// Bad - build fails with NB0005
 [Benchmark]
-public void Measure() { for (var i = 0; i < 1000; i++) { } }
+public void Empty() { }
+
+// Bad - build fails with NB0004
+[Benchmark]
+public void PureLoop() { for (var i = 0; i < 1000; i++) { } }
 
 // Good - side effect through a consumed return value
 [Benchmark]
 public int Measure() { return Compute(); }
+
+// Good - observable side effect
+[Benchmark]
+public void Mutate() { _counter++; }
+```
+
+When the analyzer cannot see the work because it happens outside the method syntax (for example native interop, external state mutation, or calls the analyzer does not recognize), suppress the diagnostic locally and document why:
+
+```csharp
+#pragma warning disable NBenchmark.NB0004 // P/Invoke call mutates native state
+[Benchmark]
+public void NativeBuffer()
+{
+    NativeMethods.FillBuffer(_buffer);
+}
+#pragma warning restore NBenchmark.NB0004
+```
+
+You can also lower the severity project-wide in `.editorconfig` if your codebase frequently encounters false positives:
+
+```ini
+[*.cs]
+dotnet_diagnostic.NB0004.severity = warning
+dotnet_diagnostic.NB0005.severity = warning
 ```
 
 ### NB0006 - Multiple baselines
@@ -145,21 +175,23 @@ var opts2 = new MeasurementOptions() with { Iterations = 200000 };
 
 ### NB0010 - Throwaway lambda body
 
-When a lambda expression passed to the `Action` overloads of `Benchmark.Run()` or `Benchmark.RunRaw()` has no observable side effects, the JIT may eliminate it. An empty lambda or one that only assigns to a local variable has no observable effect on the program state.
+When a lambda expression passed to an `Action` overload of `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, or `Benchmark.RunRawAsync()` has no observable side effects, the JIT may eliminate it. An empty lambda or one that only assigns to a local variable has no observable effect on the program state.
+
+NB0010 is a `Warning` because quick mode is intended for ad-hoc exploration. Warnings do not break the build, so you can start with a simple lambda and iterate.
 
 ```csharp
-// Bad - empty lambda, nothing to measure
+// Warning - empty lambda, nothing to measure
 Benchmark.Run(() => { });
 
-// Bad - assigns to a local; local is discarded
+// Warning - assigns to a local; local is discarded
 Benchmark.Run(() => { var x = 42; });
 
-// Good - has observable side effects (field write, method call, etc.)
+// No warning - has observable side effects (field write, method call, etc.)
 Benchmark.Run(() => { _x = 42; });
 Benchmark.Run(() => Compute());  // method call
 ```
 
-Note: NB0010 inspects only overloads whose first parameter is an `Action` (void delegate). `Benchmark.Run<T>`, `Benchmark.RunAsync`, `Benchmark.RunAsync<T>`, and `RunRaw` overloads that accept value-returning delegates are not flagged.
+Value-returning overloads such as `Benchmark.Run<T>`, `Benchmark.RunAsync<T>`, `Benchmark.RunRaw<T>`, and `Benchmark.RunRawAsync<T>` are not flagged because NBenchmark consumes the returned value internally, which prevents dead-code elimination.
 
 ### NB0011 - `PerClass` lifetime with scoped service
 
@@ -186,14 +218,14 @@ Typical fixes:
 
 ## Disabling a rule
 
-Use a `#pragma` directive to suppress a specific diagnostic:
+Use a `#pragma` directive to suppress a specific diagnostic. Always add a comment explaining why the suppression is legitimate:
 
 ```csharp
-#pragma warning disable NB0004
+#pragma warning disable NB0004 // P/Invoke mutates native state that the analyzer cannot see
 [Benchmark]
 public void Measure()
 {
-    for (var i = 0; i < 1000; i++) { }
+    NativeMethods.FillBuffer(_buffer);
 }
 #pragma warning restore NB0004
 ```
@@ -207,4 +239,22 @@ dotnet_diagnostic.NB0004.severity = none
 
 ## Severity
 
-Most diagnostics have the default severity listed in the table above. The NB0002 and NB0003 diagnostics are `Error` because they prevent discovery entirely. NB0006, NB0007, NB0008, and NB0009 are `Error` because they represent definite configuration mistakes. NB0001, NB0010, and NB0011 are `Warning` because the code can still run but the measurements may be invalid. NB0004 is `Info` because the heuristic is conservative and may have false positives.
+Diagnostics use the default severity listed in the table above. The default is chosen by where the problem sits on the invalid-to-suspicious spectrum:
+
+- **Errors** mean the benchmark cannot run or will produce meaningless results. NB0002, NB0003, NB0004, NB0005, NB0006, NB0007, NB0008, and NB0009 are errors.
+- **Warnings** mean the code can run but the measurements may be invalid. NB0001, NB0010, and NB0011 are warnings.
+
+You can override the severity of any diagnostic in `.editorconfig`. For example, to make all throwaway-lambda warnings errors in quick mode too:
+
+```ini
+[*.cs]
+dotnet_diagnostic.NB0010.severity = error
+```
+
+Or to downgrade host-mode body-effect errors to warnings in a legacy codebase while you migrate:
+
+```ini
+[*.cs]
+dotnet_diagnostic.NB0004.severity = warning
+dotnet_diagnostic.NB0005.severity = warning
+```

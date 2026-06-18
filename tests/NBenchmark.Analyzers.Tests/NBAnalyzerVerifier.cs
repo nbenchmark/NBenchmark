@@ -118,13 +118,16 @@ public static class NBAnalyzerVerifier<TAnalyzer>
 {
     private static readonly TAnalyzer Analyzer = new();
 
-    public static async Task VerifyAnalyzerAsync(string source, string diagnosticId)
+    public static async Task VerifyAnalyzerAsync(string source, string diagnosticId, DiagnosticSeverity? expectedSeverity = null)
     {
         var analyzerDiagnostics = await GetDiagnosticsAsync(source);
-        var msg = string.Join("\n", analyzerDiagnostics.Select(d => $"  [{d.Id}] {d.GetMessage()}"));
+        var msg = string.Join("\n", analyzerDiagnostics.Select(d => $"  [{d.Id}] {d.GetMessage()} ({d.Severity})"));
         Assert.True(analyzerDiagnostics.Length > 0,
             $"Expected diagnostic '{diagnosticId}' but found none.\nAll diagnostics: {msg}");
-        Assert.Contains(analyzerDiagnostics, d => d.Id == diagnosticId);
+        var match = analyzerDiagnostics.FirstOrDefault(d => d.Id == diagnosticId);
+        Assert.True(match is { Id: not null }, $"Expected diagnostic '{diagnosticId}' but found:\n{msg}");
+        if (expectedSeverity.HasValue)
+            Assert.Equal(expectedSeverity.Value, match.Severity);
     }
 
     public static async Task VerifyNoDiagnosticAsync(string source)
