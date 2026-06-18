@@ -259,6 +259,34 @@ public class BenchmarkSuiteTests
         Assert.Contains(results, r => r.Name == "b");
     }
 
+    [Fact]
+    public async Task RunAsync_Random_Order_Shuffles_NonParameterized_Suite()
+    {
+        var progress = new CapturingProgress();
+
+        var results = await new BenchmarkSuite("shuffle")
+            .Add("a", () => { })
+            .Add("b", () => { })
+            .Add("c", () => { })
+            .Add("d", () => { })
+            .Add("e", () => { })
+            .WithWarmup(0)
+            .WithIterations(1)
+            .WithOutlierMode(OutlierMode.None)
+            .WithRunOrder(RunOrder.Random)
+            .WithProgress(progress)
+            .RunAsync();
+
+        Assert.Equal(5, results.Count);
+        Assert.Equal(5, progress.BenchmarkStarts.Count);
+
+        var names = progress.BenchmarkStarts.Select(s => s.Name).ToList();
+        Assert.Equal(5, names.Distinct().Count());
+
+        var declarationOrder = new[] { "a", "b", "c", "d", "e" };
+        Assert.NotEqual(declarationOrder, names);
+    }
+
     private sealed class OrderingProgress : IBenchmarkProgress
     {
         private readonly Action _onSuiteCompleted;

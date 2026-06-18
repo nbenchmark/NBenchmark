@@ -10,6 +10,9 @@ internal sealed record BenchmarkEnvelope(
     IReadOnlyList<string> Categories,
     Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> RunAsync)
 {
+    public string OriginalName { get; init; } = Name;
+    public IReadOnlyList<BenchmarkParameter> ParameterSet { get; init; } = [];
+
     public static BenchmarkEnvelope FromDiscovered(
         BenchmarkMethodDefinition method,
         string className,
@@ -34,9 +37,6 @@ internal sealed record BenchmarkEnvelope(
             var instance = instanceFactory();
             var specWithOverride = spec;
 
-            // Apply per-method [Benchmark] count overrides unless this is a dry-run (Iterations == 0),
-            // which must stay a dry-run regardless of attribute values. Auto mode (null) still
-            // honours method-level overrides.
             if (spec.Options.Iterations is not 0)
             {
                 var overriddenOptions = spec.Options;

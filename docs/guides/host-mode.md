@@ -1,7 +1,7 @@
 ---
 title: "Host mode: BenchmarkHost"
 description: Attribute-based benchmark discovery with a built-in command-line interface.
-order: 3
+order: 4
 ---
 
 # Host mode: BenchmarkHost
@@ -411,6 +411,7 @@ dotnet run -- --dry-run
 
 ## Next steps
 
+- [Parameterized benchmarks](./parameterized-benchmarks.md) - `[BenchmarkCase]` and `[BenchmarkCases]` in depth, plus comparison with suite mode
 - [CLI Reference](../reference/cli.md) - all command-line flags
 - [Configuration](../reference/configuration.md) - options reference
-- [Reporters](../reporters/) - all reporters
+- [Reporters](../reporters/) - all available reporters

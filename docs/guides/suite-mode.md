@@ -106,6 +106,7 @@ await new BenchmarkSuite("name")
     .Add(...)
     .Add(...)
     .WithBaseline("name")           // which benchmark is the 1.00x reference
+    .WithParameter("size", 10, 100) // expand parameterized benchmarks across values
     .WithIterations(200)            // pin measured samples (default: auto)
     .WithWarmup(25)                 // pin warmup samples (default: auto)
     .WithAllocations()              // enable allocation tracking
@@ -181,6 +182,22 @@ await new BenchmarkSuite("sorting")
 
 `WithIsolation(false)` is the default (in-process). The child rebuilds the suite from your own `Main`, so custom `IOutlierDetector` / `ISignificanceTest` instances and suite setup/teardown are preserved. Isolated runs always execute in declaration order. See [Isolated Runs](./isolated-runs.md) for the full model.
 
+## Parameterized benchmarks
+
+Use `WithParameter` and typed `Add` overloads to run the same benchmark body across multiple input values. Each parameter combination produces a separate benchmark entry with a distinct name like `"sort (size=10)"`. See [Parameterized benchmarks](./parameterized-benchmarks.md) for the full guide.
+
+```csharp
+var results = await new BenchmarkSuite("sorting")
+    .WithParameter("size", 10, 100, 1000)
+    .Add("sort", (int size) =>
+    {
+        var arr = Enumerable.Range(0, size).Reverse().ToArray();
+        Array.Sort(arr);
+    })
+    .WithRunOrder(RunOrder.Declaration)
+    .RunAsync();
+```
+
 ## Run order
 
 By default benchmarks run in a **random** order (Fisher-Yates shuffle). This guards against systematic bias where the first benchmark always benefits from a warm CPU cache.
@@ -226,6 +243,7 @@ Errored benchmarks have `result.Errored == true` and a message in `result.ErrorM
 
 ## Next steps
 
+- [Parameterized benchmarks](./parameterized-benchmarks.md) - run benchmarks across multiple input values
 - [Host mode: BenchmarkHost](./host-mode.md) - attribute-based discovery and CLI control
 - [Configuration](../reference/configuration.md) - full options reference
 - [Reporters](../reporters/) - all available reporters
