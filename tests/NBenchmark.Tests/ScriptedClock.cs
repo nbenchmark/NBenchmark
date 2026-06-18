@@ -12,12 +12,18 @@ namespace NBenchmark.Tests;
 internal sealed class ScriptedClock : IClock
 {
     private readonly Func<int, double> _sampleNs;
-    private long _timestamp;
     private int _nsCall;
+    private long _timestamp;
 
-    public ScriptedClock(double constantNs) => _sampleNs = _ => constantNs;
+    public ScriptedClock(double constantNs)
+    {
+        _sampleNs = _ => constantNs;
+    }
 
-    public ScriptedClock(Func<int, double> sampleNs) => _sampleNs = sampleNs;
+    public ScriptedClock(Func<int, double> sampleNs)
+    {
+        _sampleNs = sampleNs;
+    }
 
     public long GetTimestamp() => ++_timestamp;
 

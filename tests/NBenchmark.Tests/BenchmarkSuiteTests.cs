@@ -204,7 +204,7 @@ public class BenchmarkSuiteTests
     public void WithCategoryFilter_WithBlankCategory_Throws()
     {
         var suite = new BenchmarkSuite("bad-filter");
-        Assert.Throws<ArgumentException>(() => suite.WithCategoryFilter(include: [" "]));
+        Assert.Throws<ArgumentException>(() => suite.WithCategoryFilter([" "]));
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class BenchmarkSuiteTests
             .Add("fast", () => { }, categories: ["Fast"])
             .Add("slow", () => { }, categories: ["Slow"])
             .Add("untagged", () => { })
-            .WithCategoryFilter(include: ["Fast"])
+            .WithCategoryFilter(["Fast"])
             .WithWarmup(0)
             .WithIterations(1)
             .WithOutlierMode(OutlierMode.None)
@@ -248,7 +248,7 @@ public class BenchmarkSuiteTests
             .Add("a", () => { }, categories: ["A"])
             .Add("b", () => { }, categories: ["B"])
             .Add("c", () => { }, categories: ["C"])
-            .WithCategoryFilter(include: ["A", "B"])
+            .WithCategoryFilter(["A", "B"])
             .WithWarmup(0)
             .WithIterations(1)
             .WithOutlierMode(OutlierMode.None)

@@ -192,5 +192,4 @@ public sealed class PureBodyAnalyzerTests
         await NBAnalyzerVerifier<PureBodyAnalyzer>
             .VerifyNoDiagnosticAsync(code, "NB0004");
     }
-
 }

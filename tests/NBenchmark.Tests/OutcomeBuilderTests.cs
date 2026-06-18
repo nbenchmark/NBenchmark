@@ -63,8 +63,8 @@ public class OutcomeBuilderTests
             options,
             total,
             measured,
-            resolvedWarmup: 5,
-            autoTune: diagnostic);
+            5,
+            diagnostic);
 
         Assert.Equal(rawTimings, outcome.RawSamples);
         var r = outcome.Result;
@@ -174,6 +174,7 @@ public class OutcomeBuilderTests
     public void Build_Success_Flows_ResolvedWarmup_And_AutoTune_Diagnostic()
     {
         var stats = new StatsSummary { Mean = 1 };
+
         var diagnostic = new AutoTuneDiagnostic
         {
             ResolvedWarmup = 12,
@@ -194,8 +195,8 @@ public class OutcomeBuilderTests
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1),
-            resolvedWarmup: 12,
-            autoTune: diagnostic);
+            12,
+            diagnostic);
 
         Assert.Equal(12, outcome.Result.WarmupIterations);
         Assert.Equal(diagnostic, outcome.Result.AutoTune);
@@ -316,7 +317,7 @@ public class OutcomeBuilderTests
             options,
             total,
             measured,
-            resolvedWarmup: 4);
+            4);
 
         Assert.Empty(outcome.RawSamples);
         var r = outcome.Result;

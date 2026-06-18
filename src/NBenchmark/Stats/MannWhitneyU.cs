@@ -87,6 +87,7 @@ public static class MannWhitneyU
 
         var u1 = r1 - (double)n1 * (n1 + 1) / 2.0;
         var u2 = (double)n1 * n2 - u1;
+
         // Cliff's delta: δ = P(B > A) - P(B < A) = (U2 - U1) / (n1 * n2).
         // Positive δ means the candidate (group B) tends to be larger (slower) than
         // the baseline (group A).

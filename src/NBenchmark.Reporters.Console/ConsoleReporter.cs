@@ -362,9 +362,7 @@ public sealed class ConsoleReporter : IReporter
                 + $"[{color}]{verdict}[/] [grey](α = {benchTable.SignificanceLevel:0.###})[/]");
         }
         else
-        {
             AnsiConsole.MarkupLine("[grey]Omnibus:[/] [dim]not run (fewer than 3 comparable groups)[/]");
-        }
 
         var testName = benchTable.Omnibus?.TestName ?? benchTable.SignificanceTestName;
 
@@ -372,6 +370,7 @@ public sealed class ConsoleReporter : IReporter
             $"[grey]Significance:[/] [dim]{Esc(testName)} (p < {benchTable.SignificanceLevel:0.###})[/]");
 
         AnsiConsole.MarkupLine($"[grey]Outliers:[/] [dim]{Esc(benchTable.OutlierDetector)}[/]");
+
         AnsiConsole.MarkupLine(
             $"[grey]Effect metric:[/] [dim]{Esc(GetEffectMetricSummary(benchTable.Rows))}[/]");
 

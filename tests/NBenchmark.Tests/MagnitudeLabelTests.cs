@@ -14,20 +14,15 @@ public class MagnitudeLabelTests
     [InlineData(0.473, MagnitudeLabel.Medium)]
     [InlineData(0.474, MagnitudeLabel.Large)]
     [InlineData(1.0, MagnitudeLabel.Large)]
-    public void Classify_Applies_Romano_Thresholds(double absDelta, MagnitudeLabel expected)
-    {
+    public void Classify_Applies_Romano_Thresholds(double absDelta, MagnitudeLabel expected) =>
         Assert.Equal(expected, MagnitudeLabelExtensions.Classify(absDelta));
-    }
 
     [Theory]
     [InlineData(MagnitudeLabel.Negligible, "neg")]
     [InlineData(MagnitudeLabel.Small, "small")]
     [InlineData(MagnitudeLabel.Medium, "med")]
     [InlineData(MagnitudeLabel.Large, "large")]
-    public void ToShortString_Exhaustively_Maps_Each_Value(MagnitudeLabel label, string expected)
-    {
-        Assert.Equal(expected, label.ToShortString());
-    }
+    public void ToShortString_Exhaustively_Maps_Each_Value(MagnitudeLabel label, string expected) => Assert.Equal(expected, label.ToShortString());
 
     [Fact]
     public void EffectSizeFactory_ForCliffsDelta_Populates_Default_Metadata()

@@ -234,14 +234,15 @@ public class ReporterTests
         try
         {
             var reporter = new CsvReporter(tempDir, "out.csv");
+
             var result = MakeResult("alpha", 100) with
             {
                 Effect = new EffectSize(
-                    Metric: "median-ratio",
-                    Value: 0.42,
-                    Magnitude: "small",
-                    Direction: EffectDirection.CandidateHigher,
-                    PracticalValue: 0.42),
+                    "median-ratio",
+                    0.42,
+                    "small",
+                    EffectDirection.CandidateHigher,
+                    0.42),
             };
 
             await reporter.ReportAsync([result]);
@@ -509,7 +510,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Simple);
+            var reporter = new MarkdownReporter(tempDir, "out.md");
             var result = MakeResult("alpha", 100) with { Categories = ["String"] };
 
             await reporter.ReportAsync([result]);

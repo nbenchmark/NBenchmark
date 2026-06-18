@@ -298,9 +298,9 @@ public class BenchmarkRunnerTests
         var clock = new FakeClock([
             TimeSpan.FromTicks(120), // total
             TimeSpan.FromTicks(100), // tuning span
-            TimeSpan.FromTicks(80),  // measured loop
-            TimeSpan.FromTicks(10),  // sample 1
-            TimeSpan.FromTicks(30),  // sample 2
+            TimeSpan.FromTicks(80), // measured loop
+            TimeSpan.FromTicks(10), // sample 1
+            TimeSpan.FromTicks(30), // sample 2
         ]);
 
         var runner = new BenchmarkRunner(clock);

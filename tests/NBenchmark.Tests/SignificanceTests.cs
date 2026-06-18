@@ -268,14 +268,14 @@ public class SignificanceTests
         {
             return
             [
-                new()
+                new BenchmarkResult
                 {
                     Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
                     Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
                     Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                     Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
                 },
-                new()
+                new BenchmarkResult
                 {
                     Name = "candidate", Mean = 92, Median = 92, P95 = 100, P99 = 105,
                     Min = 80, Max = 110, StandardDeviation = 5, IsBaseline = false,

@@ -357,7 +357,8 @@ internal sealed record CliArgs
         foreach (var name in cliArgs.ReporterNames)
         {
             if (!ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out _))
-                allErrors.Add($"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
+                allErrors.Add(
+                    $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
         }
 
         foreach (var error in allErrors)

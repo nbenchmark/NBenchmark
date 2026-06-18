@@ -78,6 +78,7 @@ public sealed class MarkdownReporter : IReporter
                     sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - | - | - |");
                 else
                     sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - | - |");
+
                 continue;
             }
 
@@ -100,8 +101,9 @@ public sealed class MarkdownReporter : IReporter
                 : "-";
 
             var magnitudeText = row.Effect?.Magnitude ?? "-";
+
             var categoryText = showCategories
-                ? (row.Categories.Count > 0 ? string.Join(", ", row.Categories) : "-")
+                ? row.Categories.Count > 0 ? string.Join(", ", row.Categories) : "-"
                 : "";
 
             var opsText = BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond);

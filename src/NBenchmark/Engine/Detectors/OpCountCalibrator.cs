@@ -12,8 +12,8 @@ namespace NBenchmark.Engine.Detectors;
 /// </remarks>
 internal sealed class OpCountCalibrator
 {
-    private readonly double _targetSampleNs;
     private readonly int _maxOps;
+    private readonly double _targetSampleNs;
 
     public OpCountCalibrator(double targetSampleDurationNs, int maxOpsPerSample)
     {

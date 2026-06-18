@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace NBenchmark.Integration.MSTest.Tests;
 
@@ -108,16 +107,16 @@ public sealed class PerformanceTestMethodIntegrationTests
         public Attribute[] GetAllAttributes() =>
             MethodInfo.GetCustomAttributes(true).Cast<Attribute>().ToArray();
 
+        public TAttributeType[] GetAttributes<TAttributeType>() where TAttributeType : Attribute
+            => MethodInfo.GetCustomAttributes<TAttributeType>(true).ToArray();
+
+        public Task<TestResult> InvokeAsync(object[]? args) => throw new NotSupportedException();
+
         public Attribute[] GetAllAttributes(bool inherit) =>
             MethodInfo.GetCustomAttributes(inherit).Cast<Attribute>().ToArray();
 
         public TAttributeType[] GetAttributes<TAttributeType>(bool inherit) where TAttributeType : Attribute
             => MethodInfo.GetCustomAttributes<TAttributeType>(inherit).ToArray();
-
-        public TAttributeType[] GetAttributes<TAttributeType>() where TAttributeType : Attribute
-            => MethodInfo.GetCustomAttributes<TAttributeType>(true).ToArray();
-
-        public Task<TestResult> InvokeAsync(object[]? args) => throw new NotSupportedException();
     }
 }
 

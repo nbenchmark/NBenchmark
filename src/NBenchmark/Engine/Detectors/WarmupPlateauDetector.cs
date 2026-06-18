@@ -8,17 +8,16 @@ namespace NBenchmark.Engine.Detectors;
 /// </summary>
 internal sealed class WarmupPlateauDetector
 {
-    private readonly int _minWarmup;
-    private readonly int _maxWarmup;
-    private readonly double _epsilon;
-    private readonly int _patience;
     private readonly int _batchSize;
+    private readonly double _epsilon;
+    private readonly int _maxWarmup;
+    private readonly int _minWarmup;
+    private readonly int _patience;
+    private int _batchCount;
 
     private double _batchSum;
-    private int _batchCount;
     private double _best = double.PositiveInfinity;
     private int _nonImproving;
-    private int _total;
 
     public WarmupPlateauDetector(AutoTuneOptions options)
     {
@@ -36,7 +35,7 @@ internal sealed class WarmupPlateauDetector
     public WarmupStopReason StopReason { get; private set; }
 
     /// <summary>The number of warmup samples fed so far.</summary>
-    public int Count => _total;
+    public int Count { get; private set; }
 
     /// <summary>
     ///     Reports the per-op nanoseconds of one warmup sample. Returns <c>true</c> when warmup is
@@ -47,11 +46,11 @@ internal sealed class WarmupPlateauDetector
         if (Resolved)
             return true;
 
-        _total++;
+        Count++;
         _batchSum += perOpNs;
         _batchCount++;
 
-        if (_total >= _maxWarmup)
+        if (Count >= _maxWarmup)
         {
             Resolved = true;
             StopReason = WarmupStopReason.MaxCeiling;
@@ -74,7 +73,7 @@ internal sealed class WarmupPlateauDetector
         if (batchMean < _best)
             _best = batchMean;
 
-        if (_total >= _minWarmup && _nonImproving >= _patience)
+        if (Count >= _minWarmup && _nonImproving >= _patience)
         {
             Resolved = true;
             StopReason = WarmupStopReason.Settled;

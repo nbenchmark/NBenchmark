@@ -9,13 +9,13 @@ namespace NBenchmark;
 public sealed class BenchmarkHost
 {
     private readonly List<Assembly> _assemblies = [];
-    private readonly List<IReporter> _reporters = [];
-    private readonly List<string> _categoryFilterInclude = [];
     private readonly List<string> _categoryFilterExclude = [];
+    private readonly List<string> _categoryFilterInclude = [];
+    private readonly List<IReporter> _reporters = [];
     private CliArgs _cliArgs = new();
+    private InstanceLifetime _defaultInstanceLifetime = InstanceLifetime.PerMethod;
     private ReportDetail _detail;
     private Func<Type, InstanceHandle>? _instanceFactory;
-    private InstanceLifetime _defaultInstanceLifetime = InstanceLifetime.PerMethod;
     private bool _isolationEnabled = true;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
@@ -233,7 +233,8 @@ public sealed class BenchmarkHost
             return Array.Empty<BenchmarkResult>();
         }
 
-        var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude, _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);
+        var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude, _cliArgs.CategoryFilterExclude, _categoryFilterInclude,
+            _categoryFilterExclude);
 
         if (_cliArgs.ListOnly)
         {
@@ -365,11 +366,15 @@ public sealed class BenchmarkHost
         CancellationToken cancellationToken)
     {
         if (suite.Lifetime == InstanceLifetime.PerClass)
+        {
             await RunPerClassInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
                 allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+        }
         else
+        {
             await RunPerMethodInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
                 allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private async Task RunPerClassInProcessAsync(
@@ -400,6 +405,7 @@ public sealed class BenchmarkHost
             }
 
             var factory = () => instance;
+
             var envelopes = suite.Benchmarks
                 .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
                 .ToList();
@@ -614,11 +620,13 @@ public sealed class BenchmarkHost
                 continue;
 
             if (suite.Lifetime == InstanceLifetime.PerClass)
+            {
                 return await RunPerClassHostChildAsync(suite, selected, options, cancellationToken)
                     .ConfigureAwait(false);
-            else
-                return await RunPerMethodHostChildAsync(suite, selected, options, cancellationToken)
-                    .ConfigureAwait(false);
+            }
+
+            return await RunPerMethodHostChildAsync(suite, selected, options, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         Console.Error.WriteLine($"Isolated class '{request.DeclaringTypeFullName}' was not found.");
@@ -657,6 +665,7 @@ public sealed class BenchmarkHost
             else
             {
                 var factory = () => instance;
+
                 var envelopes = selected
                     .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
                     .ToList();

@@ -24,7 +24,7 @@ public class OpCountCalibratorTests
     public void SlowBody_ResolvesToOne()
     {
         // The very first sample (K = 1) already exceeds the target, so no batching is needed.
-        var k = Calibrate(targetNs: 1_000, maxOps: 1 << 20, sampleNs: _ => 1_500);
+        var k = Calibrate(1_000, 1 << 20, _ => 1_500);
 
         Assert.Equal(1, k);
     }
@@ -34,7 +34,7 @@ public class OpCountCalibratorTests
     {
         // Each op costs ~50 ns, so a sample spans K * 50 ns. The search doubles K until
         // K * 50 >= 1000, i.e. K = 32 (16 * 50 = 800 < 1000; 32 * 50 = 1600 >= 1000).
-        var k = Calibrate(targetNs: 1_000, maxOps: 1 << 20, sampleNs: ops => ops * 50.0);
+        var k = Calibrate(1_000, 1 << 20, ops => ops * 50.0);
 
         Assert.Equal(32, k);
     }
@@ -43,7 +43,7 @@ public class OpCountCalibratorTests
     public void VeryFastBody_CapsAtMaxOpsPerSample()
     {
         // A near-instant body never reaches the target, so calibration stops at the ceiling.
-        var k = Calibrate(targetNs: 1_000, maxOps: 16, sampleNs: _ => 1.0);
+        var k = Calibrate(1_000, 16, _ => 1.0);
 
         Assert.Equal(16, k);
     }
@@ -56,7 +56,7 @@ public class OpCountCalibratorTests
     {
         // Each op costs 100 ns; the search resolves at the smallest power-of-two K whose
         // sample (K * 100 ns) meets the target.
-        var k = Calibrate(targetNs, maxOps: 1 << 20, sampleNs: ops => ops * 100.0);
+        var k = Calibrate(targetNs, 1 << 20, ops => ops * 100.0);
 
         Assert.Equal(expectedK, k);
     }

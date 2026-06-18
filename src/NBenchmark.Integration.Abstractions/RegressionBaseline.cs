@@ -85,7 +85,7 @@ public static class RegressionBaseline
 
     private sealed class BaselineEntry
     {
-        public string Name { get; init; } = string.Empty;
+        public required string Name { get; init; }
         public double Mean { get; init; }
     }
 }

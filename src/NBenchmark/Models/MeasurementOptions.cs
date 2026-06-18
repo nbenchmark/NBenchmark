@@ -27,8 +27,10 @@ public record MeasurementOptions
         init
         {
             if (value is { } count && count is < 0 or > MaxWarmupIterations)
+            {
                 throw new ArgumentOutOfRangeException(nameof(value), value,
                     $"WarmupIterations must be null (auto) or between 0 and {MaxWarmupIterations}.");
+            }
 
             _warmupIterations = value;
         }
@@ -45,8 +47,10 @@ public record MeasurementOptions
         init
         {
             if (value is { } count && count is < 0 or > MaxIterations)
+            {
                 throw new ArgumentOutOfRangeException(nameof(value), value,
                     $"Iterations must be null (auto) or between 0 and {MaxIterations} (0 = dry-run).");
+            }
 
             _iterations = value;
         }
@@ -66,8 +70,10 @@ public record MeasurementOptions
         init
         {
             if (value is { } count && count is < 1 or > MaxOpsPerSampleLimit)
+            {
                 throw new ArgumentOutOfRangeException(nameof(value), value,
                     $"OpsPerSample must be null (auto) or between 1 and {MaxOpsPerSampleLimit}.");
+            }
 
             _opsPerSample = value;
         }
@@ -97,18 +103,15 @@ public record MeasurementOptions
 
     /// <summary>Whether a Gen0 GC is forced before each measured iteration. Forced under <see cref="MeasurementProfile.Independent" />, unless overridden.</summary>
     public bool ForceGcBeforeEachIteration =>
-        ForceGcBeforeEachIterationOverride ?? (Profile == MeasurementProfile.Independent);
+        ForceGcBeforeEachIterationOverride ?? Profile == MeasurementProfile.Independent;
 
     /// <summary>Whether a full GC runs between benchmarks. Forced under <see cref="MeasurementProfile.Independent" />, unless overridden.</summary>
     public bool ForceGcBetweenBenchmarks =>
-        ForceGcBetweenBenchmarksOverride ?? (Profile == MeasurementProfile.Independent);
+        ForceGcBetweenBenchmarksOverride ?? Profile == MeasurementProfile.Independent;
 
     /// <summary>Whether per-iteration allocations are sampled and reported. On under <see cref="MeasurementProfile.Realistic" />, unless overridden.</summary>
     public bool MeasureAllocations =>
-        MeasureAllocationsOverride ?? (Profile == MeasurementProfile.Realistic);
-
-    /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
-    public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };
+        MeasureAllocationsOverride ?? Profile == MeasurementProfile.Realistic;
 
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
@@ -187,6 +190,9 @@ public record MeasurementOptions
             _minimumPracticalEffect = delta;
         }
     }
+
+    /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
+    public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };
 
     /// <summary>
     ///     Resolves the effective outlier detector: the custom

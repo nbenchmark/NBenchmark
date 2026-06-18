@@ -15,14 +15,11 @@ namespace NBenchmark.Engine.Detectors;
 /// </remarks>
 internal sealed class CiWidthDetector
 {
-    private readonly double _confidenceLevel;
-    private readonly double _ciTarget;
-    private readonly int _minSamples;
-    private readonly int _maxSamples;
     private readonly int _cadence;
-
-    private long _n;
-    private double _mean;
+    private readonly double _ciTarget;
+    private readonly double _confidenceLevel;
+    private readonly int _maxSamples;
+    private readonly int _minSamples;
     private double _m2;
 
     public CiWidthDetector(double confidenceLevel, AutoTuneOptions options)
@@ -44,13 +41,13 @@ internal sealed class CiWidthDetector
     public double AchievedRelativeHalfWidth { get; private set; } = double.PositiveInfinity;
 
     /// <summary>The number of measured samples fed so far.</summary>
-    public long Count => _n;
+    public long Count { get; private set; }
 
     /// <summary>The running mean of the fed samples.</summary>
-    public double Mean => _mean;
+    public double Mean { get; private set; }
 
     /// <summary>The running sample standard deviation (Bessel-corrected) of the fed samples.</summary>
-    public double StandardDeviation => _n >= 2 ? Math.Sqrt(_m2 / (_n - 1)) : 0.0;
+    public double StandardDeviation => Count >= 2 ? Math.Sqrt(_m2 / (Count - 1)) : 0.0;
 
     /// <summary>
     ///     Reports the per-op nanoseconds of one measured sample. Returns <c>true</c> when the
@@ -62,13 +59,13 @@ internal sealed class CiWidthDetector
             return true;
 
         // Welford online mean/variance update.
-        _n++;
-        var delta = perOpNs - _mean;
-        _mean += delta / _n;
-        var delta2 = perOpNs - _mean;
+        Count++;
+        var delta = perOpNs - Mean;
+        Mean += delta / Count;
+        var delta2 = perOpNs - Mean;
         _m2 += delta * delta2;
 
-        if (_n >= _maxSamples)
+        if (Count >= _maxSamples)
         {
             ComputeHalfWidth();
             Resolved = true;
@@ -76,8 +73,8 @@ internal sealed class CiWidthDetector
             return true;
         }
 
-        if (_n >= _minSamples && _n % _cadence == 0
-            && ComputeHalfWidth() && AchievedRelativeHalfWidth < _ciTarget)
+        if (Count >= _minSamples && Count % _cadence == 0
+                                 && ComputeHalfWidth() && AchievedRelativeHalfWidth < _ciTarget)
         {
             Resolved = true;
             StopReason = SampleStopReason.CiTargetMet;
@@ -89,14 +86,14 @@ internal sealed class CiWidthDetector
 
     private bool ComputeHalfWidth()
     {
-        if (_n < 2 || _mean <= 0)
+        if (Count < 2 || Mean <= 0)
         {
             AchievedRelativeHalfWidth = double.PositiveInfinity;
             return false;
         }
 
-        var standardError = StandardDeviation / Math.Sqrt(_n);
-        var t = StudentT.CriticalValue(_confidenceLevel, (int)(_n - 1));
+        var standardError = StandardDeviation / Math.Sqrt(Count);
+        var t = StudentT.CriticalValue(_confidenceLevel, (int)(Count - 1));
 
         if (double.IsNaN(t))
         {
@@ -104,7 +101,7 @@ internal sealed class CiWidthDetector
             return false;
         }
 
-        AchievedRelativeHalfWidth = t * standardError / _mean;
+        AchievedRelativeHalfWidth = t * standardError / Mean;
         return true;
     }
 }

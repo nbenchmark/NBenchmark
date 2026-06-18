@@ -241,6 +241,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         if (typeArgs.Length == 8 && IsValueTupleType(tupleType))
         {
             var rest = typeArgs[7];
+
             if (rest is INamedTypeSymbol namedRest && IsValueTupleType(namedRest))
                 return 7 + GetValueTupleArity(namedRest);
         }

@@ -5,26 +5,33 @@ using NBenchmark.Reporters.Console;
 static string AllocateAndConcat(int count)
 {
     var result = "";
+
     for (var i = 0; i < count; i++)
+    {
         result += i.ToString();
+    }
+
     return result;
 }
 
 // Quick mode: run the same benchmark under both profiles.
 Console.WriteLine("=== Quick Mode: Realistic ===");
+
 Benchmark.Run(
     () => AllocateAndConcat(100),
-    options: MeasurementOptions.For(MeasurementProfile.Realistic),
-    name: "string-concat/realistic").Print();
+    MeasurementOptions.For(MeasurementProfile.Realistic),
+    "string-concat/realistic").Print();
 
 Console.WriteLine("\n=== Quick Mode: Independent ===");
+
 Benchmark.Run(
     () => AllocateAndConcat(100),
-    options: MeasurementOptions.For(MeasurementProfile.Independent),
-    name: "string-concat/independent").Print();
+    MeasurementOptions.For(MeasurementProfile.Independent),
+    "string-concat/independent").Print();
 
 // Suite mode: run two separate suites, one per profile.
 Console.WriteLine("\n=== Suite Mode: Realistic ===");
+
 await new BenchmarkSuite("string-concat (Realistic)")
     .Add("concat", () => AllocateAndConcat(100))
     .WithWarmup(10)
@@ -35,6 +42,7 @@ await new BenchmarkSuite("string-concat (Realistic)")
     .RunAsync();
 
 Console.WriteLine("\n=== Suite Mode: Independent ===");
+
 await new BenchmarkSuite("string-concat (Independent)")
     .Add("concat", () => AllocateAndConcat(100))
     .WithWarmup(10)

@@ -56,8 +56,5 @@ public class BenchmarkFormatterTests
     }
 
     [Fact]
-    public void FormatOpsPerSecond_Zero_Formats_As_Ops_Per_Second()
-    {
-        Assert.Equal("0.0 ops/s", BenchmarkFormatter.FormatOpsPerSecond(0));
-    }
+    public void FormatOpsPerSecond_Zero_Formats_As_Ops_Per_Second() => Assert.Equal("0.0 ops/s", BenchmarkFormatter.FormatOpsPerSecond(0));
 }

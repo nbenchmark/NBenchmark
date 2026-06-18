@@ -9,6 +9,7 @@ public class AdaptiveLoopTests
     public void ExplicitCounts_RunExactly_And_Report_ExplicitStops()
     {
         var bodyCalls = 0;
+
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 2,
@@ -38,11 +39,12 @@ public class AdaptiveLoopTests
     public void AutoWarmup_Discards_Prefix_From_Measured_Stats()
     {
         var bodyCalls = 0;
+
         var options = MeasurementOptions.Default with
         {
-            OpsPerSample = 1,        // pin K so no calibration runs
+            OpsPerSample = 1, // pin K so no calibration runs
             WarmupIterations = null, // auto warmup
-            Iterations = 10,         // explicit measured count
+            Iterations = 10, // explicit measured count
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
         };
@@ -71,7 +73,7 @@ public class AdaptiveLoopTests
         {
             OpsPerSample = 1,
             WarmupIterations = 0, // no warmup
-            Iterations = null,    // auto sample count -> CI detector
+            Iterations = null, // auto sample count -> CI detector
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
         };
@@ -96,6 +98,7 @@ public class AdaptiveLoopTests
     public void EligibleFastBody_Calibrates_OpsPerSample_Above_One()
     {
         var bodyCalls = 0;
+
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = null, // auto-calibrate
@@ -116,12 +119,15 @@ public class AdaptiveLoopTests
             // K = 1 step
             0 => 9999.0,
             1 or 2 or 3 or 4 => 250.0,
+
             // K = 2 step
             5 => 9999.0,
             6 or 7 or 8 or 9 => 500.0,
+
             // K = 4 step
             10 => 9999.0,
             11 or 12 or 13 or 14 => 1000.0,
+
             // measured samples at K = 4
             _ => 1000.0,
         });
@@ -145,6 +151,7 @@ public class AdaptiveLoopTests
     {
         var bodyCalls = 0;
         var setupCalls = 0;
+
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = null, // auto, but an iteration setup disqualifies calibration
@@ -156,7 +163,7 @@ public class AdaptiveLoopTests
 
         var clock = new ScriptedClock(1000.0);
 
-        var result = RunSync(() => bodyCalls++, options, clock, setup: () => setupCalls++);
+        var result = RunSync(() => bodyCalls++, options, clock, () => setupCalls++);
 
         Assert.Equal(1, result.Diagnostic.OpsPerSample);
         Assert.Equal(5, result.PerOpTimings.Length);
@@ -200,6 +207,7 @@ public class AdaptiveLoopTests
         {
             Assert.True(a >= blockBytes,
                 $"per-op allocation {a} should be at least one block ({blockBytes})");
+
             Assert.True(a < 2L * blockBytes,
                 $"per-op allocation {a} should be ~one block, not K x block (~{(long)opsPerSample * blockBytes}); divide-by-K missing?");
         });
@@ -237,7 +245,7 @@ public class AdaptiveLoopTests
         {
             OpsPerSample = 1,
             WarmupIterations = null, // auto warmup
-            Iterations = 0,          // measurement phase exits immediately on explicit count
+            Iterations = 0, // measurement phase exits immediately on explicit count
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50) }, // 5000 ns
@@ -259,6 +267,7 @@ public class AdaptiveLoopTests
     public async Task RunAsync_Mirrors_Sync_For_Explicit_Counts()
     {
         var bodyCalls = 0;
+
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
@@ -294,20 +303,21 @@ public class AdaptiveLoopTests
     public void WallClock_Cap_During_Calibration_Adds_Calibration_Warning_And_Skips_Warmup()
     {
         var bodyCalls = 0;
+
         // Pin the calibrator so K is small and the search exhausts the cap while resolving K.
         // Setting TargetSampleDurationNs very high makes the calibrator probe K = 1, 2, 4, 8 ...
         // until the cap is hit before reaching the target.
         var options = MeasurementOptions.Default with
         {
-            OpsPerSample = null,    // auto-calibrate K
+            OpsPerSample = null, // auto-calibrate K
             WarmupIterations = null, // auto warmup (skipped if calibration is capped)
-            Iterations = 5,         // explicit measured count
+            Iterations = 5, // explicit measured count
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 MaxTuningTime = TimeSpan.FromTicks(50), // 5000 ns cap
-                TargetSampleDurationNs = 100_000_000,  // unreachable target so calibration probes several Ks
+                TargetSampleDurationNs = 100_000_000, // unreachable target so calibration probes several Ks
             },
         };
 
@@ -339,7 +349,7 @@ public class AdaptiveLoopTests
         {
             OpsPerSample = 1,
             WarmupIterations = null, // auto warmup
-            Iterations = 0,          // measurement exits immediately on explicit count
+            Iterations = 0, // measurement exits immediately on explicit count
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
             AutoTune = AutoTuneOptions.Default with
@@ -355,6 +365,7 @@ public class AdaptiveLoopTests
 
         Assert.Equal(WarmupStopReason.WallClockCap, result.Diagnostic.WarmupStop);
         Assert.Single(result.Warnings);
+
         // The cap label (5.00 µs for a 5000 ns cap) appears in the warning; the elapsed text
         // is not shown.
         Assert.Contains("5.00 µs", result.Warnings[0]);

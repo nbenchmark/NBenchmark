@@ -1,5 +1,6 @@
 using NBenchmark.Attributes;
 using NBenchmark.Discovery;
+using NBenchmark.Tests.ErrorFixtures;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -255,7 +256,7 @@ public class BenchmarkDiscovererTests
     public void Source_Method_Must_Return_IEnumerable_Of_ValueTuple()
     {
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            new BenchmarkDiscoverer().Discover(typeof(ErrorFixtures.InvalidReturnTypeCasesBenchmarks)));
+            new BenchmarkDiscoverer().Discover(typeof(InvalidReturnTypeCasesBenchmarks)));
 
         Assert.Contains("ValueTuple", ex.Message);
     }
@@ -264,7 +265,7 @@ public class BenchmarkDiscovererTests
     public void Source_Tuple_Arity_Must_Match_Method_Arity()
     {
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            new BenchmarkDiscoverer().Discover(typeof(ErrorFixtures.ArityMismatchCasesBenchmarks)));
+            new BenchmarkDiscoverer().Discover(typeof(ArityMismatchCasesBenchmarks)));
 
         Assert.Contains("parameter", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ArityMismatchCasesBenchmarks.Sum", ex.Message);
@@ -275,7 +276,7 @@ public class BenchmarkDiscovererTests
     public void Source_Must_Be_Parameterless()
     {
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            new BenchmarkDiscoverer().Discover(typeof(ErrorFixtures.ParamSourceCasesBenchmarks)));
+            new BenchmarkDiscoverer().Discover(typeof(ParamSourceCasesBenchmarks)));
 
         Assert.Contains("no parameters", ex.Message);
     }
@@ -284,7 +285,7 @@ public class BenchmarkDiscovererTests
     public void BenchmarkCase_And_BenchmarkCases_Cannot_Coexist()
     {
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            new BenchmarkDiscoverer().Discover(typeof(ErrorFixtures.ConflictCasesBenchmarks)));
+            new BenchmarkDiscoverer().Discover(typeof(ConflictCasesBenchmarks)));
 
         Assert.Contains("both", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -343,10 +344,7 @@ public class BenchmarkDiscovererTests
     }
 
     [Fact]
-    public void BenchmarkCategoryAttribute_Rejects_Blank_Name()
-    {
-        Assert.Throws<ArgumentException>(() => new BenchmarkCategoryAttribute("   "));
-    }
+    public void BenchmarkCategoryAttribute_Rejects_Blank_Name() => Assert.Throws<ArgumentException>(() => new BenchmarkCategoryAttribute("   "));
 }
 
 [BenchmarkCategory("String")]

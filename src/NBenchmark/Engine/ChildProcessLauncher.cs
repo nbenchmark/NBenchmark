@@ -48,77 +48,6 @@ internal static class ChildProcessLauncher
         CancellationToken cancellationToken)
         => Current.LaunchAsync(request, cancellationToken);
 
-    private sealed class DefaultLauncher : IProcessLauncher
-    {
-        public async Task<IReadOnlyList<IsolatedResultItem>> LaunchAsync(
-            IsolatedRunRequest request,
-            CancellationToken cancellationToken)
-        {
-            var requestPath = Path.Combine(Path.GetTempPath(), $"nbench-request-{Guid.NewGuid():N}.json");
-            var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-output-{Guid.NewGuid():N}.json");
-
-            try
-            {
-                await WriteRequestAsync(requestPath, request, cancellationToken).ConfigureAwait(false);
-
-                using var process = new Process
-                {
-                    StartInfo = BuildStartInfo(
-                        (RequestPathEnvVar, requestPath),
-                        (OutputPathEnvVar, outputPath)),
-                };
-
-                var stderr = new StringBuilder();
-                var stdoutTail = new Queue<string>(StdoutTailLines + 1);
-
-                process.ErrorDataReceived += (_, e) =>
-                {
-                    if (e.Data is not null)
-                        stderr.AppendLine(e.Data);
-                };
-
-                // Keep only the tail of stdout: enough to diagnose a crash without buffering a
-                // chatty child's entire output, while still draining the pipe so it cannot
-                // fill and deadlock.
-                process.OutputDataReceived += (_, e) =>
-                {
-                    if (e.Data is null)
-                        return;
-
-                    stdoutTail.Enqueue(e.Data);
-
-                    if (stdoutTail.Count > StdoutTailLines)
-                        stdoutTail.Dequeue();
-                };
-
-                process.Start();
-                process.BeginErrorReadLine();
-                process.BeginOutputReadLine();
-
-                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-
-                if (process.ExitCode != 0 || !File.Exists(outputPath))
-                {
-                    return ErroredItems(
-                        request,
-                        BuildFailureMessage(request, process.ExitCode, outputPath, stderr, stdoutTail));
-                }
-
-                return await ReadPayloadAsync(outputPath, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                return ErroredItems(
-                    request, $"Failed to launch an isolated child process for {Describe(request)}: {ex.Message}");
-            }
-            finally
-            {
-                TryDelete(requestPath);
-                TryDelete(outputPath);
-            }
-        }
-    }
-
     internal static ProcessStartInfo BuildStartInfo(
         params (string Name, string Value)[] environmentVariables)
     {
@@ -297,6 +226,77 @@ internal static class ChildProcessLauncher
         catch
         {
             // Best-effort cleanup of a temp file; nothing actionable on failure.
+        }
+    }
+
+    private sealed class DefaultLauncher : IProcessLauncher
+    {
+        public async Task<IReadOnlyList<IsolatedResultItem>> LaunchAsync(
+            IsolatedRunRequest request,
+            CancellationToken cancellationToken)
+        {
+            var requestPath = Path.Combine(Path.GetTempPath(), $"nbench-request-{Guid.NewGuid():N}.json");
+            var outputPath = Path.Combine(Path.GetTempPath(), $"nbench-output-{Guid.NewGuid():N}.json");
+
+            try
+            {
+                await WriteRequestAsync(requestPath, request, cancellationToken).ConfigureAwait(false);
+
+                using var process = new Process
+                {
+                    StartInfo = BuildStartInfo(
+                        (RequestPathEnvVar, requestPath),
+                        (OutputPathEnvVar, outputPath)),
+                };
+
+                var stderr = new StringBuilder();
+                var stdoutTail = new Queue<string>(StdoutTailLines + 1);
+
+                process.ErrorDataReceived += (_, e) =>
+                {
+                    if (e.Data is not null)
+                        stderr.AppendLine(e.Data);
+                };
+
+                // Keep only the tail of stdout: enough to diagnose a crash without buffering a
+                // chatty child's entire output, while still draining the pipe so it cannot
+                // fill and deadlock.
+                process.OutputDataReceived += (_, e) =>
+                {
+                    if (e.Data is null)
+                        return;
+
+                    stdoutTail.Enqueue(e.Data);
+
+                    if (stdoutTail.Count > StdoutTailLines)
+                        stdoutTail.Dequeue();
+                };
+
+                process.Start();
+                process.BeginErrorReadLine();
+                process.BeginOutputReadLine();
+
+                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+                if (process.ExitCode != 0 || !File.Exists(outputPath))
+                {
+                    return ErroredItems(
+                        request,
+                        BuildFailureMessage(request, process.ExitCode, outputPath, stderr, stdoutTail));
+                }
+
+                return await ReadPayloadAsync(outputPath, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return ErroredItems(
+                    request, $"Failed to launch an isolated child process for {Describe(request)}: {ex.Message}");
+            }
+            finally
+            {
+                TryDelete(requestPath);
+                TryDelete(outputPath);
+            }
         }
     }
 }
