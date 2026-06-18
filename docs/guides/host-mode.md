@@ -143,14 +143,18 @@ await BenchmarkHost.Create(args)
 
 `WithCategoryFilter` composes with the CLI flags: each source's include list is applied independently, so a benchmark must match every non-empty include source. Exclude lists are unioned.
 
-### `[BenchmarkArguments]`
+### `[BenchmarkCase]` and `[BenchmarkCases]`
 
-Runs the benchmark once for each set of arguments. The method must accept parameters matching the argument types.
+Run the benchmark once for each case (argument set). The method must accept parameters matching the argument types.
+
+#### `[BenchmarkCase]` - inline literal cases
+
+Each attribute supplies one set of arguments as a positional list:
 
 ```csharp
-[BenchmarkArguments(10)]
-[BenchmarkArguments(1_000)]
-[BenchmarkArguments(100_000)]
+[BenchmarkCase(10)]
+[BenchmarkCase(1_000)]
+[BenchmarkCase(100_000)]
 [Benchmark]
 public void Sort(int n)
 {
@@ -159,7 +163,44 @@ public void Sort(int n)
 }
 ```
 
-Each argument set becomes a separate benchmark entry in the output, named `MethodName(arg1, arg2, ...)`.
+Each case becomes a separate benchmark entry in the output, named `MethodName(arg1, arg2, ...)`.
+
+#### `[BenchmarkCases]` - programmatic case sources
+
+The attribute names a parameterless method on the same class that yields named value tuples:
+
+```csharp
+[BenchmarkCases(nameof(SortCases))]
+[Benchmark]
+public void Sort(int count, string order)
+{
+    var data = order == "desc" ? Enumerable.Range(0, count).Reverse().ToArray()
+               : Enumerable.Range(0, count).ToArray();
+    Array.Sort(data);
+}
+
+public static IEnumerable<(int Count, string Order)> SortCases()
+{
+    yield return (10, "asc");
+    yield return (10, "desc");
+    yield return (1_000, "asc");
+    yield return (1_000, "desc");
+}
+```
+
+When the tuple elements are named (e.g. `(int Count, string Order)`), the display name uses those names: `Sort(Count=10, Order="asc")`. Unnamed tuples fall back to positional: `Sort(10, "asc")`.
+
+The source method can be `static` or instance, `public` or `non-public`. A static source is recommended since instance sources receive a bare `Activator.CreateInstance` result at discovery time.
+
+#### Choosing between `[BenchmarkCase]` and `[BenchmarkCases]`
+
+| Use case | Attribute |
+|---|---|
+| Small literal list (2-5 values) | `[BenchmarkCase]` |
+| Generated values, file/database-backed inputs, parameter sweeps, or large lists | `[BenchmarkCases]` |
+| Named display names for readability in reports | `[BenchmarkCases]` with named tuples |
+
+The two attributes are mutually exclusive on a method. Use one or the other.
 
 ### Lifecycle attributes
 

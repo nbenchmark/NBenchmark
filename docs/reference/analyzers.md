@@ -22,7 +22,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 |---|---|---|---|
 | NB0001 | Benchmark class must have a public parameterless constructor | Warning | A class or record with `[Benchmark]` methods has no public parameterless constructor. Add one, or use `NBenchmark.DependencyInjection`. |
 | NB0002 | `[Benchmark]` method must not be static | Error | A method is marked `[Benchmark]` but is `static`. Only instance methods are discovered. Remove the `static` keyword. |
-| NB0003 | `[BenchmarkArguments]` must match method parameters | Error | The number of `[BenchmarkArguments]` values does not match the method's parameter count, or `[BenchmarkArguments]` is present when the method has no parameters. |
+| NB0003 | `[BenchmarkCase]` / `[BenchmarkCases]` must match method parameters | Error | The number of `[BenchmarkCase]` values does not match the method's parameter count, or the `[BenchmarkCases]` source yields a tuple arity that does not match. Also covers missing or non-existent source methods. |
 | NB0004 | `[Benchmark]` body has no observable side effects | Error | A void `[Benchmark]` method body has no observable side effects. The JIT may eliminate it, producing 0 ns results. |
 | NB0005 | `[Benchmark]` body does no observable work | Error | A void `[Benchmark]` method has an empty body (no statements at all). The JIT will eliminate it. |
 | NB0006 | Multiple `[Benchmark(Baseline = true)]` methods in the same class | Error | Only one benchmark per class can have `Baseline = true`. Remove the attribute from all but one. |
@@ -31,6 +31,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0009 | `MeasurementOptions` property value out of range | Error | `Iterations`, `WarmupIterations`, or `ConfidenceLevel` in a `MeasurementOptions` object initializer or `with` expression is outside the valid range. |
 | NB0010 | Benchmark body is throwaway | Warning | A lambda passed to the `Action` overloads of `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, or `Benchmark.RunRawAsync()` has no observable side effects. The JIT may eliminate it, producing 0 ns results. |
 | NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that looks scoped (for example `DbContext`, `UnitOfWork`, or a disposable service), which can leak warmed state across benchmark methods. |
+| NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method has both `[BenchmarkCase]` and `[BenchmarkCases]`. Use one or the other. |
 
 ### NB0001 - Missing parameterless constructor
 
@@ -70,20 +71,27 @@ public void Measure() { }
 
 This diagnostic has an automatic code fix that removes the `static` keyword.
 
-### NB0003 - BenchmarkArguments arity mismatch
+### NB0003 - BenchmarkCase arity mismatch
 
-The [BenchmarkArguments] attribute must match the method's parameter count. Each attribute corresponds to one invocation of the method.
+The `[BenchmarkCase]` attribute must match the method's parameter count. Each attribute corresponds to one invocation of the method. When using `[BenchmarkCases]`, the source method must yield tuples whose arity matches the benchmark method's parameter count.
 
 ```csharp
-// Bad - method takes no parameters
-[BenchmarkArguments(42)]
+// Bad - method takes no parameters but has [BenchmarkCase]
+[BenchmarkCase(42)]
 [Benchmark]
 public void Measure() { }
 
 // Bad - method expects one parameter, argument supplies none
-[BenchmarkArguments]
+[BenchmarkCase]
 [Benchmark]
 public void Measure(int x) { }
+
+// Bad - [BenchmarkCases] source yields tuple with wrong arity
+[BenchmarkCases(nameof(Cases))]
+[Benchmark]
+public void Measure(int x, int y) { }
+
+public static IEnumerable<(int a,)> Cases() { yield return (1,); } // arity 1, expected 2
 ```
 
 ### NB0004 / NB0005 - No observable side effects

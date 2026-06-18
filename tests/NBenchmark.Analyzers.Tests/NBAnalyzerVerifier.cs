@@ -62,10 +62,16 @@ internal static class TestSources
                                         public int WarmupIterations { get; set; } = -1;
                                     }
                                     [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = true)]
-                                    public sealed class BenchmarkArgumentsAttribute : System.Attribute
+                                    public sealed class BenchmarkCaseAttribute : System.Attribute
                                     {
-                                        public BenchmarkArgumentsAttribute(params object[] arguments) { Arguments = arguments; }
+                                        public BenchmarkCaseAttribute(params object[] arguments) { Arguments = arguments; }
                                         public object[] Arguments { get; }
+                                    }
+                                    [System.AttributeUsage(System.AttributeTargets.Method)]
+                                    public sealed class BenchmarkCasesAttribute : System.Attribute
+                                    {
+                                        public BenchmarkCasesAttribute(string sourceName) { SourceName = sourceName; }
+                                        public string SourceName { get; }
                                     }
                                     [System.AttributeUsage(System.AttributeTargets.Method)]
                                     public sealed class BenchmarkSetupAttribute : System.Attribute {}
@@ -96,21 +102,22 @@ internal static class TestSources
                                         public int Iterations { get; init; }
                                         public int WarmupIterations { get; init; }
                                         public double ConfidenceLevel { get; init; }
-                                    }
-                                    public static class Benchmark
-                                    {
-                                        public static BenchmarkResult Run(System.Action action) { return new BenchmarkResult(); }
-                                        public static BenchmarkResult Run<T>(System.Func<T> action) { return new BenchmarkResult(); }
-                                        public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
-                                        public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
-
-                                        public static MeasurementOutcome RunRaw(System.Action action) { return new MeasurementOutcome(); }
-                                        public static MeasurementOutcome RunRaw<T>(System.Func<T> action) { return new MeasurementOutcome(); }
-                                        public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
-                                        public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
-                                    }
                                 }
-                                """;
+                                
+                                public static class Benchmark
+                                {
+                                    public static BenchmarkResult Run(System.Action action) { return new BenchmarkResult(); }
+                                    public static BenchmarkResult Run<T>(System.Func<T> action) { return new BenchmarkResult(); }
+                                    public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
+                                    public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
+
+                                    public static MeasurementOutcome RunRaw(System.Action action) { return new MeasurementOutcome(); }
+                                    public static MeasurementOutcome RunRaw<T>(System.Func<T> action) { return new MeasurementOutcome(); }
+                                    public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
+                                    public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
+                                }
+                            }
+                            """;
 }
 
 public static class NBAnalyzerVerifier<TAnalyzer>
