@@ -30,6 +30,29 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
+## [Parameterized benchmarks](./parameterized-benchmarks.md)
+
+Run the same benchmark body across multiple input values. Suite mode uses `WithParameter` and typed `Add` lambdas; host mode uses `[BenchmarkCase]` and `[BenchmarkCases]` attributes.
+
+```csharp
+// Suite mode
+await new BenchmarkSuite("search")
+    .WithParameter("size", 10, 100, 1000)
+    .Add("binary", (int size) => BinarySearch(size))
+    .WithBaseline("linear")
+    .RunAsync();
+
+// Host mode
+public class SortingBenchmarks
+{
+    [BenchmarkCase(10)]
+    [BenchmarkCase(100)]
+    [BenchmarkCase(1000)]
+    [Benchmark]
+    public void Sort(int n) => Array.Sort(Enumerable.Range(0, n).Reverse().ToArray());
+}
+```
+
 ## [Categories](./categories.md)
 
 Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from the command line or fluent APIs in host/suite mode.

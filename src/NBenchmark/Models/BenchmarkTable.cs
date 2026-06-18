@@ -44,6 +44,10 @@ public sealed record BenchmarkTable
         if (results.Count == 0)
             return [BuildInternal(results, null, false)];
 
+        // When results have parameter sets, group by parameter set first, then by class
+        if (results.Any(r => r.ParameterSet.Count > 0))
+            return BuildPerParameterSet(results);
+
         var byClass = results
             .Select((result, index) => (result, index))
             .GroupBy(x => x.result.ClassName)
@@ -60,6 +64,41 @@ public sealed record BenchmarkTable
             var successful = groupResults.Where(r => !r.Errored).ToList();
             var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
             tables.Add(BuildInternal(groupResults, baseline, groupResults.Count > 1));
+        }
+
+        return tables;
+    }
+
+    public static IReadOnlyList<BenchmarkTable> BuildPerParameterSet(IReadOnlyList<BenchmarkResult> results)
+    {
+        var groups = results
+            .Select((r, i) => (r, i))
+            .GroupBy(x => GetParameterSetDisplayKey(x.r.ParameterSet))
+            .ToList();
+
+        var tables = new List<BenchmarkTable>();
+
+        foreach (var group in groups)
+        {
+            var groupResults = group.Select(x => x.r).ToList();
+            var successful = groupResults.Where(r => !r.Errored).ToList();
+            var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+            var table = BuildInternal(groupResults, baseline, groupResults.Count > 1);
+
+            var paramSet = groupResults.FirstOrDefault(r => r.ParameterSet.Count > 0)?.ParameterSet;
+            if (paramSet is { Count: > 0 })
+            {
+                var paramLabel = string.Join(", ", paramSet.Select(p => $"{p.Name}={BenchmarkParameter.FormatValue(p.Value)}"));
+                table = table with
+                {
+                    Rows = table.Rows.Select(r => r with
+                    {
+                        ClassName = paramLabel,
+                    }).ToList(),
+                };
+            }
+
+            tables.Add(table);
         }
 
         return tables;
@@ -160,6 +199,14 @@ public sealed record BenchmarkTable
             return "";
 
         return result.SignificanceVerdict == SignificanceVerdict.Significant ? "✓" : "✗";
+    }
+
+    private static string GetParameterSetDisplayKey(IReadOnlyList<BenchmarkParameter> paramSet)
+    {
+        if (paramSet.Count == 0)
+            return "";
+
+        return string.Join(", ", paramSet.Select(p => $"{p.Name}={BenchmarkParameter.FormatValue(p.Value)}"));
     }
 
     public static string RenderStatsBlock(BenchmarkRow row, ReportDetail detail)
