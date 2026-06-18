@@ -150,4 +150,56 @@ public class MannWhitneyUTests
 
         Assert.Equal(0.25, result.CliffsDelta, 10);
     }
+
+    [Fact]
+    public void Large_Samples_Are_Order_Invariant()
+    {
+        // Mann-Whitney depends on value ranks, not original input order. This
+        // protects against any future order-sensitive preprocessing.
+        var baseline = Enumerable.Range(0, 500).Select(i => (double)(i % 17)).ToArray();
+        var candidate = Enumerable.Range(0, 500)
+            .Select(i => (double)((i % 17) + (i % 3 == 0 ? 1 : 0)))
+            .ToArray();
+
+        var shuffledBaseline = baseline.ToArray();
+        var shuffledCandidate = candidate.ToArray();
+
+        ShuffleInPlace(shuffledBaseline, new Random(12345));
+        ShuffleInPlace(shuffledCandidate, new Random(67890));
+
+        var ordered = MannWhitneyU.Test(baseline, candidate);
+        var shuffled = MannWhitneyU.Test(shuffledBaseline, shuffledCandidate);
+
+        Assert.Equal(ordered.PValue, shuffled.PValue, 12);
+        Assert.Equal(ordered.CliffsDelta, shuffled.CliffsDelta, 12);
+    }
+
+    [Fact]
+    public void Large_AllTies_Return_PValue_One_And_Finite_Delta()
+    {
+        var a = Enumerable.Repeat(123.0, 10_000).ToArray();
+        var b = Enumerable.Repeat(123.0, 10_000).ToArray();
+
+        var result = MannWhitneyU.Test(a, b);
+
+        Assert.False(double.IsNaN(result.PValue));
+        Assert.Equal(1.0, result.PValue, 10);
+        Assert.Equal(0.0, result.CliffsDelta, 10);
+    }
+
+    [Fact]
+    public void Null_Sample_Throws_ArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => MannWhitneyU.Test(null!, new double[] { 1, 2 }));
+        Assert.Throws<ArgumentNullException>(() => MannWhitneyU.Test(new double[] { 1, 2 }, null!));
+    }
+
+    private static void ShuffleInPlace(double[] values, Random rng)
+    {
+        for (var i = values.Length - 1; i > 0; i--)
+        {
+            var j = rng.Next(i + 1);
+            (values[i], values[j]) = (values[j], values[i]);
+        }
+    }
 }

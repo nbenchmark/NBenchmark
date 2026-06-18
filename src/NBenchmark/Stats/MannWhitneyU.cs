@@ -31,6 +31,9 @@ public static class MannWhitneyU
 
     public static MannWhitneyUResult Test(double[] sampleA, double[] sampleB)
     {
+        ArgumentNullException.ThrowIfNull(sampleA);
+        ArgumentNullException.ThrowIfNull(sampleB);
+
         var n1 = sampleA.Length;
         var n2 = sampleB.Length;
 
@@ -51,38 +54,35 @@ public static class MannWhitneyU
 
         Array.Sort(combined, (a, b) => a.Value.CompareTo(b.Value));
 
-        var ranks = new double[n1 + n2];
         var hasTies = false;
+        var tieCorrection = 0.0;
+        double r1 = 0;
         var j = 0;
 
         while (j < combined.Length)
         {
             var k = j + 1;
+            var groupACountInBlock = combined[j].Group == 0 ? 1 : 0;
 
             while (k < combined.Length && combined[k].Value == combined[j].Value)
             {
+                if (combined[k].Group == 0)
+                    groupACountInBlock++;
+
                 k++;
             }
 
-            if (k - j > 1)
+            var blockLength = k - j;
+
+            if (blockLength > 1)
                 hasTies = true;
 
-            var meanRank = (j + k + 1) / 2.0;
+            tieCorrection += (double)blockLength * blockLength * blockLength - blockLength;
 
-            for (var t = j; t < k; t++)
-            {
-                ranks[t] = meanRank;
-            }
+            var meanRank = (j + k + 1) / 2.0;
+            r1 += groupACountInBlock * meanRank;
 
             j = k;
-        }
-
-        double r1 = 0;
-
-        for (var i = 0; i < combined.Length; i++)
-        {
-            if (combined[i].Group == 0)
-                r1 += ranks[i];
         }
 
         var u1 = r1 - (double)n1 * (n1 + 1) / 2.0;
@@ -101,7 +101,7 @@ public static class MannWhitneyU
             return new MannWhitneyUResult(pValue, cliffsDelta);
         }
 
-        var asymptoticPValue = AsymptoticTwoSided(combined, n1, n2, u1);
+        var asymptoticPValue = AsymptoticTwoSided(n1, n2, u1, tieCorrection);
         return new MannWhitneyUResult(asymptoticPValue, cliffsDelta);
     }
 
@@ -175,10 +175,10 @@ public static class MannWhitneyU
     }
 
     private static double AsymptoticTwoSided(
-        (double Value, int Group)[] combined,
         int n1,
         int n2,
-        double u1)
+        double u1,
+        double tieCorrection)
     {
         var u2 = (double)n1 * n2 - u1;
         var u = Math.Min(u1, u2);
@@ -186,40 +186,28 @@ public static class MannWhitneyU
         var mu = (double)n1 * n2 / 2.0;
         var total = n1 + n2;
 
-        var tieCorrection = 0.0;
-        var j = 0;
+        // Numerically stable form of var(U) with tie correction:
+        // n1*n2/12 * [ (N + 1) - sum(t^3 - t)/(N*(N - 1)) ].
+        var variance =
+            (double)n1 * n2 / 12.0 *
+            ((total + 1.0) - tieCorrection / (total * (total - 1.0)));
 
-        while (j < combined.Length)
-        {
-            var k = j + 1;
-
-            while (k < combined.Length && combined[k].Value == combined[j].Value)
-            {
-                k++;
-            }
-
-            var t = k - j;
-
-            if (t > 1)
-                tieCorrection += (double)t * t * t - t;
-
-            j = k;
-        }
-
-        var sigma = Math.Sqrt(
-            (double)n1 * n2 / (total * (total - 1)) *
-            ((total * total * total - total) / 12.0 - tieCorrection / 12.0)
-        );
-
-        if (sigma == 0)
+        if (variance <= 0 || double.IsNaN(variance) || double.IsInfinity(variance))
             return 1.0;
+
+        var sigma = Math.Sqrt(variance);
 
         // Continuity correction: shrink the gap by 0.5 (a discrete U approximated by a
         // continuous normal). Clamp so an exactly-central U yields p = 1.
         var corrected = Math.Max(0.0, Math.Abs(u - mu) - 0.5);
         var z = corrected / sigma;
 
-        return 2.0 * (1.0 - NormalCdf(z));
+        var pValue = 2.0 * (1.0 - NormalCdf(z));
+
+        if (double.IsNaN(pValue))
+            return 1.0;
+
+        return Math.Clamp(pValue, 0.0, 1.0);
     }
 
     private static double NormalCdf(double x)
@@ -239,6 +227,7 @@ public static class MannWhitneyU
 
         return 0.5 * (1.0 + sign * y);
     }
+
 }
 
 /// <summary>
