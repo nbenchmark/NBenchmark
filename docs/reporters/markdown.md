@@ -63,10 +63,12 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 
 ### Comparison
 
-| Benchmark | Median | Mean | Error | StdDev | P95 | P99 | Ratio | Sig | Magnitude | Alloc/op |
-|---|---:|---:|---:|---:|---:|---:|:---:|---:|---:|---:|
-| Compute | 300.0 ns | 275.3 ns | ±16.2 ns | 85.9 ns | 500.0 ns | 500.0 ns | 0.75x | ✓ | large | - |
-| Baseline | 400.0 ns | 375.8 ns | ±21.6 ns | 114.3 ns | 500.0 ns | 900.0 ns | 1.00x | - | - | - |
+| Benchmark | Median | Mean | Ops/s | Ratio | Scale | Sig | Magnitude | Alloc/op |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Compute | 300.0 ns | 275.3 ns | 3.64 Mops/s | **0.75x** | `############` | ✓ | large | - |
+| **Baseline** _(baseline)_ | 400.0 ns | 375.8 ns | 2.66 Mops/s | _baseline_ | `################` | - | - | - |
+
+> The real `MarkdownReporter` emits Unicode block characters (`█`) in the `Scale` column. They are replaced with `#` above so the example stays aligned in source form.
 
 ### Precision & Tail Latency
 
@@ -101,11 +103,9 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 | **Benchmark** | Benchmark name. |
 | **Median** | Median timing. |
 | **Mean** | Arithmetic mean. |
-| **Error** | ±Margin of error on the mean. |
-| **StdDev** | Sample standard deviation. |
-| **P95** | 95th percentile. |
-| **P99** | 99th percentile. |
+| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). `-` for errored or dry-run results. |
 | **Ratio** | Speed relative to the baseline. |
+| **Scale** | Visual bar scaled to the slowest successful benchmark. |
 | **Sig** | `✓` = significant, `✗` = not significant, `-` = not applicable. |
 | **Magnitude** | Strategy-defined qualitative effect label. With the built-in Mann-Whitney tests this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `small` (< 0.33), `med` (< 0.474), `large` (≥ 0.474). `-` for the baseline or when significance is not tested. See [Effect size: Cliff's delta](../statistics/significance.md#effect-size-cliffs-delta). |
 | **Alloc/op** | Mean bytes allocated per iteration, or `-` if not measured. |

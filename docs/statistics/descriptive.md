@@ -155,6 +155,15 @@ Reported as `0` when `n < 1$.
 | `AllocP95` | Nearest-rank P95 of iteration deltas | P95 allocation per iteration (only when `MeasureAllocations = true`). |
 | `AllocMax` | Max of iteration deltas | Max allocation per iteration (only when `MeasureAllocations = true`). |
 
+### Throughput fields
+
+| Field | Formula | Description |
+|---|---|---|
+| `OperationsPerSecond` | `1e9 / Mean` when timing is in nanoseconds | Mean operations per second. `NaN` for errored or dry-run results. |
+| `MedianOperationsPerSecond` | `1e9 / Median` when timing is in nanoseconds | Median operations per second. `NaN` for errored or dry-run results. |
+| `NanosecondsPerOperation` | Alias for `Mean` | Convenience alias that expresses the mean timing as nanoseconds per operation. |
+| `TotalOperations` | `MeasuredIterations + WarmupIterations`, or `AutoTuneDiagnostic.TotalBodyInvocations` when auto-tuning | Total body invocations executed across warmup and measurement. |
+
 ### Computed properties
 
 | Property | Formula | Description |

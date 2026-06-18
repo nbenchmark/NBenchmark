@@ -43,6 +43,31 @@ public record BenchmarkResult
 
     public long? MeanAllocatedBytes { get; init; }
 
+    /// <summary>
+    ///     The mean number of operations per second, computed as 1e9 / Mean where the mean is
+    ///     measured in nanoseconds per operation. NaN for errored or dry-run results.
+    /// </summary>
+    public double OperationsPerSecond { get; init; }
+
+    /// <summary>
+    ///     The median number of operations per second, computed as 1e9 / Median. NaN for errored
+    ///     or dry-run results.
+    /// </summary>
+    public double MedianOperationsPerSecond { get; init; }
+
+    /// <summary>
+    ///     Convenience alias for Mean, expressed as nanoseconds per operation. Identical to
+    ///     <see cref="Mean" />.
+    /// </summary>
+    public double NanosecondsPerOperation => Mean;
+
+    /// <summary>
+    ///     Total body invocations executed across warmup and measurement. When auto-tuning is
+    ///     active this mirrors <see cref="AutoTuneDiagnostic.TotalBodyInvocations" />; otherwise
+    ///     it is the sum of measured and warmup iterations.
+    /// </summary>
+    public long TotalOperations { get; init; }
+
     public double? PValue { get; init; }
     public SignificanceVerdict SignificanceVerdict { get; init; }
 

@@ -36,12 +36,12 @@ No explicit `.WithReporter(new ConsoleReporter())` call is needed when using the
 Benchmark Results
 Run at 2026-06-06 03:40:00 UTC - 40 warmup / 190 measured
 
-╭──────────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬───────┬─────┬───────────┬──────────╮
-│ Benchmark            │ Median │  Mean  │ Error  │ StdDev │  P95   │  P99   │ Ratio │ Sig │ Magnitude │ Alloc/op │
-├──────────────────────┼────────┼────────┼────────┼────────┼────────┼────────┼───────┼─────┼───────────┼──────────┤
-│ Compute              │ 300 ns │ 275 ns │ ±16 ns │  86 ns │ 500 ns │ 500 ns │ 0.75x │  ✓  │   large   │    -     │
-│ Baseline (baseline)  │ 400 ns │ 376 ns │ ±22 ns │ 114 ns │ 500 ns │ 900 ns │ 1.00x │  -  │     -     │    -     │
-╰──────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┴─────┴───────────┴──────────╯
+╭────────────────────────┬──────────┬──────────┬─────────────┬────────────────────────┬────────┬─────────────┬──────────╮
+│ Benchmark              │ Median   │ Mean     │ Ops/s       │ vs Baseline            │ Sig    │ Magnitude   │ Alloc/op │
+├────────────────────────┼──────────┼──────────┼─────────────┼────────────────────────┼────────┼─────────────┼──────────┤
+│ Compute                │ 300 ns   │ 275 ns   │ 3.64 Mops/s │ ████████ 0.75x         │   ✓    │ large       │    -     │
+│ Baseline (baseline)    │ 400 ns   │ 376 ns   │ 2.66 Mops/s │ ████████████ baseline  │   -    │ -           │    -     │
+╰────────────────────────┴──────────┴──────────┴─────────────┴────────────────────────┴────────┴─────────────┴──────────╯
 
 Precision & Tail Latency
 ... (error/stddev/cv/p95/p99 table)
@@ -86,11 +86,8 @@ After the comparison and precision tables, ConsoleReporter prints an **Interpret
 | **Benchmark** | Name of the benchmark. Colour-coded: green (≤ 5% slower than baseline), yellow (≤ 50% slower), red (> 50% slower). Baseline is shown in bold. |
 | **Median** | Median timing. |
 | **Mean** | Arithmetic mean. |
-| **Error** | ±Margin of error on the mean at the configured confidence level. |
-| **StdDev** | Sample standard deviation. |
-| **P95** | 95th percentile. |
-| **P99** | 99th percentile. |
-| **Ratio** | Speed relative to the baseline. Green for faster, yellow for moderately slower, red for significantly slower. |
+| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). `-` for errored or dry-run results. |
+| **vs Baseline** | Visual bar plus ratio relative to the baseline. Green for faster, yellow for moderately slower, red for significantly slower. The baseline cell shows `baseline`. |
 | **Sig** | **✓** = difference from baseline is statistically significant; **✗** = not significant; **-** = not applicable (baseline or significance not tested). |
 | **Magnitude** | Strategy-defined qualitative effect label. With the built-in Mann-Whitney tests this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `small` (< 0.33), `med` (< 0.474), `large` (≥ 0.474). For built-in `large`, the cell is bold-red when the candidate is slower and bold-green when faster. `-` for the baseline or when significance is not tested. See [Effect size: Cliff's delta](../statistics/significance.md#effect-size-cliffs-delta). |
 | **Alloc/op** | Mean heap bytes per iteration (only visible when allocation tracking is enabled). |

@@ -61,13 +61,13 @@ public sealed class MarkdownReporter : IReporter
 
         if (showCategories)
         {
-            sb.AppendLine("| | Benchmark | Median | Mean | Ratio | Scale | Sig | Magnitude | Alloc/op | Categories |");
-            sb.AppendLine("|:---:|---|---:|---:|:---:|---|---:|---:|---:|---|");
+            sb.AppendLine("| | Benchmark | Median | Mean | Ops/s | Ratio | Scale | Sig | Magnitude | Alloc/op | Categories |");
+            sb.AppendLine("|:---:|---|---:|---:|---:|:---:|---|---:|---:|---:|---|");
         }
         else
         {
-            sb.AppendLine("| | Benchmark | Median | Mean | Ratio | Scale | Sig | Magnitude | Alloc/op |");
-            sb.AppendLine("|:---:|---|---:|---:|:---:|---|---:|---:|---:|");
+            sb.AppendLine("| | Benchmark | Median | Mean | Ops/s | Ratio | Scale | Sig | Magnitude | Alloc/op |");
+            sb.AppendLine("|:---:|---|---:|---:|---:|:---:|---|---:|---:|---:|");
         }
 
         foreach (var row in table.Rows)
@@ -75,9 +75,9 @@ public sealed class MarkdownReporter : IReporter
             if (row.Errored)
             {
                 if (showCategories)
-                    sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - | - |");
+                    sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - | - | - |");
                 else
-                    sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - |");
+                    sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - | - |");
                 continue;
             }
 
@@ -104,6 +104,8 @@ public sealed class MarkdownReporter : IReporter
                 ? (row.Categories.Count > 0 ? string.Join(", ", row.Categories) : "-")
                 : "";
 
+            var opsText = BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond);
+
             if (showCategories)
             {
                 sb.AppendLine(
@@ -111,6 +113,7 @@ public sealed class MarkdownReporter : IReporter
                     $"| {nameText} " +
                     $"| {BenchmarkFormatter.FormatNs(row.Median)} " +
                     $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
+                    $"| {opsText} " +
                     $"| {ratioText} " +
                     $"| {bar} " +
                     $"| {sigIcon} " +
@@ -126,6 +129,7 @@ public sealed class MarkdownReporter : IReporter
                     $"| {nameText} " +
                     $"| {BenchmarkFormatter.FormatNs(row.Median)} " +
                     $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
+                    $"| {opsText} " +
                     $"| {ratioText} " +
                     $"| {bar} " +
                     $"| {sigIcon} " +

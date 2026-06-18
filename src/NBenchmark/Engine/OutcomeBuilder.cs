@@ -110,6 +110,11 @@ internal static class OutcomeBuilder
             ? StatsSummary.ComputeAllocations(rawAllocations)
             : (AllocationStats?)null;
 
+        var opsPerSecond = stats is not null ? ThroughputFromNs(stats.Mean) : double.NaN;
+        var medianOpsPerSecond = stats is not null ? ThroughputFromNs(stats.Median) : double.NaN;
+        var totalOperations = autoTune?.TotalBodyInvocations
+            ?? (long)measuredIterations + resolvedWarmup;
+
         return new MeasurementOutcome
         {
             RawSamples = rawSamples,
@@ -142,6 +147,9 @@ internal static class OutcomeBuilder
                 AllocMedian = allocStats?.P50,
                 AllocP95 = allocStats?.P95,
                 AllocMax = allocStats?.Max,
+                OperationsPerSecond = opsPerSecond,
+                MedianOperationsPerSecond = medianOpsPerSecond,
+                TotalOperations = totalOperations,
                 PValue = null,
                 SignificanceVerdict = SignificanceVerdict.NotTested,
                 Errored = errored,
@@ -163,6 +171,9 @@ internal static class OutcomeBuilder
             },
         };
     }
+
+    private static double ThroughputFromNs(double nsPerOp) =>
+        nsPerOp > 0 ? 1_000_000_000.0 / nsPerOp : double.NaN;
 
     private static Exception Unwrap(Exception ex) =>
         ex is TargetInvocationException tiex ? tiex.InnerException ?? tiex : ex;

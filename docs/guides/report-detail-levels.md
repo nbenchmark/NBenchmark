@@ -10,19 +10,17 @@ NBenchmark supports two report detail levels that control how much statistical i
 
 ## Simple mode (default)
 
-Simple mode shows a compact 10-column table:
+Simple mode shows a compact table:
 
 | Column | Description |
 |---|---|
 | **Benchmark** | Benchmark name. |
 | **Median** | Median timing. |
 | **Mean** | Arithmetic mean. |
-| **Error** | ±Margin of error on the mean, with parenthesised percentage of the mean. |
-| **StdDev** | Sample standard deviation. |
-| **P95** | 95th percentile. |
-| **P99** | 99th percentile. |
-| **Ratio** | Speed relative to the baseline. |
+| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). |
+| **vs Baseline** | Visual bar plus ratio relative to the baseline. |
 | **Sig** | ✓ = significant, ✗ = not significant, - = not applicable. |
+| **Magnitude** | Strategy-defined qualitative effect label. |
 | **Alloc/op** | Mean bytes allocated per iteration, or - if not measured. |
 
 ## Advanced mode
@@ -70,7 +68,7 @@ dotnet run -- --detail simple
 
 | Value | Behaviour |
 |---|---|
-| `simple` | 10-column table with the essential statistics. **(default)** |
+| `simple` | Compact table with the essential statistics. **(default)** |
 | `advanced` | Same table plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, and allocation percentiles. |
 
 The `--detail` flag affects all registered reporters. JSON always emits the full record regardless of detail level.

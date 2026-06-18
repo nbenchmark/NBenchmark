@@ -34,4 +34,30 @@ public class BenchmarkFormatterTests
         var result = BenchmarkFormatter.FormatBytes(bytes);
         Assert.Equal(expected, result);
     }
+
+    [Theory]
+    [InlineData(double.NaN, "-")]
+    [InlineData(0.5, "0.5 ops/s")]
+    [InlineData(999.9, "999.9 ops/s")]
+    [InlineData(1000, "1.00 Kops/s")]
+    [InlineData(1500, "1.50 Kops/s")]
+    [InlineData(500_000, "500.00 Kops/s")]
+    [InlineData(1_000_000, "1.00 Mops/s")]
+    [InlineData(1_500_000, "1.50 Mops/s")]
+    [InlineData(500_000_000, "500.00 Mops/s")]
+    [InlineData(1_000_000_000, "1.00 Gops/s")]
+    [InlineData(1_500_000_000, "1.50 Gops/s")]
+    [InlineData(500_000_000_000.0, "500.00 Gops/s")]
+    [InlineData(1_000_000_000_000.0, "1.00 Tops/s")]
+    public void FormatOpsPerSecond_Formats_Correctly(double opsPerSecond, string expected)
+    {
+        var result = BenchmarkFormatter.FormatOpsPerSecond(opsPerSecond);
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void FormatOpsPerSecond_Zero_Formats_As_Ops_Per_Second()
+    {
+        Assert.Equal("0.0 ops/s", BenchmarkFormatter.FormatOpsPerSecond(0));
+    }
 }

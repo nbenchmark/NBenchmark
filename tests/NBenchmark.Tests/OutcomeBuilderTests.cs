@@ -41,6 +41,18 @@ public class OutcomeBuilderTests
         var total = TimeSpan.FromMilliseconds(42);
         var measured = TimeSpan.FromMilliseconds(7);
 
+        var diagnostic = new AutoTuneDiagnostic
+        {
+            ResolvedWarmup = 5,
+            ResolvedSamples = 3,
+            OpsPerSample = 1,
+            TotalBodyInvocations = 8,
+            WarmupStop = WarmupStopReason.Settled,
+            SampleStop = SampleStopReason.CiTargetMet,
+            AchievedRelativeCiWidth = 0.018,
+            TuningWallClock = TimeSpan.FromMilliseconds(33),
+        };
+
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
                 new ProcessedMeasurements(stats, 3, (long)allocations.Average(), 0, 0, 0, null, null, 0, null),
@@ -51,7 +63,8 @@ public class OutcomeBuilderTests
             options,
             total,
             measured,
-            resolvedWarmup: 5);
+            resolvedWarmup: 5,
+            autoTune: diagnostic);
 
         Assert.Equal(rawTimings, outcome.RawSamples);
         var r = outcome.Result;
@@ -79,6 +92,10 @@ public class OutcomeBuilderTests
         Assert.Equal(measured, r.MeasuredDuration);
         Assert.True(r.IsBaseline);
         Assert.Equal(OutlierMode.RemoveTop5Percent, r.OutlierMode);
+        Assert.Equal(10_000_000.0, r.OperationsPerSecond, 1);
+        Assert.Equal(10_101_010.101010101, r.MedianOperationsPerSecond, 1);
+        Assert.Equal(8, r.TotalOperations);
+        Assert.Equal(100.0, r.NanosecondsPerOperation);
     }
 
     [Fact]

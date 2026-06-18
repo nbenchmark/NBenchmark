@@ -24,6 +24,7 @@ public static class BenchmarkResultExtensions
         Console.WriteLine($"  ┌─ {result.Name} ─────────────────────────────────────");
         Console.WriteLine("  │");
         Console.WriteLine($"  │  Median: {BenchmarkFormatter.FormatNs(result.Median),-14} Mean: {BenchmarkFormatter.FormatNs(result.Mean)}");
+        Console.WriteLine($"  │  Ops/s:  {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond),-14} Median ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.MedianOperationsPerSecond)}");
         Console.WriteLine($"  │  P95:    {BenchmarkFormatter.FormatNs(result.P95),-14} P99:  {BenchmarkFormatter.FormatNs(result.P99)}");
         Console.WriteLine($"  │  StdDev: {BenchmarkFormatter.FormatNs(result.StandardDeviation),-14} CV:   {result.CoefficientOfVariationPercent:F2}%");
 

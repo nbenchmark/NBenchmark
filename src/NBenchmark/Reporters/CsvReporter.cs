@@ -30,12 +30,12 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         if (Detail == ReportDetail.Simple)
         {
             sb.AppendLine(
-                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
+                "Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
         }
         else
         {
             sb.AppendLine(
-                "Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,Categories");
+                "Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,Categories");
         }
 
         var table = BenchmarkTable.Build(results);
@@ -61,6 +61,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"\"{safeName}\"," +
                     $"{row.Median:F1}," +
                     $"{row.Mean:F1}," +
+                    $"{row.OperationsPerSecond:F1}," +
                     $"{row.StandardDeviation:F1}," +
                     $"{row.StandardError:F1}," +
                     $"{row.MarginOfError:F1}," +
@@ -103,6 +104,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"\"{safeName}\"," +
                     $"{row.Median:F1}," +
                     $"{row.Mean:F1}," +
+                    $"{row.OperationsPerSecond:F1}," +
                     $"{row.StandardDeviation:F1}," +
                     $"{row.StandardError:F1}," +
                     $"{row.MarginOfError:F1}," +

@@ -108,6 +108,7 @@ public sealed class ConsoleReporter : IReporter
             .AddColumn(new TableColumn("[bold]Benchmark[/]").NoWrap())
             .AddColumn(new TableColumn("[bold]Median[/]").RightAligned().NoWrap())
             .AddColumn(new TableColumn("[bold]Mean[/]").RightAligned().NoWrap())
+            .AddColumn(new TableColumn("[bold]Ops/s[/]").RightAligned().NoWrap())
             .AddColumn(new TableColumn("[bold]vs Baseline[/]").NoWrap())
             .AddColumn(new TableColumn("[bold]Sig[/]").Centered().NoWrap())
             .AddColumn(new TableColumn("[bold]Magnitude[/]").Centered().NoWrap())
@@ -128,7 +129,7 @@ public sealed class ConsoleReporter : IReporter
                 var errorCols = new List<string>
                 {
                     $"[red]✗ {Esc(row.Name)}[/]",
-                    "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
+                    "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
                 };
 
                 if (showCategories)
@@ -171,6 +172,7 @@ public sealed class ConsoleReporter : IReporter
                 nameText,
                 $"[bold]{BenchmarkFormatter.FormatNs(row.Median)}[/]",
                 BenchmarkFormatter.FormatNs(row.Mean),
+                BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond),
                 ratioAndBar,
                 sigIcon,
                 magnitudeText,

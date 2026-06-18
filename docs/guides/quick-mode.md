@@ -122,6 +122,7 @@ await result.ToJsonAsync("results/");   // output directory
 ```csharp
 Console.WriteLine($"Median:  {result.Median} ns");
 Console.WriteLine($"Mean:    {result.Mean} ns");
+Console.WriteLine($"Ops/s:   {result.OperationsPerSecond}");
 Console.WriteLine($"P95:     {result.P95} ns");
 Console.WriteLine($"StdDev:  {result.StandardDeviation} ns");
 Console.WriteLine($"Error:   ±{result.MarginOfError} ns ({result.ConfidenceLevel * 100:0}% CI)");

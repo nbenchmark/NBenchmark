@@ -25,6 +25,23 @@ public static class BenchmarkFormatter
 
     public static string FormatAlloc(long bytes) => FormatBytes(bytes);
 
+    public static string FormatOpsPerSecond(double opsPerSecond)
+    {
+        if (double.IsNaN(opsPerSecond) || opsPerSecond < 0)
+            return "-";
+
+        return opsPerSecond switch
+        {
+            < 1_000 => $"{opsPerSecond:F1} ops/s",
+            < 1_000_000 => $"{opsPerSecond / 1_000:F2} Kops/s",
+            < 1_000_000_000 => $"{opsPerSecond / 1_000_000:F2} Mops/s",
+            < 1_000_000_000_000 => $"{opsPerSecond / 1_000_000_000:F2} Gops/s",
+            _ => $"{opsPerSecond / 1_000_000_000_000:F2} Tops/s",
+        };
+    }
+
+    public static string FormatNsPerOp(double ns) => FormatNs(ns);
+
     public static string FormatDuration(TimeSpan duration)
     {
         // Implemented with netstandard2.0-compatible TimeSpan members only (Ticks, TotalMilliseconds,

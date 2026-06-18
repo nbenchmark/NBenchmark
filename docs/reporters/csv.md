@@ -57,9 +57,9 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 ## Output format
 
 ```csv
-Name,Median,Mean,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile
-"Compute",300.0,275.3,85.9,6.1,16.2,259.1,291.5,0.95,0.3122,500.0,500.0,0.75,"true","Cliff's δ",0.6234,"large",96,5.89,2,simple,realistic
-"Baseline",400.0,375.8,114.3,8.1,21.6,354.2,397.4,0.95,0.3043,500.0,900.0,1.00,"","","","",120,5.75,0,simple,realistic
+Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile
+"Compute",300.0,275.3,3636363.6,85.9,6.1,16.2,259.1,291.5,0.95,0.3122,500.0,500.0,0.75,"true","Cliff's δ",0.6234,"large",96,5.89,2,simple,realistic
+"Baseline",400.0,375.8,2660985.4,114.3,8.1,21.6,354.2,397.4,0.95,0.3043,500.0,900.0,1.00,"","","","",120,5.75,0,simple,realistic
 ```
 
 All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magnitude` reflect the active significance strategy's effect output. With built-in Mann-Whitney tests, `EffectMetric` is `Cliff's δ`, `EffectValue` is signed (positive = candidate slower), and `Magnitude` is one of `neg`, `small`, `med`, `large` per the [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size) thresholds.
@@ -73,6 +73,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `Name` | string | Benchmark name (double-quote escaped). |
 | `Median` | float | Median timing in nanoseconds. |
 | `Mean` | float | Arithmetic mean in nanoseconds. |
+| `OpsPerSecond` | float | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). Empty for errored or dry-run results. |
 | `StdDev` | float | Sample standard deviation in nanoseconds. |
 | `StdErr` | float | Standard error of the mean (`StdDev / √n`) in nanoseconds. |
 | `MarginOfError` | float | Half-width of the confidence interval in nanoseconds. |
