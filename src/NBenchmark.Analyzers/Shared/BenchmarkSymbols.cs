@@ -5,7 +5,8 @@ namespace NBenchmark.Analyzers.Shared;
 internal static class BenchmarkSymbols
 {
     private const string BenchmarkAttributeFullName = "NBenchmark.Attributes.BenchmarkAttribute";
-    private const string BenchmarkArgumentsAttributeFullName = "NBenchmark.Attributes.BenchmarkArgumentsAttribute";
+    private const string BenchmarkCaseAttributeFullName = "NBenchmark.Attributes.BenchmarkCaseAttribute";
+    private const string BenchmarkCasesAttributeFullName = "NBenchmark.Attributes.BenchmarkCasesAttribute";
     private const string BenchmarkSetupAttributeFullName = "NBenchmark.Attributes.BenchmarkSetupAttribute";
     private const string BenchmarkTeardownAttributeFullName = "NBenchmark.Attributes.BenchmarkTeardownAttribute";
     private const string BenchmarkIterationSetupAttributeFullName = "NBenchmark.Attributes.BenchmarkIterationSetupAttribute";
@@ -21,10 +22,16 @@ internal static class BenchmarkSymbols
         return name == BenchmarkAttributeFullName;
     }
 
-    public static bool IsBenchmarkArgumentsAttribute(INamedTypeSymbol? attributeClass)
+    public static bool IsBenchmarkCaseAttribute(INamedTypeSymbol? attributeClass)
     {
         var name = GetAttributeFullName(attributeClass);
-        return name == BenchmarkArgumentsAttributeFullName;
+        return name == BenchmarkCaseAttributeFullName;
+    }
+
+    public static bool IsBenchmarkCasesAttribute(INamedTypeSymbol? attributeClass)
+    {
+        var name = GetAttributeFullName(attributeClass);
+        return name == BenchmarkCasesAttributeFullName;
     }
 
     public static bool IsLifecycleAttribute(INamedTypeSymbol? attributeClass)

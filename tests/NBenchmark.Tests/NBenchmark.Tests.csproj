@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
+    <ProjectReference Include="..\NBenchmark.Tests.ErrorFixtures\NBenchmark.Tests.ErrorFixtures.csproj"/>
   </ItemGroup>
 
 </Project>

@@ -68,7 +68,6 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(MixedIsolationBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(MixedIsolationBenchmarks));
 
-        // Class is [IsolatedProcess]; method [InProcess] opts a single benchmark back out.
         Assert.Equal(IsolationMode.InProcess, suite.Benchmarks.First(b => b.Method.Name == "OptedOut").Isolation);
         Assert.Equal(IsolationMode.PerBenchmark, suite.Benchmarks.First(b => b.Method.Name == "Inherited").Isolation);
     }
@@ -170,38 +169,124 @@ public class BenchmarkDiscovererTests
     }
 
     [Fact]
-    public void Expands_BenchmarkArguments_Into_One_Definition_Per_Set()
+    public void Expands_BenchmarkCase_Into_One_Definition_Per_Attribute()
     {
-        var suites = new BenchmarkDiscoverer().Discover(typeof(ParameterisedBenchmarks).Assembly);
-        var suite = suites.First(s => s.Type == typeof(ParameterisedBenchmarks));
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParametricBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
 
         var compute = suite.Benchmarks.Where(b => b.Method.Name == "Compute").ToList();
         Assert.Equal(2, compute.Count);
-        Assert.Equal(new[] { "Compute(100)", "Compute(1000)" }, compute.Select(b => b.DisplayName));
+        Assert.Equal("Compute(100)", compute[0].DisplayName);
+        Assert.Equal("Compute(1000)", compute[1].DisplayName);
     }
 
     [Fact]
-    public void Argument_Bound_Delegate_Invokes_With_The_Bound_Arguments()
+    public void BenchmarkCase_Bound_Delegate_Invokes_With_The_Bound_Values()
     {
-        var suites = new BenchmarkDiscoverer().Discover(typeof(ParameterisedBenchmarks).Assembly);
-        var suite = suites.First(s => s.Type == typeof(ParameterisedBenchmarks));
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParametricBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
         var benchmark = suite.Benchmarks.First(b => b.DisplayName == "Compute(1000)");
 
-        var result = benchmark.SyncDelegate!(new ParameterisedBenchmarks());
+        var result = benchmark.SyncDelegate!(new ParametricBenchmarks());
         Assert.Equal(1000, result);
     }
 
     [Fact]
     public void Formats_Multiple_And_String_Arguments_In_DisplayName()
     {
-        var suites = new BenchmarkDiscoverer().Discover(typeof(ParameterisedBenchmarks).Assembly);
-        var suite = suites.First(s => s.Type == typeof(ParameterisedBenchmarks));
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParametricBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
 
         var concat = suite.Benchmarks.First(b => b.Method.Name == "Concat");
         Assert.Equal("Concat(\"a\", 3)", concat.DisplayName);
 
-        var result = concat.SyncDelegate!(new ParameterisedBenchmarks());
+        var result = concat.SyncDelegate!(new ParametricBenchmarks());
         Assert.Equal("aaa", result);
+    }
+
+    [Fact]
+    public void Expands_BenchmarkCases_Into_One_Definition_Per_Tuple()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParametricBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
+
+        var multiply = suite.Benchmarks.Where(b => b.Method.Name == "Multiply").ToList();
+        Assert.Equal(3, multiply.Count);
+        Assert.Equal("Multiply(a=2, b=3)", multiply[0].DisplayName);
+        Assert.Equal("Multiply(a=5, b=7)", multiply[1].DisplayName);
+        Assert.Equal("Multiply(a=10, b=20)", multiply[2].DisplayName);
+    }
+
+    [Fact]
+    public void DisplayName_Uses_Tuple_Element_Names_When_Available()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParametricBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
+
+        var multiply = suite.Benchmarks.First(b => b.DisplayName == "Multiply(a=2, b=3)");
+        Assert.NotNull(multiply);
+    }
+
+    [Fact]
+    public void DisplayName_Falls_Back_To_Positional_For_Unnamed_Tuples()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(UnnamedTupleCaseBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(UnnamedTupleCaseBenchmarks));
+
+        var add = suite.Benchmarks.Where(b => b.Method.Name == "Add").ToList();
+        Assert.Equal(2, add.Count);
+        Assert.Equal("Add(1, 2)", add[0].DisplayName);
+        Assert.Equal("Add(3, 4)", add[1].DisplayName);
+    }
+
+    [Fact]
+    public void BenchmarkCases_Resolves_Static_And_Instance_Sources()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParametricBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
+
+        var divide = suite.Benchmarks.Where(b => b.Method.Name == "Divide").ToList();
+        Assert.Equal(2, divide.Count);
+        Assert.Equal("Divide(x=10, y=2)", divide[0].DisplayName);
+        Assert.Equal("Divide(x=20, y=4)", divide[1].DisplayName);
+    }
+
+    [Fact]
+    public void Source_Method_Must_Return_IEnumerable_Of_ValueTuple()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            new BenchmarkDiscoverer().Discover(typeof(ErrorFixtures.InvalidReturnTypeCasesBenchmarks)));
+
+        Assert.Contains("ValueTuple", ex.Message);
+    }
+
+    [Fact]
+    public void Source_Tuple_Arity_Must_Match_Method_Arity()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            new BenchmarkDiscoverer().Discover(typeof(ErrorFixtures.ArityMismatchCasesBenchmarks)));
+
+        Assert.Contains("parameter", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ArityMismatchCasesBenchmarks.Sum", ex.Message);
+        Assert.DoesNotContain("MismatchCases expects", ex.Message);
+    }
+
+    [Fact]
+    public void Source_Must_Be_Parameterless()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            new BenchmarkDiscoverer().Discover(typeof(ErrorFixtures.ParamSourceCasesBenchmarks)));
+
+        Assert.Contains("no parameters", ex.Message);
+    }
+
+    [Fact]
+    public void BenchmarkCase_And_BenchmarkCases_Cannot_Coexist()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            new BenchmarkDiscoverer().Discover(typeof(ErrorFixtures.ConflictCasesBenchmarks)));
+
+        Assert.Contains("both", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -425,14 +510,48 @@ internal static class InternalBenchmarksMarker
 {
 }
 
-public class ParameterisedBenchmarks
+public class ParametricBenchmarks
 {
-    [BenchmarkArguments(100)]
-    [BenchmarkArguments(1000)]
+    [BenchmarkCase(100)]
+    [BenchmarkCase(1000)]
     [Benchmark]
     public int Compute(int n) => n;
 
-    [BenchmarkArguments("a", 3)]
+    [BenchmarkCase("a", 3)]
     [Benchmark]
     public string Concat(string value, int times) => string.Concat(Enumerable.Repeat(value, times));
+
+    [BenchmarkCases(nameof(MultiplyCases))]
+    [Benchmark]
+    public int Multiply(int a, int b) => a * b;
+
+    public static IEnumerable<(int a, int b)> MultiplyCases()
+    {
+        yield return (2, 3);
+        yield return (5, 7);
+        yield return (10, 20);
+    }
+
+    [BenchmarkCases(nameof(DivideCases))]
+    [Benchmark]
+    public int Divide(int x, int y) => x / y;
+
+    public IEnumerable<(int x, int y)> DivideCases()
+    {
+        yield return (10, 2);
+        yield return (20, 4);
+    }
+}
+
+public class UnnamedTupleCaseBenchmarks
+{
+    [BenchmarkCases(nameof(AddCases))]
+    [Benchmark]
+    public int Add(int a, int b) => a + b;
+
+    public static IEnumerable<ValueTuple<int, int>> AddCases()
+    {
+        yield return (1, 2);
+        yield return (3, 4);
+    }
 }
