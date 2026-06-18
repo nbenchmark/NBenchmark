@@ -36,7 +36,41 @@ public sealed record BenchmarkTable
         if (successful.Count > 0)
             baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
 
-        var headerSource = successful.Count > 0 ? successful[0] : null;
+        return BuildInternal(results, baseline, multiBenchmark);
+    }
+
+    public static IReadOnlyList<BenchmarkTable> BuildPerClass(IReadOnlyList<BenchmarkResult> results)
+    {
+        if (results.Count == 0)
+            return [BuildInternal(results, null, false)];
+
+        var byClass = results
+            .Select((result, index) => (result, index))
+            .GroupBy(x => x.result.ClassName)
+            .ToList();
+
+        if (byClass.Count <= 1)
+            return [Build(results)];
+
+        var tables = new List<BenchmarkTable>();
+
+        foreach (var group in byClass)
+        {
+            var groupResults = group.Select(x => x.result).ToList();
+            var successful = groupResults.Where(r => !r.Errored).ToList();
+            var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+            tables.Add(BuildInternal(groupResults, baseline, groupResults.Count > 1));
+        }
+
+        return tables;
+    }
+
+    private static BenchmarkTable BuildInternal(
+        IReadOnlyList<BenchmarkResult> results,
+        BenchmarkResult? baseline,
+        bool multiBenchmark)
+    {
+        var headerSource = results.FirstOrDefault(r => !r.Errored) ?? results.FirstOrDefault();
 
         var rows = results
             .OrderBy(r => r.Median)
@@ -64,6 +98,7 @@ public sealed record BenchmarkTable
         return new BenchmarkRow
         {
             Name = result.Name,
+            ClassName = result.ClassName,
             Description = result.Description,
             Median = result.Median,
             Mean = result.Mean,
@@ -215,6 +250,7 @@ public sealed record BenchmarkTable
 public record BenchmarkRow
 {
     public required string Name { get; init; }
+    public string ClassName { get; init; } = "";
     public string? Description { get; init; }
     public required double Median { get; init; }
     public required double Mean { get; init; }

@@ -149,6 +149,7 @@ public sealed class BenchmarkRunner
         return OutcomeBuilder.Build(
             new RunOutcome.DryRun(),
             name,
+            spec.ClassName,
             spec.Description,
             spec.IsBaseline,
             spec.Options,
@@ -182,6 +183,7 @@ public sealed class BenchmarkRunner
         return OutcomeBuilder.Build(
             new RunOutcome.Success(mergedPipeline, adaptive.PerOpTimings),
             name,
+            spec.ClassName,
             spec.Description,
             spec.IsBaseline,
             spec.Options,
@@ -226,6 +228,7 @@ public sealed class BenchmarkRunner
         return OutcomeBuilder.Build(
             new RunOutcome.Errored(ex),
             name,
+            spec.ClassName,
             spec.Description,
             spec.IsBaseline,
             spec.Options,

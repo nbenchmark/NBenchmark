@@ -130,7 +130,7 @@ public sealed class BenchmarkDiscoverer
             }
 
             yield return CreateDefinition(method, attribute, method.Name, null,
-                iterSetupDel, iterTeardownDel, classCategories);
+                iterSetupDel, iterTeardownDel, classCategories, isBaseline: attribute.Baseline);
 
             yield break;
         }
@@ -146,6 +146,9 @@ public sealed class BenchmarkDiscoverer
             yield break;
         }
 
+        var methodIsBaseline = attribute.Baseline;
+        var caseIndex = 0;
+
         if (caseAttributes.Length == 0)
         {
             if (parameters.Length > 0)
@@ -157,7 +160,7 @@ public sealed class BenchmarkDiscoverer
             }
 
             yield return CreateDefinition(method, attribute, method.Name, null,
-                iterSetupDel, iterTeardownDel, classCategories);
+                iterSetupDel, iterTeardownDel, classCategories, isBaseline: attribute.Baseline);
 
             yield break;
         }
@@ -180,7 +183,9 @@ public sealed class BenchmarkDiscoverer
             var displayName = BuildDisplayName(method.Name, null, converted);
 
             yield return CreateDefinition(method, attribute, displayName, converted,
-                iterSetupDel, iterTeardownDel, classCategories);
+                iterSetupDel, iterTeardownDel, classCategories, isBaseline: methodIsBaseline && caseIndex == 0);
+
+            caseIndex++;
         }
     }
 
@@ -195,6 +200,8 @@ public sealed class BenchmarkDiscoverer
     {
         var source = ResolveCaseSource(method, casesAttribute);
         var tuples = MaterialiseCaseTuples(method, source, parameters);
+        var methodIsBaseline = benchmarkAttr.Baseline;
+        var caseIndex = 0;
 
         foreach (var (rawValues, paramNames) in tuples)
         {
@@ -202,7 +209,9 @@ public sealed class BenchmarkDiscoverer
             var displayName = BuildDisplayName(method.Name, paramNames, converted);
 
             yield return CreateDefinition(method, benchmarkAttr, displayName, converted,
-                iterSetupDel, iterTeardownDel, classCategories);
+                iterSetupDel, iterTeardownDel, classCategories, isBaseline: methodIsBaseline && caseIndex == 0);
+
+            caseIndex++;
         }
     }
 
@@ -444,7 +453,8 @@ public sealed class BenchmarkDiscoverer
         object?[]? arguments,
         Action<object>? iterSetupDel,
         Action<object>? iterTeardownDel,
-        IReadOnlyList<string> classCategories)
+        IReadOnlyList<string> classCategories,
+        bool isBaseline = false)
     {
         var isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
 
@@ -493,6 +503,7 @@ public sealed class BenchmarkDiscoverer
             IterationTeardownDelegate = iterTeardownDel,
             Isolation = ResolveIsolationMode(method),
             Categories = MergeCategories(classCategories, ResolveCategories(method)),
+            IsBaseline = isBaseline,
         };
     }
 

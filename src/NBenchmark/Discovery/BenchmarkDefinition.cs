@@ -31,6 +31,13 @@ public sealed record BenchmarkMethodDefinition(
         init => _displayName = value;
     }
 
+    /// <summary>
+    ///     Whether this specific expanded case is the baseline. For parametric benchmarks
+    ///     this is true only for the first case when the method is marked
+    ///     <c>[Benchmark(Baseline = true)]</c>.
+    /// </summary>
+    public bool IsBaseline { get; init; }
+
     public Func<object, object?>? SyncDelegate { get; init; }
     public Func<object, Task>? AsyncDelegate { get; init; }
     public Action<Task>? ResultConsumer { get; init; }

@@ -13,6 +13,12 @@ When two or more benchmarks have been run, NBenchmark tests whether their differ
 | Exactly 2 | [Mann-Whitney U](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) (pairwise) | Does the candidate differ from the baseline? |
 | 3 or more | [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) (omnibus) + post-hoc Mann-Whitney U with [Holm-Bonferroni](https://en.wikipedia.org/wiki/Holm%E2%80%93Bonferroni_method) correction | Does each candidate differ from the baseline? (gated on the omnibus) |
 
+### Scope: suite mode versus Host mode
+
+- In **suite mode** (`BenchmarkSuite`), significance is computed across every benchmark in that one suite. A single baseline is chosen from the whole suite.
+- In **Host mode** (`BenchmarkHost`), significance is computed **per class**. Each discovered class gets its own baseline, and `Sig` / `Magnitude` are relative to that class's baseline. The console reporter renders one comparison table per class.
+- Cross-class comparison is not currently supported; it may be added later as an opt-in flag.
+
 Both are **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** rank-based tests, chosen because benchmark timings are right-skewed and rarely normal. The Mann-Whitney U test compares exactly two samples. For three or more groups NBenchmark first runs the Kruskal-Wallis **omnibus** test - a generalization of Mann-Whitney U to *k* groups. If the omnibus is significant (at least one group differs), it follows up with pairwise Mann-Whitney U tests (candidate versus baseline) and applies a Holm-Bonferroni correction over the tested candidate comparisons (finite p-values) to control the family-wise error rate. If the omnibus is not significant, no post-hoc comparisons run and per-row verdicts stay `NotTested`. Both default choices are made by `DefaultSignificanceTest`; you can override the strategy entirely (see [Custom significance tests](#custom-significance-tests)).
 
 ## Mann-Whitney U test (two groups)

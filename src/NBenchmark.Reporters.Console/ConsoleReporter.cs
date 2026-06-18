@@ -28,12 +28,11 @@ public sealed class ConsoleReporter : IReporter
             return Task.CompletedTask;
         }
 
-        var benchTable = BenchmarkTable.Build(results);
-        var showCategories = Detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
+        var showCategories = Detail == ReportDetail.Advanced && results.Any(r => r.Categories.Count > 0);
 
-        if (benchTable.Rows.All(r => r.Errored))
+        if (results.All(r => r.Errored))
         {
-            foreach (var row in benchTable.Rows)
+            foreach (var row in results)
             {
                 AnsiConsole.MarkupLine($"[red]Error: {Esc(row.Name)}: {Esc(row.ErrorMessage)}[/]");
             }
@@ -42,22 +41,35 @@ public sealed class ConsoleReporter : IReporter
         }
 
         AnsiConsole.WriteLine();
-        RenderHeader(benchTable);
-        AnsiConsole.WriteLine();
-        RenderComparisonTable(benchTable, results, Detail);
-        AnsiConsole.WriteLine();
-        RenderTimingDetail(benchTable);
-        RenderAutoTune(benchTable);
 
-        if (Detail == ReportDetail.Advanced)
+        var tables = BenchmarkTable.BuildPerClass(results);
+        var firstTable = tables[0];
+        RenderHeader(firstTable);
+
+        foreach (var table in tables)
         {
+            var className = table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
+
             AnsiConsole.WriteLine();
-            RenderAdvancedDetails(benchTable);
+            AnsiConsole.MarkupLine($"[bold steelblue1]── {Esc(className ?? "Benchmarks")} ──[/]");
+            AnsiConsole.WriteLine();
+
+            RenderComparisonTable(table, className, Detail);
+            AnsiConsole.WriteLine();
+            RenderTimingDetail(table);
+            RenderAutoTune(table);
+
+            if (Detail == ReportDetail.Advanced)
+            {
+                AnsiConsole.WriteLine();
+                RenderAdvancedDetails(table);
+            }
+
+            AnsiConsole.WriteLine();
+            RenderInterpretation(table, table.Rows.Count);
+            RenderWarnings(table);
         }
 
-        AnsiConsole.WriteLine();
-        RenderInterpretation(benchTable, results.Count);
-        RenderWarnings(benchTable);
         AnsiConsole.WriteLine();
 
         return Task.CompletedTask;
@@ -96,7 +108,7 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.Write(panel);
     }
 
-    private static void RenderComparisonTable(BenchmarkTable benchTable, IReadOnlyList<BenchmarkResult> results, ReportDetail detail)
+    private static void RenderComparisonTable(BenchmarkTable benchTable, string? sectionClassName, ReportDetail detail)
     {
         var successfulRows = benchTable.Rows.Where(r => !r.Errored).ToList();
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
@@ -117,18 +129,22 @@ public sealed class ConsoleReporter : IReporter
         if (showCategories)
             table.AddColumn(new TableColumn("[bold]Categories[/]"));
 
-        var hasDescriptions = results.Any(r => !string.IsNullOrEmpty(r.Description));
+        var hasDescriptions = benchTable.Rows.Any(r => !string.IsNullOrEmpty(r.Description));
 
         if (hasDescriptions)
             table.AddColumn(new TableColumn("[bold]Description[/]"));
 
         foreach (var row in benchTable.Rows)
         {
+            var displayName = !string.IsNullOrEmpty(sectionClassName) && row.Name.StartsWith(sectionClassName + ".", StringComparison.Ordinal)
+                ? row.Name[(sectionClassName.Length + 1)..]
+                : row.Name;
+
             if (row.Errored)
             {
                 var errorCols = new List<string>
                 {
-                    $"[red]✗ {Esc(row.Name)}[/]",
+                    $"[red]✗ {Esc(displayName)}[/]",
                     "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
                 };
 
@@ -152,8 +168,8 @@ public sealed class ConsoleReporter : IReporter
             };
 
             var nameText = row.IsBaseline
-                ? $"[bold]{Esc(row.Name)}[/] [dim italic](baseline)[/]"
-                : $"[{ratioColor}]{Esc(row.Name)}[/]";
+                ? $"[bold]{Esc(displayName)}[/] [dim italic](baseline)[/]"
+                : $"[{ratioColor}]{Esc(displayName)}[/]";
 
             var bar = RenderBar(row.Median, maxMedian, ratioColor);
 
