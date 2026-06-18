@@ -51,73 +51,73 @@ internal static class SharedReferences
 internal static class TestSources
 {
     public const string Stubs = """
-                                namespace NBenchmark.Attributes
-                                {
-                                    [System.AttributeUsage(System.AttributeTargets.Method)]
-                                    public sealed class BenchmarkAttribute : System.Attribute
+                                    namespace NBenchmark.Attributes
                                     {
-                                        public string? Description { get; set; }
-                                        public bool Baseline { get; set; }
-                                        public int Iterations { get; set; } = -1;
-                                        public int WarmupIterations { get; set; } = -1;
+                                        [System.AttributeUsage(System.AttributeTargets.Method)]
+                                        public sealed class BenchmarkAttribute : System.Attribute
+                                        {
+                                            public string? Description { get; set; }
+                                            public bool Baseline { get; set; }
+                                            public int Iterations { get; set; } = -1;
+                                            public int WarmupIterations { get; set; } = -1;
+                                        }
+                                        [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = true)]
+                                        public sealed class BenchmarkCaseAttribute : System.Attribute
+                                        {
+                                            public BenchmarkCaseAttribute(params object[] arguments) { Arguments = arguments; }
+                                            public object[] Arguments { get; }
+                                        }
+                                        [System.AttributeUsage(System.AttributeTargets.Method)]
+                                        public sealed class BenchmarkCasesAttribute : System.Attribute
+                                        {
+                                            public BenchmarkCasesAttribute(string sourceName) { SourceName = sourceName; }
+                                            public string SourceName { get; }
+                                        }
+                                        [System.AttributeUsage(System.AttributeTargets.Method)]
+                                        public sealed class BenchmarkSetupAttribute : System.Attribute {}
+                                        [System.AttributeUsage(System.AttributeTargets.Method)]
+                                        public sealed class BenchmarkTeardownAttribute : System.Attribute {}
+                                        [System.AttributeUsage(System.AttributeTargets.Method)]
+                                        public sealed class BenchmarkIterationSetupAttribute : System.Attribute {}
+                                        [System.AttributeUsage(System.AttributeTargets.Method)]
+                                        public sealed class BenchmarkIterationTeardownAttribute : System.Attribute {}
+                                        [System.AttributeUsage(System.AttributeTargets.Class)]
+                                        public sealed class InstanceLifetimeAttribute : System.Attribute
+                                        {
+                                            public InstanceLifetimeAttribute(NBenchmark.InstanceLifetime lifetime) {}
+                                        }
                                     }
-                                    [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = true)]
-                                    public sealed class BenchmarkCaseAttribute : System.Attribute
+                                    namespace NBenchmark
                                     {
-                                        public BenchmarkCaseAttribute(params object[] arguments) { Arguments = arguments; }
-                                        public object[] Arguments { get; }
-                                    }
-                                    [System.AttributeUsage(System.AttributeTargets.Method)]
-                                    public sealed class BenchmarkCasesAttribute : System.Attribute
-                                    {
-                                        public BenchmarkCasesAttribute(string sourceName) { SourceName = sourceName; }
-                                        public string SourceName { get; }
-                                    }
-                                    [System.AttributeUsage(System.AttributeTargets.Method)]
-                                    public sealed class BenchmarkSetupAttribute : System.Attribute {}
-                                    [System.AttributeUsage(System.AttributeTargets.Method)]
-                                    public sealed class BenchmarkTeardownAttribute : System.Attribute {}
-                                    [System.AttributeUsage(System.AttributeTargets.Method)]
-                                    public sealed class BenchmarkIterationSetupAttribute : System.Attribute {}
-                                    [System.AttributeUsage(System.AttributeTargets.Method)]
-                                    public sealed class BenchmarkIterationTeardownAttribute : System.Attribute {}
-                                    [System.AttributeUsage(System.AttributeTargets.Class)]
-                                    public sealed class InstanceLifetimeAttribute : System.Attribute
-                                    {
-                                        public InstanceLifetimeAttribute(NBenchmark.InstanceLifetime lifetime) {}
-                                    }
-                                }
-                                namespace NBenchmark
-                                {
-                                    public enum InstanceLifetime
-                                    {
-                                        PerMethod = 0,
-                                        PerClass = 1,
-                                    }
-                                    public sealed class BenchmarkResult {}
-                                    public sealed class MeasurementOutcome {}
+                                        public enum InstanceLifetime
+                                        {
+                                            PerMethod = 0,
+                                            PerClass = 1,
+                                        }
+                                        public sealed class BenchmarkResult {}
+                                        public sealed class MeasurementOutcome {}
 
-                                    public sealed class MeasurementOptions
+                                        public sealed class MeasurementOptions
+                                        {
+                                            public int Iterations { get; init; }
+                                            public int WarmupIterations { get; init; }
+                                            public double ConfidenceLevel { get; init; }
+                                    }
+                                    
+                                    public static class Benchmark
                                     {
-                                        public int Iterations { get; init; }
-                                        public int WarmupIterations { get; init; }
-                                        public double ConfidenceLevel { get; init; }
-                                }
-                                
-                                public static class Benchmark
-                                {
-                                    public static BenchmarkResult Run(System.Action action) { return new BenchmarkResult(); }
-                                    public static BenchmarkResult Run<T>(System.Func<T> action) { return new BenchmarkResult(); }
-                                    public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
-                                    public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
+                                        public static BenchmarkResult Run(System.Action action) { return new BenchmarkResult(); }
+                                        public static BenchmarkResult Run<T>(System.Func<T> action) { return new BenchmarkResult(); }
+                                        public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
+                                        public static System.Threading.Tasks.Task<BenchmarkResult> RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
 
-                                    public static MeasurementOutcome RunRaw(System.Action action) { return new MeasurementOutcome(); }
-                                    public static MeasurementOutcome RunRaw<T>(System.Func<T> action) { return new MeasurementOutcome(); }
-                                    public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
-                                    public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
+                                        public static MeasurementOutcome RunRaw(System.Action action) { return new MeasurementOutcome(); }
+                                        public static MeasurementOutcome RunRaw<T>(System.Func<T> action) { return new MeasurementOutcome(); }
+                                        public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
+                                        public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
+                                    }
                                 }
-                            }
-                            """;
+                                """;
 }
 
 public static class NBAnalyzerVerifier<TAnalyzer>
@@ -129,10 +129,13 @@ public static class NBAnalyzerVerifier<TAnalyzer>
     {
         var analyzerDiagnostics = await GetDiagnosticsAsync(source);
         var msg = string.Join("\n", analyzerDiagnostics.Select(d => $"  [{d.Id}] {d.GetMessage()} ({d.Severity})"));
+
         Assert.True(analyzerDiagnostics.Length > 0,
             $"Expected diagnostic '{diagnosticId}' but found none.\nAll diagnostics: {msg}");
+
         var match = analyzerDiagnostics.FirstOrDefault(d => d.Id == diagnosticId);
         Assert.True(match is { Id: not null }, $"Expected diagnostic '{diagnosticId}' but found:\n{msg}");
+
         if (expectedSeverity.HasValue)
             Assert.Equal(expectedSeverity.Value, match.Severity);
     }

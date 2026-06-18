@@ -13,8 +13,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NBenchmark\NBenchmark.csproj" />
-    <ProjectReference Include="..\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj" />
+    <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
+    <ProjectReference Include="..\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj"/>
   </ItemGroup>
 
 </Project>

@@ -1,8 +1,12 @@
 namespace NBenchmark.Attributes;
 
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+[AttributeUsage(AttributeTargets.Class)]
 public sealed class InstanceLifetimeAttribute : Attribute
 {
+    public InstanceLifetimeAttribute(InstanceLifetime lifetime)
+    {
+        Lifetime = lifetime;
+    }
+
     public InstanceLifetime Lifetime { get; }
-    public InstanceLifetimeAttribute(InstanceLifetime lifetime) => Lifetime = lifetime;
 }

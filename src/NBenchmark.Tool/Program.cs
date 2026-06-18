@@ -88,7 +88,9 @@ if (!HasReporterFlag(remainingArgs))
     host.WithReporter(new ConsoleReporter());
 
 foreach (var asm in assemblies)
+{
     host.AddFromAssembly(asm);
+}
 
 var benchmarkAssemblyPaths = assemblies
     .Select(a => a.Location)
@@ -98,6 +100,7 @@ var benchmarkAssemblyPaths = assemblies
     .ToList();
 
 var previousForwarded = Environment.GetEnvironmentVariable("NBENCHMARK_TOOL_ASSEMBLIES");
+
 Environment.SetEnvironmentVariable(
     "NBENCHMARK_TOOL_ASSEMBLIES",
     string.Join(Path.PathSeparator, benchmarkAssemblyPaths));
@@ -150,8 +153,10 @@ static (List<string> projectPaths, List<string> assemblyPaths, List<string> rema
     return (projectPaths, assemblyPaths, remaining);
 }
 
-static bool IsIsolatedChildProcess() =>
-    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NBENCHMARK_ISOLATED_REQUEST_PATH"));
+static bool IsIsolatedChildProcess()
+{
+    return !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NBENCHMARK_ISOLATED_REQUEST_PATH"));
+}
 
 static List<string> ReadForwardedAssemblyPaths()
 {
@@ -185,7 +190,9 @@ static string? BuildProject(string projectPath)
                 Console.Error.WriteLine($"Multiple .csproj files found in directory '{projectPath}'. Pass an explicit project path:");
 
                 foreach (var file in csprojFiles.OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
+                {
                     Console.Error.WriteLine($"  - {Path.GetFileName(file)}");
+                }
 
                 Environment.ExitCode = 1;
                 return null;
@@ -318,7 +325,9 @@ static int? TryGetTfmMajor(string assemblyPath)
         var digitsLength = 0;
 
         while (digitsLength < suffix.Length && char.IsDigit(suffix[digitsLength]))
+        {
             digitsLength++;
+        }
 
         if (digitsLength == 0)
             continue;

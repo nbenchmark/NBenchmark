@@ -17,15 +17,19 @@ public class CategorizedBenchmarks
 
     [Benchmark]
     [BenchmarkCategory("Fast")]
-    public int Interpolate() => $"hello { "world" }".Length;
+    public int Interpolate() => $"hello {"world"}".Length;
 
     [Benchmark]
     [BenchmarkCategory("Slow")]
     public int ManyConcat()
     {
         var s = "";
+
         for (var i = 0; i < 100; i++)
+        {
             s += (char)('a' + i % 26);
+        }
+
         return s.Length;
     }
 }

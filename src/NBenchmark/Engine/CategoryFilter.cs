@@ -15,10 +15,8 @@ internal static class CategoryFilter
         IReadOnlyList<string> categories,
         IReadOnlyList<string> include,
         IReadOnlyList<string> exclude,
-        bool hasIncludeFilter)
-    {
-        return Matches(categories, include, [], exclude, hasIncludeFilter);
-    }
+        bool hasIncludeFilter) =>
+        Matches(categories, include, [], exclude, hasIncludeFilter);
 
     public static bool Matches(
         IReadOnlyList<string> categories,

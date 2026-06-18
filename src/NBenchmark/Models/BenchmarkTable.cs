@@ -212,54 +212,53 @@ public sealed record BenchmarkTable
     }
 }
 
-    public record BenchmarkRow
-    {
-        public required string Name { get; init; }
-        public string? Description { get; init; }
-        public required double Median { get; init; }
-        public required double Mean { get; init; }
-        public required double OperationsPerSecond { get; init; }
-        public required double MedianOperationsPerSecond { get; init; }
-        public required double MarginOfError { get; init; }
-        public required double StandardDeviation { get; init; }
-        public required double StandardError { get; init; }
-        public required double CoefficientOfVariation { get; init; }
-        public required double P95 { get; init; }
-        public required double P99 { get; init; }
-        public required double Ratio { get; init; }
-        public required bool IsBaseline { get; init; }
-        public required bool Errored { get; init; }
-        public string? ErrorMessage { get; init; }
-        public required double ConfidenceIntervalLower { get; init; }
-        public required double ConfidenceIntervalUpper { get; init; }
-        public long? MeanAllocatedBytes { get; init; }
-        public string SignificanceLabel { get; init; } = "";
-        public EffectSize? Effect { get; init; }
-        public IReadOnlyList<string> Warnings { get; init; } = [];
+public record BenchmarkRow
+{
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required double Median { get; init; }
+    public required double Mean { get; init; }
+    public required double OperationsPerSecond { get; init; }
+    public required double MedianOperationsPerSecond { get; init; }
+    public required double MarginOfError { get; init; }
+    public required double StandardDeviation { get; init; }
+    public required double StandardError { get; init; }
+    public required double CoefficientOfVariation { get; init; }
+    public required double P95 { get; init; }
+    public required double P99 { get; init; }
+    public required double Ratio { get; init; }
+    public required bool IsBaseline { get; init; }
+    public required bool Errored { get; init; }
+    public string? ErrorMessage { get; init; }
+    public required double ConfidenceIntervalLower { get; init; }
+    public required double ConfidenceIntervalUpper { get; init; }
+    public long? MeanAllocatedBytes { get; init; }
+    public string SignificanceLabel { get; init; } = "";
+    public EffectSize? Effect { get; init; }
+    public IReadOnlyList<string> Warnings { get; init; } = [];
 
-        public required double Q1 { get; init; }
-        public required double Q3 { get; init; }
-        public required double InterquartileRange { get; init; }
-        public double? LowerFence { get; init; }
-        public double? UpperFence { get; init; }
-        public required int OutliersRemoved { get; init; }
-        public required int N { get; init; }
-        public required double Skewness { get; init; }
-        public required double Kurtosis { get; init; }
-        public required double Mad { get; init; }
-        public long? AllocMedian { get; init; }
-        public long? AllocP95 { get; init; }
-        public long? AllocMax { get; init; }
+    public required double Q1 { get; init; }
+    public required double Q3 { get; init; }
+    public required double InterquartileRange { get; init; }
+    public double? LowerFence { get; init; }
+    public double? UpperFence { get; init; }
+    public required int OutliersRemoved { get; init; }
+    public required int N { get; init; }
+    public required double Skewness { get; init; }
+    public required double Kurtosis { get; init; }
+    public required double Mad { get; init; }
+    public long? AllocMedian { get; init; }
+    public long? AllocP95 { get; init; }
+    public long? AllocMax { get; init; }
 
-        public required double Range { get; init; }
-        public required double Min { get; init; }
-        public required double Max { get; init; }
-        public int WarmupIterations { get; init; }
-        public double ConfidenceLevel { get; init; }
-        public required double StandardErrorPercent { get; init; }
-        public required double MarginPercent { get; init; }
-        public required double CoefficientOfVariationPercent { get; init; }
-        public AutoTuneDiagnostic? AutoTune { get; init; }
-        public IReadOnlyList<string> Categories { get; init; } = [];
-    }
-
+    public required double Range { get; init; }
+    public required double Min { get; init; }
+    public required double Max { get; init; }
+    public int WarmupIterations { get; init; }
+    public double ConfidenceLevel { get; init; }
+    public required double StandardErrorPercent { get; init; }
+    public required double MarginPercent { get; init; }
+    public required double CoefficientOfVariationPercent { get; init; }
+    public AutoTuneDiagnostic? AutoTune { get; init; }
+    public IReadOnlyList<string> Categories { get; init; } = [];
+}

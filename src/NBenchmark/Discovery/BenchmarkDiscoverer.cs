@@ -82,7 +82,7 @@ public sealed class BenchmarkDiscoverer
             return null;
 
         var instanceLifetime = type.GetCustomAttribute<InstanceLifetimeAttribute>()?.Lifetime
-            ?? _defaultInstanceLifetime;
+                               ?? _defaultInstanceLifetime;
 
         return new BenchmarkSuiteDefinition(
             type,
@@ -138,7 +138,7 @@ public sealed class BenchmarkDiscoverer
         if (casesAttribute is not null)
         {
             foreach (var definition in ExpandFromBenchmarkCases(method, casesAttribute, attribute,
-                iterSetupDel, iterTeardownDel, classCategories, parameters))
+                         iterSetupDel, iterTeardownDel, classCategories, parameters))
             {
                 yield return definition;
             }
@@ -209,6 +209,7 @@ public sealed class BenchmarkDiscoverer
     private static MethodInfo ResolveCaseSource(MethodInfo method, BenchmarkCasesAttribute attr)
     {
         var declaringType = method.DeclaringType!;
+
         var source = declaringType.GetMethod(attr.SourceName,
             BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
@@ -246,9 +247,7 @@ public sealed class BenchmarkDiscoverer
         Type enumerableInterface;
 
         if (returnType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
-        {
             enumerableInterface = returnType;
-        }
         else
         {
             enumerableInterface = returnType.GetInterfaces()
@@ -282,14 +281,15 @@ public sealed class BenchmarkDiscoverer
             return false;
 
         var def = type.GetGenericTypeDefinition();
+
         return def == typeof(ValueTuple<>)
-            || def == typeof(ValueTuple<,>)
-            || def == typeof(ValueTuple<,,>)
-            || def == typeof(ValueTuple<,,,>)
-            || def == typeof(ValueTuple<,,,,>)
-            || def == typeof(ValueTuple<,,,,,>)
-            || def == typeof(ValueTuple<,,,,,,>)
-            || def == typeof(ValueTuple<,,,,,,,>);
+               || def == typeof(ValueTuple<,>)
+               || def == typeof(ValueTuple<,,>)
+               || def == typeof(ValueTuple<,,,>)
+               || def == typeof(ValueTuple<,,,,>)
+               || def == typeof(ValueTuple<,,,,,>)
+               || def == typeof(ValueTuple<,,,,,,>)
+               || def == typeof(ValueTuple<,,,,,,,>);
     }
 
     private static int GetValueTupleArity(Type tupleType)
@@ -300,6 +300,7 @@ public sealed class BenchmarkDiscoverer
         if (def == typeof(ValueTuple<,,,,,,,>))
         {
             var rest = typeArgs[7];
+
             return IsValueTupleType(rest)
                 ? 7 + GetValueTupleArity(rest)
                 : 8;
@@ -343,6 +344,7 @@ public sealed class BenchmarkDiscoverer
 
         var results = new List<(object?[] RawValues, string[]? ParamNames)>();
         var enumerableType = enumerable.GetType();
+
         var enumerableInterface = enumerableType.GetInterfaces()
             .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
 
@@ -400,7 +402,9 @@ public sealed class BenchmarkDiscoverer
             var values = new object?[tuple.Length];
 
             for (var i = 0; i < tuple.Length; i++)
+            {
                 values[i] = tuple[i];
+            }
 
             var effectiveNames = hasNames && tupleNames!.Length >= arity ? tupleNames : null;
             results.Add((values, effectiveNames));

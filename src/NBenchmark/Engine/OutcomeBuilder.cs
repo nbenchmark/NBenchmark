@@ -112,8 +112,9 @@ internal static class OutcomeBuilder
 
         var opsPerSecond = stats is not null ? ThroughputFromNs(stats.Mean) : double.NaN;
         var medianOpsPerSecond = stats is not null ? ThroughputFromNs(stats.Median) : double.NaN;
+
         var totalOperations = autoTune?.TotalBodyInvocations
-            ?? (long)measuredIterations + resolvedWarmup;
+                              ?? (long)measuredIterations + resolvedWarmup;
 
         return new MeasurementOutcome
         {

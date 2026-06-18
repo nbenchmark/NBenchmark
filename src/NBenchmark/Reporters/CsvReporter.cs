@@ -1,5 +1,4 @@
 using System.Text;
-using NBenchmark.Stats;
 
 namespace NBenchmark.Reporters;
 

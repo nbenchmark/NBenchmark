@@ -50,7 +50,7 @@ internal static class BenchmarkLifecycle
                     OutcomeBuilder.Build(
                         new RunOutcome.Errored(ex, $"Suite setup failed: {ex.Message}"),
                         $"{suite.Type.Name}.{b.DisplayName}", b.Attribute.Description, b.Attribute.Baseline,
-                        suiteOptions, TimeSpan.Zero, TimeSpan.Zero, 0, null).Result)
+                        suiteOptions, TimeSpan.Zero, TimeSpan.Zero).Result)
                 .ToList();
 
             return (false, errored);

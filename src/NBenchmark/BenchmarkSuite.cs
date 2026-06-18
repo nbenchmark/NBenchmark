@@ -8,15 +8,15 @@ namespace NBenchmark;
 public sealed class BenchmarkSuite(string name)
 {
     private readonly List<BenchmarkEnvelope> _benchmarks = [];
+    private readonly List<string> _categoryFilterExclude = [];
+    private readonly List<string> _categoryFilterInclude = [];
 
     private readonly List<IReporter> _reporters = [];
-    private readonly List<string> _categoryFilterInclude = [];
-    private readonly List<string> _categoryFilterExclude = [];
-    private string[]? _pendingCategories;
     private string? _baselineName;
     private ReportDetail _detail;
     private bool _isolated;
     private MeasurementOptions _options = MeasurementOptions.Default;
+    private string[]? _pendingCategories;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
@@ -328,16 +328,16 @@ public sealed class BenchmarkSuite(string name)
             return await RunInProcessCoreAsync(
                 NullBenchmarkProgress.Instance,
                 RunOrder.Declaration,
-                applySignificance: false,
-                applyReporters: false,
-                writeChildPayload: isTarget,
+                false,
+                false,
+                isTarget,
                 cancellationToken).ConfigureAwait(false);
         }
 
         if (_isolated)
         {
             return await RunIsolatedParentAsync(
-                invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, cancellationToken)
+                    invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -347,9 +347,9 @@ public sealed class BenchmarkSuite(string name)
         return await RunInProcessCoreAsync(
             _progress,
             _runOrder,
-            applySignificance: true,
-            applyReporters: true,
-            writeChildPayload: false,
+            true,
+            true,
+            false,
             cancellationToken).ConfigureAwait(false);
     }
 

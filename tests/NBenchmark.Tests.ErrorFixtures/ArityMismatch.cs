@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using NBenchmark.Attributes;
 
 namespace NBenchmark.Tests.ErrorFixtures;

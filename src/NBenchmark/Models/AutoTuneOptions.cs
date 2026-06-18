@@ -12,10 +12,6 @@ namespace NBenchmark;
 /// </remarks>
 public sealed record AutoTuneOptions
 {
-    private readonly int _batchSize = 8;
-    private readonly int _plateauPatience = 3;
-    private readonly int _maxOpsPerSample = 1 << 20;
-
     /// <summary>The balanced default profile.</summary>
     public static readonly AutoTuneOptions Default = new();
 
@@ -37,6 +33,10 @@ public sealed record AutoTuneOptions
         TargetSampleDurationNs = 4_000,
         MaxTuningTime = TimeSpan.FromSeconds(60),
     };
+
+    private readonly int _batchSize = 8;
+    private readonly int _maxOpsPerSample = 1 << 20;
+    private readonly int _plateauPatience = 3;
 
     // ----- Warmup plateau -----
 

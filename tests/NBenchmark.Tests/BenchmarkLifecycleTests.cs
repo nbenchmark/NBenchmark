@@ -41,8 +41,10 @@ public class BenchmarkLifecycleTests
     public void CreateInstance_InvokesPerInstanceTeardown()
     {
         var teardownFired = false;
+
         var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType),
             _ => new InstanceHandle(new SimpleType(), () => teardownFired = true));
+
         Assert.NotNull(created);
         created!.Value.InstanceTeardown();
         Assert.True(teardownFired);
@@ -176,6 +178,7 @@ public class BenchmarkLifecycleTests
     public async Task RunTeardown_Invokes_InstanceTeardown_After_ClassTeardown()
     {
         var order = new List<string>();
+
         var suite = new BenchmarkSuiteDefinition(
             typeof(SimpleType),
             [],

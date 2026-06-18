@@ -122,16 +122,16 @@ public static class EffectSizeFactory
         var magnitude = MagnitudeLabelExtensions.Classify(Math.Abs(cliffsDelta)).ToShortString();
 
         return new EffectSize(
-            Metric: EffectMetrics.CliffsDelta,
-            Value: cliffsDelta,
-            Magnitude: magnitude,
-            Direction: cliffsDelta switch
+            EffectMetrics.CliffsDelta,
+            cliffsDelta,
+            magnitude,
+            cliffsDelta switch
             {
                 > 0 => EffectDirection.CandidateHigher,
                 < 0 => EffectDirection.CandidateLower,
                 _ => EffectDirection.None,
             },
-            PracticalValue: Math.Abs(cliffsDelta));
+            Math.Abs(cliffsDelta));
     }
 }
 

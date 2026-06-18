@@ -1,4 +1,3 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NBenchmark.Integration.Abstractions;
 
 namespace NBenchmark.Integration.MSTest.Tests;

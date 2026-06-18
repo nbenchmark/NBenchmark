@@ -305,14 +305,14 @@ public class SignificanceStrategyTests
 
         // A custom test reports Significant with |delta| = 0.1, which the
         // engine must downgrade to NotSignificant because 0.1 < 0.5.
-        var custom = new DeltaReportingSignificanceTest("candidate", delta: 0.1, pValue: 0.001);
+        var custom = new DeltaReportingSignificanceTest("candidate", 0.1, 0.001);
 
         Significance.ComputeSignificance(
             results,
             rawSamples,
-            test: custom,
-            significanceLevel: 0.05,
-            minimumPracticalEffect: 0.5);
+            custom,
+            0.05,
+            0.5);
 
         var candidateResult = results.Single(r => r.Name == "candidate");
         Assert.Equal(SignificanceVerdict.NotSignificant, candidateResult.SignificanceVerdict);
@@ -337,14 +337,14 @@ public class SignificanceStrategyTests
             ["candidate"] = Cluster(10),
         };
 
-        var custom = new DeltaReportingSignificanceTest("candidate", delta: 0.1, pValue: 0.001);
+        var custom = new DeltaReportingSignificanceTest("candidate", 0.1, 0.001);
 
         Significance.ComputeSignificance(
             results,
             rawSamples,
-            test: custom,
-            significanceLevel: 0.05,
-            minimumPracticalEffect: null);
+            custom,
+            0.05,
+            null);
 
         var candidateResult = results.Single(r => r.Name == "candidate");
         Assert.Equal(SignificanceVerdict.Significant, candidateResult.SignificanceVerdict);
@@ -368,14 +368,14 @@ public class SignificanceStrategyTests
             ["candidate"] = Cluster(10),
         };
 
-        var custom = new DeltaReportingSignificanceTest("candidate", delta: 0.8, pValue: 0.001);
+        var custom = new DeltaReportingSignificanceTest("candidate", 0.8, 0.001);
 
         Significance.ComputeSignificance(
             results,
             rawSamples,
-            test: custom,
-            significanceLevel: 0.05,
-            minimumPracticalEffect: 0.5);
+            custom,
+            0.05,
+            0.5);
 
         var candidate = results.Single(r => r.Name == "candidate");
         Assert.Equal(SignificanceVerdict.Significant, candidate.SignificanceVerdict);
@@ -434,17 +434,17 @@ public class SignificanceStrategyTests
                     candidate,
                     pValue,
                     SignificanceVerdict.Significant,
-                    Effect: new EffectSize(
-                        Metric: "custom-delta",
-                        Value: delta,
-                        Magnitude: MagnitudeLabelExtensions.Classify(Math.Abs(delta)).ToShortString(),
-                        Direction: delta switch
+                    new EffectSize(
+                        "custom-delta",
+                        delta,
+                        MagnitudeLabelExtensions.Classify(Math.Abs(delta)).ToShortString(),
+                        delta switch
                         {
                             > 0 => EffectDirection.CandidateHigher,
                             < 0 => EffectDirection.CandidateLower,
                             _ => EffectDirection.None,
                         },
-                        PracticalValue: Math.Abs(delta))),
+                        Math.Abs(delta))),
             ],
         };
     }

@@ -63,12 +63,14 @@ internal static class AdaptiveLoop
                 // overhead unamortised so every fast body collapses onto the same floor. The minimum
                 // discards those warm-up spikes (and ordinary noise) so K reflects steady state.
                 var best = double.PositiveInfinity;
+
                 for (var probe = 0; probe < CalibrationSamplesPerStep; probe++)
                 {
                     var (elapsed, _) = AcquireSampleSync(body, spec, clock, probeK, false, forceGc);
                     totalBodyInvocations += probeK;
                     accumulatedNs += elapsed;
                     calibrationSamples++;
+
                     if (elapsed < best)
                         best = elapsed;
                 }
@@ -253,13 +255,16 @@ internal static class AdaptiveLoop
                 // overhead unamortised so every fast body collapses onto the same floor. The minimum
                 // discards those warm-up spikes (and ordinary noise) so K reflects steady state.
                 var best = double.PositiveInfinity;
+
                 for (var probe = 0; probe < CalibrationSamplesPerStep; probe++)
                 {
                     var (elapsed, _) = await AcquireSampleAsync(body, spec, clock, probeK, false, forceGc)
                         .ConfigureAwait(false);
+
                     totalBodyInvocations += probeK;
                     accumulatedNs += elapsed;
                     calibrationSamples++;
+
                     if (elapsed < best)
                         best = elapsed;
                 }
@@ -355,8 +360,10 @@ internal static class AdaptiveLoop
         while (true)
         {
             ct.ThrowIfCancellationRequested();
+
             var (elapsed, allocDelta) = await AcquireSampleAsync(body, spec, clock, k, measureAllocations, forceGc)
                 .ConfigureAwait(false);
+
             totalBodyInvocations += k;
             accumulatedNs += elapsed;
             var perOp = elapsed / k;
@@ -495,12 +502,17 @@ internal static class AdaptiveLoop
         spec.IterationSetup?.Invoke();
 
         AllocationMeter.AllocationSnapshot snapshot = default;
+
         if (measureAllocations)
             snapshot = AllocationMeter.Capture();
 
         var timestamp = clock.GetTimestamp();
+
         for (var j = 0; j < k; j++)
+        {
             body();
+        }
+
         var elapsedNs = clock.GetElapsedNanoseconds(timestamp);
 
         var allocDelta = measureAllocations ? AllocationMeter.Delta(snapshot) : 0L;
@@ -518,12 +530,17 @@ internal static class AdaptiveLoop
         spec.IterationSetup?.Invoke();
 
         AllocationMeter.AllocationSnapshot snapshot = default;
+
         if (measureAllocations)
             snapshot = AllocationMeter.Capture();
 
         var timestamp = clock.GetTimestamp();
+
         for (var j = 0; j < k; j++)
+        {
             await body().ConfigureAwait(false);
+        }
+
         var elapsedNs = clock.GetElapsedNanoseconds(timestamp);
 
         var allocDelta = measureAllocations ? AllocationMeter.Delta(snapshot) : 0L;
@@ -538,8 +555,12 @@ internal static class AdaptiveLoop
             GcControl.ForceGen0Collection();
 
         spec.IterationSetup?.Invoke();
+
         for (var j = 0; j < k; j++)
+        {
             body();
+        }
+
         spec.IterationTeardown?.Invoke();
     }
 
@@ -549,8 +570,12 @@ internal static class AdaptiveLoop
             GcControl.ForceGen0Collection();
 
         spec.IterationSetup?.Invoke();
+
         for (var j = 0; j < k; j++)
+        {
             await body().ConfigureAwait(false);
+        }
+
         spec.IterationTeardown?.Invoke();
     }
 

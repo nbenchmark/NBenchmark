@@ -37,6 +37,7 @@ public class SearchBenchmarks
     public int BinarySearch(int count, string targetLabel)
     {
         var data = SortedData(count);
+
         var target = targetLabel switch
         {
             "first" => data[0],
@@ -61,16 +62,24 @@ public class SearchBenchmarks
     private static int[] EmptyData(int count)
     {
         var data = new int[count];
+
         for (var i = 0; i < count; i++)
+        {
             data[i] = i;
+        }
+
         return data;
     }
 
     private static int[] SortedData(int count)
     {
         var data = new int[count];
+
         for (var i = 0; i < count; i++)
+        {
             data[i] = i * 2;
+        }
+
         return data;
     }
 

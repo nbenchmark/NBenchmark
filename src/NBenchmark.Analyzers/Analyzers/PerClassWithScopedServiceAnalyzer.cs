@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -103,6 +104,7 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
     private static bool IsInstanceLifetimeAttribute(AttributeData attr)
     {
         var original = attr.AttributeClass?.OriginalDefinition;
+
         if (original is null)
             return false;
 
@@ -113,6 +115,7 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
             return false;
 
         var ns = original.ContainingNamespace;
+
         return ns is { IsGlobalNamespace: false }
                && ns.ToDisplayString() == "NBenchmark.Attributes";
     }
@@ -125,7 +128,7 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
         if (value is INamedTypeSymbol namedMember)
             return namedMember.Name == memberName;
 
-        var ordinal = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+        var ordinal = Convert.ToInt32(value, CultureInfo.InvariantCulture);
 
         foreach (var member in enumType.GetMembers())
         {
@@ -134,9 +137,7 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
                 && field.HasConstantValue
                 && field.ConstantValue is int memberValue
                 && memberValue == ordinal)
-            {
                 return true;
-            }
         }
 
         return false;
@@ -167,8 +168,12 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
     ///     what the user meant, or (b) implement the <c>System.IDisposable</c> or
     ///     <c>System.IAsyncDisposable</c> contract directly. The name-based net is
     ///     narrower than v1 to reduce false positives; users with custom naming
-    ///     conventions can suppress the diagnostic with <c>#pragma warning disable
-    ///     NB0011</c>.
+    ///     conventions can suppress the diagnostic with
+    ///     <c>
+    ///         #pragma warning disable
+    ///         NB0011
+    ///     </c>
+    ///     .
     /// </summary>
     private static bool LooksLikeScopedService(ITypeSymbol type)
     {

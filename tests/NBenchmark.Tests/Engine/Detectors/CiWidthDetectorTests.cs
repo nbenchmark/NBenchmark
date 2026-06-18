@@ -13,9 +13,9 @@ public class CiWidthDetectorTests
         // isolating the CI math. A constant stream has zero variance, so the half-width is 0
         // and the target is met as soon as the variance is defined (n = 2).
         var options = AutoTuneOptions.Default with { MinSamples = 1, BatchSize = 1, CiTarget = 0.025 };
-        var detector = new CiWidthDetector(confidenceLevel: 0.95, options);
+        var detector = new CiWidthDetector(0.95, options);
 
-        var resolvedAt = FeedConstantUntilResolved(detector, value: 100.0, cap: 1_000);
+        var resolvedAt = FeedConstantUntilResolved(detector, 100.0, 1_000);
 
         Assert.True(detector.Resolved);
         Assert.Equal(SampleStopReason.CiTargetMet, detector.StopReason);
@@ -27,7 +27,7 @@ public class CiWidthDetectorTests
     public void WideDistribution_StopsAtCeiling()
     {
         var options = AutoTuneOptions.Default with { MinSamples = 2, MaxSamples = 20, BatchSize = 2, CiTarget = 0.001 };
-        var detector = new CiWidthDetector(confidenceLevel: 0.95, options);
+        var detector = new CiWidthDetector(0.95, options);
 
         var resolvedAt = 0;
 
@@ -54,12 +54,14 @@ public class CiWidthDetectorTests
         // Configure so the detector never resolves mid-feed: the floor sits past the data and
         // the target is unreachable, leaving the accumulator to consume every sample.
         var options = AutoTuneOptions.Default with { MinSamples = samples.Length + 1, MaxSamples = samples.Length + 1, CiTarget = 0.0 };
-        var detector = new CiWidthDetector(confidenceLevel: 0.95, options);
+        var detector = new CiWidthDetector(0.95, options);
 
         foreach (var s in samples)
+        {
             detector.Feed(s);
+        }
 
-        var expected = StatsSummary.Compute(samples, 0.95);
+        var expected = StatsSummary.Compute(samples);
 
         Assert.Equal(expected.Mean, detector.Mean, 9);
         Assert.Equal(expected.StandardDeviation, detector.StandardDeviation, 9);

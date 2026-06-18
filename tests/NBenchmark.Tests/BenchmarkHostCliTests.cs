@@ -162,7 +162,9 @@ public class BenchmarkHostCliTests
     public async Task RunAsync_Category_Filter_And_Glob_Combine()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHost.Create(["--filter", "CategoryBenchmarks.*", "--category", "String", "--exclude-category", "Slow", "--iterations", "5", "--warmup", "2"])
+            await BenchmarkHost.Create([
+                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--exclude-category", "Slow", "--iterations", "5", "--warmup", "2",
+                ])
                 .AddFromAssembly<CategoryBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -179,7 +181,7 @@ public class BenchmarkHostCliTests
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHost.Create(["--filter", "CategoryBenchmarks.*", "--category", "String", "--iterations", "5", "--warmup", "2"])
                 .AddFromAssembly<CategoryBenchmarks>()
-                .WithCategoryFilter(include: ["Fast"])
+                .WithCategoryFilter(["Fast"])
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync()
@@ -193,7 +195,7 @@ public class BenchmarkHostCliTests
     public void WithCategoryFilter_WithBlankCategory_Throws()
     {
         var host = BenchmarkHost.Create([]);
-        Assert.Throws<ArgumentException>(() => host.WithCategoryFilter(include: [" "]));
+        Assert.Throws<ArgumentException>(() => host.WithCategoryFilter([" "]));
     }
 
     [Fact]
@@ -218,7 +220,7 @@ public class BenchmarkHostCliTests
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHost.Create(["--filter", "CategoryBenchmarks.*", "--category", "String", "--iterations", "5", "--warmup", "2"])
                 .AddFromAssembly<CategoryBenchmarks>()
-                .WithCategoryFilter(include: ["Number"])
+                .WithCategoryFilter(["Number"])
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync()

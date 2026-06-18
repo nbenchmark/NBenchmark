@@ -100,8 +100,10 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
             // live sample count instead of a fake percentage and ETA.
             var indeterminate = IndeterminateBar(20);
             var count = _currentIteration > 0 ? $" ({_currentIteration} samples)" : "";
+
             Console.Write(
                 $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] {_currentName}  {indeterminate} {phase}{count}");
+
             return;
         }
 
@@ -129,12 +131,16 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
         var span = Math.Max(1, width - segment);
         var period = span * 2;
         var pos = _pulse++ % period;
+
         if (pos > span)
             pos = period - pos;
 
         var chars = new char[width];
+
         for (var i = 0; i < width; i++)
+        {
             chars[i] = i >= pos && i < pos + segment ? '\u2588' : '\u2591';
+        }
 
         return new string(chars);
     }

@@ -11,7 +11,7 @@ public class WarmupPlateauDetectorTests
         // Default options: MinWarmup 8, BatchSize 8, PlateauPatience 3.
         var detector = new WarmupPlateauDetector(AutoTuneOptions.Default);
 
-        var resolvedAt = FeedConstantUntilResolved(detector, value: 100.0, cap: 10_000);
+        var resolvedAt = FeedConstantUntilResolved(detector, 100.0, 10_000);
 
         // First batch (samples 1-8) sets the best and counts as improving; the next three
         // batches are non-improving, so warmup settles after 8 + 3 * 8 = 32 samples.
@@ -41,6 +41,7 @@ public class WarmupPlateauDetectorTests
 
         Assert.True(detector.Resolved);
         Assert.Equal(WarmupStopReason.Settled, detector.StopReason);
+
         // Settles well after the decay flattens but far below the ceiling.
         Assert.InRange(resolvedAt, 50, 200);
     }

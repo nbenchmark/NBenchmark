@@ -94,6 +94,7 @@ public sealed class BenchmarkRunner
             var adaptive = await AdaptiveLoop
                 .RunAsync(name, body, spec, _clock, progress, ct)
                 .ConfigureAwait(false);
+
             return BuildSuccessOutcome(name, spec, totalStartTimestamp, adaptive);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -170,6 +171,7 @@ public sealed class BenchmarkRunner
         {
             var ex = new InvalidOperationException(
                 FormatCapError(adaptive.Diagnostic, spec.Options.AutoTune.MaxTuningTime));
+
             return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
         }
 
@@ -193,11 +195,11 @@ public sealed class BenchmarkRunner
     private static string FormatCapError(AutoTuneDiagnostic diagnostic, TimeSpan maxTuningTime)
     {
         var phase = diagnostic.WarmupStop == WarmupStopReason.WallClockCap
-            && diagnostic.SampleStop == SampleStopReason.WallClockCap
-                ? "Warmup and measurement"
-                : diagnostic.SampleStop == SampleStopReason.WallClockCap
-                    ? "Measurement"
-                    : "Warmup";
+                    && diagnostic.SampleStop == SampleStopReason.WallClockCap
+            ? "Warmup and measurement"
+            : diagnostic.SampleStop == SampleStopReason.WallClockCap
+                ? "Measurement"
+                : "Warmup";
 
         return $"{phase} stopped at the wall-clock tuning cap ({BenchmarkFormatter.FormatDuration(maxTuningTime)}) "
                + "before reaching the requested precision. "
@@ -209,6 +211,7 @@ public sealed class BenchmarkRunner
     {
         if (pipelineWarnings.Count == 0)
             return adaptiveWarnings;
+
         if (adaptiveWarnings.Count == 0)
             return pipelineWarnings;
 

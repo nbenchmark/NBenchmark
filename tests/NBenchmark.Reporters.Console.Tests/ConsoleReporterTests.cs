@@ -86,7 +86,7 @@ public class ConsoleReporterTests
     [Fact]
     public async Task ConsoleReporter_Simple_Accepts_Results_With_Categories()
     {
-        var reporter = new ConsoleReporter(ReportDetail.Simple);
+        var reporter = new ConsoleReporter();
         var result = MakeResult("tagged", 100) with { Categories = ["String"] };
 
         // Does not throw; categories are hidden in simple detail to keep the table narrow.

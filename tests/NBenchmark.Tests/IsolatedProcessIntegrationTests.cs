@@ -63,6 +63,7 @@ public class IsolatedProcessIntegrationTests
             var fastResult = results.Single(r => r.Name == "fast");
 
             Assert.True(fastResult.IsBaseline);
+
             Assert.True(slowResult.PValue <= 0.05,
                 $"Expected slow benchmark to be significantly slower than fast; got p={slowResult.PValue}");
         }
@@ -82,36 +83,36 @@ public class IsolatedProcessIntegrationTests
             .WithIsolation();
 
         using (WithFakeLauncher((_, _) =>
-            Task.FromResult<IReadOnlyList<IsolatedResultItem>>(
-            [
-                new IsolatedResultItem
-                {
-                    Result = new BenchmarkResult
-                    {
-                        Name = "a",
-                        Mean = 100,
-                        Median = 100,
-                        P95 = 100,
-                        P99 = 100,
-                        Min = 100,
-                        Max = 100,
-                        StandardDeviation = 0,
-                        Q1 = 100,
-                        Q3 = 100,
-                        InterquartileRange = 0,
-                        OutliersRemoved = 0,
-                        N = 5,
-                        Skewness = 0,
-                        Kurtosis = 0,
-                        Mad = 0,
-                        AllocMedian = null,
-                        AllocP95 = null,
-                        AllocMax = null,
-                        Errored = false,
-                    },
-                    RawSamples = [100, 100, 100, 100, 100],
-                },
-            ])))
+                   Task.FromResult<IReadOnlyList<IsolatedResultItem>>(
+                   [
+                       new IsolatedResultItem
+                       {
+                           Result = new BenchmarkResult
+                           {
+                               Name = "a",
+                               Mean = 100,
+                               Median = 100,
+                               P95 = 100,
+                               P99 = 100,
+                               Min = 100,
+                               Max = 100,
+                               StandardDeviation = 0,
+                               Q1 = 100,
+                               Q3 = 100,
+                               InterquartileRange = 0,
+                               OutliersRemoved = 0,
+                               N = 5,
+                               Skewness = 0,
+                               Kurtosis = 0,
+                               Mad = 0,
+                               AllocMedian = null,
+                               AllocP95 = null,
+                               AllocMax = null,
+                               Errored = false,
+                           },
+                           RawSamples = [100, 100, 100, 100, 100],
+                       },
+                   ])))
         {
             var results = await suite.RunAsync();
 
