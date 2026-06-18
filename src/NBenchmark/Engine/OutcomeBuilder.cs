@@ -8,6 +8,7 @@ internal static class OutcomeBuilder
     public static MeasurementOutcome Build(
         RunOutcome input,
         string name,
+        string className,
         string? description,
         bool isBaseline,
         MeasurementOptions options,
@@ -22,7 +23,7 @@ internal static class OutcomeBuilder
         return input switch
         {
             RunOutcome.Success s => Build(
-                name, description, isBaseline, options,
+                name, className, description, isBaseline, options,
                 s.Result.Stats,
                 s.Result.MeasuredIterations,
                 s.Result.MeanAllocatedBytes,
@@ -44,7 +45,7 @@ internal static class OutcomeBuilder
                 categories),
 
             RunOutcome.DryRun => Build(
-                name, description, isBaseline, options,
+                name, className, description, isBaseline, options,
                 null,
                 0,
                 null,
@@ -61,7 +62,7 @@ internal static class OutcomeBuilder
                 categories),
 
             RunOutcome.Errored e => Build(
-                name, description, isBaseline, options,
+                name, className, description, isBaseline, options,
                 null,
                 0,
                 null,
@@ -83,6 +84,7 @@ internal static class OutcomeBuilder
 
     private static MeasurementOutcome Build(
         string name,
+        string className,
         string? description,
         bool isBaseline,
         MeasurementOptions options,
@@ -122,6 +124,7 @@ internal static class OutcomeBuilder
             Result = new BenchmarkResult
             {
                 Name = name,
+                ClassName = className,
                 Description = description,
                 Mean = stats?.Mean ?? 0,
                 Median = stats?.Median ?? 0,

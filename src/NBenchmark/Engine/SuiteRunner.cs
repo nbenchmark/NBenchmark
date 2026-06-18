@@ -55,6 +55,7 @@ internal static class SuiteRunner
                 outcome = OutcomeBuilder.Build(
                     new RunOutcome.Errored(ex),
                     envelope.Name,
+                    envelope.ClassName,
                     envelope.Description,
                     envelope.IsBaseline,
                     spec.Options,

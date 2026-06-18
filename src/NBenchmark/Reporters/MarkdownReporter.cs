@@ -37,9 +37,10 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine("## Benchmark Results");
         sb.AppendLine();
 
-        var table = BenchmarkTable.Build(results);
+        var tables = BenchmarkTable.BuildPerClass(results);
+        var anyErroredAll = tables.All(t => t.Rows.All(r => r.Errored));
 
-        if (table.Rows.All(r => r.Errored))
+        if (anyErroredAll)
         {
             sb.AppendLine("_All benchmarks errored - no results to display._");
             await File.WriteAllTextAsync(filePath, sb.ToString(), cancellationToken);
@@ -47,17 +48,41 @@ public sealed class MarkdownReporter : IReporter
         }
 
         sb.AppendLine(
-            $"> **{table.RunAtUtc} UTC** · {table.WarmupIterations} warmup · {table.MeasuredIterations} measured · {table.Profile.ToString().ToLowerInvariant()} profile");
+            $"> **{tables[0].RunAtUtc} UTC** · {tables[0].WarmupIterations} warmup · {tables[0].MeasuredIterations} measured · {tables[0].Profile.ToString().ToLowerInvariant()} profile");
 
         sb.AppendLine();
 
-        // Primary comparison table
+        foreach (var table in tables)
+        {
+            var className = table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
+
+            if (tables.Count > 1)
+            {
+                sb.AppendLine($"### {className ?? "Benchmarks"}");
+                sb.AppendLine();
+            }
+            else
+            {
+                sb.AppendLine("### Comparison");
+                sb.AppendLine();
+            }
+
+            RenderComparisonTable(sb, table, Detail);
+            RenderTimingDetail(sb, table);
+            RenderDistributionDetails(sb, table, Detail);
+            RenderInterpretation(sb, table);
+            RenderWarnings(sb, table);
+            sb.AppendLine();
+        }
+
+        await File.WriteAllTextAsync(filePath, sb.ToString(), cancellationToken);
+    }
+
+    private static void RenderComparisonTable(StringBuilder sb, BenchmarkTable table, ReportDetail detail)
+    {
         var successfulRows = table.Rows.Where(r => !r.Errored).ToList();
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
-        var showCategories = Detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
-
-        sb.AppendLine("### Comparison");
-        sb.AppendLine();
+        var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
 
         if (showCategories)
         {
@@ -142,8 +167,10 @@ public sealed class MarkdownReporter : IReporter
         }
 
         sb.AppendLine();
+    }
 
-        // Timing detail table
+    private static void RenderTimingDetail(StringBuilder sb, BenchmarkTable table)
+    {
         sb.AppendLine("### Precision & Tail Latency");
         sb.AppendLine();
         sb.AppendLine("| Benchmark | Error (±CI) | StdDev | CV | P95 | P99 |");
@@ -161,39 +188,44 @@ public sealed class MarkdownReporter : IReporter
             );
         }
 
-        if (Detail == ReportDetail.Advanced)
-        {
-            sb.AppendLine();
-            sb.AppendLine("### Distribution Details");
-            sb.AppendLine();
-
-            foreach (var row in table.Rows.Where(r => !r.Errored))
-            {
-                var statsBlock = BenchmarkTable.RenderStatsBlock(row, Detail);
-
-                if (string.IsNullOrEmpty(statsBlock))
-                    continue;
-
-                sb.AppendLine("<details>");
-                sb.AppendLine($"<summary><strong>{row.Name}</strong></summary>");
-                sb.AppendLine();
-                sb.AppendLine("```");
-                sb.AppendLine(statsBlock);
-
-                if (row.AutoTune is { } diagnostic)
-                    sb.AppendLine(BenchmarkTable.FormatAutoTuneSummary(diagnostic));
-
-                sb.AppendLine("```");
-                sb.AppendLine();
-                sb.AppendLine("</details>");
-                sb.AppendLine();
-            }
-        }
-
         sb.AppendLine();
+    }
+
+    private static void RenderDistributionDetails(StringBuilder sb, BenchmarkTable table, ReportDetail detail)
+    {
+        if (detail != ReportDetail.Advanced)
+            return;
+
+        sb.AppendLine("### Distribution Details");
+        sb.AppendLine();
+
+        foreach (var row in table.Rows.Where(r => !r.Errored))
+        {
+            var statsBlock = BenchmarkTable.RenderStatsBlock(row, detail);
+
+            if (string.IsNullOrEmpty(statsBlock))
+                continue;
+
+            sb.AppendLine("<details>");
+            sb.AppendLine($"<summary><strong>{row.Name}</strong></summary>");
+            sb.AppendLine();
+            sb.AppendLine("```");
+            sb.AppendLine(statsBlock);
+
+            if (row.AutoTune is { } diagnostic)
+                sb.AppendLine(BenchmarkTable.FormatAutoTuneSummary(diagnostic));
+
+            sb.AppendLine("```");
+            sb.AppendLine();
+            sb.AppendLine("</details>");
+            sb.AppendLine();
+        }
+    }
+
+    private static void RenderInterpretation(StringBuilder sb, BenchmarkTable table)
+    {
         sb.AppendLine("---");
         sb.AppendLine();
-
         sb.AppendLine("### Interpretation");
         sb.AppendLine();
 
@@ -225,31 +257,29 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine($"- Outliers: {table.OutlierDetector}");
         sb.AppendLine($"- Effect metric: {GetEffectMetricSummary(table.Rows)}");
         sb.AppendLine();
+    }
 
+    private static void RenderWarnings(StringBuilder sb, BenchmarkTable table)
+    {
         var warnings = table.Rows
             .Where(r => !r.Errored && r.Warnings.Count > 0)
             .ToList();
 
-        if (warnings.Count > 0)
+        if (warnings.Count == 0)
+            return;
+
+        sb.AppendLine("### Warnings");
+        sb.AppendLine();
+
+        foreach (var row in warnings)
         {
-            sb.AppendLine("### Warnings");
-            sb.AppendLine();
-
-            foreach (var row in warnings)
+            foreach (var warning in row.Warnings)
             {
-                foreach (var warning in row.Warnings)
-                {
-                    sb.AppendLine($"- **{row.Name}**: {warning}");
-                }
+                sb.AppendLine($"- **{row.Name}**: {warning}");
             }
-
-            sb.AppendLine();
         }
 
-        sb.AppendLine(
-            $"_{results.Count} benchmark(s) · {table.TotalDuration.TotalSeconds:F1}s total · {testName} (p < {table.SignificanceLevel:0.###}) · CI {table.ConfidenceLevel * 100:0.#}%_");
-
-        await File.WriteAllTextAsync(filePath, sb.ToString(), cancellationToken);
+        sb.AppendLine();
     }
 
     private static string RenderMarkdownBar(double value, double max)

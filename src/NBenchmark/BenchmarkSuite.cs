@@ -60,7 +60,7 @@ public sealed class BenchmarkSuite(string name)
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEnvelope(name, null, false, categories, runAsync));
+        _benchmarks.Add(new BenchmarkEnvelope(name, "", null, false, categories, runAsync));
         return this;
     }
 
@@ -461,7 +461,7 @@ public sealed class BenchmarkSuite(string name)
 
                 result = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException(message), message),
-                    envelope.Name, envelope.Description, isBaseline,
+                    envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
                     _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
                     envelope.Categories).Result;
 

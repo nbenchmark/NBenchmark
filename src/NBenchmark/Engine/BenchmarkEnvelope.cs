@@ -4,6 +4,7 @@ namespace NBenchmark.Engine;
 
 internal sealed record BenchmarkEnvelope(
     string Name,
+    string ClassName,
     string? Description,
     bool IsBaseline,
     IReadOnlyList<string> Categories,
@@ -16,7 +17,7 @@ internal sealed record BenchmarkEnvelope(
     {
         var name = $"{className}.{method.DisplayName}";
         var description = method.Attribute.Description;
-        var isBaseline = method.Attribute.Baseline;
+        var isBaseline = method.IsBaseline;
         var categories = method.Categories;
         var attributeIterations = method.Attribute.Iterations;
         var attributeWarmupIterations = method.Attribute.WarmupIterations;
@@ -67,10 +68,11 @@ internal sealed record BenchmarkEnvelope(
                 },
             };
 
-            return ExecuteAsync(name, asyncDel, syncDel, resultConsumer, instance, specWithIter, ct);
+            var specWithClass = specWithIter with { ClassName = className };
+            return ExecuteAsync(name, asyncDel, syncDel, resultConsumer, instance, specWithClass, ct);
         };
 
-        return new BenchmarkEnvelope(name, description, isBaseline, categories, runAsync);
+        return new BenchmarkEnvelope(name, className, description, isBaseline, categories, runAsync);
     }
 
     private static Task<MeasurementOutcome> ExecuteAsync(
@@ -86,28 +88,28 @@ internal sealed record BenchmarkEnvelope(
         {
             if (resultConsumer is not null)
             {
-                var returningBody = async () =>
-                {
-                    var task = asyncDel(instance);
-                    await task.ConfigureAwait(false);
-                    resultConsumer(task);
-                };
-
-                return BenchmarkRunner.Instance.RunAsync(name, returningBody, spec, ct);
-            }
-
-            var voidBody = async () =>
+            var returningBody = async () =>
             {
                 var task = asyncDel(instance);
                 await task.ConfigureAwait(false);
+                resultConsumer(task);
             };
 
-            return BenchmarkRunner.Instance.RunAsync(name, voidBody, spec, ct);
+            return BenchmarkRunner.Instance.RunAsync(name, returningBody, spec, ct);
         }
 
-        var sd = syncDel!;
-        var syncBody = () => sd(instance);
-        return Task.FromResult(BenchmarkRunner.Instance.Run(name, syncBody, spec, ct));
+        var voidBody = async () =>
+        {
+            var task = asyncDel(instance);
+            await task.ConfigureAwait(false);
+        };
+
+        return BenchmarkRunner.Instance.RunAsync(name, voidBody, spec, ct);
+    }
+
+    var sd = syncDel!;
+    var syncBody = () => sd(instance);
+    return Task.FromResult(BenchmarkRunner.Instance.Run(name, syncBody, spec, ct));
     }
 }
 

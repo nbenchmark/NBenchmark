@@ -159,6 +159,7 @@ public class SuiteRunnerTests
         {
             new BenchmarkEnvelope(
                 "boom",
+                "",
                 "boom description",
                 false,
                 [],
@@ -195,6 +196,7 @@ public class SuiteRunnerTests
         var dryRunResult = OutcomeBuilder.Build(
             new RunOutcome.DryRun(),
             "dry",
+            "",
             null,
             false,
             options,
@@ -206,6 +208,7 @@ public class SuiteRunnerTests
 
     private static BenchmarkEnvelope StaticEnvelope(string name, MeasurementOptions _) => new(
         name,
+        "",
         null,
         false,
         [],

@@ -333,7 +333,7 @@ public sealed class BenchmarkHost
 
         await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
 
-        Significance.ApplyIfEnabled(allResults, rawSamples, suiteOptions);
+        ApplyPerClassSignificance(allResults, rawSamples, suiteOptions);
 
         if (_cliArgs.ThresholdPct.HasValue
             && ThresholdCheck.HasRegression(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
@@ -354,6 +354,35 @@ public sealed class BenchmarkHost
         }
 
         return allResults;
+    }
+
+    private static void ApplyPerClassSignificance(
+        List<BenchmarkResult> allResults,
+        Dictionary<string, double[]> rawSamples,
+        MeasurementOptions options)
+    {
+        var groups = allResults
+            .Select((result, index) => (result, index))
+            .GroupBy(x => x.result.ClassName)
+            .ToList();
+
+        foreach (var group in groups)
+        {
+            var indices = group.Select(x => x.index).ToList();
+            var groupResults = indices.Select(i => allResults[i]).ToList();
+            var groupRawSamples = new Dictionary<string, double[]>();
+
+            foreach (var result in groupResults)
+            {
+                if (rawSamples.TryGetValue(result.Name, out var samples))
+                    groupRawSamples[result.Name] = samples;
+            }
+
+            Significance.ApplyIfEnabled(groupResults, groupRawSamples, options);
+
+            for (var i = 0; i < indices.Count; i++)
+                allResults[indices[i]] = groupResults[i];
+        }
     }
 
     private async Task RunInProcessSuiteAsync(
@@ -446,7 +475,7 @@ public sealed class BenchmarkHost
             {
                 var errored = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException("Could not instantiate benchmark class"), "Instance creation failed"),
-                    $"{suite.Type.Name}.{benchmark.DisplayName}", benchmark.Attribute.Description, benchmark.Attribute.Baseline,
+                    $"{suite.Type.Name}.{benchmark.DisplayName}", suite.Type.Name, benchmark.Attribute.Description, benchmark.IsBaseline,
                     suiteOptions, TimeSpan.Zero, TimeSpan.Zero, 0, null,
                     benchmark.Categories).Result;
 
@@ -580,7 +609,7 @@ public sealed class BenchmarkHost
 
                 result = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException(message), message),
-                    name, benchmark.Attribute.Description, benchmark.Attribute.Baseline,
+                    name, suite.Type.Name, benchmark.Attribute.Description, benchmark.IsBaseline,
                     _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
                     benchmark.Categories).Result;
 

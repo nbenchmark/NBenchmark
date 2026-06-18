@@ -29,17 +29,18 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         if (Detail == ReportDetail.Simple)
         {
             sb.AppendLine(
-                "Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
+                "ClassName,Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
         }
         else
         {
             sb.AppendLine(
-                "Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,Categories");
+                "ClassName,Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,Categories");
         }
 
-        var table = BenchmarkTable.Build(results);
-        var profile = table.Profile.ToString().ToLowerInvariant();
+        var tables = BenchmarkTable.BuildPerClass(results);
+        var profile = tables[0].Profile.ToString().ToLowerInvariant();
 
+        foreach (var table in tables)
         foreach (var row in table.Rows)
         {
             var sig = row.SignificanceLabel switch
@@ -49,6 +50,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                 _ => "",
             };
 
+            var safeClassName = row.ClassName.Replace("\"", "\"\"");
             var safeName = row.Name.Replace("\"", "\"\"");
             var safeSig = sig.Replace("\"", "\"\"");
             var safeEffectMetric = (row.Effect?.Metric ?? string.Empty).Replace("\"", "\"\"");
@@ -57,6 +59,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
             if (Detail == ReportDetail.Simple)
             {
                 sb.AppendLine(
+                    $"\"{safeClassName}\"," +
                     $"\"{safeName}\"," +
                     $"{row.Median:F1}," +
                     $"{row.Mean:F1}," +
@@ -100,6 +103,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                 var safeCategories = string.Join("; ", row.Categories).Replace("\"", "\"\"");
 
                 sb.AppendLine(
+                    $"\"{safeClassName}\"," +
                     $"\"{safeName}\"," +
                     $"{row.Median:F1}," +
                     $"{row.Mean:F1}," +

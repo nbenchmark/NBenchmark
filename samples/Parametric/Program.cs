@@ -8,16 +8,19 @@ using NBenchmark.Reporters.Console;
 // Use [BenchmarkCase(...)] for a short inline list of literal arguments.
 // Use [BenchmarkCases(nameof(Source))] for programmatic, named, or generated cases.
 //
+// In Host mode each discovered class gets its own baseline and its own comparison
+// table, so related benchmarks should live in the same class.
+//
 // Run with: dotnet run --project samples/Parametric -- --list
 // Run with: dotnet run --project samples/Parametric -- --filter "*LinearSearch*"
 
 await BenchmarkHost.Create(args)
-    .AddFromAssembly<SearchBenchmarks>()
+    .AddFromAssembly(typeof(Program).Assembly)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 
-public class SearchBenchmarks
+public class LinearSearchBenchmarks
 {
     // Inline literal cases. Each [BenchmarkCase] produces one row.
     [Benchmark(Baseline = true)]
@@ -30,9 +33,35 @@ public class SearchBenchmarks
         return LinearSearch(data, data[^1]);
     }
 
+    private static int[] EmptyData(int count)
+    {
+        var data = new int[count];
+
+        for (var i = 0; i < count; i++)
+        {
+            data[i] = i;
+        }
+
+        return data;
+    }
+
+    private static int LinearSearch(int[] data, int target)
+    {
+        for (var i = 0; i < data.Length; i++)
+        {
+            if (data[i] == target)
+                return i;
+        }
+
+        return -1;
+    }
+}
+
+public class BinarySearchBenchmarks
+{
     // Programmatic source. The tuple element names appear in the report:
     //   BinarySearch(Count=10000, Target="last")
-    [Benchmark]
+    [Benchmark(Baseline = true)]
     [BenchmarkCases(nameof(BinarySearchCases))]
     public int BinarySearch(int count, string targetLabel)
     {
@@ -59,18 +88,6 @@ public class SearchBenchmarks
         yield return (100000, "last");
     }
 
-    private static int[] EmptyData(int count)
-    {
-        var data = new int[count];
-
-        for (var i = 0; i < count; i++)
-        {
-            data[i] = i;
-        }
-
-        return data;
-    }
-
     private static int[] SortedData(int count)
     {
         var data = new int[count];
@@ -81,16 +98,5 @@ public class SearchBenchmarks
         }
 
         return data;
-    }
-
-    private static int LinearSearch(int[] data, int target)
-    {
-        for (var i = 0; i < data.Length; i++)
-        {
-            if (data[i] == target)
-                return i;
-        }
-
-        return -1;
     }
 }

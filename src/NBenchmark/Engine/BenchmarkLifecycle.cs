@@ -49,7 +49,7 @@ internal static class BenchmarkLifecycle
                 .Select(b =>
                     OutcomeBuilder.Build(
                         new RunOutcome.Errored(ex, $"Suite setup failed: {ex.Message}"),
-                        $"{suite.Type.Name}.{b.DisplayName}", b.Attribute.Description, b.Attribute.Baseline,
+                        $"{suite.Type.Name}.{b.DisplayName}", suite.Type.Name, b.Attribute.Description, b.IsBaseline,
                         suiteOptions, TimeSpan.Zero, TimeSpan.Zero).Result)
                 .ToList();
 

@@ -57,7 +57,7 @@ public class OutcomeBuilderTests
             new RunOutcome.Success(
                 new ProcessedMeasurements(stats, 3, (long)allocations.Average(), 0, 0, 0, null, null, 0, null),
                 rawTimings),
-            "bench",
+            "bench", "",
             "desc",
             true,
             options,
@@ -108,7 +108,7 @@ public class OutcomeBuilderTests
             new RunOutcome.Success(
                 new ProcessedMeasurements(stats, 4, (long)allocations.Average(), 0, 0, 0, null, null, 0, null),
                 [1, 2, 3, 4]),
-            "b", null, false,
+            "b", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
@@ -125,7 +125,7 @@ public class OutcomeBuilderTests
             new RunOutcome.Success(
                 new ProcessedMeasurements(stats, 3, null, 0, 0, 0, null, null, 0, null),
                 [1, 2, 3]),
-            "b", null, false,
+            "b", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
@@ -143,7 +143,7 @@ public class OutcomeBuilderTests
             new RunOutcome.Success(
                 new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null),
                 [1]),
-            "b", null, false,
+            "b", "", null, false,
             options,
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
@@ -161,7 +161,7 @@ public class OutcomeBuilderTests
             new RunOutcome.Success(
                 new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null),
                 [1]),
-            "b", null, false,
+            "b", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
@@ -191,7 +191,7 @@ public class OutcomeBuilderTests
             new RunOutcome.Success(
                 new ProcessedMeasurements(stats, 47, null, 0, 0, 0, null, null, 0, null),
                 [1, 2, 3]),
-            "b", null, false,
+            "b", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1),
@@ -207,7 +207,7 @@ public class OutcomeBuilderTests
     {
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.DryRun(),
-            "dry", null, false,
+            "dry", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
@@ -230,7 +230,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.DryRun(),
-            "dry", null, false,
+            "dry", "", null, false,
             options,
             TimeSpan.FromMilliseconds(10),
             TimeSpan.FromMilliseconds(10));
@@ -258,7 +258,7 @@ public class OutcomeBuilderTests
     {
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.DryRun(),
-            "dry", null, false,
+            "dry", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(10),
             TimeSpan.FromMilliseconds(10));
@@ -272,7 +272,7 @@ public class OutcomeBuilderTests
     {
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.DryRun(),
-            "dry", null, false,
+            "dry", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(10),
             TimeSpan.FromMilliseconds(10));
@@ -287,7 +287,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.DryRun(),
-            "dry", null, false,
+            "dry", "", null, false,
             new MeasurementOptions(),
             total,
             TimeSpan.FromMilliseconds(99));
@@ -313,7 +313,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Errored(ex),
-            "bad", "with desc", true,
+            "bad", "", "with desc", true,
             options,
             total,
             measured,
@@ -356,7 +356,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Errored(tiex),
-            "b", null, false,
+            "b", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
@@ -370,7 +370,7 @@ public class OutcomeBuilderTests
     {
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Errored(new Exception("inner"), "setup failed"),
-            "b", null, false,
+            "b", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
@@ -385,7 +385,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Errored(tiex),
-            "b", null, false,
+            "b", "", null, false,
             new MeasurementOptions(),
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
@@ -401,7 +401,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Errored(new Exception("x")),
-            "b", null, false,
+            "b", "", null, false,
             new MeasurementOptions(),
             total,
             measured);
@@ -418,7 +418,7 @@ public class OutcomeBuilderTests
         Assert.Throws<ArgumentNullException>(() =>
             OutcomeBuilder.Build(
                 bogus,
-                "b", null, false,
+                "b", "", null, false,
                 new MeasurementOptions(),
                 TimeSpan.Zero,
                 TimeSpan.Zero));

@@ -5,6 +5,13 @@ namespace NBenchmark;
 public record BenchmarkResult
 {
     public required string Name { get; init; }
+
+    /// <summary>
+    ///     The class that declared this benchmark. Empty when the benchmark was not
+    ///     discovered from a class (for example, suite-mode entries added directly).
+    /// </summary>
+    public string ClassName { get; init; } = "";
+
     public string? Description { get; init; }
 
     public required double Mean { get; init; }
