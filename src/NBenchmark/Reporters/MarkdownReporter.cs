@@ -83,90 +83,124 @@ public sealed class MarkdownReporter : IReporter
         var successfulRows = table.Rows.Where(r => !r.Errored).ToList();
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
+        var paramNames = table.ParameterNames;
 
-        if (showCategories)
+        // The comparison columns appear whenever rows were ranked against a reference - either a
+        // competing benchmark in a parameter group or, for a single method swept across parameter
+        // values, the fastest point in the table. They collapse to a lone Scale bar only when
+        // nothing could be ranked (for example a class whose benchmarks all errored).
+        var hasComparisons = table.Rows.Any(r => !r.Errored && !double.IsNaN(r.Ratio));
+
+        var header = new StringBuilder("| | Benchmark |");
+        foreach (var name in paramNames)
+            header.Append($" {name} |");
+        header.Append(" Median | Mean | Ops/s |");
+
+        var separator = new StringBuilder("|:---:|---|");
+        foreach (var _ in paramNames)
+            separator.Append("---:|");
+        separator.Append("---:|---:|---:|");
+
+        if (hasComparisons)
         {
-            sb.AppendLine("| | Benchmark | Median | Mean | Ops/s | Ratio | Scale | Sig | Magnitude | Alloc/op | Categories |");
-            sb.AppendLine("|:---:|---|---:|---:|---:|:---:|---|---:|---:|---:|---|");
+            header.Append(" Ratio | Scale | Sig | Magnitude |");
+            separator.Append(":---:|---|---:|---:|");
         }
         else
         {
-            sb.AppendLine("| | Benchmark | Median | Mean | Ops/s | Ratio | Scale | Sig | Magnitude | Alloc/op |");
-            sb.AppendLine("|:---:|---|---:|---:|---:|:---:|---|---:|---:|---:|");
+            header.Append(" Scale |");
+            separator.Append("---|");
         }
+
+        header.Append(" Alloc/op |");
+        separator.Append("---:|");
+
+        if (showCategories)
+        {
+            header.Append(" Categories |");
+            separator.Append("---|");
+        }
+
+        sb.AppendLine(header.ToString());
+        sb.AppendLine(separator.ToString());
 
         foreach (var row in table.Rows)
         {
+            var baseName = paramNames.Count > 0 ? row.BaseName : row.Name;
+
             if (row.Errored)
             {
-                if (showCategories)
-                    sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - | - | - |");
-                else
-                    sb.AppendLine($"| ✗ | ~~{row.Name}~~ | - | - | - | - | - | - | - | - |");
+                var errored = new StringBuilder($"| ✗ | ~~{baseName}~~ |");
+                foreach (var name in paramNames)
+                    errored.Append($" {FormatParameterCell(row, name)} |");
+                errored.Append(" - | - | - |");
+                errored.Append(hasComparisons ? " - | - | - | - |" : " - |");
+                errored.Append(" - |");
 
+                if (showCategories)
+                    errored.Append(" - |");
+
+                sb.AppendLine(errored.ToString());
                 continue;
             }
 
-            var sigIcon = row.SignificanceLabel switch
-            {
-                "✓" => "✓",
-                "✗" => "✗",
-                _ => "-",
-            };
-
             var nameText = row.IsBaseline
-                ? $"**{row.Name}** _(baseline)_"
-                : row.Name;
+                ? $"**{baseName}** _(baseline)_"
+                : baseName;
 
-            var ratioText = FormatRatioText(row);
             var bar = RenderMarkdownBar(row.Median, maxMedian);
 
             var allocText = row.MeanAllocatedBytes.HasValue
                 ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
                 : "-";
 
-            var magnitudeText = row.Effect?.Magnitude ?? "-";
-
-            var categoryText = showCategories
-                ? row.Categories.Count > 0 ? string.Join(", ", row.Categories) : "-"
-                : "";
-
             var opsText = BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond);
 
-            if (showCategories)
+            var line = new StringBuilder($"| | {nameText} |");
+            foreach (var name in paramNames)
+                line.Append($" {FormatParameterCell(row, name)} |");
+
+            line.Append(
+                $" {BenchmarkFormatter.FormatNs(row.Median)} " +
+                $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
+                $"| {opsText} |");
+
+            if (hasComparisons)
             {
-                sb.AppendLine(
-                    $"| " +
-                    $"| {nameText} " +
-                    $"| {BenchmarkFormatter.FormatNs(row.Median)} " +
-                    $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
-                    $"| {opsText} " +
-                    $"| {ratioText} " +
-                    $"| {bar} " +
-                    $"| {sigIcon} " +
-                    $"| {magnitudeText} " +
-                    $"| {allocText} " +
-                    $"| {categoryText} |"
-                );
+                var sigIcon = row.SignificanceLabel switch
+                {
+                    "✓" => "✓",
+                    "✗" => "✗",
+                    _ => "-",
+                };
+
+                var magnitudeText = row.Effect?.Magnitude ?? "-";
+
+                line.Append($" {FormatRatioText(row)} | {bar} | {sigIcon} | {magnitudeText} |");
             }
             else
             {
-                sb.AppendLine(
-                    $"| " +
-                    $"| {nameText} " +
-                    $"| {BenchmarkFormatter.FormatNs(row.Median)} " +
-                    $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
-                    $"| {opsText} " +
-                    $"| {ratioText} " +
-                    $"| {bar} " +
-                    $"| {sigIcon} " +
-                    $"| {magnitudeText} " +
-                    $"| {allocText} |"
-                );
+                line.Append($" {bar} |");
             }
+
+            line.Append($" {allocText} |");
+
+            if (showCategories)
+            {
+                var categoryText = row.Categories.Count > 0 ? string.Join(", ", row.Categories) : "-";
+                line.Append($" {categoryText} |");
+            }
+
+            sb.AppendLine(line.ToString());
         }
 
         sb.AppendLine();
+    }
+
+    private static string FormatParameterCell(BenchmarkRow row, string parameterName)
+    {
+        var parameter = row.ParameterSet.FirstOrDefault(p => p.Name == parameterName);
+        return parameter is null ? "-" : BenchmarkParameter.FormatValue(parameter.Value);
     }
 
     private static void RenderTimingDetail(StringBuilder sb, BenchmarkTable table)

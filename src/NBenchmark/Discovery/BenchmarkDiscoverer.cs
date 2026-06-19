@@ -411,7 +411,12 @@ public sealed class BenchmarkDiscoverer
                 values[i] = tuple[i];
             }
 
-            var effectiveNames = hasNames && tupleNames!.Length >= arity ? tupleNames : null;
+            // Prefer tuple element names; otherwise fall back to the benchmark method's own
+            // parameter names so the report still shows meaningful, named parameter columns.
+            var effectiveNames = hasNames && tupleNames!.Length >= arity
+                ? tupleNames
+                : benchmarkParams.Select(p => p.Name!).ToArray();
+
             results.Add((values, effectiveNames));
         }
 
@@ -431,15 +436,8 @@ public sealed class BenchmarkDiscoverer
 
     private static string BuildDisplayName(string methodName, string[]? paramNames, object?[] values)
     {
-        var parts = new string[values.Length];
-
-        for (var i = 0; i < values.Length; i++)
-        {
-            var formatted = FormatArgument(values[i]);
-            parts[i] = paramNames is not null && i < paramNames.Length ? $"{paramNames[i]}={formatted}" : formatted;
-        }
-
-        return $"{methodName}({string.Join(", ", parts)})";
+        var paramSet = BuildParameterSet(paramNames, values);
+        return BenchmarkParameter.FormatDisplayName(methodName, paramSet);
     }
 
     private static BenchmarkMethodDefinition CreateDefinition(
@@ -595,16 +593,6 @@ public sealed class BenchmarkDiscoverer
         }
 
         return result;
-    }
-
-    private static string FormatArgument(object? argument)
-    {
-        return argument switch
-        {
-            null => "null",
-            string s => $"\"{s}\"",
-            _ => Convert.ToString(argument, CultureInfo.InvariantCulture) ?? argument.ToString() ?? "",
-        };
     }
 
     private static Func<object, object?> BuildArgumentBoundSyncDelegate(MethodInfo method, object?[] arguments)
