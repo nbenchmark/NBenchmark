@@ -361,7 +361,7 @@ By default benchmarks run in **random** order to reduce systematic bias. Call `W
 
 Use `--launch-count <n>` on the CLI (or `WithOptions(new MeasurementOptions { LaunchCount = n })` in code) to run each benchmark N times as independent launches. Each launch includes its own warmup and GC cycle, so variance across launches reflects real run-to-run differences (process state, ASLR, scheduler placement), not just intra-run noise.
 
-The primary result fields (median, mean, P95, etc.) come from the **best** (lowest median) launch. Cross-launch statistics (mean, stddev, median, CI across per-launch medians) are computed and displayed in a "Launch Aggregation" table below the main results when `LaunchCount > 1`.
+The primary result fields (median, mean, percentiles, etc.) come from the **best** (lowest median) launch. Cross-launch statistics (mean, stddev, median, CI across per-launch medians) are computed and displayed in a "Launch Aggregation" table below the main results when `LaunchCount > 1`.
 
 ```bash
 dotnet run -- --launch-count 5

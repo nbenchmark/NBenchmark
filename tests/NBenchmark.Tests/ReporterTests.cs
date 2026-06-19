@@ -104,6 +104,31 @@ public class ReporterTests
     }
 
     [Fact]
+    public async Task MarkdownReporter_TimingDetail_Does_Not_Render_Empty_Tail_Columns_When_No_Percentiles()
+    {
+        var tempDir = MakeSubDir("nb-md-no-tail");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md");
+            var result = MakeResult("alpha", 100);
+
+            await reporter.ReportAsync([result]);
+
+            var filePath = Path.Combine(tempDir, "out.md");
+            var content = await File.ReadAllTextAsync(filePath);
+
+            Assert.Contains("### Precision & Tail Latency", content);
+            Assert.Contains("| Benchmark | Error (±CI) | StdDev | CV |", content);
+            Assert.DoesNotContain("| Benchmark | Error (±CI) | StdDev | CV |  |", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
     public async Task MarkdownReporter_Advanced_Appends_Details_Without_Breaking_Table()
     {
         var tempDir = MakeSubDir("nb-md-advanced");
@@ -551,8 +576,7 @@ public class ReporterTests
             Name = name,
             Mean = median,
             Median = median,
-            P95 = median * 1.1,
-            P99 = median * 1.2,
+            Percentiles = [],
             Min = median * 0.8,
             Max = median * 1.3,
             StandardDeviation = median * 0.05,

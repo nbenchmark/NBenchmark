@@ -13,11 +13,19 @@ public static class BenchmarkAssert
                 $"(excess: {result.Mean - thresholds.MaxMeanNs.Value:F2} ns)");
         }
 
-        if (thresholds.MaxP95Ns.HasValue && result.P95 > thresholds.MaxP95Ns.Value)
+        var p95 = result.GetPercentile(0.95);
+
+        if (thresholds.MaxP95Ns.HasValue && p95.HasValue && p95.Value > thresholds.MaxP95Ns.Value)
         {
             violations.Add(
-                $"P95 {result.P95:F2} ns exceeds maximum {thresholds.MaxP95Ns.Value:F2} ns " +
-                $"(excess: {result.P95 - thresholds.MaxP95Ns.Value:F2} ns)");
+                $"P95 {p95.Value:F2} ns exceeds maximum {thresholds.MaxP95Ns.Value:F2} ns " +
+                $"(excess: {p95.Value - thresholds.MaxP95Ns.Value:F2} ns)");
+        }
+        else if (thresholds.MaxP95Ns.HasValue && p95 is null)
+        {
+            violations.Add(
+                "P95 threshold specified but P95 was not computed " +
+                "(check MeasurementOptions.ReportedPercentiles includes 0.95).");
         }
 
         if (thresholds.MaxAllocatedBytes.HasValue

@@ -16,10 +16,38 @@ public record BenchmarkResult
 
     public required double Mean { get; init; }
     public required double Median { get; init; }
-    public required double P95 { get; init; }
-    public required double P99 { get; init; }
     public required double Min { get; init; }
     public required double Max { get; init; }
+
+    /// <summary>
+    ///     Configurable percentile values computed from the trimmed samples.
+    ///     Default set: P50 (0.50), P95 (0.95), P99 (0.99), P99.9 (0.999), Max (1.0).
+    ///     Controlled by <see cref="MeasurementOptions.ReportedPercentiles" />.
+    ///     Sorted by percentile value ascending.
+    /// </summary>
+    public IReadOnlyList<PercentileEntry> Percentiles { get; init; } = [];
+
+    /// <summary>
+    ///     Latency histogram with bucket boundaries and sample counts.
+    ///     <c>null</c> when <see cref="MeasurementOptions.EnableHistogram" /> is
+    ///     <c>false</c> or when there are fewer than 2 samples.
+    /// </summary>
+    public LatencyHistogram? Histogram { get; init; }
+
+    /// <summary>
+    ///     Convenience accessor for a specific percentile value.
+    ///     Returns the value for the first entry whose percentile matches
+    ///     <paramref name="p" /> within a 1e-9 tolerance, or <c>null</c> if
+    ///     the requested percentile was not computed.
+    /// </summary>
+    public double? GetPercentile(double p)
+    {
+        foreach (var e in Percentiles)
+            if (Math.Abs(e.Percentile - p) < 1e-9)
+                return e.Value;
+
+        return null;
+    }
     public required double StandardDeviation { get; init; }
 
     public double StandardError { get; init; }

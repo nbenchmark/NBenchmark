@@ -22,7 +22,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -54,7 +54,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 OutliersRemoved = 2,
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -83,7 +83,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Fast", Mean = 50, Median = 50, P95 = 50, P99 = 50, Min = 50, Max = 50,
+                Name = "Fast", Mean = 50, Median = 50, Percentiles = [], Min = 50, Max = 50,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -100,7 +100,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "Slow", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "Slow", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -135,7 +135,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Fast", Mean = 50, Median = 50, P95 = 50, P99 = 50, Min = 50, Max = 50,
+                Name = "Fast", Mean = 50, Median = 50, Percentiles = [], Min = 50, Max = 50,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -152,7 +152,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "Slow", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "Slow", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -187,7 +187,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 0, Median = 0, P95 = 0, P99 = 0, Min = 0, Max = 0,
+                Name = "A", Mean = 0, Median = 0, Percentiles = [], Min = 0, Max = 0,
                 StandardDeviation = 0, Errored = true, ErrorMessage = "fail",
                 MeasuredIterations = 0, WarmupIterations = 0, RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -219,7 +219,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Base", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "Base", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -236,7 +236,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "TwoX", Mean = 200, Median = 200, P95 = 200, P99 = 200, Min = 200, Max = 200,
+                Name = "TwoX", Mean = 200, Median = 200, Percentiles = [], Min = 200, Max = 200,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -253,7 +253,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "Half", Mean = 50, Median = 50, P95 = 50, P99 = 50, Min = 50, Max = 50,
+                Name = "Half", Mean = 50, Median = 50, Percentiles = [], Min = 50, Max = 50,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -284,7 +284,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Base", Mean = 0, Median = 0, P95 = 0, P99 = 0, Min = 0, Max = 0,
+                Name = "Base", Mean = 0, Median = 0, Percentiles = [], Min = 0, Max = 0,
                 StandardDeviation = 0, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -301,7 +301,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "Other", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "Other", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -330,7 +330,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Base", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "Base", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -347,7 +347,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "Fail", Mean = 0, Median = 0, P95 = 0, P99 = 0, Min = 0, Max = 0,
+                Name = "Fail", Mean = 0, Median = 0, Percentiles = [], Min = 0, Max = 0,
                 StandardDeviation = 0, Errored = true, ErrorMessage = "crash",
                 MeasuredIterations = 0, WarmupIterations = 0,
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -377,7 +377,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Base", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "Base", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
                 SignificanceVerdict = SignificanceVerdict.NotSignificant,
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -395,7 +395,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "Sig", Mean = 200, Median = 200, P95 = 200, P99 = 200, Min = 200, Max = 200,
+                Name = "Sig", Mean = 200, Median = 200, Percentiles = [], Min = 200, Max = 200,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 SignificanceVerdict = SignificanceVerdict.Significant,
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -413,7 +413,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "NotSig", Mean = 150, Median = 150, P95 = 150, P99 = 150, Min = 150, Max = 150,
+                Name = "NotSig", Mean = 150, Median = 150, Percentiles = [], Min = 150, Max = 150,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 SignificanceVerdict = SignificanceVerdict.NotSignificant,
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -431,7 +431,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "NoSig", Mean = 120, Median = 120, P95 = 120, P99 = 120, Min = 120, Max = 120,
+                Name = "NoSig", Mean = 120, Median = 120, Percentiles = [], Min = 120, Max = 120,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 SignificanceVerdict = SignificanceVerdict.NotTested,
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -464,7 +464,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Only", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "Only", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
                 SignificanceVerdict = SignificanceVerdict.Significant,
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -496,7 +496,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = now, ConfidenceLevel = 0.99,
                 Q1 = 0,
@@ -528,7 +528,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 TotalDuration = TimeSpan.FromSeconds(1),
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -546,7 +546,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "B", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "B", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 TotalDuration = TimeSpan.FromSeconds(2),
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -576,7 +576,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Slowest", Mean = 300, Median = 300, P95 = 300, P99 = 300, Min = 300, Max = 300,
+                Name = "Slowest", Mean = 300, Median = 300, Percentiles = [], Min = 300, Max = 300,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -593,7 +593,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "Fastest", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "Fastest", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -610,7 +610,7 @@ public class BenchmarkTableTests
             },
             new BenchmarkResult
             {
-                Name = "Middle", Mean = 200, Median = 200, P95 = 200, P99 = 200, Min = 200, Max = 200,
+                Name = "Middle", Mean = 200, Median = 200, Percentiles = [], Min = 200, Max = 200,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
                 Q1 = 0,
@@ -639,7 +639,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 OutlierDetector = "MAD (3×)",
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -670,7 +670,7 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, P95 = 100, P99 = 100, Min = 100, Max = 100,
+                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
                 StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
                 Omnibus = omnibus,
                 RunAtUtc = DateTimeOffset.UtcNow,
@@ -893,8 +893,7 @@ public class BenchmarkTableTests
             ParameterSet = parameters,
             Mean = median,
             Median = median,
-            P95 = median,
-            P99 = median,
+            Percentiles = [],
             Min = median,
             Max = median,
             StandardDeviation = 1,

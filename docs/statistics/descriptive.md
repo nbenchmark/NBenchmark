@@ -18,9 +18,9 @@ $$\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i$$
 
 The [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method) method. For sorted sample index `i = ceil(0.5 × n)` (1-based). Equivalent to the middle value for odd `n`, and the lower-middle for even `n`.
 
-### Percentiles (P95, P99)
+### Percentiles
 
-Also [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method): `i = ceil(p × n)`.
+Configurable percentile values computed via the [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method) method: `i = ceil(p × n)`. Controlled by `MeasurementOptions.ReportedPercentiles` (default: P50, P95, P99, P99.9, Max). Each entry is a `PercentileEntry` with a `Percentile` (0-1) and `Value` (nanoseconds). Access a specific percentile with `result.GetPercentile(0.95)`.
 
 ### Min and Max
 
@@ -125,8 +125,8 @@ Reported as `0` when `n < 1$.
 |---|---|---|
 | `Median` | Nearest-rank P50 | [Robust central tendency](https://en.wikipedia.org/wiki/Median). |
 | `Mean` | $\bar{x} = \frac{1}{n}\sum x_i$ | [Arithmetic average](https://en.wikipedia.org/wiki/Arithmetic_mean). |
-| `P95` | Nearest-rank P95 | 95th percentile. |
-| `P99` | Nearest-rank P99 | 99th percentile. |
+| `Percentiles` | `IReadOnlyList<PercentileEntry>` | Configurable percentile values. Default set includes P50 (0.50), P95 (0.95), P99 (0.99), P99.9 (0.999), Max (1.0). Controlled by `MeasurementOptions.ReportedPercentiles`. Access via `GetPercentile(p)`. |
+| `Histogram` | `LatencyHistogram?` | Latency histogram with bucket boundaries and sample counts. `null` when `EnableHistogram` is `false` or fewer than 2 samples. |
 | `Min` | $x_1$ (sorted) | [Fastest measured sample](https://en.wikipedia.org/wiki/Sample_maximum_and_minimum). |
 | `Max` | $x_n$ (sorted) | [Slowest measured sample](https://en.wikipedia.org/wiki/Sample_maximum_and_minimum). |
 | `Q1` | Nearest-rank P25 | [First quartile](https://en.wikipedia.org/wiki/Quartile). |

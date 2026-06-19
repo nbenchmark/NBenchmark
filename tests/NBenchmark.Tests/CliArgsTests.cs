@@ -573,6 +573,34 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_Percentiles_Parses_Valid_List()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--percentiles", "0.95,0.99,1.0"]);
+
+        Assert.Empty(errors);
+        Assert.Equal([0.95, 0.99, 1.0], result.ReportedPercentiles);
+    }
+
+    [Fact]
+    public void ParseCore_Percentiles_Invalid_Value_Returns_Error()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--percentiles", "0.95,1.5"]);
+
+        Assert.Null(result.ReportedPercentiles);
+        var error = Assert.Single(errors);
+        Assert.Contains("Invalid percentile value", error);
+    }
+
+    [Fact]
+    public void ParseCore_NoHistogram_Sets_NoHistogram_Flag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--no-histogram"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.NoHistogram);
+    }
+
+    [Fact]
     public void PrintHelp_WritesUsageToStdout()
     {
         var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp());
@@ -582,6 +610,8 @@ public class CliArgsTests
         Assert.Contains("--reporter", stdout);
         Assert.Contains("--seed", stdout);
         Assert.Contains("--autotune-cap-behavior", stdout);
+        Assert.Contains("--percentiles", stdout);
+        Assert.Contains("--no-histogram", stdout);
     }
 
     private static string CaptureConsoleOutput(Action action)

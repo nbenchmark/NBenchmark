@@ -262,15 +262,29 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.Write(rule);
         AnsiConsole.WriteLine();
 
+        // Determine which percentile columns to show (upper tail: >P50, not Max).
+        // Use the union across successful rows so errored/partial rows cannot hide columns.
+        var percentileKeys = rows
+            .SelectMany(r => r.Percentiles)
+            .Select(e => e.Percentile)
+            .Where(p => p > 0.50 && p < 1.0)
+            .Distinct()
+            .OrderBy(p => p)
+            .ToList();
+
         var table = new Table()
             .Border(TableBorder.Rounded)
             .BorderColor(Color.Grey42)
             .AddColumn(new TableColumn("[dim]Benchmark[/]").NoWrap())
             .AddColumn(new TableColumn("[dim]Error (±CI)[/]").RightAligned())
             .AddColumn(new TableColumn("[dim]StdDev[/]").RightAligned())
-            .AddColumn(new TableColumn("[dim]CV[/]").RightAligned())
-            .AddColumn(new TableColumn("[dim]P95[/]").RightAligned())
-            .AddColumn(new TableColumn("[dim]P99[/]").RightAligned());
+            .AddColumn(new TableColumn("[dim]CV[/]").RightAligned());
+
+        foreach (var percentile in percentileKeys)
+        {
+            var key = BenchmarkTable.FormatPercentileKey(percentile);
+            table.AddColumn(new TableColumn($"[dim]P{key}[/]").RightAligned());
+        }
 
         foreach (var row in rows)
         {
@@ -281,14 +295,21 @@ public sealed class ConsoleReporter : IReporter
                 _ => "red",
             };
 
-            table.AddRow(
+            var cells = new List<string>
+            {
                 $"[dim]{Esc(row.Name)}[/]",
                 $"±{BenchmarkFormatter.FormatNs(row.MarginOfError)} [dim]({row.MarginPercent:F2}%)[/]",
                 BenchmarkFormatter.FormatNs(row.StandardDeviation),
                 $"[{cvColor}]{row.CoefficientOfVariationPercent:F2}%[/]",
-                BenchmarkFormatter.FormatNs(row.P95),
-                BenchmarkFormatter.FormatNs(row.P99)
-            );
+            };
+
+            foreach (var percentile in percentileKeys)
+            {
+                var value = row.GetPercentile(percentile);
+                cells.Add(value.HasValue ? BenchmarkFormatter.FormatNs(value.Value) : "-");
+            }
+
+            table.AddRow(cells.ToArray());
         }
 
         AnsiConsole.Write(table);

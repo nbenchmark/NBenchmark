@@ -67,8 +67,22 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
       "description": null,
       "mean": 275.3,
       "median": 300.0,
-      "p95": 500.0,
-      "p99": 500.0,
+      "percentiles": [
+        { "percentile": 0.50, "value": 300.0 },
+        { "percentile": 0.95, "value": 500.0 },
+        { "percentile": 0.99, "value": 500.0 },
+        { "percentile": 0.999, "value": 1000.0 },
+        { "percentile": 1.0, "value": 1100.0 }
+      ],
+      "histogram": {
+        "min": 200.0,
+        "max": 1100.0,
+        "sampleCount": 190,
+        "buckets": [
+          { "lower": 200.0, "upper": 245.0, "count": 10 },
+          { "lower": 245.0, "upper": 290.0, "count": 45 }
+        ]
+      },
       "min": 200.0,
       "max": 1100.0,
       "standardDeviation": 85.9,
@@ -110,6 +124,8 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 ```
 
 All timing values are in **nanoseconds**. Property names use camelCase.
+
+Percentile values are now emitted in a `percentiles` array of `{ percentile, value }` objects (replacing the old `p95`/`p99` scalar properties). The set of reported percentiles is controlled by `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. When `EnableHistogram` is `true` (default), a `histogram` object with `min`, `max`, `sampleCount`, and `buckets` (array of `{ lower, upper, count }`) is also included.
 
 The `autoTune` object records what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) decided for this benchmark: the resolved warmup length (`resolvedWarmup`), measured-sample count (`resolvedSamples`), ops-per-sample K (`opsPerSample`), total body invocations, why each phase stopped (`warmupStop`, `sampleStop` - one of `settled` / `ciTargetMet` / `maxCeiling` / `explicitCount` / `wallClockCap`), the raw relative CI half-width achieved (`achievedRelativeCiWidth`), and the wall-clock tuning time. It is `null` on dry-run and errored results.
 

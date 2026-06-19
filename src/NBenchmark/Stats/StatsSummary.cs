@@ -4,8 +4,8 @@ public sealed class StatsSummary
 {
     public double Mean { get; init; }
     public double Median { get; init; }
-    public double P95 { get; init; }
-    public double P99 { get; init; }
+    public IReadOnlyList<PercentileEntry> Percentiles { get; init; } = [];
+    public LatencyHistogram? Histogram { get; init; }
     public double Min { get; init; }
     public double Max { get; init; }
     public double StandardDeviation { get; init; }
@@ -28,10 +28,21 @@ public sealed class StatsSummary
     ///     (median, percentiles, min/max, MAD) are computed on a sorted copy when the
     ///     input is unsorted. The input array is never mutated.
     /// </summary>
-    public static StatsSummary Compute(double[] samples, double confidenceLevel = 0.95)
+    public static StatsSummary Compute(
+        double[] samples,
+        double confidenceLevel = 0.95,
+        IReadOnlyList<double>? reportedPercentiles = null,
+        bool enableHistogram = true,
+        int histogramBucketCount = 20)
     {
         if (samples.Length == 0)
             return new StatsSummary { ConfidenceLevel = confidenceLevel };
+
+        if (enableHistogram && histogramBucketCount < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(histogramBucketCount), histogramBucketCount,
+                "Histogram bucket count must be at least 1 when histogram is enabled.");
+        }
 
         // The engine always passes sorted (trimmed) samples, so the common case is a
         // single O(n) verification pass. Public callers may pass raw, unsorted samples
@@ -91,12 +102,15 @@ public sealed class StatsSummary
 
         var mad = ComputeMad(samples);
 
+        var percentiles = ComputePercentiles(samples, reportedPercentiles);
+        var histogram = enableHistogram && n >= 2 ? ComputeHistogram(samples, histogramBucketCount) : null;
+
         return new StatsSummary
         {
             Mean = mean,
             Median = Percentile.Compute(samples, 0.50),
-            P95 = Percentile.Compute(samples, 0.95),
-            P99 = Percentile.Compute(samples, 0.99),
+            Percentiles = percentiles,
+            Histogram = histogram,
             Min = samples[0],
             Max = samples[^1],
             StandardDeviation = sampleStdDev,
@@ -108,6 +122,58 @@ public sealed class StatsSummary
             Kurtosis = kurtosis,
             Mad = mad,
         };
+    }
+
+    private static IReadOnlyList<PercentileEntry> ComputePercentiles(
+        double[] sorted, IReadOnlyList<double>? requested)
+    {
+        var normalized = MeasurementOptions.NormalizePercentiles(
+            requested ?? MeasurementOptions.DefaultReportedPercentiles);
+
+        if (normalized.Count == 0)
+            return Array.Empty<PercentileEntry>();
+
+        var entries = new List<PercentileEntry>(normalized.Count);
+
+        foreach (var p in normalized)
+        {
+            var value = p >= 1.0 ? sorted[^1] : Percentile.Compute(sorted, p);
+            entries.Add(new PercentileEntry(p, value));
+        }
+
+        return entries.ToArray();
+    }
+
+    internal static LatencyHistogram ComputeHistogram(double[] sorted, int bucketCount)
+    {
+        var min = sorted[0];
+        var max = sorted[^1];
+
+        if (Math.Abs(max - min) < 1e-9)
+        {
+            return new LatencyHistogram(
+                [new HistogramBucket(min, max, sorted.Length)],
+                min, max, sorted.Length);
+        }
+
+        var bucketWidth = (max - min) / bucketCount;
+        var buckets = new HistogramBucket[bucketCount];
+
+        for (var i = 0; i < bucketCount; i++)
+        {
+            var lower = min + i * bucketWidth;
+            var upper = i == bucketCount - 1 ? max : min + (i + 1) * bucketWidth;
+            buckets[i] = new HistogramBucket(lower, upper, 0);
+        }
+
+        foreach (var sample in sorted)
+        {
+            var idx = (int)((sample - min) / bucketWidth);
+            idx = Math.Clamp(idx, 0, bucketCount - 1);
+            buckets[idx] = buckets[idx] with { Count = buckets[idx].Count + 1 };
+        }
+
+        return new LatencyHistogram(buckets, min, max, sorted.Length);
     }
 
     private static bool IsSorted(double[] values)

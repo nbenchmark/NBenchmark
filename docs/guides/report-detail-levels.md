@@ -36,6 +36,7 @@ Advanced mode shows the same 10-column table **plus** a per-benchmark stats bloc
 - **CV:** coefficient of variation as a percentage.
 - **Skewness and Kurtosis:** shape of the distribution.
 - **MAD:** median absolute deviation (scaled).
+- **Percentiles:** the full set of configured percentile values (e.g. P50, P95, P99, P99.9, Max).
 - **N:** post-trim sample count.
 - **Allocation breakdown** (when `MeasureAllocations = true`): median, P95, and max allocation per iteration.
 
@@ -69,7 +70,7 @@ dotnet run -- --detail simple
 | Value | Behaviour |
 |---|---|
 | `simple` | Compact table with the essential statistics. **(default)** |
-| `advanced` | Same table plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, and allocation percentiles. |
+| `advanced` | Same table plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, configured percentiles, and allocation breakdown. |
 
 The `--detail` flag affects all registered reporters. JSON always emits the full record regardless of detail level.
 

@@ -57,6 +57,17 @@ internal sealed record CliArgs
     public int? LaunchCount { get; init; }
 
     /// <summary>
+    ///     Comma-separated list of percentile values to report (e.g. "0.50,0.95,0.99,0.999,1.0").
+    ///     <c>null</c> uses the MeasurementOptions default.
+    /// </summary>
+    public IReadOnlyList<double>? ReportedPercentiles { get; init; }
+
+    /// <summary>
+    ///     When true, disables the latency histogram.
+    /// </summary>
+    public bool NoHistogram { get; init; }
+
+    /// <summary>
     ///     Pure parse: tokenises <paramref name="args" />, validates ranges, and returns
     ///     both the structured result and any error messages. No console I/O, no
     ///     <c>Environment.ExitCode</c> mutation.
@@ -95,6 +106,8 @@ internal sealed record CliArgs
         TimeSpan? maxTuningTime = null;
         AutoTuneCapBehavior? autoTuneCapBehavior = null;
         int? launchCount = null;
+        IReadOnlyList<double>? reportedPercentiles = null;
+        var noHistogram = false;
 
         var errors = new List<string>();
 
@@ -308,12 +321,38 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --launch-count value '{args[i]}'. Must be 1-{MeasurementOptions.MaxLaunchCount}.");
 
                     break;
+                case "--percentiles" when i + 1 < args.Length:
+                    var raw = args[++i];
+                    var parts = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    var parsed = new List<double>(parts.Length);
+                    var valid = true;
+
+                    foreach (var part in parts)
+                    {
+                        if (double.TryParse(part, CultureInfo.InvariantCulture, out var val) && val is >= 0 and <= 1)
+                            parsed.Add(val);
+                        else
+                        {
+                            valid = false;
+                            errors.Add($"Invalid percentile value '{part}' in --percentiles. Each value must be a fraction between 0 and 1 (e.g. 0.95).");
+                        }
+                    }
+
+                    if (valid && parsed.Count > 0)
+                        reportedPercentiles = parsed;
+                    else if (valid)
+                        errors.Add("--percentiles must specify at least one value (e.g. 0.50,0.95,0.99).");
+
+                    break;
+                case "--no-histogram":
+                    noHistogram = true;
+                    break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--category" or "--exclude-category" or "--confidence" or "--order"
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
-                    or "--launch-count":
+                    or "--launch-count" or "--percentiles":
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -355,6 +394,8 @@ internal sealed record CliArgs
             MaxTuningTime = maxTuningTime,
             AutoTuneCapBehavior = autoTuneCapBehavior,
             LaunchCount = launchCount,
+            ReportedPercentiles = reportedPercentiles,
+            NoHistogram = noHistogram,
         }, errors);
     }
 
@@ -449,6 +490,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --max-tuning-time <s>  Wall-clock cap per benchmark, in seconds (default: 20)");
         Console.WriteLine("  --autotune-cap-behavior <mode>  Cap handling: warn (default) or error");
         Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (default: 1)");
+        Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
+        Console.WriteLine("  --no-histogram          Disable latency histogram computation");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");

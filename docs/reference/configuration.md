@@ -302,6 +302,44 @@ A higher confidence level produces a wider (larger) Error value. Use `0.99` when
 BenchmarkSuite fluent method: `.WithConfidenceLevel(0.99)`  
 CLI flag: `--confidence 0.99`
 
+### ReportedPercentiles
+
+```csharp
+ReportedPercentiles = [0.50, 0.95, 0.99, 0.999, 1.0]   // default
+```
+
+The set of percentile values to compute from the trimmed samples, typed as `IReadOnlyList<double>`. Each value must be between `0` and `1` inclusive. Values `> 0.50` and `< 1.0` appear as columns in reporter tail-latency tables (e.g. P95, P99, P99.9).
+
+| Value | Behaviour |
+|---|---|
+| `[0.50, 0.95, 0.99, 0.999, 1.0]` **(default)** | Reports P50 (Median), P95, P99, P99.9, and Max. |
+| Custom list | Only the specified percentile values are computed. P50 (`0.50`) does not produce a separate percentile column because it is already shown as Median. Max (`1.0`) is reported via the existing Max stat field. |
+| `[0.90]` | Single custom percentile - P90 is computed and displayed. |
+
+The computed values are stored in `BenchmarkResult.Percentiles` as `IReadOnlyList<PercentileEntry>`, where each entry has a `Percentile` (double, 0-1) and `Value` (double, in nanoseconds). Use `result.GetPercentile(0.95)` to retrieve a specific percentile value.
+
+CLI flag: `--percentiles <list>` (comma-separated, e.g. `--percentiles 0.90,0.99,0.999`).
+
+### EnableHistogram
+
+```csharp
+EnableHistogram = true   // default
+```
+
+When `true`, NBenchmark computes a latency histogram from the trimmed samples. The histogram is available on `BenchmarkResult.Histogram` as a `LatencyHistogram` record containing an ordered list of `HistogramBucket` values (each with `Lower`, `Upper`, and `Count`), plus `Min`, `Max`, and `SampleCount`.
+
+Set to `false` to skip histogram computation and keep `BenchmarkResult.Histogram` as `null`. Useful when you do not need the histogram and want to save a small amount of computation.
+
+CLI flag: `--no-histogram` (disables histogram).
+
+### HistogramBucketCount
+
+```csharp
+HistogramBucketCount = 20   // default
+```
+
+The number of equal-width buckets in the latency histogram. Only used when `EnableHistogram` is `true`. Must be between `5` and `100`. More buckets provide finer granularity at the cost of fewer samples per bucket.
+
 ### EnableSignificance
 
 ```csharp
@@ -378,6 +416,9 @@ Categories are not part of `MeasurementOptions`; they are metadata declared with
 | `ForceGcBetweenBenchmarks` | `bool` (computed) | `false` | Derives from `Profile`; override via `ForceGcBetweenBenchmarksOverride` |
 | `OutlierMode` | `enum` | `IqrFence` | See above |
 | `OutlierDetector` | `IOutlierDetector?` | `null` | Overrides `OutlierMode` when set |
+| `ReportedPercentiles` | `IReadOnlyList<double>` | `[0.50, 0.95, 0.99, 0.999, 1.0]` | Each value 0-1 |
+| `EnableHistogram` | `bool` | `true` | - |
+| `HistogramBucketCount` | `int` | `20` | `5` – `100` |
 | `EnableSignificance` | `bool` | `true` | - |
 | `SignificanceTest` | `ISignificanceTest?` | `null` | Defaults to `DefaultSignificanceTest` |
 

@@ -205,20 +205,50 @@ public sealed class MarkdownReporter : IReporter
 
     private static void RenderTimingDetail(StringBuilder sb, BenchmarkTable table)
     {
+        var successful = table.Rows.Where(r => !r.Errored).ToList();
+
+        if (successful.Count == 0)
+            return;
+
+        var percentileKeys = successful
+            .SelectMany(r => r.Percentiles)
+            .Select(e => e.Percentile)
+            .Where(p => p > 0.50 && p < 1.0)
+            .Distinct()
+            .OrderBy(p => p)
+            .ToList();
+
         sb.AppendLine("### Precision & Tail Latency");
         sb.AppendLine();
-        sb.AppendLine("| Benchmark | Error (±CI) | StdDev | CV | P95 | P99 |");
-        sb.AppendLine("|---|---:|---:|---:|---:|---:|");
 
-        foreach (var row in table.Rows.Where(r => !r.Errored))
+        if (percentileKeys.Count > 0)
         {
+            var headerCols = string.Join(" | ", percentileKeys.Select(p => $"P{BenchmarkTable.FormatPercentileKey(p)}"));
+            var alignCols = string.Join("", percentileKeys.Select(_ => "---:|"));
+
+            sb.AppendLine($"| Benchmark | Error (±CI) | StdDev | CV | {headerCols} |");
+            sb.AppendLine($"|---|---:|---:|---:|{alignCols}");
+        }
+        else
+        {
+            sb.AppendLine("| Benchmark | Error (±CI) | StdDev | CV |");
+            sb.AppendLine("|---|---:|---:|---:|");
+        }
+
+        foreach (var row in successful)
+        {
+            var tailCells = percentileKeys
+                .Select(p => row.GetPercentile(p))
+                .Select(value => value.HasValue ? BenchmarkFormatter.FormatNs(value.Value) : string.Empty);
+
             sb.AppendLine(
                 $"| {row.Name} " +
                 $"| ±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}%) " +
                 $"| {BenchmarkFormatter.FormatNs(row.StandardDeviation)} " +
                 $"| {row.CoefficientOfVariationPercent:F2}% " +
-                $"| {BenchmarkFormatter.FormatNs(row.P95)} " +
-                $"| {BenchmarkFormatter.FormatNs(row.P99)} |"
+                (percentileKeys.Count > 0
+                    ? $"| {string.Join(" | ", tailCells)} |"
+                    : "|")
             );
         }
 

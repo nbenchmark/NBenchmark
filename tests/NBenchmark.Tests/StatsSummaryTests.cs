@@ -14,8 +14,8 @@ public class StatsSummaryTests
 
         Assert.Equal(3.0, stats.Mean, 10);
         Assert.Equal(3.0, stats.Median, 10);
-        Assert.Equal(5.0, stats.P95, 10);
-        Assert.Equal(5.0, stats.P99, 10);
+        Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 10);
+        Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 10);
         Assert.Equal(1.0, stats.Min, 10);
         Assert.Equal(5.0, stats.Max, 10);
 
@@ -39,7 +39,7 @@ public class StatsSummaryTests
         Assert.Equal(3.0, stats.Median, 10);
         Assert.Equal(1.0, stats.Min, 10);
         Assert.Equal(5.0, stats.Max, 10);
-        Assert.Equal(5.0, stats.P95, 10);
+        Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 10);
         Assert.Equal(original, unsorted);
 
         var sorted = new double[] { 1, 2, 3, 4, 5 };
@@ -96,6 +96,7 @@ public class StatsSummaryTests
         var stats = StatsSummary.Compute([7.0]);
         Assert.Equal(7.0, stats.Mean, 10);
         Assert.Equal(7.0, stats.Median, 10);
+        Assert.Null(stats.Histogram);
         Assert.Equal(0.0, stats.StandardDeviation, 10);
         Assert.Equal(0.0, stats.StandardError, 10);
         Assert.Equal(0.0, stats.MarginOfError, 10);
@@ -111,5 +112,34 @@ public class StatsSummaryTests
         Assert.Equal(5.0, stats.Mean, 10);
         Assert.Equal(5.0, stats.Median, 10);
         Assert.Equal(0.0, stats.StandardDeviation, 10);
+    }
+
+    [Fact]
+    public void Compute_Normalizes_Custom_Percentiles()
+    {
+        var samples = new double[] { 1, 2, 3, 4, 5 };
+
+        var stats = StatsSummary.Compute(samples, reportedPercentiles: [0.99, 0.95, 0.95, 1.0, 0.50]);
+
+        Assert.Equal([0.50, 0.95, 0.99, 1.0], stats.Percentiles.Select(p => p.Percentile).ToArray());
+    }
+
+    [Fact]
+    public void Compute_Disables_Histogram_When_Requested()
+    {
+        var samples = new double[] { 1, 2, 3, 4, 5 };
+
+        var stats = StatsSummary.Compute(samples, enableHistogram: false);
+
+        Assert.Null(stats.Histogram);
+    }
+
+    [Fact]
+    public void Compute_Histogram_Rejects_Invalid_Bucket_Count_When_Enabled()
+    {
+        var samples = new double[] { 1, 2, 3 };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            StatsSummary.Compute(samples, enableHistogram: true, histogramBucketCount: 0));
     }
 }

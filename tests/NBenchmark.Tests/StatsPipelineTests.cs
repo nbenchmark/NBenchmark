@@ -90,8 +90,8 @@ public class StatsPipelineTests
 
         Assert.Equal(0, result.Stats.Mean);
         Assert.Equal(0, result.Stats.Median);
-        Assert.Equal(0, result.Stats.P95);
-        Assert.Equal(0, result.Stats.P99);
+        Assert.Equal(0, result.Stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value);
+        Assert.Equal(0, result.Stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value);
         Assert.Equal(0, result.Stats.Min);
         Assert.Equal(0, result.Stats.Max);
         Assert.Equal(0, result.Stats.StandardDeviation);

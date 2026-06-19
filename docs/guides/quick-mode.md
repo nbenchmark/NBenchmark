@@ -123,7 +123,7 @@ await result.ToJsonAsync("results/");   // output directory
 Console.WriteLine($"Median:  {result.Median} ns");
 Console.WriteLine($"Mean:    {result.Mean} ns");
 Console.WriteLine($"Ops/s:   {result.OperationsPerSecond}");
-Console.WriteLine($"P95:     {result.P95} ns");
+Console.WriteLine($"P95:     {result.GetPercentile(0.95)} ns");
 Console.WriteLine($"StdDev:  {result.StandardDeviation} ns");
 Console.WriteLine($"Error:   ±{result.MarginOfError} ns ({result.ConfidenceLevel * 100:0}% CI)");
 Console.WriteLine($"CI:      {result.ConfidenceIntervalLower} … {result.ConfidenceIntervalUpper} ns");

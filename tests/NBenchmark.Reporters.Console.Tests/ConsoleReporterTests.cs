@@ -37,8 +37,7 @@ public class ConsoleReporterTests
                 Name = "broken",
                 Mean = 0,
                 Median = 0,
-                P95 = 0,
-                P99 = 0,
+                Percentiles = [],
                 Min = 0,
                 Max = 0,
                 StandardDeviation = 0,
@@ -58,6 +57,46 @@ public class ConsoleReporterTests
             };
 
             await reporter.ReportAsync([result]);
+        });
+    }
+
+    [Fact]
+    public async Task ConsoleReporter_ReportAsync_Errored_First_Row_Renders_Tail_Columns_From_Healthy_Rows()
+    {
+        await CaptureConsoleOutputAsyncVoid(async () =>
+        {
+            var reporter = new ConsoleReporter();
+
+            var errored = new BenchmarkResult
+            {
+                Name = "broken",
+                Mean = 0,
+                Median = 0,
+                Percentiles = [],
+                Min = 0,
+                Max = 0,
+                StandardDeviation = 0,
+                Errored = true,
+                ErrorMessage = "something went wrong",
+                Q1 = 0,
+                Q3 = 0,
+                InterquartileRange = 0,
+                OutliersRemoved = 0,
+                N = 0,
+                Skewness = 0,
+                Kurtosis = 0,
+                Mad = 0,
+                AllocMedian = null,
+                AllocP95 = null,
+                AllocMax = null,
+            };
+
+            var healthy = MakeResult("healthy", 100) with
+            {
+                Percentiles = [new PercentileEntry(0.95, 110), new PercentileEntry(0.99, 120)],
+            };
+
+            await reporter.ReportAsync([errored, healthy]);
         });
     }
 
@@ -100,8 +139,7 @@ public class ConsoleReporterTests
             Name = name,
             Mean = median,
             Median = median,
-            P95 = median * 1.1,
-            P99 = median * 1.2,
+            Percentiles = [],
             Min = median * 0.8,
             Max = median * 1.3,
             StandardDeviation = median * 0.05,
