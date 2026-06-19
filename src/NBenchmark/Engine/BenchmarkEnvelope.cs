@@ -72,7 +72,12 @@ internal sealed record BenchmarkEnvelope(
             return ExecuteAsync(name, asyncDel, syncDel, resultConsumer, instance, specWithClass, ct);
         };
 
-        return new BenchmarkEnvelope(name, className, description, isBaseline, categories, runAsync);
+        var parameterSet = method.ParameterSet;
+
+        return new BenchmarkEnvelope(name, className, description, isBaseline, categories, runAsync)
+        {
+            ParameterSet = parameterSet,
+        };
     }
 
     private static Task<MeasurementOutcome> ExecuteAsync(

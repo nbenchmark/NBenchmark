@@ -366,22 +366,52 @@ public sealed class BenchmarkHost
             .GroupBy(x => x.result.ClassName)
             .ToList();
 
-        foreach (var group in groups)
+        foreach (var classGroup in groups)
         {
-            var indices = group.Select(x => x.index).ToList();
-            var groupResults = indices.Select(i => allResults[i]).ToList();
-            var groupRawSamples = new Dictionary<string, double[]>();
+            var classIndices = classGroup.Select(x => x.index).ToList();
+            var classResults = classIndices.Select(i => allResults[i]).ToList();
+            var classRawSamples = new Dictionary<string, double[]>();
 
-            foreach (var result in groupResults)
+            foreach (var result in classResults)
             {
                 if (rawSamples.TryGetValue(result.Name, out var samples))
-                    groupRawSamples[result.Name] = samples;
+                    classRawSamples[result.Name] = samples;
             }
 
-            Significance.ApplyIfEnabled(groupResults, groupRawSamples, options);
+            if (!classResults.Any(r => r.ParameterSet.Count > 0))
+            {
+                Significance.ApplyIfEnabled(classResults, classRawSamples, options);
 
-            for (var i = 0; i < indices.Count; i++)
-                allResults[indices[i]] = groupResults[i];
+                for (var i = 0; i < classIndices.Count; i++)
+                    allResults[classIndices[i]] = classResults[i];
+
+                continue;
+            }
+
+            var indexedResults = classResults
+                .Select((r, idx) => (Result: r, Index: idx))
+                .ToList();
+
+            var paramGroups = indexedResults
+                .GroupBy(ri => BenchmarkParameter.GetKey(ri.Result.ParameterSet))
+                .ToList();
+
+            foreach (var paramGroup in paramGroups)
+            {
+                var paramList = paramGroup.ToList();
+                var paramResults = paramList.Select(ri => ri.Result).ToList();
+                var paramRaw = new Dictionary<string, double[]>();
+                foreach (var ri in paramList)
+                {
+                    if (rawSamples.TryGetValue(ri.Result.Name, out var samples))
+                        paramRaw[ri.Result.Name] = samples;
+                }
+
+                Significance.ApplyIfEnabled(paramResults, paramRaw, options);
+
+                for (var j = 0; j < paramList.Count; j++)
+                    allResults[classIndices[paramList[j].Index]] = paramResults[j];
+            }
         }
     }
 
@@ -530,16 +560,40 @@ public sealed class BenchmarkHost
         if (order != RunOrder.Random)
             return benchmarks;
 
-        var shuffled = benchmarks.ToList();
-        var rng = new Random(seed ?? Random.Shared.Next());
-
-        for (var i = shuffled.Count - 1; i > 0; i--)
+        var hasParameters = benchmarks.Any(b => b.ParameterSet.Count > 0);
+        if (!hasParameters)
         {
-            var j = rng.Next(i + 1);
-            (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
+            var shuffled = benchmarks.ToList();
+            var rng = new Random(seed ?? Random.Shared.Next());
+            ShuffleInPlace(shuffled, rng);
+            return shuffled;
         }
 
-        return shuffled;
+        var parameterGroups = benchmarks
+            .GroupBy(b => BenchmarkParameter.GetKey(b.ParameterSet))
+            .ToList();
+
+        var ordered = new List<BenchmarkMethodDefinition>(benchmarks.Count);
+        var groupSeedRng = new Random(seed ?? Random.Shared.Next());
+
+        foreach (var group in parameterGroups)
+        {
+            var groupList = group.ToList();
+            var groupRng = new Random(groupSeedRng.Next());
+            ShuffleInPlace(groupList, groupRng);
+            ordered.AddRange(groupList);
+        }
+
+        return ordered;
+    }
+
+    private static void ShuffleInPlace<T>(List<T> items, Random rng)
+    {
+        for (var i = items.Count - 1; i > 0; i--)
+        {
+            var j = rng.Next(i + 1);
+            (items[i], items[j]) = (items[j], items[i]);
+        }
     }
 
     /// <summary>

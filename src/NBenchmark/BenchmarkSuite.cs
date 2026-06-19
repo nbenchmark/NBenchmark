@@ -686,8 +686,6 @@ public sealed class BenchmarkSuite(string name)
             _suiteTeardown?.Invoke();
         }
 
-        ApplyParameterSetsToResults(results, envelopes);
-
         await progress.OnSuiteCompleted(results).ConfigureAwait(false);
 
         if (applySignificance)
@@ -851,18 +849,12 @@ public sealed class BenchmarkSuite(string name)
                 }
 
                 var envelope = factory.Factory(combo.ToArray(), displayName);
-                var capturedParamSet = paramSet;
 
                 expanded.Add(envelope with
                 {
                     OriginalName = factory.Name,
                     ParameterSet = paramSet,
                     IsBaseline = false,
-                    RunAsync = (spec, ct) =>
-                    {
-                        var task = envelope.RunAsync(spec, ct);
-                        return WithParameterSet(task, capturedParamSet);
-                    },
                 });
             }
         }
@@ -906,28 +898,10 @@ public sealed class BenchmarkSuite(string name)
     private static string FormatParamDisplayName(string benchmarkName, BenchmarkParameter[] paramSet)
     {
         if (paramSet.Length == 1)
-            return $"{benchmarkName} ({paramSet[0].Name}={BenchmarkParameter.FormatValue(paramSet[0].Value)})";
+            return $"{benchmarkName}({paramSet[0].Name}={BenchmarkParameter.FormatValue(paramSet[0].Value)})";
 
         var parts = paramSet.Select(p => $"{p.Name}={BenchmarkParameter.FormatValue(p.Value)}");
-        return $"{benchmarkName} ({string.Join(", ", parts)})";
-    }
-
-    private static string GetParameterSetKey(IReadOnlyList<BenchmarkParameter> paramSet)
-    {
-        if (paramSet.Count == 0)
-            return "";
-
-        return string.Join("\u001F", paramSet.Select(p => $"{p.Name}={p.Value}"));
-    }
-
-    private static void ApplyParameterSetsToResults(List<BenchmarkResult> results, List<BenchmarkEnvelope> envelopes)
-    {
-        var byName = envelopes.ToDictionary(e => e.Name);
-        for (var i = 0; i < results.Count; i++)
-        {
-            if (byName.TryGetValue(results[i].Name, out var match) && match.ParameterSet.Count > 0)
-                results[i] = results[i] with { ParameterSet = match.ParameterSet };
-        }
+        return $"{benchmarkName}({string.Join(", ", parts)})";
     }
 
     private void ApplyPerParameterSignificance(List<BenchmarkResult> results, Dictionary<string, double[]> rawSamples)
@@ -943,7 +917,7 @@ public sealed class BenchmarkSuite(string name)
             .ToList();
 
         var groups = indexedResults
-            .GroupBy(ri => GetParameterSetKey(ri.Result.ParameterSet))
+            .GroupBy(ri => BenchmarkParameter.GetKey(ri.Result.ParameterSet))
             .ToList();
 
         foreach (var group in groups)
@@ -985,15 +959,15 @@ public sealed class BenchmarkSuite(string name)
 
         // Group by parameter set, then shuffle within each group.
         var parameterGroups = expanded
-            .GroupBy(e => GetParameterSetKey(e.ParameterSet))
+            .GroupBy(e => BenchmarkParameter.GetKey(e.ParameterSet))
             .ToList();
 
         var ordered = new List<BenchmarkEnvelope>(expanded.Count);
-        var seed = Random.Shared.Next();
+        var groupSeedRng = new Random(Random.Shared.Next());
 
         foreach (var group in parameterGroups)
         {
-            var shuffled = ShuffleEnvelopes(group.ToList(), seed ^ group.Key.GetHashCode());
+            var shuffled = ShuffleEnvelopes(group.ToList(), groupSeedRng.Next());
             ordered.AddRange(shuffled);
         }
 
@@ -1012,16 +986,6 @@ public sealed class BenchmarkSuite(string name)
         }
 
         return list;
-    }
-
-    private static async Task<MeasurementOutcome> WithParameterSet(Task<MeasurementOutcome> task, BenchmarkParameter[] paramSet)
-    {
-        var outcome = await task.ConfigureAwait(false);
-        return new MeasurementOutcome
-        {
-            Result = outcome.Result with { ParameterSet = paramSet },
-            RawSamples = outcome.RawSamples,
-        };
     }
 
     // --- Validation ---
