@@ -1,3 +1,4 @@
+using System.Globalization;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
 
@@ -210,8 +211,8 @@ public sealed record BenchmarkTable
             StandardDeviation = result.StandardDeviation,
             StandardError = result.StandardError,
             CoefficientOfVariation = result.CoefficientOfVariation,
-            P95 = result.P95,
-            P99 = result.P99,
+            Percentiles = result.Percentiles,
+            Histogram = result.Histogram,
             Ratio = comparable ? ComputeRatio(result, baseline) : double.NaN,
             IsBaseline = comparable && (isBaselineOverride ?? result.IsBaseline),
             Errored = result.Errored,
@@ -316,6 +317,16 @@ public sealed record BenchmarkTable
 
         lines.Add($"MAD: {BenchmarkFormatter.FormatNs(row.Mad)}");
 
+        if (row.Percentiles.Count > 0)
+        {
+            var parts = row.Percentiles.Select(e =>
+            {
+                var label = e.Percentile >= 1.0 ? "Max" : $"P{FormatPercentileKey(e.Percentile)}";
+                return $"{label} = {BenchmarkFormatter.FormatNs(e.Value)}";
+            });
+            lines.Add($"Percentiles: {string.Join(", ", parts)}");
+        }
+
         if (row.Effect is { } effect && string.Equals(effect.Metric, EffectMetrics.CliffsDelta, StringComparison.Ordinal))
         {
             var magnitudeText = effect.Magnitude ?? "?";
@@ -361,6 +372,22 @@ public sealed record BenchmarkTable
         return $"auto-tuned: {diagnostic.ResolvedSamples:N0} samples × {diagnostic.OpsPerSample:N0} ops, "
                + $"warmup {diagnostic.ResolvedWarmup:N0}, CI ±{diagnostic.AchievedRelativeCiWidth * 100:F1}%";
     }
+
+    /// <summary>
+    ///     Formats a percentile value (0.0-1.0) into a short display key.
+    ///     Examples: 0.50 -> "50", 0.95 -> "95", 0.99 -> "99", 0.999 -> "99.9", 1.0 -> "Max".
+    /// </summary>
+    public static string FormatPercentileKey(double p)
+    {
+        if (p >= 1.0) return "Max";
+
+        var scaled = p * 100.0;
+        var rounded = Math.Round(scaled, 1);
+
+        return rounded == (int)rounded
+            ? ((int)rounded).ToString(CultureInfo.InvariantCulture)
+            : rounded.ToString("F1", CultureInfo.InvariantCulture);
+    }
 }
 
 public record BenchmarkRow
@@ -387,8 +414,8 @@ public record BenchmarkRow
     public required double StandardDeviation { get; init; }
     public required double StandardError { get; init; }
     public required double CoefficientOfVariation { get; init; }
-    public required double P95 { get; init; }
-    public required double P99 { get; init; }
+    public required IReadOnlyList<PercentileEntry> Percentiles { get; init; }
+    public LatencyHistogram? Histogram { get; init; }
     public required double Ratio { get; init; }
     public required bool IsBaseline { get; init; }
     public required bool Errored { get; init; }
@@ -432,4 +459,13 @@ public record BenchmarkRow
     public required double CoefficientOfVariationPercent { get; init; }
     public AutoTuneDiagnostic? AutoTune { get; init; }
     public IReadOnlyList<string> Categories { get; init; } = [];
+
+    public double? GetPercentile(double p)
+    {
+        foreach (var e in Percentiles)
+            if (Math.Abs(e.Percentile - p) < 1e-9)
+                return e.Value;
+
+        return null;
+    }
 }

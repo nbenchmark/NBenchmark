@@ -269,7 +269,7 @@ Set the report detail level. Controls how much information reporters display.
 | Value | Behaviour |
 |---|---|
 | `simple` | 10-column table with the essential statistics. **(default)** |
-| `advanced` | Same table plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, and allocation percentiles. |
+| `advanced` | Same table plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, allocation breakdown, and the full set of configured percentiles. |
 
 ```bash
 dotnet run -- --detail advanced
@@ -338,6 +338,38 @@ When combined with `--dry-run`, exactly one dry launch is performed regardless o
 
 ---
 
+### `--percentiles <list>`
+
+Control which percentile values are computed and displayed. A comma-separated list of fractions between `0` and `1`. Default: `0.50,0.95,0.99,0.999,1.0` (P50, P95, P99, P99.9, Max).
+
+```bash
+# Custom percentile set: report P90, P99, and P99.9
+dotnet run -- --percentiles 0.90,0.99,0.999
+
+# Report only the median and maximum
+dotnet run -- --percentiles 0.50,1.0
+```
+
+Reporters render one column per percentile value between P50 and Max (P95, P99, etc.) in the tail-latency table. P50 is excluded from percentiles columns because it is already shown as Median. Max (`1.0`) is excluded because it appears as a separate Max stat.
+
+Programmatic equivalent: `WithOptions(new MeasurementOptions { ReportedPercentiles = [0.90, 0.95, 0.99] })`.
+
+---
+
+### `--no-histogram`
+
+Disable latency histogram computation. By default NBenchmark computes a latency histogram from the trimmed samples with 20 equal-width buckets. This flag skips histogram computation entirely.
+
+The histogram is available on `BenchmarkResult.Histogram` (a `LatencyHistogram` with bucket boundaries and sample counts). When histogram computation is skipped, the property is `null`.
+
+Programmatic equivalent: `WithOptions(new MeasurementOptions { EnableHistogram = false })`.
+
+```bash
+dotnet run -- --no-histogram
+```
+
+---
+
 ### `--threshold-pct <n>`
 
 Causes the run to fail with **exit code 1** if any benchmark regresses more than `n`% against the baseline. `n` must be a positive integer (1 or greater). The regression check compares median execution times: a benchmark is considered regressed if `candidate.Median / baseline.Median > 1.0 + (n / 100.0)`.
@@ -355,7 +387,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown reporter name (`--reporter`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`, `--percentiles`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown reporter name (`--reporter`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
 When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 

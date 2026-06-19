@@ -105,7 +105,7 @@ await result.ToJsonAsync("results/");   // directory
 | **Mean** | The average. Close to the median for stable code; further away when timings vary widely. |
 | **Error** | How precisely the mean is estimated (±95% CI). A small Error means the mean is reliable. |
 | **StdDev** | How spread out the measurements are. High StdDev = unpredictable timing. |
-| **P95 / P99** | Worst-case timing 95% / 99% of the time. Useful for latency budgets. |
+| **P95 / P99 / P99.9** | Tail-latency percentiles. P95: 95% of measurements completed within this time. Useful for latency budgets. Configurable via `MeasurementOptions.ReportedPercentiles`. |
 | **Ratio** | Speed relative to the baseline. `0.75x` = 25% faster; `2.0x` = twice as slow. |
 | **Sig** | **✓** = difference from baseline is statistically significant; **✗** = not significant ([p < 0.05](https://en.wikipedia.org/wiki/P-value)). |
 

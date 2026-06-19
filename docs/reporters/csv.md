@@ -60,13 +60,15 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile
 "Compute",300.0,275.3,3636363.6,85.9,6.1,16.2,259.1,291.5,0.95,0.3122,500.0,500.0,0.75,"true","Cliff's δ",0.6234,"large",96,5.89,2,simple,realistic
 "Baseline",400.0,375.8,2660985.4,114.3,8.1,21.6,354.2,397.4,0.95,0.3043,500.0,900.0,1.00,"","","","",120,5.75,0,simple,realistic
+
+Percentile columns (P95, P99, etc.) are dynamic -- they appear only when the corresponding percentiles are configured via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set of `[0.50, 0.95, 0.99, 0.999, 1.0]`, columns P95 and P99 are emitted. P50 and Max (1.0) are excluded from percentile columns because they are shown separately as Median and Max. Values are in nanoseconds. Empty cells indicate the percentile was not in the configured set or the row is errored.
 ```
 
 All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magnitude` reflect the active significance strategy's effect output. With built-in Mann-Whitney tests, `EffectMetric` is `Cliff's δ`, `EffectValue` is signed (positive = candidate slower), and `Magnitude` is one of `neg`, `small`, `med`, `large` per the [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size) thresholds.
 
 ## Column reference
 
-### Simple mode (22 columns)
+### Simple mode (dynamic columns)
 
 | Column | Type | Description |
 |---|---|---|
@@ -81,8 +83,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `CiUpper` | float | Upper bound of the confidence interval on the mean (`Mean + MarginOfError`). |
 | `ConfidenceLevel` | float | The confidence level used (e.g. `0.95`). |
 | `CoefficientOfVariation` | float | `StdDev / Mean`. Dimensionless measure of relative variability. |
-| `P95` | float | 95th percentile in nanoseconds. |
-| `P99` | float | 99th percentile in nanoseconds. |
+| `P{key}` | float | Dynamic percentile columns. One column per configured percentile value between P50 and Max (e.g. `P95`, `P99`, `P99.9`). Controlled by `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. Values in nanoseconds. |
 | `Ratio` | float or `null` | Speed relative to the baseline. `null` if no baseline or only one benchmark. |
 | `Significant` | `"true"` / `"false"` / empty | [Mann-Whitney U](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) significance result. Empty for the baseline or when significance testing is disabled. |
 | `EffectMetric` | string or empty | Strategy-defined effect metric name (for example `Cliff's δ`, `median-ratio`, `A12`). Empty for the baseline or when significance is not tested. |
@@ -94,7 +95,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `Detail` | string | Active detail level (`simple` or `advanced`). |
 | `Profile` | string | Active measurement profile (`realistic` or `independent`). |
 
-### Advanced mode (44 columns - all simple columns plus the following)
+### Advanced mode (dynamic columns - all simple columns plus the following)
 
 | Column | Type | Description |
 |---|---|---|
@@ -126,7 +127,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 - Results are sorted by median (fastest first).
 - The output directory is created automatically if it does not exist.
 - Names containing double-quotes are escaped by doubling the quote character (standard CSV escaping).
-- Simple mode CSV has 22 columns. Advanced mode CSV has 44 columns and is selected via the `--detail advanced` flag or `WithDetail(ReportDetail.Advanced)`.
+- Simple mode CSV has a dynamic column count (22 base columns plus one column per configured tail-latency percentile). Advanced mode adds 22 advanced fields on top of the simple columns and therefore also has a dynamic total column count.
 
 ## Using with Benchmark (Quick mode)
 

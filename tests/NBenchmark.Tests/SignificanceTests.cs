@@ -15,14 +15,14 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
+                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
                 Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                 Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
-                Name = "faster", Mean = 50, Median = 50, P95 = 55, P99 = 58,
+                Name = "faster", Mean = 50, Median = 50, Percentiles = [],
                 Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
                 Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                 Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
@@ -50,14 +50,14 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
+                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
                 Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                 Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
-                Name = "other", Mean = 100, Median = 100, P95 = 110, P99 = 115,
+                Name = "other", Mean = 100, Median = 100, Percentiles = [],
                 Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = false,
                 Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                 Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
@@ -84,7 +84,7 @@ public class SignificanceTests
             ErroredResult("broken", "error"),
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
+                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
                 Min = 85, Max = 120, StandardDeviation = 5,
                 Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                 Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
@@ -108,7 +108,7 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "solo", Mean = 100, Median = 100, P95 = 110, P99 = 115,
+                Name = "solo", Mean = 100, Median = 100, Percentiles = [],
                 Min = 85, Max = 120, StandardDeviation = 5,
                 Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                 Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
@@ -132,14 +132,14 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "fast", Mean = 50, Median = 50, P95 = 55, P99 = 58,
+                Name = "fast", Mean = 50, Median = 50, Percentiles = [],
                 Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
                 Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                 Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
-                Name = "slow", Mean = 200, Median = 200, P95 = 220, P99 = 240,
+                Name = "slow", Mean = 200, Median = 200, Percentiles = [],
                 Min = 180, Max = 260, StandardDeviation = 10, IsBaseline = false,
                 Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                 Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
@@ -169,12 +169,12 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0, Q3 = 0,
+                Name = "a", Mean = 100, Median = 100, Percentiles = [], Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0, Q3 = 0,
                 InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
             new()
             {
-                Name = "b", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3, Q1 = 0, Q3 = 0, InterquartileRange = 0,
+                Name = "b", Mean = 50, Median = 50, Percentiles = [], Min = 40, Max = 60, StandardDeviation = 3, Q1 = 0, Q3 = 0, InterquartileRange = 0,
                 OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
@@ -193,7 +193,7 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "a", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0, Q3 = 0,
+                Name = "a", Mean = 100, Median = 100, Percentiles = [], Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0, Q3 = 0,
                 InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
@@ -216,13 +216,13 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115, Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0,
+                Name = "baseline", Mean = 100, Median = 100, Percentiles = [], Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0,
                 Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null,
                 AllocMax = null,
             },
             new()
             {
-                Name = "faster", Mean = 50, Median = 50, P95 = 55, P99 = 58, Min = 40, Max = 60, StandardDeviation = 3, Q1 = 0, Q3 = 0, InterquartileRange = 0,
+                Name = "faster", Mean = 50, Median = 50, Percentiles = [], Min = 40, Max = 60, StandardDeviation = 3, Q1 = 0, Q3 = 0, InterquartileRange = 0,
                 OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
             },
         };
@@ -270,14 +270,14 @@ public class SignificanceTests
             [
                 new BenchmarkResult
                 {
-                    Name = "baseline", Mean = 100, Median = 100, P95 = 110, P99 = 115,
+                    Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
                     Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
                     Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                     Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
                 },
                 new BenchmarkResult
                 {
-                    Name = "candidate", Mean = 92, Median = 92, P95 = 100, P99 = 105,
+                    Name = "candidate", Mean = 92, Median = 92, Percentiles = [],
                     Min = 80, Max = 110, StandardDeviation = 5, IsBaseline = false,
                     Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
                     Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
@@ -292,8 +292,7 @@ public class SignificanceTests
             Name = name,
             Mean = 0,
             Median = 0,
-            P95 = 0,
-            P99 = 0,
+            Percentiles = [],
             Min = 0,
             Max = 0,
             StandardDeviation = 0,

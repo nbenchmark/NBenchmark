@@ -26,19 +26,32 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         var sb = new StringBuilder();
         var detail = Detail.ToString().ToLowerInvariant();
 
+        var tables = BenchmarkTable.BuildPerClass(results);
+        var profile = tables[0].Profile.ToString().ToLowerInvariant();
+
+        var percentileCols = tables
+            .SelectMany(t => t.Rows)
+            .SelectMany(r => r.Percentiles)
+            .Select(e => e.Percentile)
+            .Where(p => p > 0.50 && p < 1.0)
+            .Distinct()
+            .OrderBy(p => p)
+            .ToList();
+
+        var percentileHeaders = string.Join(",", percentileCols.Select(p => $"P{BenchmarkTable.FormatPercentileKey(p)}"));
+        var percentileHeaderPart = percentileHeaders.Length > 0 ? $",{percentileHeaders}" : "";
+
+        var baseHeaders = "ClassName,Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation";
+
         if (Detail == ReportDetail.Simple)
         {
-            sb.AppendLine(
-                "ClassName,Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
+            sb.AppendLine($"{baseHeaders}{percentileHeaderPart},Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
         }
         else
         {
             sb.AppendLine(
-                "ClassName,Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,P95,P99,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,Categories");
+                $"{baseHeaders}{percentileHeaderPart},Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,Categories");
         }
-
-        var tables = BenchmarkTable.BuildPerClass(results);
-        var profile = tables[0].Profile.ToString().ToLowerInvariant();
 
         foreach (var table in tables)
         foreach (var row in table.Rows)
@@ -56,23 +69,28 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
             var safeEffectMetric = (row.Effect?.Metric ?? string.Empty).Replace("\"", "\"\"");
             var safeMagnitude = (row.Effect?.Magnitude ?? string.Empty).Replace("\"", "\"\"");
 
+            var percentileValues = string.Join(",", percentileCols
+                .Select(p => row.GetPercentile(p)?.ToString("F1") ?? ""));
+
+            var baseData = $"\"{safeClassName}\"," +
+                           $"\"{safeName}\"," +
+                           $"{row.Median:F1}," +
+                           $"{row.Mean:F1}," +
+                           $"{row.OperationsPerSecond:F1}," +
+                           $"{row.StandardDeviation:F1}," +
+                           $"{row.StandardError:F1}," +
+                           $"{row.MarginOfError:F1}," +
+                           $"{row.ConfidenceIntervalLower:F1}," +
+                           $"{row.ConfidenceIntervalUpper:F1}," +
+                           $"{table.ConfidenceLevel:F2}," +
+                           $"{row.CoefficientOfVariation:F4}";
+
+            var percentileData = percentileValues.Length > 0 ? $",{percentileValues}" : "";
+
             if (Detail == ReportDetail.Simple)
             {
                 sb.AppendLine(
-                    $"\"{safeClassName}\"," +
-                    $"\"{safeName}\"," +
-                    $"{row.Median:F1}," +
-                    $"{row.Mean:F1}," +
-                    $"{row.OperationsPerSecond:F1}," +
-                    $"{row.StandardDeviation:F1}," +
-                    $"{row.StandardError:F1}," +
-                    $"{row.MarginOfError:F1}," +
-                    $"{row.ConfidenceIntervalLower:F1}," +
-                    $"{row.ConfidenceIntervalUpper:F1}," +
-                    $"{table.ConfidenceLevel:F2}," +
-                    $"{row.CoefficientOfVariation:F4}," +
-                    $"{row.P95:F1}," +
-                    $"{row.P99:F1}," +
+                    $"{baseData}{percentileData}," +
                     $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
                     $"\"{safeSig}\"," +
                     $"\"{safeEffectMetric}\"," +
@@ -103,20 +121,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                 var safeCategories = string.Join("; ", row.Categories).Replace("\"", "\"\"");
 
                 sb.AppendLine(
-                    $"\"{safeClassName}\"," +
-                    $"\"{safeName}\"," +
-                    $"{row.Median:F1}," +
-                    $"{row.Mean:F1}," +
-                    $"{row.OperationsPerSecond:F1}," +
-                    $"{row.StandardDeviation:F1}," +
-                    $"{row.StandardError:F1}," +
-                    $"{row.MarginOfError:F1}," +
-                    $"{row.ConfidenceIntervalLower:F1}," +
-                    $"{row.ConfidenceIntervalUpper:F1}," +
-                    $"{table.ConfidenceLevel:F2}," +
-                    $"{row.CoefficientOfVariation:F4}," +
-                    $"{row.P95:F1}," +
-                    $"{row.P99:F1}," +
+                    $"{baseData}{percentileData}," +
                     $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
                     $"\"{safeSig}\"," +
                     $"\"{safeEffectMetric}\"," +

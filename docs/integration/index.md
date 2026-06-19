@@ -75,7 +75,7 @@ All three packages share the same set of threshold properties. A threshold of `-
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `MaxMeanNs` | `double` | -1 (disabled) | Maximum allowed mean execution time in nanoseconds. |
-| `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. |
+| `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles` (the default set includes `0.95`). If P95 was not computed, a clear error message guides you to check the configuration. |
 | `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
 | `BaselinePath` | `string?` | null | Path to a JSON baseline file. Fails if the benchmark regresses beyond `MaxSlowdownRatio`. |
 | `MaxSlowdownRatio` | `double` | 1.2 | Maximum allowed slowdown relative to the baseline (1.2 = 20% regression). |

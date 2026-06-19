@@ -87,8 +87,8 @@ public class StatsRecomputationTests
 
         // Nearest-rank percentiles recomputed independently.
         Assert.Equal(NearestRank(samples, 0.50), stats.Median, 12);
-        Assert.Equal(NearestRank(samples, 0.95), stats.P95, 12);
-        Assert.Equal(NearestRank(samples, 0.99), stats.P99, 12);
+        Assert.Equal(NearestRank(samples, 0.95), stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 12);
+        Assert.Equal(NearestRank(samples, 0.99), stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 12);
     }
 
     [Theory]

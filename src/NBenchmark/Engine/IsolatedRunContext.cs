@@ -60,6 +60,10 @@ internal sealed record MeasurementOverrides
 
     public int? LaunchCount { get; init; }
 
+    public IReadOnlyList<double>? ReportedPercentiles { get; init; }
+
+    public bool? NoHistogram { get; init; }
+
     public static MeasurementOverrides FromCliArgs(CliArgs cliArgs) => new()
     {
         Iterations = cliArgs.Iterations,
@@ -80,6 +84,8 @@ internal sealed record MeasurementOverrides
         MaxTuningTime = cliArgs.MaxTuningTime,
         CapBehavior = cliArgs.AutoTuneCapBehavior,
         LaunchCount = cliArgs.LaunchCount,
+        ReportedPercentiles = cliArgs.ReportedPercentiles,
+        NoHistogram = cliArgs.NoHistogram,
     };
 
     public MeasurementOptions Apply(MeasurementOptions options)
@@ -164,6 +170,12 @@ internal sealed record MeasurementOverrides
 
         if (LaunchCount.HasValue)
             result = result with { LaunchCount = LaunchCount.Value };
+
+        if (ReportedPercentiles is not null)
+            result = result with { ReportedPercentiles = ReportedPercentiles };
+
+        if (NoHistogram.HasValue && NoHistogram.Value)
+            result = result with { EnableHistogram = false };
 
         return result;
     }

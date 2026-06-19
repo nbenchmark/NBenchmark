@@ -100,11 +100,13 @@ Concretely, at a 95% confidence level the true mean is likely within `Mean ± Er
 
 **What a large Error means:** your measurements are highly variable. In the default auto-sampling mode NBenchmark keeps collecting samples until the Error meets the precision target, so a wide interval usually points to genuine run-to-run variability - check whether something external is interfering (e.g. background processes on your machine), or demand a tighter target with the `Thorough` preset. If you have pinned `Iterations`, raising it (or returning to auto mode) narrows the interval.
 
-## Percentiles (P95, P99)
+## Percentiles
 
-**P95** is the 95th percentile: 95% of individual measurements completed within this time. **P99** is the 99th percentile.
+Percentiles tell you about the distribution tail. By default NBenchmark reports P50 (the median, already shown separately), P95, P99, P99.9, and the maximum. Each percentile answers: "X% of measurements completed within this time."
 
-These are important for **latency-sensitive** code where you care about worst-case behaviour, not just the average. A method might have a low median but a high P99 if it occasionally triggers GC or hits a slow path.
+**P95** means 95% of individual measurements completed within this time. **P99** means 99%. **P99.9** means 99.9%. These are important for **latency-sensitive** code where you care about worst-case behaviour, not just the average. A method might have a low median but a high P99 if it occasionally triggers GC or hits a slow path.
+
+The set of reported percentiles is configurable via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. Access a specific percentile value programmatically with `result.GetPercentile(0.95)`.
 
 ## Statistical significance
 

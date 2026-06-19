@@ -56,8 +56,8 @@ public class StatsCrossCheckTests
         Numerics.AssertRelativeClose(1.9632431614775572, stats.MarginOfError, 1e-2);
 
         Assert.Equal(3.0, stats.Median, 12);
-        Assert.Equal(5.0, stats.P95, 12);
-        Assert.Equal(5.0, stats.P99, 12);
+        Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 12);
+        Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 12);
     }
 
     [Fact]
@@ -78,8 +78,8 @@ public class StatsCrossCheckTests
         Numerics.AssertRelativeClose(3.02585542280894, stats.MarginOfError, 1e-2);
 
         Assert.Equal(100.0, stats.Median, 12);
-        Assert.Equal(110.1, stats.P95, 12);
-        Assert.Equal(110.1, stats.P99, 12);
+        Assert.Equal(110.1, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 12);
+        Assert.Equal(110.1, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 12);
     }
 
     [Fact]
@@ -93,8 +93,8 @@ public class StatsCrossCheckTests
         Numerics.AssertRelativeClose(9.814129230772705, stats.MarginOfError, 1e-3);
 
         Assert.Equal(502.83658401138837, stats.Median, 9);
-        Assert.Equal(555.9591597889488, stats.P95, 9);
-        Assert.Equal(604.7263770547136, stats.P99, 9);
+        Assert.Equal(555.9591597889488, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 9);
+        Assert.Equal(604.7263770547136, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 9);
     }
 
     // ---- Nearest-rank percentiles vs numpy.percentile(method='inverted_cdf')

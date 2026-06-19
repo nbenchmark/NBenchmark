@@ -19,10 +19,59 @@ public class MeasurementOptionsTests
         Assert.True(opts.MeasureAllocations);
         Assert.Equal(OutlierMode.IqrFence, opts.OutlierMode);
         Assert.Equal(0.95, opts.ConfidenceLevel);
+        Assert.Equal([0.50, 0.95, 0.99, 0.999, 1.0], opts.ReportedPercentiles);
+        Assert.True(opts.EnableHistogram);
+        Assert.Equal(20, opts.HistogramBucketCount);
         Assert.True(opts.EnableSignificance);
         Assert.Equal(0.05, opts.SignificanceLevel);
         Assert.Null(opts.MinimumPracticalEffect);
         Assert.Equal(1, opts.LaunchCount);
+    }
+
+    [Fact]
+    public void ReportedPercentiles_Are_Normalized_To_Sorted_Distinct()
+    {
+        var opts = new MeasurementOptions
+        {
+            ReportedPercentiles = [0.99, 0.95, 0.95, 1.0, 0.50],
+        };
+
+        Assert.Equal([0.50, 0.95, 0.99, 1.0], opts.ReportedPercentiles);
+    }
+
+    [Fact]
+    public void ReportedPercentiles_Rejects_Invalid_Values()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { ReportedPercentiles = [-0.01, 0.95] });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { ReportedPercentiles = [1.1] });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { ReportedPercentiles = [double.NaN] });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { ReportedPercentiles = [double.PositiveInfinity] });
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(101)]
+    public void HistogramBucketCount_Rejects_Invalid_Values(int value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { HistogramBucketCount = value });
+    }
+
+    [Theory]
+    [InlineData(5)]
+    [InlineData(20)]
+    [InlineData(100)]
+    public void HistogramBucketCount_Accepts_Valid_Values(int value)
+    {
+        var opts = new MeasurementOptions { HistogramBucketCount = value };
+        Assert.Equal(value, opts.HistogramBucketCount);
     }
 
     [Fact]

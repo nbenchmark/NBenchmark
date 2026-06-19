@@ -16,8 +16,7 @@ public class OutcomeBuilderTests
         {
             Mean = 100,
             Median = 99,
-            P95 = 110,
-            P99 = 120,
+            Percentiles = [new(0.95, 110), new(0.99, 120)],
             Min = 80,
             Max = 130,
             StandardDeviation = 5,
@@ -72,8 +71,8 @@ public class OutcomeBuilderTests
         Assert.Equal("desc", r.Description);
         Assert.Equal(100, r.Mean);
         Assert.Equal(99, r.Median);
-        Assert.Equal(110, r.P95);
-        Assert.Equal(120, r.P99);
+        Assert.Equal(110, r.GetPercentile(0.95) ?? 0);
+        Assert.Equal(120, r.GetPercentile(0.99) ?? 0);
         Assert.Equal(80, r.Min);
         Assert.Equal(130, r.Max);
         Assert.Equal(5, r.StandardDeviation);
@@ -238,8 +237,8 @@ public class OutcomeBuilderTests
         var r = outcome.Result;
         Assert.Equal(0, r.Mean);
         Assert.Equal(0, r.Median);
-        Assert.Equal(0, r.P95);
-        Assert.Equal(0, r.P99);
+        Assert.Equal(0, r.GetPercentile(0.95) ?? 0);
+        Assert.Equal(0, r.GetPercentile(0.99) ?? 0);
         Assert.Equal(0, r.Min);
         Assert.Equal(0, r.Max);
         Assert.Equal(0, r.StandardDeviation);
@@ -325,8 +324,8 @@ public class OutcomeBuilderTests
         Assert.Equal("with desc", r.Description);
         Assert.Equal(0, r.Mean);
         Assert.Equal(0, r.Median);
-        Assert.Equal(0, r.P95);
-        Assert.Equal(0, r.P99);
+        Assert.Equal(0, r.GetPercentile(0.95) ?? 0);
+        Assert.Equal(0, r.GetPercentile(0.99) ?? 0);
         Assert.Equal(0, r.Min);
         Assert.Equal(0, r.Max);
         Assert.Equal(0, r.StandardDeviation);

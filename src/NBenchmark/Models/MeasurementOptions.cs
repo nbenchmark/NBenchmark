@@ -4,17 +4,24 @@ namespace NBenchmark;
 
 public record MeasurementOptions
 {
+    internal const double PercentileEqualityTolerance = 1e-9;
     public const int MinIterations = 0;
     public const int MaxIterations = 100_000;
     public const int MaxWarmupIterations = 10_000;
     public const int MaxOpsPerSampleLimit = 1 << 24;
     public const int MaxLaunchCount = 100;
+    public const int MinHistogramBucketCount = 5;
+    public const int MaxHistogramBucketCount = 100;
+    internal static readonly IReadOnlyList<double> DefaultReportedPercentiles =
+        Array.AsReadOnly(new double[] { 0.50, 0.95, 0.99, 0.999, 1.0 });
     public static readonly MeasurementOptions Default = new();
     private readonly double _confidenceLevel = 0.95;
+    private readonly int _histogramBucketCount = 20;
     private readonly int? _iterations;
     private readonly int _launchCount = 1;
     private readonly double? _minimumPracticalEffect;
     private readonly int? _opsPerSample;
+    private readonly IReadOnlyList<double> _reportedPercentiles = DefaultReportedPercentiles;
     private readonly double _significanceLevel = 0.05;
     private readonly int? _warmupIterations;
 
@@ -137,6 +144,40 @@ public record MeasurementOptions
                 "ConfidenceLevel must be strictly between 0 and 1 (e.g. 0.95).");
     }
 
+    /// <summary>
+    ///     The set of percentiles to compute and report (values in [0, 1]).
+    ///     Default: [0.50, 0.95, 0.99, 0.999, 1.0] (P50, P95, P99, P99.9, Max).
+    ///     Use 1.0 to report the sample maximum for display alongside integer percentiles.
+    ///     Values are normalized to ascending order with duplicates removed.
+    /// </summary>
+    public IReadOnlyList<double> ReportedPercentiles
+    {
+        get => _reportedPercentiles;
+        init => _reportedPercentiles = NormalizePercentiles(value);
+    }
+
+    /// <summary>
+    ///     Whether to compute a latency histogram from the trimmed samples.
+    ///     Enabled by default. Set to <c>false</c> to skip histogram computation
+    ///     and keep the <see cref="BenchmarkResult.Histogram" /> property <c>null</c>.
+    /// </summary>
+    public bool EnableHistogram { get; init; } = true;
+
+    /// <summary>
+    ///     The number of buckets in the latency histogram. Only used when
+    ///     <see cref="EnableHistogram" /> is <c>true</c>.
+    ///     Must be between <see cref="MinHistogramBucketCount" /> and
+    ///     <see cref="MaxHistogramBucketCount" />. Default 20.
+    /// </summary>
+    public int HistogramBucketCount
+    {
+        get => _histogramBucketCount;
+        init => _histogramBucketCount = value is >= MinHistogramBucketCount and <= MaxHistogramBucketCount
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value,
+                $"HistogramBucketCount must be between {MinHistogramBucketCount} and {MaxHistogramBucketCount}.");
+    }
+
     public bool EnableSignificance { get; init; } = true;
 
     /// <summary>
@@ -232,4 +273,37 @@ public record MeasurementOptions
     /// </summary>
     public ISignificanceTest ResolveSignificanceTest() =>
         SignificanceTest ?? DefaultSignificanceTest.Instance;
+
+    internal static IReadOnlyList<double> NormalizePercentiles(IReadOnlyList<double> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+
+        if (values.Count == 0)
+            return Array.Empty<double>();
+
+        var normalized = new List<double>(values.Count);
+
+        foreach (var percentile in values)
+        {
+            if (!double.IsFinite(percentile) || percentile is < 0 or > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(values), values,
+                    "ReportedPercentiles must contain only finite values between 0 and 1 inclusive.");
+            }
+
+            normalized.Add(percentile);
+        }
+
+        normalized.Sort();
+
+        var deduped = new List<double>(normalized.Count);
+
+        foreach (var percentile in normalized)
+        {
+            if (deduped.Count == 0 || Math.Abs(percentile - deduped[^1]) > PercentileEqualityTolerance)
+                deduped.Add(percentile);
+        }
+
+        return Array.AsReadOnly(deduped.ToArray());
+    }
 }

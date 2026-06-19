@@ -44,7 +44,7 @@ Run at 2026-06-06 03:40:00 UTC - 40 warmup / 190 measured
 ╰────────────────────────┴──────────┴──────────┴─────────────┴────────────────────────┴────────┴─────────────┴──────────╯
 
 Precision & Tail Latency
-... (error/stddev/cv/p95/p99 table)
+... (error/stddev/cv/dynamic percentile columns)
 
 Compute: auto-tuned: 190 samples × 1 ops, warmup 40, CI ±1.8%
 Baseline: auto-tuned: 190 samples × 1 ops, warmup 40, CI ±1.9%

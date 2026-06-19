@@ -77,6 +77,8 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 | Compute | ±16.2 ns (5.89%) | 85.9 ns | 31.22% | 500.0 ns | 500.0 ns |
 | Baseline | ±21.6 ns (5.75%) | 114.3 ns | 30.43% | 500.0 ns | 900.0 ns |
 
+Percentile columns (P95, P99, etc.) are dynamic -- they appear only when the corresponding percentiles are configured via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set of `[0.50, 0.95, 0.99, 0.999, 1.0]`, columns P95 and P99 are emitted in the tail-latency table (P50 is already shown as Median; Max appears as a separate stat).
+
 ---
 
 ### Interpretation
@@ -114,7 +116,7 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 
 - Results are sorted by median (fastest first).
 - For [parameterized benchmarks](../guides/parameterized-benchmarks.md#reading-the-report), one column per parameter appears after **Benchmark** (which shows the base method name). When a single method is swept across parameter values, the **Ratio** column reports each point's scaling factor relative to the fastest point (the reference, shown as `baseline`), while **Sig** and **Magnitude** stay `-`. When a parameter group holds competing benchmarks, **Sig** and **Magnitude** carry the usual within-group significance and effect.
-- Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, StdDev, P95, and P99 columns show `0.0 ns`.
+- Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, and StdDev columns show `0.0 ns`. Percentile columns show empty cells.
 - The output directory is created automatically if it does not exist.
 - The report order is: Comparison -> Precision & Tail Latency -> (optional) Distribution Details -> Interpretation -> (optional) Warnings -> final summary line.
 - In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown, followed by an `auto-tuned: …` line summarising the adaptive loop's decisions (resolved samples × ops-per-sample, warmup length, achieved CI half-width).

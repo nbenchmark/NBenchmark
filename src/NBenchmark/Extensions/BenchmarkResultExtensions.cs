@@ -28,7 +28,16 @@ public static class BenchmarkResultExtensions
         Console.WriteLine(
             $"  │  Ops/s:  {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond),-14} Median ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.MedianOperationsPerSecond)}");
 
-        Console.WriteLine($"  │  P95:    {BenchmarkFormatter.FormatNs(result.P95),-14} P99:  {BenchmarkFormatter.FormatNs(result.P99)}");
+        var percentileSummary = string.Join("  ", result.Percentiles
+            .Where(e => e.Percentile > 0.50 && e.Percentile < 1.0)
+            .Select(e =>
+            {
+                var label = BenchmarkTable.FormatPercentileKey(e.Percentile);
+                return $"P{label}: {BenchmarkFormatter.FormatNs(e.Value)}";
+            }));
+
+        if (percentileSummary.Length > 0)
+            Console.WriteLine($"  │  {percentileSummary}");
         Console.WriteLine($"  │  StdDev: {BenchmarkFormatter.FormatNs(result.StandardDeviation),-14} CV:   {result.CoefficientOfVariationPercent:F2}%");
 
         if (result.MarginOfError > 0)

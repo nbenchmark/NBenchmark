@@ -13,7 +13,7 @@ public class LaunchAggregatorTests
             new()
             {
                 Name = "test", Mean = 100, Median = 95, StandardDeviation = 10,
-                P95 = 110, P99 = 120, Min = 80, Max = 130, N = 100,
+                Percentiles = [], Min = 80, Max = 130, N = 100,
                 Q1 = 90, Q3 = 105, InterquartileRange = 15,
                 OutliersRemoved = 0, Skewness = 0.5, Kurtosis = 3, Mad = 8,
                 AllocMedian = null, AllocP95 = null, AllocMax = null,
@@ -160,8 +160,7 @@ public class LaunchAggregatorTests
             Mean = mean,
             Median = median,
             StandardDeviation = stdDev,
-            P95 = median * 1.1,
-            P99 = median * 1.2,
+            Percentiles = [],
             Min = median * 0.8,
             Max = median * 1.3,
             N = iterations,
