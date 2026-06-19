@@ -30,6 +30,26 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
+## [Host mode - BenchmarkHost](./host-mode.md)
+
+Attribute-based discovery driven by a command-line interface. Designed for dedicated benchmark projects - similar to BenchmarkDotNet's style.
+
+```csharp
+await BenchmarkHost.Create(args)
+    .AddFromAssembly<MyBenchmarks>()
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+
+public class MyBenchmarks
+{
+    [Benchmark(Baseline = true)]
+    public int Baseline() => 1;
+
+    [Benchmark]
+    public int Compute() => SomeExpensiveWork();
+}
+```
+
 ## [Parameterized benchmarks](./parameterized-benchmarks.md)
 
 Run the same benchmark body across multiple input values. Suite mode uses `WithParameter` and typed `Add` lambdas; host mode uses `[BenchmarkCase]` and `[BenchmarkCases]` attributes.
@@ -62,26 +82,6 @@ await new BenchmarkSuite("string")
     .Add("concat", () => "a" + "b", categories: ["Fast"])
     .WithCategoryFilter(include: ["Fast"])
     .RunAsync();
-```
-
-## [Host mode - BenchmarkHost](./host-mode.md)
-
-Attribute-based discovery driven by a command-line interface. Designed for dedicated benchmark projects - similar to BenchmarkDotNet's style.
-
-```csharp
-await BenchmarkHost.Create(args)
-    .AddFromAssembly<MyBenchmarks>()
-    .WithReporter(new ConsoleReporter())
-    .RunAsync();
-
-public class MyBenchmarks
-{
-    [Benchmark(Baseline = true)]
-    public int Baseline() => 1;
-
-    [Benchmark]
-    public int Compute() => SomeExpensiveWork();
-}
 ```
 
 ## [Global Tool - dotnet benchmark](./dotnet-tool.md)
