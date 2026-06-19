@@ -109,6 +109,29 @@ public class EnvelopeTests
         Assert.Equal(0, instance.InvocationCount);
     }
 
+    [Fact]
+    public async Task FromDiscovered_Sync_Returning_Method_Consumes_ReturnValue()
+    {
+        var instance = new SyncReturningBenchmarks();
+        var method = TestReflectionHelper.ResolveMethod(typeof(SyncReturningBenchmarks), nameof(SyncReturningBenchmarks.Compute));
+        var envelope = BenchmarkEnvelope.FromDiscovered(method, nameof(SyncReturningBenchmarks), () => instance);
+
+        var outcome = await envelope.RunAsync(new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                Iterations = 3,
+                WarmupIterations = 1,
+                OpsPerSample = 1,
+                OutlierMode = OutlierMode.None,
+            },
+        }, CancellationToken.None);
+
+        Assert.False(outcome.Result.Errored);
+        Assert.True(instance.InvocationCount > 0,
+            $"Sync-returning method was not invoked. JIT may have elided the computation.");
+    }
+
     private static RunSpec MinimalSpec() => new()
     {
         Options = new MeasurementOptions { Iterations = 0, WarmupIterations = 0 },
@@ -126,6 +149,18 @@ public class EnvelopeTests
 
         [Benchmark(Iterations = 2, WarmupIterations = 3)]
         public void Work() => InvocationCount++;
+    }
+
+    private sealed class SyncReturningBenchmarks
+    {
+        public int InvocationCount;
+
+        [Benchmark(Iterations = 3, WarmupIterations = 1)]
+        public int Compute()
+        {
+            InvocationCount++;
+            return 42;
+        }
     }
 }
 

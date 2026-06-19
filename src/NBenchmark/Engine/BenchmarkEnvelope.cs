@@ -113,7 +113,8 @@ internal sealed record BenchmarkEnvelope(
     }
 
     var sd = syncDel!;
-    var syncBody = () => sd(instance);
+    var consumer = BenchmarkRunner.GetResultConsumer<object?>();
+    var syncBody = () => consumer(sd(instance));
     return Task.FromResult(BenchmarkRunner.Instance.Run(name, syncBody, spec, ct));
     }
 }
