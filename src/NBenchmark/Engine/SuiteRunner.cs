@@ -66,12 +66,14 @@ internal static class SuiteRunner
                     envelope.Categories);
             }
 
-            results.Add(outcome.Result);
+            var completedResult = outcome.Result with { ParameterSet = envelope.ParameterSet };
+
+            results.Add(completedResult);
             rawSamples[envelope.Name] = outcome.RawSamples;
 
-            await progress.OnBenchmarkCompleted(outcome.Result).ConfigureAwait(false);
+            await progress.OnBenchmarkCompleted(completedResult).ConfigureAwait(false);
 
-            if (ShouldForceGcBetweenBenchmarks(spec.Options, outcome.Result))
+            if (ShouldForceGcBetweenBenchmarks(spec.Options, completedResult))
                 ForceFullGc();
         }
 

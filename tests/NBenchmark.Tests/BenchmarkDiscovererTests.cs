@@ -177,8 +177,8 @@ public class BenchmarkDiscovererTests
 
         var compute = suite.Benchmarks.Where(b => b.Method.Name == "Compute").ToList();
         Assert.Equal(2, compute.Count);
-        Assert.Equal("Compute(100)", compute[0].DisplayName);
-        Assert.Equal("Compute(1000)", compute[1].DisplayName);
+        Assert.Equal("Compute(n=100)", compute[0].DisplayName);
+        Assert.Equal("Compute(n=1000)", compute[1].DisplayName);
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public class BenchmarkDiscovererTests
     {
         var suites = new BenchmarkDiscoverer().Discover(typeof(ParametricBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
-        var benchmark = suite.Benchmarks.First(b => b.DisplayName == "Compute(1000)");
+        var benchmark = suite.Benchmarks.First(b => b.DisplayName == "Compute(n=1000)");
 
         var result = benchmark.SyncDelegate!(new ParametricBenchmarks());
         Assert.Equal(1000, result);
@@ -199,7 +199,7 @@ public class BenchmarkDiscovererTests
         var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
 
         var concat = suite.Benchmarks.First(b => b.Method.Name == "Concat");
-        Assert.Equal("Concat(\"a\", 3)", concat.DisplayName);
+        Assert.Equal("Concat(value=\"a\", times=3)", concat.DisplayName);
 
         var result = concat.SyncDelegate!(new ParametricBenchmarks());
         Assert.Equal("aaa", result);
@@ -279,6 +279,51 @@ public class BenchmarkDiscovererTests
             new BenchmarkDiscoverer().Discover(typeof(ParamSourceCasesBenchmarks)));
 
         Assert.Contains("no parameters", ex.Message);
+    }
+
+    [Fact]
+    public void BaselineParametric_All_Cases_Share_Baseline_Flag()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(BaselineParametricBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(BaselineParametricBenchmarks));
+
+        var compute = suite.Benchmarks.Where(b => b.Method.Name == "Compute").ToList();
+        Assert.Equal(2, compute.Count);
+        Assert.All(compute, b => Assert.True(b.IsBaseline));
+
+        var multiply = suite.Benchmarks.Where(b => b.Method.Name == "Multiply").ToList();
+        Assert.Equal(2, multiply.Count);
+        Assert.All(multiply, b => Assert.True(b.IsBaseline));
+    }
+
+    [Fact]
+    public void BenchmarkCase_Definition_Includes_ParameterSet()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParametricBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
+
+        var compute100 = suite.Benchmarks.First(b => b.DisplayName == "Compute(n=100)");
+        Assert.Single(compute100.ParameterSet);
+        Assert.Equal("n", compute100.ParameterSet[0].Name);
+        Assert.Equal(100, compute100.ParameterSet[0].Value);
+
+        var compute1000 = suite.Benchmarks.First(b => b.DisplayName == "Compute(n=1000)");
+        Assert.Single(compute1000.ParameterSet);
+        Assert.Equal(1000, compute1000.ParameterSet[0].Value);
+    }
+
+    [Fact]
+    public void BenchmarkCases_Definition_Includes_ParameterSet()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(ParametricBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
+
+        var multiply = suite.Benchmarks.First(b => b.DisplayName == "Multiply(a=2, b=3)");
+        Assert.Equal(2, multiply.ParameterSet.Count);
+        Assert.Equal("a", multiply.ParameterSet[0].Name);
+        Assert.Equal(2, multiply.ParameterSet[0].Value);
+        Assert.Equal("b", multiply.ParameterSet[1].Name);
+        Assert.Equal(3, multiply.ParameterSet[1].Value);
     }
 
     [Fact]
@@ -551,5 +596,23 @@ public class UnnamedTupleCaseBenchmarks
     {
         yield return (1, 2);
         yield return (3, 4);
+    }
+}
+
+public class BaselineParametricBenchmarks
+{
+    [BenchmarkCase(10)]
+    [BenchmarkCase(100)]
+    [Benchmark(Baseline = true)]
+    public int Compute(int n) => n;
+
+    [BenchmarkCases(nameof(Sizes))]
+    [Benchmark(Baseline = true)]
+    public int Multiply(int a, int b) => a * b;
+
+    public static IEnumerable<(int a, int b)> Sizes()
+    {
+        yield return (2, 3);
+        yield return (5, 7);
     }
 }

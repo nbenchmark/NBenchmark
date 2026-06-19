@@ -129,7 +129,7 @@ public sealed class BenchmarkDiscoverer
                     + "but takes no parameters.");
             }
 
-            yield return CreateDefinition(method, attribute, method.Name, null,
+            yield return CreateDefinition(method, attribute, method.Name, null, null,
                 iterSetupDel, iterTeardownDel, classCategories, isBaseline: attribute.Baseline);
 
             yield break;
@@ -147,7 +147,6 @@ public sealed class BenchmarkDiscoverer
         }
 
         var methodIsBaseline = attribute.Baseline;
-        var caseIndex = 0;
 
         if (caseAttributes.Length == 0)
         {
@@ -159,11 +158,13 @@ public sealed class BenchmarkDiscoverer
                     + "Add one [BenchmarkCase(...)] per argument set, or remove the parameters.");
             }
 
-            yield return CreateDefinition(method, attribute, method.Name, null,
+            yield return CreateDefinition(method, attribute, method.Name, null, null,
                 iterSetupDel, iterTeardownDel, classCategories, isBaseline: attribute.Baseline);
 
             yield break;
         }
+
+        var paramNames = parameters.Select(p => p.Name!).ToArray();
 
         foreach (var caseAttr in caseAttributes)
         {
@@ -180,12 +181,10 @@ public sealed class BenchmarkDiscoverer
             // Display names use converted values so coerced types (e.g. DayOfWeek from int)
             // render as their enum names rather than raw numeric literals.
             var converted = ConvertArguments(rawArgs, parameters);
-            var displayName = BuildDisplayName(method.Name, null, converted);
+            var displayName = BuildDisplayName(method.Name, paramNames, converted);
 
-            yield return CreateDefinition(method, attribute, displayName, converted,
-                iterSetupDel, iterTeardownDel, classCategories, isBaseline: methodIsBaseline && caseIndex == 0);
-
-            caseIndex++;
+            yield return CreateDefinition(method, attribute, displayName, converted, paramNames,
+                iterSetupDel, iterTeardownDel, classCategories, isBaseline: methodIsBaseline);
         }
     }
 
@@ -201,17 +200,14 @@ public sealed class BenchmarkDiscoverer
         var source = ResolveCaseSource(method, casesAttribute);
         var tuples = MaterialiseCaseTuples(method, source, parameters);
         var methodIsBaseline = benchmarkAttr.Baseline;
-        var caseIndex = 0;
 
         foreach (var (rawValues, paramNames) in tuples)
         {
             var converted = ConvertArguments(rawValues, parameters);
             var displayName = BuildDisplayName(method.Name, paramNames, converted);
 
-            yield return CreateDefinition(method, benchmarkAttr, displayName, converted,
-                iterSetupDel, iterTeardownDel, classCategories, isBaseline: methodIsBaseline && caseIndex == 0);
-
-            caseIndex++;
+            yield return CreateDefinition(method, benchmarkAttr, displayName, converted, paramNames,
+                iterSetupDel, iterTeardownDel, classCategories, isBaseline: methodIsBaseline);
         }
     }
 
@@ -451,6 +447,7 @@ public sealed class BenchmarkDiscoverer
         BenchmarkAttribute attribute,
         string displayName,
         object?[]? arguments,
+        string[]? paramNames,
         Action<object>? iterSetupDel,
         Action<object>? iterTeardownDel,
         IReadOnlyList<string> classCategories,
@@ -493,6 +490,8 @@ public sealed class BenchmarkDiscoverer
                 : BuildArgumentBoundSyncDelegate(method, arguments);
         }
 
+        var parameterSet = BuildParameterSet(paramNames, arguments);
+
         return new BenchmarkMethodDefinition(method, attribute)
         {
             DisplayName = displayName,
@@ -504,7 +503,24 @@ public sealed class BenchmarkDiscoverer
             Isolation = ResolveIsolationMode(method),
             Categories = MergeCategories(classCategories, ResolveCategories(method)),
             IsBaseline = isBaseline,
+            ParameterSet = parameterSet,
         };
+    }
+
+    private static IReadOnlyList<BenchmarkParameter> BuildParameterSet(string[]? paramNames, object?[]? arguments)
+    {
+        if (arguments is null || arguments.Length == 0)
+            return [];
+
+        var result = new BenchmarkParameter[arguments.Length];
+
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            var name = paramNames is not null && i < paramNames.Length ? paramNames[i] : $"arg{i}";
+            result[i] = new BenchmarkParameter(name, arguments[i]);
+        }
+
+        return result;
     }
 
     private static IsolationMode ResolveIsolationMode(MethodInfo method)

@@ -35,9 +35,9 @@ var results = await new BenchmarkSuite("sorting")
     .RunAsync();
 
 // Produces three benchmarks:
-//   sort (size=10)
-//   sort (size=100)
-//   sort (size=1000)
+//   sort(size=10)
+//   sort(size=100)
+//   sort(size=1000)
 ```
 
 The `Add` lambda accepts one parameter whose type matches the `WithParameter` type argument. Return a value to prevent dead-code elimination:
@@ -59,10 +59,10 @@ var results = await new BenchmarkSuite("matrix")
     .RunAsync();
 
 // Produces four benchmarks:
-//   allocate (rows=10, cols=5)
-//   allocate (rows=10, cols=50)
-//   allocate (rows=100, cols=5)
-//   allocate (rows=100, cols=50)
+//   allocate(rows=10, cols=5)
+//   allocate(rows=10, cols=50)
+//   allocate(rows=100, cols=5)
+//   allocate(rows=100, cols=50)
 ```
 
 Multi-parameter `Add` overloads accept up to three lambda parameters:
@@ -101,8 +101,8 @@ var results = await new BenchmarkSuite("mixed")
 
 // Produces three benchmarks:
 //   plain
-//   param (size=10)
-//   param (size=100)
+//   param(size=10)
+//   param(size=100)
 ```
 
 ## Supported parameter types
@@ -129,7 +129,7 @@ var results = await new BenchmarkSuite("search")
     .WithBaseline("linear")
     .RunAsync();
 
-// "linear (size=10)" and "linear (size=100)" are both baselines.
+// "linear(size=10)" and "linear(size=100)" are both baselines.
 // Significance is computed separately within each parameter group.
 ```
 
@@ -151,7 +151,7 @@ var results = await new BenchmarkSuite("search")
     .WithCategoryFilter(include: ["Smart"])
     .RunAsync();
 
-// Only runs "binary (size=10)" and "binary (size=100)"
+// Only runs "binary(size=10)" and "binary(size=100)"
 ```
 
 Categories on parameterized benchmarks work identically to categories on non-parameterized benchmarks. See [Categories](./categories.md) for the full filtering model.
@@ -161,7 +161,7 @@ Categories on parameterized benchmarks work identically to categories on non-par
 Each expanded name must be unique. Duplicate parameter values produce duplicate names and throw `ArgumentException` at run time:
 
 ```csharp
-// This throws ArgumentException: "sort (size=10)" appears twice
+// This throws ArgumentException: "sort(size=10)" appears twice
 suite.WithParameter("size", 10, 10)
      .Add("sort", (int size) => Sort(size));
 ```
@@ -209,7 +209,7 @@ public class SortingBenchmarks
 }
 ```
 
-Each case becomes a separate benchmark entry named `Sort(10)`, `Sort(1000)`, `Sort(100000)`. Multi-parameter methods use positional arguments:
+Each case becomes a separate benchmark entry named `Sort(n=10)`, `Sort(n=1000)`, `Sort(n=100000)`. Multi-parameter methods use method-parameter names in the display name:
 
 ```csharp
 [BenchmarkCase(100, "asc")]
@@ -224,7 +224,7 @@ public void Sort(int count, string order)
         : Enumerable.Range(0, count).ToArray();
     Array.Sort(data);
 }
-// Names: Sort(100, "asc"), Sort(100, "desc"), Sort(10000, "asc"), Sort(10000, "desc")
+// Names: Sort(count=100, order="asc"), Sort(count=100, order="desc"), Sort(count=10000, order="asc"), Sort(count=10000, order="desc")
 ```
 
 ### `[BenchmarkCases]` - programmatic case sources
@@ -267,7 +267,7 @@ The two attributes are mutually exclusive on a method. Use one or the other.
 
 ### Baselines in host mode
 
-When `[Benchmark(Baseline = true)]` is applied to a parameterized method, only the **first** case is marked as baseline. The others are compared against it:
+When `[Benchmark(Baseline = true)]` is applied to a parameterized method, **all** expanded cases from that method are marked as baseline:
 
 ```csharp
 [BenchmarkCase(10)]
@@ -283,14 +283,14 @@ public void BinarySearch(int size) => Search(size);
 
 ### Significance in host mode
 
-Host mode computes significance **per class** across all discovered benchmarks in that class, including all expanded cases. There is no per-parameter-group grouping. If you need per-parameter significance, use suite mode with `WithParameter`.
+Host mode computes significance **per class**. When a class has parameterized results, comparisons are grouped by `ParameterSet`, so each parameter combination is tested independently. Non-parameterized results in the same class form their own group.
 
 ### Host mode filtering
 
 Use `--filter` on the CLI to select specific cases by display name:
 
 ```bash
-dotnet run -- --filter "Sort*100*"   # runs Sort(100) and Sort(100000)
+dotnet run -- --filter "Sort*100*"   # runs Sort(n=100) and Sort(n=100000)
 ```
 
 ## Accessing results
@@ -315,7 +315,7 @@ foreach (var r in results)
 
 ### Host mode
 
-Each case is a separate `BenchmarkResult` with the display name in the `Name` property:
+Each case is a separate `BenchmarkResult` with the display name in the `Name` property and structured values in `ParameterSet`:
 
 ```csharp
 var results = await BenchmarkHost.Create(args)
@@ -323,11 +323,12 @@ var results = await BenchmarkHost.Create(args)
     .RunAsync();
 
 foreach (var r in results)
+{
     Console.WriteLine($"{r.Name}: {r.Median:F0} ns");
-    // Names like "Sort(10)", "Sort(1000)", "Sort(100000)"
+    // Names like "Sort(n=10)", "Sort(n=1000)", "Sort(n=100000)"
+    // r.ParameterSet carries the parsed parameter names and values.
+}
 ```
-
-Host mode results do not populate `ParameterSet` - the parameter values are baked into the display name instead.
 
 ## Suite vs. host mode comparison
 
@@ -335,11 +336,11 @@ Host mode results do not populate `ParameterSet` - the parameter values are bake
 |---|---|---|
 | Declaration | Fluent lambda + `WithParameter` call | Attribute on method |
 | Parameter types | Primitives, enums, strings, null | Any type matching method signature |
-| Multi-parameter | `WithParameter<T1, T2>` / `WithParameter<T1, T2, T3>` | Positional args or named tuples |
-| Display name | `sort (size=10)` | `Sort(10)` or `Sort(Count=10, Order="asc")` |
-| Significance | Per-parameter-group | Per-class (all cases) |
-| Per-case baseline | All expanded variants share baseline flag | First case is baseline |
-| Result metadata | `ParameterSet` property on `BenchmarkResult` | Values in display name only |
+| Multi-parameter | `WithParameter<T1, T2>` / `WithParameter<T1, T2, T3>` | Method parameter names or named tuples |
+| Display name | `sort(size=10)` | `Sort(n=10)` or `Sort(count=10, order="asc")` |
+| Significance | Per-parameter-group | Per-parameter-group within each class |
+| Per-case baseline | All expanded variants share baseline flag | All expanded variants share baseline flag |
+| Result metadata | `ParameterSet` property on `BenchmarkResult` | `ParameterSet` property on `BenchmarkResult` |
 | CLI filtering | N/A (programmatic only) | `--filter` by display name |
 
 ## Next steps

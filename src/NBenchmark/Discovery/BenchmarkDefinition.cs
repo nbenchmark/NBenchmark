@@ -32,8 +32,8 @@ public sealed record BenchmarkMethodDefinition(
     }
 
     /// <summary>
-    ///     Whether this specific expanded case is the baseline. For parametric benchmarks
-    ///     this is true only for the first case when the method is marked
+    ///     Whether this benchmark is the baseline. For parametric benchmarks all expanded
+    ///     cases share the baseline flag when the method is marked
     ///     <c>[Benchmark(Baseline = true)]</c>.
     /// </summary>
     public bool IsBaseline { get; init; }
@@ -56,6 +56,12 @@ public sealed record BenchmarkMethodDefinition(
     ///     <see cref="BenchmarkCategoryAttribute" />, merged by union.
     /// </summary>
     public IReadOnlyList<string> Categories { get; init; } = [];
+
+    /// <summary>
+    ///     The parameter values for this expanded case, if part of a parameterised benchmark.
+    ///     Empty when no parameters were defined.
+    /// </summary>
+    public IReadOnlyList<BenchmarkParameter> ParameterSet { get; init; } = [];
 }
 
 /// <summary>

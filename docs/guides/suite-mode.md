@@ -184,7 +184,7 @@ await new BenchmarkSuite("sorting")
 
 ## Parameterized benchmarks
 
-Use `WithParameter` and typed `Add` overloads to run the same benchmark body across multiple input values. Each parameter combination produces a separate benchmark entry with a distinct name like `"sort (size=10)"`. See [Parameterized benchmarks](./parameterized-benchmarks.md) for the full guide.
+Use `WithParameter` and typed `Add` overloads to run the same benchmark body across multiple input values. Each parameter combination produces a separate benchmark entry with a distinct name like `"sort(size=10)"`. See [Parameterized benchmarks](./parameterized-benchmarks.md) for the full guide.
 
 ```csharp
 var results = await new BenchmarkSuite("sorting")
