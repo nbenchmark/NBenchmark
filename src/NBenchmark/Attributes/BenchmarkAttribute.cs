@@ -9,7 +9,9 @@ public sealed class BenchmarkAttribute : Attribute
     public bool Baseline { get; set; }
     public int Iterations { get; set; } = Unset;
     public int WarmupIterations { get; set; } = Unset;
+    public int LaunchCount { get; set; } = Unset;
 
     public bool HasIterationsOverride => Iterations >= 0;
     public bool HasWarmupIterationsOverride => WarmupIterations >= 0;
+    public bool HasLaunchCountOverride => LaunchCount >= 0;
 }

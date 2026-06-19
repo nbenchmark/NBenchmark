@@ -518,6 +518,61 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_LaunchCount_ParsesValidValue()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--launch-count", "5"]);
+
+        Assert.Empty(errors);
+        Assert.Equal(5, result.LaunchCount);
+    }
+
+    [Fact]
+    public void ParseCore_LaunchCount_MinimumValue()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--launch-count", "1"]);
+
+        Assert.Empty(errors);
+        Assert.Equal(1, result.LaunchCount);
+    }
+
+    [Fact]
+    public void ParseCore_LaunchCount_MaximumValue()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--launch-count", "100"]);
+
+        Assert.Empty(errors);
+        Assert.Equal(100, result.LaunchCount);
+    }
+
+    [Fact]
+    public void ParseCore_LaunchCount_OutOfRange_Errors()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--launch-count", "101"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Contains("launch-count", errors[0], StringComparison.OrdinalIgnoreCase);
+        Assert.Null(result.LaunchCount);
+    }
+
+    [Fact]
+    public void ParseCore_LaunchCount_Zero_Errors()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--launch-count", "0"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.LaunchCount);
+    }
+
+    [Fact]
+    public void ParseCore_LaunchCount_NonNumeric_Errors()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--launch-count", "abc"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.LaunchCount);
+    }
+
+    [Fact]
     public void PrintHelp_WritesUsageToStdout()
     {
         var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp());

@@ -22,6 +22,7 @@ public class MeasurementOptionsTests
         Assert.True(opts.EnableSignificance);
         Assert.Equal(0.05, opts.SignificanceLevel);
         Assert.Null(opts.MinimumPracticalEffect);
+        Assert.Equal(1, opts.LaunchCount);
     }
 
     [Fact]

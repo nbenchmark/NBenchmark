@@ -24,8 +24,10 @@ internal sealed record BenchmarkEnvelope(
         var categories = method.Categories;
         var attributeIterations = method.Attribute.Iterations;
         var attributeWarmupIterations = method.Attribute.WarmupIterations;
+        var attributeLaunchCount = method.Attribute.LaunchCount;
         var hasIterationsOverride = method.Attribute.HasIterationsOverride;
         var hasWarmupIterationsOverride = method.Attribute.HasWarmupIterationsOverride;
+        var hasLaunchCountOverride = method.Attribute.HasLaunchCountOverride;
         var iterationSetupDel = method.IterationSetupDelegate;
         var iterationTeardownDel = method.IterationTeardownDelegate;
         var asyncDel = method.AsyncDelegate;
@@ -46,6 +48,9 @@ internal sealed record BenchmarkEnvelope(
 
                 if (hasWarmupIterationsOverride)
                     overriddenOptions = overriddenOptions with { WarmupIterations = attributeWarmupIterations };
+
+                if (hasLaunchCountOverride && spec.Options.LaunchCount == 1)
+                    overriddenOptions = overriddenOptions with { LaunchCount = attributeLaunchCount };
 
                 specWithOverride = spec with { Options = overriddenOptions };
             }

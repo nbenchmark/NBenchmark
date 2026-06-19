@@ -8,9 +8,11 @@ public record MeasurementOptions
     public const int MaxIterations = 100_000;
     public const int MaxWarmupIterations = 10_000;
     public const int MaxOpsPerSampleLimit = 1 << 24;
+    public const int MaxLaunchCount = 100;
     public static readonly MeasurementOptions Default = new();
     private readonly double _confidenceLevel = 0.95;
     private readonly int? _iterations;
+    private readonly int _launchCount = 1;
     private readonly double? _minimumPracticalEffect;
     private readonly int? _opsPerSample;
     private readonly double _significanceLevel = 0.05;
@@ -188,6 +190,27 @@ public record MeasurementOptions
             }
 
             _minimumPracticalEffect = delta;
+        }
+    }
+
+    /// <summary>
+    ///     Number of times to repeat the benchmark as separate launches.
+    ///     1 (default) runs the benchmark once. Higher values trigger per-launch
+    ///     aggregation and populate <see cref="BenchmarkResult.LaunchStatistics" />.
+    ///     Must be between 1 and <see cref="MaxLaunchCount" />.
+    /// </summary>
+    public int LaunchCount
+    {
+        get => _launchCount;
+        init
+        {
+            if (value is < 1 or > MaxLaunchCount)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    $"LaunchCount must be between 1 and {MaxLaunchCount}.");
+            }
+
+            _launchCount = value;
         }
     }
 

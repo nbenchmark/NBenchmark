@@ -469,15 +469,46 @@ public sealed class BenchmarkHost
                 .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
                 .ToList();
 
-            var (results, samples) = await SuiteRunner.RunAsync(
-                envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                startIndex, totalBenchmarks, _progress, cancellationToken).ConfigureAwait(false);
+            var effectiveClassLaunchCount = suiteOptions.LaunchCount;
 
-            allResults.AddRange(results);
-
-            foreach (var kvp in samples)
+            foreach (var b in suite.Benchmarks)
             {
-                rawSamples[kvp.Key] = kvp.Value;
+                if (b.Attribute.HasLaunchCountOverride && b.Attribute.LaunchCount > effectiveClassLaunchCount)
+                    effectiveClassLaunchCount = b.Attribute.LaunchCount;
+            }
+
+            if (effectiveClassLaunchCount > 1)
+            {
+                var allLaunchResults = new List<IReadOnlyList<BenchmarkResult>>();
+                var allLaunchSamples = new List<Dictionary<string, double[]>>();
+
+                for (var launchIdx = 0; launchIdx < effectiveClassLaunchCount; launchIdx++)
+                {
+                    var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+                    var (results, samples) = await SuiteRunner.RunAsync(
+                        envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                        startIndex, totalBenchmarks, progress, cancellationToken).ConfigureAwait(false);
+
+                    allLaunchResults.Add(results);
+                    allLaunchSamples.Add(samples);
+                }
+
+                var aggregated = AggregateInProcessLaunches(allLaunchResults, allLaunchSamples);
+                allResults.AddRange(aggregated.Results);
+
+                foreach (var kvp in aggregated.Samples)
+                    rawSamples[kvp.Key] = kvp.Value;
+            }
+            else
+            {
+                var (results, samples) = await SuiteRunner.RunAsync(
+                    envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                    startIndex, totalBenchmarks, _progress, cancellationToken).ConfigureAwait(false);
+
+                allResults.AddRange(results);
+
+                foreach (var kvp in samples)
+                    rawSamples[kvp.Key] = kvp.Value;
             }
         }
         finally
@@ -532,15 +563,47 @@ public sealed class BenchmarkHost
                 var factory = () => instance;
                 var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
 
-                var (results, samples) = await SuiteRunner.RunAsync(
-                    [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                    startIndex, totalBenchmarks, _progress, cancellationToken).ConfigureAwait(false);
+                var perMethodLaunchCount = benchmark.Attribute.HasLaunchCountOverride
+                    ? benchmark.Attribute.LaunchCount
+                    : suiteOptions.LaunchCount;
 
-                allResults.AddRange(results);
-
-                foreach (var kvp in samples)
+                if (perMethodLaunchCount > 1)
                 {
-                    rawSamples[kvp.Key] = kvp.Value;
+                    var perLaunchResults = new List<BenchmarkResult>();
+                    var perLaunchSamples = new List<Dictionary<string, double[]>>();
+
+                    for (var launchIdx = 0; launchIdx < perMethodLaunchCount; launchIdx++)
+                    {
+                        var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+                        var (results, samples) = await SuiteRunner.RunAsync(
+                            [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                            startIndex, totalBenchmarks, progress, cancellationToken).ConfigureAwait(false);
+
+                        perLaunchResults.AddRange(results);
+                        perLaunchSamples.Add(samples);
+                    }
+
+                    var stats = LaunchAggregator.Aggregate(perLaunchResults);
+                    var best = LaunchAggregator.BestLaunch(perLaunchResults);
+                    allResults.Add(best with { LaunchStatistics = stats });
+
+                    var bestIndex = perLaunchResults.IndexOf(best);
+                    if (bestIndex >= 0 && bestIndex < perLaunchSamples.Count)
+                    {
+                        foreach (var kvp in perLaunchSamples[bestIndex])
+                            rawSamples[kvp.Key] = kvp.Value;
+                    }
+                }
+                else
+                {
+                    var (results, samples) = await SuiteRunner.RunAsync(
+                        [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                        startIndex, totalBenchmarks, _progress, cancellationToken).ConfigureAwait(false);
+
+                    allResults.AddRange(results);
+
+                    foreach (var kvp in samples)
+                        rawSamples[kvp.Key] = kvp.Value;
                 }
             }
             finally
@@ -550,6 +613,43 @@ public sealed class BenchmarkHost
 
             startIndex++;
         }
+    }
+
+    private static (List<BenchmarkResult> Results, Dictionary<string, double[]> Samples) AggregateInProcessLaunches(
+        IReadOnlyList<IReadOnlyList<BenchmarkResult>> allLaunchResults,
+        IReadOnlyList<Dictionary<string, double[]>> allLaunchSamples)
+    {
+        if (allLaunchResults.Count == 0)
+            return ([], []);
+
+        var names = allLaunchResults[0].Select(r => r.Name).ToList();
+        var aggregated = new List<BenchmarkResult>(names.Count);
+        var samples = new Dictionary<string, double[]>(names.Count);
+
+        foreach (var name in names)
+        {
+            var perLaunch = allLaunchResults
+                .Select(launch => launch.FirstOrDefault(r => r.Name == name))
+                .Where(r => r is not null)
+                .Cast<BenchmarkResult>()
+                .ToList();
+
+            if (perLaunch.Count == 0)
+                continue;
+
+            var stats = LaunchAggregator.Aggregate(perLaunch);
+            var best = LaunchAggregator.BestLaunch(perLaunch);
+            aggregated.Add(best with { LaunchStatistics = stats });
+
+            var bestIndex = perLaunch.IndexOf(best);
+            if (bestIndex >= 0 && bestIndex < allLaunchSamples.Count
+                && allLaunchSamples[bestIndex].TryGetValue(name, out var launchSamples))
+            {
+                samples[name] = launchSamples;
+            }
+        }
+
+        return (aggregated, samples);
     }
 
     private static IReadOnlyList<BenchmarkMethodDefinition> OrderBenchmarksForRun(
@@ -627,6 +727,16 @@ public sealed class BenchmarkHost
         Dictionary<string, double[]> rawSamples,
         CancellationToken cancellationToken)
     {
+        var effectiveLaunchCount = _cliArgs.LaunchCount ?? _options.LaunchCount;
+
+        // Check per-benchmark attribute overrides; take the maximum so all
+        // benchmarks in the group get enough launches for their overrides.
+        foreach (var b in benchmarks)
+        {
+            if (b.Attribute.HasLaunchCountOverride && b.Attribute.LaunchCount > effectiveLaunchCount)
+                effectiveLaunchCount = b.Attribute.LaunchCount;
+        }
+
         for (var i = 0; i < benchmarks.Count; i++)
         {
             var name = $"{suite.Type.Name}.{benchmarks[i].DisplayName}";
@@ -642,7 +752,26 @@ public sealed class BenchmarkHost
             Overrides = MeasurementOverrides.FromCliArgs(_cliArgs),
         };
 
-        var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<IsolatedResultItem> items;
+
+        if (effectiveLaunchCount > 1)
+        {
+            var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
+
+            for (var launchIdx = 0; launchIdx < effectiveLaunchCount; launchIdx++)
+            {
+                var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                    .ConfigureAwait(false);
+                allLaunchItems.Add(launchItems);
+            }
+
+            items = HostAggregateIsolatedLaunches(allLaunchItems, benchmarks, suite);
+        }
+        else
+        {
+            items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+
         var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
 
         foreach (var benchmark in benchmarks)
@@ -675,6 +804,66 @@ public sealed class BenchmarkHost
 
             await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
         }
+    }
+
+    private static IReadOnlyList<IsolatedResultItem> HostAggregateIsolatedLaunches(
+        IReadOnlyList<IReadOnlyList<IsolatedResultItem>> allLaunchItems,
+        IReadOnlyList<BenchmarkMethodDefinition> benchmarks,
+        BenchmarkSuiteDefinition suite)
+    {
+        if (allLaunchItems.Count == 0)
+            return [];
+
+        var aggregated = new List<IsolatedResultItem>();
+
+        foreach (var benchmark in benchmarks)
+        {
+            var name = $"{suite.Type.Name}.{benchmark.DisplayName}";
+            var perLaunchResults = new List<BenchmarkResult>();
+
+            foreach (var launchItems in allLaunchItems)
+            {
+                var match = launchItems.FirstOrDefault(item => item.Result.Name == name);
+                if (match is not null)
+                    perLaunchResults.Add(match.Result);
+            }
+
+            if (perLaunchResults.Count == 0)
+            {
+                var message = $"Isolated child did not return a result for '{name}' in any launch.";
+                aggregated.Add(new IsolatedResultItem
+                {
+                    Result = OutcomeBuilder.Build(
+                        new RunOutcome.Errored(new InvalidOperationException(message), message),
+                        name, suite.Type.Name, benchmark.Attribute.Description, benchmark.IsBaseline,
+                        new MeasurementOptions(), TimeSpan.Zero, TimeSpan.Zero, 0, null,
+                        benchmark.Categories).Result,
+                    RawSamples = [],
+                });
+
+                continue;
+            }
+
+            var stats = LaunchAggregator.Aggregate(perLaunchResults);
+            var best = LaunchAggregator.BestLaunch(perLaunchResults);
+            var aggregatedResult = best with { LaunchStatistics = stats };
+
+            var bestIndex = perLaunchResults.IndexOf(best);
+            var rawSamples = bestIndex >= 0 && bestIndex < allLaunchItems.Count
+                ? allLaunchItems[bestIndex]
+                    .Where(item => item.Result.Name == name)
+                    .Select(item => item.RawSamples)
+                    .FirstOrDefault() ?? []
+                : [];
+
+            aggregated.Add(new IsolatedResultItem
+            {
+                Result = aggregatedResult,
+                RawSamples = rawSamples,
+            });
+        }
+
+        return aggregated;
     }
 
     /// <summary>

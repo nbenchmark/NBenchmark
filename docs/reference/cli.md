@@ -326,6 +326,18 @@ dotnet run -- --help
 
 ---
 
+### `--launch-count <n>`
+
+Repeat each benchmark N times as separate launches. Statistics (mean, stddev, median, CI) are computed across launch medians, and the best launch (lowest median) is displayed as the primary result. An aggregation table appears below the main results when `n > 1`. Valid range: `1` to `100`. Default: `1`.
+
+```bash
+dotnet run -- --launch-count 3
+```
+
+When combined with `--dry-run`, exactly one dry launch is performed regardless of the count. When combined with process isolation, the parent spawns N child processes per isolated group.
+
+---
+
 ### `--threshold-pct <n>`
 
 Causes the run to fail with **exit code 1** if any benchmark regresses more than `n`% against the baseline. `n` must be a positive integer (1 or greater). The regression check compares median execution times: a benchmark is considered regressed if `candidate.Median / baseline.Median > 1.0 + (n / 100.0)`.
@@ -343,7 +355,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown reporter name (`--reporter`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown reporter name (`--reporter`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
 When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 
@@ -358,6 +370,9 @@ dotnet run -- --filter Sort* --confidence 0.99
 
 # Reproducible run in declaration order
 dotnet run -- --order declaration --seed 12345
+
+# Run all benchmarks with 3 launches and view cross-launch aggregation
+dotnet run -- --launch-count 3
 
 # Check what will run before committing to a full benchmark
 dotnet run -- --list

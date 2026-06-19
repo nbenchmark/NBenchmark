@@ -239,3 +239,41 @@ What to look at:
 - The quick in-process result.
 - The isolated suite comparison, where the whole suite runs in one fresh child process.
 - The tradeoff between cleaner measurements and additional process-launch overhead.
+
+---
+
+## MultiLaunch - Cross-launch aggregation
+
+**`samples/MultiLaunch/`**
+
+Demonstrates the `--launch-count` / `WithLaunchCount()` / `[Benchmark(LaunchCount)]` feature for running each benchmark multiple times as independent launches, with cross-launch aggregation statistics.
+
+```bash
+cd samples/MultiLaunch
+dotnet run
+dotnet run -- --launch-count 5
+```
+
+```csharp
+using NBenchmark;
+using NBenchmark.Reporters.Console;
+
+// Suite mode: each benchmark runs 3 times
+await new BenchmarkSuite("sleep")
+    .Add("sleep100", () => Task.Delay(1).Wait())
+    .Add("sleep200", () => Task.Delay(2).Wait())
+    .WithBaseline("sleep100")
+    .WithLaunchCount(3)
+    .WithWarmup(5)
+    .WithIterations(30)
+    .WithReporter(new ConsoleReporter())
+    .WithProgress(new ConsoleBenchmarkProgress())
+    .RunAsync();
+```
+
+What to look at:
+
+- The "Launch Aggregation" table below the main results, showing cross-launch mean, stddev, median, and CI when `LaunchCount > 1`.
+- The primary result fields come from the **best** (lowest median) launch, so the main table reflects the most favourable reading.
+- How `--launch-count 5` on the CLI overrides the programmatic count.
+- How the per-method `[Benchmark(LaunchCount = 3)]` attribute specifies different counts per benchmark.
