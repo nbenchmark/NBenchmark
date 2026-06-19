@@ -199,7 +199,7 @@ public class BenchmarkDiscovererTests
         var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
 
         var concat = suite.Benchmarks.First(b => b.Method.Name == "Concat");
-        Assert.Equal("Concat(value=\"a\", times=3)", concat.DisplayName);
+        Assert.Equal("Concat(value=a, times=3)", concat.DisplayName);
 
         var result = concat.SyncDelegate!(new ParametricBenchmarks());
         Assert.Equal("aaa", result);
@@ -229,15 +229,15 @@ public class BenchmarkDiscovererTests
     }
 
     [Fact]
-    public void DisplayName_Falls_Back_To_Positional_For_Unnamed_Tuples()
+    public void DisplayName_Falls_Back_To_Method_Parameter_Names_For_Unnamed_Tuples()
     {
         var suites = new BenchmarkDiscoverer().Discover(typeof(UnnamedTupleCaseBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(UnnamedTupleCaseBenchmarks));
 
         var add = suite.Benchmarks.Where(b => b.Method.Name == "Add").ToList();
         Assert.Equal(2, add.Count);
-        Assert.Equal("Add(1, 2)", add[0].DisplayName);
-        Assert.Equal("Add(3, 4)", add[1].DisplayName);
+        Assert.Equal("Add(a=1, b=2)", add[0].DisplayName);
+        Assert.Equal("Add(a=3, b=4)", add[1].DisplayName);
     }
 
     [Fact]

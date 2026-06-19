@@ -896,13 +896,7 @@ public sealed class BenchmarkSuite(string name)
     }
 
     private static string FormatParamDisplayName(string benchmarkName, BenchmarkParameter[] paramSet)
-    {
-        if (paramSet.Length == 1)
-            return $"{benchmarkName}({paramSet[0].Name}={BenchmarkParameter.FormatValue(paramSet[0].Value)})";
-
-        var parts = paramSet.Select(p => $"{p.Name}={BenchmarkParameter.FormatValue(p.Value)}");
-        return $"{benchmarkName}({string.Join(", ", parts)})";
-    }
+        => BenchmarkParameter.FormatDisplayName(benchmarkName, paramSet);
 
     private void ApplyPerParameterSignificance(List<BenchmarkResult> results, Dictionary<string, double[]> rawSamples)
     {

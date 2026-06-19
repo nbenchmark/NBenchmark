@@ -26,6 +26,13 @@ public sealed record BenchmarkTable
     /// </summary>
     public OmnibusComparison? Omnibus { get; init; }
 
+    /// <summary>
+    ///     The ordered set of parameter names present across the rows of this table, when the
+    ///     benchmarks are parameterised; empty otherwise. Reporters render one column per name so a
+    ///     parameter sweep can be read and compared within a single table.
+    /// </summary>
+    public IReadOnlyList<string> ParameterNames { get; init; } = [];
+
     public static BenchmarkTable Build(IReadOnlyList<BenchmarkResult> results)
     {
         var successful = results.Where(r => !r.Errored).ToList();
@@ -44,23 +51,28 @@ public sealed record BenchmarkTable
         if (results.Count == 0)
             return [BuildInternal(results, null, false)];
 
-        // When results have parameter sets, group by parameter set first, then by class
-        if (results.Any(r => r.ParameterSet.Count > 0))
-            return BuildPerParameterSet(results);
+        var anyParameterised = results.Any(r => r.ParameterSet.Count > 0);
 
         var byClass = results
-            .Select((result, index) => (result, index))
-            .GroupBy(x => x.result.ClassName)
+            .GroupBy(r => r.ClassName)
             .ToList();
 
-        if (byClass.Count <= 1)
+        // Fast path: a single non-parameterised class renders as one flat comparison table.
+        if (!anyParameterised && byClass.Count <= 1)
             return [Build(results)];
 
-        var tables = new List<BenchmarkTable>();
+        var tables = new List<BenchmarkTable>(byClass.Count);
 
         foreach (var group in byClass)
         {
-            var groupResults = group.Select(x => x.result).ToList();
+            var groupResults = group.ToList();
+
+            if (groupResults.Any(r => r.ParameterSet.Count > 0))
+            {
+                tables.Add(BuildParameterised(groupResults));
+                continue;
+            }
+
             var successful = groupResults.Where(r => !r.Errored).ToList();
             var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
             tables.Add(BuildInternal(groupResults, baseline, groupResults.Count > 1));
@@ -69,39 +81,76 @@ public sealed record BenchmarkTable
         return tables;
     }
 
-    public static IReadOnlyList<BenchmarkTable> BuildPerParameterSet(IReadOnlyList<BenchmarkResult> results)
+    /// <summary>
+    ///     Builds a single comparison table for a parameterised benchmark group (one class in host
+    ///     mode, or the whole suite in suite mode). Parameter values become columns; rows are grouped
+    ///     by parameter set in first-appearance order and ordered by median within each group, with
+    ///     the baseline, ratio and significance computed independently per parameter group.
+    /// </summary>
+    private static BenchmarkTable BuildParameterised(IReadOnlyList<BenchmarkResult> results)
     {
+        var parameterNames = CollectParameterNames(results);
+
+        // GroupBy preserves first-appearance order of keys, which mirrors expansion order.
         var groups = results
-            .Select((r, i) => (r, i))
-            .GroupBy(x => GetParameterSetDisplayKey(x.r.ParameterSet))
+            .GroupBy(r => BenchmarkParameter.GetKey(r.ParameterSet))
             .ToList();
 
-        var tables = new List<BenchmarkTable>();
+        var rows = new List<BenchmarkRow>(results.Count);
+
+        // A within-group comparison exists only when some parameter group holds two or more
+        // benchmarks (e.g. competing methods measured at the same parameters). When no group
+        // does - a single method swept across parameter values - rank the whole table against
+        // its reference point so the Ratio column conveys the scaling factor across the sweep.
+        var anyGroupComparison = groups.Any(g => g.Count(r => !r.Errored) > 1);
+
+        if (!anyGroupComparison)
+        {
+            var successful = results.Where(r => !r.Errored).ToList();
+            var explicitBaselines = successful.Where(r => r.IsBaseline).ToList();
+
+            // Honour a single explicit baseline; otherwise scale against the fastest point so
+            // ratios read naturally as 1.00x (fastest) up to the slowest parameter value.
+            var reference = explicitBaselines.Count == 1
+                ? explicitBaselines[0]
+                : successful.MinBy(r => r.Median);
+
+            foreach (var result in results.OrderBy(r => r.Median))
+                rows.Add(BuildRow(
+                    result,
+                    reference,
+                    multiBenchmark: false,
+                    comparable: true,
+                    isBaselineOverride: ReferenceEquals(result, reference)));
+
+            return AssembleTable(results, rows, parameterNames);
+        }
 
         foreach (var group in groups)
         {
-            var groupResults = group.Select(x => x.r).ToList();
+            var groupResults = group.ToList();
             var successful = groupResults.Where(r => !r.Errored).ToList();
             var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
-            var table = BuildInternal(groupResults, baseline, groupResults.Count > 1);
+            var multiBenchmark = successful.Count > 1;
 
-            var paramSet = groupResults.FirstOrDefault(r => r.ParameterSet.Count > 0)?.ParameterSet;
-            if (paramSet is { Count: > 0 })
-            {
-                var paramLabel = string.Join(", ", paramSet.Select(p => $"{p.Name}={BenchmarkParameter.FormatValue(p.Value)}"));
-                table = table with
-                {
-                    Rows = table.Rows.Select(r => r with
-                    {
-                        ClassName = paramLabel,
-                    }).ToList(),
-                };
-            }
-
-            tables.Add(table);
+            foreach (var result in groupResults.OrderBy(r => r.Median))
+                rows.Add(BuildRow(result, baseline, multiBenchmark, comparable: multiBenchmark));
         }
 
-        return tables;
+        return AssembleTable(results, rows, parameterNames);
+    }
+
+    private static IReadOnlyList<string> CollectParameterNames(IReadOnlyList<BenchmarkResult> results)
+    {
+        var names = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var result in results)
+            foreach (var parameter in result.ParameterSet)
+                if (seen.Add(parameter.Name))
+                    names.Add(parameter.Name);
+
+        return names;
     }
 
     private static BenchmarkTable BuildInternal(
@@ -109,16 +158,25 @@ public sealed record BenchmarkTable
         BenchmarkResult? baseline,
         bool multiBenchmark)
     {
-        var headerSource = results.FirstOrDefault(r => !r.Errored) ?? results.FirstOrDefault();
-
         var rows = results
             .OrderBy(r => r.Median)
             .Select(r => BuildRow(r, baseline, multiBenchmark))
             .ToList();
 
+        return AssembleTable(results, rows, []);
+    }
+
+    private static BenchmarkTable AssembleTable(
+        IReadOnlyList<BenchmarkResult> results,
+        IReadOnlyList<BenchmarkRow> rows,
+        IReadOnlyList<string> parameterNames)
+    {
+        var headerSource = results.FirstOrDefault(r => !r.Errored) ?? results.FirstOrDefault();
+
         return new BenchmarkTable
         {
             Rows = rows,
+            ParameterNames = parameterNames,
             RunAtUtc = headerSource?.RunAtUtc.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
             WarmupIterations = headerSource?.WarmupIterations ?? 0,
             MeasuredIterations = headerSource?.MeasuredIterations ?? 0,
@@ -132,7 +190,12 @@ public sealed record BenchmarkTable
         };
     }
 
-    private static BenchmarkRow BuildRow(BenchmarkResult result, BenchmarkResult? baseline, bool multiBenchmark)
+    private static BenchmarkRow BuildRow(
+        BenchmarkResult result,
+        BenchmarkResult? baseline,
+        bool multiBenchmark,
+        bool comparable = true,
+        bool? isBaselineOverride = null)
     {
         return new BenchmarkRow
         {
@@ -149,8 +212,8 @@ public sealed record BenchmarkTable
             CoefficientOfVariation = result.CoefficientOfVariation,
             P95 = result.P95,
             P99 = result.P99,
-            Ratio = ComputeRatio(result, baseline),
-            IsBaseline = result.IsBaseline,
+            Ratio = comparable ? ComputeRatio(result, baseline) : double.NaN,
+            IsBaseline = comparable && (isBaselineOverride ?? result.IsBaseline),
             Errored = result.Errored,
             ErrorMessage = result.ErrorMessage,
             MeanAllocatedBytes = result.MeanAllocatedBytes,
@@ -182,7 +245,20 @@ public sealed record BenchmarkTable
             CoefficientOfVariationPercent = result.CoefficientOfVariationPercent,
             AutoTune = result.AutoTune,
             Categories = result.Categories,
+            ParameterSet = result.ParameterSet,
+            BaseName = ComputeBaseName(result),
         };
+    }
+
+    private static string ComputeBaseName(BenchmarkResult result)
+    {
+        if (result.ParameterSet.Count == 0)
+            return result.Name;
+
+        var suffix = $"({BenchmarkParameter.FormatLabel(result.ParameterSet)})";
+        return result.Name.EndsWith(suffix, StringComparison.Ordinal)
+            ? result.Name[..^suffix.Length]
+            : result.Name;
     }
 
     private static double ComputeRatio(BenchmarkResult result, BenchmarkResult? baseline)
@@ -199,14 +275,6 @@ public sealed record BenchmarkTable
             return "";
 
         return result.SignificanceVerdict == SignificanceVerdict.Significant ? "✓" : "✗";
-    }
-
-    private static string GetParameterSetDisplayKey(IReadOnlyList<BenchmarkParameter> paramSet)
-    {
-        if (paramSet.Count == 0)
-            return "";
-
-        return string.Join(", ", paramSet.Select(p => $"{p.Name}={BenchmarkParameter.FormatValue(p.Value)}"));
     }
 
     public static string RenderStatsBlock(BenchmarkRow row, ReportDetail detail)
@@ -298,6 +366,17 @@ public record BenchmarkRow
 {
     public required string Name { get; init; }
     public string ClassName { get; init; } = "";
+
+    /// <summary>
+    ///     The benchmark name with any parameter suffix removed (e.g. <c>Sort</c> for
+    ///     <c>Sort(size=10)</c>). Equal to <see cref="Name" /> for non-parameterised benchmarks.
+    ///     Reporters show this in the Benchmark column while parameter values appear as columns.
+    /// </summary>
+    public string BaseName { get; init; } = "";
+
+    /// <summary>The parameter set for this row; empty for non-parameterised benchmarks.</summary>
+    public IReadOnlyList<BenchmarkParameter> ParameterSet { get; init; } = [];
+
     public string? Description { get; init; }
     public required double Median { get; init; }
     public required double Mean { get; init; }

@@ -8,8 +8,11 @@ using NBenchmark.Reporters.Console;
 // Use [BenchmarkCase(...)] for a short inline list of literal arguments.
 // Use [BenchmarkCases(nameof(Source))] for programmatic, named, or generated cases.
 //
-// In Host mode each discovered class gets its own baseline and its own comparison
-// table, so related benchmarks should live in the same class.
+// In Host mode each class renders as a single comparison table: parameter values
+// become columns. When competing benchmarks share a parameter group the baseline,
+// ratio and significance are computed per group; when a single method is swept the
+// Ratio column shows each point's scaling factor against the fastest point. Keep
+// related benchmarks in the same class so they share a table.
 //
 // Run with: dotnet run --project samples/Parametric -- --list
 // Run with: dotnet run --project samples/Parametric -- --filter "*LinearSearch*"

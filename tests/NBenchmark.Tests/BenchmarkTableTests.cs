@@ -685,4 +685,235 @@ public class BenchmarkTableTests
         Assert.Equal("Kruskal-Wallis", table.Omnibus!.TestName);
         Assert.Equal(3, table.Omnibus.GroupCount);
     }
+
+    [Fact]
+    public void BuildPerClass_NonParameterised_ReturnsOneTablePerClass()
+    {
+        var results = new[]
+        {
+            R("ClassA", "M1", 100),
+            R("ClassA", "M2", 200),
+            R("ClassB", "M1", 150),
+        };
+
+        var tables = BenchmarkTable.BuildPerClass(results);
+
+        Assert.Equal(2, tables.Count);
+        Assert.All(tables, t => Assert.Empty(t.ParameterNames));
+        Assert.Equal(2, tables[0].Rows.Count);
+        Assert.Single(tables[1].Rows);
+    }
+
+    [Fact]
+    public void BuildPerClass_ParameterisedClass_RendersSingleTableWithParameterColumns()
+    {
+        var results = new[]
+        {
+            R("Sweep", "Sort", 100, [P("size", 10)], baseline: true),
+            R("Sweep", "Sort", 200, [P("size", 100)]),
+            R("Sweep", "Sort", 300, [P("size", 1000)]),
+        };
+
+        var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+
+        Assert.Equal(["size"], table.ParameterNames);
+        Assert.Equal(3, table.Rows.Count);
+        Assert.All(table.Rows, r => Assert.Equal("Sort", r.BaseName));
+
+        // A single method swept across parameter values is ranked against its reference point
+        // (here the explicit baseline at size=10), so the Ratio column shows the scaling factor.
+        var small = Row(table, "Sort", 10);
+        var medium = Row(table, "Sort", 100);
+        var large = Row(table, "Sort", 1000);
+
+        Assert.True(small.IsBaseline);
+        Assert.Equal(1.0, small.Ratio, 6);
+        Assert.False(medium.IsBaseline);
+        Assert.Equal(2.0, medium.Ratio, 6);
+        Assert.False(large.IsBaseline);
+        Assert.Equal(3.0, large.Ratio, 6);
+    }
+
+    [Fact]
+    public void BuildPerClass_SingleMethodSweep_WithoutExplicitBaseline_RanksAgainstFastestPoint()
+    {
+        var results = new[]
+        {
+            R("Sweep", "Hash", 300, [P("size", 1000)]),
+            R("Sweep", "Hash", 100, [P("size", 10)]),
+            R("Sweep", "Hash", 200, [P("size", 100)]),
+        };
+
+        var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+
+        // No explicit baseline and no within-group comparison: the fastest point becomes the
+        // reference (1.00x) and the remaining points report their scaling ratio, regardless of
+        // the order results were supplied in.
+        var fastest = Row(table, "Hash", 10);
+        var mid = Row(table, "Hash", 100);
+        var slowest = Row(table, "Hash", 1000);
+
+        Assert.True(fastest.IsBaseline);
+        Assert.Equal(1.0, fastest.Ratio, 6);
+        Assert.False(mid.IsBaseline);
+        Assert.Equal(2.0, mid.Ratio, 6);
+        Assert.False(slowest.IsBaseline);
+        Assert.Equal(3.0, slowest.Ratio, 6);
+
+        // Significance stays unreported because the engine does not test different workloads
+        // across parameter values against one another.
+        Assert.All(table.Rows, r => Assert.Equal("", r.SignificanceLabel));
+    }
+
+    [Fact]
+    public void BuildPerClass_CollectsParameterNames_InFirstAppearanceOrder()
+    {
+        var results = new[]
+        {
+            R("C", "First", 100, [P("size", 1)]),
+            R("C", "Second", 200, [P("size", 1), P("order", 2)]),
+        };
+
+        var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+
+        Assert.Equal(["size", "order"], table.ParameterNames);
+    }
+
+    [Fact]
+    public void BuildPerClass_ComputesBaselineAndRatio_PerParameterGroup()
+    {
+        var results = new[]
+        {
+            R("Search", "Binary", 100, [P("size", 10)], baseline: true),
+            R("Search", "Linear", 120, [P("size", 10)], significance: SignificanceVerdict.Significant),
+            R("Search", "Binary", 250, [P("size", 100)], baseline: true),
+            R("Search", "Linear", 300, [P("size", 100)], significance: SignificanceVerdict.Significant),
+        };
+
+        var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+
+        var binarySmall = Row(table, "Binary", 10);
+        var linearSmall = Row(table, "Linear", 10);
+        var binaryLarge = Row(table, "Binary", 100);
+        var linearLarge = Row(table, "Linear", 100);
+
+        Assert.True(binarySmall.IsBaseline);
+        Assert.Equal(1.0, binarySmall.Ratio, 6);
+        Assert.Equal(1.2, linearSmall.Ratio, 6);
+
+        Assert.True(binaryLarge.IsBaseline);
+        Assert.Equal(1.0, binaryLarge.Ratio, 6);
+        Assert.Equal(1.2, linearLarge.Ratio, 6);
+
+        // Significance applies within the multi-benchmark group, not to the baseline.
+        Assert.Equal("✓", linearSmall.SignificanceLabel);
+        Assert.Equal("", binarySmall.SignificanceLabel);
+    }
+
+    [Fact]
+    public void BuildPerClass_OrdersGroupsByFirstAppearance_ThenMedianWithinGroup()
+    {
+        var results = new[]
+        {
+            R("Search", "Linear", 120, [P("size", 10)]),
+            R("Search", "Linear", 300, [P("size", 100)]),
+            R("Search", "Binary", 100, [P("size", 10)], baseline: true),
+            R("Search", "Binary", 250, [P("size", 100)], baseline: true),
+        };
+
+        var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+
+        var ordering = table.Rows
+            .Select(r => (r.BaseName, Size: (int)r.ParameterSet.Single(p => p.Name == "size").Value!))
+            .ToArray();
+
+        Assert.Equal(
+            [("Binary", 10), ("Linear", 10), ("Binary", 100), ("Linear", 100)],
+            ordering);
+    }
+
+    [Fact]
+    public void BuildPerClass_MixedPlainAndParameterised_PlainRowHasEmptyParameterSet()
+    {
+        var results = new[]
+        {
+            R("Mix", "Constant", 100, []),
+            R("Mix", "Variable", 200, [P("count", 10)]),
+            R("Mix", "Variable", 400, [P("count", 100)]),
+        };
+
+        var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+
+        Assert.Equal(["count"], table.ParameterNames);
+
+        var plain = Assert.Single(table.Rows, r => r.BaseName == "Constant");
+        Assert.Empty(plain.ParameterSet);
+
+        Assert.All(
+            table.Rows.Where(r => r.BaseName == "Variable"),
+            r => Assert.Single(r.ParameterSet, p => p.Name == "count"));
+    }
+
+    [Fact]
+    public void BuildPerClass_Row_StripsParameterSuffixIntoBaseName_AndCarriesParameterSet()
+    {
+        var results = new[] { R("C", "Sort", 100, [P("size", 10)]) };
+
+        var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+        var row = Assert.Single(table.Rows);
+
+        Assert.Equal("Sort(size=10)", row.Name);
+        Assert.Equal("Sort", row.BaseName);
+        var parameter = Assert.Single(row.ParameterSet);
+        Assert.Equal("size", parameter.Name);
+        Assert.Equal(10, parameter.Value);
+    }
+
+    private static BenchmarkRow Row(BenchmarkTable table, string baseName, int size)
+        => table.Rows.Single(r =>
+            r.BaseName == baseName
+            && r.ParameterSet.Any(p => p.Name == "size" && (int)p.Value! == size));
+
+    private static BenchmarkParameter P(string name, object? value) => new(name, value);
+
+    private static BenchmarkResult R(
+        string className,
+        string baseName,
+        double median,
+        BenchmarkParameter[]? parameters = null,
+        bool baseline = false,
+        SignificanceVerdict significance = SignificanceVerdict.NotTested)
+    {
+        parameters ??= [];
+
+        return new BenchmarkResult
+        {
+            Name = BenchmarkParameter.FormatDisplayName(baseName, parameters),
+            ClassName = className,
+            ParameterSet = parameters,
+            Mean = median,
+            Median = median,
+            P95 = median,
+            P99 = median,
+            Min = median,
+            Max = median,
+            StandardDeviation = 1,
+            MeasuredIterations = 10,
+            WarmupIterations = 5,
+            IsBaseline = baseline,
+            SignificanceVerdict = significance,
+            RunAtUtc = DateTimeOffset.UtcNow,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 0,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
+        };
+    }
 }

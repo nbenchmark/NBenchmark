@@ -114,17 +114,36 @@ public sealed class ConsoleReporter : IReporter
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
 
+        // A ratio is present whenever a row was ranked against a reference - either a competing
+        // benchmark in its parameter group or, for a single method swept across parameter values,
+        // the fastest point in the table. Parametric tables use compact headers to save width.
+        var hasComparisons = benchTable.Rows.Any(r => !r.Errored && !double.IsNaN(r.Ratio));
+        var isParametric = benchTable.ParameterNames.Count > 0;
+        var ratioHeader = isParametric ? "Ratio" : "vs Baseline";
+        var magnitudeHeader = isParametric ? "Mag" : "Magnitude";
+
         var table = new Table()
             .Border(TableBorder.Simple)
             .BorderColor(Color.Grey)
-            .AddColumn(new TableColumn("[bold]Benchmark[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Benchmark[/]").NoWrap());
+
+        foreach (var paramName in benchTable.ParameterNames)
+            table.AddColumn(new TableColumn($"[bold]{Esc(paramName)}[/]").RightAligned().NoWrap());
+
+        table
             .AddColumn(new TableColumn("[bold]Median[/]").RightAligned().NoWrap())
             .AddColumn(new TableColumn("[bold]Mean[/]").RightAligned().NoWrap())
             .AddColumn(new TableColumn("[bold]Ops/s[/]").RightAligned().NoWrap())
-            .AddColumn(new TableColumn("[bold]vs Baseline[/]").NoWrap())
-            .AddColumn(new TableColumn("[bold]Sig[/]").Centered().NoWrap())
-            .AddColumn(new TableColumn("[bold]Magnitude[/]").Centered().NoWrap())
-            .AddColumn(new TableColumn("[bold]Alloc/op[/]").RightAligned().NoWrap());
+            .AddColumn(new TableColumn($"[bold]{(hasComparisons ? ratioHeader : "Scale")}[/]").NoWrap());
+
+        if (hasComparisons)
+        {
+            table
+                .AddColumn(new TableColumn("[bold]Sig[/]").Centered().NoWrap())
+                .AddColumn(new TableColumn($"[bold]{magnitudeHeader}[/]").Centered().NoWrap());
+        }
+
+        table.AddColumn(new TableColumn("[bold]Alloc/op[/]").RightAligned().NoWrap());
 
         if (showCategories)
             table.AddColumn(new TableColumn("[bold]Categories[/]"));
@@ -136,17 +155,21 @@ public sealed class ConsoleReporter : IReporter
 
         foreach (var row in benchTable.Rows)
         {
-            var displayName = !string.IsNullOrEmpty(sectionClassName) && row.Name.StartsWith(sectionClassName + ".", StringComparison.Ordinal)
-                ? row.Name[(sectionClassName.Length + 1)..]
-                : row.Name;
+            var rawName = benchTable.ParameterNames.Count > 0 ? row.BaseName : row.Name;
+            var displayName = !string.IsNullOrEmpty(sectionClassName) && rawName.StartsWith(sectionClassName + ".", StringComparison.Ordinal)
+                ? rawName[(sectionClassName.Length + 1)..]
+                : rawName;
 
             if (row.Errored)
             {
-                var errorCols = new List<string>
-                {
-                    $"[red]✗ {Esc(displayName)}[/]",
-                    "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]",
-                };
+                var errorCols = new List<string> { $"[red]✗ {Esc(displayName)}[/]" };
+                errorCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
+                errorCols.AddRange(["[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]"]);
+
+                if (hasComparisons)
+                    errorCols.AddRange(["[dim]-[/]", "[dim]-[/]"]);
+
+                errorCols.Add("[dim]-[/]");
 
                 if (showCategories)
                     errorCols.Add("[dim]-[/]");
@@ -160,40 +183,48 @@ public sealed class ConsoleReporter : IReporter
 
             var (ratioText, ratioColor) = FormatRatio(row);
 
-            var sigIcon = row.SignificanceLabel switch
-            {
-                "✓" => "[green]✓[/]",
-                "✗" => "[red]✗[/]",
-                _ => "[dim]-[/]",
-            };
-
             var nameText = row.IsBaseline
                 ? $"[bold]{Esc(displayName)}[/] [dim italic](baseline)[/]"
                 : $"[{ratioColor}]{Esc(displayName)}[/]";
 
             var bar = RenderBar(row.Median, maxMedian, ratioColor);
 
-            var ratioAndBar = row.IsBaseline
-                ? $"{bar} [dim]{ratioText}[/]"
-                : $"{bar} [{ratioColor}]{ratioText}[/]";
+            string barCell;
+
+            if (!hasComparisons)
+                barCell = bar;
+            else if (row.IsBaseline)
+                barCell = $"{bar} [dim]{ratioText}[/]";
+            else
+                barCell = $"{bar} [{ratioColor}]{ratioText}[/]";
 
             var allocText = row.MeanAllocatedBytes.HasValue
                 ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
                 : "[dim]-[/]";
 
-            var magnitudeText = RenderMagnitude(row.Effect);
-
-            var rowCols = new List<string>
-            {
-                nameText,
+            var rowCols = new List<string> { nameText };
+            rowCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
+            rowCols.AddRange([
                 $"[bold]{BenchmarkFormatter.FormatNs(row.Median)}[/]",
                 BenchmarkFormatter.FormatNs(row.Mean),
                 BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond),
-                ratioAndBar,
-                sigIcon,
-                magnitudeText,
-                allocText,
-            };
+                barCell,
+            ]);
+
+            if (hasComparisons)
+            {
+                var sigIcon = row.SignificanceLabel switch
+                {
+                    "✓" => "[green]✓[/]",
+                    "✗" => "[red]✗[/]",
+                    _ => "[dim]-[/]",
+                };
+
+                rowCols.Add(sigIcon);
+                rowCols.Add(RenderMagnitude(row.Effect));
+            }
+
+            rowCols.Add(allocText);
 
             if (showCategories)
                 rowCols.Add(row.Categories.Count > 0 ? Esc(string.Join(", ", row.Categories)) : "[dim]-[/]");
@@ -205,6 +236,15 @@ public sealed class ConsoleReporter : IReporter
         }
 
         AnsiConsole.Write(table);
+    }
+
+    private static IEnumerable<string> ParameterCells(BenchmarkRow row, IReadOnlyList<string> parameterNames)
+    {
+        foreach (var parameterName in parameterNames)
+        {
+            var parameter = row.ParameterSet.FirstOrDefault(p => p.Name == parameterName);
+            yield return parameter is null ? "[dim]-[/]" : Esc(BenchmarkParameter.FormatValue(parameter.Value));
+        }
     }
 
     private static void RenderTimingDetail(BenchmarkTable benchTable)
