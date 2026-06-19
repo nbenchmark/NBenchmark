@@ -82,11 +82,12 @@ public async Task<int> MyAsyncMethodWithResult() => await ComputeAsync();
 **Properties:**
 
 | Property | Type | Description |
-|---|---|---|
+|---|---|---|---|
 | `Baseline` | `bool` | Marks this method as the baseline for ratio/significance calculations. |
 | `Description` | `string?` | Optional label shown in output when descriptions are present. |
 | `Iterations` | `int?` | Override the default iteration count for this method only. |
 | `WarmupIterations` | `int?` | Override the default warmup count for this method only. |
+| `LaunchCount` | `int` | Override the default launch count for this method only. |
 
 ```csharp
 [Benchmark(Baseline = true, Description = "current production implementation")]
@@ -355,6 +356,68 @@ BenchmarkHost.Create(args)
 CLI flags like `--iterations` always override `WithOptions` values.
 
 By default benchmarks run in **random** order to reduce systematic bias. Call `WithRunOrder(RunOrder.Declaration)` (or pass `--order declaration`) to run them in declaration order instead.
+
+## Multiple launches
+
+Use `--launch-count <n>` on the CLI (or `WithOptions(new MeasurementOptions { LaunchCount = n })` in code) to run each benchmark N times as independent launches. Each launch includes its own warmup and GC cycle, so variance across launches reflects real run-to-run differences (process state, ASLR, scheduler placement), not just intra-run noise.
+
+The primary result fields (median, mean, P95, etc.) come from the **best** (lowest median) launch. Cross-launch statistics (mean, stddev, median, CI across per-launch medians) are computed and displayed in a "Launch Aggregation" table below the main results when `LaunchCount > 1`.
+
+```bash
+dotnet run -- --launch-count 5
+```
+
+### Per-method attribute override
+
+Each `[Benchmark]` can specify its own launch count via the `LaunchCount` property:
+
+```csharp
+// 3 independent launches for this method only
+[Benchmark(LaunchCount = 3)]
+public int NoisyMethod() => Compute();
+
+// Default launch count (1) - no aggregation
+[Benchmark]
+public int StableMethod() => Compute();
+```
+
+The per-method override is overridden by `--launch-count` if both are present. This matters when you want a single method to get extra launches without affecting the rest:
+
+```csharp
+public class MyBenchmarks
+{
+    [Benchmark(Baseline = true)]
+    public int Baseline() => 1;
+
+    // This method runs 5 launches on its own;
+    // Baseline and Fast keep the default (1).
+    [Benchmark(LaunchCount = 5)]
+    public int NoisyWork() => ExpensiveJob();
+
+    [Benchmark]
+    public int Fast() => QuickJob();
+}
+```
+
+### Dry-run interaction
+
+When `--dry-run` (Iterations=0, WarmupIterations=0) is combined with `LaunchCount > 1`, exactly one dry launch is performed. Extra launches would not add information since dry runs skip the body.
+
+### Isolation interaction
+
+In isolated mode (the default), the parent spawns N child processes per isolated group. The child process is unaware of the launch count; the parent orchestrates the repeats. Per-method attribute overrides are respected: the parent uses the maximum launch count across all benchmarks in the group so that every benchmark receives at least the launches it requested.
+
+### Example
+
+```bash
+# Run each benchmark 3 times and show the launch aggregation table
+dotnet run -- --launch-count 3
+
+# With a single benchmark getting extra attention via attribute:
+dotnet run -- --filter MyBenchmarks.NoisyWork
+```
+
+The "Launch Aggregation" table shows cross-launch mean, standard deviation, median, and 95% confidence interval for each benchmark that ran multiple launches. Only benchmarks with `LaunchCount > 1` appear in this table.
 
 ## Category filtering
 

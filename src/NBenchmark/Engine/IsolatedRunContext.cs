@@ -58,6 +58,8 @@ internal sealed record MeasurementOverrides
 
     public AutoTuneCapBehavior? CapBehavior { get; init; }
 
+    public int? LaunchCount { get; init; }
+
     public static MeasurementOverrides FromCliArgs(CliArgs cliArgs) => new()
     {
         Iterations = cliArgs.Iterations,
@@ -77,6 +79,7 @@ internal sealed record MeasurementOverrides
         MaxWarmup = cliArgs.MaxWarmup,
         MaxTuningTime = cliArgs.MaxTuningTime,
         CapBehavior = cliArgs.AutoTuneCapBehavior,
+        LaunchCount = cliArgs.LaunchCount,
     };
 
     public MeasurementOptions Apply(MeasurementOptions options)
@@ -158,6 +161,9 @@ internal sealed record MeasurementOverrides
 
         if (OpsPerSample.HasValue)
             result = result with { OpsPerSample = OpsPerSample.Value };
+
+        if (LaunchCount.HasValue)
+            result = result with { LaunchCount = LaunchCount.Value };
 
         return result;
     }

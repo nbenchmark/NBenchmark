@@ -244,6 +244,7 @@ public sealed record BenchmarkTable
             MarginPercent = result.MarginPercent,
             CoefficientOfVariationPercent = result.CoefficientOfVariationPercent,
             AutoTune = result.AutoTune,
+            LaunchStatistics = result.LaunchStatistics,
             Categories = result.Categories,
             ParameterSet = result.ParameterSet,
             BaseName = ComputeBaseName(result),
@@ -398,6 +399,14 @@ public record BenchmarkRow
     public string SignificanceLabel { get; init; } = "";
     public EffectSize? Effect { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    /// <summary>
+    ///     Cross-launch summary when the benchmark was run with
+    ///     <see cref="MeasurementOptions.LaunchCount"/> > 1. <c>null</c> for
+    ///     single-launch runs. Reporters can display this to explain
+    ///     between-launch variance.
+    /// </summary>
+    public LaunchStatistics? LaunchStatistics { get; init; }
 
     public required double Q1 { get; init; }
     public required double Q3 { get; init; }

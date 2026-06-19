@@ -109,6 +109,7 @@ await new BenchmarkSuite("name")
     .WithParameter("size", 10, 100) // expand parameterized benchmarks across values
     .WithIterations(200)            // pin measured samples (default: auto)
     .WithWarmup(25)                 // pin warmup samples (default: auto)
+    .WithLaunchCount(3)             // repeat each benchmark 3 times as separate launches (default: 1)
     .WithAllocations()              // enable allocation tracking
     .WithOutlierMode(OutlierMode.IqrFence)   // default
     .WithOutlierDetector(new MyDetector())   // custom IOutlierDetector (overrides WithOutlierMode)
@@ -181,6 +182,25 @@ await new BenchmarkSuite("sorting")
 ```
 
 `WithIsolation(false)` is the default (in-process). The child rebuilds the suite from your own `Main`, so custom `IOutlierDetector` / `ISignificanceTest` instances and suite setup/teardown are preserved. Isolated runs always execute in declaration order. See [Isolated Runs](./isolated-runs.md) for the full model.
+
+## Multiple launches
+
+Use `WithLaunchCount(n)` to run each benchmark in the suite N times as independent launches. Each launch includes its own warmup and GC cycle, and the cross-launch statistics (mean, stddev, median, CI) are computed from the per-launch medians. The primary result uses the **best** launch (lowest median), and an aggregation table appears below the main results.
+
+```csharp
+await new BenchmarkSuite("sorting")
+    .Add("bubble", () => BubbleSort(data))
+    .Add("array", () => Array.Sort(data))
+    .WithBaseline("bubble")
+    .WithLaunchCount(5)             // 5 independent launches per benchmark
+    .WithIterations(100)
+    .WithWarmup(10)
+    .RunAsync();
+```
+
+Use multiple launches when single-run noise is a concern and you want to understand how stable the measurement is at the launch level. Each launch is a full independent measurement, so launch-level variance reflects real run-to-run differences (process state, ASLR, scheduler placement), not just intra-run noise.
+
+When combined with `WithIsolation()`, the suite repeats in a fresh child process per launch. The child process is unaware of the launch count; the parent orchestrates the repeats.
 
 ## Parameterized benchmarks
 

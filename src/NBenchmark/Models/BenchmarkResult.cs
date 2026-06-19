@@ -148,6 +148,13 @@ public record BenchmarkResult
     /// </summary>
     public AutoTuneDiagnostic? AutoTune { get; init; }
 
+    /// <summary>
+    ///     Cross-launch summary statistics populated when
+    ///     <see cref="MeasurementOptions.LaunchCount"/> > 1.
+    ///     <c>null</c> when the benchmark ran a single launch.
+    /// </summary>
+    public LaunchStatistics? LaunchStatistics { get; init; }
+
     public double ConfidenceIntervalLower => Mean - MarginOfError;
     public double ConfidenceIntervalUpper => Mean + MarginOfError;
     public double Range => Max - Min;

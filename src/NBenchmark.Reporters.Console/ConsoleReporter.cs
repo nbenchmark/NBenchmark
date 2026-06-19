@@ -57,6 +57,7 @@ public sealed class ConsoleReporter : IReporter
             RenderComparisonTable(table, className, Detail);
             AnsiConsole.WriteLine();
             RenderTimingDetail(table);
+            RenderLaunchStats(table);
             RenderAutoTune(table);
 
             if (Detail == ReportDetail.Advanced)
@@ -287,6 +288,50 @@ public sealed class ConsoleReporter : IReporter
                 $"[{cvColor}]{row.CoefficientOfVariationPercent:F2}%[/]",
                 BenchmarkFormatter.FormatNs(row.P95),
                 BenchmarkFormatter.FormatNs(row.P99)
+            );
+        }
+
+        AnsiConsole.Write(table);
+    }
+
+    private static void RenderLaunchStats(BenchmarkTable benchTable)
+    {
+        var rows = benchTable.Rows.Where(r => !r.Errored && r.LaunchStatistics is not null).ToList();
+
+        if (rows.Count == 0)
+            return;
+
+        var rule = new Rule("[dim]Launch Aggregation[/]")
+            .LeftJustified()
+            .RuleStyle(Style.Parse("grey"));
+
+        AnsiConsole.Write(rule);
+        AnsiConsole.WriteLine();
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey42)
+            .AddColumn(new TableColumn("[dim]Benchmark[/]").NoWrap())
+            .AddColumn(new TableColumn("[dim]Launches[/]").RightAligned())
+            .AddColumn(new TableColumn("[dim]Mean[/]").RightAligned())
+            .AddColumn(new TableColumn("[dim]StdDev[/]").RightAligned())
+            .AddColumn(new TableColumn("[dim]Median[/]").RightAligned())
+            .AddColumn(new TableColumn("[dim]CI (95%)[/]").RightAligned());
+
+        foreach (var row in rows)
+        {
+            var ls = row.LaunchStatistics!;
+            var ciText = ls.LaunchConfidenceIntervalLower.HasValue && ls.LaunchConfidenceIntervalUpper.HasValue
+                ? $"[[{ls.LaunchConfidenceIntervalLower!.Value:F1}–{ls.LaunchConfidenceIntervalUpper!.Value:F1}]]"
+                : "[dim]-[/]";
+
+            table.AddRow(
+                $"[dim]{Esc(row.Name)}[/]",
+                $"{ls.LaunchCount}",
+                BenchmarkFormatter.FormatNs(ls.LaunchMean),
+                BenchmarkFormatter.FormatNs(ls.LaunchStandardDeviation),
+                BenchmarkFormatter.FormatNs(ls.LaunchMedian),
+                ciText
             );
         }
 

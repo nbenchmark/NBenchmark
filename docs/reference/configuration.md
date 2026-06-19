@@ -113,6 +113,38 @@ CLI flag: `--ops-per-sample <n>` (pins K). The calibration target is `AutoTune.T
 
 Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per method via `[Benchmark]` - it is set suite- or host-wide only (`.WithOpsPerSample(n)` or `--ops-per-sample n`).
 
+### LaunchCount
+
+```csharp
+LaunchCount = 1   // default
+```
+
+The number of times to repeat each benchmark as a separate launch, typed as `int`:
+
+| Value | Behaviour |
+|---|---|
+| `1` **(default)** | Run the benchmark once. No aggregation. |
+| `> 1` | Repeat the full benchmark (warmup + measurement) N times. Cross-launch statistics (mean, stddev, median, CI across launch medians) are computed and stored in `BenchmarkResult.LaunchStatistics`. The primary result fields reflect the **best** launch (lowest median). Valid range: `2` to `100`. |
+
+Use multiple launches when single-run noise is a concern and you want to see how much the median itself varies across independent measurements. Each launch includes its own warmup and GC cycle, so consecutive launches are independent measurements of the same body - not correlated samples.
+
+**Dry-run interaction:** When `--dry-run` (Iterations=0, WarmupIterations=0) is combined with `LaunchCount > 1`, exactly one dry launch is performed. The extra launches would not add information since dry runs skip the body.
+
+**Isolation interaction:** When the benchmark runs in a child process (host mode default, or `WithIsolation()` in suite mode), the parent spawns N children. The child process is unaware of the launch count.
+
+**Attribute override:** In Host mode each `[Benchmark]` can override the launch count per-method:
+
+```csharp
+// This method runs 5 independent launches regardless of the host setting.
+[Benchmark(LaunchCount = 5)]
+public void MyNoisyBenchmark() => SlowOperation();
+```
+
+The CLI flag `--launch-count` always takes priority over both `WithOptions` and the per-method attribute.
+
+BenchmarkSuite fluent method: `.WithLaunchCount(5)`  
+CLI flag: `--launch-count <n>`
+
 ### AutoTune
 
 ```csharp
@@ -323,7 +355,7 @@ public void MyExpensiveBenchmark() => SlowOperation();
 ```
 
 > [!NOTE]
-> Only `Iterations` and `WarmupIterations` are pinnable per method. `OpsPerSample` is not exposed on `[Benchmark]` - pin it host-wide with `.WithOpsPerSample(n)` or `--ops-per-sample n`.
+> Only `Iterations`, `WarmupIterations`, and `LaunchCount` are pinnable per method. `OpsPerSample` is not exposed on `[Benchmark]` - pin it host-wide with `.WithOpsPerSample(n)` or `--ops-per-sample n`.
 
 ## Categories
 
@@ -336,6 +368,7 @@ Categories are not part of `MeasurementOptions`; they are metadata declared with
 | `Iterations` | `int?` | `null` (auto) | `0` – `100 000` when set (`0` = dry-run) |
 | `WarmupIterations` | `int?` | `null` (auto) | `0` – `10 000` when set |
 | `OpsPerSample` | `int?` | `null` (auto) | `1` – `16 777 216` when set |
+| `LaunchCount` | `int` | `1` | `1` – `100` |
 | `AutoTune` | `AutoTuneOptions` | `AutoTuneOptions.Default` | See [AutoTune](#autotune) |
 | `ConfidenceLevel` | `double` | `0.95` | `>0` and `<1` |
 | `SignificanceLevel` | `double` | `0.05` | `>0` and `<1` |
