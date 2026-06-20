@@ -377,6 +377,34 @@ The console and markdown reporters add a "Runtime" column when results span mult
 
 `--runtimes` overrides `--in-process`; cross-runtime always uses child processes.
 
+### `[Runtimes]` attribute
+
+Instead of passing `--runtimes` on the CLI, you can declare the runtimes on the benchmark class itself:
+
+```csharp
+using NBenchmark.Attributes;
+
+[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)]
+public class StringBenchmarks
+{
+    [Benchmark]
+    public string Concat() => "a" + "b" + "c";
+}
+```
+
+```bash
+# No --runtimes flag needed - the attribute drives the build
+dotnet run --project samples/MultiRuntimeHost
+```
+
+When `--runtimes` is passed on the CLI, the CLI list wins and `[Runtimes]` is ignored. When multiple classes declare `[Runtimes]`, the host uses the union of all declared lists (preserving declaration order, deduplicating). A class filtered out by `--filter` does not contribute its runtimes.
+
+| `--runtimes` flag | `[Runtimes]` attribute | Runtimes used |
+|-------------------|------------------------|---------------|
+| absent            | absent                 | none (single-runtime) |
+| absent            | present on >= 1 class  | union of all declared lists |
+| present           | absent or present      | CLI list; attribute ignored |
+
 See the [MultiRuntimeHost sample](../samples.md#multiruntimehost---host-mode-multi-runtime) for a complete example.
 
 ## Multiple launches

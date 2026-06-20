@@ -92,7 +92,7 @@ public void CriticalPath_ShouldBeFast() => ProcessOrder(testOrder);
 
 ## Multi-Runtime Comparison
 
-Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in both Suite mode (`WithRuntimes`) and Host mode (`--runtimes`).
+Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in Suite mode (`WithRuntimes`), Host mode (`--runtimes` CLI flag), and Host mode via the `[Runtimes]` attribute.
 
 ```bash
 dotnet run -- --runtimes net8,net9,net10

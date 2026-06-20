@@ -1,4 +1,5 @@
 using NBenchmark.Attributes;
+using NBenchmark.Discovery;
 using NBenchmark.Reporters;
 using Xunit;
 
@@ -531,6 +532,105 @@ public class BenchmarkHostCliTests
         }
     }
 
+    [Fact]
+    public void AggregateRuntimes_Unions_Across_Suites()
+    {
+        var suites = new List<BenchmarkSuiteDefinition>
+        {
+            new(typeof(RuntimeAttributedHostBenchmarks), []) { Runtimes = [RuntimeMoniker.Net8, RuntimeMoniker.Net9] },
+            new(typeof(CliOverrideHostBenchmarks), []) { Runtimes = [RuntimeMoniker.Net10] },
+        };
+
+        var result = BenchmarkHost.AggregateRuntimes(suites);
+
+        Assert.Equal([RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10], result);
+    }
+
+    [Fact]
+    public void AggregateRuntimes_Deduplicates_Duplicates()
+    {
+        var suites = new List<BenchmarkSuiteDefinition>
+        {
+            new(typeof(RuntimeAttributedHostBenchmarks), []) { Runtimes = [RuntimeMoniker.Net8, RuntimeMoniker.Net9] },
+            new(typeof(CliOverrideHostBenchmarks), []) { Runtimes = [RuntimeMoniker.Net8, RuntimeMoniker.Net10] },
+        };
+
+        var result = BenchmarkHost.AggregateRuntimes(suites);
+
+        Assert.Equal([RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10], result);
+    }
+
+    [Fact]
+    public void AggregateRuntimes_Empty_When_No_Attribute()
+    {
+        var suites = new List<BenchmarkSuiteDefinition>
+        {
+            new(typeof(NoRuntimeAttributeBenchmarks), []) { Runtimes = [] },
+        };
+
+        var result = BenchmarkHost.AggregateRuntimes(suites);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void AggregateRuntimes_Preserves_Declaration_Order()
+    {
+        var suites = new List<BenchmarkSuiteDefinition>
+        {
+            new(typeof(RuntimeAttributedHostBenchmarks), []) { Runtimes = [RuntimeMoniker.Net10] },
+            new(typeof(CliOverrideHostBenchmarks), []) { Runtimes = [RuntimeMoniker.Net8] },
+        };
+
+        var result = BenchmarkHost.AggregateRuntimes(suites);
+
+        Assert.Equal([RuntimeMoniker.Net10, RuntimeMoniker.Net8], result);
+    }
+
+    [Fact]
+    public async Task No_Attribute_No_Cli_Flag_Runs_Single_Runtime()
+    {
+        var results = await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHost.Create(["--filter", "NoRuntimeAttributeBenchmarks.*", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<NoRuntimeAttributeBenchmarks>()
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync()
+        );
+
+        Assert.Single(results);
+        Assert.False(results[0].Errored);
+    }
+
+    [Fact]
+    public void Help_Flag_Works_With_Runtimes_Attribute_Present()
+    {
+        var stdout = CaptureConsoleOutput(() =>
+        {
+            BenchmarkHost.Create(["--help"])
+                .AddFromAssembly<RuntimeAttributedHostBenchmarks>()
+                .RunAsync().GetAwaiter().GetResult();
+        });
+
+        Assert.Contains("Usage:", stdout);
+        Assert.DoesNotContain("Building for runtimes:", stdout);
+    }
+
+    [Fact]
+    public void List_Flag_Works_With_Runtimes_Attribute_Present()
+    {
+        var stdout = CaptureConsoleOutput(() =>
+        {
+            BenchmarkHost.Create(["--filter", "RuntimeAttributedHostBenchmarks.*", "--list"])
+                .AddFromAssembly<RuntimeAttributedHostBenchmarks>()
+                .WithIsolation(false)
+                .RunAsync().GetAwaiter().GetResult();
+        });
+
+        Assert.Contains("RuntimeAttributedHostBenchmarks", stdout);
+        Assert.DoesNotContain("Building for runtimes:", stdout);
+    }
+
     private static string CaptureConsoleOutput(Action action)
     {
         var sw = new StringWriter();
@@ -699,4 +799,24 @@ public class HostOrderBenchmarks
 
     [Benchmark]
     public int B() => 2;
+}
+
+[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9)]
+public class RuntimeAttributedHostBenchmarks
+{
+    [Benchmark]
+    public int A() => 1;
+}
+
+[Runtimes(RuntimeMoniker.Net10)]
+public class CliOverrideHostBenchmarks
+{
+    [Benchmark]
+    public int A() => 1;
+}
+
+public class NoRuntimeAttributeBenchmarks
+{
+    [Benchmark]
+    public int A() => 1;
 }

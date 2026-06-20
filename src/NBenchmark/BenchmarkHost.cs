@@ -222,19 +222,25 @@ public sealed class BenchmarkHost
             return results;
         }
 
-        // When runtimes are specified, delegate to the multi-runtime orchestrator.
-        if (_cliArgs.Runtimes.Count > 0)
-        {
-            if (_cliArgs.InProcess || !_isolationEnabled)
-                Console.WriteLine("Warning: --runtimes overrides --in-process; cross-runtime always uses child processes.");
-
-            return await RunMultiRuntimeAsync(cancellationToken).ConfigureAwait(false);
-        }
-
         if (_cliArgs.ShowHelp)
         {
             CliArgs.PrintHelp();
             return Array.Empty<BenchmarkResult>();
+        }
+
+        // When runtimes are specified (CLI or attribute), delegate to the multi-runtime orchestrator.
+        // --help and --list-only are handled before this so they never trigger multi-runtime builds.
+        IReadOnlyList<RuntimeMoniker> effectiveRuntimes = _cliArgs.Runtimes;
+
+        if (effectiveRuntimes.Count == 0 && !_cliArgs.ListOnly)
+            effectiveRuntimes = DiscoverAttributeRuntimes();
+
+        if (effectiveRuntimes.Count > 0)
+        {
+            if (_cliArgs.InProcess || !_isolationEnabled)
+                Console.WriteLine("Warning: cross-runtime execution always uses child processes.");
+
+            return await RunMultiRuntimeAsync(effectiveRuntimes, cancellationToken).ConfigureAwait(false);
         }
 
         Console.WriteLine($"Timer resolution: {Stopwatch.Frequency:N0} ticks/s "
@@ -380,9 +386,9 @@ public sealed class BenchmarkHost
     }
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunMultiRuntimeAsync(
+        IReadOnlyList<RuntimeMoniker> runtimes,
         CancellationToken cancellationToken)
     {
-        var runtimes = _cliArgs.Runtimes;
         Console.WriteLine($"Building for runtimes: {string.Join(", ", runtimes.Select(r => r.ToTargetFramework()))}");
 
         var builds = await MultiRuntimeOrchestrator
@@ -1267,6 +1273,34 @@ public sealed class BenchmarkHost
         }
 
         return merged;
+    }
+
+    private IReadOnlyList<RuntimeMoniker> DiscoverAttributeRuntimes()
+    {
+        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
+        var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
+        var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude,
+            _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);
+
+        return AggregateRuntimes(filtered);
+    }
+
+    internal static IReadOnlyList<RuntimeMoniker> AggregateRuntimes(
+        IReadOnlyList<BenchmarkSuiteDefinition> suites)
+    {
+        var union = new List<RuntimeMoniker>();
+        var seen = new HashSet<RuntimeMoniker>();
+
+        foreach (var suite in suites)
+        {
+            foreach (var moniker in suite.Runtimes)
+            {
+                if (seen.Add(moniker))
+                    union.Add(moniker);
+            }
+        }
+
+        return union;
     }
 
     private static MeasurementOptions MergeCliOptions(MeasurementOptions options, CliArgs cliArgs)
