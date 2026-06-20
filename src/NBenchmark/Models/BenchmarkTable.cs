@@ -127,12 +127,14 @@ public sealed record BenchmarkTable
                 }
 
                 foreach (var result in runtimeResults.OrderBy(r => r.Median))
+                {
                     rows.Add(BuildRow(
                         result,
                         reference,
-                        multiBenchmark: false,
-                        comparable: true,
-                        isBaselineOverride: reference is not null && ReferenceEquals(result, reference)));
+                        false,
+                        true,
+                        reference is not null && ReferenceEquals(result, reference)));
+                }
             }
 
             return AssembleTable(results, rows, parameterNames);
@@ -148,7 +150,9 @@ public sealed record BenchmarkTable
                 var multiBenchmark = successful.Count > 1;
 
                 foreach (var result in runtimeResults.OrderBy(r => r.Median))
-                    rows.Add(BuildRow(result, baseline, multiBenchmark, comparable: multiBenchmark));
+                {
+                    rows.Add(BuildRow(result, baseline, multiBenchmark, multiBenchmark));
+                }
             }
         }
 
@@ -161,9 +165,11 @@ public sealed record BenchmarkTable
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var result in results)
-            foreach (var parameter in result.ParameterSet)
-                if (seen.Add(parameter.Name))
-                    names.Add(parameter.Name);
+        foreach (var parameter in result.ParameterSet)
+        {
+            if (seen.Add(parameter.Name))
+                names.Add(parameter.Name);
+        }
 
         return names;
     }
@@ -192,7 +198,9 @@ public sealed record BenchmarkTable
                 var runtimeMultiBenchmark = runtimeResults.Count > 1;
 
                 foreach (var result in runtimeResults.OrderBy(r => r.Median))
+                {
                     rowsByRuntime.Add(BuildRow(result, runtimeBaseline, runtimeMultiBenchmark));
+                }
             }
 
             return AssembleTable(results, rowsByRuntime, []);
@@ -298,6 +306,7 @@ public sealed record BenchmarkTable
             return result.Name;
 
         var suffix = $"({BenchmarkParameter.FormatLabel(result.ParameterSet)})";
+
         return result.Name.EndsWith(suffix, StringComparison.Ordinal)
             ? result.Name[..^suffix.Length]
             : result.Name;
@@ -364,6 +373,7 @@ public sealed record BenchmarkTable
                 var label = e.Percentile >= 1.0 ? "Max" : $"P{FormatPercentileKey(e.Percentile)}";
                 return $"{label} = {BenchmarkFormatter.FormatNs(e.Value)}";
             });
+
             lines.Add($"Percentiles: {string.Join(", ", parts)}");
         }
 
@@ -419,7 +429,8 @@ public sealed record BenchmarkTable
     /// </summary>
     public static string FormatPercentileKey(double p)
     {
-        if (p >= 1.0) return "Max";
+        if (p >= 1.0)
+            return "Max";
 
         var scaled = p * 100.0;
         var rounded = Math.Round(scaled, 1);
@@ -469,7 +480,7 @@ public record BenchmarkRow
 
     /// <summary>
     ///     Cross-launch summary when the benchmark was run with
-    ///     <see cref="MeasurementOptions.LaunchCount"/> > 1. <c>null</c> for
+    ///     <see cref="MeasurementOptions.LaunchCount" /> > 1. <c>null</c> for
     ///     single-launch runs. Reporters can display this to explain
     ///     between-launch variance.
     /// </summary>
@@ -509,8 +520,10 @@ public record BenchmarkRow
     public double? GetPercentile(double p)
     {
         foreach (var e in Percentiles)
+        {
             if (Math.Abs(e.Percentile - p) < 1e-9)
                 return e.Value;
+        }
 
         return null;
     }

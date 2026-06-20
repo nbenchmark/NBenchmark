@@ -44,9 +44,8 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         var baseHeaders = "ClassName,Name,Median,Mean,OpsPerSecond,StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation";
 
         if (Detail == ReportDetail.Simple)
-        {
-            sb.AppendLine($"{baseHeaders}{percentileHeaderPart},Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
-        }
+            sb.AppendLine(
+                $"{baseHeaders}{percentileHeaderPart},Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
         else
         {
             sb.AppendLine(

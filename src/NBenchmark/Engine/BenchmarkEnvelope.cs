@@ -98,29 +98,29 @@ internal sealed record BenchmarkEnvelope(
         {
             if (resultConsumer is not null)
             {
-            var returningBody = async () =>
+                var returningBody = async () =>
+                {
+                    var task = asyncDel(instance);
+                    await task.ConfigureAwait(false);
+                    resultConsumer(task);
+                };
+
+                return BenchmarkRunner.Instance.RunAsync(name, returningBody, spec, ct);
+            }
+
+            var voidBody = async () =>
             {
                 var task = asyncDel(instance);
                 await task.ConfigureAwait(false);
-                resultConsumer(task);
             };
 
-            return BenchmarkRunner.Instance.RunAsync(name, returningBody, spec, ct);
+            return BenchmarkRunner.Instance.RunAsync(name, voidBody, spec, ct);
         }
 
-        var voidBody = async () =>
-        {
-            var task = asyncDel(instance);
-            await task.ConfigureAwait(false);
-        };
-
-        return BenchmarkRunner.Instance.RunAsync(name, voidBody, spec, ct);
-    }
-
-    var sd = syncDel!;
-    var consumer = BenchmarkRunner.GetResultConsumer<object?>();
-    var syncBody = () => consumer(sd(instance));
-    return Task.FromResult(BenchmarkRunner.Instance.Run(name, syncBody, spec, ct));
+        var sd = syncDel!;
+        var consumer = BenchmarkRunner.GetResultConsumer<object?>();
+        var syncBody = () => consumer(sd(instance));
+        return Task.FromResult(BenchmarkRunner.Instance.Run(name, syncBody, spec, ct));
     }
 }
 

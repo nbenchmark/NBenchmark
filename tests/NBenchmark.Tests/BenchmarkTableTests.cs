@@ -709,7 +709,7 @@ public class BenchmarkTableTests
     {
         var results = new[]
         {
-            R("Sweep", "Sort", 100, [P("size", 10)], baseline: true),
+            R("Sweep", "Sort", 100, [P("size", 10)], true),
             R("Sweep", "Sort", 200, [P("size", 100)]),
             R("Sweep", "Sort", 300, [P("size", 1000)]),
         };
@@ -784,9 +784,9 @@ public class BenchmarkTableTests
     {
         var results = new[]
         {
-            R("Search", "Binary", 100, [P("size", 10)], baseline: true),
+            R("Search", "Binary", 100, [P("size", 10)], true),
             R("Search", "Linear", 120, [P("size", 10)], significance: SignificanceVerdict.Significant),
-            R("Search", "Binary", 250, [P("size", 100)], baseline: true),
+            R("Search", "Binary", 250, [P("size", 100)], true),
             R("Search", "Linear", 300, [P("size", 100)], significance: SignificanceVerdict.Significant),
         };
 
@@ -842,9 +842,9 @@ public class BenchmarkTableTests
     {
         var results = new[]
         {
-            R("Search", "Binary", 100, [P("size", 10)], baseline: true, runtimeMoniker: "net8.0"),
+            R("Search", "Binary", 100, [P("size", 10)], true, runtimeMoniker: "net8.0"),
             R("Search", "Linear", 200, [P("size", 10)], significance: SignificanceVerdict.Significant, runtimeMoniker: "net8.0"),
-            R("Search", "Binary", 40, [P("size", 10)], baseline: true, runtimeMoniker: "net9.0"),
+            R("Search", "Binary", 40, [P("size", 10)], true, runtimeMoniker: "net9.0"),
             R("Search", "Linear", 120, [P("size", 10)], significance: SignificanceVerdict.Significant, runtimeMoniker: "net9.0"),
         };
 
@@ -869,8 +869,8 @@ public class BenchmarkTableTests
         {
             R("Search", "Linear", 120, [P("size", 10)]),
             R("Search", "Linear", 300, [P("size", 100)]),
-            R("Search", "Binary", 100, [P("size", 10)], baseline: true),
-            R("Search", "Binary", 250, [P("size", 100)], baseline: true),
+            R("Search", "Binary", 100, [P("size", 10)], true),
+            R("Search", "Binary", 250, [P("size", 100)], true),
         };
 
         var table = Assert.Single(BenchmarkTable.BuildPerClass(results));

@@ -60,7 +60,9 @@ public class CpuBenchmarks
         var sum = 0;
 
         for (var i = 0; i < bound; i++)
+        {
             sum += i;
+        }
 
         return sum;
     }

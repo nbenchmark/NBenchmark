@@ -157,8 +157,9 @@ public class MannWhitneyUTests
         // Mann-Whitney depends on value ranks, not original input order. This
         // protects against any future order-sensitive preprocessing.
         var baseline = Enumerable.Range(0, 500).Select(i => (double)(i % 17)).ToArray();
+
         var candidate = Enumerable.Range(0, 500)
-            .Select(i => (double)((i % 17) + (i % 3 == 0 ? 1 : 0)))
+            .Select(i => (double)(i % 17 + (i % 3 == 0 ? 1 : 0)))
             .ToArray();
 
         var shuffledBaseline = baseline.ToArray();

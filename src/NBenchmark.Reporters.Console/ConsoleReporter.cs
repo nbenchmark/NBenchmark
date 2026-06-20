@@ -133,7 +133,9 @@ public sealed class ConsoleReporter : IReporter
             table.AddColumn(new TableColumn("[bold]Runtime[/]").RightAligned().NoWrap());
 
         foreach (var paramName in benchTable.ParameterNames)
+        {
             table.AddColumn(new TableColumn($"[bold]{Esc(paramName)}[/]").RightAligned().NoWrap());
+        }
 
         table
             .AddColumn(new TableColumn("[bold]Median[/]").RightAligned().NoWrap())
@@ -161,6 +163,7 @@ public sealed class ConsoleReporter : IReporter
         foreach (var row in benchTable.Rows)
         {
             var rawName = benchTable.ParameterNames.Count > 0 ? row.BaseName : row.Name;
+
             var displayName = !string.IsNullOrEmpty(sectionClassName) && rawName.StartsWith(sectionClassName + ".", StringComparison.Ordinal)
                 ? rawName[(sectionClassName.Length + 1)..]
                 : rawName;
@@ -168,8 +171,10 @@ public sealed class ConsoleReporter : IReporter
             if (row.Errored)
             {
                 var errorCols = new List<string> { $"[red]✗ {Esc(displayName)}[/]" };
+
                 if (showRuntime)
                     errorCols.Add(Esc(row.RuntimeMoniker));
+
                 errorCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
                 errorCols.AddRange(["[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]"]);
 
@@ -210,9 +215,12 @@ public sealed class ConsoleReporter : IReporter
                 : "[dim]-[/]";
 
             var rowCols = new List<string> { nameText };
+
             if (showRuntime)
                 rowCols.Add(Esc(row.RuntimeMoniker));
+
             rowCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
+
             rowCols.AddRange([
                 $"[bold]{BenchmarkFormatter.FormatNs(row.Median)}[/]",
                 BenchmarkFormatter.FormatNs(row.Mean),
@@ -362,6 +370,7 @@ public sealed class ConsoleReporter : IReporter
         foreach (var row in rows)
         {
             var ls = row.LaunchStatistics!;
+
             var ciText = ls.LaunchConfidenceIntervalLower.HasValue && ls.LaunchConfidenceIntervalUpper.HasValue
                 ? $"[[{ls.LaunchConfidenceIntervalLower!.Value:F1}–{ls.LaunchConfidenceIntervalUpper!.Value:F1}]]"
                 : "[dim]-[/]";
@@ -497,9 +506,7 @@ public sealed class ConsoleReporter : IReporter
             .Count() > 1;
 
         if (hasMultipleRuntimes)
-        {
             AnsiConsole.MarkupLine("[grey]Omnibus:[/] [dim]runtime-scoped in multi-runtime runs; combined summary omitted.[/]");
-        }
         else if (benchTable.Omnibus is { } omnibus)
         {
             var (verdict, color) = omnibus.Verdict switch

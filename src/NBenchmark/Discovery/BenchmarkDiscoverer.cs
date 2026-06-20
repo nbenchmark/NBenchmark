@@ -132,7 +132,7 @@ public sealed class BenchmarkDiscoverer
             }
 
             yield return CreateDefinition(method, attribute, method.Name, null, null,
-                iterSetupDel, iterTeardownDel, classCategories, isBaseline: attribute.Baseline);
+                iterSetupDel, iterTeardownDel, classCategories, attribute.Baseline);
 
             yield break;
         }
@@ -161,7 +161,7 @@ public sealed class BenchmarkDiscoverer
             }
 
             yield return CreateDefinition(method, attribute, method.Name, null, null,
-                iterSetupDel, iterTeardownDel, classCategories, isBaseline: attribute.Baseline);
+                iterSetupDel, iterTeardownDel, classCategories, attribute.Baseline);
 
             yield break;
         }
@@ -186,7 +186,7 @@ public sealed class BenchmarkDiscoverer
             var displayName = BuildDisplayName(method.Name, paramNames, converted);
 
             yield return CreateDefinition(method, attribute, displayName, converted, paramNames,
-                iterSetupDel, iterTeardownDel, classCategories, isBaseline: methodIsBaseline);
+                iterSetupDel, iterTeardownDel, classCategories, methodIsBaseline);
         }
     }
 
@@ -209,7 +209,7 @@ public sealed class BenchmarkDiscoverer
             var displayName = BuildDisplayName(method.Name, paramNames, converted);
 
             yield return CreateDefinition(method, benchmarkAttr, displayName, converted, paramNames,
-                iterSetupDel, iterTeardownDel, classCategories, isBaseline: methodIsBaseline);
+                iterSetupDel, iterTeardownDel, classCategories, methodIsBaseline);
         }
     }
 
@@ -557,7 +557,7 @@ public sealed class BenchmarkDiscoverer
 
     private static IReadOnlyList<RuntimeMoniker> ResolveRuntimes(Type type)
     {
-        var attr = type.GetCustomAttribute<RuntimesAttribute>(inherit: true);
+        var attr = type.GetCustomAttribute<RuntimesAttribute>(true);
         return attr?.Runtimes ?? [];
     }
 

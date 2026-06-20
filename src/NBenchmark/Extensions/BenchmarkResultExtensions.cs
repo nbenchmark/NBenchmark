@@ -38,6 +38,7 @@ public static class BenchmarkResultExtensions
 
         if (percentileSummary.Length > 0)
             Console.WriteLine($"  │  {percentileSummary}");
+
         Console.WriteLine($"  │  StdDev: {BenchmarkFormatter.FormatNs(result.StandardDeviation),-14} CV:   {result.CoefficientOfVariationPercent:F2}%");
 
         if (result.MarginOfError > 0)

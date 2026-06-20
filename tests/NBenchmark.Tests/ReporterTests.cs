@@ -136,8 +136,8 @@ public class ReporterTests
         try
         {
             var reporter = new MarkdownReporter(tempDir, "out.md");
-            var net8 = MakeResult("alpha", 100, runtimeMoniker: "net8.0", percentiles: [new PercentileEntry(0.95, 110)]);
-            var net9 = MakeResult("alpha", 80, runtimeMoniker: "net9.0", percentiles: [new PercentileEntry(0.95, 95)]);
+            var net8 = MakeResult("alpha", 100, "net8.0", [new PercentileEntry(0.95, 110)]);
+            var net9 = MakeResult("alpha", 80, "net9.0", [new PercentileEntry(0.95, 95)]);
 
             await reporter.ReportAsync([net8, net9]);
 
@@ -162,8 +162,8 @@ public class ReporterTests
         try
         {
             var reporter = new MarkdownReporter(tempDir, "out.md");
-            var net8 = MakeResult("alpha", 100, runtimeMoniker: "net8.0");
-            var net9 = MakeResult("alpha", 80, runtimeMoniker: "net9.0");
+            var net8 = MakeResult("alpha", 100, "net8.0");
+            var net9 = MakeResult("alpha", 80, "net9.0");
 
             await reporter.ReportAsync([net8, net9]);
 

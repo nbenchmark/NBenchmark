@@ -21,6 +21,7 @@ internal static class LaunchAggregator
 
         var launchMean = successfulCount > 0 ? successfulMedians.Average() : 0;
         var launchMedian = successfulCount > 0 ? MedianOf(successfulMedians) : 0;
+
         var launchStdDev = successfulCount > 1
             ? Math.Sqrt(successfulMedians.Sum(m => (m - launchMean) * (m - launchMean)) / (successfulCount - 1))
             : 0;
@@ -87,6 +88,7 @@ internal static class LaunchAggregator
             return 0;
 
         var mid = sorted.Length / 2;
+
         return sorted.Length % 2 == 1
             ? sorted[mid]
             : (sorted[mid - 1] + sorted[mid]) / 2.0;
@@ -104,16 +106,19 @@ internal static class LaunchAggregator
         const double z90 = 1.645;
         const double z80 = 1.282;
 
-        static double ZForConfidence(double cl) => cl switch
+        static double ZForConfidence(double cl)
         {
-            >= 0.995 => 2.807,
-            >= 0.99 => z99,
-            >= 0.975 => 2.241,
-            >= 0.95 => z95,
-            >= 0.90 => z90,
-            >= 0.80 => z80,
-            _ => 1.0,
-        };
+            return cl switch
+            {
+                >= 0.995 => 2.807,
+                >= 0.99 => z99,
+                >= 0.975 => 2.241,
+                >= 0.95 => z95,
+                >= 0.90 => z90,
+                >= 0.80 => z80,
+                _ => 1.0,
+            };
+        }
 
         if (df > 30)
             return ZForConfidence(confidenceLevel);
@@ -124,7 +129,8 @@ internal static class LaunchAggregator
 
         // For a quick approximation with small df, we use the most common
         // two-tailed values at 95% confidence. Scale by z/z95 for other levels.
-        ReadOnlySpan<double> t95 = [
+        ReadOnlySpan<double> t95 =
+        [
             12.706, 4.303, 3.182, 2.776, 2.571,
             2.447, 2.365, 2.306, 2.262, 2.228,
             2.201, 2.179, 2.160, 2.145, 2.131,

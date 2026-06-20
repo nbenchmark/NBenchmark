@@ -105,6 +105,7 @@ public class ConsoleReporterTests
     public async Task ConsoleReporter_TimingDetail_Includes_Runtime_Column_When_MultiRuntime()
     {
         var reporter = new ConsoleReporter();
+
         var net8 = MakeResult("alpha", 100) with
         {
             RuntimeMoniker = "net8.0",

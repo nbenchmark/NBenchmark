@@ -92,7 +92,7 @@ public class IsolatedProcessIntegrationTests
                                Name = "a",
                                Mean = 100,
                                Median = 100,
-                                Percentiles = [],
+                               Percentiles = [],
                                Min = 100,
                                Max = 100,
                                StandardDeviation = 0,

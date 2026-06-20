@@ -63,8 +63,8 @@ public sealed record BenchmarkParameter(string Name, object? Value)
             }
 
             var valueText = Convert.ToString(parameter.Value, CultureInfo.InvariantCulture)
-                ?? parameter.Value.ToString()
-                ?? "?";
+                            ?? parameter.Value.ToString()
+                            ?? "?";
 
             AppendPart(builder, valueText);
             builder.Append('@');

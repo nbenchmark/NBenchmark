@@ -190,7 +190,7 @@ public static class MannWhitneyU
         // n1*n2/12 * [ (N + 1) - sum(t^3 - t)/(N*(N - 1)) ].
         var variance =
             (double)n1 * n2 / 12.0 *
-            ((total + 1.0) - tieCorrection / (total * (total - 1.0)));
+            (total + 1.0 - tieCorrection / (total * (total - 1.0)));
 
         if (variance <= 0 || double.IsNaN(variance) || double.IsInfinity(variance))
             return 1.0;
@@ -227,7 +227,6 @@ public static class MannWhitneyU
 
         return 0.5 * (1.0 + sign * y);
     }
-
 }
 
 /// <summary>

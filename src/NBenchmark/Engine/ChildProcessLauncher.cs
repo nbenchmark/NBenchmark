@@ -94,7 +94,7 @@ internal static class ChildProcessLauncher
     }
 
     /// <summary>
-    ///     Builds a <see cref="ProcessStartInfo"/> that launches the specified entry assembly
+    ///     Builds a <see cref="ProcessStartInfo" /> that launches the specified entry assembly
     ///     via <c>dotnet exec</c>. Used for cross-runtime runs where the child must run a
     ///     specific TFM's build output rather than re-running the current process.
     /// </summary>

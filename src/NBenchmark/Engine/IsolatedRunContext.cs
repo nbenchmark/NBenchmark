@@ -211,8 +211,8 @@ internal sealed record IsolatedRunRequest
 
     /// <summary>
     ///     The runtime the parent built this child for. When set, the child stamps
-    ///     <see cref="RuntimeMonikerExtensions.ToTargetFramework"/> onto every
-    ///     <see cref="BenchmarkResult.RuntimeMoniker"/> it produces.
+    ///     <see cref="RuntimeMonikerExtensions.ToTargetFramework" /> onto every
+    ///     <see cref="BenchmarkResult.RuntimeMoniker" /> it produces.
     /// </summary>
     public RuntimeMoniker? RuntimeMoniker { get; init; }
 

@@ -41,5 +41,5 @@ public class StringBenchmarks
     public string Join() => string.Join("", "a", "b", "c", "d", "e");
 
     [Benchmark]
-    public string Create() => new string(['a', 'b', 'c', 'd', 'e']);
+    public string Create() => new(['a', 'b', 'c', 'd', 'e']);
 }

@@ -480,6 +480,7 @@ public class EmptyRuntimeAttributedBenchmarks
     [Benchmark]
     public int A() => 1;
 }
+
 [BenchmarkCategory("String")]
 public class CategorizedBenchmarks
 {

@@ -34,20 +34,6 @@ public record BenchmarkResult
     /// </summary>
     public LatencyHistogram? Histogram { get; init; }
 
-    /// <summary>
-    ///     Convenience accessor for a specific percentile value.
-    ///     Returns the value for the first entry whose percentile matches
-    ///     <paramref name="p" /> within a 1e-9 tolerance, or <c>null</c> if
-    ///     the requested percentile was not computed.
-    /// </summary>
-    public double? GetPercentile(double p)
-    {
-        foreach (var e in Percentiles)
-            if (Math.Abs(e.Percentile - p) < 1e-9)
-                return e.Value;
-
-        return null;
-    }
     public required double StandardDeviation { get; init; }
 
     public double StandardError { get; init; }
@@ -185,7 +171,7 @@ public record BenchmarkResult
 
     /// <summary>
     ///     Cross-launch summary statistics populated when
-    ///     <see cref="MeasurementOptions.LaunchCount"/> > 1.
+    ///     <see cref="MeasurementOptions.LaunchCount" /> > 1.
     ///     <c>null</c> when the benchmark ran a single launch.
     /// </summary>
     public LaunchStatistics? LaunchStatistics { get; init; }
@@ -196,4 +182,21 @@ public record BenchmarkResult
     public double StandardErrorPercent => Mean > 0 ? StandardError / Mean * 100 : 0;
     public double MarginPercent => Mean > 0 ? MarginOfError / Mean * 100 : 0;
     public double CoefficientOfVariationPercent => CoefficientOfVariation * 100;
+
+    /// <summary>
+    ///     Convenience accessor for a specific percentile value.
+    ///     Returns the value for the first entry whose percentile matches
+    ///     <paramref name="p" /> within a 1e-9 tolerance, or <c>null</c> if
+    ///     the requested percentile was not computed.
+    /// </summary>
+    public double? GetPercentile(double p)
+    {
+        foreach (var e in Percentiles)
+        {
+            if (Math.Abs(e.Percentile - p) < 1e-9)
+                return e.Value;
+        }
+
+        return null;
+    }
 }

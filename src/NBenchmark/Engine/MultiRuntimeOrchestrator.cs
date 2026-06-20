@@ -15,6 +15,7 @@ internal static class MultiRuntimeOrchestrator
         foreach (var moniker in runtimes)
         {
             var tfm = moniker.ToTargetFramework();
+
             var outputDir = Path.Combine(
                 Path.GetTempPath(),
                 $"nbench-rt-{tfm}-{Guid.NewGuid():N}");
@@ -29,6 +30,7 @@ internal static class MultiRuntimeOrchestrator
                 var detail = string.IsNullOrWhiteSpace(errorOutput)
                     ? ""
                     : $"\n{errorOutput.Trim()}";
+
                 TryDeleteBuildOutput(outputDir);
                 results.Add(new TfmBuild(moniker, null, null, $"Build failed for {tfm} (exit code {exitCode}){detail}"));
                 continue;
@@ -107,6 +109,7 @@ internal static class MultiRuntimeOrchestrator
         foreach (var deps in depsFiles)
         {
             var depsBaseName = Path.GetFileNameWithoutExtension(deps);
+
             var assemblyName = depsBaseName.EndsWith(".deps", StringComparison.Ordinal)
                 ? depsBaseName[..^5]
                 : depsBaseName;
@@ -122,10 +125,11 @@ internal static class MultiRuntimeOrchestrator
             .FirstOrDefault(f =>
             {
                 var name = Path.GetFileNameWithoutExtension(f);
+
                 return !name.StartsWith("System.", StringComparison.Ordinal)
-                    && !name.StartsWith("Microsoft.", StringComparison.Ordinal)
-                    && !name.StartsWith("mscorlib", StringComparison.Ordinal)
-                    && !string.Equals(name, "netstandard", StringComparison.Ordinal);
+                       && !name.StartsWith("Microsoft.", StringComparison.Ordinal)
+                       && !name.StartsWith("mscorlib", StringComparison.Ordinal)
+                       && !string.Equals(name, "netstandard", StringComparison.Ordinal);
             });
     }
 
@@ -152,6 +156,7 @@ internal static class MultiRuntimeOrchestrator
 
         // Fall back to CWD-based lookup.
         var csprojDir = Environment.CurrentDirectory;
+
         while (csprojDir is not null)
         {
             if (Directory.GetFiles(csprojDir, "*.csproj").Length > 0)
@@ -161,6 +166,7 @@ internal static class MultiRuntimeOrchestrator
         }
 
         var slnDir = Environment.CurrentDirectory;
+
         while (slnDir is not null)
         {
             if (Directory.GetFiles(slnDir, "*.sln").Length > 0)
@@ -181,7 +187,7 @@ internal static class MultiRuntimeOrchestrator
         try
         {
             if (Directory.Exists(outputDir))
-                Directory.Delete(outputDir, recursive: true);
+                Directory.Delete(outputDir, true);
         }
         catch
         {

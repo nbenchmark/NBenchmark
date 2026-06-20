@@ -1,6 +1,6 @@
 namespace NBenchmark.Attributes;
 
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+[AttributeUsage(AttributeTargets.Class)]
 public sealed class RuntimesAttribute : Attribute
 {
     private readonly RuntimeMoniker[] _runtimes;

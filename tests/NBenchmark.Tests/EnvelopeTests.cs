@@ -128,8 +128,9 @@ public class EnvelopeTests
         }, CancellationToken.None);
 
         Assert.False(outcome.Result.Errored);
+
         Assert.True(instance.InvocationCount > 0,
-            $"Sync-returning method was not invoked. JIT may have elided the computation.");
+            "Sync-returning method was not invoked. JIT may have elided the computation.");
     }
 
     private static RunSpec MinimalSpec() => new()
