@@ -1,3 +1,4 @@
+using Spectre.Console;
 using Xunit;
 
 namespace NBenchmark.Reporters.Console.Tests;
@@ -98,6 +99,38 @@ public class ConsoleReporterTests
 
             await reporter.ReportAsync([errored, healthy]);
         });
+    }
+
+    [Fact]
+    public async Task ConsoleReporter_TimingDetail_Includes_Runtime_Column_When_MultiRuntime()
+    {
+        var reporter = new ConsoleReporter();
+        var net8 = MakeResult("alpha", 100) with
+        {
+            RuntimeMoniker = "net8.0",
+            Percentiles = [new PercentileEntry(0.95, 110)],
+        };
+
+        var net9 = MakeResult("alpha", 80) with
+        {
+            RuntimeMoniker = "net9.0",
+            Percentiles = [new PercentileEntry(0.95, 95)],
+        };
+
+        AnsiConsole.Record();
+
+        await reporter.ReportAsync([net8, net9]);
+
+        var output = AnsiConsole.ExportText();
+
+        var tailIndex = output.IndexOf("Precision & Tail Latency", StringComparison.Ordinal);
+        Assert.True(tailIndex >= 0);
+
+        var tailSection = output[tailIndex..];
+        Assert.Contains("Runtime", tailSection);
+        Assert.Contains("net8.0", tailSection);
+        Assert.Contains("net9.0", tailSection);
+        Assert.Contains("runtime-scoped in multi-runtime runs; combined summary omitted.", output);
     }
 
     [Fact]

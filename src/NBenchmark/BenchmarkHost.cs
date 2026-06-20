@@ -421,16 +421,23 @@ public sealed class BenchmarkHost
         foreach (var build in successfulBuilds)
         {
             var tfm = build.Moniker.ToTargetFramework();
-            Console.WriteLine($"Running benchmarks under {tfm}...");
-
-            var runtimeResults = await RunForRuntimeAsync(
-                    build.Moniker, build.DllPath!, filtered, cancellationToken)
-                .ConfigureAwait(false);
-
-            foreach (var item in runtimeResults)
+            try
             {
-                allResults.Add(item.Result);
-                rawSamples[$"{item.Result.Name}\0{tfm}"] = item.RawSamples;
+                Console.WriteLine($"Running benchmarks under {tfm}...");
+
+                var runtimeResults = await RunForRuntimeAsync(
+                        build.Moniker, build.DllPath!, filtered, cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var item in runtimeResults)
+                {
+                    allResults.Add(item.Result);
+                    rawSamples[$"{item.Result.Name}\0{tfm}"] = item.RawSamples;
+                }
+            }
+            finally
+            {
+                MultiRuntimeOrchestrator.TryDeleteBuildOutput(build.OutputDirectory);
             }
         }
 

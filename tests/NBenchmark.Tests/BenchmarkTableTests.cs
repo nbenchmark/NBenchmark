@@ -811,6 +811,58 @@ public class BenchmarkTableTests
     }
 
     [Fact]
+    public void BuildPerClass_MultiRuntime_UsesRuntimeScopedBaselineForRatios()
+    {
+        var results = new[]
+        {
+            R("Compare", "Base", 100, baseline: true, runtimeMoniker: "net8.0"),
+            R("Compare", "Alt", 150, runtimeMoniker: "net8.0"),
+            R("Compare", "Base", 50, baseline: true, runtimeMoniker: "net9.0"),
+            R("Compare", "Alt", 125, runtimeMoniker: "net9.0"),
+        };
+
+        var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+
+        var baseNet8 = table.Rows.Single(r => r.BaseName == "Base" && r.RuntimeMoniker == "net8.0");
+        var altNet8 = table.Rows.Single(r => r.BaseName == "Alt" && r.RuntimeMoniker == "net8.0");
+        var baseNet9 = table.Rows.Single(r => r.BaseName == "Base" && r.RuntimeMoniker == "net9.0");
+        var altNet9 = table.Rows.Single(r => r.BaseName == "Alt" && r.RuntimeMoniker == "net9.0");
+
+        Assert.True(baseNet8.IsBaseline);
+        Assert.Equal(1.0, baseNet8.Ratio, 6);
+        Assert.Equal(1.5, altNet8.Ratio, 6);
+
+        Assert.True(baseNet9.IsBaseline);
+        Assert.Equal(1.0, baseNet9.Ratio, 6);
+        Assert.Equal(2.5, altNet9.Ratio, 6);
+    }
+
+    [Fact]
+    public void BuildPerClass_Parameterised_MultiRuntime_UsesRuntimeScopedBaselineForRatios()
+    {
+        var results = new[]
+        {
+            R("Search", "Binary", 100, [P("size", 10)], baseline: true, runtimeMoniker: "net8.0"),
+            R("Search", "Linear", 200, [P("size", 10)], significance: SignificanceVerdict.Significant, runtimeMoniker: "net8.0"),
+            R("Search", "Binary", 40, [P("size", 10)], baseline: true, runtimeMoniker: "net9.0"),
+            R("Search", "Linear", 120, [P("size", 10)], significance: SignificanceVerdict.Significant, runtimeMoniker: "net9.0"),
+        };
+
+        var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+
+        var binaryNet8 = table.Rows.Single(r => r.BaseName == "Binary" && r.RuntimeMoniker == "net8.0");
+        var linearNet8 = table.Rows.Single(r => r.BaseName == "Linear" && r.RuntimeMoniker == "net8.0");
+        var binaryNet9 = table.Rows.Single(r => r.BaseName == "Binary" && r.RuntimeMoniker == "net9.0");
+        var linearNet9 = table.Rows.Single(r => r.BaseName == "Linear" && r.RuntimeMoniker == "net9.0");
+
+        Assert.Equal(1.0, binaryNet8.Ratio, 6);
+        Assert.Equal(2.0, linearNet8.Ratio, 6);
+
+        Assert.Equal(1.0, binaryNet9.Ratio, 6);
+        Assert.Equal(3.0, linearNet9.Ratio, 6);
+    }
+
+    [Fact]
     public void BuildPerClass_OrdersGroupsByFirstAppearance_ThenMedianWithinGroup()
     {
         var results = new[]
@@ -882,7 +934,8 @@ public class BenchmarkTableTests
         double median,
         BenchmarkParameter[]? parameters = null,
         bool baseline = false,
-        SignificanceVerdict significance = SignificanceVerdict.NotTested)
+        SignificanceVerdict significance = SignificanceVerdict.NotTested,
+        string runtimeMoniker = "")
     {
         parameters ??= [];
 
@@ -901,6 +954,7 @@ public class BenchmarkTableTests
             WarmupIterations = 5,
             IsBaseline = baseline,
             SignificanceVerdict = significance,
+            RuntimeMoniker = runtimeMoniker,
             RunAtUtc = DateTimeOffset.UtcNow,
             Q1 = 0,
             Q3 = 0,

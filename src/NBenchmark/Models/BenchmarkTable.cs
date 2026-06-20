@@ -103,39 +103,53 @@ public sealed record BenchmarkTable
         // benchmarks (e.g. competing methods measured at the same parameters). When no group
         // does - a single method swept across parameter values - rank the whole table against
         // its reference point so the Ratio column conveys the scaling factor across the sweep.
-        var anyGroupComparison = groups.Any(g => g.Count(r => !r.Errored) > 1);
+        var anyGroupComparison = groups.Any(g =>
+            g.GroupBy(r => r.RuntimeMoniker, StringComparer.Ordinal)
+                .Any(runtimeGroup => runtimeGroup.Count(r => !r.Errored) > 1));
 
         if (!anyGroupComparison)
         {
-            var successful = results.Where(r => !r.Errored).ToList();
-            var explicitBaselines = successful.Where(r => r.IsBaseline).ToList();
+            foreach (var runtimeGroup in results.GroupBy(r => r.RuntimeMoniker, StringComparer.Ordinal))
+            {
+                var runtimeResults = runtimeGroup.ToList();
+                var successful = runtimeResults.Where(r => !r.Errored).ToList();
+                BenchmarkResult? reference = null;
 
-            // Honour a single explicit baseline; otherwise scale against the fastest point so
-            // ratios read naturally as 1.00x (fastest) up to the slowest parameter value.
-            var reference = explicitBaselines.Count == 1
-                ? explicitBaselines[0]
-                : successful.MinBy(r => r.Median);
+                if (successful.Count > 0)
+                {
+                    var explicitBaselines = successful.Where(r => r.IsBaseline).ToList();
 
-            foreach (var result in results.OrderBy(r => r.Median))
-                rows.Add(BuildRow(
-                    result,
-                    reference,
-                    multiBenchmark: false,
-                    comparable: true,
-                    isBaselineOverride: ReferenceEquals(result, reference)));
+                    // Honour a single explicit baseline; otherwise scale against the fastest point so
+                    // ratios read naturally as 1.00x (fastest) up to the slowest parameter value.
+                    reference = explicitBaselines.Count == 1
+                        ? explicitBaselines[0]
+                        : successful.MinBy(r => r.Median);
+                }
+
+                foreach (var result in runtimeResults.OrderBy(r => r.Median))
+                    rows.Add(BuildRow(
+                        result,
+                        reference,
+                        multiBenchmark: false,
+                        comparable: true,
+                        isBaselineOverride: reference is not null && ReferenceEquals(result, reference)));
+            }
 
             return AssembleTable(results, rows, parameterNames);
         }
 
         foreach (var group in groups)
         {
-            var groupResults = group.ToList();
-            var successful = groupResults.Where(r => !r.Errored).ToList();
-            var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
-            var multiBenchmark = successful.Count > 1;
+            foreach (var runtimeGroup in group.GroupBy(r => r.RuntimeMoniker, StringComparer.Ordinal))
+            {
+                var runtimeResults = runtimeGroup.ToList();
+                var successful = runtimeResults.Where(r => !r.Errored).ToList();
+                var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+                var multiBenchmark = successful.Count > 1;
 
-            foreach (var result in groupResults.OrderBy(r => r.Median))
-                rows.Add(BuildRow(result, baseline, multiBenchmark, comparable: multiBenchmark));
+                foreach (var result in runtimeResults.OrderBy(r => r.Median))
+                    rows.Add(BuildRow(result, baseline, multiBenchmark, comparable: multiBenchmark));
+            }
         }
 
         return AssembleTable(results, rows, parameterNames);
@@ -154,11 +168,36 @@ public sealed record BenchmarkTable
         return names;
     }
 
+    private static bool HasMultipleRuntimes(IReadOnlyList<BenchmarkResult> results)
+        => results
+            .Select(r => r.RuntimeMoniker)
+            .Distinct(StringComparer.Ordinal)
+            .Take(2)
+            .Count() > 1;
+
     private static BenchmarkTable BuildInternal(
         IReadOnlyList<BenchmarkResult> results,
         BenchmarkResult? baseline,
         bool multiBenchmark)
     {
+        if (HasMultipleRuntimes(results))
+        {
+            var rowsByRuntime = new List<BenchmarkRow>(results.Count);
+
+            foreach (var runtimeGroup in results.GroupBy(r => r.RuntimeMoniker, StringComparer.Ordinal))
+            {
+                var runtimeResults = runtimeGroup.ToList();
+                var successful = runtimeResults.Where(r => !r.Errored).ToList();
+                var runtimeBaseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+                var runtimeMultiBenchmark = runtimeResults.Count > 1;
+
+                foreach (var result in runtimeResults.OrderBy(r => r.Median))
+                    rowsByRuntime.Add(BuildRow(result, runtimeBaseline, runtimeMultiBenchmark));
+            }
+
+            return AssembleTable(results, rowsByRuntime, []);
+        }
+
         var rows = results
             .OrderBy(r => r.Median)
             .Select(r => BuildRow(r, baseline, multiBenchmark))

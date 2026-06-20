@@ -259,6 +259,7 @@ public sealed class ConsoleReporter : IReporter
     private static void RenderTimingDetail(BenchmarkTable benchTable)
     {
         var rows = benchTable.Rows.Where(r => !r.Errored).ToList();
+        var showRuntime = rows.Any(r => r.RuntimeMoniker.Length > 0);
 
         if (rows.Count == 0)
             return;
@@ -283,7 +284,12 @@ public sealed class ConsoleReporter : IReporter
         var table = new Table()
             .Border(TableBorder.Rounded)
             .BorderColor(Color.Grey42)
-            .AddColumn(new TableColumn("[dim]Benchmark[/]").NoWrap())
+            .AddColumn(new TableColumn("[dim]Benchmark[/]").NoWrap());
+
+        if (showRuntime)
+            table.AddColumn(new TableColumn("[dim]Runtime[/]").RightAligned().NoWrap());
+
+        table
             .AddColumn(new TableColumn("[dim]Error (±CI)[/]").RightAligned())
             .AddColumn(new TableColumn("[dim]StdDev[/]").RightAligned())
             .AddColumn(new TableColumn("[dim]CV[/]").RightAligned());
@@ -306,10 +312,16 @@ public sealed class ConsoleReporter : IReporter
             var cells = new List<string>
             {
                 $"[dim]{Esc(row.Name)}[/]",
+            };
+
+            if (showRuntime)
+                cells.Add(Esc(row.RuntimeMoniker));
+
+            cells.AddRange([
                 $"±{BenchmarkFormatter.FormatNs(row.MarginOfError)} [dim]({row.MarginPercent:F2}%)[/]",
                 BenchmarkFormatter.FormatNs(row.StandardDeviation),
                 $"[{cvColor}]{row.CoefficientOfVariationPercent:F2}%[/]",
-            };
+            ]);
 
             foreach (var percentile in percentileKeys)
             {
@@ -477,7 +489,18 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.Write(rule);
         AnsiConsole.WriteLine();
 
-        if (benchTable.Omnibus is { } omnibus)
+        var hasMultipleRuntimes = benchTable.Rows
+            .Where(r => !r.Errored)
+            .Select(r => r.RuntimeMoniker)
+            .Distinct(StringComparer.Ordinal)
+            .Take(2)
+            .Count() > 1;
+
+        if (hasMultipleRuntimes)
+        {
+            AnsiConsole.MarkupLine("[grey]Omnibus:[/] [dim]runtime-scoped in multi-runtime runs; combined summary omitted.[/]");
+        }
+        else if (benchTable.Omnibus is { } omnibus)
         {
             var (verdict, color) = omnibus.Verdict switch
             {
@@ -494,7 +517,9 @@ public sealed class ConsoleReporter : IReporter
         else
             AnsiConsole.MarkupLine("[grey]Omnibus:[/] [dim]not run (fewer than 3 comparable groups)[/]");
 
-        var testName = benchTable.Omnibus?.TestName ?? benchTable.SignificanceTestName;
+        var testName = hasMultipleRuntimes
+            ? benchTable.SignificanceTestName
+            : benchTable.Omnibus?.TestName ?? benchTable.SignificanceTestName;
 
         AnsiConsole.MarkupLine(
             $"[grey]Significance:[/] [dim]{Esc(testName)} (p < {benchTable.SignificanceLevel:0.###})[/]");
