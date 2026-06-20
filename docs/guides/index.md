@@ -132,4 +132,4 @@ Run Suite and Host benchmarks in clean child processes when runtime state contam
 
 ## [Multi-Runtime Comparison](./suite-mode.md#multi-runtime-comparison)
 
-Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in both Suite mode (`WithRuntimes`) and Host mode (`--runtimes`).
+Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in Suite mode (`WithRuntimes`), Host mode (`--runtimes` CLI flag), and Host mode via the `[Runtimes]` attribute.

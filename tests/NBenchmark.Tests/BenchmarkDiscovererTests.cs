@@ -390,9 +390,96 @@ public class BenchmarkDiscovererTests
 
     [Fact]
     public void BenchmarkCategoryAttribute_Rejects_Blank_Name() => Assert.Throws<ArgumentException>(() => new BenchmarkCategoryAttribute("   "));
+
+    [Fact]
+    public void Discovers_Class_Level_Runtimes_Attribute()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(RuntimeAttributedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(RuntimeAttributedBenchmarks));
+
+        Assert.Equal([RuntimeMoniker.Net8, RuntimeMoniker.Net9], suite.Runtimes);
+    }
+
+    [Fact]
+    public void Class_Level_Runtimes_Attribute_Is_Inherited_By_Derived_Classes()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(DerivedRuntimeAttributedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(DerivedRuntimeAttributedBenchmarks));
+
+        Assert.Equal([RuntimeMoniker.Net8, RuntimeMoniker.Net9], suite.Runtimes);
+    }
+
+    [Fact]
+    public void Derived_Class_Runtimes_Attribute_Overrides_Base()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(OverridingRuntimeAttributedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(OverridingRuntimeAttributedBenchmarks));
+
+        Assert.Equal([RuntimeMoniker.Net10], suite.Runtimes);
+    }
+
+    [Fact]
+    public void No_Runtimes_Attribute_Returns_Empty_List()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(PublicBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(PublicBenchmarks));
+
+        Assert.Empty(suite.Runtimes);
+    }
+
+    [Fact]
+    public void Empty_Runtimes_Attribute_Is_NoOp()
+    {
+        var suites = new BenchmarkDiscoverer().Discover(typeof(EmptyRuntimeAttributedBenchmarks).Assembly);
+        var suite = suites.First(s => s.Type == typeof(EmptyRuntimeAttributedBenchmarks));
+
+        Assert.Empty(suite.Runtimes);
+    }
 }
 
-[BenchmarkCategory("String")]
+[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9)]
+public class RuntimeAttributedBenchmarks
+{
+    [Benchmark]
+    public int A() => 1;
+
+    [Benchmark]
+    public int B() => 2;
+}
+
+[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9)]
+public class BaseRuntimeAttributedBenchmarks
+{
+    [Benchmark]
+    public int Inherited() => 1;
+}
+
+public class DerivedRuntimeAttributedBenchmarks : BaseRuntimeAttributedBenchmarks
+{
+    [Benchmark]
+    public int Declared() => 2;
+}
+
+[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9)]
+public class BaseOverridingRuntimeAttributedBenchmarks
+{
+    [Benchmark]
+    public int Inherited() => 1;
+}
+
+[Runtimes(RuntimeMoniker.Net10)]
+public class OverridingRuntimeAttributedBenchmarks : BaseOverridingRuntimeAttributedBenchmarks
+{
+    [Benchmark]
+    public int Declared() => 2;
+}
+
+[Runtimes]
+public class EmptyRuntimeAttributedBenchmarks
+{
+    [Benchmark]
+    public int A() => 1;
+}
 public class CategorizedBenchmarks
 {
     [Benchmark]

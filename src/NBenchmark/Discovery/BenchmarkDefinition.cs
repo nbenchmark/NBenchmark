@@ -11,6 +11,8 @@ public sealed record BenchmarkSuiteDefinition(
 )
 {
     public InstanceLifetime Lifetime { get; init; } = InstanceLifetime.PerMethod;
+
+    internal IReadOnlyList<RuntimeMoniker> Runtimes { get; init; } = [];
 }
 
 public sealed record BenchmarkMethodDefinition(

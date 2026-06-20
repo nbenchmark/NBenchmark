@@ -373,7 +373,7 @@ When `--runtimes` is specified, the host builds the project for each target fram
 
 The console and markdown reporters add a "Runtime" column when results span multiple runtimes. Significance testing is performed within each runtime (net8 results are compared against the net8 baseline, not the net10 one). The first runtime in the list is the implicit baseline for ratio calculations.
 
-`--runtimes` overrides `--in-process`; cross-runtime always uses child processes.
+`--runtimes` overrides `--in-process`; cross-runtime always uses child processes. When `--runtimes` is passed, it also overrides any `[Runtimes]` attribute on discovered classes.
 
 ---
 

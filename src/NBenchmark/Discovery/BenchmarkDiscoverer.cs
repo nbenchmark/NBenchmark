@@ -72,6 +72,7 @@ public sealed class BenchmarkDiscoverer
         var iterTeardownDel = BuildVoidDelegate(iterTeardownMethod);
 
         var classCategories = ResolveCategories(type);
+        var classRuntimes = ResolveRuntimes(type);
 
         var benchmarks = methods
             .Where(m => m.GetCustomAttribute<BenchmarkAttribute>() is not null)
@@ -92,6 +93,7 @@ public sealed class BenchmarkDiscoverer
         )
         {
             Lifetime = instanceLifetime,
+            Runtimes = classRuntimes,
         };
     }
 
@@ -551,6 +553,12 @@ public sealed class BenchmarkDiscoverer
         }
 
         return resolved;
+    }
+
+    private static IReadOnlyList<RuntimeMoniker> ResolveRuntimes(Type type)
+    {
+        var attr = type.GetCustomAttribute<RuntimesAttribute>(inherit: true);
+        return attr?.Runtimes ?? [];
     }
 
     private static IReadOnlyList<string> MergeCategories(
