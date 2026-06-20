@@ -149,6 +149,13 @@ public record BenchmarkResult
     /// </summary>
     public IReadOnlyList<string> Categories { get; init; } = [];
 
+    /// <summary>
+    ///     The target framework moniker (e.g. "net8.0", "net9.0") under which this
+    ///     benchmark was executed. Empty when the runtime is not explicitly specified
+    ///     (single-runtime runs).
+    /// </summary>
+    public string RuntimeMoniker { get; init; } = "";
+
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
     /// <summary>

@@ -356,6 +356,27 @@ Programmatic equivalent: `WithOptions(new MeasurementOptions { ReportedPercentil
 
 ---
 
+### `--runtimes <list>`
+
+Run the same benchmarks under multiple .NET runtimes and compare results side-by-side. The value is a comma-separated list of target framework monikers. Both short (`net8`) and full (`net8.0`) forms are accepted.
+
+```bash
+dotnet run -- --runtimes net8,net9,net10
+dotnet run -- --runtimes net8.0,net10.0
+```
+
+When `--runtimes` is specified, the host builds the project for each target framework via `dotnet build -f <tfm>`, runs the benchmarks in a child process under that runtime, and aggregates the results. The project must target all specified runtimes in its `.csproj` file:
+
+```xml
+<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+```
+
+The console and markdown reporters add a "Runtime" column when results span multiple runtimes. Significance testing is performed within each runtime (net8 results are compared against the net8 baseline, not the net10 one). The first runtime in the list is the implicit baseline for ratio calculations.
+
+`--runtimes` overrides `--in-process`; cross-runtime always uses child processes.
+
+---
+
 ### `--no-histogram`
 
 Disable latency histogram computation. By default NBenchmark computes a latency histogram from the trimmed samples with 20 equal-width buckets. This flag skips histogram computation entirely.

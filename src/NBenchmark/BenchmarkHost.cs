@@ -208,9 +208,27 @@ public sealed class BenchmarkHost
         // does nothing here, so it neither recurses nor duplicates output.
         if (IsolatedRunContext.TryGetActiveRequest(out var activeRequest))
         {
-            return activeRequest.Kind == IsolatedRunKind.Host
+            var results = activeRequest.Kind == IsolatedRunKind.Host
                 ? await RunHostChildAsync(activeRequest, cancellationToken).ConfigureAwait(false)
                 : Array.Empty<BenchmarkResult>();
+
+            // Stamp RuntimeMoniker on child results.
+            if (activeRequest.RuntimeMoniker is { } runtimeMoniker)
+            {
+                var tfm = runtimeMoniker.ToTargetFramework();
+                results = results.Select(r => r with { RuntimeMoniker = tfm }).ToList();
+            }
+
+            return results;
+        }
+
+        // When runtimes are specified, delegate to the multi-runtime orchestrator.
+        if (_cliArgs.Runtimes.Count > 0)
+        {
+            if (_cliArgs.InProcess || !_isolationEnabled)
+                Console.WriteLine("Warning: --runtimes overrides --in-process; cross-runtime always uses child processes.");
+
+            return await RunMultiRuntimeAsync(cancellationToken).ConfigureAwait(false);
         }
 
         if (_cliArgs.ShowHelp)
@@ -333,6 +351,11 @@ public sealed class BenchmarkHost
 
         await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
 
+        // SuiteRunner and the isolated-launch aggregators key raw samples by benchmark name;
+        // ApplyPerClassSignificance needs the composite name+runtime key so multi-runtime
+        // results don't collide.
+        rawSamples = ToCompositeKeys(allResults, rawSamples);
+
         ApplyPerClassSignificance(allResults, rawSamples, suiteOptions);
 
         if (_cliArgs.ThresholdPct.HasValue
@@ -356,11 +379,143 @@ public sealed class BenchmarkHost
         return allResults;
     }
 
+    private async Task<IReadOnlyList<BenchmarkResult>> RunMultiRuntimeAsync(
+        CancellationToken cancellationToken)
+    {
+        var runtimes = _cliArgs.Runtimes;
+        Console.WriteLine($"Building for runtimes: {string.Join(", ", runtimes.Select(r => r.ToTargetFramework()))}");
+
+        var builds = await MultiRuntimeOrchestrator
+            .BuildForRuntimesAsync(runtimes, cancellationToken).ConfigureAwait(false);
+
+        var failedBuilds = builds.Where(b => b.Error is not null).ToList();
+
+        foreach (var failed in failedBuilds)
+            Console.Error.WriteLine($"  {failed.Moniker.ToTargetFramework()}: {failed.Error}");
+
+        var successfulBuilds = builds.Where(b => b.DllPath is not null).ToList();
+
+        if (successfulBuilds.Count == 0)
+        {
+            Console.Error.WriteLine("All runtime builds failed.");
+            Environment.ExitCode = 1;
+            return [];
+        }
+
+        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
+        var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
+        var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude,
+            _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);
+        var allResults = new List<BenchmarkResult>();
+        var rawSamples = new Dictionary<string, double[]>();
+        var suiteOptions = _cliArgs.DryRun
+            ? _options with { Iterations = 0, WarmupIterations = 0 }
+            : MergeCliOptions(_options, _cliArgs);
+
+        foreach (var build in successfulBuilds)
+        {
+            var tfm = build.Moniker.ToTargetFramework();
+            Console.WriteLine($"Running benchmarks under {tfm}...");
+
+            var runtimeResults = await RunForRuntimeAsync(
+                    build.Moniker, build.DllPath!, filtered, cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var item in runtimeResults)
+            {
+                allResults.Add(item.Result);
+                rawSamples[$"{item.Result.Name}\0{tfm}"] = item.RawSamples;
+            }
+        }
+
+        ApplyPerClassSignificance(allResults, rawSamples, suiteOptions);
+
+        if (_cliArgs.ThresholdPct.HasValue)
+        {
+            var threshold = _cliArgs.ThresholdPct.Value;
+            var regressedNames = new List<string>();
+
+            // Threshold comparisons only make sense within the same runtime - net8 will
+            // always look "slower" than net10, which would false-positive every net8 row.
+            foreach (var runtimeGroup in allResults.GroupBy(r => r.RuntimeMoniker))
+            {
+                if (ThresholdCheck.HasRegression(runtimeGroup.ToList(), threshold) is (true, var names))
+                    regressedNames.AddRange(names);
+            }
+
+            if (regressedNames.Count > 0)
+            {
+                Console.Error.WriteLine(
+                    $"Regression threshold exceeded ({threshold}%). "
+                    + $"Regressed benchmarks: {string.Join(", ", regressedNames)}");
+
+                Environment.ExitCode = 1;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
+            ApplyOutputDirectory(_cliArgs.OutputDir);
+
+        foreach (var reporter in _reporters)
+            await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+
+        return allResults;
+    }
+
+    private async Task<IReadOnlyList<IsolatedResultItem>> RunForRuntimeAsync(
+        RuntimeMoniker moniker,
+        string entryAssemblyPath,
+        IReadOnlyList<BenchmarkSuiteDefinition> filteredSuites,
+        CancellationToken cancellationToken)
+    {
+        var allItems = new List<IsolatedResultItem>();
+        var tfm = moniker.ToTargetFramework();
+
+        foreach (var suite in filteredSuites)
+        {
+            var request = new IsolatedRunRequest
+            {
+                Kind = IsolatedRunKind.Host,
+                DeclaringTypeFullName = suite.Type.FullName,
+                DisplayPrefix = suite.Type.Name,
+                BenchmarkDisplayNames = suite.Benchmarks.Select(b => b.DisplayName).ToList(),
+                Overrides = MeasurementOverrides.FromCliArgs(_cliArgs),
+                RuntimeMoniker = moniker,
+                EntryAssemblyPath = entryAssemblyPath,
+            };
+
+            var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var item in items)
+                allItems.Add(item with { Result = item.Result with { RuntimeMoniker = tfm } });
+        }
+
+        return allItems;
+    }
+
+    private static Dictionary<string, double[]> ToCompositeKeys(
+        IReadOnlyList<BenchmarkResult> results,
+        Dictionary<string, double[]> nameKeyedSamples)
+    {
+        var composite = new Dictionary<string, double[]>(nameKeyedSamples.Count);
+
+        foreach (var r in results)
+        {
+            if (nameKeyedSamples.TryGetValue(r.Name, out var samples))
+                composite[$"{r.Name}\0{r.RuntimeMoniker}"] = samples;
+        }
+
+        return composite;
+    }
+
     private static void ApplyPerClassSignificance(
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
         MeasurementOptions options)
     {
+        static string RawKey(BenchmarkResult r) => $"{r.Name}\0{r.RuntimeMoniker}";
+
         var groups = allResults
             .Select((result, index) => (result, index))
             .GroupBy(x => x.result.ClassName)
@@ -370,20 +525,34 @@ public sealed class BenchmarkHost
         {
             var classIndices = classGroup.Select(x => x.index).ToList();
             var classResults = classIndices.Select(i => allResults[i]).ToList();
-            var classRawSamples = new Dictionary<string, double[]>();
 
-            foreach (var result in classResults)
-            {
-                if (rawSamples.TryGetValue(result.Name, out var samples))
-                    classRawSamples[result.Name] = samples;
-            }
+            // Within a class, significance and threshold comparisons only make sense within
+            // the same runtime. Group by RuntimeMoniker so net8 results are compared against
+            // the net8 baseline, not the net10 one.
+            var runtimeGroups = classResults
+                .Select((r, idx) => (Result: r, Index: idx))
+                .GroupBy(ri => ri.Result.RuntimeMoniker)
+                .ToList();
 
             if (!classResults.Any(r => r.ParameterSet.Count > 0))
             {
-                Significance.ApplyIfEnabled(classResults, classRawSamples, options);
+                foreach (var runtimeGroup in runtimeGroups)
+                {
+                    var runtimeList = runtimeGroup.ToList();
+                    var runtimeResults = runtimeList.Select(ri => ri.Result).ToList();
+                    var runtimeRaw = new Dictionary<string, double[]>();
 
-                for (var i = 0; i < classIndices.Count; i++)
-                    allResults[classIndices[i]] = classResults[i];
+                    foreach (var ri in runtimeList)
+                    {
+                        if (rawSamples.TryGetValue(RawKey(ri.Result), out var samples))
+                            runtimeRaw[ri.Result.Name] = samples;
+                    }
+
+                    Significance.ApplyIfEnabled(runtimeResults, runtimeRaw, options);
+
+                    for (var j = 0; j < runtimeList.Count; j++)
+                        allResults[classIndices[runtimeList[j].Index]] = runtimeResults[j];
+                }
 
                 continue;
             }
@@ -398,19 +567,26 @@ public sealed class BenchmarkHost
 
             foreach (var paramGroup in paramGroups)
             {
-                var paramList = paramGroup.ToList();
-                var paramResults = paramList.Select(ri => ri.Result).ToList();
-                var paramRaw = new Dictionary<string, double[]>();
-                foreach (var ri in paramList)
+                var paramRuntimeGroups = paramGroup
+                    .GroupBy(ri => ri.Result.RuntimeMoniker)
+                    .ToList();
+
+                foreach (var runtimeGroup in paramRuntimeGroups)
                 {
-                    if (rawSamples.TryGetValue(ri.Result.Name, out var samples))
-                        paramRaw[ri.Result.Name] = samples;
+                    var paramList = runtimeGroup.ToList();
+                    var paramResults = paramList.Select(ri => ri.Result).ToList();
+                    var paramRaw = new Dictionary<string, double[]>();
+                    foreach (var ri in paramList)
+                    {
+                        if (rawSamples.TryGetValue(RawKey(ri.Result), out var samples))
+                            paramRaw[ri.Result.Name] = samples;
+                    }
+
+                    Significance.ApplyIfEnabled(paramResults, paramRaw, options);
+
+                    for (var j = 0; j < paramList.Count; j++)
+                        allResults[classIndices[paramList[j].Index]] = paramResults[j];
                 }
-
-                Significance.ApplyIfEnabled(paramResults, paramRaw, options);
-
-                for (var j = 0; j < paramList.Count; j++)
-                    allResults[classIndices[paramList[j].Index]] = paramResults[j];
             }
         }
     }

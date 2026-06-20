@@ -93,6 +93,36 @@ internal static class ChildProcessLauncher
         return psi;
     }
 
+    /// <summary>
+    ///     Builds a <see cref="ProcessStartInfo"/> that launches the specified entry assembly
+    ///     via <c>dotnet exec</c>. Used for cross-runtime runs where the child must run a
+    ///     specific TFM's build output rather than re-running the current process.
+    /// </summary>
+    internal static ProcessStartInfo BuildStartInfo(
+        string entryAssemblyPath,
+        params (string Name, string Value)[] environmentVariables)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = Environment.CurrentDirectory,
+        };
+
+        psi.ArgumentList.Add("exec");
+        psi.ArgumentList.Add(entryAssemblyPath);
+
+        foreach (var (name, value) in environmentVariables)
+        {
+            psi.Environment[name] = value;
+        }
+
+        return psi;
+    }
+
     public static async Task WritePayloadAsync(
         string outputPath,
         IReadOnlyList<IsolatedResultItem> items,
@@ -243,9 +273,14 @@ internal static class ChildProcessLauncher
 
                 using var process = new Process
                 {
-                    StartInfo = BuildStartInfo(
-                        (RequestPathEnvVar, requestPath),
-                        (OutputPathEnvVar, outputPath)),
+                    StartInfo = !string.IsNullOrEmpty(request.EntryAssemblyPath)
+                        ? BuildStartInfo(
+                            request.EntryAssemblyPath,
+                            (RequestPathEnvVar, requestPath),
+                            (OutputPathEnvVar, outputPath))
+                        : BuildStartInfo(
+                            (RequestPathEnvVar, requestPath),
+                            (OutputPathEnvVar, outputPath)),
                 };
 
                 var stderr = new StringBuilder();

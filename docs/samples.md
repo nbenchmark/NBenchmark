@@ -277,3 +277,88 @@ What to look at:
 - The primary result fields come from the **best** (lowest median) launch, so the main table reflects the most favourable reading.
 - How `--launch-count 5` on the CLI overrides the programmatic count.
 - How the per-method `[Benchmark(LaunchCount = 3)]` attribute specifies different counts per benchmark.
+
+---
+
+## MultiRuntimeSuite - Suite mode multi-runtime
+
+**`samples/MultiRuntimeSuite/`**
+
+A `BenchmarkSuite` comparing three string concatenation methods across .NET 8, 9, and 10. Demonstrates `WithRuntimes` for cross-runtime comparison.
+
+```bash
+cd samples/MultiRuntimeSuite
+dotnet run
+```
+
+```csharp
+using NBenchmark;
+using NBenchmark.Reporters.Console;
+
+var results = await new BenchmarkSuite("string-concat")
+    .Add("concat", () => "a" + "b" + "c" + "d" + "e")
+    .Add("interpolate", () => $"a {"b"} {"c"} {"d"} {"e"}")
+    .Add("join", () => string.Join("", "a", "b", "c", "d", "e"))
+    .WithBaseline("concat")
+    .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)
+    .WithWarmup(3)
+    .WithIterations(50)
+    .WithReporter(new ConsoleReporter())
+    .WithProgress(new ConsoleBenchmarkProgress())
+    .RunAsync();
+```
+
+What to look at:
+
+- The "Runtime" column in the comparison table, showing results grouped by target framework.
+- How the same benchmark body produces different timings across runtimes.
+- The Ratio column showing how each runtime compares to the net8 baseline.
+- The project must target all runtimes in its `.csproj` (`<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>`).
+
+---
+
+## MultiRuntimeHost - Host mode multi-runtime
+
+**`samples/MultiRuntimeHost/`**
+
+A `BenchmarkHost` with attribute-based benchmarks that can be run across multiple .NET runtimes via the `--runtimes` CLI flag.
+
+```bash
+cd samples/MultiRuntimeHost
+dotnet run -- --runtimes net8,net9,net10
+dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output ./results
+```
+
+```csharp
+using NBenchmark;
+using NBenchmark.Attributes;
+using NBenchmark.Reporters.Console;
+
+await BenchmarkHost.Create(args)
+    .AddFromAssembly<StringBenchmarks>()
+    .WithReporter(new ConsoleReporter())
+    .WithProgress(new ConsoleBenchmarkProgress())
+    .RunAsync();
+
+public class StringBenchmarks
+{
+    [Benchmark(Baseline = true)]
+    public string Concat() => "a" + "b" + "c" + "d" + "e";
+
+    [Benchmark]
+    public string Interpolate() => $"a {"b"} {"c"} {"d"} {"e"}";
+
+    [Benchmark]
+    public string Join() => string.Join("", "a", "b", "c", "d", "e");
+
+    [Benchmark]
+    public string Create() => new string(['a', 'b', 'c', 'd', 'e']);
+}
+```
+
+What to look at:
+
+- How `--runtimes net8,net9,net10` triggers cross-runtime builds and execution.
+- The "Runtime" column in the console output.
+- How the host builds the project for each TFM, runs benchmarks in child processes, and aggregates results.
+- Combining `--runtimes` with other CLI flags like `--iterations`, `--reporter`, and `--output`.

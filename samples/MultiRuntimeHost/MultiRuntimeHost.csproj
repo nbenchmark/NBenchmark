@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
+    <ProjectReference Include="..\..\src\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj"/>
+  </ItemGroup>
+
+</Project>

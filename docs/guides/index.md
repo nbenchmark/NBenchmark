@@ -129,3 +129,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 ## [Isolated Runs (Advanced)](./isolated-runs.md)
 
 Run Suite and Host benchmarks in clean child processes when runtime state contamination matters more than raw execution speed. Host mode is isolated by default; suites opt in with `WithIsolation()`.
+
+## [Multi-Runtime Comparison](./suite-mode.md#multi-runtime-comparison)
+
+Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in both Suite mode (`WithRuntimes`) and Host mode (`--runtimes`).

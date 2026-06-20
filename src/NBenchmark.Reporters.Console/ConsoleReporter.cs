@@ -114,6 +114,7 @@ public sealed class ConsoleReporter : IReporter
         var successfulRows = benchTable.Rows.Where(r => !r.Errored).ToList();
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
+        var showRuntime = benchTable.Rows.Any(r => r.RuntimeMoniker.Length > 0);
 
         // A ratio is present whenever a row was ranked against a reference - either a competing
         // benchmark in its parameter group or, for a single method swept across parameter values,
@@ -127,6 +128,9 @@ public sealed class ConsoleReporter : IReporter
             .Border(TableBorder.Simple)
             .BorderColor(Color.Grey)
             .AddColumn(new TableColumn("[bold]Benchmark[/]").NoWrap());
+
+        if (showRuntime)
+            table.AddColumn(new TableColumn("[bold]Runtime[/]").RightAligned().NoWrap());
 
         foreach (var paramName in benchTable.ParameterNames)
             table.AddColumn(new TableColumn($"[bold]{Esc(paramName)}[/]").RightAligned().NoWrap());
@@ -164,6 +168,8 @@ public sealed class ConsoleReporter : IReporter
             if (row.Errored)
             {
                 var errorCols = new List<string> { $"[red]✗ {Esc(displayName)}[/]" };
+                if (showRuntime)
+                    errorCols.Add(Esc(row.RuntimeMoniker));
                 errorCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
                 errorCols.AddRange(["[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]"]);
 
@@ -204,6 +210,8 @@ public sealed class ConsoleReporter : IReporter
                 : "[dim]-[/]";
 
             var rowCols = new List<string> { nameText };
+            if (showRuntime)
+                rowCols.Add(Esc(row.RuntimeMoniker));
             rowCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
             rowCols.AddRange([
                 $"[bold]{BenchmarkFormatter.FormatNs(row.Median)}[/]",

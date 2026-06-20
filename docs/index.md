@@ -90,6 +90,23 @@ Enforce performance SLAs directly in your test suite. If a benchmark exceeds the
 public void CriticalPath_ShouldBeFast() => ProcessOrder(testOrder);
 ```
 
+## Multi-Runtime Comparison
+
+Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in both Suite mode (`WithRuntimes`) and Host mode (`--runtimes`).
+
+```bash
+dotnet run -- --runtimes net8,net9,net10
+```
+
+```csharp
+await new BenchmarkSuite("sorting")
+    .Add("bubble", BubbleSort)
+    .Add("linq", LinqSort)
+    .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+```
+
 ## Packages
 
 | Package | Purpose |
@@ -109,6 +126,7 @@ public void CriticalPath_ShouldBeFast() => ProcessOrder(testOrder);
 - **[Quick Start](./getting-started/quick-start.md)** - your first benchmark in 60 seconds
 - **[Key Concepts](./getting-started/key-concepts.md)** - warmup, outliers, and statistics
 - **[Guides](./guides/index.md)** - detailed walkthroughs for each mode
+- **[Multi-Runtime Comparison](./guides/suite-mode.md#multi-runtime-comparison)** - run benchmarks across .NET runtimes
 - **[Configuration](./reference/configuration.md)** - every option explained
 - **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0010)
 - **[Statistics](./statistics/index.md)** - how the numbers are calculated

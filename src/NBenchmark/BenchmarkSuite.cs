@@ -16,6 +16,7 @@ public sealed class BenchmarkSuite(string name)
     private string? _baselineName;
     private ReportDetail _detail;
     private bool _isolated;
+    private IReadOnlyList<RuntimeMoniker> _runtimes = [];
     private MeasurementOptions _options = MeasurementOptions.Default;
     private string[]? _pendingCategories;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
@@ -607,6 +608,18 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
+    ///     Runs the suite benchmarks under each specified runtime and compares results.
+    ///     Cross-runtime execution always uses child processes (each runtime is built via
+    ///     <c>dotnet build -f &lt;tfm&gt;</c> and run in a separate child process),
+    ///     regardless of the <see cref="WithIsolation"/> setting.
+    /// </summary>
+    public BenchmarkSuite WithRuntimes(params RuntimeMoniker[] runtimes)
+    {
+        _runtimes = runtimes;
+        return this;
+    }
+
+    /// <summary>
     ///     Runs every benchmark in the suite and returns their results. When
     ///     <see cref="WithIsolation" /> is enabled the suite runs in a dedicated child
     ///     process; otherwise it runs in the current process.
@@ -634,14 +647,30 @@ public sealed class BenchmarkSuite(string name)
             var isTarget = IsolatedRunContext.IsSuiteRequestMatch(
                 invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, Name);
 
-            return await RunInProcessCoreAsync(
+            var results = await RunInProcessCoreAsync(
                 NullBenchmarkProgress.Instance,
                 RunOrder.Declaration,
                 false,
                 false,
                 isTarget,
                 cancellationToken).ConfigureAwait(false);
+
+            // Stamp RuntimeMoniker on child results before returning/writing payload.
+            if (IsolatedRunContext.TryGetActiveRequest(out var childRequest)
+                && childRequest.RuntimeMoniker is { } runtimeMoniker)
+            {
+                var tfm = runtimeMoniker.ToTargetFramework();
+                results = results.Select(r => r with { RuntimeMoniker = tfm }).ToList();
+            }
+
+            return results;
         }
+
+        // When runtimes are specified, delegate to the multi-runtime orchestrator.
+        if (_runtimes.Count > 0)
+            return await RunMultiRuntimeSuiteAsync(
+                invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, cancellationToken)
+                .ConfigureAwait(false);
 
         if (_isolated)
         {
@@ -720,6 +749,10 @@ public sealed class BenchmarkSuite(string name)
 
         await progress.OnSuiteCompleted(results).ConfigureAwait(false);
 
+        // SuiteRunner keys raw samples by benchmark name; the significance and payload paths
+        // need the composite name+runtime key so multi-runtime results don't collide.
+        rawSamples = ToCompositeKeys(results, rawSamples);
+
         if (applySignificance)
             ApplyPerParameterSignificance(results, rawSamples);
 
@@ -770,7 +803,7 @@ public sealed class BenchmarkSuite(string name)
             if (bestIndex >= 0 && bestIndex < allLaunchSamples.Count
                 && allLaunchSamples[bestIndex].TryGetValue(name, out var samples))
             {
-                rawSamples[name] = samples;
+                rawSamples[$"{name}\0{best.RuntimeMoniker}"] = samples;
             }
         }
 
@@ -858,7 +891,7 @@ public sealed class BenchmarkSuite(string name)
 
             result = result with { ParameterSet = envelope.ParameterSet };
             results.Add(result);
-            rawSamples[envelope.Name] = raw;
+            rawSamples[$"{envelope.Name}\0{result.RuntimeMoniker}"] = raw;
 
             await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
         }
@@ -873,6 +906,143 @@ public sealed class BenchmarkSuite(string name)
         }
 
         return results;
+    }
+
+    private async Task<IReadOnlyList<BenchmarkResult>> RunMultiRuntimeSuiteAsync(
+        int invocationOrdinal,
+        string callerFilePath,
+        int callerLineNumber,
+        string callerMemberName,
+        CancellationToken cancellationToken)
+    {
+        if (!_progressExplicitlySet)
+            _progress = new DefaultConsoleProgress();
+
+        Console.WriteLine($"Building for runtimes: {string.Join(", ", _runtimes.Select(r => r.ToTargetFramework()))}");
+
+        var builds = await MultiRuntimeOrchestrator
+            .BuildForRuntimesAsync(_runtimes, cancellationToken).ConfigureAwait(false);
+
+        var failedBuilds = builds.Where(b => b.Error is not null).ToList();
+
+        foreach (var failed in failedBuilds)
+            Console.Error.WriteLine($"  {failed.Moniker.ToTargetFramework()}: {failed.Error}");
+
+        var successfulBuilds = builds.Where(b => b.DllPath is not null).ToList();
+
+        if (successfulBuilds.Count == 0)
+        {
+            Console.Error.WriteLine("All runtime builds failed.");
+            return [];
+        }
+
+        var allResults = new List<BenchmarkResult>();
+        var rawSamples = new Dictionary<string, double[]>();
+
+        var expanded = ExpandEnvelopes();
+        var filteredBenchmarks = ApplyCategoryFilter(expanded);
+        var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
+
+        await _progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
+
+        _suiteSetup?.Invoke();
+
+        try
+        {
+            foreach (var build in successfulBuilds)
+            {
+                var tfm = build.Moniker.ToTargetFramework();
+                Console.WriteLine($"  Running under {tfm}...");
+
+                var request = new IsolatedRunRequest
+                {
+                    Kind = IsolatedRunKind.Suite,
+                    InvocationOrdinal = invocationOrdinal,
+                    CallerFilePath = callerFilePath,
+                    CallerLineNumber = callerLineNumber,
+                    CallerMemberName = callerMemberName,
+                    SuiteName = Name,
+                    BenchmarkDisplayNames = envelopeNames,
+                    RuntimeMoniker = build.Moniker,
+                    EntryAssemblyPath = build.DllPath,
+                };
+
+                IReadOnlyList<IsolatedResultItem> items;
+
+                if (_options.LaunchCount > 1)
+                {
+                    var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
+
+                    for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
+                    {
+                        var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                            .ConfigureAwait(false);
+                        allLaunchItems.Add(launchItems);
+                    }
+
+                    items = AggregateIsolatedLaunches(allLaunchItems, envelopeNames, filteredBenchmarks);
+                }
+                else
+                {
+                    items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
+
+                for (var i = 0; i < filteredBenchmarks.Count; i++)
+                {
+                    var envelope = filteredBenchmarks[i];
+                    var isBaseline = _baselineName is not null && envelope.OriginalName == _baselineName;
+
+                    await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count)
+                        .ConfigureAwait(false);
+
+                    BenchmarkResult result;
+
+                    if (byName.TryGetValue(envelope.Name, out var item))
+                    {
+                        result = item.Result with
+                        {
+                            IsBaseline = isBaseline,
+                            Description = envelope.Description,
+                            RuntimeMoniker = tfm,
+                        };
+
+                        if (item.RawSamples.Length > 0)
+                            rawSamples[$"{envelope.Name}\0{tfm}"] = item.RawSamples;
+                    }
+                    else
+                    {
+                        var message = $"Isolated child did not return a result for '{envelope.Name}'.";
+
+                        result = OutcomeBuilder.Build(
+                            new RunOutcome.Errored(new InvalidOperationException(message), message),
+                            envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
+                            _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
+                            envelope.Categories).Result with { RuntimeMoniker = tfm };
+                    }
+
+                    result = result with { ParameterSet = envelope.ParameterSet };
+                    allResults.Add(result);
+
+                    await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+                }
+            }
+        }
+        finally
+        {
+            _suiteTeardown?.Invoke();
+        }
+
+        await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
+
+        ApplyPerParameterSignificance(allResults, rawSamples);
+
+        foreach (var reporter in _reporters)
+            await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+
+        return allResults;
     }
 
     private static IReadOnlyList<IsolatedResultItem> AggregateIsolatedLaunches(
@@ -1050,11 +1220,52 @@ public sealed class BenchmarkSuite(string name)
     private static string FormatParamDisplayName(string benchmarkName, BenchmarkParameter[] paramSet)
         => BenchmarkParameter.FormatDisplayName(benchmarkName, paramSet);
 
+    private static Dictionary<string, double[]> ToCompositeKeys(
+        IReadOnlyList<BenchmarkResult> results,
+        Dictionary<string, double[]> nameKeyedSamples)
+    {
+        var composite = new Dictionary<string, double[]>(nameKeyedSamples.Count);
+
+        foreach (var r in results)
+        {
+            if (nameKeyedSamples.TryGetValue(r.Name, out var samples))
+                composite[$"{r.Name}\0{r.RuntimeMoniker}"] = samples;
+        }
+
+        return composite;
+    }
+
     private void ApplyPerParameterSignificance(List<BenchmarkResult> results, Dictionary<string, double[]> rawSamples)
     {
+        static string RawKey(BenchmarkResult r) => $"{r.Name}\0{r.RuntimeMoniker}";
+
         if (!results.Any(r => r.ParameterSet.Count > 0))
         {
-            Significance.ApplyIfEnabled(results, rawSamples, _options);
+            // Significance only makes sense within the same runtime; net8 vs net10 is not
+            // a meaningful comparison for p-value purposes.
+            foreach (var runtimeGroup in results.GroupBy(r => r.RuntimeMoniker))
+            {
+                var runtimeList = runtimeGroup.ToList();
+                var runtimeRaw = new Dictionary<string, double[]>();
+
+                foreach (var r in runtimeList)
+                {
+                    if (rawSamples.TryGetValue(RawKey(r), out var samples))
+                        runtimeRaw[r.Name] = samples;
+                }
+
+                var indices = results
+                    .Select((res, idx) => (res, idx))
+                    .Where(x => x.res.RuntimeMoniker == runtimeGroup.Key)
+                    .Select(x => x.idx)
+                    .ToList();
+
+                Significance.ApplyIfEnabled(runtimeList, runtimeRaw, _options);
+
+                for (var j = 0; j < runtimeList.Count; j++)
+                    results[indices[j]] = runtimeList[j];
+            }
+
             return;
         }
 
@@ -1068,19 +1279,22 @@ public sealed class BenchmarkSuite(string name)
 
         foreach (var group in groups)
         {
-            var groupList = group.ToList();
-            var groupResults = groupList.Select(ri => ri.Result).ToList();
-            var groupRaw = new Dictionary<string, double[]>();
-            foreach (var ri in groupList)
+            foreach (var runtimeGroup in group.GroupBy(ri => ri.Result.RuntimeMoniker))
             {
-                if (rawSamples.TryGetValue(ri.Result.Name, out var samples))
-                    groupRaw[ri.Result.Name] = samples;
+                var groupList = runtimeGroup.ToList();
+                var groupResults = groupList.Select(ri => ri.Result).ToList();
+                var groupRaw = new Dictionary<string, double[]>();
+                foreach (var ri in groupList)
+                {
+                    if (rawSamples.TryGetValue(RawKey(ri.Result), out var samples))
+                        groupRaw[ri.Result.Name] = samples;
+                }
+
+                Significance.ApplyIfEnabled(groupResults, groupRaw, _options);
+
+                for (var j = 0; j < groupList.Count; j++)
+                    results[groupList[j].Index] = groupResults[j];
             }
-
-            Significance.ApplyIfEnabled(groupResults, groupRaw, _options);
-
-            for (var j = 0; j < groupList.Count; j++)
-                results[groupList[j].Index] = groupResults[j];
         }
     }
 

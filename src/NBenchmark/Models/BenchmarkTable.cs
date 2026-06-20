@@ -249,6 +249,7 @@ public sealed record BenchmarkTable
             Categories = result.Categories,
             ParameterSet = result.ParameterSet,
             BaseName = ComputeBaseName(result),
+            RuntimeMoniker = result.RuntimeMoniker,
         };
     }
 
@@ -459,6 +460,12 @@ public record BenchmarkRow
     public required double CoefficientOfVariationPercent { get; init; }
     public AutoTuneDiagnostic? AutoTune { get; init; }
     public IReadOnlyList<string> Categories { get; init; } = [];
+
+    /// <summary>
+    ///     The target framework moniker (e.g. "net8.0", "net9.0") under which this
+    ///     benchmark was executed. Empty for single-runtime runs.
+    /// </summary>
+    public string RuntimeMoniker { get; init; } = "";
 
     public double? GetPercentile(double p)
     {
