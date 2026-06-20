@@ -129,6 +129,56 @@ public class ReporterTests
     }
 
     [Fact]
+    public async Task MarkdownReporter_TimingDetail_Includes_Runtime_Column_When_MultiRuntime()
+    {
+        var tempDir = MakeSubDir("nb-md-tail-runtime");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md");
+            var net8 = MakeResult("alpha", 100, runtimeMoniker: "net8.0", percentiles: [new PercentileEntry(0.95, 110)]);
+            var net9 = MakeResult("alpha", 80, runtimeMoniker: "net9.0", percentiles: [new PercentileEntry(0.95, 95)]);
+
+            await reporter.ReportAsync([net8, net9]);
+
+            var filePath = Path.Combine(tempDir, "out.md");
+            var content = await File.ReadAllTextAsync(filePath);
+
+            Assert.Contains("| Benchmark | Runtime | Error (±CI) | StdDev | CV | P95 |", content);
+            Assert.Contains("| alpha | net8.0 |", content);
+            Assert.Contains("| alpha | net9.0 |", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task MarkdownReporter_Interpretation_Uses_RuntimeScoped_Omnibus_Note_For_MultiRuntime()
+    {
+        var tempDir = MakeSubDir("nb-md-omnibus-runtime");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md");
+            var net8 = MakeResult("alpha", 100, runtimeMoniker: "net8.0");
+            var net9 = MakeResult("alpha", 80, runtimeMoniker: "net9.0");
+
+            await reporter.ReportAsync([net8, net9]);
+
+            var filePath = Path.Combine(tempDir, "out.md");
+            var content = await File.ReadAllTextAsync(filePath);
+
+            Assert.Contains("**Omnibus**: runtime-scoped in multi-runtime runs; combined summary omitted.", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
     public async Task MarkdownReporter_Advanced_Appends_Details_Without_Breaking_Table()
     {
         var tempDir = MakeSubDir("nb-md-advanced");
@@ -569,18 +619,25 @@ public class ReporterTests
         Assert.Equal("csv", new CsvReporter().Name);
     }
 
-    private static BenchmarkResult MakeResult(string name, double median)
+    private static BenchmarkResult MakeResult(
+        string name,
+        double median,
+        string runtimeMoniker = "",
+        IReadOnlyList<PercentileEntry>? percentiles = null)
     {
+        percentiles ??= [];
+
         return new BenchmarkResult
         {
             Name = name,
             Mean = median,
             Median = median,
-            Percentiles = [],
+            Percentiles = percentiles,
             Min = median * 0.8,
             Max = median * 1.3,
             StandardDeviation = median * 0.05,
             MeanAllocatedBytes = 64,
+            RuntimeMoniker = runtimeMoniker,
             Q1 = 0,
             Q3 = 0,
             InterquartileRange = 0,

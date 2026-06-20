@@ -29,7 +29,8 @@ internal static class MultiRuntimeOrchestrator
                 var detail = string.IsNullOrWhiteSpace(errorOutput)
                     ? ""
                     : $"\n{errorOutput.Trim()}";
-                results.Add(new TfmBuild(moniker, null, $"Build failed for {tfm} (exit code {exitCode}){detail}"));
+                TryDeleteBuildOutput(outputDir);
+                results.Add(new TfmBuild(moniker, null, null, $"Build failed for {tfm} (exit code {exitCode}){detail}"));
                 continue;
             }
 
@@ -37,11 +38,12 @@ internal static class MultiRuntimeOrchestrator
 
             if (dllPath is null)
             {
-                results.Add(new TfmBuild(moniker, null, $"Could not locate entry assembly DLL in {outputDir}"));
+                TryDeleteBuildOutput(outputDir);
+                results.Add(new TfmBuild(moniker, null, null, $"Could not locate entry assembly DLL in {outputDir}"));
                 continue;
             }
 
-            results.Add(new TfmBuild(moniker, dllPath, null));
+            results.Add(new TfmBuild(moniker, dllPath, outputDir, null));
         }
 
         return results;
@@ -170,6 +172,22 @@ internal static class MultiRuntimeOrchestrator
         throw new InvalidOperationException(
             "Could not locate a .csproj or .sln file. Run the benchmark from within a project directory.");
     }
+
+    public static void TryDeleteBuildOutput(string? outputDir)
+    {
+        if (string.IsNullOrWhiteSpace(outputDir))
+            return;
+
+        try
+        {
+            if (Directory.Exists(outputDir))
+                Directory.Delete(outputDir, recursive: true);
+        }
+        catch
+        {
+            // Best-effort cleanup of temporary runtime build output.
+        }
+    }
 }
 
-internal sealed record TfmBuild(RuntimeMoniker Moniker, string? DllPath, string? Error);
+internal sealed record TfmBuild(RuntimeMoniker Moniker, string? DllPath, string? OutputDirectory, string? Error);

@@ -952,81 +952,89 @@ public sealed class BenchmarkSuite(string name)
             foreach (var build in successfulBuilds)
             {
                 var tfm = build.Moniker.ToTargetFramework();
-                Console.WriteLine($"  Running under {tfm}...");
-
-                var request = new IsolatedRunRequest
+                try
                 {
-                    Kind = IsolatedRunKind.Suite,
-                    InvocationOrdinal = invocationOrdinal,
-                    CallerFilePath = callerFilePath,
-                    CallerLineNumber = callerLineNumber,
-                    CallerMemberName = callerMemberName,
-                    SuiteName = Name,
-                    BenchmarkDisplayNames = envelopeNames,
-                    RuntimeMoniker = build.Moniker,
-                    EntryAssemblyPath = build.DllPath,
-                };
+                    Console.WriteLine($"  Running under {tfm}...");
 
-                IReadOnlyList<IsolatedResultItem> items;
-
-                if (_options.LaunchCount > 1)
-                {
-                    var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
-
-                    for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
+                    var request = new IsolatedRunRequest
                     {
-                        var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                            .ConfigureAwait(false);
-                        allLaunchItems.Add(launchItems);
-                    }
+                        Kind = IsolatedRunKind.Suite,
+                        InvocationOrdinal = invocationOrdinal,
+                        CallerFilePath = callerFilePath,
+                        CallerLineNumber = callerLineNumber,
+                        CallerMemberName = callerMemberName,
+                        SuiteName = Name,
+                        BenchmarkDisplayNames = envelopeNames,
+                        RuntimeMoniker = build.Moniker,
+                        EntryAssemblyPath = build.DllPath,
+                    };
 
-                    items = AggregateIsolatedLaunches(allLaunchItems, envelopeNames, filteredBenchmarks);
-                }
-                else
-                {
-                    items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                        .ConfigureAwait(false);
-                }
+                    IReadOnlyList<IsolatedResultItem> items;
 
-                var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
-
-                for (var i = 0; i < filteredBenchmarks.Count; i++)
-                {
-                    var envelope = filteredBenchmarks[i];
-                    var isBaseline = _baselineName is not null && envelope.OriginalName == _baselineName;
-
-                    await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count)
-                        .ConfigureAwait(false);
-
-                    BenchmarkResult result;
-
-                    if (byName.TryGetValue(envelope.Name, out var item))
+                    if (_options.LaunchCount > 1)
                     {
-                        result = item.Result with
+                        var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
+
+                        for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
                         {
-                            IsBaseline = isBaseline,
-                            Description = envelope.Description,
-                            RuntimeMoniker = tfm,
-                        };
+                            var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                                .ConfigureAwait(false);
+                            allLaunchItems.Add(launchItems);
+                        }
 
-                        if (item.RawSamples.Length > 0)
-                            rawSamples[$"{envelope.Name}\0{tfm}"] = item.RawSamples;
+                        items = AggregateIsolatedLaunches(allLaunchItems, envelopeNames, filteredBenchmarks);
                     }
                     else
                     {
-                        var message = $"Isolated child did not return a result for '{envelope.Name}'.";
-
-                        result = OutcomeBuilder.Build(
-                            new RunOutcome.Errored(new InvalidOperationException(message), message),
-                            envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
-                            _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
-                            envelope.Categories).Result with { RuntimeMoniker = tfm };
+                        items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                            .ConfigureAwait(false);
                     }
 
-                    result = result with { ParameterSet = envelope.ParameterSet };
-                    allResults.Add(result);
+                    var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
 
-                    await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+                    for (var i = 0; i < filteredBenchmarks.Count; i++)
+                    {
+                        var envelope = filteredBenchmarks[i];
+                        var isBaseline = _baselineName is not null && envelope.OriginalName == _baselineName;
+
+                        await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count)
+                            .ConfigureAwait(false);
+
+                        BenchmarkResult result;
+
+                        if (byName.TryGetValue(envelope.Name, out var item))
+                        {
+                            result = item.Result with
+                            {
+                                IsBaseline = isBaseline,
+                                Description = envelope.Description,
+                                RuntimeMoniker = tfm,
+                            };
+
+                            if (item.RawSamples.Length > 0)
+                                rawSamples[$"{envelope.Name}\0{tfm}"] = item.RawSamples;
+                        }
+                        else
+                        {
+                            var message = $"Isolated child did not return a result for '{envelope.Name}'.";
+
+                            result = OutcomeBuilder.Build(
+                                new RunOutcome.Errored(new InvalidOperationException(message), message),
+                                envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
+                                _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
+                                envelope.Categories).Result with
+                            { RuntimeMoniker = tfm };
+                        }
+
+                        result = result with { ParameterSet = envelope.ParameterSet };
+                        allResults.Add(result);
+
+                        await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+                    }
+                }
+                finally
+                {
+                    MultiRuntimeOrchestrator.TryDeleteBuildOutput(build.OutputDirectory);
                 }
             }
         }

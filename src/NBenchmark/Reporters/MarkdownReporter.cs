@@ -213,6 +213,7 @@ public sealed class MarkdownReporter : IReporter
     private static void RenderTimingDetail(StringBuilder sb, BenchmarkTable table)
     {
         var successful = table.Rows.Where(r => !r.Errored).ToList();
+        var showRuntime = successful.Any(r => r.RuntimeMoniker.Length > 0);
 
         if (successful.Count == 0)
             return;
@@ -228,19 +229,29 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine("### Precision & Tail Latency");
         sb.AppendLine();
 
+        var header = new StringBuilder("| Benchmark |");
+        var separator = new StringBuilder("|---|");
+
+        if (showRuntime)
+        {
+            header.Append(" Runtime |");
+            separator.Append("---:|");
+        }
+
+        header.Append(" Error (±CI) | StdDev | CV |");
+        separator.Append("---:|---:|---:|");
+
         if (percentileKeys.Count > 0)
         {
-            var headerCols = string.Join(" | ", percentileKeys.Select(p => $"P{BenchmarkTable.FormatPercentileKey(p)}"));
-            var alignCols = string.Join("", percentileKeys.Select(_ => "---:|"));
+            foreach (var percentile in percentileKeys)
+            {
+                header.Append($" P{BenchmarkTable.FormatPercentileKey(percentile)} |");
+                separator.Append("---:|");
+            }
+        }
 
-            sb.AppendLine($"| Benchmark | Error (±CI) | StdDev | CV | {headerCols} |");
-            sb.AppendLine($"|---|---:|---:|---:|{alignCols}");
-        }
-        else
-        {
-            sb.AppendLine("| Benchmark | Error (±CI) | StdDev | CV |");
-            sb.AppendLine("|---|---:|---:|---:|");
-        }
+        sb.AppendLine(header.ToString());
+        sb.AppendLine(separator.ToString());
 
         foreach (var row in successful)
         {
@@ -248,15 +259,22 @@ public sealed class MarkdownReporter : IReporter
                 .Select(p => row.GetPercentile(p))
                 .Select(value => value.HasValue ? BenchmarkFormatter.FormatNs(value.Value) : string.Empty);
 
-            sb.AppendLine(
-                $"| {row.Name} " +
-                $"| ±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}%) " +
-                $"| {BenchmarkFormatter.FormatNs(row.StandardDeviation)} " +
-                $"| {row.CoefficientOfVariationPercent:F2}% " +
-                (percentileKeys.Count > 0
-                    ? $"| {string.Join(" | ", tailCells)} |"
-                    : "|")
-            );
+            var line = new StringBuilder($"| {row.Name} |");
+
+            if (showRuntime)
+                line.Append($" {row.RuntimeMoniker} |");
+
+            line.Append(
+                $" ±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}%) "
+                + $"| {BenchmarkFormatter.FormatNs(row.StandardDeviation)} "
+                + $"| {row.CoefficientOfVariationPercent:F2}% ");
+
+            if (percentileKeys.Count > 0)
+                line.Append($"| {string.Join(" | ", tailCells)} |");
+            else
+                line.Append("|");
+
+            sb.AppendLine(line.ToString());
         }
 
         sb.AppendLine();
@@ -300,7 +318,19 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine("### Interpretation");
         sb.AppendLine();
 
-        if (table.Omnibus is { } omnibus)
+        var hasMultipleRuntimes = table.Rows
+            .Where(r => !r.Errored)
+            .Select(r => r.RuntimeMoniker)
+            .Distinct(StringComparer.Ordinal)
+            .Take(2)
+            .Count() > 1;
+
+        if (hasMultipleRuntimes)
+        {
+            sb.AppendLine("**Omnibus**: runtime-scoped in multi-runtime runs; combined summary omitted.");
+            sb.AppendLine();
+        }
+        else if (table.Omnibus is { } omnibus)
         {
             var verdict = omnibus.Verdict switch
             {
@@ -322,7 +352,7 @@ public sealed class MarkdownReporter : IReporter
             sb.AppendLine();
         }
 
-        var testName = table.Omnibus?.TestName ?? table.SignificanceTestName;
+        var testName = hasMultipleRuntimes ? table.SignificanceTestName : table.Omnibus?.TestName ?? table.SignificanceTestName;
 
         sb.AppendLine($"- Significance: {testName} (p < {table.SignificanceLevel:0.###})");
         sb.AppendLine($"- Outliers: {table.OutlierDetector}");
