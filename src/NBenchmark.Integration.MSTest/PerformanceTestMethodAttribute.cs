@@ -1,12 +1,14 @@
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using NBenchmark.Engine;
 using NBenchmark.Integration.Abstractions;
 
 namespace NBenchmark.Integration.MSTest;
 
 [AttributeUsage(AttributeTargets.Method)]
-public sealed class PerformanceTestMethodAttribute : TestMethodAttribute, IPerformanceThresholds
+public sealed class PerformanceTestMethodAttribute([CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = -1)
+    : TestMethodAttribute(callerFilePath, callerLineNumber), IPerformanceThresholds
 {
     public double MaxMeanNs { get; init; } = -1;
     public double MaxP95Ns { get; init; } = -1;

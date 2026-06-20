@@ -83,6 +83,7 @@ public sealed class MarkdownReporter : IReporter
         var successfulRows = table.Rows.Where(r => !r.Errored).ToList();
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
+        var showRuntime = table.Rows.Any(r => r.RuntimeMoniker.Length > 0);
         var paramNames = table.ParameterNames;
 
         // The comparison columns appear whenever rows were ranked against a reference - either a
@@ -92,15 +93,17 @@ public sealed class MarkdownReporter : IReporter
         var hasComparisons = table.Rows.Any(r => !r.Errored && !double.IsNaN(r.Ratio));
 
         var header = new StringBuilder("| | Benchmark |");
+        if (showRuntime)
+            header.Append(" Runtime |");
         foreach (var name in paramNames)
             header.Append($" {name} |");
         header.Append(" Median | Mean | Ops/s |");
-
         var separator = new StringBuilder("|:---:|---|");
+        if (showRuntime)
+            separator.Append("---:|");
         foreach (var _ in paramNames)
             separator.Append("---:|");
         separator.Append("---:|---:|---:|");
-
         if (hasComparisons)
         {
             header.Append(" Ratio | Scale | Sig | Magnitude |");
@@ -131,6 +134,8 @@ public sealed class MarkdownReporter : IReporter
             if (row.Errored)
             {
                 var errored = new StringBuilder($"| ✗ | ~~{baseName}~~ |");
+                if (showRuntime)
+                    errored.Append($" {row.RuntimeMoniker} |");
                 foreach (var name in paramNames)
                     errored.Append($" {FormatParameterCell(row, name)} |");
                 errored.Append(" - | - | - |");
@@ -157,6 +162,8 @@ public sealed class MarkdownReporter : IReporter
             var opsText = BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond);
 
             var line = new StringBuilder($"| | {nameText} |");
+            if (showRuntime)
+                line.Append($" {row.RuntimeMoniker} |");
             foreach (var name in paramNames)
                 line.Append($" {FormatParameterCell(row, name)} |");
 

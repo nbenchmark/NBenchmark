@@ -168,6 +168,32 @@ await new BenchmarkSuite("http")
 
 Once suite setup has succeeded, suite teardown is **guaranteed to run** - even when the run is cancelled through a `CancellationToken` - so resources opened in setup are always released.
 
+## Multi-runtime comparison
+
+Use `WithRuntimes` to run the same benchmarks across multiple .NET runtimes and compare results side-by-side. The project must target all specified runtimes in its `.csproj` file:
+
+```xml
+<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+```
+
+```csharp
+var results = await new BenchmarkSuite("string-concat")
+    .Add("concat", () => "a" + "b" + "c")
+    .Add("interpolate", () => $"a {"b"} {"c"}")
+    .WithBaseline("concat")
+    .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)
+    .WithWarmup(3)
+    .WithIterations(50)
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+```
+
+`WithRuntimes` implicitly enables process isolation: each runtime runs in a freshly spawned child process via `dotnet exec`, so JIT, GC, and thread-pool state from one runtime cannot bias another. The console and markdown reporters add a "Runtime" column when results span multiple runtimes.
+
+Significance testing is performed within each runtime (net8 results are compared against the net8 baseline, not the net10 one). The first runtime in the list is the implicit baseline for ratio calculations.
+
+See the [MultiRuntimeSuite sample](../samples.md#multiruntimesuite---suite-mode-multi-runtime) for a complete example.
+
 ## Process isolation
 
 Call `WithIsolation()` to run the **entire suite** in a single freshly spawned child process, so runtime state (JIT warmup, GC pressure, thread-pool state) from the host can't bias the measurements:

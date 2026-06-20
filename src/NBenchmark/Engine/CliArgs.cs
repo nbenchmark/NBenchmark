@@ -68,6 +68,13 @@ internal sealed record CliArgs
     public bool NoHistogram { get; init; }
 
     /// <summary>
+    ///     Target framework monikers to benchmark under. When non-empty, the host builds
+    ///     and runs the benchmark project under each specified runtime and aggregates
+    ///     results for cross-runtime comparison.
+    /// </summary>
+    public IReadOnlyList<RuntimeMoniker> Runtimes { get; init; } = [];
+
+    /// <summary>
     ///     Pure parse: tokenises <paramref name="args" />, validates ranges, and returns
     ///     both the structured result and any error messages. No console I/O, no
     ///     <c>Environment.ExitCode</c> mutation.
@@ -108,6 +115,7 @@ internal sealed record CliArgs
         int? launchCount = null;
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
+        var runtimes = new List<RuntimeMoniker>();
 
         var errors = new List<string>();
 
@@ -347,12 +355,28 @@ internal sealed record CliArgs
                 case "--no-histogram":
                     noHistogram = true;
                     break;
+                case "--runtimes" when i + 1 < args.Length:
+                    var runtimesRaw = args[++i];
+                    var runtimeParts = runtimesRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+                    foreach (var part in runtimeParts)
+                    {
+                        if (TryParseRuntimeMoniker(part, out var parsedMoniker))
+                        {
+                            if (!runtimes.Contains(parsedMoniker))
+                                runtimes.Add(parsedMoniker);
+                        }
+                        else
+                            errors.Add($"Unknown runtime '{part}' in --runtimes. Valid values: net8, net9, net10 (or net8.0, net9.0, net10.0).");
+                    }
+
+                    break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--category" or "--exclude-category" or "--confidence" or "--order"
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
-                    or "--launch-count" or "--percentiles":
+                    or "--launch-count" or "--percentiles" or "--runtimes":
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -396,6 +420,7 @@ internal sealed record CliArgs
             LaunchCount = launchCount,
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
+            Runtimes = runtimes,
         }, errors);
     }
 
@@ -451,6 +476,25 @@ internal sealed record CliArgs
         }
     }
 
+    private static bool TryParseRuntimeMoniker(string value, out RuntimeMoniker moniker)
+    {
+        switch (value.ToLowerInvariant())
+        {
+            case "net8" or "net8.0":
+                moniker = RuntimeMoniker.Net8;
+                return true;
+            case "net9" or "net9.0":
+                moniker = RuntimeMoniker.Net9;
+                return true;
+            case "net10" or "net10.0":
+                moniker = RuntimeMoniker.Net10;
+                return true;
+            default:
+                moniker = default;
+                return false;
+        }
+    }
+
     private static void AddCategory(string rawValue, string flagName, List<string> target, List<string> errors)
     {
         if (string.IsNullOrWhiteSpace(rawValue))
@@ -495,6 +539,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");
+        Console.WriteLine("  --runtimes <list>      Runtimes to compare (comma-separated, e.g. net8,net9,net10)");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
         Console.WriteLine("  --seed <n>             Seed for deterministic random ordering");
         Console.WriteLine("  --detail <level>       Report detail: simple or advanced (default: simple)");

@@ -208,6 +208,19 @@ internal sealed record IsolatedRunRequest
 
     // Host-only scalar measurement overrides (Suite children rebuild their own options).
     public MeasurementOverrides Overrides { get; init; } = new();
+
+    /// <summary>
+    ///     The runtime the parent built this child for. When set, the child stamps
+    ///     <see cref="RuntimeMonikerExtensions.ToTargetFramework"/> onto every
+    ///     <see cref="BenchmarkResult.RuntimeMoniker"/> it produces.
+    /// </summary>
+    public RuntimeMoniker? RuntimeMoniker { get; init; }
+
+    /// <summary>
+    ///     Explicit path to the entry assembly DLL. When set, the launcher uses
+    ///     <c>dotnet exec</c> with this path instead of re-running the current process.
+    /// </summary>
+    public string? EntryAssemblyPath { get; init; }
 }
 
 /// <summary>A single benchmark result plus its raw per-iteration samples, as shipped from a child.</summary>
@@ -299,7 +312,7 @@ internal static class IsolatedRunContext
             .Select(r => new IsolatedResultItem
             {
                 Result = r,
-                RawSamples = rawSamples.TryGetValue(r.Name, out var samples) ? samples : [],
+                RawSamples = rawSamples.TryGetValue($"{r.Name}\0{r.RuntimeMoniker}", out var samples) ? samples : [],
             })
             .ToList();
 
