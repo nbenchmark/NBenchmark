@@ -241,6 +241,7 @@ public class ParametricSuiteTests
     public void BenchmarkParameter_GetKey_Does_Not_Collide_When_Values_Contain_Separators()
     {
         var keyWithSeparators = BenchmarkParameter.GetKey([new BenchmarkParameter("a", "x\u001Fb=y")]);
+
         var splitKey = BenchmarkParameter.GetKey([
             new BenchmarkParameter("a", "x"),
             new BenchmarkParameter("b", "y"),
@@ -266,11 +267,13 @@ public class ParametricSuiteTests
         public Task OnWarmupCompleted(string name) => Task.CompletedTask;
         public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
         public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
+
         public Task OnBenchmarkCompleted(BenchmarkResult result)
         {
             BenchmarkCompletions.Add(result);
             return Task.CompletedTask;
         }
+
         public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) => Task.CompletedTask;
     }
 }

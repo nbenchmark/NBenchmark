@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Runtime.CompilerServices;
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
@@ -12,32 +11,24 @@ public sealed class BenchmarkSuite(string name)
     private readonly List<string> _categoryFilterExclude = [];
     private readonly List<string> _categoryFilterInclude = [];
 
+    private readonly List<ParameterDef> _parameterDefs = [];
+    private readonly List<ParameterizedAdd> _parameterizedFactories = [];
+
     private readonly List<IReporter> _reporters = [];
     private string? _baselineName;
     private ReportDetail _detail;
     private bool _isolated;
-    private IReadOnlyList<RuntimeMoniker> _runtimes = [];
     private MeasurementOptions _options = MeasurementOptions.Default;
     private string[]? _pendingCategories;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
+    private IReadOnlyList<RuntimeMoniker> _runtimes = [];
     private Action? _suiteSetup;
     private Action? _suiteTeardown;
 
-    private readonly List<ParameterDef> _parameterDefs = [];
-    private readonly List<ParameterizedAdd> _parameterizedFactories = [];
-
     /// <summary>The display name of this suite.</summary>
     public string Name { get; } = name;
-
-    private sealed record ParameterDef(string Name, Type Type, object?[] Values);
-
-    private sealed record ParameterizedAdd(
-        string Name,
-        IReadOnlyList<string> Categories,
-        Func<object?[], string, BenchmarkEnvelope> Factory,
-        Type[] ParamTypes);
 
     // --- Parameter-free Add overloads ---
 
@@ -77,16 +68,19 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
             {
                 var val = (T)values[0]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
             [typeof(T)]));
+
         return this;
     }
 
@@ -96,17 +90,20 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
             {
                 var val = (T)values[0]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
                         async () => await action(val).ConfigureAwait(false),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
             [typeof(T)]));
+
         return this;
     }
 
@@ -116,16 +113,19 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
             {
                 var val = (T)values[0]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
             [typeof(T)]));
+
         return this;
     }
 
@@ -135,17 +135,20 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
             {
                 var val = (T)values[0]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
                         () => action(val),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
             [typeof(T)]));
+
         return this;
     }
 
@@ -157,17 +160,20 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
             {
                 var v1 = (T1)values[0]!;
                 var v2 = (T2)values[1]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
             [typeof(T1), typeof(T2)]));
+
         return this;
     }
 
@@ -177,18 +183,21 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
             {
                 var v1 = (T1)values[0]!;
                 var v2 = (T2)values[1]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
                         async () => await action(v1, v2).ConfigureAwait(false),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
             [typeof(T1), typeof(T2)]));
+
         return this;
     }
 
@@ -198,17 +207,20 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
             {
                 var v1 = (T1)values[0]!;
                 var v2 = (T2)values[1]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
             [typeof(T1), typeof(T2)]));
+
         return this;
     }
 
@@ -218,18 +230,21 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
             {
                 var v1 = (T1)values[0]!;
                 var v2 = (T2)values[1]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
                         () => action(v1, v2),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
             [typeof(T1), typeof(T2)]));
+
         return this;
     }
 
@@ -241,6 +256,7 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
@@ -248,11 +264,13 @@ public sealed class BenchmarkSuite(string name)
                 var v1 = (T1)values[0]!;
                 var v2 = (T2)values[1]!;
                 var v3 = (T3)values[2]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
             [typeof(T1), typeof(T2), typeof(T3)]));
+
         return this;
     }
 
@@ -262,6 +280,7 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
@@ -269,12 +288,14 @@ public sealed class BenchmarkSuite(string name)
                 var v1 = (T1)values[0]!;
                 var v2 = (T2)values[1]!;
                 var v3 = (T3)values[2]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
                         async () => await action(v1, v2, v3).ConfigureAwait(false),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
             [typeof(T1), typeof(T2), typeof(T3)]));
+
         return this;
     }
 
@@ -284,6 +305,7 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
@@ -291,11 +313,13 @@ public sealed class BenchmarkSuite(string name)
                 var v1 = (T1)values[0]!;
                 var v2 = (T2)values[1]!;
                 var v3 = (T3)values[2]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
             [typeof(T1), typeof(T2), typeof(T3)]));
+
         return this;
     }
 
@@ -305,6 +329,7 @@ public sealed class BenchmarkSuite(string name)
     {
         var cat = ResolveAddCategories(categories, _pendingCategories);
         EnsureAddNameUnique(name);
+
         _parameterizedFactories.Add(new ParameterizedAdd(
             name, cat,
             (values, displayName) =>
@@ -312,12 +337,14 @@ public sealed class BenchmarkSuite(string name)
                 var v1 = (T1)values[0]!;
                 var v2 = (T2)values[1]!;
                 var v3 = (T3)values[2]!;
+
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
                     async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
                         () => action(v1, v2, v3),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
             [typeof(T1), typeof(T2), typeof(T3)]));
+
         return this;
     }
 
@@ -611,7 +638,7 @@ public sealed class BenchmarkSuite(string name)
     ///     Runs the suite benchmarks under each specified runtime and compares results.
     ///     Cross-runtime execution always uses child processes (each runtime is built via
     ///     <c>dotnet build -f &lt;tfm&gt;</c> and run in a separate child process),
-    ///     regardless of the <see cref="WithIsolation"/> setting.
+    ///     regardless of the <see cref="WithIsolation" /> setting.
     /// </summary>
     public BenchmarkSuite WithRuntimes(params RuntimeMoniker[] runtimes)
     {
@@ -668,9 +695,11 @@ public sealed class BenchmarkSuite(string name)
 
         // When runtimes are specified, delegate to the multi-runtime orchestrator.
         if (_runtimes.Count > 0)
+        {
             return await RunMultiRuntimeSuiteAsync(
-                invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, cancellationToken)
+                    invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, cancellationToken)
                 .ConfigureAwait(false);
+        }
 
         if (_isolated)
         {
@@ -800,11 +829,10 @@ public sealed class BenchmarkSuite(string name)
             aggregated.Add(best with { LaunchStatistics = stats });
 
             var bestIndex = perLaunch.IndexOf(best);
+
             if (bestIndex >= 0 && bestIndex < allLaunchSamples.Count
-                && allLaunchSamples[bestIndex].TryGetValue(name, out var samples))
-            {
+                               && allLaunchSamples[bestIndex].TryGetValue(name, out var samples))
                 rawSamples[$"{name}\0{best.RuntimeMoniker}"] = samples;
-            }
         }
 
         return (aggregated, rawSamples);
@@ -846,15 +874,14 @@ public sealed class BenchmarkSuite(string name)
             {
                 var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
                     .ConfigureAwait(false);
+
                 allLaunchItems.Add(launchItems);
             }
 
             items = AggregateIsolatedLaunches(allLaunchItems, displayNames, filteredBenchmarks);
         }
         else
-        {
             items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
-        }
 
         var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
 
@@ -926,7 +953,9 @@ public sealed class BenchmarkSuite(string name)
         var failedBuilds = builds.Where(b => b.Error is not null).ToList();
 
         foreach (var failed in failedBuilds)
+        {
             Console.Error.WriteLine($"  {failed.Moniker.ToTargetFramework()}: {failed.Error}");
+        }
 
         var successfulBuilds = builds.Where(b => b.DllPath is not null).ToList();
 
@@ -952,6 +981,7 @@ public sealed class BenchmarkSuite(string name)
             foreach (var build in successfulBuilds)
             {
                 var tfm = build.Moniker.ToTargetFramework();
+
                 try
                 {
                     Console.WriteLine($"  Running under {tfm}...");
@@ -979,6 +1009,7 @@ public sealed class BenchmarkSuite(string name)
                         {
                             var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
                                 .ConfigureAwait(false);
+
                             allLaunchItems.Add(launchItems);
                         }
 
@@ -1019,11 +1050,13 @@ public sealed class BenchmarkSuite(string name)
                             var message = $"Isolated child did not return a result for '{envelope.Name}'.";
 
                             result = OutcomeBuilder.Build(
-                                new RunOutcome.Errored(new InvalidOperationException(message), message),
-                                envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
-                                _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
-                                envelope.Categories).Result with
-                            { RuntimeMoniker = tfm };
+                                    new RunOutcome.Errored(new InvalidOperationException(message), message),
+                                    envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
+                                    _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
+                                    envelope.Categories).Result with
+                                {
+                                    RuntimeMoniker = tfm,
+                                };
                         }
 
                         result = result with { ParameterSet = envelope.ParameterSet };
@@ -1048,7 +1081,9 @@ public sealed class BenchmarkSuite(string name)
         ApplyPerParameterSignificance(allResults, rawSamples);
 
         foreach (var reporter in _reporters)
+        {
             await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+        }
 
         return allResults;
     }
@@ -1070,6 +1105,7 @@ public sealed class BenchmarkSuite(string name)
             foreach (var launchItems in allLaunchItems)
             {
                 var match = launchItems.FirstOrDefault(item => item.Result.Name == name);
+
                 if (match is not null)
                     perLaunchResults.Add(match.Result);
             }
@@ -1077,9 +1113,11 @@ public sealed class BenchmarkSuite(string name)
             if (perLaunchResults.Count == 0)
             {
                 var envelope = filteredBenchmarks.FirstOrDefault(e => e.Name == name);
+
                 if (envelope is not null)
                 {
                     var message = $"Isolated child did not return a result for '{name}' in any launch.";
+
                     aggregated.Add(new IsolatedResultItem
                     {
                         Result = OutcomeBuilder.Build(
@@ -1100,6 +1138,7 @@ public sealed class BenchmarkSuite(string name)
 
             // Use the best launch's raw samples
             var bestIndex = perLaunchResults.IndexOf(best);
+
             var rawSamples = bestIndex >= 0 && bestIndex < allLaunchItems.Count
                 ? allLaunchItems[bestIndex]
                     .Where(item => item.Result.Name == name)
@@ -1146,6 +1185,7 @@ public sealed class BenchmarkSuite(string name)
 
         var parameterTypes = _parameterDefs.Select(d => d.Type).ToArray();
         var compatibleFactories = new List<ParameterizedAdd>();
+
         foreach (var factory in _parameterizedFactories)
         {
             if (factory.ParamTypes.Length != _parameterDefs.Count)
@@ -1164,8 +1204,11 @@ public sealed class BenchmarkSuite(string name)
         foreach (var combo in combinations)
         {
             var paramSet = new BenchmarkParameter[combo.Length];
+
             for (var i = 0; i < combo.Length; i++)
+            {
                 paramSet[i] = new BenchmarkParameter(_parameterDefs[i].Name, combo[i]);
+            }
 
             foreach (var factory in compatibleFactories)
             {
@@ -1245,7 +1288,10 @@ public sealed class BenchmarkSuite(string name)
 
     private void ApplyPerParameterSignificance(List<BenchmarkResult> results, Dictionary<string, double[]> rawSamples)
     {
-        static string RawKey(BenchmarkResult r) => $"{r.Name}\0{r.RuntimeMoniker}";
+        static string RawKey(BenchmarkResult r)
+        {
+            return $"{r.Name}\0{r.RuntimeMoniker}";
+        }
 
         if (!results.Any(r => r.ParameterSet.Count > 0))
         {
@@ -1271,7 +1317,9 @@ public sealed class BenchmarkSuite(string name)
                 Significance.ApplyIfEnabled(runtimeList, runtimeRaw, _options);
 
                 for (var j = 0; j < runtimeList.Count; j++)
+                {
                     results[indices[j]] = runtimeList[j];
+                }
             }
 
             return;
@@ -1292,6 +1340,7 @@ public sealed class BenchmarkSuite(string name)
                 var groupList = runtimeGroup.ToList();
                 var groupResults = groupList.Select(ri => ri.Result).ToList();
                 var groupRaw = new Dictionary<string, double[]>();
+
                 foreach (var ri in groupList)
                 {
                     if (rawSamples.TryGetValue(RawKey(ri.Result), out var samples))
@@ -1301,7 +1350,9 @@ public sealed class BenchmarkSuite(string name)
                 Significance.ApplyIfEnabled(groupResults, groupRaw, _options);
 
                 for (var j = 0; j < groupList.Count; j++)
+                {
                     results[groupList[j].Index] = groupResults[j];
+                }
             }
         }
     }
@@ -1448,4 +1499,12 @@ public sealed class BenchmarkSuite(string name)
                 string.Join(", ", allNames));
         }
     }
+
+    private sealed record ParameterDef(string Name, Type Type, object?[] Values);
+
+    private sealed record ParameterizedAdd(
+        string Name,
+        IReadOnlyList<string> Categories,
+        Func<object?[], string, BenchmarkEnvelope> Factory,
+        Type[] ParamTypes);
 }

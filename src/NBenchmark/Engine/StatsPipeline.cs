@@ -22,6 +22,7 @@ internal static class StatsPipeline
             options.ReportedPercentiles,
             options.EnableHistogram,
             options.HistogramBucketCount);
+
         long? meanAllocs = rawAllocations is not null ? ComputeMean(rawAllocations) : null;
         var warnings = BuildWarnings(trimResult.Kept, trimResult.Discarded, rawTimings.Length);
         var outliersRemoved = rawTimings.Length - trimResult.Kept.Length;

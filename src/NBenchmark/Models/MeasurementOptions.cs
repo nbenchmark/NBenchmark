@@ -12,8 +12,10 @@ public record MeasurementOptions
     public const int MaxLaunchCount = 100;
     public const int MinHistogramBucketCount = 5;
     public const int MaxHistogramBucketCount = 100;
+
     internal static readonly IReadOnlyList<double> DefaultReportedPercentiles =
-        Array.AsReadOnly(new double[] { 0.50, 0.95, 0.99, 0.999, 1.0 });
+        Array.AsReadOnly(new[] { 0.50, 0.95, 0.99, 0.999, 1.0 });
+
     public static readonly MeasurementOptions Default = new();
     private readonly double _confidenceLevel = 0.95;
     private readonly int _histogramBucketCount = 20;

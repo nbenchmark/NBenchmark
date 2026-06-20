@@ -230,7 +230,7 @@ public sealed class BenchmarkHost
 
         // When runtimes are specified (CLI or attribute), delegate to the multi-runtime orchestrator.
         // --help and --list-only are handled before this so they never trigger multi-runtime builds.
-        IReadOnlyList<RuntimeMoniker> effectiveRuntimes = _cliArgs.Runtimes;
+        var effectiveRuntimes = _cliArgs.Runtimes;
 
         if (effectiveRuntimes.Count == 0 && !_cliArgs.ListOnly)
             effectiveRuntimes = DiscoverAttributeRuntimes();
@@ -397,7 +397,9 @@ public sealed class BenchmarkHost
         var failedBuilds = builds.Where(b => b.Error is not null).ToList();
 
         foreach (var failed in failedBuilds)
+        {
             Console.Error.WriteLine($"  {failed.Moniker.ToTargetFramework()}: {failed.Error}");
+        }
 
         var successfulBuilds = builds.Where(b => b.DllPath is not null).ToList();
 
@@ -410,10 +412,13 @@ public sealed class BenchmarkHost
 
         var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
         var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
+
         var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude,
             _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);
+
         var allResults = new List<BenchmarkResult>();
         var rawSamples = new Dictionary<string, double[]>();
+
         var suiteOptions = _cliArgs.DryRun
             ? _options with { Iterations = 0, WarmupIterations = 0 }
             : MergeCliOptions(_options, _cliArgs);
@@ -421,6 +426,7 @@ public sealed class BenchmarkHost
         foreach (var build in successfulBuilds)
         {
             var tfm = build.Moniker.ToTargetFramework();
+
             try
             {
                 Console.WriteLine($"Running benchmarks under {tfm}...");
@@ -470,7 +476,9 @@ public sealed class BenchmarkHost
             ApplyOutputDirectory(_cliArgs.OutputDir);
 
         foreach (var reporter in _reporters)
+        {
             await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+        }
 
         return allResults;
     }
@@ -501,7 +509,9 @@ public sealed class BenchmarkHost
                 .ConfigureAwait(false);
 
             foreach (var item in items)
+            {
                 allItems.Add(item with { Result = item.Result with { RuntimeMoniker = tfm } });
+            }
         }
 
         return allItems;
@@ -527,7 +537,10 @@ public sealed class BenchmarkHost
         Dictionary<string, double[]> rawSamples,
         MeasurementOptions options)
     {
-        static string RawKey(BenchmarkResult r) => $"{r.Name}\0{r.RuntimeMoniker}";
+        static string RawKey(BenchmarkResult r)
+        {
+            return $"{r.Name}\0{r.RuntimeMoniker}";
+        }
 
         var groups = allResults
             .Select((result, index) => (result, index))
@@ -564,7 +577,9 @@ public sealed class BenchmarkHost
                     Significance.ApplyIfEnabled(runtimeResults, runtimeRaw, options);
 
                     for (var j = 0; j < runtimeList.Count; j++)
+                    {
                         allResults[classIndices[runtimeList[j].Index]] = runtimeResults[j];
+                    }
                 }
 
                 continue;
@@ -589,6 +604,7 @@ public sealed class BenchmarkHost
                     var paramList = runtimeGroup.ToList();
                     var paramResults = paramList.Select(ri => ri.Result).ToList();
                     var paramRaw = new Dictionary<string, double[]>();
+
                     foreach (var ri in paramList)
                     {
                         if (rawSamples.TryGetValue(RawKey(ri.Result), out var samples))
@@ -598,7 +614,9 @@ public sealed class BenchmarkHost
                     Significance.ApplyIfEnabled(paramResults, paramRaw, options);
 
                     for (var j = 0; j < paramList.Count; j++)
+                    {
                         allResults[classIndices[paramList[j].Index]] = paramResults[j];
+                    }
                 }
             }
         }
@@ -674,6 +692,7 @@ public sealed class BenchmarkHost
                 for (var launchIdx = 0; launchIdx < effectiveClassLaunchCount; launchIdx++)
                 {
                     var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+
                     var (results, samples) = await SuiteRunner.RunAsync(
                         envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
                         startIndex, totalBenchmarks, progress, cancellationToken).ConfigureAwait(false);
@@ -686,7 +705,9 @@ public sealed class BenchmarkHost
                 allResults.AddRange(aggregated.Results);
 
                 foreach (var kvp in aggregated.Samples)
+                {
                     rawSamples[kvp.Key] = kvp.Value;
+                }
             }
             else
             {
@@ -697,7 +718,9 @@ public sealed class BenchmarkHost
                 allResults.AddRange(results);
 
                 foreach (var kvp in samples)
+                {
                     rawSamples[kvp.Key] = kvp.Value;
+                }
             }
         }
         finally
@@ -764,6 +787,7 @@ public sealed class BenchmarkHost
                     for (var launchIdx = 0; launchIdx < perMethodLaunchCount; launchIdx++)
                     {
                         var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+
                         var (results, samples) = await SuiteRunner.RunAsync(
                             [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
                             startIndex, totalBenchmarks, progress, cancellationToken).ConfigureAwait(false);
@@ -777,10 +801,13 @@ public sealed class BenchmarkHost
                     allResults.Add(best with { LaunchStatistics = stats });
 
                     var bestIndex = perLaunchResults.IndexOf(best);
+
                     if (bestIndex >= 0 && bestIndex < perLaunchSamples.Count)
                     {
                         foreach (var kvp in perLaunchSamples[bestIndex])
+                        {
                             rawSamples[kvp.Key] = kvp.Value;
+                        }
                     }
                 }
                 else
@@ -792,7 +819,9 @@ public sealed class BenchmarkHost
                     allResults.AddRange(results);
 
                     foreach (var kvp in samples)
+                    {
                         rawSamples[kvp.Key] = kvp.Value;
+                    }
                 }
             }
             finally
@@ -831,11 +860,10 @@ public sealed class BenchmarkHost
             aggregated.Add(best with { LaunchStatistics = stats });
 
             var bestIndex = perLaunch.IndexOf(best);
+
             if (bestIndex >= 0 && bestIndex < allLaunchSamples.Count
-                && allLaunchSamples[bestIndex].TryGetValue(name, out var launchSamples))
-            {
+                               && allLaunchSamples[bestIndex].TryGetValue(name, out var launchSamples))
                 samples[name] = launchSamples;
-            }
         }
 
         return (aggregated, samples);
@@ -850,6 +878,7 @@ public sealed class BenchmarkHost
             return benchmarks;
 
         var hasParameters = benchmarks.Any(b => b.ParameterSet.Count > 0);
+
         if (!hasParameters)
         {
             var shuffled = benchmarks.ToList();
@@ -951,15 +980,14 @@ public sealed class BenchmarkHost
             {
                 var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
                     .ConfigureAwait(false);
+
                 allLaunchItems.Add(launchItems);
             }
 
             items = HostAggregateIsolatedLaunches(allLaunchItems, benchmarks, suite);
         }
         else
-        {
             items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
-        }
 
         var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
 
@@ -1013,6 +1041,7 @@ public sealed class BenchmarkHost
             foreach (var launchItems in allLaunchItems)
             {
                 var match = launchItems.FirstOrDefault(item => item.Result.Name == name);
+
                 if (match is not null)
                     perLaunchResults.Add(match.Result);
             }
@@ -1020,6 +1049,7 @@ public sealed class BenchmarkHost
             if (perLaunchResults.Count == 0)
             {
                 var message = $"Isolated child did not return a result for '{name}' in any launch.";
+
                 aggregated.Add(new IsolatedResultItem
                 {
                     Result = OutcomeBuilder.Build(
@@ -1038,6 +1068,7 @@ public sealed class BenchmarkHost
             var aggregatedResult = best with { LaunchStatistics = stats };
 
             var bestIndex = perLaunchResults.IndexOf(best);
+
             var rawSamples = bestIndex >= 0 && bestIndex < allLaunchItems.Count
                 ? allLaunchItems[bestIndex]
                     .Where(item => item.Result.Name == name)
@@ -1286,6 +1317,7 @@ public sealed class BenchmarkHost
     {
         var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
         var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
+
         var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude,
             _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);
 

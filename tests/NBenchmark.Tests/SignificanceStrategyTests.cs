@@ -342,9 +342,7 @@ public class SignificanceStrategyTests
         Significance.ComputeSignificance(
             results,
             rawSamples,
-            custom,
-            0.05,
-            null);
+            custom);
 
         var candidateResult = results.Single(r => r.Name == "candidate");
         Assert.Equal(SignificanceVerdict.Significant, candidateResult.SignificanceVerdict);

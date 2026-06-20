@@ -15,7 +15,7 @@ public class HostModePerClassSignificanceTests
 
         host
             .AddFromAssembly(typeof(HostModePerClassSignificanceTests).Assembly)
-            .WithCategoryFilter(include: ["host-perclass"])
+            .WithCategoryFilter(["host-perclass"])
             .WithOptions(new MeasurementOptions
             {
                 Iterations = 20,
@@ -40,8 +40,10 @@ public class HostModePerClassSignificanceTests
             Assert.Equal("AlphaBenchmarks.AlphaFast", alphaBaseline.Name);
 
             var alphaSlow = alphaResults.Single(r => !r.IsBaseline);
+
             Assert.True(alphaSlow.SignificanceVerdict == SignificanceVerdict.Significant,
                 $"Expected AlphaSlow to be significant versus AlphaFast; got {alphaSlow.SignificanceVerdict} (p={alphaSlow.PValue})");
+
             Assert.NotNull(alphaSlow.Effect);
 
             var betaBaseline = betaResults.Single(r => r.IsBaseline);
@@ -51,6 +53,7 @@ public class HostModePerClassSignificanceTests
             {
                 Assert.True(candidate.SignificanceVerdict == SignificanceVerdict.Significant,
                     $"Expected {candidate.Name} to be significant versus BetaSmall; got {candidate.SignificanceVerdict} (p={candidate.PValue})");
+
                 Assert.NotNull(candidate.Effect);
             }
         }
@@ -146,7 +149,10 @@ public class HostModePerClassSignificanceTests
         private readonly IProcessLauncher _prior;
         private bool _disposed;
 
-        public Restorer(IProcessLauncher prior) => _prior = prior;
+        public Restorer(IProcessLauncher prior)
+        {
+            _prior = prior;
+        }
 
         public void Dispose()
         {
@@ -163,36 +169,21 @@ public class HostModePerClassSignificanceTests
 public class AlphaBenchmarks
 {
     [Benchmark(Baseline = true)]
-    public void AlphaFast()
-    {
-        Thread.SpinWait(32);
-    }
+    public void AlphaFast() => Thread.SpinWait(32);
 
     [Benchmark]
-    public void AlphaSlow()
-    {
-        Thread.SpinWait(256);
-    }
+    public void AlphaSlow() => Thread.SpinWait(256);
 }
 
 [BenchmarkCategory("host-perclass")]
 public class BetaBenchmarks
 {
     [Benchmark(Baseline = true)]
-    public void BetaSmall()
-    {
-        Thread.SpinWait(16);
-    }
+    public void BetaSmall() => Thread.SpinWait(16);
 
     [Benchmark]
-    public void BetaMedium()
-    {
-        Thread.SpinWait(128);
-    }
+    public void BetaMedium() => Thread.SpinWait(128);
 
     [Benchmark]
-    public void BetaLarge()
-    {
-        Thread.SpinWait(512);
-    }
+    public void BetaLarge() => Thread.SpinWait(512);
 }

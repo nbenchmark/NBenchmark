@@ -16,7 +16,7 @@ public class OutcomeBuilderTests
         {
             Mean = 100,
             Median = 99,
-            Percentiles = [new(0.95, 110), new(0.99, 120)],
+            Percentiles = [new PercentileEntry(0.95, 110), new PercentileEntry(0.99, 120)],
             Min = 80,
             Max = 130,
             StandardDeviation = 5,

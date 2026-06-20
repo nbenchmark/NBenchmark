@@ -37,11 +37,11 @@ public class LaunchAggregatorTests
     {
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", median: 100, mean: 102, stdDev: 8, iterations: 100),
-            CreateResult("test", median: 110, mean: 112, stdDev: 9, iterations: 100),
-            CreateResult("test", median: 105, mean: 107, stdDev: 7, iterations: 100),
-            CreateResult("test", median: 95, mean: 97, stdDev: 6, iterations: 100),
-            CreateResult("test", median: 108, mean: 110, stdDev: 10, iterations: 100),
+            CreateResult("test", 100, 102, 8, 100),
+            CreateResult("test", 110, 112, 9, 100),
+            CreateResult("test", 105, 107, 7, 100),
+            CreateResult("test", 95, 97, 6, 100),
+            CreateResult("test", 108, 110, 10, 100),
         };
 
         var stats = LaunchAggregator.Aggregate(results);
@@ -62,9 +62,9 @@ public class LaunchAggregatorTests
     {
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", median: 100, mean: 102, stdDev: 8, iterations: 100),
-            CreateResult("test", median: 0, mean: 0, stdDev: 0, iterations: 0, errored: true),
-            CreateResult("test", median: 110, mean: 112, stdDev: 9, iterations: 100),
+            CreateResult("test", 100, 102, 8, 100),
+            CreateResult("test", 0, 0, 0, 0, true),
+            CreateResult("test", 110, 112, 9, 100),
         };
 
         var stats = LaunchAggregator.Aggregate(results);
@@ -81,8 +81,8 @@ public class LaunchAggregatorTests
     {
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", median: 0, mean: 0, stdDev: 0, iterations: 0, errored: true),
-            CreateResult("test", median: 0, mean: 0, stdDev: 0, iterations: 0, errored: true),
+            CreateResult("test", 0, 0, 0, 0, true),
+            CreateResult("test", 0, 0, 0, 0, true),
         };
 
         var stats = LaunchAggregator.Aggregate(results);
@@ -100,8 +100,8 @@ public class LaunchAggregatorTests
     {
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", median: 100, mean: 100, stdDev: 5, iterations: 50),
-            CreateResult("test", median: 120, mean: 120, stdDev: 5, iterations: 50),
+            CreateResult("test", 100, 100, 5, 50),
+            CreateResult("test", 120, 120, 5, 50),
         };
 
         var stats = LaunchAggregator.Aggregate(results);
@@ -111,6 +111,7 @@ public class LaunchAggregatorTests
         Assert.Equal(110, stats.LaunchMedian);
         Assert.NotNull(stats.LaunchConfidenceIntervalLower);
         Assert.NotNull(stats.LaunchConfidenceIntervalUpper);
+
         // For 2 launches, t-value at df=1 is 12.706, so CI should be wide
         Assert.True(stats.LaunchConfidenceIntervalLower < 100);
         Assert.True(stats.LaunchConfidenceIntervalUpper > 120);
@@ -121,9 +122,9 @@ public class LaunchAggregatorTests
     {
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", median: 110, mean: 112, stdDev: 9, iterations: 100),
-            CreateResult("test", median: 100, mean: 102, stdDev: 8, iterations: 100),
-            CreateResult("test", median: 120, mean: 122, stdDev: 10, iterations: 100),
+            CreateResult("test", 110, 112, 9, 100),
+            CreateResult("test", 100, 102, 8, 100),
+            CreateResult("test", 120, 122, 10, 100),
         };
 
         var best = LaunchAggregator.BestLaunch(results);
@@ -136,9 +137,9 @@ public class LaunchAggregatorTests
     {
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", median: 0, mean: 0, stdDev: 0, iterations: 0, errored: true),
-            CreateResult("test", median: 120, mean: 122, stdDev: 10, iterations: 100),
-            CreateResult("test", median: 100, mean: 102, stdDev: 8, iterations: 100),
+            CreateResult("test", 0, 0, 0, 0, true),
+            CreateResult("test", 120, 122, 10, 100),
+            CreateResult("test", 100, 102, 8, 100),
         };
 
         var best = LaunchAggregator.BestLaunch(results);
