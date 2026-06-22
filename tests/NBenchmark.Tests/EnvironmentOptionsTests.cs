@@ -37,7 +37,14 @@ public class EnvironmentOptionsTests
     [Fact]
     public void ParseCpuAffinity_List_Parses()
     {
-        Assert.Equal([2, 3, 5], EnvironmentOptions.ParseCpuAffinity("2,3,5"));
+        // Pick distinct indices that are valid on any host. CI runners can have as few
+        // as 1 logical core, so cap the list at the host's core count.
+        var coreCount = Environment.ProcessorCount;
+        var indices = coreCount >= 3 ? "0,1,2" : coreCount == 2 ? "0,1" : "0";
+
+        var expected = indices.Split(',').Select(int.Parse).ToArray();
+
+        Assert.Equal(expected, EnvironmentOptions.ParseCpuAffinity(indices));
     }
 
     [Fact]
