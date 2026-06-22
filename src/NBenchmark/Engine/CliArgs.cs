@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using NBenchmark.Reporters;
 
@@ -68,6 +69,28 @@ internal sealed record CliArgs
     public bool NoHistogram { get; init; }
 
     /// <summary>
+    ///     Comma-separated list of logical CPU cores to pin the benchmark process to
+    ///     (e.g. "0" or "2,3"). <c>null</c> leaves affinity untouched. Parsed into
+    ///     <see cref="EnvironmentOptions.CpuAffinity" /> by the host.
+    /// </summary>
+    public IReadOnlyList<int>? CpuAffinity { get; init; }
+
+    /// <summary>
+    ///     The process priority to request for the benchmark run. <c>null</c> leaves
+    ///     priority untouched. Mapped into <see cref="EnvironmentOptions.ProcessPriority" />
+    ///     by the host.
+    /// </summary>
+    public ProcessPriorityClass? ProcessPriority { get; init; }
+
+    /// <summary>
+    ///     When true, emits a non-fatal pre-run warning when the host looks like a shared
+    ///     or noisy benchmark environment (low core count, unraisable priority, or on
+    ///     macOS unobservable frequency scaling/thermal throttling). Mapped into
+    ///     <see cref="EnvironmentOptions.DedicatedHostGuidance" />.
+    /// </summary>
+    public bool DedicatedHostGuidance { get; init; }
+
+    /// <summary>
     ///     Target framework monikers to benchmark under. When non-empty, the host builds
     ///     and runs the benchmark project under each specified runtime and aggregates
     ///     results for cross-runtime comparison.
@@ -116,6 +139,9 @@ internal sealed record CliArgs
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
         var runtimes = new List<RuntimeMoniker>();
+        IReadOnlyList<int>? cpuAffinity = null;
+        ProcessPriorityClass? processPriority = null;
+        var dedicatedHostGuidance = false;
 
         var errors = new List<string>();
 
@@ -357,6 +383,33 @@ internal sealed record CliArgs
                 case "--no-histogram":
                     noHistogram = true;
                     break;
+                case "--cpu-affinity" when i + 1 < args.Length:
+                    var affinityRaw = args[++i];
+
+                    try
+                    {
+                        cpuAffinity = EnvironmentOptions.ParseCpuAffinity(affinityRaw);
+                    }
+                    catch (FormatException ex)
+                    {
+                        errors.Add($"Invalid --cpu-affinity value '{affinityRaw}': {ex.Message}");
+                    }
+
+                    break;
+                case "--priority" when i + 1 < args.Length:
+                    var priorityStr = args[++i];
+
+                    if (TryParseProcessPriority(priorityStr, out var parsedPriority))
+                        processPriority = parsedPriority;
+                    else
+                        errors.Add(
+                            $"Invalid --priority value '{priorityStr}'. Must be one of: "
+                            + "normal, idle, belownormal, abovenormal, high, realtime.");
+
+                    break;
+                case "--dedicated-host-guidance":
+                    dedicatedHostGuidance = true;
+                    break;
                 case "--runtimes" when i + 1 < args.Length:
                     var runtimesRaw = args[++i];
                     var runtimeParts = runtimesRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -378,7 +431,8 @@ internal sealed record CliArgs
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
-                    or "--launch-count" or "--percentiles" or "--runtimes":
+                    or "--launch-count" or "--percentiles" or "--runtimes"
+                    or "--cpu-affinity" or "--priority":
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -423,6 +477,9 @@ internal sealed record CliArgs
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
             Runtimes = runtimes,
+            CpuAffinity = cpuAffinity,
+            ProcessPriority = processPriority,
+            DedicatedHostGuidance = dedicatedHostGuidance,
         }, errors);
     }
 
@@ -499,6 +556,34 @@ internal sealed record CliArgs
         }
     }
 
+    private static bool TryParseProcessPriority(string value, out ProcessPriorityClass priority)
+    {
+        switch (value.ToLowerInvariant())
+        {
+            case "normal":
+                priority = ProcessPriorityClass.Normal;
+                return true;
+            case "idle":
+                priority = ProcessPriorityClass.Idle;
+                return true;
+            case "belownormal":
+                priority = ProcessPriorityClass.BelowNormal;
+                return true;
+            case "abovenormal":
+                priority = ProcessPriorityClass.AboveNormal;
+                return true;
+            case "high":
+                priority = ProcessPriorityClass.High;
+                return true;
+            case "realtime":
+                priority = ProcessPriorityClass.RealTime;
+                return true;
+            default:
+                priority = default;
+                return false;
+        }
+    }
+
     private static void AddCategory(string rawValue, string flagName, List<string> target, List<string> errors)
     {
         if (string.IsNullOrWhiteSpace(rawValue))
@@ -552,6 +637,9 @@ internal sealed record CliArgs
         Console.WriteLine("  --profile <mode>       Measurement profile: realistic (default) or independent");
         Console.WriteLine("  --force-gc             Force Gen0 GC before every iteration (overrides profile)");
         Console.WriteLine("  --no-allocations       Disable allocation tracking (overrides profile)");
+        Console.WriteLine("  --cpu-affinity <list>  Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)");
+        Console.WriteLine("  --priority <level>     Process priority: normal, idle, belownormal, abovenormal, high, realtime");
+        Console.WriteLine("  --dedicated-host-guidance  Warn when the host looks noisy (low core count, unraisable priority, macOS throttling)");
         Console.WriteLine("  --help, -h             Show this help text");
     }
 }

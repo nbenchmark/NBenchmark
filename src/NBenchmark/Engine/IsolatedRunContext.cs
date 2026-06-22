@@ -64,6 +64,14 @@ internal sealed record MeasurementOverrides
 
     public bool? NoHistogram { get; init; }
 
+    /// <summary>
+    ///     Environment controls forwarded to a Host-mode child so it can pin itself to
+    ///     the same cores and priority as the parent. The child re-runs the entry point
+    ///     to rebuild its base options, then applies these deltas on top - mirroring what
+    ///     the parent applies in-process. <c>null</c> means the parent set nothing.
+    /// </summary>
+    public EnvironmentOptions? Environment { get; init; }
+
     public static MeasurementOverrides FromCliArgs(CliArgs cliArgs) => new()
     {
         Iterations = cliArgs.Iterations,
@@ -86,6 +94,7 @@ internal sealed record MeasurementOverrides
         LaunchCount = cliArgs.LaunchCount,
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
+        Environment = BuildEnvironmentFromCli(cliArgs),
     };
 
     public MeasurementOptions Apply(MeasurementOptions options)
@@ -177,7 +186,52 @@ internal sealed record MeasurementOverrides
         if (NoHistogram.HasValue && NoHistogram.Value)
             result = result with { EnableHistogram = false };
 
+        if (Environment is not null)
+            result = result with { Environment = MergeEnvironment(result.Environment, Environment) };
+
         return result;
+    }
+
+    /// <summary>
+    ///     Builds the <see cref="EnvironmentOptions" /> carried by overrides from the CLI
+    ///     flags. Returns <c>null</c> when no environment flag was set, so the child does
+    ///     nothing when the parent set nothing.
+    /// </summary>
+    private static EnvironmentOptions? BuildEnvironmentFromCli(CliArgs cliArgs)
+    {
+        if (cliArgs.CpuAffinity is null
+            && cliArgs.ProcessPriority is null
+            && !cliArgs.DedicatedHostGuidance)
+        {
+            return null;
+        }
+
+        return new EnvironmentOptions
+        {
+            CpuAffinity = cliArgs.CpuAffinity,
+            ProcessPriority = cliArgs.ProcessPriority,
+            DedicatedHostGuidance = cliArgs.DedicatedHostGuidance,
+        };
+    }
+
+    /// <summary>
+    ///     Layers override environment settings on top of any programmatic ones. CLI
+    ///     flags win on a per-field basis for nullable fields (the same pattern as the
+    ///     other overrides); unset CLI fields preserve the programmatic value. The
+    ///     <see cref="EnvironmentOptions.DedicatedHostGuidance" /> flag is a bool and
+    ///     uses OR semantics - enabling it on either side enables it.
+    /// </summary>
+    private static EnvironmentOptions? MergeEnvironment(EnvironmentOptions? programmatic, EnvironmentOptions cli)
+    {
+        if (programmatic is null)
+            return cli;
+
+        return programmatic with
+        {
+            CpuAffinity = cli.CpuAffinity ?? programmatic.CpuAffinity,
+            ProcessPriority = cli.ProcessPriority ?? programmatic.ProcessPriority,
+            DedicatedHostGuidance = cli.DedicatedHostGuidance || programmatic.DedicatedHostGuidance,
+        };
     }
 }
 

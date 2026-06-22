@@ -125,3 +125,17 @@ Per-iteration timings are computed directly from raw `Stopwatch` ticks - deliber
 > range. When K is pinned to 1 - or when setup/teardown forces it - the read cost is
 > a fixed addend on every sample, so treat absolute values at that scale as upper
 > bounds and compare against a baseline measured the same way.
+
+## Reducing noise at the source
+
+The adaptive loop, [outlier trimming](./outliers.md) (including the [bimodal warning](./outliers.md#bimodal-distribution-warning)), and [significance testing](./significance.md) all work around OS noise statistically - they discard or down-weight samples that look like interference. But they cannot remove noise that is baked into every sample: a benchmark thread that migrates between cores suffers cold-cache stalls on every migration, and a normal-priority process on a busy host is preempted on a schedule that has nothing to do with your code.
+
+NBenchmark provides opt-in **environment controls** that reduce this noise before the timer starts:
+
+- **CPU affinity** - pin the benchmark process to specific cores to eliminate inter-core migration.
+- **Process priority** - raise the process priority to reduce preemption by unrelated OS work.
+- **Dedicated-host guidance** - a non-fatal probe that warns when the host looks noisy (low core count, unraisable priority, or on macOS unobservable frequency scaling/thermal throttling) and suggests `--priority high` on a suitable host.
+
+All three default to off and are restored when the run completes. They are the proactive counterpart to the reactive statistical noise handling: trimming discards noisy samples after the fact; environment control reduces the noise at the source.
+
+See [Environment control](../features/environment-control.md) for the full model, platform notes, and isolated-process propagation.

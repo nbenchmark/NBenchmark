@@ -257,6 +257,17 @@ public record MeasurementOptions
         }
     }
 
+    /// <summary>
+    ///     Opt-in hardware/OS controls applied for the duration of a run: CPU affinity,
+    ///     process priority, and dedicated-host guidance. <c>null</c> (the default) does
+    ///     nothing - the benchmark runs with whatever affinity and priority the host
+    ///     started it with. Set via <see cref="BenchmarkSuite.WithHardwareAffinity" /> /
+    ///     <see cref="BenchmarkHost.WithHardwareAffinity" />, the <c>--cpu-affinity</c> /
+    ///     <c>--priority</c> / <c>--dedicated-host-guidance</c> CLI flags, or directly on
+    ///     the options record.
+    /// </summary>
+    public EnvironmentOptions? Environment { get; init; }
+
     /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
     public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };
 
