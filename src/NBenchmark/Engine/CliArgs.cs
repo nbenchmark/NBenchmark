@@ -215,10 +215,12 @@ internal sealed record CliArgs
 
                     if (string.Equals(detailStr, "simple", StringComparison.OrdinalIgnoreCase))
                         detail = ReportDetail.Simple;
+                    else if (string.Equals(detailStr, "standard", StringComparison.OrdinalIgnoreCase))
+                        detail = ReportDetail.Standard;
                     else if (string.Equals(detailStr, "advanced", StringComparison.OrdinalIgnoreCase))
                         detail = ReportDetail.Advanced;
                     else
-                        errors.Add($"Invalid --detail value '{detailStr}'. Must be 'simple' or 'advanced'.");
+                        errors.Add($"Invalid --detail value '{detailStr}'. Must be 'simple', 'standard', or 'advanced'.");
 
                     break;
                 case "--list":
@@ -544,7 +546,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --runtimes <list>      Runtimes to compare (comma-separated, e.g. net8,net9,net10)");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
         Console.WriteLine("  --seed <n>             Seed for deterministic random ordering");
-        Console.WriteLine("  --detail <level>       Report detail: simple or advanced (default: simple)");
+        Console.WriteLine("  --detail <level>       Report detail: simple, standard, or advanced (default: simple)");
         Console.WriteLine("  --threshold-pct <n>    Fail with exit code 1 if any benchmark regresses");
         Console.WriteLine("                        >N% vs baseline (median-based comparison; n >= 1).");
         Console.WriteLine("  --profile <mode>       Measurement profile: realistic (default) or independent");

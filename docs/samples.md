@@ -362,3 +362,60 @@ What to look at:
 - The "Runtime" column in the console output.
 - How the host builds the project for each TFM, runs benchmarks in child processes, and aggregates results.
 - Combining `--runtimes` with other CLI flags like `--iterations`, `--reporter`, and `--output`.
+
+---
+
+## ReportDetail - Simple, Standard, and Advanced output
+
+**`samples/ReportDetail/`**
+
+Runs the same sorting benchmark three times with `.WithDetail(ReportDetail.Simple)`, `.Standard`, and `.Advanced` so you can see exactly what each detail level adds.
+
+```bash
+cd samples/ReportDetail
+dotnet run
+```
+
+```csharp
+using NBenchmark;
+using NBenchmark.Reporters;
+using NBenchmark.Reporters.Console;
+
+// Simple - one table, counts footer. The default.
+await new BenchmarkSuite("sorting-simple")
+    .Add("bubble", () => { var a = Enumerable.Range(0, 100).Reverse().ToArray(); Array.Sort(a); })
+    .Add("linq",   () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
+    .WithBaseline("bubble")
+    .WithWarmup(3).WithIterations(50)
+    .WithDetail(ReportDetail.Simple)
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+
+// Standard - full comparison table + precision/tail latency + auto-tune + interpretation
+await new BenchmarkSuite("sorting-standard")
+    .Add("bubble", () => { var a = Enumerable.Range(0, 100).Reverse().ToArray(); Array.Sort(a); })
+    .Add("linq",   () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
+    .WithBaseline("bubble")
+    .WithWarmup(3).WithIterations(50)
+    .WithDetail(ReportDetail.Standard)
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+
+// Advanced - everything in Standard plus per-benchmark distribution details
+await new BenchmarkSuite("sorting-advanced")
+    .Add("bubble", () => { var a = Enumerable.Range(0, 100).Reverse().ToArray(); Array.Sort(a); })
+    .Add("linq",   () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
+    .WithBaseline("bubble")
+    .WithWarmup(3).WithIterations(50)
+    .WithDetail(ReportDetail.Advanced)
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+```
+
+What to look at:
+
+- **Simple** (the default): a single table - Benchmark, Median, Ops/s, Ratio, Sig, Alloc/op - plus a counts-only footer. No statistical jargon.
+- **Standard**: adds the Precision & Tail Latency table, a full Interpretation block (omnibus verdict, significance test, outlier detector, measurement profile), and auto-tune summary lines.
+- **Advanced**: adds a per-benchmark Distribution Details block with quartiles, fences, skewness, kurtosis, MAD, Cliff's delta, and allocation breakdown.
+
+See [Report Detail Levels](./output/report-detail-levels.md) for the full column reference.

@@ -268,11 +268,13 @@ Set the report detail level. Controls how much information reporters display.
 
 | Value | Behaviour |
 |---|---|
-| `simple` | 10-column table with the essential statistics. **(default)** |
-| `advanced` | Same table plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, allocation breakdown, and the full set of configured percentiles. |
+| `simple` | 6-column table with the essential statistics. **(default)** |
+| `standard` | Full comparison table plus Precision & Tail Latency, Interpretation, and auto-tune sections. |
+| `advanced` | Same as standard plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, allocation breakdown, and the full set of configured percentiles. |
 
 ```bash
 dotnet run -- --detail advanced
+dotnet run -- --detail standard
 dotnet run -- --detail simple
 ```
 

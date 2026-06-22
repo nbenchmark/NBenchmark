@@ -23,34 +23,45 @@ public static class BenchmarkResultExtensions
         // Header
         Console.WriteLine($"  ┌─ {result.Name} ─────────────────────────────────────");
         Console.WriteLine("  │");
-        Console.WriteLine($"  │  Median: {BenchmarkFormatter.FormatNs(result.Median),-14} Mean: {BenchmarkFormatter.FormatNs(result.Mean)}");
 
-        Console.WriteLine(
-            $"  │  Ops/s:  {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond),-14} Median ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.MedianOperationsPerSecond)}");
-
-        var percentileSummary = string.Join("  ", result.Percentiles
-            .Where(e => e.Percentile > 0.50 && e.Percentile < 1.0)
-            .Select(e =>
-            {
-                var label = BenchmarkTable.FormatPercentileKey(e.Percentile);
-                return $"P{label}: {BenchmarkFormatter.FormatNs(e.Value)}";
-            }));
-
-        if (percentileSummary.Length > 0)
-            Console.WriteLine($"  │  {percentileSummary}");
-
-        Console.WriteLine($"  │  StdDev: {BenchmarkFormatter.FormatNs(result.StandardDeviation),-14} CV:   {result.CoefficientOfVariationPercent:F2}%");
-
-        if (result.MarginOfError > 0)
+        if (detail == ReportDetail.Simple)
         {
-            Console.WriteLine($"  │  Error:  ±{BenchmarkFormatter.FormatNs(result.MarginOfError)} ({result.MarginPercent:F2}% of Mean)");
+            Console.WriteLine($"  │  Median: {BenchmarkFormatter.FormatNs(result.Median),-14} Ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond)}");
+
+            if (!string.IsNullOrEmpty(allocText))
+                Console.WriteLine($"  │{allocText}");
+        }
+        else
+        {
+            Console.WriteLine($"  │  Median: {BenchmarkFormatter.FormatNs(result.Median),-14} Mean: {BenchmarkFormatter.FormatNs(result.Mean)}");
 
             Console.WriteLine(
-                $"  │  CI:     [{BenchmarkFormatter.FormatNs(result.ConfidenceIntervalLower)} … {BenchmarkFormatter.FormatNs(result.ConfidenceIntervalUpper)}] ({result.ConfidenceLevel * 100:0.#}%)");
-        }
+                $"  │  Ops/s:  {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond),-14} Median ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.MedianOperationsPerSecond)}");
 
-        if (!string.IsNullOrEmpty(allocText))
-            Console.WriteLine($"  │{allocText}");
+            var percentileSummary = string.Join("  ", result.Percentiles
+                .Where(e => e.Percentile > 0.50 && e.Percentile < 1.0)
+                .Select(e =>
+                {
+                    var label = BenchmarkTable.FormatPercentileKey(e.Percentile);
+                    return $"P{label}: {BenchmarkFormatter.FormatNs(e.Value)}";
+                }));
+
+            if (percentileSummary.Length > 0)
+                Console.WriteLine($"  │  {percentileSummary}");
+
+            Console.WriteLine($"  │  StdDev: {BenchmarkFormatter.FormatNs(result.StandardDeviation),-14} CV:   {result.CoefficientOfVariationPercent:F2}%");
+
+            if (result.MarginOfError > 0)
+            {
+                Console.WriteLine($"  │  Error:  ±{BenchmarkFormatter.FormatNs(result.MarginOfError)} ({result.MarginPercent:F2}% of Mean)");
+
+                Console.WriteLine(
+                    $"  │  CI:     [{BenchmarkFormatter.FormatNs(result.ConfidenceIntervalLower)} … {BenchmarkFormatter.FormatNs(result.ConfidenceIntervalUpper)}] ({result.ConfidenceLevel * 100:0.#}%)");
+            }
+
+            if (!string.IsNullOrEmpty(allocText))
+                Console.WriteLine($"  │{allocText}");
+        }
 
         if (detail == ReportDetail.Advanced)
         {

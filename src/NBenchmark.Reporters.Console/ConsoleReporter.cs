@@ -40,24 +40,38 @@ public sealed class ConsoleReporter : IReporter
             return Task.CompletedTask;
         }
 
-        AnsiConsole.WriteLine();
-
         var tables = BenchmarkTable.BuildPerClass(results);
         var firstTable = tables[0];
+
+        if (Detail == ReportDetail.Simple)
+        {
+            foreach (var table in tables)
+            {
+                var className = table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
+
+                RenderComparisonTable(table, className, Detail);
+                AnsiConsole.WriteLine();
+                RenderSimpleFooter(table);
+                RenderWarnings(table);
+            }
+
+            AnsiConsole.WriteLine();
+            return Task.CompletedTask;
+        }
+
+        AnsiConsole.WriteLine();
         RenderHeader(firstTable);
 
         foreach (var table in tables)
         {
             var className = table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
 
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[bold steelblue1]── {Esc(className ?? "Benchmarks")} ──[/]");
-            AnsiConsole.WriteLine();
-
             RenderComparisonTable(table, className, Detail);
             AnsiConsole.WriteLine();
             RenderTimingDetail(table);
             RenderLaunchStats(table);
+            AnsiConsole.WriteLine();
+            RenderInterpretation(table, table.Rows.Count);
             RenderAutoTune(table);
 
             if (Detail == ReportDetail.Advanced)
@@ -67,7 +81,6 @@ public sealed class ConsoleReporter : IReporter
             }
 
             AnsiConsole.WriteLine();
-            RenderInterpretation(table, table.Rows.Count);
             RenderWarnings(table);
         }
 
@@ -76,37 +89,20 @@ public sealed class ConsoleReporter : IReporter
         return Task.CompletedTask;
     }
 
+    private static void RenderSimpleFooter(BenchmarkTable benchTable)
+    {
+        var count = benchTable.Rows.Count(r => !r.Errored);
+        AnsiConsole.MarkupLine(
+            $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · CI {benchTable.ConfidenceLevel * 100:0.#}%[/]");
+    }
+
     private static void RenderHeader(BenchmarkTable benchTable)
     {
-        var profileLabel = benchTable.Profile switch
-        {
-            MeasurementProfile.Independent => "independent (per-iteration GC, between-benchmark GC, no alloc tracking)",
-            _ => "realistic (no per-iteration GC, no between-benchmark GC, alloc tracking on)",
-        };
+        var rule = new Rule($"[bold steelblue1]BENCHMARK RESULTS[/]  [grey]{benchTable.RunAtUtc} UTC[/]")
+            .LeftJustified()
+            .RuleStyle(Style.Parse("steelblue1"));
 
-        var headerGrid = new Grid()
-            .AddColumn(new GridColumn().NoWrap())
-            .AddColumn(new GridColumn().NoWrap())
-            .AddColumn(new GridColumn().NoWrap());
-
-        headerGrid.AddRow(
-            "[bold steelblue1]BENCHMARK RESULTS[/]",
-            $"[grey]{benchTable.RunAtUtc} UTC[/]",
-            $"[grey]{benchTable.WarmupIterations} warmup / {benchTable.MeasuredIterations} measured[/]"
-        );
-
-        headerGrid.AddRow(
-            "",
-            $"[grey]Profile: {profileLabel}[/]",
-            ""
-        );
-
-        var panel = new Panel(headerGrid)
-            .Border(BoxBorder.Heavy)
-            .BorderColor(Color.SteelBlue1)
-            .Padding(1, 0);
-
-        AnsiConsole.Write(panel);
+        AnsiConsole.Write(rule);
     }
 
     private static void RenderComparisonTable(BenchmarkTable benchTable, string? sectionClassName, ReportDetail detail)
@@ -115,14 +111,14 @@ public sealed class ConsoleReporter : IReporter
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
         var showRuntime = benchTable.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+        var isSimple = detail == ReportDetail.Simple;
 
         // A ratio is present whenever a row was ranked against a reference - either a competing
         // benchmark in its parameter group or, for a single method swept across parameter values,
         // the fastest point in the table. Parametric tables use compact headers to save width.
         var hasComparisons = benchTable.Rows.Any(r => !r.Errored && !double.IsNaN(r.Ratio));
-        var isParametric = benchTable.ParameterNames.Count > 0;
-        var ratioHeader = isParametric ? "Ratio" : "vs Baseline";
-        var magnitudeHeader = isParametric ? "Mag" : "Magnitude";
+        var ratioHeader = "Ratio";
+        var magnitudeHeader = "Mag";
 
         var table = new Table()
             .Border(TableBorder.Simple)
@@ -138,16 +134,24 @@ public sealed class ConsoleReporter : IReporter
         }
 
         table
-            .AddColumn(new TableColumn("[bold]Median[/]").RightAligned().NoWrap())
-            .AddColumn(new TableColumn("[bold]Mean[/]").RightAligned().NoWrap())
+            .AddColumn(new TableColumn("[bold]Median[/]").RightAligned().NoWrap());
+
+        if (!isSimple)
+        {
+            table.AddColumn(new TableColumn("[bold]Mean[/]").RightAligned().NoWrap());
+        }
+
+        table
             .AddColumn(new TableColumn("[bold]Ops/s[/]").RightAligned().NoWrap())
             .AddColumn(new TableColumn($"[bold]{(hasComparisons ? ratioHeader : "Scale")}[/]").NoWrap());
 
         if (hasComparisons)
         {
             table
-                .AddColumn(new TableColumn("[bold]Sig[/]").Centered().NoWrap())
-                .AddColumn(new TableColumn($"[bold]{magnitudeHeader}[/]").Centered().NoWrap());
+                .AddColumn(new TableColumn("[bold]Sig[/]").Centered().NoWrap());
+
+            if (!isSimple)
+                table.AddColumn(new TableColumn($"[bold]{magnitudeHeader}[/]").Centered().NoWrap());
         }
 
         table.AddColumn(new TableColumn("[bold]Alloc/op[/]").RightAligned().NoWrap());
@@ -155,7 +159,7 @@ public sealed class ConsoleReporter : IReporter
         if (showCategories)
             table.AddColumn(new TableColumn("[bold]Categories[/]"));
 
-        var hasDescriptions = benchTable.Rows.Any(r => !string.IsNullOrEmpty(r.Description));
+        var hasDescriptions = !isSimple && benchTable.Rows.Any(r => !string.IsNullOrEmpty(r.Description));
 
         if (hasDescriptions)
             table.AddColumn(new TableColumn("[bold]Description[/]"));
@@ -176,10 +180,19 @@ public sealed class ConsoleReporter : IReporter
                     errorCols.Add(Esc(row.RuntimeMoniker));
 
                 errorCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
-                errorCols.AddRange(["[dim]-[/]", "[dim]-[/]", "[dim]-[/]", "[dim]-[/]"]);
+                errorCols.Add("[dim]-[/]");
+
+                if (!isSimple)
+                    errorCols.Add("[dim]-[/]");
+
+                errorCols.AddRange(["[dim]-[/]", "[dim]-[/]"]);
 
                 if (hasComparisons)
-                    errorCols.AddRange(["[dim]-[/]", "[dim]-[/]"]);
+                {
+                    errorCols.Add("[dim]-[/]");
+                    if (!isSimple)
+                        errorCols.Add("[dim]-[/]");
+                }
 
                 errorCols.Add("[dim]-[/]");
 
@@ -223,7 +236,12 @@ public sealed class ConsoleReporter : IReporter
 
             rowCols.AddRange([
                 $"[bold]{BenchmarkFormatter.FormatNs(row.Median)}[/]",
-                BenchmarkFormatter.FormatNs(row.Mean),
+            ]);
+
+            if (!isSimple)
+                rowCols.Add(BenchmarkFormatter.FormatNs(row.Mean));
+
+            rowCols.AddRange([
                 BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond),
                 barCell,
             ]);
@@ -238,7 +256,8 @@ public sealed class ConsoleReporter : IReporter
                 };
 
                 rowCols.Add(sigIcon);
-                rowCols.Add(RenderMagnitude(row.Effect));
+                if (!isSimple)
+                    rowCols.Add(RenderMagnitude(row.Effect));
             }
 
             rowCols.Add(allocText);
@@ -471,8 +490,6 @@ public sealed class ConsoleReporter : IReporter
         if (warnings.Count == 0)
             return;
 
-        AnsiConsole.WriteLine();
-
         var rule = new Rule("[yellow]Warnings[/]")
             .LeftJustified()
             .RuleStyle(Style.Parse("yellow"));
@@ -536,6 +553,13 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.MarkupLine(
             $"[grey]Effect metric:[/] [dim]{Esc(GetEffectMetricSummary(benchTable.Rows))}[/]");
 
+        var profileLabel = benchTable.Profile switch
+        {
+            MeasurementProfile.Independent => "independent (per-iteration GC, between-benchmark GC, no alloc tracking)",
+            _ => "realistic (no per-iteration GC, no between-benchmark GC, alloc tracking on)",
+        };
+        AnsiConsole.MarkupLine($"[grey]Profile:[/] [dim]{profileLabel}[/]");
+
         AnsiConsole.MarkupLine(
             $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · CI {benchTable.ConfidenceLevel * 100:0.#}%[/]");
     }
@@ -579,7 +603,7 @@ public sealed class ConsoleReporter : IReporter
             return "[dim]neg[/]";
 
         if (string.Equals(magnitude, "small", StringComparison.OrdinalIgnoreCase))
-            return "[yellow]small[/]";
+            return "[yellow]sml[/]";
 
         if (string.Equals(magnitude, "med", StringComparison.OrdinalIgnoreCase)
             || string.Equals(magnitude, "medium", StringComparison.OrdinalIgnoreCase))
@@ -589,9 +613,9 @@ public sealed class ConsoleReporter : IReporter
         {
             return value.Direction switch
             {
-                EffectDirection.CandidateHigher => "[bold red]large[/]",
-                EffectDirection.CandidateLower => "[bold green]large[/]",
-                _ => "[bold]large[/]",
+                EffectDirection.CandidateHigher => "[bold red]lrg[/]",
+                EffectDirection.CandidateLower => "[bold green]lrg[/]",
+                _ => "[bold]lrg[/]",
             };
         }
 

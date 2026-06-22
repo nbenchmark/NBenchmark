@@ -33,32 +33,28 @@ No explicit `.WithReporter(new ConsoleReporter())` call is needed when using the
 ## Example output
 
 ```
-Benchmark Results
-Run at 2026-06-06 03:40:00 UTC - 40 warmup / 190 measured
+── BENCHMARK RESULTS  2026-06-06 03:40:00 UTC ──────────────────────────────────
 
-╭────────────────────────┬──────────┬──────────┬─────────────┬────────────────────────┬────────┬─────────────┬──────────╮
-│ Benchmark              │ Median   │ Mean     │ Ops/s       │ vs Baseline            │ Sig    │ Magnitude   │ Alloc/op │
-├────────────────────────┼──────────┼──────────┼─────────────┼────────────────────────┼────────┼─────────────┼──────────┤
-│ Compute                │ 300 ns   │ 275 ns   │ 3.64 Mops/s │ ████████ 0.75x         │   ✓    │ large       │    -     │
-│ Baseline (baseline)    │ 400 ns   │ 376 ns   │ 2.66 Mops/s │ ████████████ baseline  │   -    │ -           │    -     │
-╰────────────────────────┴──────────┴──────────┴─────────────┴────────────────────────┴────────┴─────────────┴──────────╯
+  Benchmark              Median   Mean     Ops/s       Ratio                  Sig    Mag     Alloc/op
+  Compute                300 ns   275 ns   3.64 Mops/s ████████ 0.75x         ✓      lrg     -
+  Baseline (baseline)    400 ns   376 ns   2.66 Mops/s ████████████ baseline  -      -       -
 
-Precision & Tail Latency
+── Precision & Tail Latency ────────────────────────────────────────────────────
 ... (error/stddev/cv/dynamic percentile columns)
 
-Compute: auto-tuned: 190 samples × 1 ops, warmup 40, CI ±1.8%
-Baseline: auto-tuned: 190 samples × 1 ops, warmup 40, CI ±1.9%
-
-Interpretation
+── Interpretation ──────────────────────────────────────────────────────────────
 Omnibus: not run (fewer than 3 comparable groups)
 Significance: Mann-Whitney U (p < 0.05)
 Outliers: IQR fence (1.5×)
 Effect metric: Cliff's δ (Romano neg/small/med/large labels)
+Profile: realistic (no per-iteration GC, no between-benchmark GC, alloc tracking on)
+2 benchmark(s) · 0.0s total · CI 95%
 
-Warnings
+Compute: auto-tuned: 190 samples × 1 ops, warmup 40, CI ±1.8%
+Baseline: auto-tuned: 190 samples × 1 ops, warmup 40, CI ±1.9%
+
+── Warnings ────────────────────────────────────────────────────────────────────
 ... (only shown when present)
-
-2 benchmark(s) · 0.0s total · Mann-Whitney U (p < 0.05) · CI 95%
 ```
 
 When there are two or more benchmarks, a bar chart of median timings is also displayed below the table.
@@ -71,13 +67,13 @@ Omnibus Kruskal-Wallis across 3 groups: H(2) = 7.20, p = 0.027 → significant
 Significance: Kruskal-Wallis (p < 0.05)
 Outliers: MAD (3×)
 Effect metric: Cliff's δ (Romano neg/small/med/large labels)
-
-3 benchmark(s) · 0.0s total · Kruskal-Wallis (p < 0.05) · CI 95%
+Profile: realistic (no per-iteration GC, no between-benchmark GC, alloc tracking on)
+3 benchmark(s) · 0.0s total · CI 95%
 ```
 
-Between the precision table and the Interpretation section, ConsoleReporter prints a grey `auto-tuned: …` line per benchmark summarising what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) resolved - the measured-sample count, ops-per-sample (K), warmup length, and the achieved CI half-width. Pinned runs still show the line, with the resolved counts you set.
+After the Interpretation section, ConsoleReporter prints a grey `auto-tuned: …` line per benchmark summarising what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) resolved - the measured-sample count, ops-per-sample (K), warmup length, and the achieved CI half-width. Pinned runs still show the line, with the resolved counts you set.
 
-After the comparison and precision tables, ConsoleReporter prints an **Interpretation** section with omnibus/significance context, outlier mode, and effect-metric semantics. If warnings exist, they are shown in a separate **Warnings** section below Interpretation. The final summary line then shows benchmark count, total run time, active significance test, and confidence interval.
+After the comparison and precision tables, ConsoleReporter prints an **Interpretation** section with omnibus/significance context, outlier mode, effect-metric semantics, and the measurement profile. If warnings exist, they are shown in a separate **Warnings** section below the auto-tune lines. The final summary line shows benchmark count, total run time, and confidence interval.
 
 ## Columns
 
@@ -87,14 +83,16 @@ After the comparison and precision tables, ConsoleReporter prints an **Interpret
 | **Median** | Median timing. |
 | **Mean** | Arithmetic mean. |
 | **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). `-` for errored or dry-run results. |
-| **vs Baseline** | Visual bar plus ratio relative to the baseline. Green for faster, yellow for moderately slower, red for significantly slower. The baseline cell shows `baseline`. |
+| **Ratio** | Visual bar plus ratio relative to the baseline. Green for faster, yellow for moderately slower, red for significantly slower. The baseline cell shows `baseline`. |
 | **Sig** | **✓** = difference from baseline is statistically significant; **✗** = not significant; **-** = not applicable (baseline or significance not tested). |
-| **Magnitude** | Strategy-defined qualitative effect label. With the built-in Mann-Whitney tests this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `small` (< 0.33), `med` (< 0.474), `large` (≥ 0.474). For built-in `large`, the cell is bold-red when the candidate is slower and bold-green when faster. `-` for the baseline or when significance is not tested. See [Effect size: Cliff's delta](../statistics/significance.md#effect-size-cliffs-delta). |
+| **Mag** | Strategy-defined qualitative effect label. With the built-in Mann-Whitney tests this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `sml` (< 0.33), `med` (< 0.474), `lrg` (≥ 0.474). For `lrg`, the cell is bold-red when the candidate is slower and bold-green when faster. `-` for the baseline or when significance is not tested. See [Effect size: Cliff's delta](../statistics/significance.md#effect-size-cliffs-delta). |
 | **Alloc/op** | Mean heap bytes per iteration (only visible when allocation tracking is enabled). |
 
 An optional **Description** column appears if any benchmark has a `Description` set.
 
 For [parameterized benchmarks](../features/parameterized-suite.md#reading-the-report), one column per parameter appears immediately after **Benchmark**, and the **Benchmark** cell shows the base method name. To save width, parametric tables label the comparison columns **Ratio**, **Sig** and **Mag**. When a single method is swept across parameter values, **Ratio** reports each point's scaling factor relative to the fastest point (the reference, shown as `baseline`); **Sig** and **Mag** stay `-`, because the engine does not test different workloads against one another. When a parameter group instead holds competing benchmarks, **Sig** and **Mag** carry the usual within-group significance and effect.
+
+In Standard mode (`--detail standard` or `WithDetail(ReportDetail.Standard)`), the full multi-section output is shown: comparison table, Precision & Tail Latency, auto-tune, and Interpretation.
 
 In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), each benchmark row is followed by an indented stats block.
 

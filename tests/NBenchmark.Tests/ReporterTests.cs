@@ -110,7 +110,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md");
+            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Standard);
             var result = MakeResult("alpha", 100);
 
             await reporter.ReportAsync([result]);
@@ -135,7 +135,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md");
+            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Standard);
             var net8 = MakeResult("alpha", 100, "net8.0", [new PercentileEntry(0.95, 110)]);
             var net9 = MakeResult("alpha", 80, "net9.0", [new PercentileEntry(0.95, 95)]);
 
@@ -161,7 +161,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md");
+            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Standard);
             var net8 = MakeResult("alpha", 100, "net8.0");
             var net9 = MakeResult("alpha", 80, "net9.0");
 
@@ -200,6 +200,34 @@ public class ReporterTests
             Assert.Contains("### Distribution Details", content);
             Assert.Contains("<summary><strong>alpha</strong></summary>", content);
             Assert.Contains("<summary><strong>beta</strong></summary>", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Theory]
+    [InlineData(ReportDetail.Standard)]
+    [InlineData(ReportDetail.Advanced)]
+    public async Task MarkdownReporter_StandardAndAdvanced_HeaderHasWellFormedColumns(ReportDetail detail)
+    {
+        var tempDir = MakeSubDir($"nb-md-header-{detail}");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md", detail);
+            var first = MakeResult("alpha", 100);
+            var second = MakeResult("beta", 150);
+
+            await reporter.ReportAsync([first, second]);
+
+            var content = await File.ReadAllTextAsync(Path.Combine(tempDir, "out.md"));
+
+            Assert.Contains(
+                "| | Benchmark | Median | Mean | Ops/s | Ratio | Scale | Sig | Magnitude | Alloc/op |",
+                content);
+            Assert.Contains("|:---:|---|---:|---:|---:|:---:|---|---:|---:|---:|", content);
         }
         finally
         {
@@ -261,7 +289,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new CsvReporter(tempDir, "out.csv");
+            var reporter = new CsvReporter(tempDir, "out.csv", ReportDetail.Standard);
             var result = MakeResult("alpha", 100);
 
             await reporter.ReportAsync([result]);
@@ -269,7 +297,7 @@ public class ReporterTests
             var filePath = Path.Combine(tempDir, "out.csv");
             Assert.True(File.Exists(filePath));
             var content = await File.ReadAllTextAsync(filePath);
-            Assert.Contains("Name,Median,Mean", content);
+            Assert.Contains("Name,Median,Mean,OpsPerSecond", content);
             Assert.Contains("EffectMetric,EffectValue,Magnitude", content);
             Assert.Contains("\"alpha\"", content);
         }
@@ -308,7 +336,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new CsvReporter(tempDir, "out.csv");
+            var reporter = new CsvReporter(tempDir, "out.csv", ReportDetail.Standard);
 
             var result = MakeResult("alpha", 100) with
             {

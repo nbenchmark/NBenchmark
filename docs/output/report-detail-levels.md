@@ -1,31 +1,43 @@
 ---
 title: Report Detail Levels
-description: Understand the difference between Simple and Advanced detail modes, and how to control what reporters display.
+description: Understand the difference between Simple, Standard, and Advanced detail modes, and how to control what reporters display.
 order: 6
 ---
 
 # Report Detail Levels
 
-NBenchmark supports two report detail levels that control how much statistical information reporters display. **Simple** is the default; **Advanced** adds a per-benchmark stats block with the full distribution summary.
+NBenchmark supports three report detail levels that control how much statistical information reporters display. **Simple** is the default; **Standard** adds the full multi-section output; **Advanced** adds a per-benchmark stats block with the full distribution summary.
 
 ## Simple mode (default)
 
-Simple mode shows a compact table:
+Simple mode shows a compact table with the essential information an average developer needs to know whether their code performs well or how it compares to other implementations:
 
 | Column | Description |
 |---|---|
 | **Benchmark** | Benchmark name. |
 | **Median** | Median timing. |
-| **Mean** | Arithmetic mean. |
 | **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). |
-| **vs Baseline** | Visual bar plus ratio relative to the baseline. |
+| **Ratio** | Visual bar plus ratio relative to the baseline. |
 | **Sig** | ✓ = significant, ✗ = not significant, - = not applicable. |
-| **Magnitude** | Strategy-defined qualitative effect label. |
 | **Alloc/op** | Mean bytes allocated per iteration, or - if not measured. |
+
+A one-line footer shows the benchmark count, total duration, and confidence level. No statistical jargon, no auxiliary tables.
+
+## Standard mode
+
+Standard mode shows the same comparison table with additional columns (Mean, Mag, Description) plus several auxiliary sections:
+
+- **Precision & Tail Latency** table: Error (±CI), StdDev, CV, and upper-tail percentiles (P95, P99, etc.).
+- **Launch Aggregation** table (when `LaunchCount > 1`): cross-launch mean, stddev, median, and CI.
+- **Interpretation** block: omnibus verdict, significance test name, outlier detector, effect metric summary, and measurement profile.
+- **Auto-tune summary** lines: resolved warmup, sample count, ops-per-sample, and achieved CI half-width.
+- **Warnings** (when present).
+
+This is the level for practitioners who want to understand variability and the statistical rigour behind the results.
 
 ## Advanced mode
 
-Advanced mode shows the same 10-column table **plus** a per-benchmark stats block. The console reporter prints each stats block below its row; the Markdown reporter emits a dedicated details section after the table. The stats block includes:
+Advanced mode shows everything in Standard **plus** a per-benchmark stats block. The console reporter prints each stats block below its row; the Markdown reporter emits a dedicated details section after the table. The stats block includes:
 
 - **Outliers:** count of removed samples and the trimming method.
 - **Range:** Min to Max spread.
@@ -55,7 +67,7 @@ host.WithDetail(ReportDetail.Advanced)
 
 // Suite mode
 var suite = new BenchmarkSuite("MySuite");
-suite.WithDetail(ReportDetail.Advanced)
+suite.WithDetail(ReportDetail.Standard)
      .WithReporter(new ConsoleReporter())
      .RunAsync();
 ```
@@ -64,13 +76,15 @@ suite.WithDetail(ReportDetail.Advanced)
 
 ```bash
 dotnet run -- --detail advanced
+dotnet run -- --detail standard
 dotnet run -- --detail simple
 ```
 
 | Value | Behaviour |
 |---|---|
 | `simple` | Compact table with the essential statistics. **(default)** |
-| `advanced` | Same table plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, configured percentiles, and allocation breakdown. |
+| `standard` | Full comparison table plus Precision & Tail Latency, auto-tune, and Interpretation sections. |
+| `advanced` | Same as standard plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, configured percentiles, and allocation breakdown. |
 
 The `--detail` flag affects all registered reporters. JSON always emits the full record regardless of detail level.
 
@@ -80,12 +94,12 @@ Quick mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail 
 
 ## Reporter behaviour
 
-| Reporter | Simple | Advanced |
-|---|---|---|
-| **Console** | Table only | Table + per-benchmark stats block below each row |
-| **Markdown** | Table only | Table + dedicated details section after the table |
-| **CSV** | Core columns | Extended columns including quartiles, fences, and shape stats |
-| **JSON** | Full record (always) | Full record (always) |
+| Reporter | Simple | Standard | Advanced |
+|---|---|---|---|
+| **Console** | 6-column table + counts footer | Full table + Precision & Tail Latency + Interpretation + auto-tune | Standard + per-benchmark stats block |
+| **Markdown** | 6-column table + counts footer | Full table + Precision & Tail Latency + Interpretation | Standard + dedicated details section |
+| **CSV** | 9 core columns | 22 core columns | 45 columns including quartiles, fences, and shape stats |
+| **JSON** | Full record (always) | Full record (always) | Full record (always) |
 
 ## See also
 

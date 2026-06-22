@@ -88,8 +88,6 @@ Percentile columns (P95, P99, etc.) are dynamic -- they appear only when the cor
 - Significance: Mann-Whitney U (p < 0.05)
 - Outliers: IQR fence (1.5×)
 - Effect metric: Cliff's δ (Romano neg/small/med/large labels)
-
-_2 benchmark(s) · 0.0s total · Mann-Whitney U (p < 0.05) · CI 95%_
 ```
 
 When **three or more** benchmarks are compared, the Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and the **Interpretation** section includes an omnibus line summarising the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
@@ -118,7 +116,8 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 - For [parameterized benchmarks](../features/parameterized-suite.md#reading-the-report), one column per parameter appears after **Benchmark** (which shows the base method name). When a single method is swept across parameter values, the **Ratio** column reports each point's scaling factor relative to the fastest point (the reference, shown as `baseline`), while **Sig** and **Magnitude** stay `-`. When a parameter group holds competing benchmarks, **Sig** and **Magnitude** carry the usual within-group significance and effect.
 - Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, and StdDev columns show `0.0 ns`. Percentile columns show empty cells.
 - The output directory is created automatically if it does not exist.
-- The report order is: Comparison -> Precision & Tail Latency -> (optional) Distribution Details -> Interpretation -> (optional) Warnings -> final summary line.
+- The report order is: Comparison -> Precision & Tail Latency -> (optional) Distribution Details -> Interpretation -> (optional) Warnings.
+- In Standard mode (`--detail standard` or `WithDetail(ReportDetail.Standard)`), the full multi-section output is shown: comparison table, Precision & Tail Latency, and Interpretation.
 - In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown, followed by an `auto-tuned: …` line summarising the adaptive loop's decisions (resolved samples × ops-per-sample, warmup length, achieved CI half-width).
 
 ## Using with Benchmark (Quick mode)

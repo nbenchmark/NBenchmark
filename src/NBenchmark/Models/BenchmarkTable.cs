@@ -330,10 +330,12 @@ public sealed record BenchmarkTable
 
     public static string RenderStatsBlock(BenchmarkRow row, ReportDetail detail)
     {
-        if (detail == ReportDetail.Simple)
+        if (detail != ReportDetail.Advanced)
             return "";
 
         var lines = new List<string>();
+
+        lines.Add($"Iterations: {row.N} measured (warmup: {row.WarmupIterations}, pre-trim: {row.N + row.OutliersRemoved})");
 
         if (row.OutliersRemoved > 0)
         {
@@ -348,8 +350,6 @@ public sealed record BenchmarkTable
 
         if (row.LowerFence is not null && row.UpperFence is not null)
             lines.Add($"Fences: [{BenchmarkFormatter.FormatNs(row.LowerFence.Value)}; {BenchmarkFormatter.FormatNs(row.UpperFence.Value)}]");
-
-        lines.Add($"Iterations: {row.N} measured (warmup: {row.WarmupIterations}, pre-trim: {row.N + row.OutliersRemoved})");
 
         lines.Add(
             $"CI: [{BenchmarkFormatter.FormatNs(row.ConfidenceIntervalLower)}; {BenchmarkFormatter.FormatNs(row.ConfidenceIntervalUpper)}] (CI {row.ConfidenceLevel * 100:F1}%)");
@@ -372,9 +372,15 @@ public sealed record BenchmarkTable
             {
                 var label = e.Percentile >= 1.0 ? "Max" : $"P{FormatPercentileKey(e.Percentile)}";
                 return $"{label} = {BenchmarkFormatter.FormatNs(e.Value)}";
-            });
+            }).ToList();
 
-            lines.Add($"Percentiles: {string.Join(", ", parts)}");
+            lines.Add($"Percentiles:  {string.Join("  ", parts.Take(3))}");
+
+            for (var i = 3; i < parts.Count; i += 3)
+            {
+                var chunk = parts.Skip(i).Take(3);
+                lines.Add($"              {string.Join("  ", chunk)}");
+            }
         }
 
         if (row.Effect is { } effect && string.Equals(effect.Metric, EffectMetrics.CliffsDelta, StringComparison.Ordinal))
@@ -397,8 +403,6 @@ public sealed record BenchmarkTable
             var magnitudeText = string.IsNullOrWhiteSpace(genericEffect.Magnitude) ? "?" : genericEffect.Magnitude;
             lines.Add($"Effect ({genericEffect.Metric}): {valueText} ({magnitudeText})");
         }
-
-        lines.Add($"N: {row.N} samples");
 
         if (row.AllocMedian is not null)
         {

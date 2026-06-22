@@ -131,7 +131,7 @@ The `autoTune` object records what the [adaptive measurement loop](../statistics
 
 `totalDuration` is end-to-end wall-clock (warmup + pre-measure GC + measured loop); `measuredDuration` is the measured loop only. `measuredDuration <= totalDuration` always; the gap is dominated by warmup iterations and the pre-measure `GC.Collect`.
 
-The `detail` and `profile` fields in the envelope report the active detail level and measurement profile. The result records always contain all available fields regardless of detail level.
+The `detail` and `profile` fields in the envelope report the active detail level (`simple`, `standard`, or `advanced`) and measurement profile. The result records always contain all available fields regardless of detail level.
 
 ## Notes
 

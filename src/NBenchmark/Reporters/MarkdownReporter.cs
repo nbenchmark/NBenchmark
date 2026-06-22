@@ -68,6 +68,15 @@ public sealed class MarkdownReporter : IReporter
             }
 
             RenderComparisonTable(sb, table, Detail);
+
+            if (Detail == ReportDetail.Simple)
+            {
+                RenderSimpleFooter(sb, table);
+                RenderWarnings(sb, table);
+                sb.AppendLine();
+                continue;
+            }
+
             RenderTimingDetail(sb, table);
             RenderDistributionDetails(sb, table, Detail);
             RenderInterpretation(sb, table);
@@ -85,6 +94,7 @@ public sealed class MarkdownReporter : IReporter
         var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
         var showRuntime = table.Rows.Any(r => r.RuntimeMoniker.Length > 0);
         var paramNames = table.ParameterNames;
+        var isSimple = detail == ReportDetail.Simple;
 
         // The comparison columns appear whenever rows were ranked against a reference - either a
         // competing benchmark in a parameter group or, for a single method swept across parameter
@@ -102,7 +112,7 @@ public sealed class MarkdownReporter : IReporter
             header.Append($" {name} |");
         }
 
-        header.Append(" Median | Mean | Ops/s |");
+        header.Append(" Median |");
         var separator = new StringBuilder("|:---:|---|");
 
         if (showRuntime)
@@ -113,12 +123,27 @@ public sealed class MarkdownReporter : IReporter
             separator.Append("---:|");
         }
 
-        separator.Append("---:|---:|---:|");
+        separator.Append("---:|");
+
+        if (!isSimple)
+        {
+            header.Append(" Mean |");
+            separator.Append("---:|");
+        }
+
+        header.Append(" Ops/s |");
+        separator.Append("---:|");
 
         if (hasComparisons)
         {
-            header.Append(" Ratio | Scale | Sig | Magnitude |");
-            separator.Append(":---:|---|---:|---:|");
+            header.Append(" Ratio | Scale | Sig |");
+            separator.Append(":---:|---|---:|");
+
+            if (!isSimple)
+            {
+                header.Append(" Magnitude |");
+                separator.Append("---:|");
+            }
         }
         else
         {
@@ -154,8 +179,18 @@ public sealed class MarkdownReporter : IReporter
                     errored.Append($" {FormatParameterCell(row, name)} |");
                 }
 
-                errored.Append(" - | - | - |");
-                errored.Append(hasComparisons ? " - | - | - | - |" : " - |");
+                errored.Append(" - |");
+
+                if (!isSimple)
+                    errored.Append(" - |");
+
+                errored.Append(" - |");
+
+                errored.Append(hasComparisons ? " - | - | - |" : " - |");
+
+                if (hasComparisons && !isSimple)
+                    errored.Append(" - |");
+
                 errored.Append(" - |");
 
                 if (showCategories)
@@ -188,9 +223,13 @@ public sealed class MarkdownReporter : IReporter
             }
 
             line.Append(
-                $" {BenchmarkFormatter.FormatNs(row.Median)} " +
-                $"| {BenchmarkFormatter.FormatNs(row.Mean)} " +
-                $"| {opsText} |");
+                $" {BenchmarkFormatter.FormatNs(row.Median)} |");
+
+            if (!isSimple)
+                line.Append($" {BenchmarkFormatter.FormatNs(row.Mean)} |");
+
+            line.Append(
+                $" {opsText} |");
 
             if (hasComparisons)
             {
@@ -201,9 +240,13 @@ public sealed class MarkdownReporter : IReporter
                     _ => "-",
                 };
 
-                var magnitudeText = row.Effect?.Magnitude ?? "-";
+                line.Append($" {FormatRatioText(row)} | {bar} | {sigIcon} |");
 
-                line.Append($" {FormatRatioText(row)} | {bar} | {sigIcon} | {magnitudeText} |");
+                if (!isSimple)
+                {
+                    var magnitudeText = row.Effect?.Magnitude ?? "-";
+                    line.Append($" {magnitudeText} |");
+                }
             }
             else
                 line.Append($" {bar} |");
@@ -375,6 +418,14 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine($"- Significance: {testName} (p < {table.SignificanceLevel:0.###})");
         sb.AppendLine($"- Outliers: {table.OutlierDetector}");
         sb.AppendLine($"- Effect metric: {GetEffectMetricSummary(table.Rows)}");
+        sb.AppendLine();
+    }
+
+    private static void RenderSimpleFooter(StringBuilder sb, BenchmarkTable table)
+    {
+        var count = table.Rows.Count(r => !r.Errored);
+        sb.AppendLine(
+            $"{count} benchmark(s) · {table.TotalDuration.TotalSeconds:F1}s total · CI {table.ConfidenceLevel * 100:0.#}%");
         sb.AppendLine();
     }
 
