@@ -20,12 +20,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.branch || 'main' }}
 
       - name: Checkout nbenchmark.net repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: nbenchmark/nbenchmark.net
           token: ${{ secrets.NBENCHMARK_NET_TOKEN }}
