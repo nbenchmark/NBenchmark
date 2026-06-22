@@ -143,5 +143,5 @@ dotnet benchmark --assembly ./new/MyApp.dll --reporter json --output ./after
 
 - [Host mode](./host-mode.md) - the project-based alternative
 - [CLI reference](../reference/cli.md) - all available flags
-- [Reporters](../reporters/index.md) - output formats
+- [Reporters](../output/index.md) - output formats
 - [Configuration](../reference/configuration.md) - measurement options

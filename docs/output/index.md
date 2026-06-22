@@ -1,10 +1,10 @@
 ---
-title: Reporters
-description: Overview of all NBenchmark reporters and how to use them.
+title: Output
+description: Reporters and output control - console, JSON, Markdown, CSV, custom reporters, and report detail levels.
 order: 4
 ---
 
-# Reporters
+# Output
 
 Reporters consume the finished `BenchmarkResult` list and produce output - terminal tables, Markdown files, CSVs, or JSON. You can attach as many reporters as you like to a single run.
 
@@ -60,10 +60,10 @@ await result.ToJsonAsync("results/");
 
 | Reporter | Package | Output |
 |---|---|---|
-| [ConsoleReporter](./console.md) | `NBenchmark.Reporters.Console` | Rich terminal table with colour and a bar chart |
-| [MarkdownReporter](./markdown.md) | `NBenchmark` | `.md` file with a formatted results table |
-| [CsvReporter](./csv.md) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |
-| [JsonReporter](./json.md) | `NBenchmark` | `.json` file with full structured results |
+| [ConsoleReporter](./console-reporter.md) | `NBenchmark.Reporters.Console` | Rich terminal table with colour and a bar chart |
+| [MarkdownReporter](./markdown-reporter.md) | `NBenchmark` | `.md` file with a formatted results table |
+| [CsvReporter](./csv-reporter.md) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |
+| [JsonReporter](./json-reporter.md) | `NBenchmark` | `.json` file with full structured results |
 
 ## Output path validation
 
@@ -98,7 +98,7 @@ If you reference an unknown reporter name, the host prints the list of available
 
 ## Detail levels
 
-Reporters support two detail levels - **Simple** (default) and **Advanced** - that control how much statistical information is included in the output. Set the level via `WithDetail(ReportDetail.Advanced)` on both `BenchmarkHost` and `BenchmarkSuite`, or via the `--detail advanced` CLI flag in host mode. See the [Report Detail Levels guide](../guides/report-detail-levels.md) for the full column reference.
+Reporters support two detail levels - **Simple** (default) and **Advanced** - that control how much statistical information is included in the output. Set the level via `WithDetail(ReportDetail.Advanced)` on both `BenchmarkHost` and `BenchmarkSuite`, or via the `--detail advanced` CLI flag in host mode. See the [Report Detail Levels guide](./report-detail-levels.md) for the full column reference.
 
 ## Writing a custom reporter
 

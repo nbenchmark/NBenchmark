@@ -1,7 +1,7 @@
 ---
 title: FAQ
 description: Frequently asked questions about NBenchmark.
-order: 7
+order: 9
 ---
 
 # FAQ
@@ -200,7 +200,7 @@ Use `--list` to check what NBenchmark finds before running.
        .RunAsync();
    ```
 
-   This is the cleanest approach when you already have a DI container in your application. See the [Dependency Injection guide](./guides/dependency-injection.md) for full details.
+   This is the cleanest approach when you already have a DI container in your application. See the [Dependency Injection guide](./features/dependency-injection.md) for full details.
 
 ### My benchmark class needs dependencies. How do I inject them?
 
@@ -224,7 +224,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per suite and disposed after teardown. See the [Dependency Injection guide](./guides/dependency-injection.md) for the full API and lifetime semantics.
+The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per suite and disposed after teardown. See the [Dependency Injection guide](./features/dependency-injection.md) for the full API and lifetime semantics.
 
 ### Can I use a DI container other than `Microsoft.Extensions.DependencyInjection`?
 

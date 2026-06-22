@@ -1,7 +1,7 @@
 ---
 title: Statistics
 description: How NBenchmark measures, analyses, and reports benchmark data.
-order: 3
+order: 5
 ---
 
 # Statistics

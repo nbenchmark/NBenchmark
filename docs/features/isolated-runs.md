@@ -1,7 +1,7 @@
 ---
 title: "Isolated Runs (Advanced)"
 description: Run benchmarks in clean child processes to avoid runtime cross-contamination.
-order: 6
+order: 4
 ---
 
 # Isolated Runs (Advanced)
@@ -90,7 +90,7 @@ public sealed class MixedBenchmarks
 
 When isolation resolves to a mix, NBenchmark runs the in-process benchmarks in the host, the per-class benchmarks together in one child, and each `[IsolatedProcess]` benchmark in its own child. The host re-runs the same entry assembly for each child, executes only the requested benchmarks, and reads their results back through a temporary file (never stdout, so the child's own console output cannot corrupt the data).
 
-See [Host mode](./host-mode.md#isolatedprocess) for the full attribute reference.
+See [Host mode](../usage-modes/host-mode.md#isolatedprocess) for the full attribute reference.
 
 ## Important behavior notes
 
@@ -101,6 +101,6 @@ See [Host mode](./host-mode.md#isolatedprocess) for the full attribute reference
 
 ## Related
 
-- See [Host mode](./host-mode.md#isolatedprocess) for `[IsolatedProcess]` and `[InProcess]` on attribute-discovered benchmarks.
-- See [Suite mode](./suite-mode.md) for the full `BenchmarkSuite` fluent API.
+- See [Host mode](../usage-modes/host-mode.md#isolatedprocess) for `[IsolatedProcess]` and `[InProcess]` on attribute-discovered benchmarks.
+- See [Suite mode](../usage-modes/suite-mode.md) for the full `BenchmarkSuite` fluent API.
 - See [Samples](../samples.md) for a runnable isolated-runs sample project.

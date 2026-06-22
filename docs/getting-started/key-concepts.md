@@ -137,6 +137,6 @@ Allocation tracking is **on by default** under the `Realistic` profile. It can b
 
 ## Next steps
 
-- **[Guides](../guides/)** - see these concepts applied in real benchmarks
+- **[Usage modes](../usage-modes/)** - see these concepts applied in real benchmarks
 - **[Statistics](../statistics/)** - the full mathematical detail
 - **[Configuration](../reference/configuration.md)** - tune iterations, warmup, outlier mode, and confidence level

@@ -1,5 +1,5 @@
 ---
-title: "Integration: xUnit"
+title: "Test integration: xUnit"
 description: Run NBenchmark benchmarks as xUnit tests using PerformanceFact and PerformanceTheory attributes.
 order: 1
 ---

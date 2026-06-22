@@ -397,7 +397,7 @@ public void MyExpensiveBenchmark() => SlowOperation();
 
 ## Categories
 
-Categories are not part of `MeasurementOptions`; they are metadata declared with `[BenchmarkCategory]` and used for filtering. See the [Categories guide](../guides/categories.md) for the full feature.
+Categories are not part of `MeasurementOptions`; they are metadata declared with `[BenchmarkCategory]` and used for filtering. See the [Categories guide](../features/categories.md) for the full feature.
 
 ## Valid ranges summary
 

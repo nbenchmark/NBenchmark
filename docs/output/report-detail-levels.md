@@ -1,7 +1,7 @@
 ---
 title: Report Detail Levels
 description: Understand the difference between Simple and Advanced detail modes, and how to control what reporters display.
-order: 5
+order: 6
 ---
 
 # Report Detail Levels
@@ -89,6 +89,6 @@ Quick mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail 
 
 ## See also
 
-- [Reporters](../reporters/) - available reporters and how to attach them
+- [Reporters](./index.md) - available reporters and how to attach them
 - [CLI Reference: `--detail`](../reference/cli.md#--detail-level) - full flag documentation
 - [Descriptive Statistics](../statistics/descriptive.md) - what each field measures

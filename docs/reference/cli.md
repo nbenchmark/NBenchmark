@@ -217,7 +217,7 @@ Disable process isolation for the whole run. Host mode is isolated by default - 
 dotnet run -- --in-process
 ```
 
-`--dry-run` also always runs in-process. See [Isolated Runs](../guides/isolated-runs.md) for the full isolation model.
+`--dry-run` also always runs in-process. See [Isolated Runs](../features/isolated-runs.md) for the full isolation model.
 
 ---
 
@@ -280,7 +280,7 @@ The `--detail` flag affects all registered reporters. File-based reporters emit 
 
 In host mode you can also set the detail level programmatically with `WithDetail(ReportDetail.Advanced)` before calling `RunAsync`.
 
-See [Report Detail Levels](../guides/report-detail-levels.md) for the full column reference and `WithDetail()` examples for suite mode.
+See [Report Detail Levels](../output/report-detail-levels.md) for the full column reference and `WithDetail()` examples for suite mode.
 
 ---
 

@@ -6,6 +6,8 @@ order: 2
 
 # Suite mode: BenchmarkSuite
 
+> **Advanced features:** [Parameterized benchmarks](../features/parameterized-suite.md), [categories](../features/categories.md), [isolated runs](../features/isolated-runs.md), [multi-runtime comparison](../features/multi-runtime.md), and [multiple launches](../features/multiple-launches.md) are covered in the Features section.
+
 `BenchmarkSuite` is a fluent builder for running several benchmarks in the same run and comparing them. It handles run ordering, significance testing, setup and teardown, and reporter output automatically.
 
 ## Minimal example
@@ -67,7 +69,7 @@ suite.Add(
 
 ### With categories
 
-Tag a benchmark with categories and filter the suite before running:
+Tag a benchmark with categories and filter the suite before running. See [Categories](../features/categories.md) for the full filtering model.
 
 ```csharp
 var results = await new BenchmarkSuite("sorting")
@@ -170,29 +172,7 @@ Once suite setup has succeeded, suite teardown is **guaranteed to run** - even w
 
 ## Multi-runtime comparison
 
-Use `WithRuntimes` to run the same benchmarks across multiple .NET runtimes and compare results side-by-side. The project must target all specified runtimes in its `.csproj` file:
-
-```xml
-<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-```
-
-```csharp
-var results = await new BenchmarkSuite("string-concat")
-    .Add("concat", () => "a" + "b" + "c")
-    .Add("interpolate", () => $"a {"b"} {"c"}")
-    .WithBaseline("concat")
-    .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)
-    .WithWarmup(3)
-    .WithIterations(50)
-    .WithReporter(new ConsoleReporter())
-    .RunAsync();
-```
-
-`WithRuntimes` implicitly enables process isolation: each runtime runs in a freshly spawned child process via `dotnet exec`, so JIT, GC, and thread-pool state from one runtime cannot bias another. The console and markdown reporters add a "Runtime" column when results span multiple runtimes.
-
-Significance testing is performed within each runtime (net8 results are compared against the net8 baseline, not the net10 one). The first runtime in the list is the implicit baseline for ratio calculations.
-
-See the [MultiRuntimeSuite sample](../samples.md#multiruntimesuite---suite-mode-multi-runtime) for a complete example.
+Use `WithRuntimes` to run the same benchmarks across multiple .NET runtimes and compare results side-by-side. See [Multi-runtime comparison](../features/multi-runtime.md) for the full guide.
 
 ## Process isolation
 
@@ -207,30 +187,15 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-`WithIsolation(false)` is the default (in-process). The child rebuilds the suite from your own `Main`, so custom `IOutlierDetector` / `ISignificanceTest` instances and suite setup/teardown are preserved. Isolated runs always execute in declaration order. See [Isolated Runs](./isolated-runs.md) for the full model.
+`WithIsolation(false)` is the default (in-process). The child rebuilds the suite from your own `Main`, so custom `IOutlierDetector` / `ISignificanceTest` instances and suite setup/teardown are preserved. See [Isolated Runs](../features/isolated-runs.md) for the full model.
 
 ## Multiple launches
 
-Use `WithLaunchCount(n)` to run each benchmark in the suite N times as independent launches. Each launch includes its own warmup and GC cycle, and the cross-launch statistics (mean, stddev, median, CI) are computed from the per-launch medians. The primary result uses the **best** launch (lowest median), and an aggregation table appears below the main results.
-
-```csharp
-await new BenchmarkSuite("sorting")
-    .Add("bubble", () => BubbleSort(data))
-    .Add("array", () => Array.Sort(data))
-    .WithBaseline("bubble")
-    .WithLaunchCount(5)             // 5 independent launches per benchmark
-    .WithIterations(100)
-    .WithWarmup(10)
-    .RunAsync();
-```
-
-Use multiple launches when single-run noise is a concern and you want to understand how stable the measurement is at the launch level. Each launch is a full independent measurement, so launch-level variance reflects real run-to-run differences (process state, ASLR, scheduler placement), not just intra-run noise.
-
-When combined with `WithIsolation()`, the suite repeats in a fresh child process per launch. The child process is unaware of the launch count; the parent orchestrates the repeats.
+Use `WithLaunchCount(n)` to run each benchmark in the suite N times as independent launches. See [Multiple launches](../features/multiple-launches.md) for the full guide.
 
 ## Parameterized benchmarks
 
-Use `WithParameter` and typed `Add` overloads to run the same benchmark body across multiple input values. Each parameter combination produces a separate benchmark entry with a distinct name like `"sort(size=10)"`. See [Parameterized benchmarks](./parameterized-benchmarks.md) for the full guide.
+Use `WithParameter` and typed `Add` overloads to run the same benchmark body across multiple input values. Each parameter combination produces a separate benchmark entry with a distinct name like `"sort(size=10)"`. See [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) for the full guide.
 
 ```csharp
 var results = await new BenchmarkSuite("sorting")
@@ -289,7 +254,10 @@ Errored benchmarks have `result.Errored == true` and a message in `result.ErrorM
 
 ## Next steps
 
-- [Parameterized benchmarks](./parameterized-benchmarks.md) - run benchmarks across multiple input values
+- [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) - run benchmarks across multiple input values
+- [Multi-runtime comparison](../features/multi-runtime.md) - compare across .NET runtimes
+- [Multiple launches](../features/multiple-launches.md) - measure run-to-run variance
+- [Isolated runs](../features/isolated-runs.md) - run in a clean child process
 - [Host mode: BenchmarkHost](./host-mode.md) - attribute-based discovery and CLI control
 - [Configuration](../reference/configuration.md) - full options reference
-- [Reporters](../reporters/) - all available reporters
+- [Reporters](../output/index.md) - all available reporters

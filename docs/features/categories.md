@@ -1,7 +1,7 @@
 ---
 title: Categories
 description: Tag and filter benchmarks by category.
-order: 4
+order: 3
 ---
 
 # Categories

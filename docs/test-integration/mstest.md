@@ -1,36 +1,36 @@
 ---
-title: "Integration: NUnit"
-description: Run NBenchmark benchmarks as NUnit tests using the [Performance] attribute or PerformanceAssert.
-order: 2
+title: "Test integration: MSTest"
+description: Run NBenchmark benchmarks as MSTest tests using [PerformanceTestMethod] or PerformanceAssert.
+order: 3
 ---
 
-# NUnit integration
+# MSTest integration
 
-`NBenchmark.Integration.NUnit` lets you enforce performance thresholds on NUnit tests. There are two ways to use it:
+`NBenchmark.Integration.MSTest` lets you enforce performance thresholds on MSTest tests. There are two ways to use it:
 
-- **`[Performance]` attribute** - the entire test method is run as a benchmark.
+- **`[PerformanceTestMethod]` attribute** - the entire test method is run as a benchmark.
 - **`PerformanceAssert`** - benchmark a specific piece of code inline from any test.
 
 ## Installation
 
 ```bash
-dotnet add package NBenchmark.Integration.NUnit
+dotnet add package NBenchmark.Integration.MSTest
 ```
 
 This automatically pulls in `NBenchmark` and `NBenchmark.Integration.Abstractions`.
 
-## [Performance] attribute
+## [PerformanceTestMethod]
 
-Add `[Performance]` to any test method in place of (or in addition to) `[Test]`. The method body is run as a benchmark and the result is checked against the configured thresholds. If a threshold is exceeded the test fails.
+Add `[PerformanceTestMethod]` in place of `[TestMethod]`. The method body is run as a benchmark and the result is checked against the configured thresholds. If a threshold is exceeded the test fails.
 
 ```csharp
-using NBenchmark.Integration.NUnit;
-using NUnit.Framework;
+using NBenchmark.Integration.MSTest;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-[TestFixture]
+[TestClass]
 public class SerializationTests
 {
-    [Performance(MaxMeanNs = 500_000)]
+    [PerformanceTestMethod(MaxMeanNs = 500_000)]
     public void Serialize_Is_Fast_Enough()
     {
         JsonSerializer.Serialize(new MyDto { Id = 1, Name = "test" });
@@ -41,24 +41,24 @@ public class SerializationTests
 ### Async tests
 
 ```csharp
-[Performance(MaxMeanNs = 2_000_000)]
+[PerformanceTestMethod(MaxMeanNs = 2_000_000)]
 public async Task FetchFromCache_Is_Fast_Enough()
 {
     await _cache.GetAsync("key");
 }
 ```
 
-`Task`, `Task<T>`, `ValueTask`, and `ValueTask<T>` return types are all supported.
+Both `Task` and `Task<T>` return types are supported.
 
-### Parameterised tests
+### Data-driven tests
 
-`[Performance]` works together with NUnit's built-in parameterisation attributes:
+`[PerformanceTestMethod]` works with MSTest's data-driven attributes:
 
 ```csharp
-[Performance(MaxMeanNs = 1_000_000)]
-[TestCase(10)]
-[TestCase(100)]
-[TestCase(1_000)]
+[PerformanceTestMethod(MaxMeanNs = 1_000_000)]
+[DataRow(10)]
+[DataRow(100)]
+[DataRow(1_000)]
 public void Sort_Scales_Reasonably(int size)
 {
     var data = Enumerable.Range(0, size).Reverse().ToArray();
@@ -66,17 +66,17 @@ public void Sort_Scales_Reasonably(int size)
 }
 ```
 
-Each test case is benchmarked independently and reported as a separate NUnit test.
+Each data row is benchmarked independently and reported as a separate test case.
 
 > [!NOTE]
-> Thresholds apply to every test case. If you need different limits per case, split into separate methods or use `PerformanceAssert` (see below) for per-case control.
+> Thresholds apply to every data row. If you need different limits per row, split into separate methods or use `PerformanceAssert` (see below) for per-row control.
 
 ## Threshold properties
 
 See the [thresholds reference](./index.md#thresholds-reference) for the complete list. All properties are `init`-only.
 
 ```csharp
-[Performance(
+[PerformanceTestMethod(
     MaxMeanNs         = 100_000,   // fail if mean > 100 µs
     MaxP95Ns          = 300_000,   // fail if P95  > 300 µs
     MaxAllocatedBytes = 4096,      // fail if mean allocs > 4 KiB per op
@@ -96,7 +96,7 @@ Use `PerformanceAssert` when you want to benchmark a specific piece of code insi
 ### Synchronous
 
 ```csharp
-[Test]
+[TestMethod]
 public void Repository_Query_Is_Fast_Enough()
 {
     var repo = new OrderRepository(connection);
@@ -107,14 +107,14 @@ public void Repository_Query_Is_Fast_Enough()
         name: "GetRecentOrders");
 
     // result is a BenchmarkResult - inspect it further if needed
-    Assert.That(result.Mean, Is.LessThan(3_000_000));
+    Assert.IsTrue(result.Mean < 3_000_000);
 }
 ```
 
 ### Async
 
 ```csharp
-[Test]
+[TestMethod]
 public async Task Cache_Lookup_Is_Fast_Enough()
 {
     await PerformanceAssert.RunAsync(
@@ -128,7 +128,7 @@ public async Task Cache_Lookup_Is_Fast_Enough()
 If you already have a `BenchmarkResult` from `Benchmark.Run`, call `PerformanceAssert.Validate` to assert against it:
 
 ```csharp
-[Test]
+[TestMethod]
 public void Manually_Measured_Code_Meets_Threshold()
 {
     var result = Benchmark.Run(() => DoWork(), name: "DoWork");
@@ -143,27 +143,27 @@ public void Manually_Measured_Code_Meets_Threshold()
 
 ### PerformanceAssertionOptions reference
 
-`PerformanceAssertionOptions` exposes the same properties as the `[Performance]` attribute. All properties are optional; omitting them disables the corresponding check.
+`PerformanceAssertionOptions` exposes the same properties as the `[PerformanceTestMethod]` attribute. All properties are optional; omitting them disables the corresponding check.
 
 ```csharp
 new PerformanceAssertionOptions
 {
-    MaxMeanNs         = 100_000,
-    MaxP95Ns          = 300_000,
-    MaxAllocatedBytes = 4096,
-    BaselinePath      = "baselines/my-benchmark.json",
-    MaxSlowdownRatio  = 1.1,
-    Iterations        = 300,
-    WarmupIterations  = 30,
+    MaxMeanNs          = 100_000,
+    MaxP95Ns           = 300_000,
+    MaxAllocatedBytes  = 4096,
+    BaselinePath       = "baselines/my-benchmark.json",
+    MaxSlowdownRatio   = 1.1,
+    Iterations         = 300,
+    WarmupIterations   = 30,
     MeasureAllocations = true,
-    OutlierMode       = OutlierMode.IqrFence,
-    ConfidenceLevel   = 0.99,
+    OutlierMode        = OutlierMode.IqrFence,
+    ConfidenceLevel    = 0.99,
 }
 ```
 
 ## Failure output
 
-When a threshold is violated the test fails with an NUnit assertion failure. The message lists every violated threshold:
+When a threshold is violated the test fails with a `PerformanceAssertException` (which extends `AssertFailedException`). The message lists every violated threshold:
 
 ```
 Performance thresholds exceeded for 'GetRecentOrders':

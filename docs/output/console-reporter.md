@@ -94,7 +94,7 @@ After the comparison and precision tables, ConsoleReporter prints an **Interpret
 
 An optional **Description** column appears if any benchmark has a `Description` set.
 
-For [parameterized benchmarks](../guides/parameterized-benchmarks.md#reading-the-report), one column per parameter appears immediately after **Benchmark**, and the **Benchmark** cell shows the base method name. To save width, parametric tables label the comparison columns **Ratio**, **Sig** and **Mag**. When a single method is swept across parameter values, **Ratio** reports each point's scaling factor relative to the fastest point (the reference, shown as `baseline`); **Sig** and **Mag** stay `-`, because the engine does not test different workloads against one another. When a parameter group instead holds competing benchmarks, **Sig** and **Mag** carry the usual within-group significance and effect.
+For [parameterized benchmarks](../features/parameterized-suite.md#reading-the-report), one column per parameter appears immediately after **Benchmark**, and the **Benchmark** cell shows the base method name. To save width, parametric tables label the comparison columns **Ratio**, **Sig** and **Mag**. When a single method is swept across parameter values, **Ratio** reports each point's scaling factor relative to the fastest point (the reference, shown as `baseline`); **Sig** and **Mag** stay `-`, because the engine does not test different workloads against one another. When a parameter group instead holds competing benchmarks, **Sig** and **Mag** carry the usual within-group significance and effect.
 
 In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), each benchmark row is followed by an indented stats block.
 

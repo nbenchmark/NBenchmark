@@ -125,8 +125,8 @@ await new BenchmarkSuite("sorting")
 - **[Installation](./getting-started/installation.md)** - add the NuGet packages
 - **[Quick Start](./getting-started/quick-start.md)** - your first benchmark in 60 seconds
 - **[Key Concepts](./getting-started/key-concepts.md)** - warmup, outliers, and statistics
-- **[Guides](./guides/index.md)** - detailed walkthroughs for each mode
-- **[Multi-Runtime Comparison](./guides/suite-mode.md#multi-runtime-comparison)** - run benchmarks across .NET runtimes
+- **[Usage modes](./usage-modes/)** - detailed walkthroughs for each mode
+- **[Features](./features/)** - parameterized benchmarks, categories, isolation, multi-runtime, launches, DI
 - **[Configuration](./reference/configuration.md)** - every option explained
 - **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0010)
-- **[Statistics](./statistics/index.md)** - how the numbers are calculated
+- **[Statistics](./statistics/)** - how the numbers are calculated

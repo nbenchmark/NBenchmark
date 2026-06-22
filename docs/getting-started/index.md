@@ -14,5 +14,3 @@ This section walks you through everything you need to start benchmarking - from 
 - **[Quick Start](./quick-start.md)** - Write your first benchmark and read the results.
 - **[Key Concepts](./key-concepts.md)** - Understand what warmup, outlier trimming, confidence intervals, and significance testing mean in practice.
 - **[What's Next?](./whats-next.md)** - Where to go after the basics.
-
-For benchmark classes with constructor dependencies, see the [Dependency Injection guide](../guides/dependency-injection.md).

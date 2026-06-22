@@ -8,11 +8,10 @@ order: 2
 
 ## Your first benchmark
 
-The simplest way to measure code is `Benchmark.Run`. Call it anywhere - no special project structure, no attributes, no configuration.
+The simplest way to measure code is `Benchmark.Run`. Call it anywhere - no special project structure, no configuration.
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Reporters.Console;
 
 var result = Benchmark.Run(() =>
 {
@@ -22,13 +21,20 @@ var result = Benchmark.Run(() =>
 result.Print();
 ```
 
-Run with `dotnet run` and you'll see:
+Run with `dotnet run` and you'll see something like:
 
 ```
-  Benchmark: 1.20 µs median
-    Mean: 1.24 µs, P95: 2.00 µs
-    StdDev: 360 ns
-    95% CI: 1.19 µs … 1.29 µs (±50 ns)
+  ┌─ Benchmark ─────────────────────────────────────
+  │
+  │  Median: 342.1 ns       Mean: 348.7 ns
+  │  Ops/s:  2.87 Mops/s    Median ops/s: 2.92 Mops/s
+  │  P95: 361.2 ns  P99: 378.5 ns  P99.9: 380.0 ns
+  │  StdDev: 8.3 ns         CV:   2.38%
+  │  Error:  ±3.1 ns (0.89% of Mean)
+  │  CI:     [345.6 ns … 351.8 ns] (95%)
+  │  Alloc/op: 0 B
+  │
+  └─────────────────────────────────────────────────
 ```
 
 That's it. NBenchmark warmed up until the timings plateaued (to let the JIT compile your code), collected enough measured samples to tighten the confidence interval, trimmed outliers using the IQR fence rule, and printed a summary.
@@ -61,27 +67,16 @@ To compare two approaches side-by-side, use `BenchmarkSuite`:
 using NBenchmark;
 using NBenchmark.Reporters.Console;
 
-var results = await new BenchmarkSuite("string concat")
-    .Add("plus operator",  () => { var s = "hello" + " " + "world"; })
-    .Add("interpolation",  () => { var s = $"hello {"world"}"; })
-    .WithBaseline("plus operator")
+var results = await new BenchmarkSuite("sorting")
+    .Add("Array.Sort", () => { var a = data.ToArray(); Array.Sort(a); })
+    .Add("LINQ OrderBy", () => { _ = data.OrderBy(x => x).ToArray(); })
+    .WithBaseline("Array.Sort")
     .WithReporter(new ConsoleReporter())
     .RunAsync();
 ```
 
 The console output will look like:
-
-```
-╭────────────────┬────────┬────────┬───────┬────────┬───────┬───────┬───────┬─────┬──────────╮
-│ Benchmark      │ Median │  Mean  │ Error │ StdDev │  P95  │  P99  │ Ratio │ Sig │ Alloc/op │
-├────────────────┼────────┼────────┼───────┼────────┼───────┼───────┼───────┼─────┼──────────┤
-│ interpolation  │ 8.0 ns │ 8.1 ns │ ±1 ns │ 6 ns   │ 10 ns │ 11 ns │ 0.95x │  ✓  │    -     │
-│ plus operator  │ 8.5 ns │ 8.4 ns │ ±1 ns │ 5 ns   │ 10 ns │ 10 ns │ 1.00x │  -  │    -     │
-╰────────────────┴────────┴────────┴───────┴────────┴───────┴───────┴───────┴─────┴──────────╯
-
-Ran 2 benchmark(s) - Significance: Mann-Whitney U (p < 0.05) - Outliers: IQR fence (1.5×)
-Error = ±95% confidence interval half-width on the mean.
-```
+[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)
 
 The **Ratio** column shows speed relative to the baseline. The **Sig** column shows **✓** when the difference is statistically significant and **✗** when it's not. No symbol means the benchmark is the baseline or significance wasn't tested.
 
@@ -114,5 +109,5 @@ See [Key Concepts](./key-concepts.md) for a deeper explanation of what these mea
 ## Next steps
 
 - **[Key Concepts](./key-concepts.md)** - understand warmup, outlier trimming, and the statistics
-- **[Guides](../guides/)** - detailed coverage of all four usage modes
+- **[Usage modes](../usage-modes/)** - detailed coverage of all four usage modes
 - **[Configuration](../reference/configuration.md)** - change defaults (iterations, warmup, confidence level, etc.)

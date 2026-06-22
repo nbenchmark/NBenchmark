@@ -1,10 +1,10 @@
 ---
-title: Integration
-description: Integrate NBenchmark with other tools and frameworks - test runners, CI pipelines, and more.
-order: 5
+title: Test integration
+description: Enforce performance thresholds inside an existing xUnit, NUnit, or MSTest test suite.
+order: 6
 ---
 
-# Integration
+# Test integration
 
 NBenchmark's integration packages connect it to the rest of your toolchain. The current integrations focus on test frameworks, letting you enforce performance thresholds directly inside your existing test suite - no separate benchmark project or CI step required.
 

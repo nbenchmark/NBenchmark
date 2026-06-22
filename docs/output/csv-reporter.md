@@ -1,7 +1,7 @@
 ---
 title: CsvReporter
 description: Save benchmark results to a CSV file for post-processing in Excel, Python, or other tools.
-order: 2
+order: 3
 ---
 
 # CsvReporter

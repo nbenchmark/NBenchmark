@@ -1,7 +1,7 @@
 ---
 title: Reference
 description: Complete reference for all NBenchmark configuration options, CLI flags, and compile-time diagnostics.
-order: 5
+order: 7
 ---
 
 # Reference

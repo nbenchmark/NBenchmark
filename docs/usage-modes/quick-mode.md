@@ -91,10 +91,17 @@ result.Print();
 Output:
 
 ```
-  MyMethod: 1.20 µs median
-    Mean: 1.24 µs, P95: 2.00 µs
-    StdDev: 360 ns
-    95% CI: 1.19 µs … 1.29 µs (±50 ns)
+  ┌─ Benchmark ─────────────────────────────────────
+  │
+  │  Median: 342.1 ns       Mean: 348.7 ns
+  │  Ops/s:  2.87 Mops/s    Median ops/s: 2.92 Mops/s
+  │  P95: 361.2 ns  P99: 378.5 ns  P99.9: 380.0 ns
+  │  StdDev: 8.3 ns         CV:   2.38%
+  │  Error:  ±3.1 ns (0.89% of Mean)
+  │  CI:     [345.6 ns … 351.8 ns] (95%)
+  │  Alloc/op: 0 B
+  │
+  └─────────────────────────────────────────────────
 ```
 
 ### Rich console table (NBenchmark.Reporters.Console)
@@ -141,4 +148,4 @@ if (result.MeanAllocatedBytes.HasValue)
 
 - [Suite mode: BenchmarkSuite](./suite-mode.md) - compare two or more implementations
 - [Configuration](../reference/configuration.md) - full options reference
-- [Reporters](../reporters/) - save results to files
+- [Reporters](../output/index.md) - save results to files

@@ -1,7 +1,7 @@
 ---
 title: Dependency Injection
 description: Use Microsoft.Extensions.DependencyInjection (or any container) to give benchmark classes constructor dependencies.
-order: 4
+order: 7
 ---
 
 # Dependency Injection
@@ -187,6 +187,6 @@ await new BenchmarkSuite("repo")
 
 ## Next steps
 
-- [Host mode: BenchmarkHost](./host-mode.md) - full reference for the host mode
+- [Host mode: BenchmarkHost](../usage-modes/host-mode.md) - full reference for the host mode
 - [Samples](../samples.md) - see the `samples/DependencyInjection/` project for a complete working example
 - [FAQ](../faq.md#my-benchmark-class-needs-dependencies-how-do-i-inject-them) - common questions
