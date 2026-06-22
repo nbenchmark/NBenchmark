@@ -30,6 +30,12 @@ public sealed class BenchmarkSuite(string name)
     /// <summary>The display name of this suite.</summary>
     public string Name { get; } = name;
 
+    /// <summary>
+    ///     Internal accessor for the configured <see cref="EnvironmentOptions" />. Exposed
+    ///     so tests can verify the fluent <c>With*</c> builders without running a suite.
+    /// </summary>
+    internal EnvironmentOptions? Environment => _options.Environment;
+
     // --- Parameter-free Add overloads ---
 
     public BenchmarkSuite Add(string name, Action action,
@@ -550,6 +556,54 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>
+    ///     Pins the benchmark process to the specified logical CPU cores for the duration
+    ///     of the run, removing inter-core migration noise. Cores are zero-based and
+    ///     logical (as reported by the OS). The prior affinity is restored when the run
+    ///     completes. Call <see cref="WithDedicatedHostGuidance" /> alongside this to
+    ///     surface a warning when the host looks unsuitable.
+    /// </summary>
+    public BenchmarkSuite WithHardwareAffinity(params int[] cores)
+    {
+        ArgumentNullException.ThrowIfNull(cores);
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { CpuAffinity = cores },
+        };
+        return this;
+    }
+
+    /// <summary>
+    ///     Requests the specified process priority for the duration of the run, reducing
+    ///     preemption by unrelated OS work. <see cref="System.Diagnostics.ProcessPriorityClass.High" />
+    ///     is the recommended value for dedicated benchmark hosts. The prior priority is
+    ///     restored when the run completes. A refused elevation (common on locked-down CI
+    ///     runners) is surfaced as a warning, not an error.
+    /// </summary>
+    public BenchmarkSuite WithProcessPriority(System.Diagnostics.ProcessPriorityClass priority)
+    {
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { ProcessPriority = priority },
+        };
+        return this;
+    }
+
+    /// <summary>
+    ///     Enables a non-fatal pre-run probe that warns when the host looks like a
+    ///     shared or otherwise noisy benchmark environment: a low CPU core count,
+    ///     an unraisable process priority, or (on macOS) unobservable frequency scaling
+    ///     and thermal throttling. The run still proceeds - this is guidance, not a gate.
+    /// </summary>
+    public BenchmarkSuite WithDedicatedHostGuidance(bool enabled = true)
+    {
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { DedicatedHostGuidance = enabled },
+        };
+        return this;
+    }
+
     public BenchmarkSuite WithRunOrder(RunOrder order)
     {
         _runOrder = order;
@@ -733,6 +787,12 @@ public sealed class BenchmarkSuite(string name)
         var filteredBenchmarks = ApplyCategoryFilter(ordered);
         var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
         await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
+
+        // Apply opt-in hardware/OS controls for the duration of the in-process run. The
+        // scope restores the prior process state on dispose. Isolated suite children
+        // re-run this same entry point and re-derive _options, so they apply the same
+        // settings themselves; Host-mode children receive settings via MeasurementOverrides.
+        using var _ = EnvironmentControl.Apply(_options.Environment);
 
         _suiteSetup?.Invoke();
 
@@ -973,6 +1033,12 @@ public sealed class BenchmarkSuite(string name)
         var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
 
         await _progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
+
+        // Apply opt-in hardware/OS controls to the parent process for the duration of the
+        // multi-runtime run, mirroring the single-runtime suite path. Each spawned child
+        // re-runs this entry point and re-derives _options, so it applies the same settings
+        // itself; this scope covers the parent's own launch/aggregation work.
+        using var _ = EnvironmentControl.Apply(_options.Environment);
 
         _suiteSetup?.Invoke();
 

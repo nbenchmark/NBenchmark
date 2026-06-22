@@ -393,6 +393,60 @@ dotnet run -- --no-histogram
 
 ---
 
+### `--cpu-affinity <list>`
+
+Pin the benchmark process to specific logical CPU cores for the duration of the run, reducing inter-core migration noise. The value is a comma-separated list of zero-based logical core indices (as reported by the OS). The prior affinity is restored when the run completes.
+
+```bash
+dotnet run -- --cpu-affinity 0          # pin to core 0 only
+dotnet run -- --cpu-affinity 2,3        # pin to cores 2 and 3
+```
+
+Indices must be non-negative and within the host's logical core count (0 to `Environment.ProcessorCount - 1`). Out-of-range or non-numeric values produce a parse error and the run does not proceed.
+
+**Platform support:** processor affinity is applied on Linux and Windows. On macOS the BCL does not expose the `setaffinity` syscall, so the flag is accepted but skipped with a warning - use a Linux or Windows host for affinity-pinned CI gates. See [Environment control](../features/environment-control.md) for the full model.
+
+Programmatic equivalent: `WithHardwareAffinity(2, 3)` (suite/host) or `new MeasurementOptions { Environment = new EnvironmentOptions { CpuAffinity = [2, 3] } }`.
+
+---
+
+### `--priority <level>`
+
+Request a process priority for the benchmark run, reducing preemption by unrelated OS work. The prior priority is restored when the run completes. A refused elevation (common on locked-down CI runners) is surfaced as a warning, not an error - the run still proceeds.
+
+| Value | Priority |
+|---|---|
+| `normal` | `ProcessPriorityClass.Normal` |
+| `idle` | `ProcessPriorityClass.Idle` |
+| `belownormal` | `ProcessPriorityClass.BelowNormal` |
+| `abovenormal` | `ProcessPriorityClass.AboveNormal` |
+| `high` | `ProcessPriorityClass.High` |
+| `realtime` | `ProcessPriorityClass.RealTime` |
+
+```bash
+dotnet run -- --priority high
+```
+
+`high` is the recommended value for dedicated benchmark hosts. `realtime` can starve the OS and is discouraged. See [Environment control](../features/environment-control.md) for the rationale and the `--dedicated-host-guidance` probe that suggests this flag.
+
+Programmatic equivalent: `WithProcessPriority(ProcessPriorityClass.High)` (suite/host).
+
+---
+
+### `--dedicated-host-guidance`
+
+Emit a non-fatal pre-run warning when the host looks like a shared or otherwise noisy benchmark environment: a low CPU core count (typical of shared-tenant CI runners), an unraisable process priority, or (on macOS) unobservable frequency scaling and thermal throttling. On a suitable host (>= 4 cores, no priority set) the probe actively suggests `--priority high`. The run still proceeds - this is guidance, not a gate.
+
+```bash
+dotnet run -- --dedicated-host-guidance
+```
+
+Use it on CI runners and dev laptops to surface hidden noise sources before you trust a comparison. See [Environment control](../features/environment-control.md) for what the probe checks.
+
+Programmatic equivalent: `WithDedicatedHostGuidance()` (suite/host).
+
+---
+
 ### `--threshold-pct <n>`
 
 Causes the run to fail with **exit code 1** if any benchmark regresses more than `n`% against the baseline. `n` must be a positive integer (1 or greater). The regression check compares median execution times: a benchmark is considered regressed if `candidate.Median / baseline.Median > 1.0 + (n / 100.0)`.
@@ -410,7 +464,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`, `--percentiles`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown reporter name (`--reporter`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown reporter name (`--reporter`), unknown priority level (`--priority`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
 When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 
@@ -428,6 +482,9 @@ dotnet run -- --order declaration --seed 12345
 
 # Run all benchmarks with 3 launches and view cross-launch aggregation
 dotnet run -- --launch-count 3
+
+# Pin to cores 2-3, raise priority, and warn if the host looks noisy
+dotnet run -- --cpu-affinity 2,3 --priority high --dedicated-host-guidance
 
 # Check what will run before committing to a full benchmark
 dotnet run -- --list

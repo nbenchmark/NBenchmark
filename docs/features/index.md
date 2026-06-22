@@ -32,6 +32,10 @@ Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) 
 
 Run each benchmark N times as independent launches to measure run-to-run variance and produce cross-launch aggregation statistics.
 
+## [Environment control](./environment-control.md)
+
+Pin benchmarks to CPU cores, raise process priority, and detect noisy hosts to reduce measurement noise at its source. Opt-in controls that complement the statistical noise handling.
+
 ## [Dependency injection](./dependency-injection.md)
 
 Use `Microsoft.Extensions.DependencyInjection` (or any container that exposes an `IServiceProvider`) to give benchmark classes constructor dependencies. Host mode only.

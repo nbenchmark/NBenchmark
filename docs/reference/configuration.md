@@ -382,6 +382,37 @@ BenchmarkSuite fluent method: `.WithSignificanceTest(test)`
 
 See [Custom significance tests](../statistics/significance.md#custom-significance-tests).
 
+### Environment
+
+```csharp
+Environment = null   // default - no hardware/OS controls applied
+```
+
+Opt-in hardware/OS controls applied for the duration of a run, typed as `EnvironmentOptions?`. When `null` (the default), the benchmark runs with whatever CPU affinity and process priority the host started it with - the zero-ceremony path. Set it to reduce measurement noise at its source (CPU migration, preemption, shared-host jitter) before the timer starts.
+
+| Field | Type | Default | Effect |
+|---|---|---|---|
+| `CpuAffinity` | `IReadOnlyList<int>?` | `null` | Logical CPU core indices to pin the process to (e.g. `[2, 3]`). Restored on run exit. Linux/Windows only; ignored with a warning on macOS. |
+| `ProcessPriority` | `ProcessPriorityClass?` | `null` | Process priority to request. `High` is recommended for dedicated hosts. Restored on run exit. A refused elevation is a warning, not an error. |
+| `DedicatedHostGuidance` | `bool` | `false` | Emit a non-fatal pre-run warning when the host looks noisy (low core count, unraisable priority, or on macOS unobservable frequency scaling/thermal throttling). On a suitable host, actively suggests `--priority high`. |
+
+```csharp
+var options = new MeasurementOptions
+{
+    Environment = new EnvironmentOptions
+    {
+        CpuAffinity = [2, 3],
+        ProcessPriority = ProcessPriorityClass.High,
+        DedicatedHostGuidance = true,
+    },
+};
+```
+
+BenchmarkSuite/BenchmarkHost fluent methods: `.WithHardwareAffinity(2, 3)`, `.WithProcessPriority(ProcessPriorityClass.High)`, `.WithDedicatedHostGuidance()`  
+CLI flags: `--cpu-affinity <list>`, `--priority <level>`, `--dedicated-host-guidance`
+
+This is the proactive counterpart to the statistical noise handling in [Outlier Trimming](../statistics/outliers.md): trimming reacts to noise after the fact; environment control reduces it at the source. See [Environment control](../features/environment-control.md) for the full model, platform notes, and isolated-process propagation.
+
 ## Applying options per-method (Host mode)
 
 In Host mode, the `[Benchmark]` attribute accepts per-method overrides that take priority over the host-level options:
@@ -421,6 +452,7 @@ Categories are not part of `MeasurementOptions`; they are metadata declared with
 | `HistogramBucketCount` | `int` | `20` | `5` – `100` |
 | `EnableSignificance` | `bool` | `true` | - |
 | `SignificanceTest` | `ISignificanceTest?` | `null` | Defaults to `DefaultSignificanceTest` |
+| `Environment` | `EnvironmentOptions?` | `null` | See [Environment](#environment) |
 
 Values outside the valid range throw `ArgumentOutOfRangeException`.
 

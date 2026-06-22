@@ -118,6 +118,56 @@ public sealed class BenchmarkHost
     }
 
     /// <summary>
+    ///     Pins the benchmark process to the specified logical CPU cores for the duration
+    ///     of the run, removing inter-core migration noise. Cores are zero-based and
+    ///     logical (as reported by the OS). The prior affinity is restored when the run
+    ///     completes. Also propagated to isolated child processes. Call
+    ///     <see cref="WithDedicatedHostGuidance" /> alongside this to surface a warning
+    ///     when the host looks unsuitable.
+    /// </summary>
+    public BenchmarkHost WithHardwareAffinity(params int[] cores)
+    {
+        ArgumentNullException.ThrowIfNull(cores);
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { CpuAffinity = cores },
+        };
+        return this;
+    }
+
+    /// <summary>
+    ///     Requests the specified process priority for the duration of the run, reducing
+    ///     preemption by unrelated OS work. <see cref="System.Diagnostics.ProcessPriorityClass.High" />
+    ///     is the recommended value for dedicated benchmark hosts. The prior priority is
+    ///     restored when the run completes. Also propagated to isolated child processes.
+    ///     A refused elevation (common on locked-down CI runners) is surfaced as a
+    ///     warning, not an error.
+    /// </summary>
+    public BenchmarkHost WithProcessPriority(System.Diagnostics.ProcessPriorityClass priority)
+    {
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { ProcessPriority = priority },
+        };
+        return this;
+    }
+
+    /// <summary>
+    ///     Enables a non-fatal pre-run probe that warns when the host looks like a
+    ///     shared or otherwise noisy benchmark environment: a low CPU core count,
+    ///     an unraisable process priority, or (on macOS) unobservable frequency scaling
+    ///     and thermal throttling. The run still proceeds - this is guidance, not a gate.
+    /// </summary>
+    public BenchmarkHost WithDedicatedHostGuidance(bool enabled = true)
+    {
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { DedicatedHostGuidance = enabled },
+        };
+        return this;
+    }
+
+    /// <summary>
     ///     Sets the measurement profile, which bundles per-iteration GC, between-benchmark GC, and
     ///     allocation tracking. <see cref="MeasurementProfile.Realistic" /> (the default) keeps natural
     ///     GC pressure in the timing; <see cref="MeasurementProfile.Independent" /> isolates iterations
@@ -291,6 +341,13 @@ public sealed class BenchmarkHost
             ? _options with { Iterations = 0, WarmupIterations = 0 }
             : MergeCliOptions(_options, _cliArgs);
 
+        // Apply opt-in hardware/OS controls (CPU affinity, process priority, dedicated-host
+        // guidance) for the duration of the run. The scope restores the prior process state
+        // on dispose. Isolated children receive the same settings via MeasurementOverrides
+        // and apply them themselves; the parent applies its own so in-process benchmarks and
+        // the parent-side measurement loop run pinned/elevated too.
+        using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
+
         var allNames = filtered
             .SelectMany(s => s.Benchmarks.Select(b => $"{s.Type.Name}.{b.DisplayName}"))
             .ToList();
@@ -422,6 +479,12 @@ public sealed class BenchmarkHost
         var suiteOptions = _cliArgs.DryRun
             ? _options with { Iterations = 0, WarmupIterations = 0 }
             : MergeCliOptions(_options, _cliArgs);
+
+        // Apply opt-in hardware/OS controls to the parent process for the duration of the
+        // multi-runtime run, mirroring the single-runtime path. Each spawned child also
+        // applies its own settings via MeasurementOverrides; this scope covers the parent's
+        // own measurement/aggregation work.
+        using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
 
         foreach (var build in successfulBuilds)
         {
@@ -1098,6 +1161,11 @@ public sealed class BenchmarkHost
     {
         var options = request.Overrides.Apply(_options);
         var requested = new HashSet<string>(request.BenchmarkDisplayNames, StringComparer.Ordinal);
+
+        // A child re-runs in a fresh CLR; apply the propagated environment controls (CPU
+        // affinity, priority, guidance) so the child's measurements run under the same
+        // hardware constraints as the parent. The scope restores on dispose.
+        using var _ = EnvironmentControl.Apply(options.Environment);
 
         var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
 

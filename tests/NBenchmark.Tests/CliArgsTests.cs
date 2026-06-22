@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NBenchmark.Engine;
 using Xunit;
 
@@ -601,6 +602,126 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_CpuAffinity_Single_Core_Parses()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--cpu-affinity", "0"]);
+
+        Assert.Empty(errors);
+        Assert.Equal([0], result.CpuAffinity);
+    }
+
+    [Fact]
+    public void ParseCore_CpuAffinity_Multiple_Cores_Parses()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--cpu-affinity", "2,3"]);
+
+        Assert.Empty(errors);
+        Assert.Equal([2, 3], result.CpuAffinity);
+    }
+
+    [Fact]
+    public void ParseCore_CpuAffinity_Trims_Whitespace()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--cpu-affinity", " 0 , 1 "]);
+
+        Assert.Empty(errors);
+        Assert.Equal([0, 1], result.CpuAffinity);
+    }
+
+    [Fact]
+    public void ParseCore_CpuAffinity_Negative_ReturnsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--cpu-affinity", "-1"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.CpuAffinity);
+        Assert.Contains("--cpu-affinity", errors[0]);
+    }
+
+    [Fact]
+    public void ParseCore_CpuAffinity_NonNumeric_ReturnsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--cpu-affinity", "foo"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.CpuAffinity);
+    }
+
+    [Fact]
+    public void ParseCore_CpuAffinity_MissingValue_ReturnsError()
+    {
+        var (_, errors) = CliArgs.ParseCore(["--cpu-affinity"]);
+
+        var error = Assert.Single(errors);
+        Assert.Contains("Missing value", error);
+    }
+
+    [Fact]
+    public void ParseCore_CpuAffinity_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.CpuAffinity);
+    }
+
+    [Theory]
+    [InlineData("normal", ProcessPriorityClass.Normal)]
+    [InlineData("high", ProcessPriorityClass.High)]
+    [InlineData("idle", ProcessPriorityClass.Idle)]
+    [InlineData("belownormal", ProcessPriorityClass.BelowNormal)]
+    [InlineData("abovenormal", ProcessPriorityClass.AboveNormal)]
+    [InlineData("realtime", ProcessPriorityClass.RealTime)]
+    [InlineData("HIGH", ProcessPriorityClass.High)]
+    public void ParseCore_Priority_Valid_SetsPriority(string value, ProcessPriorityClass expected)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--priority", value]);
+
+        Assert.Empty(errors);
+        Assert.Equal(expected, result.ProcessPriority);
+    }
+
+    [Fact]
+    public void ParseCore_Priority_Invalid_ReturnsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--priority", "bogus"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.ProcessPriority);
+        Assert.Contains("--priority", errors[0]);
+    }
+
+    [Fact]
+    public void ParseCore_Priority_MissingValue_ReturnsError()
+    {
+        var (_, errors) = CliArgs.ParseCore(["--priority"]);
+
+        var error = Assert.Single(errors);
+        Assert.Contains("Missing value", error);
+    }
+
+    [Fact]
+    public void ParseCore_Priority_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.ProcessPriority);
+    }
+
+    [Fact]
+    public void ParseCore_DedicatedHostGuidance_Sets_Flag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--dedicated-host-guidance"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.DedicatedHostGuidance);
+    }
+
+    [Fact]
+    public void ParseCore_DedicatedHostGuidance_Default_IsFalse()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.False(result.DedicatedHostGuidance);
+    }
+
+    [Fact]
     public void PrintHelp_WritesUsageToStdout()
     {
         var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp());
@@ -612,6 +733,9 @@ public class CliArgsTests
         Assert.Contains("--autotune-cap-behavior", stdout);
         Assert.Contains("--percentiles", stdout);
         Assert.Contains("--no-histogram", stdout);
+        Assert.Contains("--cpu-affinity", stdout);
+        Assert.Contains("--priority", stdout);
+        Assert.Contains("--dedicated-host-guidance", stdout);
     }
 
     private static string CaptureConsoleOutput(Action action)
