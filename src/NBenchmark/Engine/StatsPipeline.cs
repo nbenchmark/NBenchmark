@@ -95,4 +95,5 @@ internal sealed record ProcessedMeasurements(
     long[]? RawAllocations)
 {
     public IReadOnlyList<string> Warnings { get; init; } = [];
+    public DiagnosticsResult? DiagnosticsResult { get; init; }
 }

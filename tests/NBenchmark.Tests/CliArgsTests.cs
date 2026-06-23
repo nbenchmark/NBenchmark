@@ -211,6 +211,29 @@ public class CliArgsTests
         Assert.Contains("Invalid --outlier", error);
     }
 
+    [Theory]
+    [InlineData("none", DiagnosticsMode.None)]
+    [InlineData("gc", DiagnosticsMode.Gc)]
+    [InlineData("gcandcpu", DiagnosticsMode.GcAndCpu)]
+    [InlineData("all", DiagnosticsMode.All)]
+    public void ParseCore_Diagnostics_Valid_SetsDiagnosticsMode(string value, DiagnosticsMode expected)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--diagnostics", value]);
+
+        Assert.Empty(errors);
+        Assert.Equal(expected, result.Diagnostics);
+    }
+
+    [Fact]
+    public void ParseCore_Diagnostics_Invalid_ReturnsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--diagnostics", "bogus"]);
+
+        Assert.Null(result.Diagnostics);
+        var error = Assert.Single(errors);
+        Assert.Contains("Invalid --diagnostics value", error);
+    }
+
     [Fact]
     public void ParseCore_MissingValue_ReturnsError()
     {

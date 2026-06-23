@@ -229,6 +229,21 @@ public sealed class BenchmarkHost
         return this;
     }
 
+    /// <summary>Configures runtime diagnostics (GC counts, heap info, exceptions, CPU time).</summary>
+    public BenchmarkHost WithDiagnostics(DiagnosticsOptions diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        _options = _options with { Diagnostics = diagnostics };
+        return this;
+    }
+
+    /// <summary>Selects a diagnostics mode (None, Gc, GcAndCpu, All).</summary>
+    public BenchmarkHost WithDiagnostics(DiagnosticsMode mode)
+    {
+        _options = _options with { Diagnostics = DiagnosticsOptions.FromMode(mode) };
+        return this;
+    }
+
     /// <summary>
     ///     Controls Host mode's isolated-by-default execution. When enabled (the default),
     ///     each discovered class runs in its own clean-room child process unless a benchmark

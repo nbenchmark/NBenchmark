@@ -176,6 +176,13 @@ public record BenchmarkResult
     /// </summary>
     public LaunchStatistics? LaunchStatistics { get; init; }
 
+    /// <summary>
+    ///     Runtime diagnostics collected during measurement: GC collection counts, heap info,
+    ///     exception rates, and CPU time. <c>null</c> when no diagnostics were collected or
+    ///     the run errored.
+    /// </summary>
+    public DiagnosticsResult? Diagnostics { get; init; }
+
     public double ConfidenceIntervalLower => Mean - MarginOfError;
     public double ConfidenceIntervalUpper => Mean + MarginOfError;
     public double Range => Max - Min;

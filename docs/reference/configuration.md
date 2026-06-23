@@ -241,6 +241,52 @@ BenchmarkSuite fluent method: `.WithAllocations()`
 > [!NOTE]
 > Allocation tracking adds a small overhead to each iteration and may slightly affect timing measurements.
 
+### Diagnostics
+
+```csharp
+Diagnostics = DiagnosticsOptions.Default   // default - GC collection counts on
+```
+
+Runtime diagnostics collected alongside timing and allocations. Typed as a `DiagnosticsOptions` record with four boolean toggles:
+
+| Toggle | Default | What it collects |
+|---|---|---|
+| `GcCollectionCounts` | `true` | Gen0, Gen1, Gen2 collection counts during the measurement phase (totals, not per-op). Cheap - two `GC.CollectionCount` reads per sample. |
+| `GcHeapInfo` | `false` | Heap committed bytes and fragmented bytes delta across the measurement phase, via `GC.GetGCMemoryInfo`. |
+| `Exceptions` | `false` | Total first-chance exceptions during the measurement phase, via an `AppDomain.FirstChanceException` subscription. Divided by total measurement ops to give exceptions per operation. |
+| `CpuTime` | `false` | Process CPU time (TotalProcessorTime) delta per sample, divided by total measurement ops. Also reports the CPU/wall-clock ratio. |
+
+Three named presets are available via `DiagnosticsOptions.FromMode(DiagnosticsMode)`:
+
+| Mode | Toggles enabled |
+|---|---|
+| `DiagnosticsMode.None` | None |
+| `DiagnosticsMode.Gc` | `GcCollectionCounts` |
+| `DiagnosticsMode.GcAndCpu` | `GcCollectionCounts`, `CpuTime` |
+| `DiagnosticsMode.All` | All four toggles |
+
+```csharp
+// Programmatic - enable everything
+var options = new MeasurementOptions
+{
+    Diagnostics = DiagnosticsOptions.All,
+};
+
+// Or build a custom combination
+var options = new MeasurementOptions
+{
+    Diagnostics = new DiagnosticsOptions { GcCollectionCounts = true, Exceptions = true },
+};
+```
+
+BenchmarkSuite/BenchmarkHost fluent methods: `.WithDiagnostics(DiagnosticsMode.All)` or `.WithDiagnostics(DiagnosticsOptions.All)`  
+CLI flag: `--diagnostics <none|gc|gcandcpu|all>`
+
+> [!NOTE]
+> GC collection counts are on by default because they are cheap (`GC.CollectionCount` is a counter read, not a measurement). The other toggles add varying overhead: exception counting subscribes to `FirstChanceException` for the measurement phase, and CPU time reads `Process.TotalProcessorTime` per sample. Enable them only when you need the data.
+
+See [Diagnostics](../statistics/diagnostics.md) for what each counter measures and how collection works.
+
 ### OutlierMode
 
 ```csharp
@@ -453,6 +499,7 @@ Categories are not part of `MeasurementOptions`; they are metadata declared with
 | `EnableSignificance` | `bool` | `true` | - |
 | `SignificanceTest` | `ISignificanceTest?` | `null` | Defaults to `DefaultSignificanceTest` |
 | `Environment` | `EnvironmentOptions?` | `null` | See [Environment](#environment) |
+| `Diagnostics` | `DiagnosticsOptions` | `DiagnosticsOptions.Default` (GC counts on) | See [Diagnostics](#diagnostics) |
 
 Values outside the valid range throw `ArgumentOutOfRangeException`.
 

@@ -135,6 +135,42 @@ public class ConsoleReporterTests
     }
 
     [Fact]
+    public async Task ConsoleReporter_Diagnostics_Leaves_Blank_For_Missing_CpuRatio()
+    {
+        var reporter = new ConsoleReporter(ReportDetail.Standard);
+
+        var gcOnly = MakeResult("gc", 100) with
+        {
+            Diagnostics = new DiagnosticsResult
+            {
+                Gen0Collections = 1,
+                Gen1Collections = 0,
+                Gen2Collections = 0,
+                Mode = DiagnosticsMode.Gc,
+            },
+        };
+
+        var cpuOnly = MakeResult("cpu", 100) with
+        {
+            Diagnostics = new DiagnosticsResult
+            {
+                CpuWallRatio = 0.42,
+                Mode = DiagnosticsMode.CpuTime,
+            },
+        };
+
+        AnsiConsole.Record();
+
+        await reporter.ReportAsync([gcOnly, cpuOnly]);
+
+        var output = AnsiConsole.ExportText();
+        Assert.Contains("Diagnostics", output);
+        Assert.Contains("gc", output);
+        Assert.Contains("cpu", output);
+        Assert.Contains("42%", output);
+    }
+
+    [Fact]
     public void IReporter_Name_Property_Returns_Console() => Assert.Equal("console", new ConsoleReporter().Name);
 
     [Fact]

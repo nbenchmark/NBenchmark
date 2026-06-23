@@ -80,6 +80,7 @@ public sealed class MarkdownReporter : IReporter
             }
 
             RenderTimingDetail(sb, table);
+            RenderDiagnostics(sb, table);
             RenderDistributionDetails(sb, table, Detail);
             RenderInterpretation(sb, table);
             RenderWarnings(sb, table);
@@ -356,6 +357,96 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine();
     }
 
+    private static void RenderDiagnostics(StringBuilder sb, BenchmarkTable table)
+    {
+        var rowsWithDiag = table.Rows.Where(r => r.Diagnostics is not null).ToList();
+
+        if (rowsWithDiag.Count == 0)
+            return;
+
+        sb.AppendLine("### Diagnostics");
+        sb.AppendLine();
+
+        var header = new StringBuilder("| Benchmark |");
+        var separator = new StringBuilder("|---|");
+
+        var showRuntime = table.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+
+        if (showRuntime)
+        {
+            header.Append(" Runtime |");
+            separator.Append("---:|");
+        }
+
+        var hasGen0 = rowsWithDiag.Any(r => r.Diagnostics!.Gen0Collections.HasValue);
+        var hasHeap = rowsWithDiag.Any(r => r.Diagnostics!.HeapCommittedBytes.HasValue);
+        var hasCpu = rowsWithDiag.Any(r => r.Diagnostics!.CpuWallRatio.HasValue);
+        var hasExc = rowsWithDiag.Any(r => r.Diagnostics!.ExceptionCountPerOp.HasValue);
+
+        if (hasGen0)
+        {
+            header.Append(" Gen0 | Gen1 | Gen2 |");
+            separator.Append("---:|---:|---:|");
+        }
+
+        if (hasHeap)
+        {
+            header.Append(" Heap |");
+            separator.Append("---:|");
+        }
+
+        if (hasCpu)
+        {
+            header.Append(" CPU% |");
+            separator.Append("---:|");
+        }
+
+        if (hasExc)
+        {
+            header.Append(" Exc/op |");
+            separator.Append("---:|");
+        }
+
+        sb.AppendLine(header.ToString());
+        sb.AppendLine(separator.ToString());
+
+        foreach (var row in rowsWithDiag)
+        {
+            var line = new StringBuilder($"| {MarkdownEscape(row.Name)} |");
+
+            if (showRuntime)
+                line.Append($" {row.RuntimeMoniker} |");
+
+            var diag = row.Diagnostics!;
+
+            if (hasGen0)
+            {
+                line.Append($" {diag.Gen0Collections?.ToString() ?? string.Empty} |");
+                line.Append($" {diag.Gen1Collections?.ToString() ?? string.Empty} |");
+                line.Append($" {diag.Gen2Collections?.ToString() ?? string.Empty} |");
+            }
+
+            if (hasHeap)
+                line.Append(diag.HeapCommittedBytes.HasValue
+                    ? $" {BenchmarkFormatter.FormatBytes(diag.HeapCommittedBytes.Value)} |"
+                    : "  |");
+
+            if (hasCpu)
+                line.Append(diag.CpuWallRatio.HasValue
+                    ? $" {diag.CpuWallRatio.Value * 100:F0}% |"
+                    : "  |");
+
+            if (hasExc)
+                line.Append(diag.ExceptionCountPerOp.HasValue
+                    ? $" {diag.ExceptionCountPerOp.Value:F4} |"
+                    : "  |");
+
+            sb.AppendLine(line.ToString());
+        }
+
+        sb.AppendLine();
+    }
+
     private static void RenderDistributionDetails(StringBuilder sb, BenchmarkTable table, ReportDetail detail)
     {
         if (detail != ReportDetail.Advanced)
@@ -490,6 +581,16 @@ public sealed class MarkdownReporter : IReporter
     }
 
     private static string FormatP(double p) => p < 0.001 ? "<0.001" : p.ToString("0.###");
+
+    private static string MarkdownEscape(string text) => text
+        .Replace("\\", "\\\\")
+        .Replace("`", "\\`")
+        .Replace("*", "\\*")
+        .Replace("_", "\\_")
+        .Replace("[", "\\[")
+        .Replace("]", "\\]")
+        .Replace("<", "\\<")
+        .Replace("|", "\\|");
 
     private static string GetEffectMetricSummary(IReadOnlyList<BenchmarkRow> rows)
     {

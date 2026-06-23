@@ -47,19 +47,19 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         {
             baseHeaders += ",OpsPerSecond";
             sb.AppendLine(
-                $"{baseHeaders},Ratio,Significant,AllocPerOp,Detail,Profile");
+                $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,Detail,Profile");
         }
         else if (Detail == ReportDetail.Standard)
         {
             baseHeaders += ",Mean,OpsPerSecond";
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile");
         }
         else
         {
             baseHeaders += ",Mean,OpsPerSecond";
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,Categories");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories");
         }
 
         foreach (var table in tables)
@@ -89,16 +89,23 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
 
             if (Detail == ReportDetail.Simple)
             {
+                var simpleDiag = row.Diagnostics;
                 sb.AppendLine(
                     $"{commonData},{row.OperationsPerSecond:F1}," +
                     $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
                     $"\"{safeSig}\"," +
                     $"{row.MeanAllocatedBytes?.ToString() ?? "null"}," +
+                    $"{simpleDiag?.Gen0Collections?.ToString() ?? ""}," +
+                    $"{simpleDiag?.Gen1Collections?.ToString() ?? ""}," +
+                    $"{simpleDiag?.Gen2Collections?.ToString() ?? ""}," +
                     $"{detail}," +
                     $"{profile}");
             }
             else
             {
+                var diag = row.Diagnostics;
+                var diagCols = $"{diag?.Gen0Collections?.ToString() ?? ""},{diag?.Gen1Collections?.ToString() ?? ""},{diag?.Gen2Collections?.ToString() ?? ""}";
+
                 var fullData = $"{commonData},{row.Mean:F1},{row.OperationsPerSecond:F1}{percentileData}," +
                                $"{row.StandardDeviation:F1}," +
                                $"{row.StandardError:F1}," +
@@ -113,6 +120,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                                $"{row.Effect?.Value?.ToString("F4") ?? ""}," +
                                $"\"{safeMagnitude}\"," +
                                $"{row.MeanAllocatedBytes?.ToString() ?? "null"}," +
+                               $"{diagCols}," +
                                $"{row.MarginPercent:F2}," +
                                $"{row.OutliersRemoved}," +
                                $"{detail}," +
@@ -139,6 +147,13 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     var atTuningMs = autoTune is null ? "" : autoTune.TuningWallClock.TotalMilliseconds.ToString("F1");
 
                     var safeCategories = string.Join("; ", row.Categories).Replace("\"", "\"\"");
+                    var advancedDiag = row.Diagnostics;
+                    var heapCommitted = advancedDiag?.HeapCommittedBytes?.ToString() ?? "";
+                    var heapFragmented = advancedDiag?.HeapFragmentedBytes?.ToString() ?? "";
+                    var excPerOp = advancedDiag?.ExceptionCountPerOp?.ToString("F4") ?? "";
+                    var cpuNs = advancedDiag?.CpuTimeNsPerOp?.ToString("F1") ?? "";
+                    var cpuRatio = advancedDiag?.CpuWallRatio?.ToString("F4") ?? "";
+                    var diagMode = (advancedDiag?.Mode.ToString() ?? "").Replace("\"", "\"\"");
 
                     sb.AppendLine(
                         $"{fullData}," +
@@ -164,6 +179,12 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                         $"{atSampleStop}," +
                         $"{atCiWidth}," +
                         $"{atTuningMs}," +
+                        $"{heapCommitted}," +
+                        $"{heapFragmented}," +
+                        $"{excPerOp}," +
+                        $"{cpuNs}," +
+                        $"{cpuRatio}," +
+                        $"\"{diagMode}\"," +
                         $"\"{safeCategories}\"");
                 }
             }

@@ -26,6 +26,21 @@ public class MeasurementOptionsTests
         Assert.Equal(0.05, opts.SignificanceLevel);
         Assert.Null(opts.MinimumPracticalEffect);
         Assert.Equal(1, opts.LaunchCount);
+        Assert.Equal(DiagnosticsOptions.Default, opts.Diagnostics);
+    }
+
+    [Theory]
+    [InlineData(DiagnosticsMode.None)]
+    [InlineData(DiagnosticsMode.Gc)]
+    [InlineData(DiagnosticsMode.GcAndCpu)]
+    [InlineData(DiagnosticsMode.All)]
+    [InlineData(DiagnosticsMode.Exceptions)]
+    [InlineData(DiagnosticsMode.GcHeapInfo | DiagnosticsMode.Exceptions)]
+    public void DiagnosticsOptions_FromMode_ToMode_RoundTrips(DiagnosticsMode mode)
+    {
+        var options = DiagnosticsOptions.FromMode(mode);
+
+        Assert.Equal(mode, options.ToMode());
     }
 
     [Fact]

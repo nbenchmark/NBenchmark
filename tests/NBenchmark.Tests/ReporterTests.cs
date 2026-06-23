@@ -155,6 +155,50 @@ public class ReporterTests
     }
 
     [Fact]
+    public async Task MarkdownReporter_Diagnostics_Leaves_Blanks_For_Uncollected_Metrics()
+    {
+        var tempDir = MakeSubDir("nb-md-diagnostics-blanks");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Standard);
+
+            var gcOnly = MakeResult("gc", 100) with
+            {
+                Diagnostics = new DiagnosticsResult
+                {
+                    Gen0Collections = 1,
+                    Gen1Collections = 0,
+                    Gen2Collections = 0,
+                    Mode = DiagnosticsMode.Gc,
+                },
+            };
+
+            var cpuOnly = MakeResult("cpu", 100) with
+            {
+                Diagnostics = new DiagnosticsResult
+                {
+                    CpuWallRatio = 0.42,
+                    Mode = DiagnosticsMode.CpuTime,
+                },
+            };
+
+            await reporter.ReportAsync([gcOnly, cpuOnly]);
+
+            var filePath = Path.Combine(tempDir, "out.md");
+            var content = await File.ReadAllTextAsync(filePath);
+
+            Assert.Contains("| Benchmark | Gen0 | Gen1 | Gen2 | CPU% |", content);
+            Assert.Contains("| gc | 1 | 0 | 0 |  |", content);
+            Assert.Contains("| cpu |  |  |  | 42% |", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
     public async Task MarkdownReporter_Interpretation_Uses_RuntimeScoped_Omnibus_Note_For_MultiRuntime()
     {
         var tempDir = MakeSubDir("nb-md-omnibus-runtime");
@@ -355,6 +399,35 @@ public class ReporterTests
 
             Assert.Contains("EffectMetric,EffectValue,Magnitude", lines[0]);
             Assert.Contains("\"median-ratio\",0.4200,\"small\"", lines[1]);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task CsvReporter_Advanced_Quotes_DiagnosticsMode_For_Combined_Flags()
+    {
+        var tempDir = MakeSubDir("nb-csv-diag-mode");
+
+        try
+        {
+            var reporter = new CsvReporter(tempDir, "out.csv", ReportDetail.Advanced);
+            var result = MakeResult("alpha", 100) with
+            {
+                Diagnostics = new DiagnosticsResult
+                {
+                    Mode = DiagnosticsMode.GcHeapInfo | DiagnosticsMode.Exceptions,
+                },
+            };
+
+            await reporter.ReportAsync([result]);
+
+            var filePath = Path.Combine(tempDir, "out.csv");
+            var line = (await File.ReadAllLinesAsync(filePath))[1];
+
+            Assert.Contains("\"GcHeapInfo, Exceptions\"", line);
         }
         finally
         {
