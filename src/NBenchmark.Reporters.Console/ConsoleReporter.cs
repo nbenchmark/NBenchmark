@@ -47,7 +47,9 @@ public sealed class ConsoleReporter : IReporter
         {
             foreach (var table in tables)
             {
-                var className = table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
+                var className = BenchmarkTable.CrossClassMode
+                    ? null
+                    : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
 
                 RenderComparisonTable(table, className, Detail);
                 AnsiConsole.WriteLine();
@@ -64,7 +66,9 @@ public sealed class ConsoleReporter : IReporter
 
         foreach (var table in tables)
         {
-            var className = table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
+            var className = BenchmarkTable.CrossClassMode
+                ? null
+                : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
 
             RenderComparisonTable(table, className, Detail);
             AnsiConsole.WriteLine();
@@ -112,6 +116,7 @@ public sealed class ConsoleReporter : IReporter
         var showCategories = detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
         var showRuntime = benchTable.Rows.Any(r => r.RuntimeMoniker.Length > 0);
         var isSimple = detail == ReportDetail.Simple;
+        var showClass = BenchmarkTable.CrossClassMode && benchTable.Rows.Any(r => r.ClassName.Length > 0);
 
         // A ratio is present whenever a row was ranked against a reference - either a competing
         // benchmark in its parameter group or, for a single method swept across parameter values,
@@ -124,6 +129,9 @@ public sealed class ConsoleReporter : IReporter
             .Border(TableBorder.Simple)
             .BorderColor(Color.Grey)
             .AddColumn(new TableColumn("[bold]Benchmark[/]").NoWrap());
+
+        if (showClass)
+            table.AddColumn(new TableColumn("[bold]Class[/]").NoWrap());
 
         if (showRuntime)
             table.AddColumn(new TableColumn("[bold]Runtime[/]").RightAligned().NoWrap());
@@ -175,6 +183,9 @@ public sealed class ConsoleReporter : IReporter
             if (row.Errored)
             {
                 var errorCols = new List<string> { $"[red]✗ {Esc(displayName)}[/]" };
+
+                if (showClass)
+                    errorCols.Add(Esc(row.ClassName));
 
                 if (showRuntime)
                     errorCols.Add(Esc(row.RuntimeMoniker));
@@ -228,6 +239,9 @@ public sealed class ConsoleReporter : IReporter
                 : "[dim]-[/]";
 
             var rowCols = new List<string> { nameText };
+
+            if (showClass)
+                rowCols.Add(Esc(row.ClassName));
 
             if (showRuntime)
                 rowCols.Add(Esc(row.RuntimeMoniker));

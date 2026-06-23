@@ -13,6 +13,7 @@ public sealed class BenchmarkHost
     private readonly List<string> _categoryFilterInclude = [];
     private readonly List<IReporter> _reporters = [];
     private CliArgs _cliArgs = new();
+    private bool _crossClass;
     private InstanceLifetime _defaultInstanceLifetime = InstanceLifetime.PerMethod;
     private ReportDetail _detail;
     private Func<Type, InstanceHandle>? _instanceFactory;
@@ -220,6 +221,18 @@ public sealed class BenchmarkHost
         return this;
     }
 
+    /// <summary>
+    ///     When enabled, significance is computed across all classes in a single comparison
+    ///     table instead of per class. The baseline is chosen from the whole group. Use this
+    ///     when comparing implementations that live in separate classes (e.g. a legacy version
+    ///     and a refactored version). Disabled by default.
+    /// </summary>
+    public BenchmarkHost WithCrossClassSignificance(bool enabled = true)
+    {
+        _crossClass = enabled;
+        return this;
+    }
+
     public BenchmarkHost WithInstanceLifetime(InstanceLifetime lifetime)
     {
         _defaultInstanceLifetime = lifetime;
@@ -419,7 +432,7 @@ public sealed class BenchmarkHost
         // results don't collide.
         rawSamples = ToCompositeKeys(allResults, rawSamples);
 
-        ApplyPerClassSignificance(allResults, rawSamples, suiteOptions);
+        ApplyPerClassSignificance(allResults, rawSamples, suiteOptions, _cliArgs.CrossClass || _crossClass);
 
         if (_cliArgs.ThresholdPct.HasValue
             && ThresholdCheck.HasRegression(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
@@ -434,9 +447,17 @@ public sealed class BenchmarkHost
         if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
             ApplyOutputDirectory(_cliArgs.OutputDir);
 
-        foreach (var reporter in _reporters)
+        BenchmarkTable.CrossClassMode = _cliArgs.CrossClass || _crossClass;
+        try
         {
-            await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+            foreach (var reporter in _reporters)
+            {
+                await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            BenchmarkTable.CrossClassMode = false;
         }
 
         return allResults;
@@ -510,7 +531,7 @@ public sealed class BenchmarkHost
             }
         }
 
-        ApplyPerClassSignificance(allResults, rawSamples, suiteOptions);
+        ApplyPerClassSignificance(allResults, rawSamples, suiteOptions, _cliArgs.CrossClass || _crossClass);
 
         if (_cliArgs.ThresholdPct.HasValue)
         {
@@ -538,9 +559,17 @@ public sealed class BenchmarkHost
         if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
             ApplyOutputDirectory(_cliArgs.OutputDir);
 
-        foreach (var reporter in _reporters)
+        BenchmarkTable.CrossClassMode = _cliArgs.CrossClass || _crossClass;
+        try
         {
-            await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+            foreach (var reporter in _reporters)
+            {
+                await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            BenchmarkTable.CrossClassMode = false;
         }
 
         return allResults;
@@ -598,11 +627,18 @@ public sealed class BenchmarkHost
     private static void ApplyPerClassSignificance(
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
-        MeasurementOptions options)
+        MeasurementOptions options,
+        bool crossClass = false)
     {
         static string RawKey(BenchmarkResult r)
         {
             return $"{r.Name}\0{r.RuntimeMoniker}";
+        }
+
+        if (crossClass)
+        {
+            ApplyCrossClassSignificance(allResults, rawSamples, options, RawKey);
+            return;
         }
 
         var groups = allResults
@@ -680,6 +716,76 @@ public sealed class BenchmarkHost
                     {
                         allResults[classIndices[paramList[j].Index]] = paramResults[j];
                     }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Cross-class significance: group all results by RuntimeMoniker (and parameter set
+    ///     when present) instead of by ClassName, then run significance once per group.
+    /// </summary>
+    private static void ApplyCrossClassSignificance(
+        List<BenchmarkResult> allResults,
+        Dictionary<string, double[]> rawSamples,
+        MeasurementOptions options,
+        Func<BenchmarkResult, string> rawKey)
+    {
+        var anyParameterised = allResults.Any(r => r.ParameterSet.Count > 0);
+
+        if (!anyParameterised)
+        {
+            foreach (var runtimeGroup in allResults
+                         .Select((r, idx) => (Result: r, Index: idx))
+                         .GroupBy(ri => ri.Result.RuntimeMoniker))
+            {
+                var runtimeList = runtimeGroup.ToList();
+                var runtimeResults = runtimeList.Select(ri => ri.Result).ToList();
+                var runtimeRaw = new Dictionary<string, double[]>();
+
+                foreach (var ri in runtimeList)
+                {
+                    if (rawSamples.TryGetValue(rawKey(ri.Result), out var samples))
+                        runtimeRaw[ri.Result.Name] = samples;
+                }
+
+                Significance.ApplyIfEnabled(runtimeResults, runtimeRaw, options);
+
+                for (var j = 0; j < runtimeList.Count; j++)
+                {
+                    allResults[runtimeList[j].Index] = runtimeResults[j];
+                }
+            }
+
+            return;
+        }
+
+        // Parameterised: group by parameter set, then by runtime within each set.
+        var paramGroups = allResults
+            .Select((r, idx) => (Result: r, Index: idx))
+            .GroupBy(ri => BenchmarkParameter.GetKey(ri.Result.ParameterSet))
+            .ToList();
+
+        foreach (var paramGroup in paramGroups)
+        {
+            foreach (var runtimeGroup in paramGroup
+                         .GroupBy(ri => ri.Result.RuntimeMoniker))
+            {
+                var runtimeList = runtimeGroup.ToList();
+                var runtimeResults = runtimeList.Select(ri => ri.Result).ToList();
+                var runtimeRaw = new Dictionary<string, double[]>();
+
+                foreach (var ri in runtimeList)
+                {
+                    if (rawSamples.TryGetValue(rawKey(ri.Result), out var samples))
+                        runtimeRaw[ri.Result.Name] = samples;
+                }
+
+                Significance.ApplyIfEnabled(runtimeResults, runtimeRaw, options);
+
+                for (var j = 0; j < runtimeList.Count; j++)
+                {
+                    allResults[runtimeList[j].Index] = runtimeResults[j];
                 }
             }
         }

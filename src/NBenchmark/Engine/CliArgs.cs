@@ -30,6 +30,12 @@ internal sealed record CliArgs
     /// </summary>
     public bool InProcess { get; init; }
 
+    /// <summary>
+    ///     When true, significance is computed across all classes in a single comparison
+    ///     table instead of per class. The baseline is chosen from the whole group.
+    /// </summary>
+    public bool CrossClass { get; init; }
+
     public MeasurementProfile? Profile { get; init; }
 
     public bool? ForceGc { get; init; }
@@ -141,6 +147,7 @@ internal sealed record CliArgs
         var runtimes = new List<RuntimeMoniker>();
         IReadOnlyList<int>? cpuAffinity = null;
         ProcessPriorityClass? processPriority = null;
+        var crossClass = false;
         var dedicatedHostGuidance = false;
 
         var errors = new List<string>();
@@ -257,6 +264,9 @@ internal sealed record CliArgs
                     break;
                 case "--in-process":
                     inProcess = true;
+                    break;
+                case "--cross-class":
+                    crossClass = true;
                     break;
                 case "--profile" when i + 1 < args.Length:
                     var profileStr = args[++i];
@@ -461,6 +471,7 @@ internal sealed record CliArgs
             CategoryFilterExclude = categoryExclude,
             Detail = detail,
             InProcess = inProcess,
+            CrossClass = crossClass,
             Profile = profile,
             ForceGc = forceGc,
             NoAllocations = noAllocations,
@@ -628,6 +639,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");
+        Console.WriteLine("  --cross-class          Compute significance across all classes instead of per class");
         Console.WriteLine("  --runtimes <list>      Runtimes to compare (comma-separated, e.g. net8,net9,net10)");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
         Console.WriteLine("  --seed <n>             Seed for deterministic random ordering");

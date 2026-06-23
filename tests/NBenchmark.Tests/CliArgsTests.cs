@@ -60,6 +60,22 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_CrossClass_SetsCrossClass()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--cross-class"]);
+        Assert.Empty(errors);
+        Assert.True(result.CrossClass);
+    }
+
+    [Fact]
+    public void ParseCore_NoCrossClass_DefaultsFalse()
+    {
+        var (result, errors) = CliArgs.ParseCore([]);
+        Assert.Empty(errors);
+        Assert.False(result.CrossClass);
+    }
+
+    [Fact]
     public void ParseCore_Filter_SetsFilter()
     {
         var (result, errors) = CliArgs.ParseCore(["--filter", "Foo*"]);
