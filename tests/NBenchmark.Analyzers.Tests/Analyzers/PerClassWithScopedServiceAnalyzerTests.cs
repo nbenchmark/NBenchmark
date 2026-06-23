@@ -74,20 +74,20 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     }
 
     [Fact]
-    public async Task No_diagnostic_for_disposable_parameter_that_doesnt_match_heuristic()
+    public async Task No_diagnostic_for_PerClass_with_string_ctor_parameter()
     {
+        // string is a reference type but immutable; sharing it cannot contaminate state.
         var code = """
                    using NBenchmark.Attributes;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
-                   public class OrderBenchmarks
+                   public class ParserBenchmarks
                    {
-                       public OrderBenchmarks(IWorker worker) { _ = worker; }
+                       public ParserBenchmarks(string input) { _ = input; }
                        [Benchmark] public int A() => 0;
+                       [Benchmark] public int B() => 0;
                    }
-
-                   public interface IWorker { int Do(); }
                    """;
 
         await NBAnalyzerVerifier<PerClassWithScopedServiceAnalyzer>
@@ -95,28 +95,26 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     }
 
     [Fact]
-    public async Task No_diagnostic_for_PerClass_with_string_context_parameter()
+    public async Task Reports_diagnostic_for_PerClass_with_non_disposable_reference_type()
     {
+        // The broadened heuristic now flags any non-primitive, non-ambient reference type.
         var code = """
                    using NBenchmark.Attributes;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
-                   public class StringContextBenchmarks
+                   public class CacheBenchmarks
                    {
-                       public StringContextBenchmarks(StringContext ctx) { _ = ctx; }
+                       public CacheBenchmarks(IMemoryCache cache) { _ = cache; }
                        [Benchmark] public int A() => 0;
                        [Benchmark] public int B() => 0;
                    }
 
-                   public sealed class StringContext
-                   {
-                       public string Value { get; set; } = "";
-                   }
+                   public interface IMemoryCache { int Get(); }
                    """;
 
         await NBAnalyzerVerifier<PerClassWithScopedServiceAnalyzer>
-            .VerifyNoDiagnosticAsync(code, "NB0011");
+            .VerifyAnalyzerAsync(code, "NB0011");
     }
 
     [Fact]
@@ -141,9 +139,6 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     [Fact]
     public async Task No_diagnostic_for_underspecified_DbContext_on_single_method_permethod()
     {
-        // The PerMethod variant should never trigger NB0011 regardless of other
-        // characteristics; this is the canonical "DB context with one method
-        // and PerMethod lifetime" case the analyzer should leave alone.
         var code = """
                    using NBenchmark.Attributes;
                    using NBenchmark;

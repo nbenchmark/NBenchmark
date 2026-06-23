@@ -258,6 +258,15 @@ public record MeasurementOptions
     }
 
     /// <summary>
+    ///     When <c>false</c> (the default), a runtime warning is emitted when a class with
+    ///     <c>InstanceLifetime.PerClass</c> has more than one <c>[Benchmark]</c> method,
+    ///     because shared state across methods violates the statistical-independence
+    ///     assumption of the significance test. Set to <c>true</c> to suppress this warning
+    ///     when sharing is intentional.
+    /// </summary>
+    public bool SuppressPerClassIndependenceWarning { get; init; }
+
+    /// <summary>
     ///     Opt-in hardware/OS controls applied for the duration of a run: CPU affinity,
     ///     process priority, and dedicated-host guidance. <c>null</c> (the default) does
     ///     nothing - the benchmark runs with whatever affinity and priority the host

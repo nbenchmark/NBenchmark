@@ -161,43 +161,43 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    ///     Heuristic detection of types that look like scoped DI services. The check is
-    ///     intentionally conservative: it requires the type to either (a) have a name
-    ///     that strongly suggests a stateful disposable unit of work, AND not be a
-    ///     well-known ambient type (e.g. <c>HttpContext</c>) that is almost never
-    ///     what the user meant, or (b) implement the <c>System.IDisposable</c> or
-    ///     <c>System.IAsyncDisposable</c> contract directly. The name-based net is
-    ///     narrower than v1 to reduce false positives; users with custom naming
-    ///     conventions can suppress the diagnostic with
-    ///     <c>
-    ///         #pragma warning disable
-    ///         NB0011
-    ///     </c>
-    ///     .
+    ///     Broad detection of types that may hold per-instance state when injected into a
+    ///     PerClass benchmark. Flags any non-primitive, non-ambient reference-type
+    ///     constructor parameter, excluding well-known stateless types
+    ///     (<c>ILogger&lt;T&gt;</c>, <c>IOptions&lt;T&gt;</c>, etc.) and the ambient-type
+    ///     allowlist. Users with intentional sharing can suppress the diagnostic with
+    ///     <c>#pragma warning disable NB0011</c>.
     /// </summary>
     private static bool LooksLikeScopedService(ITypeSymbol type)
     {
+        if (type.IsValueType)
+            return false;
+
+        if (type.SpecialType == SpecialType.System_String)
+            return false;
+
         if (IsWellKnownAmbientType(type))
             return false;
 
-        if (ImplementsDisposable(type))
-            return true;
+        if (IsWellKnownStatelessType(type))
+            return false;
 
-        var name = type.Name;
-
-        return name.EndsWith("DbContext", StringComparison.Ordinal)
-               || name.EndsWith("UnitOfWork", StringComparison.Ordinal);
+        return type.IsReferenceType;
     }
 
-    private static bool ImplementsDisposable(ITypeSymbol type)
+    private static bool IsWellKnownStatelessType(ITypeSymbol type)
     {
-        foreach (var iface in type.AllInterfaces)
-        {
-            if (iface.ToDisplayString(FullNameFormat) is "System.IDisposable" or "System.IAsyncDisposable")
-                return true;
-        }
+        if (type is not INamedTypeSymbol named)
+            return false;
 
-        return false;
+        var fullName = named.OriginalDefinition?.ToDisplayString(FullNameFormat)
+                       ?? named.ToDisplayString(FullNameFormat);
+
+        return fullName is
+            "global::Microsoft.Extensions.Logging.ILogger<T>" or
+            "global::Microsoft.Extensions.Options.IOptions<T>" or
+            "global::Microsoft.Extensions.Options.IOptionsSnapshot<T>" or
+            "global::Microsoft.Extensions.Options.IOptionsMonitor<T>";
     }
 
     private static bool IsWellKnownAmbientType(ITypeSymbol type)

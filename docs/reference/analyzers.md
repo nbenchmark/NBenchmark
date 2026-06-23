@@ -30,8 +30,9 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0008 | `[Benchmark]` property value out of range | Error | `Iterations` or `WarmupIterations` on `[Benchmark]` is outside the valid range (0-100000 for iterations, 0-10000 for warmup, or -1 for the default). |
 | NB0009 | `MeasurementOptions` property value out of range | Error | `Iterations`, `WarmupIterations`, or `ConfidenceLevel` in a `MeasurementOptions` object initializer or `with` expression is outside the valid range. |
 | NB0010 | Benchmark body is throwaway | Warning | A lambda passed to the `Action` overloads of `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, or `Benchmark.RunRawAsync()` has no observable side effects. The JIT may eliminate it, producing 0 ns results. |
-| NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that looks scoped (for example `DbContext`, `UnitOfWork`, or a disposable service), which can leak warmed state across benchmark methods. |
+| NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that may hold per-instance state (any non-primitive, non-ambient reference type), which can leak warmed state across benchmark methods. |
 | NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method has both `[BenchmarkCase]` and `[BenchmarkCases]`. Use one or the other. |
+| NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a mutable instance field that is read or written by at least two `[Benchmark]` methods, which can leak warmed state across methods. |
 
 ### NB0001 - Missing parameterless constructor
 
@@ -203,7 +204,9 @@ Value-returning overloads such as `Benchmark.Run<T>`, `Benchmark.RunAsync<T>`, `
 
 ### NB0011 - `PerClass` lifetime with scoped service
 
-When a class uses `[InstanceLifetime(InstanceLifetime.PerClass)]`, all `[Benchmark]` methods in that class share one object instance. If the class constructor takes a dependency that looks like a scoped or stateful service, one method can warm caches that the next method reads, which distorts timing.
+When a class uses `[InstanceLifetime(InstanceLifetime.PerClass)]`, all `[Benchmark]` methods in that class share one object instance. If the class constructor takes a dependency that may hold per-instance state, one method can warm caches that the next method reads, which distorts timing.
+
+The analyzer flags any non-primitive, non-ambient reference-type constructor parameter. Well-known stateless types (`ILogger<T>`, `IOptions<T>`) and ambient types (`HttpContext`, `IServiceProvider`, `CancellationToken`) are excluded.
 
 ```csharp
 // Warning NB0011
@@ -223,6 +226,40 @@ Typical fixes:
 2. Keep `PerClass` and suppress with `#pragma warning disable NB0011` when sharing state is intentional
 
 > **CI note.** This is a compile-time warning, not a runtime error. In CI/CD pipelines the warning scrolls past in the build log and is easy to miss. If you suppress NB0011, verify that the shared state does not create a timing dependency between methods - for example, by running each method in isolation and comparing results.
+
+### NB0013 - `PerClass` lifetime with mutable instance field
+
+When a class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a non-`readonly` instance field that is accessed by at least two `[Benchmark]` methods, the field can carry warmed state from one method to the next, violating the statistical-independence assumption.
+
+```csharp
+// Warning NB0013
+[InstanceLifetime(InstanceLifetime.PerClass)]
+public sealed class CacheBenchmarks
+{
+    private int _counter;
+
+    [Benchmark] public int A() => _counter++;
+    [Benchmark] public int B() => _counter++;
+}
+```
+
+Typical fixes:
+
+1. Remove the attribute so the class uses `PerMethod`
+2. Make the field `readonly` if it is only assigned once
+3. Keep `PerClass` and suppress with `#pragma warning disable NB0013` when sharing state is intentional
+
+## Runtime independence warning
+
+In addition to the compile-time analyzers above, NBenchmark emits a runtime warning on every `BenchmarkResult.Warnings` list when a class uses `InstanceLifetime.PerClass` and has more than one `[Benchmark]` method. This covers suite mode (where analyzers do not run) and cases where the analyzer package is not installed.
+
+The runtime warning is opt-out: set `SuppressPerClassIndependenceWarning` to `true` on `MeasurementOptions` to silence it when sharing is intentional.
+
+```csharp
+// Suppress the runtime warning
+var host = BenchmarkHost.Create(args)
+    .WithOptions(new MeasurementOptions { SuppressPerClassIndependenceWarning = true });
+```
 
 ## Disabling a rule
 
@@ -250,7 +287,7 @@ dotnet_diagnostic.NB0004.severity = none
 Diagnostics use the default severity listed in the table above. The default is chosen by where the problem sits on the invalid-to-suspicious spectrum:
 
 - **Errors** mean the benchmark cannot run or will produce meaningless results. NB0002, NB0003, NB0004, NB0005, NB0006, NB0007, NB0008, and NB0009 are errors.
-- **Warnings** mean the code can run but the measurements may be invalid. NB0001, NB0010, and NB0011 are warnings.
+- **Warnings** mean the code can run but the measurements may be invalid. NB0001, NB0010, NB0011, and NB0013 are warnings.
 
 You can override the severity of any diagnostic in `.editorconfig`. For example, to make all throwaway-lambda warnings errors in quick mode too:
 

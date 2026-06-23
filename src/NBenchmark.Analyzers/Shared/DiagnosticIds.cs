@@ -14,4 +14,5 @@ public static class DiagnosticIds
     public const string ThrowawayBody = "NB0010";
     public const string PerClassWithScopedService = "NB0011";
     public const string BenchmarkCaseConflict = "NB0012";
+    public const string PerClassMutableField = "NB0013";
 }

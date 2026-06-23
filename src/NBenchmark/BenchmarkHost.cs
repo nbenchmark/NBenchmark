@@ -871,6 +871,7 @@ public sealed class BenchmarkHost
                 }
 
                 var aggregated = AggregateInProcessLaunches(allLaunchResults, allLaunchSamples);
+                ApplyPerClassIndependenceWarning(aggregated.Results, suite, suiteOptions);
                 allResults.AddRange(aggregated.Results);
 
                 foreach (var kvp in aggregated.Samples)
@@ -884,6 +885,7 @@ public sealed class BenchmarkHost
                     envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
                     startIndex, totalBenchmarks, _progress, cancellationToken).ConfigureAwait(false);
 
+                ApplyPerClassIndependenceWarning(results, suite, suiteOptions);
                 allResults.AddRange(results);
 
                 foreach (var kvp in samples)
@@ -1339,6 +1341,8 @@ public sealed class BenchmarkHost
                 (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, RunOrder.Declaration, null, options,
                     0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken).ConfigureAwait(false);
+
+                ApplyPerClassIndependenceWarning(results, suite, options);
             }
         }
         finally
@@ -1409,6 +1413,38 @@ public sealed class BenchmarkHost
             .ConfigureAwait(false);
 
         return results;
+    }
+
+    private static void ApplyPerClassIndependenceWarning(
+        List<BenchmarkResult> results,
+        BenchmarkSuiteDefinition suite,
+        MeasurementOptions options)
+    {
+        if (options.SuppressPerClassIndependenceWarning)
+            return;
+
+        if (suite.Lifetime != InstanceLifetime.PerClass)
+            return;
+
+        if (suite.Benchmarks.Count <= 1)
+            return;
+
+        var warning = $"Class '{suite.Type.Name}' uses InstanceLifetime.PerClass with "
+                      + $"{suite.Benchmarks.Count} [Benchmark] methods. Sharing a single instance "
+                      + "across methods can cause the second method to observe cached state from "
+                      + "the first, violating the statistical-independence assumption of the "
+                      + "significance test. Set SuppressPerClassIndependenceWarning to true on "
+                      + "MeasurementOptions if sharing is intentional.";
+
+        for (var i = 0; i < results.Count; i++)
+        {
+            results[i] = results[i] with
+            {
+                Warnings = results[i].Warnings.Count > 0
+                    ? [..results[i].Warnings, warning]
+                    : [warning],
+            };
+        }
     }
 
     private void ApplyOutputDirectory(string outputDir)
