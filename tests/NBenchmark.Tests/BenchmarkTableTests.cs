@@ -926,6 +926,54 @@ public class BenchmarkTableTests
             r.BaseName == baseName
             && r.ParameterSet.Any(p => p.Name == "size" && (int)p.Value! == size));
 
+    [Fact]
+    public void BuildPerClass_CrossClassMode_ReturnsSingleCombinedTable()
+    {
+        var results = new[]
+        {
+            R("ClassA", "ClassA.M1", 100, baseline: true),
+            R("ClassA", "ClassA.M2", 200),
+            R("ClassB", "ClassB.M1", 150),
+        };
+
+        BenchmarkTable.CrossClassMode = true;
+        try
+        {
+            var tables = BenchmarkTable.BuildPerClass(results);
+
+            Assert.Single(tables);
+            Assert.Equal(3, tables[0].Rows.Count);
+        }
+        finally
+        {
+            BenchmarkTable.CrossClassMode = false;
+        }
+    }
+
+    [Fact]
+    public void BuildPerClass_CrossClassMode_BaselineIsGlobalFastest()
+    {
+        var results = new[]
+        {
+            R("ClassA", "ClassA.M1", 100, baseline: true),
+            R("ClassA", "ClassA.M2", 200),
+            R("ClassB", "ClassB.M1", 150),
+        };
+
+        BenchmarkTable.CrossClassMode = true;
+        try
+        {
+            var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
+
+            var baselineRow = table.Rows.Single(r => r.IsBaseline);
+            Assert.Equal("ClassA.M1", baselineRow.Name);
+        }
+        finally
+        {
+            BenchmarkTable.CrossClassMode = false;
+        }
+    }
+
     private static BenchmarkParameter P(string name, object? value) => new(name, value);
 
     private static BenchmarkResult R(

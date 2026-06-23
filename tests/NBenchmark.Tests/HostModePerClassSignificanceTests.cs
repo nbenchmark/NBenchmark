@@ -59,6 +59,56 @@ public class HostModePerClassSignificanceTests
         }
     }
 
+    [Fact]
+    public async Task HostIsolated_CrossClassSignificance_SingleBaselineAcrossClasses()
+    {
+        IsolatedRunContext.ResetInvocationOrdinalsForTesting();
+
+        var host = (BenchmarkHost)Activator.CreateInstance(typeof(BenchmarkHost), true)!;
+
+        host
+            .AddFromAssembly(typeof(HostModePerClassSignificanceTests).Assembly)
+            .WithCategoryFilter(["host-perclass"])
+            .WithOptions(new MeasurementOptions
+            {
+                Iterations = 20,
+                WarmupIterations = 0,
+                OutlierMode = OutlierMode.None,
+            })
+            .WithIsolation()
+            .WithCrossClassSignificance();
+
+        using (WithFakeLauncher(SimulateHostChildRun))
+        {
+            var results = await host.RunAsync();
+
+            Assert.Equal(5, results.Count);
+
+            // In cross-class mode, both AlphaFast and BetaSmall carry IsBaseline=true
+            // (they are declared [Benchmark(Baseline = true)]). Significance is computed
+            // against the first explicit baseline in the group. BetaSmall becomes a
+            // candidate compared against AlphaFast rather than its own class baseline.
+            var baselines = results.Where(r => r.IsBaseline).ToList();
+            Assert.Equal(2, baselines.Count);
+            Assert.Contains(baselines, r => r.Name == "AlphaBenchmarks.AlphaFast");
+            Assert.Contains(baselines, r => r.Name == "BetaBenchmarks.BetaSmall");
+
+            // BetaSmall was a per-class baseline (median 100, same as AlphaFast). In
+            // cross-class mode it is compared against AlphaFast and should be NotSignificant
+            // (identical distributions).
+            var betaSmall = results.Single(r => r.Name == "BetaBenchmarks.BetaSmall");
+            Assert.Equal(SignificanceVerdict.NotSignificant, betaSmall.SignificanceVerdict);
+
+            // The genuinely slower benchmarks should be significant versus the global baseline.
+            foreach (var candidate in results.Where(r => !r.IsBaseline))
+            {
+                Assert.True(candidate.SignificanceVerdict == SignificanceVerdict.Significant,
+                    $"Expected {candidate.Name} to be significant vs global baseline; got {candidate.SignificanceVerdict} (p={candidate.PValue})");
+                Assert.NotNull(candidate.Effect);
+            }
+        }
+    }
+
     private static Task<IReadOnlyList<IsolatedResultItem>> SimulateHostChildRun(
         IsolatedRunRequest request,
         CancellationToken ct)

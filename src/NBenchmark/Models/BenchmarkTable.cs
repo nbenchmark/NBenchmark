@@ -6,6 +6,13 @@ namespace NBenchmark;
 
 public sealed record BenchmarkTable
 {
+    /// <summary>
+    ///     When set by the host, <see cref="BuildPerClass" /> returns a single combined table
+    ///     with a <see cref="BenchmarkRow.ClassName" /> column instead of one table per class.
+    ///     The host sets this before calling reporters and clears it after.
+    /// </summary>
+    public static bool CrossClassMode { get; set; }
+
     public required IReadOnlyList<BenchmarkRow> Rows { get; init; }
     public required string RunAtUtc { get; init; }
     public required int WarmupIterations { get; init; }
@@ -51,6 +58,19 @@ public sealed record BenchmarkTable
     {
         if (results.Count == 0)
             return [BuildInternal(results, null, false)];
+
+        // Cross-class mode: return a single combined table with a ClassName column.
+        if (CrossClassMode)
+        {
+            var anyParam = results.Any(r => r.ParameterSet.Count > 0);
+
+            if (anyParam)
+                return [BuildParameterised(results)];
+
+            var successful = results.Where(r => !r.Errored).ToList();
+            var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+            return [BuildInternal(results, baseline, results.Count > 1)];
+        }
 
         var anyParameterised = results.Any(r => r.ParameterSet.Count > 0);
 

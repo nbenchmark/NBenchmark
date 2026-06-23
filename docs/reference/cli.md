@@ -221,6 +221,20 @@ dotnet run -- --in-process
 
 ---
 
+### `--cross-class`
+
+Compute significance across all classes in a single comparison table instead of per class. The baseline is chosen from the whole group, and the reporter adds a `Class` column so rows can be distinguished.
+
+```bash
+dotnet run -- --cross-class
+```
+
+Use this when comparing implementations that live in separate classes (e.g. a legacy version and a refactored version). Cross-class mode is opt-in because mixing unrelated benchmark classes into one significance table produces a baseline that may be semantically meaningless.
+
+Equivalent to calling `WithCrossClassSignificance()` in code.
+
+---
+
 ### `--profile <mode>`
 
 Set the measurement profile. Controls per-iteration GC, between-benchmark GC, and allocation tracking as a bundle.

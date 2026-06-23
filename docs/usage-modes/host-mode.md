@@ -299,6 +299,20 @@ CLI flags like `--iterations` always override `WithOptions` values.
 
 By default benchmarks run in **random** order to reduce systematic bias. Call `WithRunOrder(RunOrder.Declaration)` (or pass `--order declaration`) to run them in declaration order instead.
 
+## Cross-class significance
+
+By default, Host mode computes significance **per class**: each discovered class gets its own baseline, and `Sig` / `Magnitude` are relative to that class's baseline. The console reporter renders one comparison table per class.
+
+When comparing implementations that live in separate classes (e.g. a legacy version and a refactored version), pass `--cross-class` on the CLI or call `WithCrossClassSignificance()` in code to compute significance across all classes in a single comparison table. The baseline is chosen from the whole group, and the reporter adds a `Class` column so rows can be distinguished.
+
+```csharp
+await BenchmarkHost.Create(args)
+    .WithCrossClassSignificance()
+    .RunAsync();
+```
+
+Cross-class mode is opt-in because mixing unrelated benchmark classes into one significance table produces a baseline that may be semantically meaningless.
+
 ## Multi-runtime comparison
 
 Use the `--runtimes` CLI flag (or the `[Runtimes]` attribute) to run the same benchmarks across multiple .NET runtimes and compare results side-by-side. See [Multi-runtime comparison](../features/multi-runtime.md) for the full guide, including the `[Runtimes]` attribute and how it interacts with `--runtimes`.

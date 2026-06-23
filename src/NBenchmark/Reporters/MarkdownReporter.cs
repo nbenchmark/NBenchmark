@@ -54,7 +54,9 @@ public sealed class MarkdownReporter : IReporter
 
         foreach (var table in tables)
         {
-            var className = table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
+            var className = BenchmarkTable.CrossClassMode
+                ? null
+                : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
 
             if (tables.Count > 1)
             {
@@ -93,6 +95,7 @@ public sealed class MarkdownReporter : IReporter
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
         var showRuntime = table.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+        var showClass = BenchmarkTable.CrossClassMode && table.Rows.Any(r => r.ClassName.Length > 0);
         var paramNames = table.ParameterNames;
         var isSimple = detail == ReportDetail.Simple;
 
@@ -104,6 +107,9 @@ public sealed class MarkdownReporter : IReporter
 
         var header = new StringBuilder("| | Benchmark |");
 
+        if (showClass)
+            header.Append(" Class |");
+
         if (showRuntime)
             header.Append(" Runtime |");
 
@@ -114,6 +120,9 @@ public sealed class MarkdownReporter : IReporter
 
         header.Append(" Median |");
         var separator = new StringBuilder("|:---:|---|");
+
+        if (showClass)
+            separator.Append("---:|");
 
         if (showRuntime)
             separator.Append("---:|");
@@ -171,6 +180,9 @@ public sealed class MarkdownReporter : IReporter
             {
                 var errored = new StringBuilder($"| ✗ | ~~{baseName}~~ |");
 
+                if (showClass)
+                    errored.Append($" {row.ClassName} |");
+
                 if (showRuntime)
                     errored.Append($" {row.RuntimeMoniker} |");
 
@@ -213,6 +225,9 @@ public sealed class MarkdownReporter : IReporter
             var opsText = BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond);
 
             var line = new StringBuilder($"| | {nameText} |");
+
+            if (showClass)
+                line.Append($" {row.ClassName} |");
 
             if (showRuntime)
                 line.Append($" {row.RuntimeMoniker} |");
