@@ -22,7 +22,10 @@ internal static class BenchmarkLifecycle
         {
             var hint = instanceFactory is null
                 ? "the type must have a public parameterless constructor, or be internal with "
-                  + "a public constructor and InternalsVisibleTo. "
+                  + "a public constructor and InternalsVisibleTo. To fix: (1) add a parameterless "
+                  + "constructor, (2) install NBenchmark.Analyzers for compile-time detection, or "
+                  + "(3) call WithInstanceFactory or WithServiceProvider on BenchmarkHost. "
+                  + "See https://www.nbenchmark.net/features/dependency-injection for details. "
                 : "the instance factory threw during resolution. ";
 
             Console.WriteLine($"[Error] Could not instantiate {type.Name} - "

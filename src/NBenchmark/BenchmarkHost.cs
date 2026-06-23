@@ -108,6 +108,26 @@ public sealed class BenchmarkHost
     }
 
     /// <summary>
+    ///     Configures the host to resolve benchmark instances from the specified
+    ///     <see cref="IServiceProvider" />. Each benchmark method gets a fresh instance
+    ///     resolved from the root provider. Throws if a benchmark type is not registered.
+    ///     For scoped lifetime (e.g. EF Core's DbContext), install the
+    ///     <c>NBenchmark.DependencyInjection</c> package and use
+    ///     <c>WithScopedServiceProvider</c> instead.
+    /// </summary>
+    public BenchmarkHost WithServiceProvider(IServiceProvider serviceProvider)
+    {
+        ArgumentNullException.ThrowIfNull(serviceProvider);
+        return WithInstanceFactory(type =>
+        {
+            var instance = serviceProvider.GetService(type)
+                ?? throw new InvalidOperationException(
+                    $"No service of type '{type.FullName}' is registered in the service provider.");
+            return InstanceHandle.NoTeardown(instance);
+        });
+    }
+
+    /// <summary>
     ///     Requires a minimum strategy-defined practical effect in [0, 1] for a candidate
     ///     to be considered practically significant. Values below the threshold are reported
     ///     as NotSignificant with a <c>neg</c> magnitude label.

@@ -185,6 +185,25 @@ await new BenchmarkSuite("repo")
     .RunAsync();
 ```
 
+## Troubleshooting
+
+**Runtime error: "Could not instantiate MyBenchmarks - the type must have a public parameterless constructor"**
+
+This error fires when `Activator.CreateInstance` cannot construct your benchmark class because it has no parameterless constructor. Three remedies:
+
+1. **Add a parameterless constructor** to the benchmark class. This is the simplest fix if the class has no real dependencies.
+2. **Install `NBenchmark.Analyzers`** for compile-time detection (NB0001). The analyzer catches the missing constructor before you run, saving a debug cycle.
+3. **Use `WithServiceProvider` or `WithInstanceFactory`** on `BenchmarkHost` to resolve instances from your DI container. If you already have an `IServiceProvider`:
+
+   ```csharp
+   await BenchmarkHost.Create(args)
+       .AddFromAssembly<MyBenchmarks>()
+       .WithServiceProvider(services)
+       .RunAsync();
+   ```
+
+   `WithServiceProvider` is a core-library method (no extra package needed). For scoped lifetime (e.g. EF Core's `DbContext`), install `NBenchmark.DependencyInjection` and use `WithScopedServiceProvider` or `UseScopedDependencyInjection<T>` instead.
+
 ## Next steps
 
 - [Host mode: BenchmarkHost](../usage-modes/host-mode.md) - full reference for the host mode
