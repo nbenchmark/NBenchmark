@@ -28,6 +28,7 @@ A one-line footer shows the benchmark count, total duration, and confidence leve
 Standard mode shows the same comparison table with additional columns (Mean, Mag, Description) plus several auxiliary sections:
 
 - **Precision & Tail Latency** table: Error (±CI), StdDev, CV, and upper-tail percentiles (P95, P99, etc.).
+- **Diagnostics** table (when diagnostics are enabled): GC Gen0/Gen1/Gen2 collection counts, heap info, CPU/wall ratio, and exceptions per op. See [Diagnostics](../statistics/diagnostics.md).
 - **Launch Aggregation** table (when `LaunchCount > 1`): cross-launch mean, stddev, median, and CI.
 - **Interpretation** block: omnibus verdict, significance test name, outlier detector, effect metric summary, and measurement profile.
 - **Auto-tune summary** lines: resolved warmup, sample count, ops-per-sample, and achieved CI half-width.
@@ -51,6 +52,7 @@ Advanced mode shows everything in Standard **plus** a per-benchmark stats block.
 - **Percentiles:** the full set of configured percentile values (e.g. P50, P95, P99, P99.9, Max).
 - **N:** post-trim sample count.
 - **Allocation breakdown** (when `MeasureAllocations = true`): median, P95, and max allocation per iteration.
+- **Diagnostics breakdown** (when diagnostics are enabled): GC collection counts, heap committed and fragmented bytes, CPU time and CPU/wall ratio, and exceptions per operation.
 
 ## Setting the detail level
 
@@ -96,9 +98,9 @@ Quick mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail 
 
 | Reporter | Simple | Standard | Advanced |
 |---|---|---|---|
-| **Console** | 6-column table + counts footer | Full table + Precision & Tail Latency + Interpretation + auto-tune | Standard + per-benchmark stats block |
-| **Markdown** | 6-column table + counts footer | Full table + Precision & Tail Latency + Interpretation | Standard + dedicated details section |
-| **CSV** | 9 core columns | 22 core columns | 45 columns including quartiles, fences, and shape stats |
+| **Console** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation + auto-tune | Standard + per-benchmark stats block (incl. diagnostics breakdown) |
+| **Markdown** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation | Standard + dedicated details section (incl. diagnostics breakdown) |
+| **CSV** | 12 core columns (incl. GC counts) | 25 core columns (incl. GC counts) | 51 columns including quartiles, fences, shape stats, and full diagnostics |
 | **JSON** | Full record (always) | Full record (always) | Full record (always) |
 
 ## See also

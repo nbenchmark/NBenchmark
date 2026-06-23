@@ -29,6 +29,7 @@ internal static class AdaptiveLoop
         var o = spec.Options;
         var autoTune = o.AutoTune;
         var measureAllocations = o.MeasureAllocations;
+        var diagnostics = o.Diagnostics;
         var forceGc = o.ForceGcBeforeEachIteration;
         var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
         var calibrate = IsEligibleForCalibration(o, spec);
@@ -66,7 +67,7 @@ internal static class AdaptiveLoop
 
                 for (var probe = 0; probe < CalibrationSamplesPerStep; probe++)
                 {
-                    var (elapsed, _) = AcquireSampleSync(body, spec, clock, probeK, false, forceGc);
+                    var (elapsed, _, _) = AcquireSampleSync(body, spec, clock, probeK, false, forceGc, DiagnosticsOptions.None);
                     totalBodyInvocations += probeK;
                     accumulatedNs += elapsed;
                     calibrationSamples++;
@@ -118,7 +119,7 @@ internal static class AdaptiveLoop
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
-                var (elapsed, _) = AcquireSampleSync(body, spec, clock, k, false, forceGc);
+                var (elapsed, _, _) = AcquireSampleSync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
 
@@ -151,7 +152,24 @@ internal static class AdaptiveLoop
         var explicitSamples = o.Iterations;
         var timings = new List<double>(explicitSamples ?? autoTune.MinSamples);
         var allocations = measureAllocations ? new List<long>(timings.Capacity) : null;
+        var diagnosticsList = diagnostics.Any ? new List<DiagnosticDelta>(timings.Capacity) : null;
         var ci = explicitSamples is null ? new CiWidthDetector(o.ConfidenceLevel, autoTune) : null;
+
+        // Subscribe to FirstChanceException for the measurement phase only.
+        if (diagnostics.Exceptions)
+            ExceptionCounter.Subscribe();
+
+        // Capture heap info snapshot before measurement.
+        HeapSnapshot? heapInfo = null;
+
+        if (diagnostics.GcHeapInfo)
+        {
+            var info = GC.GetGCMemoryInfo();
+            heapInfo = new HeapSnapshot(info.HeapSizeBytes, info.FragmentedBytes);
+        }
+
+        // Capture exception count before measurement.
+        var exceptionCountBefore = diagnostics.Exceptions ? ExceptionCounter.Capture() : 0L;
 
         // In auto mode the sample count is resolved at runtime, so there is no honest total to
         // report - signal indeterminate (0) to the progress UI while still bounding how often we
@@ -163,47 +181,69 @@ internal static class AdaptiveLoop
         var sampleCount = 0;
         SampleStopReason sampleStop;
 
-        while (true)
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            var (elapsed, allocDelta) = AcquireSampleSync(body, spec, clock, k, measureAllocations, forceGc);
-            totalBodyInvocations += k;
-            accumulatedNs += elapsed;
-            var perOp = elapsed / k;
-            timings.Add(perOp);
-            allocations?.Add(allocDelta / k);
-            sampleCount++;
-
-            if (sampleCount % progressInterval == 0)
-                progress.OnIterationCompleted(name, sampleCount, reportedTotal).GetAwaiter().GetResult();
-
-            if (ci is null)
+            while (true)
             {
-                // A null CI detector means the count is pinned (the detector is built only in auto
-                // mode), so explicitSamples is set; stop once the pinned target is reached.
-                if (sampleCount >= explicitSamples.GetValueOrDefault())
+                ct.ThrowIfCancellationRequested();
+                var (elapsed, allocDelta, diagDelta) = AcquireSampleSync(body, spec, clock, k, measureAllocations, forceGc, diagnostics);
+                totalBodyInvocations += k;
+                accumulatedNs += elapsed;
+                var perOp = elapsed / k;
+                timings.Add(perOp);
+                allocations?.Add(allocDelta / k);
+                diagnosticsList?.Add(diagDelta);
+                sampleCount++;
+
+                if (sampleCount % progressInterval == 0)
+                    progress.OnIterationCompleted(name, sampleCount, reportedTotal).GetAwaiter().GetResult();
+
+                if (ci is null)
                 {
-                    sampleStop = SampleStopReason.ExplicitCount;
+                    // A null CI detector means the count is pinned (the detector is built only in auto
+                    // mode), so explicitSamples is set; stop once the pinned target is reached.
+                    if (sampleCount >= explicitSamples.GetValueOrDefault())
+                    {
+                        sampleStop = SampleStopReason.ExplicitCount;
+                        break;
+                    }
+                }
+                else if (ci.Feed(perOp))
+                {
+                    sampleStop = ci.StopReason;
+                    break;
+                }
+
+                if (accumulatedNs >= maxTuningNs)
+                {
+                    sampleStop = SampleStopReason.WallClockCap;
                     break;
                 }
             }
-            else if (ci.Feed(perOp))
-            {
-                sampleStop = ci.StopReason;
-                break;
-            }
-
-            if (accumulatedNs >= maxTuningNs)
-            {
-                sampleStop = SampleStopReason.WallClockCap;
-                break;
-            }
+        }
+        finally
+        {
+            if (diagnostics.Exceptions)
+                ExceptionCounter.Unsubscribe();
         }
 
         var measuredDuration = clock.GetElapsedTime(measureStartTimestamp);
 
+        // Capture final exception count after the measurement loop (unsubscribe ran in finally).
+        long? exceptionCount = null;
+
+        if (diagnostics.Exceptions)
+            exceptionCount = ExceptionCounter.Delta(exceptionCountBefore);
+
+        // Capture heap info snapshot after measurement.
+        if (diagnostics.GcHeapInfo)
+        {
+            var info = GC.GetGCMemoryInfo();
+            heapInfo = new HeapSnapshot(info.HeapSizeBytes - heapInfo?.CommittedBytes ?? 0, info.FragmentedBytes - heapInfo?.FragmentedBytes ?? 0);
+        }
+
         return BuildResult(
-            timings, allocations, measuredDuration, resolvedWarmup, sampleCount, k,
+            timings, allocations, diagnosticsList, exceptionCount, heapInfo, measuredDuration, resolvedWarmup, sampleCount, k,
             totalBodyInvocations, warmupStop, sampleStop, o.ConfidenceLevel,
             clock.GetElapsedTime(tuningStartTimestamp),
             calibrationCapped,
@@ -221,6 +261,7 @@ internal static class AdaptiveLoop
         var o = spec.Options;
         var autoTune = o.AutoTune;
         var measureAllocations = o.MeasureAllocations;
+        var diagnostics = o.Diagnostics;
         var forceGc = o.ForceGcBeforeEachIteration;
         var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
         var calibrate = IsEligibleForCalibration(o, spec);
@@ -258,7 +299,7 @@ internal static class AdaptiveLoop
 
                 for (var probe = 0; probe < CalibrationSamplesPerStep; probe++)
                 {
-                    var (elapsed, _) = await AcquireSampleAsync(body, spec, clock, probeK, false, forceGc)
+                    var (elapsed, _, _) = await AcquireSampleAsync(body, spec, clock, probeK, false, forceGc, DiagnosticsOptions.None)
                         .ConfigureAwait(false);
 
                     totalBodyInvocations += probeK;
@@ -312,7 +353,7 @@ internal static class AdaptiveLoop
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
-                var (elapsed, _) = await AcquireSampleAsync(body, spec, clock, k, false, forceGc).ConfigureAwait(false);
+                var (elapsed, _, _) = await AcquireSampleAsync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None).ConfigureAwait(false);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
 
@@ -345,7 +386,24 @@ internal static class AdaptiveLoop
         var explicitSamples = o.Iterations;
         var timings = new List<double>(explicitSamples ?? autoTune.MinSamples);
         var allocations = measureAllocations ? new List<long>(timings.Capacity) : null;
+        var diagnosticsList = diagnostics.Any ? new List<DiagnosticDelta>(timings.Capacity) : null;
         var ci = explicitSamples is null ? new CiWidthDetector(o.ConfidenceLevel, autoTune) : null;
+
+        // Subscribe to FirstChanceException for the measurement phase only.
+        if (diagnostics.Exceptions)
+            ExceptionCounter.Subscribe();
+
+        // Capture heap info snapshot before measurement.
+        HeapSnapshot? heapInfo = null;
+
+        if (diagnostics.GcHeapInfo)
+        {
+            var info = GC.GetGCMemoryInfo();
+            heapInfo = new HeapSnapshot(info.HeapSizeBytes, info.FragmentedBytes);
+        }
+
+        // Capture exception count before measurement.
+        var exceptionCountBefore = diagnostics.Exceptions ? ExceptionCounter.Capture() : 0L;
 
         // In auto mode the sample count is resolved at runtime, so there is no honest total to
         // report - signal indeterminate (0) to the progress UI while still bounding how often we
@@ -357,50 +415,72 @@ internal static class AdaptiveLoop
         var sampleCount = 0;
         SampleStopReason sampleStop;
 
-        while (true)
+        try
         {
-            ct.ThrowIfCancellationRequested();
-
-            var (elapsed, allocDelta) = await AcquireSampleAsync(body, spec, clock, k, measureAllocations, forceGc)
-                .ConfigureAwait(false);
-
-            totalBodyInvocations += k;
-            accumulatedNs += elapsed;
-            var perOp = elapsed / k;
-            timings.Add(perOp);
-            allocations?.Add(allocDelta / k);
-            sampleCount++;
-
-            if (sampleCount % progressInterval == 0)
-                await progress.OnIterationCompleted(name, sampleCount, reportedTotal).ConfigureAwait(false);
-
-            if (ci is null)
+            while (true)
             {
-                // A null CI detector means the count is pinned (the detector is built only in auto
-                // mode), so explicitSamples is set; stop once the pinned target is reached.
-                if (sampleCount >= explicitSamples.GetValueOrDefault())
+                ct.ThrowIfCancellationRequested();
+
+                var (elapsed, allocDelta, diagDelta) = await AcquireSampleAsync(body, spec, clock, k, measureAllocations, forceGc, diagnostics)
+                    .ConfigureAwait(false);
+
+                totalBodyInvocations += k;
+                accumulatedNs += elapsed;
+                var perOp = elapsed / k;
+                timings.Add(perOp);
+                allocations?.Add(allocDelta / k);
+                diagnosticsList?.Add(diagDelta);
+                sampleCount++;
+
+                if (sampleCount % progressInterval == 0)
+                    await progress.OnIterationCompleted(name, sampleCount, reportedTotal).ConfigureAwait(false);
+
+                if (ci is null)
                 {
-                    sampleStop = SampleStopReason.ExplicitCount;
+                    // A null CI detector means the count is pinned (the detector is built only in auto
+                    // mode), so explicitSamples is set; stop once the pinned target is reached.
+                    if (sampleCount >= explicitSamples.GetValueOrDefault())
+                    {
+                        sampleStop = SampleStopReason.ExplicitCount;
+                        break;
+                    }
+                }
+                else if (ci.Feed(perOp))
+                {
+                    sampleStop = ci.StopReason;
+                    break;
+                }
+
+                if (accumulatedNs >= maxTuningNs)
+                {
+                    sampleStop = SampleStopReason.WallClockCap;
                     break;
                 }
             }
-            else if (ci.Feed(perOp))
-            {
-                sampleStop = ci.StopReason;
-                break;
-            }
-
-            if (accumulatedNs >= maxTuningNs)
-            {
-                sampleStop = SampleStopReason.WallClockCap;
-                break;
-            }
+        }
+        finally
+        {
+            if (diagnostics.Exceptions)
+                ExceptionCounter.Unsubscribe();
         }
 
         var measuredDuration = clock.GetElapsedTime(measureStartTimestamp);
 
+        // Capture final exception count after the measurement loop (unsubscribe ran in finally).
+        long? exceptionCount = null;
+
+        if (diagnostics.Exceptions)
+            exceptionCount = ExceptionCounter.Delta(exceptionCountBefore);
+
+        // Capture heap info snapshot after measurement.
+        if (diagnostics.GcHeapInfo)
+        {
+            var info = GC.GetGCMemoryInfo();
+            heapInfo = new HeapSnapshot(info.HeapSizeBytes - heapInfo?.CommittedBytes ?? 0, info.FragmentedBytes - heapInfo?.FragmentedBytes ?? 0);
+        }
+
         return BuildResult(
-            timings, allocations, measuredDuration, resolvedWarmup, sampleCount, k,
+            timings, allocations, diagnosticsList, exceptionCount, heapInfo, measuredDuration, resolvedWarmup, sampleCount, k,
             totalBodyInvocations, warmupStop, sampleStop, o.ConfidenceLevel,
             clock.GetElapsedTime(tuningStartTimestamp),
             calibrationCapped,
@@ -416,6 +496,9 @@ internal static class AdaptiveLoop
     private static AdaptiveResult BuildResult(
         List<double> timings,
         List<long>? allocations,
+        List<DiagnosticDelta>? diagnosticsList,
+        long? exceptionCount,
+        HeapSnapshot? heapInfo,
         TimeSpan measuredDuration,
         int resolvedWarmup,
         int sampleCount,
@@ -449,7 +532,7 @@ internal static class AdaptiveLoop
 
         var warnings = BuildWallClockCapWarnings(warmupStop, sampleStop, calibrationCapped, maxTuningTime);
 
-        return new AdaptiveResult(timingsArray, allocations?.ToArray(), measuredDuration, resolvedWarmup, diagnostic, warnings);
+        return new AdaptiveResult(timingsArray, allocations?.ToArray(), diagnosticsList?.ToArray(), exceptionCount, heapInfo, measuredDuration, resolvedWarmup, diagnostic, warnings);
     }
 
     private static IReadOnlyList<string> BuildWallClockCapWarnings(
@@ -493,8 +576,8 @@ internal static class AdaptiveLoop
         return [];
     }
 
-    private static (double elapsedNs, long allocDelta) AcquireSampleSync(
-        Action body, RunSpec spec, IClock clock, int k, bool measureAllocations, bool forceGc)
+    private static (double elapsedNs, long allocDelta, DiagnosticDelta diagDelta) AcquireSampleSync(
+        Action body, RunSpec spec, IClock clock, int k, bool measureAllocations, bool forceGc, DiagnosticsOptions diagnostics)
     {
         if (forceGc)
             GcControl.ForceGen0Collection();
@@ -505,6 +588,8 @@ internal static class AdaptiveLoop
 
         if (measureAllocations)
             snapshot = AllocationMeter.Capture();
+
+        var diagSnapshot = diagnostics.Any ? DiagnosticMeter.Capture(diagnostics) : default;
 
         var timestamp = clock.GetTimestamp();
 
@@ -516,13 +601,14 @@ internal static class AdaptiveLoop
         var elapsedNs = clock.GetElapsedNanoseconds(timestamp);
 
         var allocDelta = measureAllocations ? AllocationMeter.Delta(snapshot) : 0L;
+        var diagDelta = diagnostics.Any ? DiagnosticMeter.Delta(diagSnapshot, diagnostics) : default;
 
         spec.IterationTeardown?.Invoke();
-        return (elapsedNs, allocDelta);
+        return (elapsedNs, allocDelta, diagDelta);
     }
 
-    private static async Task<(double elapsedNs, long allocDelta)> AcquireSampleAsync(
-        Func<Task> body, RunSpec spec, IClock clock, int k, bool measureAllocations, bool forceGc)
+    private static async Task<(double elapsedNs, long allocDelta, DiagnosticDelta diagDelta)> AcquireSampleAsync(
+        Func<Task> body, RunSpec spec, IClock clock, int k, bool measureAllocations, bool forceGc, DiagnosticsOptions diagnostics)
     {
         if (forceGc)
             GcControl.ForceGen0Collection();
@@ -534,6 +620,8 @@ internal static class AdaptiveLoop
         if (measureAllocations)
             snapshot = AllocationMeter.Capture();
 
+        var diagSnapshot = diagnostics.Any ? DiagnosticMeter.Capture(diagnostics) : default;
+
         var timestamp = clock.GetTimestamp();
 
         for (var j = 0; j < k; j++)
@@ -544,9 +632,10 @@ internal static class AdaptiveLoop
         var elapsedNs = clock.GetElapsedNanoseconds(timestamp);
 
         var allocDelta = measureAllocations ? AllocationMeter.Delta(snapshot) : 0L;
+        var diagDelta = diagnostics.Any ? DiagnosticMeter.Delta(diagSnapshot, diagnostics) : default;
 
         spec.IterationTeardown?.Invoke();
-        return (elapsedNs, allocDelta);
+        return (elapsedNs, allocDelta, diagDelta);
     }
 
     private static void RunUntimedSampleSync(Action body, RunSpec spec, int k, bool forceGc)
@@ -590,6 +679,9 @@ internal static class AdaptiveLoop
 internal readonly record struct AdaptiveResult(
     double[] PerOpTimings,
     long[]? PerOpAllocations,
+    DiagnosticDelta[]? PerOpDiagnostics,
+    long? ExceptionCount,
+    HeapSnapshot? HeapInfo,
     TimeSpan MeasuredDuration,
     int ResolvedWarmup,
     AutoTuneDiagnostic Diagnostic,

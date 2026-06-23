@@ -313,6 +313,7 @@ public sealed record BenchmarkTable
             CoefficientOfVariationPercent = result.CoefficientOfVariationPercent,
             AutoTune = result.AutoTune,
             LaunchStatistics = result.LaunchStatistics,
+            Diagnostics = result.Diagnostics,
             Categories = result.Categories,
             ParameterSet = result.ParameterSet,
             BaseName = ComputeBaseName(result),
@@ -434,6 +435,24 @@ public sealed record BenchmarkTable
             lines.Add($"  Max:  {BenchmarkFormatter.FormatAlloc(row.AllocMax ?? 0)}");
         }
 
+        if (row.Diagnostics is { } diag)
+        {
+            lines.Add("");
+            lines.Add("Diagnostics:");
+
+            if (diag.Gen0Collections.HasValue)
+                lines.Add($"  Gen0: {diag.Gen0Collections.Value}   Gen1: {diag.Gen1Collections ?? 0}   Gen2: {diag.Gen2Collections ?? 0}");
+
+            if (diag.HeapCommittedBytes.HasValue)
+                lines.Add($"  Heap: {BenchmarkFormatter.FormatBytes(diag.HeapCommittedBytes.Value)} (fragmented {BenchmarkFormatter.FormatBytes(diag.HeapFragmentedBytes ?? 0)})");
+
+            if (diag.CpuWallRatio.HasValue)
+                lines.Add($"  CPU: {diag.CpuWallRatio.Value * 100:F0}% ({BenchmarkFormatter.FormatNs(diag.CpuTimeNsPerOp ?? 0)}/op)");
+
+            if (diag.ExceptionCountPerOp.HasValue)
+                lines.Add($"  Exc/op: {diag.ExceptionCountPerOp.Value:F4}");
+        }
+
         return string.Join("\n", lines);
     }
 
@@ -533,6 +552,7 @@ public record BenchmarkRow
     public required double MarginPercent { get; init; }
     public required double CoefficientOfVariationPercent { get; init; }
     public AutoTuneDiagnostic? AutoTune { get; init; }
+    public DiagnosticsResult? Diagnostics { get; init; }
     public IReadOnlyList<string> Categories { get; init; } = [];
 
     /// <summary>

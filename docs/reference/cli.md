@@ -276,6 +276,34 @@ There is no `--allocations` flag because `Realistic` already enables allocation 
 
 ---
 
+### `--diagnostics <mode>`
+
+Control which runtime diagnostics are collected during measurement. GC collection counts are cheap and always available; heap info, exceptions, and CPU time add more detail at a small overhead cost.
+
+| Value | Behaviour |
+|---|---|
+| `none` | No diagnostics collected. |
+| `gc` | GC Gen0/Gen1/Gen2 collection counts. **(default)** |
+| `gcandcpu` | GC collection counts plus process CPU time and CPU/wall-clock ratio. |
+| `all` | GC collection counts, heap info (committed and fragmented bytes), exception count, and CPU time. |
+
+```bash
+# Default - just GC collection counts
+dotnet run -- --diagnostics gc
+
+# Add CPU time to distinguish CPU-bound from IO-bound benchmarks
+dotnet run -- --diagnostics gcandcpu
+
+# Everything - useful for diagnosing exception-driven control flow
+dotnet run -- --diagnostics all
+```
+
+The diagnostics table appears at `standard` and `advanced` detail levels, below the Precision & Tail Latency table. See [Diagnostics](../statistics/diagnostics.md) for what each counter measures and how it is collected.
+
+Programmatic equivalent: `WithDiagnostics(DiagnosticsMode.All)` or `WithOptions(new MeasurementOptions { Diagnostics = DiagnosticsOptions.All })`.
+
+---
+
 ### `--detail <level>`
 
 Set the report detail level. Controls how much information reporters display.
@@ -283,8 +311,8 @@ Set the report detail level. Controls how much information reporters display.
 | Value | Behaviour |
 |---|---|
 | `simple` | 6-column table with the essential statistics. **(default)** |
-| `standard` | Full comparison table plus Precision & Tail Latency, Interpretation, and auto-tune sections. |
-| `advanced` | Same as standard plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, allocation breakdown, and the full set of configured percentiles. |
+| `standard` | Full comparison table plus Precision & Tail Latency, Diagnostics, Interpretation, and auto-tune sections. |
+| `advanced` | Same as standard plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, allocation breakdown, diagnostics breakdown, and the full set of configured percentiles. |
 
 ```bash
 dotnet run -- --detail advanced
@@ -478,7 +506,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown reporter name (`--reporter`), unknown priority level (`--priority`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown diagnostics mode (`--diagnostics`), unknown reporter name (`--reporter`), unknown priority level (`--priority`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
 When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 
@@ -499,6 +527,9 @@ dotnet run -- --launch-count 3
 
 # Pin to cores 2-3, raise priority, and warn if the host looks noisy
 dotnet run -- --cpu-affinity 2,3 --priority high --dedicated-host-guidance
+
+# Collect all diagnostics (GC counts, heap info, exceptions, CPU time)
+dotnet run -- --diagnostics all --detail standard
 
 # Check what will run before committing to a full benchmark
 dotnet run -- --list

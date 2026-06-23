@@ -485,6 +485,21 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>Configures runtime diagnostics (GC counts, heap info, exceptions, CPU time).</summary>
+    public BenchmarkSuite WithDiagnostics(DiagnosticsOptions diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        _options = _options with { Diagnostics = diagnostics };
+        return this;
+    }
+
+    /// <summary>Selects a diagnostics mode (None, Gc, GcAndCpu, All).</summary>
+    public BenchmarkSuite WithDiagnostics(DiagnosticsMode mode)
+    {
+        _options = _options with { Diagnostics = DiagnosticsOptions.FromMode(mode) };
+        return this;
+    }
+
     /// <summary>
     ///     Sets the measurement profile, which bundles per-iteration GC, between-benchmark GC, and
     ///     allocation tracking. <see cref="MeasurementProfile.Realistic" /> (the default) keeps natural

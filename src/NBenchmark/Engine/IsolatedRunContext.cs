@@ -64,6 +64,8 @@ internal sealed record MeasurementOverrides
 
     public bool? NoHistogram { get; init; }
 
+    public DiagnosticsMode? Diagnostics { get; init; }
+
     /// <summary>
     ///     Environment controls forwarded to a Host-mode child so it can pin itself to
     ///     the same cores and priority as the parent. The child re-runs the entry point
@@ -94,6 +96,7 @@ internal sealed record MeasurementOverrides
         LaunchCount = cliArgs.LaunchCount,
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
+        Diagnostics = cliArgs.Diagnostics,
         Environment = BuildEnvironmentFromCli(cliArgs),
     };
 
@@ -185,6 +188,9 @@ internal sealed record MeasurementOverrides
 
         if (NoHistogram.HasValue && NoHistogram.Value)
             result = result with { EnableHistogram = false };
+
+        if (Diagnostics.HasValue)
+            result = result with { Diagnostics = NBenchmark.DiagnosticsOptions.FromMode(Diagnostics.Value) };
 
         if (Environment is not null)
             result = result with { Environment = MergeEnvironment(result.Environment, Environment) };

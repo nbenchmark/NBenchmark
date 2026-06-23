@@ -78,7 +78,17 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
             ? result.ErrorMessage
             : BenchmarkFormatter.FormatNs(result.Median);
 
-        Console.WriteLine($"  {icon} {result.Name}  {timing}  ({_benchmarkStopwatch.Elapsed.TotalSeconds:F1}s)");
+        var diagSuffix = "";
+
+        if (result.Diagnostics is { } diag && diag.Gen0Collections.HasValue)
+        {
+            var gen0 = diag.Gen0Collections.Value;
+            var gen1 = diag.Gen1Collections ?? 0;
+            var gen2 = diag.Gen2Collections ?? 0;
+            diagSuffix = $" · {gen0}/{gen1}/{gen2} GC";
+        }
+
+        Console.WriteLine($"  {icon} {result.Name}  {timing}{diagSuffix}  ({_benchmarkStopwatch.Elapsed.TotalSeconds:F1}s)");
 
         return Task.CompletedTask;
     }

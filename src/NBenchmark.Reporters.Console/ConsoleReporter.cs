@@ -73,6 +73,7 @@ public sealed class ConsoleReporter : IReporter
             RenderComparisonTable(table, className, Detail);
             AnsiConsole.WriteLine();
             RenderTimingDetail(table);
+            RenderDiagnostics(table);
             RenderLaunchStats(table);
             AnsiConsole.WriteLine();
             RenderInterpretation(table, table.Rows.Count);
@@ -416,6 +417,102 @@ public sealed class ConsoleReporter : IReporter
                 BenchmarkFormatter.FormatNs(ls.LaunchMedian),
                 ciText
             );
+        }
+
+        AnsiConsole.Write(table);
+    }
+
+    private static void RenderDiagnostics(BenchmarkTable benchTable)
+    {
+        var rows = benchTable.Rows.Where(r => !r.Errored && r.Diagnostics is not null).ToList();
+
+        if (rows.Count == 0)
+            return;
+
+        var rule = new Rule("[dim]Diagnostics[/]")
+            .LeftJustified()
+            .RuleStyle(Style.Parse("grey"));
+
+        AnsiConsole.Write(rule);
+        AnsiConsole.WriteLine();
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey42)
+            .AddColumn(new TableColumn("[dim]Benchmark[/]").NoWrap());
+
+        var showRuntime = benchTable.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+
+        if (showRuntime)
+            table.AddColumn(new TableColumn("[dim]Runtime[/]").RightAligned().NoWrap());
+
+        var hasGen0 = rows.Any(r => r.Diagnostics!.Gen0Collections.HasValue);
+        var hasHeap = rows.Any(r => r.Diagnostics!.HeapCommittedBytes.HasValue);
+        var hasCpu = rows.Any(r => r.Diagnostics!.CpuWallRatio.HasValue);
+        var hasExc = rows.Any(r => r.Diagnostics!.ExceptionCountPerOp.HasValue);
+
+        if (hasGen0)
+        {
+            table.AddColumn(new TableColumn("[dim]Gen0[/]").RightAligned());
+            table.AddColumn(new TableColumn("[dim]Gen1[/]").RightAligned());
+            table.AddColumn(new TableColumn("[dim]Gen2[/]").RightAligned());
+        }
+
+        if (hasHeap)
+            table.AddColumn(new TableColumn("[dim]Heap[/]").RightAligned());
+
+        if (hasCpu)
+            table.AddColumn(new TableColumn("[dim]CPU%[/]").RightAligned());
+
+        if (hasExc)
+            table.AddColumn(new TableColumn("[dim]Exc/op[/]").RightAligned());
+
+        foreach (var row in rows)
+        {
+            var cells = new List<IRenderable> { new Markup(Esc(row.Name)) };
+
+            if (showRuntime)
+                cells.Add(new Markup(Esc(row.RuntimeMoniker)));
+
+            var diag = row.Diagnostics!;
+
+            if (hasGen0)
+            {
+                cells.Add(new Markup(diag.Gen0Collections?.ToString() ?? string.Empty));
+                cells.Add(new Markup(diag.Gen1Collections?.ToString() ?? string.Empty));
+                cells.Add(new Markup(diag.Gen2Collections?.ToString() ?? string.Empty));
+            }
+
+            if (hasHeap)
+                cells.Add(new Markup(diag.HeapCommittedBytes.HasValue
+                    ? BenchmarkFormatter.FormatBytes(diag.HeapCommittedBytes.Value)
+                    : string.Empty));
+
+            if (hasCpu)
+            {
+                if (diag.CpuWallRatio.HasValue)
+                {
+                    var cpuRatio = diag.CpuWallRatio.Value;
+                    var cpuColor = cpuRatio switch
+                    {
+                        >= 0.85 => "green",
+                        >= 0.50 => "yellow",
+                        _ => "red",
+                    };
+                    cells.Add(new Markup($"[{cpuColor}]{cpuRatio * 100:F0}%[/]"));
+                }
+                else
+                {
+                    cells.Add(new Markup(string.Empty));
+                }
+            }
+
+            if (hasExc)
+                cells.Add(new Markup(diag.ExceptionCountPerOp.HasValue
+                    ? $"{diag.ExceptionCountPerOp.Value:F4}"
+                    : string.Empty));
+
+            table.AddRow(cells.ToArray());
         }
 
         AnsiConsole.Write(table);

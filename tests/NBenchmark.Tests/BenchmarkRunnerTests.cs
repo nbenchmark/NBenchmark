@@ -709,6 +709,49 @@ public class BenchmarkRunnerTests
         }
     }
 
+    [Fact]
+    public void Run_With_Default_Diagnostics_Reports_Gc_Mode()
+    {
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                WarmupIterations = 0,
+                Iterations = 3,
+                OutlierMode = OutlierMode.None,
+            },
+        };
+
+        var outcome = BenchmarkRunner.Instance.Run("diag-default", () => Thread.SpinWait(25), spec);
+
+        Assert.NotNull(outcome.Result.Diagnostics);
+        Assert.Equal(DiagnosticsMode.Gc, outcome.Result.Diagnostics!.Mode);
+    }
+
+    [Fact]
+    public void Run_With_Custom_Diagnostics_Reports_Exact_Mode_Flags()
+    {
+        var spec = new RunSpec
+        {
+            Options = new MeasurementOptions
+            {
+                WarmupIterations = 0,
+                Iterations = 3,
+                OutlierMode = OutlierMode.None,
+                Diagnostics = new DiagnosticsOptions
+                {
+                    GcHeapInfo = true,
+                    Exceptions = true,
+                },
+            },
+        };
+
+        var outcome = BenchmarkRunner.Instance.Run("diag-custom", () => Thread.SpinWait(25), spec);
+
+        Assert.NotNull(outcome.Result.Diagnostics);
+        Assert.Equal(DiagnosticsMode.GcHeapInfo | DiagnosticsMode.Exceptions, outcome.Result.Diagnostics!.Mode);
+    }
+
     // ---------- IsBaseline plumbing ----------
 
     [Fact]

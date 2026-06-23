@@ -97,6 +97,13 @@ public record MeasurementOptions
     public AutoTuneOptions AutoTune { get; init; } = AutoTuneOptions.Default;
 
     /// <summary>
+    ///     Diagnostics options controlling which runtime counters are collected during measurement.
+    ///     GC collection counts are on by default (cheap, always available); heap info, exceptions,
+    ///     and CPU time are opt-in. Defaults to <see cref="DiagnosticsOptions.Default" />.
+    /// </summary>
+    public DiagnosticsOptions Diagnostics { get; init; } = DiagnosticsOptions.Default;
+
+    /// <summary>
     ///     The authoritative measurement profile. The resolved booleans
     ///     (<see cref="ForceGcBeforeEachIteration" />, <see cref="ForceGcBetweenBenchmarks" />,
     ///     <see cref="MeasureAllocations" />) derive from this unless an explicit override is set.

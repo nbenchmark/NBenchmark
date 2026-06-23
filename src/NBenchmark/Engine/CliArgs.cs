@@ -75,6 +75,12 @@ internal sealed record CliArgs
     public bool NoHistogram { get; init; }
 
     /// <summary>
+    ///     Diagnostics mode controlling which runtime counters are collected.
+    ///     <c>null</c> uses the MeasurementOptions default (GC counts on).
+    /// </summary>
+    public DiagnosticsMode? Diagnostics { get; init; }
+
+    /// <summary>
     ///     Comma-separated list of logical CPU cores to pin the benchmark process to
     ///     (e.g. "0" or "2,3"). <c>null</c> leaves affinity untouched. Parsed into
     ///     <see cref="EnvironmentOptions.CpuAffinity" /> by the host.
@@ -132,6 +138,7 @@ internal sealed record CliArgs
         MeasurementProfile? profile = null;
         bool? forceGc = null;
         bool? noAllocations = null;
+        DiagnosticsMode? diagnostics = null;
         int? opsPerSample = null;
         AutoTunePreset? autoTunePreset = null;
         double? ciTarget = null;
@@ -284,6 +291,21 @@ internal sealed record CliArgs
                     break;
                 case "--no-allocations":
                     noAllocations = true;
+                    break;
+                case "--diagnostics" when i + 1 < args.Length:
+                    var diagStr = args[++i];
+
+                    if (string.Equals(diagStr, "none", StringComparison.OrdinalIgnoreCase))
+                        diagnostics = NBenchmark.DiagnosticsMode.None;
+                    else if (string.Equals(diagStr, "gc", StringComparison.OrdinalIgnoreCase))
+                        diagnostics = NBenchmark.DiagnosticsMode.Gc;
+                    else if (string.Equals(diagStr, "gcandcpu", StringComparison.OrdinalIgnoreCase))
+                        diagnostics = NBenchmark.DiagnosticsMode.GcAndCpu;
+                    else if (string.Equals(diagStr, "all", StringComparison.OrdinalIgnoreCase))
+                        diagnostics = NBenchmark.DiagnosticsMode.All;
+                    else
+                        errors.Add($"Invalid --diagnostics value '{diagStr}'. Must be 'none', 'gc', 'gcandcpu', or 'all'.");
+
                     break;
                 case "--auto-tune" when i + 1 < args.Length:
                     var presetStr = args[++i];
@@ -475,6 +497,7 @@ internal sealed record CliArgs
             Profile = profile,
             ForceGc = forceGc,
             NoAllocations = noAllocations,
+            Diagnostics = diagnostics,
             OpsPerSample = opsPerSample,
             AutoTunePreset = autoTunePreset,
             CiTarget = ciTarget,
@@ -649,6 +672,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --profile <mode>       Measurement profile: realistic (default) or independent");
         Console.WriteLine("  --force-gc             Force Gen0 GC before every iteration (overrides profile)");
         Console.WriteLine("  --no-allocations       Disable allocation tracking (overrides profile)");
+        Console.WriteLine("  --diagnostics <mode>   Runtime diagnostics: none, gc, gcandcpu, all (default: gc)");
         Console.WriteLine("  --cpu-affinity <list>  Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)");
         Console.WriteLine("  --priority <level>     Process priority: normal, idle, belownormal, abovenormal, high, realtime");
         Console.WriteLine("  --dedicated-host-guidance  Warn when the host looks noisy (low core count, unraisable priority, macOS throttling)");

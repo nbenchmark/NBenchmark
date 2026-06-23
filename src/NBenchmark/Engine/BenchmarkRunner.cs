@@ -178,7 +178,8 @@ public sealed class BenchmarkRunner
 
         var pipeline = StatsPipeline.Run(adaptive.PerOpTimings, adaptive.PerOpAllocations, spec.Options);
         var mergedWarnings = MergeWarnings(pipeline.Warnings, adaptive.Warnings);
-        var mergedPipeline = pipeline with { Warnings = mergedWarnings };
+        var diagnosticsResult = BuildDiagnosticsResult(adaptive, spec.Options.Diagnostics);
+        var mergedPipeline = pipeline with { Warnings = mergedWarnings, DiagnosticsResult = diagnosticsResult };
 
         return OutcomeBuilder.Build(
             new RunOutcome.Success(mergedPipeline, adaptive.PerOpTimings),
@@ -192,6 +193,53 @@ public sealed class BenchmarkRunner
             adaptive.ResolvedWarmup,
             adaptive.Diagnostic,
             spec.Categories);
+    }
+
+    private static DiagnosticsResult? BuildDiagnosticsResult(AdaptiveResult adaptive, DiagnosticsOptions opts)
+    {
+        if (!opts.Any)
+            return null;
+
+        var diags = adaptive.PerOpDiagnostics;
+        var measuredOps = (long)adaptive.Diagnostic.ResolvedSamples * adaptive.Diagnostic.OpsPerSample;
+
+        if (measuredOps <= 0)
+            return null;
+
+        long sumGen0 = 0, sumGen1 = 0, sumGen2 = 0;
+        long sumCpuTicks = 0;
+
+        if (diags is not null)
+        {
+            for (var i = 0; i < diags.Length; i++)
+            {
+                sumGen0 += diags[i].Gen0;
+                sumGen1 += diags[i].Gen1;
+                sumGen2 += diags[i].Gen2;
+                sumCpuTicks += diags[i].CpuTimeTicks;
+            }
+        }
+
+        var mode = opts.ToMode();
+
+        return new DiagnosticsResult
+        {
+            Gen0Collections = opts.GcCollectionCounts ? sumGen0 : null,
+            Gen1Collections = opts.GcCollectionCounts ? sumGen1 : null,
+            Gen2Collections = opts.GcCollectionCounts ? sumGen2 : null,
+            HeapCommittedBytes = adaptive.HeapInfo?.CommittedBytes,
+            HeapFragmentedBytes = adaptive.HeapInfo?.FragmentedBytes,
+            ExceptionCountPerOp = opts.Exceptions && adaptive.ExceptionCount.HasValue
+                ? (double)adaptive.ExceptionCount.Value / measuredOps
+                : null,
+            CpuTimeNsPerOp = opts.CpuTime
+                ? (double)sumCpuTicks * 100.0 / measuredOps
+                : null,
+            CpuWallRatio = opts.CpuTime && adaptive.MeasuredDuration.Ticks > 0
+                ? (double)sumCpuTicks / adaptive.MeasuredDuration.Ticks
+                : null,
+            Mode = mode,
+        };
     }
 
     private static string FormatCapError(AutoTuneDiagnostic diagnostic, TimeSpan maxTuningTime)
