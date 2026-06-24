@@ -122,7 +122,7 @@ The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonp
 
 When you compare **three or more** benchmarks, NBenchmark first runs the **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus test**. If the omnibus is significant (at least one group differs), it follows up with pairwise Mann-Whitney U tests (candidate versus baseline) with Holm-Bonferroni correction, and the per-row Sig column shows the corrected verdicts. If the omnibus is not significant, no post-hoc comparisons run and the per-row Sig column stays blank. The default strategy is `DefaultSignificanceTest`; you can swap in your own via `ISignificanceTest` (see [Significance Testing](../statistics/significance.md#custom-significance-tests)).
 
-Statistical significance is reported with a standardized magnitude: the **Magnitude** column shows Cliff's delta classified as Negligible / Small / Medium / Large. See [Effect size: Cliff's delta](../statistics/significance.md#effect-size-cliffs-delta) for the thresholds, the sign convention, and the opt-in `MinimumPracticalEffect` gate.
+Statistical significance is reported with a standardized magnitude: the **Magnitude** column shows Cliff's delta classified as Negligible / Small / Medium / Large. See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta) for the thresholds, the sign convention, and the opt-in `MinimumPracticalEffect` gate.
 
 > [!NOTE]
 > Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Read the Magnitude column alongside Sig and the Ratio column.
@@ -137,6 +137,7 @@ Allocation tracking is **on by default** under the `Realistic` profile. It can b
 
 ## Next steps
 
+- **[Reading Your Results](../output/reading-your-results.md)** - interpret every column, indicator, and warning in the output
 - **[Usage modes](../usage-modes/)** - see these concepts applied in real benchmarks
 - **[Statistics](../statistics/)** - the full mathematical detail
-- **[Configuration](../reference/configuration.md)** - tune iterations, warmup, outlier mode, and confidence level
+- **[Configuration](../reference/configuration.md)** - tune for noisy CI, fast feedback, or publication-grade precision

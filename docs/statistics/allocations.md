@@ -1,7 +1,7 @@
 ---
 title: Allocation Measurement
 description: How NBenchmark samples per-iteration heap allocation using GC counters.
-order: 5
+order: 2
 ---
 
 # Allocation Measurement

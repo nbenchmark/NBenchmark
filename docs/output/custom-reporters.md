@@ -1,7 +1,7 @@
 ---
 title: Custom Reporters
 description: Implement IReporter to create your own output format, and register it with ReporterRegistry for CLI use.
-order: 5
+order: 6
 ---
 
 # Custom Reporters

@@ -127,6 +127,6 @@ await new BenchmarkSuite("sorting")
 - **[Key Concepts](./getting-started/key-concepts.md)** - warmup, outliers, and statistics
 - **[Usage modes](./usage-modes/)** - detailed walkthroughs for each mode
 - **[Features](./features/)** - parameterized benchmarks, categories, isolation, multi-runtime, launches, DI
-- **[Configuration](./reference/configuration.md)** - every option explained
+- **[Configuration](./reference/configuration.md)** - task-based guides and the full options reference
 - **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0010)
 - **[Statistics](./statistics/)** - how the numbers are calculated

@@ -1,7 +1,7 @@
 ---
 title: "Parameterized benchmarks: Host mode"
 description: Run a benchmark body across multiple input values using BenchmarkCase and BenchmarkCases attributes in BenchmarkHost.
-order: 2
+order: 3
 ---
 
 # Parameterized benchmarks: Host mode

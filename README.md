@@ -132,7 +132,7 @@ Supports P95 latency, allocation limits, and **baseline regression checks** (com
 - [Installation](./docs/getting-started/installation.md)
 - [Quick Start Guide](./docs/getting-started/quick-start.md)
 - [Key Concepts (Warmup, Outliers, Statistics)](./docs/getting-started/key-concepts.md)
-- [Configuration Reference](./docs/reference/configuration.md)
+- [Configuration](./docs/reference/configuration.md)
 - [CLI Reference](./docs/reference/cli.md)
 - [Statistical Methodology](./docs/statistics/index.md)
 - [Analyzers (NB0001-NB0010)](./docs/reference/analyzers.md)

@@ -1,7 +1,7 @@
 ---
 title: "Parameterized benchmarks: Suite mode"
 description: Run a benchmark body across multiple input values using WithParameter and typed Add lambdas in BenchmarkSuite.
-order: 1
+order: 2
 ---
 
 # Parameterized benchmarks: Suite mode

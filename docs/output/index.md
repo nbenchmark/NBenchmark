@@ -8,6 +8,16 @@ order: 4
 
 Reporters consume the finished `BenchmarkResult` list and produce output - terminal tables, Markdown files, CSVs, or JSON. You can attach as many reporters as you like to a single run.
 
+## In this section
+
+- **[Reading Your Results](./reading-your-results.md)** - interpret every column, indicator, and warning in the output.
+- **[Console Reporter](./console-reporter.md)** - rich terminal table with colour and a bar chart.
+- **[Markdown Reporter](./markdown-reporter.md)** - `.md` file with a formatted results table.
+- **[CSV Reporter](./csv-reporter.md)** - `.csv` file with all statistics, suitable for post-processing.
+- **[JSON Reporter](./json-reporter.md)** - `.json` file with full structured results.
+- **[Report Detail Levels](./report-detail-levels.md)** - Simple, Standard, and Advanced detail modes.
+- **[Custom Reporters](./custom-reporters.md)** - implement and register your own reporter.
+
 ## How reporters work
 
 All reporters implement `IReporter`:

@@ -107,7 +107,7 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 | **Ratio** | Speed relative to the baseline. |
 | **Scale** | Visual bar scaled to the slowest successful benchmark. |
 | **Sig** | `✓` = significant, `✗` = not significant, `-` = not applicable. |
-| **Magnitude** | Strategy-defined qualitative effect label. With the built-in Mann-Whitney tests this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `small` (< 0.33), `med` (< 0.474), `large` (≥ 0.474). `-` for the baseline or when significance is not tested. See [Effect size: Cliff's delta](../statistics/significance.md#effect-size-cliffs-delta). |
+| **Magnitude** | Strategy-defined qualitative effect label. With the built-in Mann-Whitney tests this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `small` (< 0.33), `med` (< 0.474), `large` (≥ 0.474). `-` for the baseline or when significance is not tested. See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
 | **Alloc/op** | Mean bytes allocated per iteration, or `-` if not measured. |
 
 ## Notes

@@ -8,6 +8,10 @@ order: 3
 
 These pages cover advanced capabilities that apply across the usage modes. They are opt-in features for experienced benchmarkers who need finer control over measurement, filtering, isolation, or runtime environments.
 
+## [Categories](./categories.md)
+
+Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from a run via CLI flags or the programmatic `WithCategoryFilter` API.
+
 ## [Parameterized benchmarks: Suite mode](./parameterized-suite.md)
 
 Run a benchmark body across multiple input values using `WithParameter` and typed `Add` lambdas. Each parameter combination produces a separate benchmark entry.
@@ -15,10 +19,6 @@ Run a benchmark body across multiple input values using `WithParameter` and type
 ## [Parameterized benchmarks: Host mode](./parameterized-host.md)
 
 Run a benchmark body across multiple input values using the `[BenchmarkCase]` and `[BenchmarkCases]` attributes. Includes a comparison with the suite-mode API.
-
-## [Categories](./categories.md)
-
-Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from a run via CLI flags or the programmatic `WithCategoryFilter` API.
 
 ## [Isolated runs](./isolated-runs.md)
 
@@ -44,4 +44,4 @@ Use `Microsoft.Extensions.DependencyInjection` (or any container that exposes an
 
 - [Usage modes](../usage-modes/) - the four ways to run benchmarks
 - [Output](../output/index.md) - reporters and output control
-- [Reference](../reference/configuration.md) - configuration and CLI flags
+- [Configuration](../reference/configuration.md) - configuration and CLI flags

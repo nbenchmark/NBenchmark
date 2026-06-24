@@ -1,7 +1,7 @@
 ---
 title: Descriptive Statistics
 description: Mean, median, percentiles, confidence intervals, and the complete BenchmarkResult field reference.
-order: 3
+order: 4
 ---
 
 # Descriptive Statistics

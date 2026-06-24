@@ -1,7 +1,7 @@
 ---
 title: Report Detail Levels
 description: Understand the difference between Simple, Standard, and Advanced detail modes, and how to control what reporters display.
-order: 6
+order: 5
 ---
 
 # Report Detail Levels

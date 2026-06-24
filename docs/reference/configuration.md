@@ -1,16 +1,216 @@
 ---
 title: Configuration
-description: All MeasurementOptions settings with their defaults and valid ranges.
+description: Task-based configuration guides and the full MeasurementOptions reference.
 order: 0
 ---
 
 # Configuration
 
+## Guides
+
+Task-based configuration guides for common benchmarking situations. Each guide shows the code and CLI equivalent, explains why the settings work together, and links to the property definitions below.
+
+---
+
+### Tuning for noisy CI environments
+
+**When to use:** Your benchmark runs on a shared CI runner (GitHub Actions, Azure Pipelines, etc.) where CPU cycles, memory bandwidth, and scheduler time are shared with other containers. Results are noisy and comparisons are unreliable.
+
+**What to combine:**
+
+| Setting | Why |
+|---|---|
+| `Environment.ProcessPriority = High` | Reduces preemption by unrelated OS work. The benchmark thread is less likely to be paused mid-sample. |
+| `OutlierMode.MedianAbsoluteDeviation` | More robust than the default IQR fence when a heavy tail of preempted samples distorts the quartile-based fence. MAD has a 50% breakdown point. |
+| `LaunchCount = 3` | Runs the benchmark 3 times as independent launches. The best (lowest-median) launch is reported, giving you a second layer of noise rejection. |
+| `AutoTune.CapBehavior = Error` | If the wall-clock cap is hit before the CI target is met, the benchmark errors instead of silently reporting a wide interval. |
+
+**Fluent API:**
+
+```csharp
+await new BenchmarkSuite("ci-suite")
+    .Add("myBenchmark", () => MyMethod())
+    .WithProcessPriority(ProcessPriorityClass.High)
+    .WithOutlierMode(OutlierMode.MedianAbsoluteDeviation)
+    .WithLaunchCount(3)
+    .WithAutoTune(new AutoTuneOptions { CapBehavior = CapBehavior.Error })
+    .RunAsync();
+```
+
+**CLI:**
+
+```bash
+dotnet run -- --priority high --outlier mad --launch-count 3 --autotune-cap-behavior error
+```
+
+**See also:**
+- [Environment](#environment)
+- [OutlierMode](#outliermode)
+- [LaunchCount](#launchcount)
+- [AutoTune](#autotune)
+- [Environment Control](../features/environment-control.md)
+
+---
+
+### Fast feedback during development
+
+**When to use:** You are iterating on code and need a quick signal - seconds, not minutes. Precision is less important than turnaround time.
+
+**What to combine:**
+
+| Setting | Why |
+|---|---|
+| `AutoTune = AutoTuneOptions.Quick` | Lowers the CI target to ±5%, reduces minimum samples to 15, and minimum warmup to 4. |
+| `WarmupIterations = 4` | Pins a short warmup instead of auto-detecting. |
+| `Iterations = 20` | Pins a small measured sample count. |
+| `ConfidenceLevel = 0.90` | A 90% CI is narrower and requires fewer samples to satisfy. |
+
+**Fluent API:**
+
+```csharp
+await new BenchmarkSuite("fast-feedback")
+    .Add("myBenchmark", () => MyMethod())
+    .WithAutoTune(AutoTunePreset.Quick)
+    .WithWarmup(4)
+    .WithIterations(20)
+    .WithConfidenceLevel(0.90)
+    .RunAsync();
+```
+
+**CLI:**
+
+```bash
+dotnet run -- --auto-tune quick --warmup 4 --iterations 20 --confidence 0.90
+```
+
+**See also:**
+- [AutoTune](#autotune)
+- [WarmupIterations](#warmupiterations)
+- [Iterations](#iterations)
+- [ConfidenceLevel](#confidencelevel)
+
+---
+
+### Publication-grade precision
+
+**When to use:** You are publishing benchmark results, comparing across commits in a blog post, or establishing a baseline that others will rely on. Accuracy matters more than run time.
+
+**What to combine:**
+
+| Setting | Why |
+|---|---|
+| `AutoTune = AutoTuneOptions.Thorough` | Raises the CI target to ±1%, minimum samples to 100, and minimum warmup to 16. |
+| `ConfidenceLevel = 0.99` | A 99% CI is wider and more conservative. |
+| `LaunchCount = 5` | Multiple independent launches let you report cross-launch statistics and the best representative run. |
+| `EnableHistogram = true` | The latency histogram gives you the full distribution, not just summary statistics. |
+
+**Fluent API:**
+
+```csharp
+await new BenchmarkSuite("publication")
+    .Add("myBenchmark", () => MyMethod())
+    .WithAutoTune(AutoTunePreset.Thorough)
+    .WithConfidenceLevel(0.99)
+    .WithLaunchCount(5)
+    .RunAsync();
+```
+
+**CLI:**
+
+```bash
+dotnet run -- --auto-tune thorough --confidence 0.99 --launch-count 5
+```
+
+**See also:**
+- [AutoTune](#autotune)
+- [ConfidenceLevel](#confidencelevel)
+- [LaunchCount](#launchcount)
+- [EnableHistogram](#enablehistogram)
+
+---
+
+### Pure CPU measurement
+
+**When to use:** You want to measure CPU time only, excluding GC pressure, allocation overhead, and cache effects. Suitable for cryptographic algorithms, numeric kernels, and other CPU-bound work.
+
+**What to combine:**
+
+| Setting | Why |
+|---|---|
+| `Profile = Independent` | Forces Gen0 GC before every iteration, full GC between benchmarks, and disables allocation tracking. |
+| `OpsPerSample = 1` | Each sample is a single invocation. Calibration is skipped when per-iteration GC is on, so K stays 1 by default - pin it explicitly if you want a different value. |
+
+**Fluent API:**
+
+```csharp
+await new BenchmarkSuite("cpu-only")
+    .Add("myBenchmark", () => MyMethod())
+    .WithMeasurementProfile(MeasurementProfile.Independent)
+    .RunAsync();
+```
+
+**CLI:**
+
+```bash
+dotnet run -- --profile independent
+```
+
+**See also:**
+- [Profile](#profile)
+- [ForceGcBeforeEachIteration](#forcegcbeforeeachiteration)
+- [MeasureAllocations](#measureallocations)
+- [Measurement Profiles](../statistics/measurement.md#measurement-profiles)
+
+---
+
+### Debugging unstable results
+
+**When to use:** Your benchmark produces wildly different numbers across runs, the Error column is large, or you see a bimodal-distribution warning and want to understand why.
+
+**What to combine:**
+
+| Setting | Why |
+|---|---|
+| `Diagnostics = DiagnosticsOptions.All` | Enables GC collection counts, heap info, exception tracking, and CPU time. Lets you correlate timing spikes with GC pauses or CPU throttling. |
+| `OutlierMode = MedianAbsoluteDeviation` | More robust to heavy-tailed distributions. If the default IQR fence is being distorted by a long tail, MAD gives a clearer picture. |
+| `Detail = Advanced` | Shows the auto-tune diagnostic line (K, warmup, samples, CI half-width, jitter metric) and the outlier fence values. |
+
+**Fluent API:**
+
+```csharp
+await new BenchmarkSuite("debug")
+    .Add("myBenchmark", () => MyMethod())
+    .WithDiagnostics(DiagnosticsMode.All)
+    .WithOutlierMode(OutlierMode.MedianAbsoluteDeviation)
+    .RunAsync();
+```
+
+**CLI:**
+
+```bash
+dotnet run -- --diagnostics all --outlier mad --detail advanced
+```
+
+**What to look for:**
+- High jitter metric (> 0.10) in the auto-tune diagnostic: the host is noisy. Consider [environment controls](../features/environment-control.md).
+- GC collection counts that correlate with slow samples: GC pressure is affecting your timings. Try `--profile independent`.
+- A bimodal-distribution warning: investigate the cause (lock contention, cache misses, GC pauses) rather than silencing it.
+
+**See also:**
+- [Diagnostics](#diagnostics)
+- [OutlierMode](#outliermode)
+- [Reading Your Results](../output/reading-your-results.md)
+- [Troubleshooting](../troubleshooting.md)
+
+---
+
+## Reference
+
 All measurement settings are controlled by `MeasurementOptions`. The defaults are sensible for most benchmarks - only change what you have a reason to change.
 
-## Using MeasurementOptions
+### Using MeasurementOptions
 
-### With Benchmark (Quick mode)
+#### With Benchmark (Quick mode)
 
 ```csharp
 var options = new MeasurementOptions
@@ -22,7 +222,7 @@ var options = new MeasurementOptions
 var result = Benchmark.Run(() => MyMethod(), options: options);
 ```
 
-### With BenchmarkSuite (Suite mode)
+#### With BenchmarkSuite (Suite mode)
 
 Use the fluent `With*` methods - they each update a single option:
 
@@ -36,7 +236,7 @@ await new BenchmarkSuite("name")
     .RunAsync();
 ```
 
-### With BenchmarkHost (Host mode)
+#### With BenchmarkHost (Host mode)
 
 Call `WithOptions` or use CLI flags. CLI flags always take priority over `WithOptions`:
 
@@ -50,7 +250,7 @@ BenchmarkHost.Create(args)
 dotnet run -- --iterations 500 --warmup 50
 ```
 
-## Options reference
+### Options reference
 
 ### Iterations
 

@@ -1,7 +1,7 @@
 ---
 title: Outlier Trimming
 description: How NBenchmark removes outliers before computing statistics.
-order: 2
+order: 3
 ---
 
 # Outlier Trimming
