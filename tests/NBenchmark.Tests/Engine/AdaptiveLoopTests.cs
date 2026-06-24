@@ -1,4 +1,5 @@
 using NBenchmark.Engine;
+using NBenchmark.Stats;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -106,6 +107,7 @@ public class AdaptiveLoopTests
             Iterations = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false }, // isolate Phase A calibration
         };
 
         // Calibration probes each candidate K = 1, 2, 4 five times and feeds the *fastest* reading
@@ -370,6 +372,237 @@ public class AdaptiveLoopTests
         // is not shown.
         Assert.Contains("5.00 µs", result.Warnings[0]);
         Assert.Contains("Warmup stopped at the wall-clock tuning cap", result.Warnings[0]);
+    }
+
+    [Fact]
+    public void JitterCalibration_Runs_By_Default_And_Reports_Metric()
+    {
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = 3,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                JitterCalibrationSamples = 8,
+                JitterCalibrationWorkPerSample = 16,
+            },
+        };
+
+        // Constant clock: zero-variance jitter probe -> metric is 0, no switch.
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.NotNull(result.Diagnostic.JitterMetric);
+        Assert.Equal(0.0, result.Diagnostic.JitterMetric!.Value, 10);
+        Assert.False(result.Diagnostic.OutlierDetectorSwitched);
+        Assert.Null(result.EffectiveOutlierDetector);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void JitterCalibration_Skipped_When_Disabled_Reports_Null_Metric()
+    {
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = 3,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
+        };
+
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.Null(result.Diagnostic.JitterMetric);
+        Assert.False(result.Diagnostic.OutlierDetectorSwitched);
+        Assert.Null(result.EffectiveOutlierDetector);
+    }
+
+    [Fact]
+    public void JitterCalibration_AutoSwitches_To_Mad_When_Jitter_Exceeds_Threshold()
+    {
+        var jitterSamples = 8;
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = 3,
+            // Leave OutlierMode at the default IqrFence so the auto-switch is eligible.
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                JitterCalibrationSamples = jitterSamples,
+                JitterCalibrationWorkPerSample = 16,
+                JitterAutoSwitchThreshold = 0.10,
+            },
+        };
+
+        // First `jitterSamples` calls are the jitter probe: alternate between 500 and 1500 ns
+        // -> mean 1000, stddev 500 -> CV 0.50, well above the 0.10 threshold. Subsequent calls
+        // (Phase A calibration is skipped because OpsPerSample is pinned, warmup is 0, so the
+        // next calls are the 3 measured samples) return a constant 1000 ns.
+        var clock = new ScriptedClock(call => call < jitterSamples
+            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            : 1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.True(result.Diagnostic.OutlierDetectorSwitched);
+        Assert.NotNull(result.Diagnostic.JitterMetric);
+        Assert.True(result.Diagnostic.JitterMetric!.Value > 0.10,
+            $"jitter metric {result.Diagnostic.JitterMetric} should exceed threshold 0.10");
+        Assert.NotNull(result.EffectiveOutlierDetector);
+        Assert.Equal("MAD (3×)", result.EffectiveOutlierDetector!.Name);
+
+        // The switch produces a warning explaining what happened.
+        Assert.Single(result.Warnings);
+        Assert.Contains("auto-switch", result.Warnings[0]);
+        Assert.Contains("IQR fence to Median Absolute Deviation", result.Warnings[0]);
+    }
+
+    [Fact]
+    public void JitterCalibration_Does_Not_Switch_When_OutlierMode_Is_Not_Default_IqrFence()
+    {
+        var jitterSamples = 8;
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = 3,
+            OutlierMode = OutlierMode.RemoveTop5Percent, // not IqrFence -> switch is not eligible
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                JitterCalibrationSamples = jitterSamples,
+                JitterCalibrationWorkPerSample = 16,
+                JitterAutoSwitchThreshold = 0.10,
+            },
+        };
+
+        var clock = new ScriptedClock(call => call < jitterSamples
+            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            : 1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        // The metric is still reported (the probe ran), but no switch because the user pinned
+        // a non-default OutlierMode.
+        Assert.NotNull(result.Diagnostic.JitterMetric);
+        Assert.True(result.Diagnostic.JitterMetric!.Value > 0.10);
+        Assert.False(result.Diagnostic.OutlierDetectorSwitched);
+        Assert.Null(result.EffectiveOutlierDetector);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void JitterCalibration_Does_Not_Switch_When_Custom_OutlierDetector_Is_Set()
+    {
+        var jitterSamples = 8;
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = 3,
+            // Custom detector pinned -> switch is not eligible, even with OutlierMode at default.
+            OutlierDetector = OutlierDetectors.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                JitterCalibrationSamples = jitterSamples,
+                JitterCalibrationWorkPerSample = 16,
+                JitterAutoSwitchThreshold = 0.10,
+            },
+        };
+
+        var clock = new ScriptedClock(call => call < jitterSamples
+            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            : 1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.NotNull(result.Diagnostic.JitterMetric);
+        Assert.True(result.Diagnostic.JitterMetric!.Value > 0.10);
+        Assert.False(result.Diagnostic.OutlierDetectorSwitched);
+        Assert.Null(result.EffectiveOutlierDetector);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void JitterCalibration_Disabled_AutoSwitch_With_NonPositive_Threshold_Still_Reports_Metric()
+    {
+        var jitterSamples = 8;
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = 3,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                JitterCalibrationSamples = jitterSamples,
+                JitterCalibrationWorkPerSample = 16,
+                JitterAutoSwitchThreshold = 0.0, // disable auto-switch, keep probe
+            },
+        };
+
+        var clock = new ScriptedClock(call => call < jitterSamples
+            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            : 1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        // The probe ran and the metric is high, but the auto-switch is disabled by the
+        // non-positive threshold.
+        Assert.NotNull(result.Diagnostic.JitterMetric);
+        Assert.True(result.Diagnostic.JitterMetric!.Value > 0.10);
+        Assert.False(result.Diagnostic.OutlierDetectorSwitched);
+        Assert.Null(result.EffectiveOutlierDetector);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task JitterCalibration_AutoSwitches_In_Async_Path()
+    {
+        var jitterSamples = 8;
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = 3,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                JitterCalibrationSamples = jitterSamples,
+                JitterCalibrationWorkPerSample = 16,
+                JitterAutoSwitchThreshold = 0.10,
+            },
+        };
+
+        var clock = new ScriptedClock(call => call < jitterSamples
+            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            : 1000.0);
+
+        var spec = new RunSpec { Options = options };
+
+        var result = await AdaptiveLoop.RunAsync(
+            "bench",
+            () => Task.CompletedTask,
+            spec,
+            clock,
+            NullBenchmarkProgress.Instance,
+            CancellationToken.None);
+
+        Assert.True(result.Diagnostic.OutlierDetectorSwitched);
+        Assert.NotNull(result.Diagnostic.JitterMetric);
+        Assert.NotNull(result.EffectiveOutlierDetector);
+        Assert.Single(result.Warnings);
     }
 
     private static AdaptiveResult RunSync(

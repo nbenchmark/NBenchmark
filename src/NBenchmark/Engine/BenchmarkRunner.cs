@@ -176,7 +176,16 @@ public sealed class BenchmarkRunner
             return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
         }
 
-        var pipeline = StatsPipeline.Run(adaptive.PerOpTimings, adaptive.PerOpAllocations, spec.Options);
+        // When the adaptive loop auto-switched the outlier detector (Phase 0 jitter calibration
+        // detected a noisy host), build an effective options record with the switched detector
+        // pinned so the stats pipeline trims with MAD and the result's OutlierDetector name
+        // reflects the switch. The effective options are local to this path; the caller's spec
+        // is never mutated.
+        var effectiveOptions = adaptive.EffectiveOutlierDetector is { } switchedDetector
+            ? spec.Options with { OutlierDetector = switchedDetector }
+            : spec.Options;
+
+        var pipeline = StatsPipeline.Run(adaptive.PerOpTimings, adaptive.PerOpAllocations, effectiveOptions);
         var mergedWarnings = MergeWarnings(pipeline.Warnings, adaptive.Warnings);
         var diagnosticsResult = BuildDiagnosticsResult(adaptive, spec.Options.Diagnostics);
         var mergedPipeline = pipeline with { Warnings = mergedWarnings, DiagnosticsResult = diagnosticsResult };
@@ -187,7 +196,7 @@ public sealed class BenchmarkRunner
             spec.ClassName,
             spec.Description,
             spec.IsBaseline,
-            spec.Options,
+            effectiveOptions,
             _clock.GetElapsedTime(totalStartTimestamp),
             adaptive.MeasuredDuration,
             adaptive.ResolvedWarmup,

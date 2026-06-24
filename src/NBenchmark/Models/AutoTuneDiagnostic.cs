@@ -43,4 +43,30 @@ public sealed record AutoTuneDiagnostic
     ///     callbacks.
     /// </summary>
     public required TimeSpan TuningWallClock { get; init; }
+
+    /// <summary>
+    ///     The pre-flight jitter metric: the ratio of the median absolute deviation to the
+    ///     median (MAD / median) of the per-sample timings of a deterministic busy-weight loop
+    ///     run before calibration. The metric is robust - both the median and MAD have a ~50%
+    ///     breakdown point, so a single JIT spike or one-off preemption cannot distort it. A
+    ///     quiet dedicated host reports well below <c>0.05</c>; a shared-tenant CI runner
+    ///     typically reports <c>0.10</c>-<c>0.30</c>. <c>null</c> when jitter calibration was
+    ///     disabled (<see cref="AutoTuneOptions.EnableJitterCalibration" /> = <c>false</c>) or
+    ///     the probe did not produce enough samples to compute a metric.
+    ///     <para>
+    ///         Use this to decide whether a result is trustworthy on a given host: a high
+    ///         metric means the timings were collected under scheduling pressure and the
+    ///         reported Error likely underestimates the true spread.
+    ///     </para>
+    /// </summary>
+    public double? JitterMetric { get; init; }
+
+    /// <summary>
+    ///     <c>true</c> when the loop auto-switched the outlier detector from the configured
+    ///     <c>IqrFence</c> to <c>MedianAbsoluteDeviation</c> because the
+    ///     <see cref="JitterMetric" /> exceeded <see cref="AutoTuneOptions.JitterAutoSwitchThreshold" />.
+    ///     <c>false</c> when the configured detector was used unchanged. The detector name in
+    ///     use is on <see cref="BenchmarkResult.OutlierDetector" />.
+    /// </summary>
+    public bool OutlierDetectorSwitched { get; init; }
 }

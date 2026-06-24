@@ -59,7 +59,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         {
             baseHeaders += ",Mean,OpsPerSecond";
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories");
         }
 
         foreach (var table in tables)
@@ -145,6 +145,10 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     var atSampleStop = autoTune?.SampleStop.ToString() ?? "";
                     var atCiWidth = autoTune is null ? "" : autoTune.AchievedRelativeCiWidth.ToString("F4");
                     var atTuningMs = autoTune is null ? "" : autoTune.TuningWallClock.TotalMilliseconds.ToString("F1");
+                    var atJitterMetric = autoTune?.JitterMetric.HasValue == true
+                        ? autoTune.JitterMetric.Value.ToString("F4")
+                        : "";
+                    var atDetectorSwitched = autoTune?.OutlierDetectorSwitched == true ? "true" : "";
 
                     var safeCategories = string.Join("; ", row.Categories).Replace("\"", "\"\"");
                     var advancedDiag = row.Diagnostics;
@@ -179,6 +183,8 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                         $"{atSampleStop}," +
                         $"{atCiWidth}," +
                         $"{atTuningMs}," +
+                        $"{atJitterMetric}," +
+                        $"{atDetectorSwitched}," +
                         $"{heapCommitted}," +
                         $"{heapFragmented}," +
                         $"{excPerOp}," +

@@ -838,6 +838,7 @@ public class BenchmarkRunnerTests
                 OpsPerSample = 1,
                 OutlierMode = OutlierMode.None,
                 MeasureAllocationsOverride = false,
+                AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
             },
         };
     }

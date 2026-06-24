@@ -119,6 +119,54 @@ public sealed record AutoTuneOptions
     /// </summary>
     public TimeSpan MaxTuningTime { get; init; } = TimeSpan.FromSeconds(20);
 
+    // ----- Phase 0: pre-flight jitter calibration -----
+
+    /// <summary>
+    ///     Whether the adaptive loop runs a pre-flight jitter probe before calibration. The
+    ///     probe times a deterministic busy-weight loop and derives a <see cref="AutoTuneDiagnostic.JitterMetric" />
+    ///     (the ratio of the median absolute deviation to the median, MAD / median, of per-sample
+    ///     wall-clock) that characterises the host's baseline interruption rate. When the metric exceeds
+    ///     <see cref="JitterAutoSwitchThreshold" /> and the user has not pinned an outlier
+    ///     detector, the loop switches the effective detector from <c>IqrFence</c> to
+    ///     <c>MedianAbsoluteDeviation</c> for that run - MAD's ~50% breakdown point is more
+    ///     resilient than IQR to the heavy-tailed, skewed samples a noisy host produces.
+    ///     <para>
+    ///         Defaults to <c>true</c>. Set to <c>false</c> to skip the probe entirely (the
+    ///         jitter metric is reported as <c>null</c> and the detector is never auto-switched).
+    ///         Pinning <see cref="MeasurementOptions.OutlierMode" /> or
+    ///         <see cref="MeasurementOptions.OutlierDetector" /> disables the auto-switch but
+    ///         not the probe - the metric is still reported for visibility.
+    ///     </para>
+    /// </summary>
+    public bool EnableJitterCalibration { get; init; } = true;
+
+    /// <summary>
+    ///     The number of timed samples the jitter probe collects. Each sample runs
+    ///     <see cref="JitterCalibrationWorkPerSample" /> busy-weight iterations. Default 32 -
+    ///     enough to characterise the tail without measurably extending the tuning budget.
+    /// </summary>
+    public int JitterCalibrationSamples { get; init; } = 32;
+
+    /// <summary>
+    ///     The number of deterministic arithmetic iterations each jitter sample performs. The
+    ///     loop body is a multiply-accumulate over a private accumulator, chosen to be
+    ///     CPU-bound, allocation-free, and not optimised away. Default 4096 - spans a few
+    ///     microseconds on modern hardware, long enough to observe a scheduling preemption
+    ///     but short enough that 32 samples complete in single-digit milliseconds.
+    /// </summary>
+    public int JitterCalibrationWorkPerSample { get; init; } = 4096;
+
+    /// <summary>
+    ///     The jitter metric value above which the loop auto-switches the outlier detector
+    ///     from <c>IqrFence</c> to <c>MedianAbsoluteDeviation</c>. The metric is the ratio of
+    ///     the median absolute deviation to the median (MAD / median) of the per-sample
+    ///     busy-weight timings; a quiet host reports well below 0.05, a shared-tenant CI
+    ///     runner typically reports 0.10-0.30. Default 0.10 - switches only on genuinely noisy
+    ///     hosts. Set to a non-positive value (<c>0</c> or negative) to disable the
+    ///     auto-switch while still running the probe and reporting the metric.
+    /// </summary>
+    public double JitterAutoSwitchThreshold { get; init; } = 0.10;
+
     /// <summary>
     ///     What happens when the adaptive loop stops because it hit the wall-clock tuning cap
     ///     before reaching the confidence-interval target or a steady warmup state. Default

@@ -41,6 +41,32 @@ internal static class AdaptiveLoop
         // the reported time covers only the adaptive loop's own work.
         var tuningStartTimestamp = clock.GetTimestamp();
 
+        // ----- Phase 0: pre-flight jitter calibration -----
+        //
+        // Before any real measurement, time a deterministic busy-weight loop and derive a robust
+        // jitter metric (MAD / median) of its per-sample timings. A high metric means the host is
+        // under scheduling pressure (shared-tenant CI runner, thermal throttling, co-tenant noise)
+        // and the IQR fence - which uses a scale estimate (IQR) with a low breakdown point - will be
+        // distorted by the heavy tail. MAD's ~50% breakdown point is more resilient, so the loop
+        // auto-switches the effective outlier detector when the metric exceeds the threshold.
+        //
+        // The probe is skipped when EnableJitterCalibration is false. Pinning OutlierMode or a
+        // custom OutlierDetector disables the auto-switch but not the probe - the metric is still
+        // reported for visibility.
+        double? jitterMetric = null;
+        var detectorSwitched = false;
+
+        if (autoTune.EnableJitterCalibration)
+        {
+            jitterMetric = JitterCalibrator.Run(
+                autoTune.JitterCalibrationSamples,
+                autoTune.JitterCalibrationWorkPerSample,
+                clock);
+
+            if (ShouldSwitchDetector(o, autoTune, jitterMetric))
+                detectorSwitched = true;
+        }
+
         // ----- Phase A: ops-per-sample calibration -----
         var calibrationCapped = false;
         var calibrationSamples = 0;
@@ -247,7 +273,9 @@ internal static class AdaptiveLoop
             totalBodyInvocations, warmupStop, sampleStop, o.ConfidenceLevel,
             clock.GetElapsedTime(tuningStartTimestamp),
             calibrationCapped,
-            autoTune.MaxTuningTime);
+            autoTune.MaxTuningTime,
+            jitterMetric,
+            detectorSwitched);
     }
 
     public static async Task<AdaptiveResult> RunAsync(
@@ -272,6 +300,32 @@ internal static class AdaptiveLoop
         // Start the tuning-wall-clock span here, after the runner's pre-loop progress callback, so
         // the reported time covers only the adaptive loop's own work.
         var tuningStartTimestamp = clock.GetTimestamp();
+
+        // ----- Phase 0: pre-flight jitter calibration -----
+        //
+        // Before any real measurement, time a deterministic busy-weight loop and derive a robust
+        // jitter metric (MAD / median) of its per-sample timings. A high metric means the host is
+        // under scheduling pressure (shared-tenant CI runner, thermal throttling, co-tenant noise)
+        // and the IQR fence - which uses a scale estimate (IQR) with a low breakdown point - will be
+        // distorted by the heavy tail. MAD's ~50% breakdown point is more resilient, so the loop
+        // auto-switches the effective outlier detector when the metric exceeds the threshold.
+        //
+        // The probe is skipped when EnableJitterCalibration is false. Pinning OutlierMode or a
+        // custom OutlierDetector disables the auto-switch but not the probe - the metric is still
+        // reported for visibility.
+        double? jitterMetric = null;
+        var detectorSwitched = false;
+
+        if (autoTune.EnableJitterCalibration)
+        {
+            jitterMetric = JitterCalibrator.Run(
+                autoTune.JitterCalibrationSamples,
+                autoTune.JitterCalibrationWorkPerSample,
+                clock);
+
+            if (ShouldSwitchDetector(o, autoTune, jitterMetric))
+                detectorSwitched = true;
+        }
 
         // ----- Phase A: ops-per-sample calibration -----
         var calibrationCapped = false;
@@ -484,7 +538,9 @@ internal static class AdaptiveLoop
             totalBodyInvocations, warmupStop, sampleStop, o.ConfidenceLevel,
             clock.GetElapsedTime(tuningStartTimestamp),
             calibrationCapped,
-            autoTune.MaxTuningTime);
+            autoTune.MaxTuningTime,
+            jitterMetric,
+            detectorSwitched);
     }
 
     private static bool IsEligibleForCalibration(MeasurementOptions o, RunSpec spec)
@@ -509,7 +565,9 @@ internal static class AdaptiveLoop
         double confidenceLevel,
         TimeSpan tuningWallClock,
         bool calibrationCapped,
-        TimeSpan maxTuningTime)
+        TimeSpan maxTuningTime,
+        double? jitterMetric,
+        bool detectorSwitched)
     {
         var timingsArray = timings.ToArray();
 
@@ -528,11 +586,87 @@ internal static class AdaptiveLoop
             SampleStop = sampleStop,
             AchievedRelativeCiWidth = achievedCi,
             TuningWallClock = tuningWallClock,
+            JitterMetric = jitterMetric,
+            OutlierDetectorSwitched = detectorSwitched,
         };
 
         var warnings = BuildWallClockCapWarnings(warmupStop, sampleStop, calibrationCapped, maxTuningTime);
 
-        return new AdaptiveResult(timingsArray, allocations?.ToArray(), diagnosticsList?.ToArray(), exceptionCount, heapInfo, measuredDuration, resolvedWarmup, diagnostic, warnings);
+        if (detectorSwitched)
+        {
+            var switchWarning = BuildJitterSwitchWarning(jitterMetric);
+            warnings = warnings.Count == 0 ? switchWarning : [..warnings, ..switchWarning];
+        }
+
+        // The effective detector is non-null only when the loop auto-switched it; the caller
+        // (BenchmarkRunner) inspects this to build an effective options record for the stats
+        // pipeline. When no switch happened, the caller uses the options' configured detector.
+        IOutlierDetector? effectiveDetector = detectorSwitched
+            ? OutlierDetectors.MedianAbsoluteDeviation
+            : null;
+
+        return new AdaptiveResult(
+            timingsArray,
+            allocations?.ToArray(),
+            diagnosticsList?.ToArray(),
+            exceptionCount,
+            heapInfo,
+            measuredDuration,
+            resolvedWarmup,
+            diagnostic,
+            warnings,
+            effectiveDetector);
+    }
+
+    /// <summary>
+    ///     Decides whether the loop should auto-switch the outlier detector from the configured
+    ///     <c>IqrFence</c> to <c>MedianAbsoluteDeviation</c> based on the jitter metric. The switch
+    ///     fires only when all of the following hold:
+    ///     <list type="bullet">
+    ///         <item>The jitter metric is a finite, positive value (the probe produced usable data).</item>
+    ///         <item><see cref="AutoTuneOptions.JitterAutoSwitchThreshold" /> is positive (a non-positive
+    ///         value disables the auto-switch while keeping the probe).</item>
+    ///         <item>The metric exceeds the threshold.</item>
+    ///         <item>The user has not pinned a custom <see cref="MeasurementOptions.OutlierDetector" />.</item>
+    ///         <item>The configured <see cref="MeasurementOptions.OutlierMode" /> is the default
+    ///         <c>IqrFence</c> - switching from any other explicitly-chosen mode would override user
+    ///         intent.</item>
+    ///     </list>
+    /// </summary>
+    private static bool ShouldSwitchDetector(MeasurementOptions o, AutoTuneOptions autoTune, double? jitterMetric)
+    {
+        if (jitterMetric is not { } metric || !double.IsFinite(metric) || metric <= 0)
+            return false;
+
+        if (autoTune.JitterAutoSwitchThreshold <= 0)
+            return false;
+
+        if (metric <= autoTune.JitterAutoSwitchThreshold)
+            return false;
+
+        if (o.OutlierDetector is not null)
+            return false;
+
+        return o.OutlierMode == OutlierMode.IqrFence;
+    }
+
+    private static IReadOnlyList<string> BuildJitterSwitchWarning(double? jitterMetric)
+    {
+        var metricLabel = jitterMetric.HasValue
+            ? $"{jitterMetric.Value:F2}"
+            : "unknown";
+
+        return
+        [
+            $"Pre-flight jitter probe measured a jitter metric (MAD/median) of {metricLabel} "
+            + "on the busy-weight loop, exceeding the auto-switch threshold. The outlier detector "
+            + "has been switched from IQR fence to Median Absolute Deviation for this run - MAD's "
+            + "higher breakdown point is more resilient to the heavy-tailed samples a noisy host "
+            + "produces. Investigate the host (shared-tenant CI runner, thermal throttling, "
+            + "frequency scaling) before trusting these numbers. Set AutoTune.JitterAutoSwitchThreshold "
+            + "to 0 to disable the auto-switch while keeping the probe, or "
+            + "AutoTune.EnableJitterCalibration to false to skip the probe entirely.",
+        ];
     }
 
     private static IReadOnlyList<string> BuildWallClockCapWarnings(
@@ -685,4 +819,5 @@ internal readonly record struct AdaptiveResult(
     TimeSpan MeasuredDuration,
     int ResolvedWarmup,
     AutoTuneDiagnostic Diagnostic,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    IOutlierDetector? EffectiveOutlierDetector = null);

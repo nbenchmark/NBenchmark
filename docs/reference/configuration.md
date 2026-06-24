@@ -173,6 +173,10 @@ Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/host) or `--a
 | `BatchSize` | `8` | Warmup batch size and the cadence on which the CI-width rule is evaluated. |
 | `MaxTuningTime` | `20 s` | Per-benchmark safety cap on cumulative in-body sample time (calibration + warmup + measurement). Setup, teardown, and GC are excluded, so real wall-clock can exceed it. |
 | `CapBehavior` | `Warn` | What happens when `MaxTuningTime` is reached before the CI target or warmup plateau is reached. `Warn` emits a warning; `Error` marks the benchmark as errored. |
+| `EnableJitterCalibration` | `true` | Whether the pre-flight jitter probe runs. When `false`, the jitter metric is `null` and the outlier detector is never auto-switched. |
+| `JitterCalibrationSamples` | `32` | Number of timed samples the jitter probe collects. |
+| `JitterCalibrationWorkPerSample` | `4096` | Number of deterministic arithmetic iterations each jitter sample performs. |
+| `JitterAutoSwitchThreshold` | `0.10` | Jitter metric value above which the outlier detector auto-switches from IQR fence to MAD. Set to `0` to disable the auto-switch while keeping the probe. |
 
 The interval's confidence level is `ConfidenceLevel` (below) - the CI-width rule targets that same level, so it is not duplicated on `AutoTune`.
 

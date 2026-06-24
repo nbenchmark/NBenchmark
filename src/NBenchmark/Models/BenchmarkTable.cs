@@ -458,12 +458,22 @@ public sealed record BenchmarkTable
 
     /// <summary>
     ///     Formats the adaptive measurement diagnostic into a single human-readable summary line
-    ///     (e.g. <c>auto-tuned: 240 samples × 64 ops, warmup 40, CI ±1.8%</c>).
+    ///     (e.g. <c>auto-tuned: 240 samples × 64 ops, warmup 40, CI ±1.8%</c>). When the pre-flight
+    ///     jitter probe ran, appends a jitter clause (e.g. <c>, jitter 0.04</c>); when the outlier
+    ///     detector was auto-switched, appends a switch clause (e.g. <c>, detector→MAD</c>).
     /// </summary>
     public static string FormatAutoTuneSummary(AutoTuneDiagnostic diagnostic)
     {
-        return $"auto-tuned: {diagnostic.ResolvedSamples:N0} samples × {diagnostic.OpsPerSample:N0} ops, "
+        var summary = $"auto-tuned: {diagnostic.ResolvedSamples:N0} samples × {diagnostic.OpsPerSample:N0} ops, "
                + $"warmup {diagnostic.ResolvedWarmup:N0}, CI ±{diagnostic.AchievedRelativeCiWidth * 100:F1}%";
+
+        if (diagnostic.JitterMetric.HasValue)
+            summary += $", jitter {diagnostic.JitterMetric.Value:F2}";
+
+        if (diagnostic.OutlierDetectorSwitched)
+            summary += ", detector→MAD";
+
+        return summary;
     }
 
     /// <summary>
