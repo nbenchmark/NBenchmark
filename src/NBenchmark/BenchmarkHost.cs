@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
+using NBenchmark.Lifecycle;
 using NBenchmark.Reporters;
 
 namespace NBenchmark;
@@ -412,13 +413,20 @@ public sealed class BenchmarkHost
 
         foreach (var suite in filtered)
         {
+            var suiteResultStart = allResults.Count;
             var inProcess = new List<BenchmarkMethodDefinition>();
             var perClass = new List<BenchmarkMethodDefinition>();
             var perBenchmark = new List<BenchmarkMethodDefinition>();
+            var autoUpgradedResultNames = new HashSet<string>();
 
             foreach (var benchmark in suite.Benchmarks)
             {
-                switch (ResolveIsolation(benchmark, inProcessGlobal))
+                var decision = ResolveIsolation(benchmark, suite, inProcessGlobal, _instanceFactory is not null, out var autoUpgraded);
+
+                if (autoUpgraded)
+                    autoUpgradedResultNames.Add($"{suite.Type.Name}.{benchmark.DisplayName}");
+
+                switch (decision)
                 {
                     case IsolationDecision.InProcess:
                         inProcess.Add(benchmark);
@@ -458,6 +466,11 @@ public sealed class BenchmarkHost
 
                 runningIndex++;
             }
+
+            // Attach the auto-isolation upgrade warning to every result that was
+            // auto-upgraded from PerClass to PerBenchmark by the b-factory rule.
+            if (autoUpgradedResultNames.Count > 0)
+                ApplyAutoIsolationUpgradeWarning(allResults, autoUpgradedResultNames, suiteResultStart);
         }
 
         await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
@@ -880,6 +893,12 @@ public sealed class BenchmarkHost
                 .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
                 .ToList();
 
+            // When the class implements IStateReset, fire ResetAsync between benchmark methods
+            // to keep the shared instance's state clean across PerClass execution. Null otherwise.
+            Func<Task>? betweenBenchmarksReset = typeof(IStateReset).IsAssignableFrom(suite.Type)
+                ? () => ((IStateReset)instance).ResetAsync(cancellationToken)
+                : null;
+
             var effectiveClassLaunchCount = suiteOptions.LaunchCount;
 
             foreach (var b in suite.Benchmarks)
@@ -899,7 +918,7 @@ public sealed class BenchmarkHost
 
                     var (results, samples) = await SuiteRunner.RunAsync(
                         envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, progress, cancellationToken).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset).ConfigureAwait(false);
 
                     allLaunchResults.Add(results);
                     allLaunchSamples.Add(samples);
@@ -918,7 +937,7 @@ public sealed class BenchmarkHost
             {
                 var (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                    startIndex, totalBenchmarks, _progress, cancellationToken).ConfigureAwait(false);
+                    startIndex, totalBenchmarks, _progress, cancellationToken, betweenBenchmarksReset).ConfigureAwait(false);
 
                 ApplyPerClassIndependenceWarning(results, suite, suiteOptions);
                 allResults.AddRange(results);
@@ -1122,19 +1141,51 @@ public sealed class BenchmarkHost
 
     /// <summary>
     ///     Resolves how a single benchmark should run, layering the global in-process
-    ///     switch over the isolation intent declared by its attributes.
+    ///     switch over the isolation intent declared by its attributes. When the declaring
+    ///     class uses <see cref="InstanceLifetime.PerClass" /> with a factory-resolved
+    ///     instance and does not implement <see cref="IStateReset" />, the decision is
+    ///     auto-upgraded to <see cref="IsolationDecision.PerBenchmark" /> to preserve the
+    ///     statistical-independence assumption of the significance engine. Explicit
+    ///     <c>[InProcess]</c> on the method or the <c>--in-process</c> global flag wins
+    ///     over the upgrade.
     /// </summary>
-    private static IsolationDecision ResolveIsolation(BenchmarkMethodDefinition benchmark, bool inProcessGlobal)
+    /// <param name="autoUpgraded">
+    ///     Set to <c>true</c> when the PerClass default was upgraded to PerBenchmark
+    ///     because the class uses a factory and does not implement <see cref="IStateReset" />;
+    ///     <c>false</c> for every other decision (explicit <c>[IsolatedProcess]</c>,
+    ///     in-process, or genuine PerClass).
+    /// </param>
+    private static IsolationDecision ResolveIsolation(
+        BenchmarkMethodDefinition benchmark,
+        BenchmarkSuiteDefinition suite,
+        bool inProcessGlobal,
+        bool usesFactory,
+        out bool autoUpgraded)
     {
+        autoUpgraded = false;
+
         if (inProcessGlobal)
             return IsolationDecision.InProcess;
 
-        return benchmark.Isolation switch
+        if (benchmark.Isolation == IsolationMode.InProcess)
+            return IsolationDecision.InProcess;
+
+        if (benchmark.Isolation == IsolationMode.PerBenchmark)
+            return IsolationDecision.PerBenchmark;
+
+        // PerClass default. Auto-upgrade to PerBenchmark when the instance is
+        // factory-resolved and the class does not implement IStateReset, to
+        // preserve the statistical-independence assumption of the significance
+        // engine. Explicit [InProcess] on the method already returned above.
+        if (suite.Lifetime == InstanceLifetime.PerClass
+            && usesFactory
+            && !typeof(IStateReset).IsAssignableFrom(suite.Type))
         {
-            IsolationMode.InProcess => IsolationDecision.InProcess,
-            IsolationMode.PerBenchmark => IsolationDecision.PerBenchmark,
-            _ => IsolationDecision.PerClass,
-        };
+            autoUpgraded = true;
+            return IsolationDecision.PerBenchmark;
+        }
+
+        return IsolationDecision.PerClass;
     }
 
     /// <summary>
@@ -1373,9 +1424,15 @@ public sealed class BenchmarkHost
                     .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
                     .ToList();
 
+                // When the class implements IStateReset, fire ResetAsync between benchmark methods
+                // to keep the shared instance's state clean across PerClass execution in the child.
+                Func<Task>? betweenBenchmarksReset = typeof(IStateReset).IsAssignableFrom(suite.Type)
+                    ? () => ((IStateReset)instance).ResetAsync(cancellationToken)
+                    : null;
+
                 (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, RunOrder.Declaration, null, options,
-                    0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken).ConfigureAwait(false);
+                    0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken, betweenBenchmarksReset).ConfigureAwait(false);
 
                 ApplyPerClassIndependenceWarning(results, suite, options);
             }
@@ -1468,15 +1525,53 @@ public sealed class BenchmarkHost
                       + $"{suite.Benchmarks.Count} [Benchmark] methods. Sharing a single instance "
                       + "across methods can cause the second method to observe cached state from "
                       + "the first, violating the statistical-independence assumption of the "
-                      + "significance test. Set SuppressPerClassIndependenceWarning to true on "
-                      + "MeasurementOptions if sharing is intentional.";
+                      + "significance test. To preserve independence: implement IStateReset on the "
+                      + "class (the engine will call it between methods), or add [IsolatedProcess] "
+                      + "to run each method in a clean process. Set SuppressPerClassIndependenceWarning "
+                      + "to true on MeasurementOptions only if sharing is intentional.";
 
         for (var i = 0; i < results.Count; i++)
         {
             results[i] = results[i] with
             {
                 Warnings = results[i].Warnings.Count > 0
-                    ? [..results[i].Warnings, warning]
+                    ? [.. results[i].Warnings, warning]
+                    : [warning],
+            };
+        }
+    }
+
+    /// <summary>
+    ///     Attaches the auto-isolation upgrade warning to every result whose benchmark
+    ///     was auto-upgraded from PerClass to PerBenchmark by the b-factory rule in
+    ///     <see cref="ResolveIsolation" />. The warning is attached in the parent process
+    ///     after the isolated child results are folded back in, so it appears on the
+    ///     results the user actually sees. Only the specific benchmarks that were
+    ///     upgraded carry the warning; benchmarks from the same class that kept their
+    ///     explicit isolation decision (e.g. <c>[InProcess]</c>) are left untouched.
+    /// </summary>
+    private static void ApplyAutoIsolationUpgradeWarning(
+        List<BenchmarkResult> results,
+        HashSet<string> autoUpgradedResultNames,
+        int startIndex)
+    {
+        if (autoUpgradedResultNames.Count == 0)
+            return;
+
+        for (var i = startIndex; i < results.Count; i++)
+        {
+            if (!autoUpgradedResultNames.Contains(results[i].Name))
+                continue;
+
+            var warning = $"Class '{results[i].ClassName}' uses InstanceLifetime.PerClass with a "
+                          + "factory-resolved instance and does not implement IStateReset; upgrading to "
+                          + "per-benchmark isolated process to preserve statistical independence. Implement "
+                          + "IStateReset on the class to allow in-process PerClass execution.";
+
+            results[i] = results[i] with
+            {
+                Warnings = results[i].Warnings.Count > 0
+                    ? [.. results[i].Warnings, warning]
                     : [warning],
             };
         }

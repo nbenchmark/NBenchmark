@@ -135,4 +135,4 @@ Supports P95 latency, allocation limits, and **baseline regression checks** (com
 - [Configuration](./docs/reference/configuration.md)
 - [CLI Reference](./docs/reference/cli.md)
 - [Statistical Methodology](./docs/statistics/index.md)
-- [Analyzers (NB0001-NB0010)](./docs/reference/analyzers.md)
+- [Analyzers (NB0001-NB0013)](./docs/reference/analyzers.md)

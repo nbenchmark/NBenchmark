@@ -54,35 +54,44 @@ public static class MannWhitneyU
 
         Array.Sort(combined, (a, b) => a.Value.CompareTo(b.Value));
 
+        var ranks = new double[n1 + n2];
         var hasTies = false;
         var tieCorrection = 0.0;
-        double r1 = 0;
         var j = 0;
 
         while (j < combined.Length)
         {
             var k = j + 1;
-            var groupACountInBlock = combined[j].Group == 0 ? 1 : 0;
 
             while (k < combined.Length && combined[k].Value == combined[j].Value)
             {
-                if (combined[k].Group == 0)
-                    groupACountInBlock++;
-
                 k++;
             }
 
             var blockLength = k - j;
 
             if (blockLength > 1)
+            {
                 hasTies = true;
-
-            tieCorrection += (double)blockLength * blockLength * blockLength - blockLength;
+                tieCorrection += (double)blockLength * blockLength * blockLength - blockLength;
+            }
 
             var meanRank = (j + k + 1) / 2.0;
-            r1 += groupACountInBlock * meanRank;
+
+            for (var t = j; t < k; t++)
+            {
+                ranks[t] = meanRank;
+            }
 
             j = k;
+        }
+
+        double r1 = 0;
+
+        for (var i = 0; i < combined.Length; i++)
+        {
+            if (combined[i].Group == 0)
+                r1 += ranks[i];
         }
 
         var u1 = r1 - (double)n1 * (n1 + 1) / 2.0;
@@ -186,7 +195,7 @@ public static class MannWhitneyU
         var mu = (double)n1 * n2 / 2.0;
         var total = n1 + n2;
 
-        // Numerically stable form of var(U) with tie correction:
+        // Numerically stable tie-corrected variance:
         // n1*n2/12 * [ (N + 1) - sum(t^3 - t)/(N*(N - 1)) ].
         var variance =
             (double)n1 * n2 / 12.0 *

@@ -40,6 +40,10 @@ Pin benchmarks to CPU cores, raise process priority, and detect noisy hosts to r
 
 Use `Microsoft.Extensions.DependencyInjection` (or any container that exposes an `IServiceProvider`) to give benchmark classes constructor dependencies. Host mode only.
 
+## [State isolation](./state-isolation.md)
+
+Keep `InstanceLifetime.PerClass` statistically valid with `IStateReset` or automatic per-benchmark isolation fallback when shared state would contaminate timing.
+
 ## See also
 
 - [Usage modes](../usage-modes/) - the four ways to run benchmarks

@@ -30,6 +30,34 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     }
 
     [Fact]
+    public async Task No_diagnostic_when_PerClass_with_scoped_service_implements_IStateReset()
+    {
+        var code = """
+                   using NBenchmark.Attributes;
+                   using NBenchmark;
+                   using NBenchmark.Lifecycle;
+
+                   [InstanceLifetime(InstanceLifetime.PerClass)]
+                   public class OrderBenchmarks : IStateReset
+                   {
+                       public OrderBenchmarks(MyDbContext db) { _ = db; }
+                       [Benchmark] public int A() => 0;
+                       [Benchmark] public int B() => 0;
+                       public System.Threading.Tasks.Task ResetAsync(System.Threading.CancellationToken cancellationToken)
+                           => System.Threading.Tasks.Task.CompletedTask;
+                   }
+
+                   public class MyDbContext : System.IDisposable
+                   {
+                       public void Dispose() { }
+                   }
+                   """;
+
+        await NBAnalyzerVerifier<PerClassWithScopedServiceAnalyzer>
+            .VerifyNoDiagnosticAsync(code, "NB0011");
+    }
+
+    [Fact]
     public async Task No_diagnostic_for_PerMethod_with_DbContext()
     {
         var code = """

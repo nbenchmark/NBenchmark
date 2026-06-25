@@ -12,4 +12,4 @@ Technical reference for NBenchmark.
 
 - **[Configuration](./configuration.md)** - task-based guides and the full MeasurementOptions reference.
 - **[CLI Reference](./cli.md)** - all command-line flags accepted by `BenchmarkHost`.
-- **[Analyzers](./analyzers.md)** - compile-time Roslyn diagnostics (NB0001-NB0010).
+- **[Analyzers](./analyzers.md)** - compile-time Roslyn diagnostics (NB0001-NB0013).
