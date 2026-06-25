@@ -128,5 +128,5 @@ await new BenchmarkSuite("sorting")
 - **[Usage modes](./usage-modes/)** - detailed walkthroughs for each mode
 - **[Features](./features/)** - parameterized benchmarks, categories, isolation, multi-runtime, launches, DI
 - **[Configuration](./reference/configuration.md)** - task-based guides and the full options reference
-- **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0010)
+- **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0013)
 - **[Statistics](./statistics/)** - how the numbers are calculated

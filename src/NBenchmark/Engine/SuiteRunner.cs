@@ -13,7 +13,8 @@ internal static class SuiteRunner
         int startIndex,
         int totalBenchmarks,
         IBenchmarkProgress progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<Task>? onBetweenBenchmarksAsync = null)
     {
         ArgumentNullException.ThrowIfNull(envelopes);
         ArgumentNullException.ThrowIfNull(progress);
@@ -75,6 +76,14 @@ internal static class SuiteRunner
 
             if (ShouldForceGcBetweenBenchmarks(spec.Options, completedResult))
                 ForceFullGc();
+
+            // PerClass shared-instance reset hook: fired once per gap, after this method's
+            // completion + inter-benchmark GC and before the next method's OnBenchmarkStarting.
+            // N-1 fires for N envelopes (no fire after the last benchmark; the first method sees
+            // a fresh instance with setup already run). Null in per-method, per-benchmark, and
+            // suite-mode paths.
+            if (index < ordered.Count - 1 && onBetweenBenchmarksAsync is not null)
+                await onBetweenBenchmarksAsync().ConfigureAwait(false);
         }
 
         return (results, rawSamples);

@@ -117,6 +117,13 @@ internal static class TestSources
                                         public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
                                     }
                                 }
+                                    namespace NBenchmark.Lifecycle
+                                    {
+                                        public interface IStateReset
+                                        {
+                                            System.Threading.Tasks.Task ResetAsync(System.Threading.CancellationToken cancellationToken);
+                                        }
+                                    }
                                 """;
 }
 
@@ -154,7 +161,11 @@ public static class NBAnalyzerVerifier<TAnalyzer>
         Assert.DoesNotContain(analyzerDiagnostics, d => d.Id == diagnosticId);
     }
 
-    public static async Task VerifyCodeFixAsync<TCodeFix>(string source, string fixedSource, string diagnosticId)
+    public static async Task VerifyCodeFixAsync<TCodeFix>(
+        string source,
+        string fixedSource,
+        string diagnosticId,
+        string? preferredCodeActionTitle = null)
         where TCodeFix : CodeFixProvider, new()
     {
         var analyzerDiagnostics = await GetDiagnosticsAsync(source);
@@ -186,7 +197,14 @@ public static class NBAnalyzerVerifier<TAnalyzer>
         await codeFixProvider.RegisterCodeFixesAsync(context);
 
         Assert.True(actions.Count > 0, "Expected at least one code fix action.");
-        var applied = await actions[0].GetOperationsAsync(CancellationToken.None);
+
+        var selectedAction = string.IsNullOrWhiteSpace(preferredCodeActionTitle)
+            ? actions[0]
+            : actions.FirstOrDefault(a => string.Equals(a.Title, preferredCodeActionTitle, StringComparison.Ordinal));
+
+        Assert.NotNull(selectedAction);
+
+        var applied = await selectedAction!.GetOperationsAsync(CancellationToken.None);
         var changedSolution = applied.OfType<ApplyChangesOperation>().FirstOrDefault()?.ChangedSolution;
         Assert.NotNull(changedSolution);
         var changedDoc = changedSolution!.GetDocument(documentId)!;

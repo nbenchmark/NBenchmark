@@ -223,7 +223,8 @@ public sealed class OrderBenchmarks(MyDbContext db)
 Typical fixes:
 
 1. Remove the attribute so the class uses `PerMethod`
-2. Keep `PerClass` and suppress with `#pragma warning disable NB0011` when sharing state is intentional
+2. Keep `PerClass` and implement `IStateReset` so shared state is reset between benchmark methods
+3. Keep `PerClass` and suppress with `#pragma warning disable NB0011` when sharing state is intentional
 
 > **CI note.** This is a compile-time warning, not a runtime error. In CI/CD pipelines the warning scrolls past in the build log and is easy to miss. If you suppress NB0011, verify that the shared state does not create a timing dependency between methods - for example, by running each method in isolation and comparing results.
 

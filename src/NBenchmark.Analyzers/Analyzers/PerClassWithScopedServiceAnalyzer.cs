@@ -12,6 +12,7 @@ namespace NBenchmark.Analyzers.Analyzers;
 public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
 {
     private const string InstanceLifetimeTypeMetadataName = "NBenchmark.InstanceLifetime";
+    private const string IStateResetTypeMetadataName = "NBenchmark.Lifecycle.IStateReset";
     private const string PerClassMemberName = "PerClass";
 
     private static readonly DiagnosticDescriptor Rule = new(
@@ -61,12 +62,31 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
         if (!HasPerClassLifetime(context.Compilation, type))
             return;
 
+        if (ImplementsIStateReset(context.Compilation, type))
+            return;
+
         var scopedParam = FindScopedConstructorParameter(type);
 
         if (scopedParam is null)
             return;
 
         context.ReportDiagnostic(Diagnostic.Create(Rule, typeDecl.Identifier.GetLocation(), type.Name, scopedParam.Type.Name));
+    }
+
+    private static bool ImplementsIStateReset(Compilation compilation, INamedTypeSymbol type)
+    {
+        var iStateResetType = compilation.GetTypeByMetadataName(IStateResetTypeMetadataName);
+
+        if (iStateResetType is null)
+            return false;
+
+        for (var i = 0; i < type.AllInterfaces.Length; i++)
+        {
+            if (SymbolEqualityComparer.Default.Equals(type.AllInterfaces[i], iStateResetType))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
