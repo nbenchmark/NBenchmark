@@ -8,14 +8,14 @@ order: 8
 
 The repository includes several sample projects in the `samples/` directory that demonstrate each usage mode. Run any of them with `dotnet run`.
 
-## Quick - Quick mode
+## Single - Single mode
 
-**`samples/Quick/`**
+**`samples/Single/`**
 
 The simplest possible benchmark: `Benchmark.Run` on a tight loop, followed by `Print()` and `PrintAsync()`.
 
 ```bash
-cd samples/Quick
+cd samples/Single
 dotnet run
 ```
 
@@ -82,14 +82,14 @@ What to look at:
 
 ---
 
-## Host - Host mode
+## Harness - Harness mode
 
-**`samples/Host/`**
+**`samples/Harness/`**
 
-A `BenchmarkHost` with two attribute-based benchmarks: a fast `Compute` method and a slower `Baseline`.
+A `BenchmarkHarness` with two attribute-based benchmarks: a fast `Compute` method and a slower `Baseline`.
 
 ```bash
-cd samples/Host
+cd samples/Harness
 dotnet run
 dotnet run -- --list
 dotnet run -- --filter Compute
@@ -102,7 +102,7 @@ using NBenchmark;
 using NBenchmark.Reporters.Console;
 using NBenchmark.Attributes;
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly<HostBenchmarks>()
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
@@ -127,11 +127,11 @@ What to look at:
 
 ---
 
-## DependencyInjection - Host mode with DI
+## DependencyInjection - Harness mode with DI
 
 **`samples/DependencyInjection/`**
 
-A `BenchmarkHost` setup where the benchmark class has **constructor dependencies** resolved from a `Microsoft.Extensions.DependencyInjection` container. Demonstrates the `NBenchmark.DependencyInjection` companion package and `UseDependencyInjection<T>`.
+A `BenchmarkHarness` setup where the benchmark class has **constructor dependencies** resolved from a `Microsoft.Extensions.DependencyInjection` container. Demonstrates the `NBenchmark.DependencyInjection` companion package and `UseDependencyInjection<T>`.
 
 ```bash
 cd samples/DependencyInjection
@@ -151,7 +151,7 @@ var services = new ServiceCollection()
     .AddTransient<DependencyInjectionBenchmarks>()
     .BuildServiceProvider();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .UseDependencyInjection<DependencyInjectionBenchmarks>(services)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
@@ -226,7 +226,7 @@ See [Custom outlier detectors](./statistics/outliers.md#custom-outlier-detectors
 
 Demonstrates process isolation:
 
-- Quick mode is always in-process (`Benchmark.Run`).
+- Single mode is always in-process (`Benchmark.Run`).
 - Suite mode opts into a single clean child process with `WithIsolation()`.
 
 ```bash
@@ -317,14 +317,14 @@ What to look at:
 
 ---
 
-## MultiRuntimeHost - Host mode multi-runtime
+## MultiRuntimeHarness - Harness mode multi-runtime
 
-**`samples/MultiRuntimeHost/`**
+**`samples/MultiRuntimeHarness/`**
 
-A `BenchmarkHost` with attribute-based benchmarks that can be run across multiple .NET runtimes via the `--runtimes` CLI flag.
+A `BenchmarkHarness` with attribute-based benchmarks that can be run across multiple .NET runtimes via the `--runtimes` CLI flag.
 
 ```bash
-cd samples/MultiRuntimeHost
+cd samples/MultiRuntimeHarness
 dotnet run -- --runtimes net8,net9,net10
 dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output ./results
 ```
@@ -334,7 +334,7 @@ using NBenchmark;
 using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly<StringBenchmarks>()
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())

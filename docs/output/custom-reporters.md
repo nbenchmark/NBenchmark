@@ -27,7 +27,7 @@ public sealed class MyReporter : IReporter
 }
 ```
 
-Add it to your host or suite with `.WithReporter(new MyReporter())`.
+Add it to your harness or suite with `.WithReporter(new MyReporter())`.
 
 If you want your custom reporter to be usable from the `--reporter` CLI flag, register it with the global `ReporterRegistry`:
 

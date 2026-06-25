@@ -10,7 +10,7 @@ var services = new ServiceCollection()
     .AddTransient<DependencyInjectionBenchmarks>()
     .BuildServiceProvider();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .UseDependencyInjection<DependencyInjectionBenchmarks>(services)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())

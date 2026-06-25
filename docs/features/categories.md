@@ -65,10 +65,10 @@ Untagged benchmarks are excluded when any `--category` flag is present.
 
 ## Programmatic filtering
 
-In Host mode, use `WithCategoryFilter`:
+In Harness mode, use `WithCategoryFilter`:
 
 ```csharp
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly<StringBenchmarks>()
     .WithCategoryFilter(include: ["String"], exclude: ["Slow"])
     .RunAsync();

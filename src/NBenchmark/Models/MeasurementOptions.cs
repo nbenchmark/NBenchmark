@@ -278,7 +278,7 @@ public record MeasurementOptions
     ///     process priority, and dedicated-host guidance. <c>null</c> (the default) does
     ///     nothing - the benchmark runs with whatever affinity and priority the host
     ///     started it with. Set via <see cref="BenchmarkSuite.WithHardwareAffinity" /> /
-    ///     <see cref="BenchmarkHost.WithHardwareAffinity" />, the <c>--cpu-affinity</c> /
+    ///     <see cref="BenchmarkHarness.WithHardwareAffinity" />, the <c>--cpu-affinity</c> /
     ///     <c>--priority</c> / <c>--dedicated-host-guidance</c> CLI flags, or directly on
     ///     the options record.
     /// </summary>

@@ -25,7 +25,7 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-## Host mode: `--launch-count` CLI flag
+## Harness mode: `--launch-count` CLI flag
 
 ```bash
 dotnet run -- --launch-count 5
@@ -34,14 +34,14 @@ dotnet run -- --launch-count 5
 Or in code via `WithOptions`:
 
 ```csharp
-BenchmarkHost.Create(args)
+BenchmarkHarness.Create(args)
     .WithOptions(new MeasurementOptions { LaunchCount = 5 })
     .RunAsync();
 ```
 
 ## Per-method attribute override
 
-Each `[Benchmark]` can specify its own launch count via the `LaunchCount` property (Host mode):
+Each `[Benchmark]` can specify its own launch count via the `LaunchCount` property (Harness mode):
 
 ```csharp
 // 3 independent launches for this method only
@@ -77,7 +77,7 @@ When `--dry-run` (Iterations=0, WarmupIterations=0) is combined with `LaunchCoun
 
 ## Isolation interaction
 
-In isolated mode (the Host mode default), the parent spawns N child processes per isolated group. The child process is unaware of the launch count; the parent orchestrates the repeats. Per-method attribute overrides are respected: the parent uses the maximum launch count across all benchmarks in the group so that every benchmark receives at least the launches it requested.
+In isolated mode (the Harness mode default), the parent spawns N child processes per isolated group. The child process is unaware of the launch count; the parent orchestrates the repeats. Per-method attribute overrides are respected: the parent uses the maximum launch count across all benchmarks in the group so that every benchmark receives at least the launches it requested.
 
 When combined with `WithIsolation()` in Suite mode, the suite repeats in a fresh child process per launch. The child process is unaware of the launch count; the parent orchestrates the repeats.
 
@@ -96,6 +96,6 @@ The "Launch Aggregation" table shows cross-launch mean, standard deviation, medi
 ## See also
 
 - [Suite mode](../usage-modes/suite-mode.md) - the full fluent API
-- [Host mode](../usage-modes/host-mode.md) - attribute-based discovery and CLI
+- [Harness mode](../usage-modes/harness-mode.md) - attribute-based discovery and CLI
 - [Isolated runs](./isolated-runs.md) - how launches interact with process isolation
-- [CLI reference](../reference/cli.md) - all `BenchmarkHost` flags
+- [CLI reference](../reference/cli.md) - all `BenchmarkHarness` flags

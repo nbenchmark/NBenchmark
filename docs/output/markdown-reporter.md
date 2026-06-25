@@ -120,7 +120,7 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 - In Standard mode (`--detail standard` or `WithDetail(ReportDetail.Standard)`), the full multi-section output is shown: comparison table, Precision & Tail Latency, and Interpretation.
 - In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown, followed by an `auto-tuned: …` line summarising the adaptive loop's decisions (resolved samples × ops-per-sample, warmup length, achieved CI half-width).
 
-## Using with Benchmark (Quick mode)
+## Using with Benchmark (Single mode)
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
@@ -128,7 +128,7 @@ await result.ToMarkdownAsync("results/");
 await result.ToMarkdownAsync("results/", "benchmarks.md");
 ```
 
-## CLI usage (BenchmarkHost)
+## CLI usage (BenchmarkHarness)
 
 ```bash
 dotnet run -- --reporter markdown

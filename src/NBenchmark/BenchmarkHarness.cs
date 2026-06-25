@@ -7,7 +7,7 @@ using NBenchmark.Reporters;
 
 namespace NBenchmark;
 
-public sealed class BenchmarkHost
+public sealed class BenchmarkHarness
 {
     private readonly List<Assembly> _assemblies = [];
     private readonly List<string> _categoryFilterExclude = [];
@@ -24,60 +24,60 @@ public sealed class BenchmarkHost
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
 
-    private BenchmarkHost()
+    private BenchmarkHarness()
     {
     }
 
     internal Action? PostSuiteCleanup { get; set; }
 
-    public static BenchmarkHost Create(string[] args)
+    public static BenchmarkHarness Create(string[] args)
     {
         var cliArgs = CliArgs.Parse(args);
-        var host = new BenchmarkHost();
-        host._cliArgs = cliArgs;
-        host._detail = cliArgs.Detail;
+        var harness = new BenchmarkHarness();
+        harness._cliArgs = cliArgs;
+        harness._detail = cliArgs.Detail;
 
         foreach (var name in cliArgs.ReporterNames)
         {
             if (ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out var reporter))
-                host._reporters.Add(reporter);
+                harness._reporters.Add(reporter);
         }
 
-        return host;
+        return harness;
     }
 
-    public BenchmarkHost AddFromAssembly<T>()
+    public BenchmarkHarness AddFromAssembly<T>()
     {
         _assemblies.Add(typeof(T).Assembly);
         return this;
     }
 
-    public BenchmarkHost AddFromAssembly(Assembly assembly)
+    public BenchmarkHarness AddFromAssembly(Assembly assembly)
     {
         _assemblies.Add(assembly);
         return this;
     }
 
-    public BenchmarkHost WithReporter(IReporter reporter)
+    public BenchmarkHarness WithReporter(IReporter reporter)
     {
         reporter.Detail = _detail;
         _reporters.Add(reporter);
         return this;
     }
 
-    public BenchmarkHost WithOptions(MeasurementOptions options)
+    public BenchmarkHarness WithOptions(MeasurementOptions options)
     {
         _options = options;
         return this;
     }
 
-    public BenchmarkHost WithRunOrder(RunOrder order)
+    public BenchmarkHarness WithRunOrder(RunOrder order)
     {
         _runOrder = order;
         return this;
     }
 
-    public BenchmarkHost WithDetail(ReportDetail detail)
+    public BenchmarkHarness WithDetail(ReportDetail detail)
     {
         _detail = detail;
 
@@ -89,34 +89,34 @@ public sealed class BenchmarkHost
         return this;
     }
 
-    public BenchmarkHost WithProgress(IBenchmarkProgress progress)
+    public BenchmarkHarness WithProgress(IBenchmarkProgress progress)
     {
         _progress = progress;
         _progressExplicitlySet = true;
         return this;
     }
 
-    public BenchmarkHost WithInstanceFactory(Func<Type, object> factory)
+    public BenchmarkHarness WithInstanceFactory(Func<Type, object> factory)
     {
         _instanceFactory = type => InstanceHandle.NoTeardown(factory(type));
         return this;
     }
 
-    internal BenchmarkHost WithInstanceFactory(Func<Type, InstanceHandle> factory)
+    internal BenchmarkHarness WithInstanceFactory(Func<Type, InstanceHandle> factory)
     {
         _instanceFactory = factory;
         return this;
     }
 
     /// <summary>
-    ///     Configures the host to resolve benchmark instances from the specified
+    ///     Configures the harness to resolve benchmark instances from the specified
     ///     <see cref="IServiceProvider" />. Each benchmark method gets a fresh instance
     ///     resolved from the root provider. Throws if a benchmark type is not registered.
     ///     For scoped lifetime (e.g. EF Core's DbContext), install the
     ///     <c>NBenchmark.DependencyInjection</c> package and use
     ///     <c>WithScopedServiceProvider</c> instead.
     /// </summary>
-    public BenchmarkHost WithServiceProvider(IServiceProvider serviceProvider)
+    public BenchmarkHarness WithServiceProvider(IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
         return WithInstanceFactory(type =>
@@ -133,7 +133,7 @@ public sealed class BenchmarkHost
     ///     to be considered practically significant. Values below the threshold are reported
     ///     as NotSignificant with a <c>neg</c> magnitude label.
     /// </summary>
-    public BenchmarkHost WithMinimumPracticalEffect(double minimumDelta)
+    public BenchmarkHarness WithMinimumPracticalEffect(double minimumDelta)
     {
         _options = _options with { MinimumPracticalEffect = minimumDelta };
         return this;
@@ -147,7 +147,7 @@ public sealed class BenchmarkHost
     ///     <see cref="WithDedicatedHostGuidance" /> alongside this to surface a warning
     ///     when the host looks unsuitable.
     /// </summary>
-    public BenchmarkHost WithHardwareAffinity(params int[] cores)
+    public BenchmarkHarness WithHardwareAffinity(params int[] cores)
     {
         ArgumentNullException.ThrowIfNull(cores);
         _options = _options with
@@ -165,7 +165,7 @@ public sealed class BenchmarkHost
     ///     A refused elevation (common on locked-down CI runners) is surfaced as a
     ///     warning, not an error.
     /// </summary>
-    public BenchmarkHost WithProcessPriority(System.Diagnostics.ProcessPriorityClass priority)
+    public BenchmarkHarness WithProcessPriority(System.Diagnostics.ProcessPriorityClass priority)
     {
         _options = _options with
         {
@@ -180,7 +180,7 @@ public sealed class BenchmarkHost
     ///     an unraisable process priority, or (on macOS) unobservable frequency scaling
     ///     and thermal throttling. The run still proceeds - this is guidance, not a gate.
     /// </summary>
-    public BenchmarkHost WithDedicatedHostGuidance(bool enabled = true)
+    public BenchmarkHarness WithDedicatedHostGuidance(bool enabled = true)
     {
         _options = _options with
         {
@@ -195,7 +195,7 @@ public sealed class BenchmarkHost
     ///     GC pressure in the timing; <see cref="MeasurementProfile.Independent" /> isolates iterations
     ///     for pure-CPU measurement.
     /// </summary>
-    public BenchmarkHost WithMeasurementProfile(MeasurementProfile profile)
+    public BenchmarkHarness WithMeasurementProfile(MeasurementProfile profile)
     {
         _options = _options with { Profile = profile };
         return this;
@@ -206,7 +206,7 @@ public sealed class BenchmarkHost
     ///     ops-per-sample calibration). Use <see cref="AutoTuneOptions.Quick" /> for fast feedback
     ///     or <see cref="AutoTuneOptions.Thorough" /> for tighter intervals.
     /// </summary>
-    public BenchmarkHost WithAutoTune(AutoTuneOptions autoTune)
+    public BenchmarkHarness WithAutoTune(AutoTuneOptions autoTune)
     {
         ArgumentNullException.ThrowIfNull(autoTune);
         _options = _options with { AutoTune = autoTune };
@@ -214,7 +214,7 @@ public sealed class BenchmarkHost
     }
 
     /// <summary>Selects an adaptive-tuning preset (Default, Quick, or Thorough).</summary>
-    public BenchmarkHost WithAutoTune(AutoTunePreset preset)
+    public BenchmarkHarness WithAutoTune(AutoTunePreset preset)
     {
         _options = _options with { AutoTune = AutoTuneOptions.FromPreset(preset) };
         return this;
@@ -224,14 +224,14 @@ public sealed class BenchmarkHost
     ///     Pins the number of back-to-back body invocations timed as one sample (<c>K</c>),
     ///     overriding auto-calibration. Honoured even with per-iteration setup/teardown.
     /// </summary>
-    public BenchmarkHost WithOpsPerSample(int opsPerSample)
+    public BenchmarkHarness WithOpsPerSample(int opsPerSample)
     {
         _options = _options with { OpsPerSample = opsPerSample };
         return this;
     }
 
     /// <summary>Configures runtime diagnostics (GC counts, heap info, exceptions, CPU time).</summary>
-    public BenchmarkHost WithDiagnostics(DiagnosticsOptions diagnostics)
+    public BenchmarkHarness WithDiagnostics(DiagnosticsOptions diagnostics)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
         _options = _options with { Diagnostics = diagnostics };
@@ -239,19 +239,19 @@ public sealed class BenchmarkHost
     }
 
     /// <summary>Selects a diagnostics mode (None, Gc, GcAndCpu, All).</summary>
-    public BenchmarkHost WithDiagnostics(DiagnosticsMode mode)
+    public BenchmarkHarness WithDiagnostics(DiagnosticsMode mode)
     {
         _options = _options with { Diagnostics = DiagnosticsOptions.FromMode(mode) };
         return this;
     }
 
     /// <summary>
-    ///     Controls Host mode's isolated-by-default execution. When enabled (the default),
+    ///     Controls Harness mode's isolated-by-default execution. When enabled (the default),
     ///     each discovered class runs in its own clean-room child process unless a benchmark
     ///     or its class opts out with <c>[InProcess]</c>. When disabled, every benchmark
     ///     runs in the host process - equivalent to passing <c>--in-process</c> on the CLI.
     /// </summary>
-    public BenchmarkHost WithIsolation(bool enabled = true)
+    public BenchmarkHarness WithIsolation(bool enabled = true)
     {
         _isolationEnabled = enabled;
         return this;
@@ -263,13 +263,13 @@ public sealed class BenchmarkHost
     ///     when comparing implementations that live in separate classes (e.g. a legacy version
     ///     and a refactored version). Disabled by default.
     /// </summary>
-    public BenchmarkHost WithCrossClassSignificance(bool enabled = true)
+    public BenchmarkHarness WithCrossClassSignificance(bool enabled = true)
     {
         _crossClass = enabled;
         return this;
     }
 
-    public BenchmarkHost WithInstanceLifetime(InstanceLifetime lifetime)
+    public BenchmarkHarness WithInstanceLifetime(InstanceLifetime lifetime)
     {
         _defaultInstanceLifetime = lifetime;
         return this;
@@ -282,7 +282,7 @@ public sealed class BenchmarkHost
     ///     is set. This programmatic filter composes with the <c>--category</c> and
     ///     <c>--exclude-category</c> CLI flags.
     /// </summary>
-    public BenchmarkHost WithCategoryFilter(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
+    public BenchmarkHarness WithCategoryFilter(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
     {
         if (include is not null)
             AddCategories(_categoryFilterInclude, include, nameof(include));
@@ -303,7 +303,7 @@ public sealed class BenchmarkHost
     private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(CancellationToken cancellationToken)
     {
         // Isolated child entry: serve only the class the parent requested, write its
-        // samples back, and return. A child belonging to a sibling suite (not this host)
+        // samples back, and return. A child belonging to a sibling suite (not this harness)
         // does nothing here, so it neither recurses nor duplicates output.
         if (IsolatedRunContext.TryGetActiveRequest(out var activeRequest))
         {
@@ -1591,15 +1591,15 @@ public sealed class BenchmarkHost
         string? filter,
         IReadOnlyList<string> cliInclude,
         IReadOnlyList<string> cliExclude,
-        IReadOnlyList<string> hostInclude,
-        IReadOnlyList<string> hostExclude)
+        IReadOnlyList<string> harnessInclude,
+        IReadOnlyList<string> harnessExclude)
     {
-        var hasIncludeFilter = cliInclude.Count > 0 || hostInclude.Count > 0;
+        var hasIncludeFilter = cliInclude.Count > 0 || harnessInclude.Count > 0;
 
-        if (filter is null && !hasIncludeFilter && cliExclude.Count == 0 && hostExclude.Count == 0)
+        if (filter is null && !hasIncludeFilter && cliExclude.Count == 0 && harnessExclude.Count == 0)
             return suites;
 
-        var exclude = UnionCategories(cliExclude, hostExclude);
+        var exclude = UnionCategories(cliExclude, harnessExclude);
 
         var filtered = suites
             .Select(s => s with
@@ -1610,7 +1610,7 @@ public sealed class BenchmarkHost
                         if (filter is not null && !GlobMatcher.Match(filter, $"{s.Type.Name}.{b.DisplayName}"))
                             return false;
 
-                        return CategoryFilter.Matches(b.Categories, cliInclude, hostInclude, exclude, hasIncludeFilter);
+                        return CategoryFilter.Matches(b.Categories, cliInclude, harnessInclude, exclude, hasIncludeFilter);
                     })
                     .ToList(),
             })

@@ -1,10 +1,10 @@
 namespace NBenchmark.Attributes;
 
 /// <summary>
-///     Opts a benchmark (or an entire benchmark class) out of Host mode's
+///     Opts a benchmark (or an entire benchmark class) out of Harness mode's
 ///     isolated-by-default execution, running it in the host process instead of a child.
 ///     <para>
-///         Host mode runs each discovered class in its own child process by default for a
+///         Harness mode runs each discovered class in its own child process by default for a
 ///         clean-room reading. In-process execution is faster (no process spawn) and
 ///         simpler to debug, at the cost of inheriting the host's warmed-up runtime state.
 ///         Apply <c>[InProcess]</c> to a method to run just that benchmark in the host

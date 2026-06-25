@@ -136,7 +136,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 - Names containing double-quotes are escaped by doubling the quote character (standard CSV escaping).
 - Simple mode CSV has 9 fixed columns. Standard mode has 22 base columns plus one column per configured tail-latency percentile. Advanced mode adds 23 advanced fields on top of the standard columns and therefore also has a dynamic total column count.
 
-## Using with Benchmark (Quick mode)
+## Using with Benchmark (Single mode)
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
@@ -144,7 +144,7 @@ await result.ToCsvAsync("results/");
 await result.ToCsvAsync("results/", "benchmarks.csv");
 ```
 
-## CLI usage (BenchmarkHost)
+## CLI usage (BenchmarkHarness)
 
 ```bash
 dotnet run -- --reporter csv

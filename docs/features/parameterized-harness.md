@@ -1,14 +1,14 @@
 ---
-title: "Parameterized benchmarks: Host mode"
-description: Run a benchmark body across multiple input values using BenchmarkCase and BenchmarkCases attributes in BenchmarkHost.
+title: "Parameterized benchmarks: Harness mode"
+description: Run a benchmark body across multiple input values using BenchmarkCase and BenchmarkCases attributes in BenchmarkHarness.
 order: 3
 ---
 
-# Parameterized benchmarks: Host mode
+# Parameterized benchmarks: Harness mode
 
 Parameterized benchmarks run the same method body across multiple input values, producing one benchmark entry per parameter combination. This is useful for comparing algorithms at different scales, testing multiple configurations, or sweeping a parameter space.
 
-In Host mode, parameterized benchmarks use the `[BenchmarkCase]` and `[BenchmarkCases]` attributes. The method must accept parameters matching the argument types.
+In Harness mode, parameterized benchmarks use the `[BenchmarkCase]` and `[BenchmarkCases]` attributes. The method must accept parameters matching the argument types.
 
 ## `[BenchmarkCase]` - inline literal cases
 
@@ -87,7 +87,7 @@ The source method can be `static` or instance, `public` or `non-public`. A stati
 
 The two attributes are mutually exclusive on a method. Use one or the other.
 
-## Baselines in host mode
+## Baselines in harness mode
 
 When `[Benchmark(Baseline = true)]` is applied to a parameterized method, **all** expanded cases from that method are marked as baseline:
 
@@ -103,11 +103,11 @@ public void LinearSearch(int size) => Search(size);
 public void BinarySearch(int size) => Search(size);
 ```
 
-## Significance in host mode
+## Significance in harness mode
 
-Host mode computes significance **per class**. When a class has parameterized results, comparisons are grouped by `ParameterSet`, so each parameter combination is tested independently. Non-parameterized results in the same class form their own group.
+Harness mode computes significance **per class**. When a class has parameterized results, comparisons are grouped by `ParameterSet`, so each parameter combination is tested independently. Non-parameterized results in the same class form their own group.
 
-## Host mode filtering
+## Harness mode filtering
 
 Use `--filter` on the CLI to select specific cases by display name:
 
@@ -117,7 +117,7 @@ dotnet run -- --filter "Sort*100*"   # runs Sort(n=100) and Sort(n=100000)
 
 ## Reading the report
 
-Console and Markdown reporters consolidate a parameterized benchmark into a **single comparison table** - one table per class in host mode. Each parameter becomes its own column, and the `Benchmark` column shows the base method name without its parameter suffix:
+Console and Markdown reporters consolidate a parameterized benchmark into a **single comparison table** - one table per class in harness mode. Each parameter becomes its own column, and the `Benchmark` column shows the base method name without its parameter suffix:
 
 ```text
 search benchmarks
@@ -151,7 +151,7 @@ CSV and JSON reporters keep one record per result, each carrying its full `Param
 Each case is a separate `BenchmarkResult` with the display name in the `Name` property and structured values in `ParameterSet`:
 
 ```csharp
-var results = await BenchmarkHost.Create(args)
+var results = await BenchmarkHarness.Create(args)
     .AddFromAssembly<SortingBenchmarks>()
     .RunAsync();
 
@@ -163,9 +163,9 @@ foreach (var r in results)
 }
 ```
 
-## Suite vs. host mode comparison
+## Suite vs. Harness mode comparison
 
-| Feature | Suite (`WithParameter`) | Host (`[BenchmarkCase]` / `[BenchmarkCases]`) |
+| Feature | Suite (`WithParameter`) | Harness (`[BenchmarkCase]` / `[BenchmarkCases]`) |
 |---|---|---|
 | Declaration | Fluent lambda + `WithParameter` call | Attribute on method |
 | Parameter types | Primitives, enums, strings, null | Any type matching method signature |
@@ -179,6 +179,6 @@ foreach (var r in results)
 ## Next steps
 
 - [Parameterized benchmarks: Suite mode](./parameterized-suite.md) - the `WithParameter` fluent API
-- [Host mode](../usage-modes/host-mode.md) - attribute-based discovery and CLI
+- [Harness mode](../usage-modes/harness-mode.md) - attribute-based discovery and CLI
 - [Categories](./categories.md) - tag and filter benchmarks
 - [Configuration](../reference/configuration.md) - all measurement options

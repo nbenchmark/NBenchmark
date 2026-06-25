@@ -15,7 +15,7 @@ var result = Benchmark.Run(() => MandelbrotCalculation(name: "Mandelbrot calcula
 result.Print();
 ```
 
-[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-quick.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-quick.png)
+[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-single.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-single.png)
 
 ## Why NBenchmark?
 
@@ -57,7 +57,7 @@ dotnet add package NBenchmark
 
 ## Usage Modes
 
-### 1. Quick Mode (Ad-hoc checks)
+### 1. Single Mode (Ad-hoc checks)
 
 The fastest way to get a reliable number.
 
@@ -87,7 +87,7 @@ var results = await new BenchmarkSuite("string concat")
 
 The output includes a **Ratio** column and a **✓** signifier if the speed difference is statistically significant.
 
-### 3. Host Mode (Dedicated projects)
+### 3. Harness Mode (Dedicated projects)
 
 Attribute-based discovery with a full CLI, designed for dedicated benchmark projects.
 
@@ -102,7 +102,7 @@ public class StringBenchmarks
 }
 
 // Program.cs
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly<StringBenchmarks>()
     .WithReporter(new ConsoleReporter())
     .RunAsync();

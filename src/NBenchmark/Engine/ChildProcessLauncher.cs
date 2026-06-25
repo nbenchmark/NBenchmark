@@ -7,7 +7,7 @@ namespace NBenchmark.Engine;
 
 /// <summary>
 ///     The single child-process launcher shared by every isolated run. Both isolation
-///     entry points - Suite mode's <c>WithIsolation()</c> and Host mode's
+///     entry points - Suite mode's <c>WithIsolation()</c> and Harness mode's
 ///     isolated-by-default execution - funnel through here, so there is exactly one
 ///     process-launch path and one wire protocol.
 ///     <para>

@@ -1,23 +1,23 @@
 using NBenchmark;
 using NBenchmark.Reporters.Console;
 
-var quickOptions = new MeasurementOptions
+var singleOptions = new MeasurementOptions
 {
     WarmupIterations = 3,
     Iterations = 40,
     OutlierMode = OutlierMode.IqrFence,
 };
 
-// Quick mode (Benchmark.Run) always runs in the current process - it is the fast,
+// Single mode (Benchmark.Run) always runs in the current process - it is the fast,
 // zero-ceremony path. Reach for an isolated child process when you need a clean-room
-// reading: use Suite mode's WithIsolation() (below) or Host mode, which isolates by
-// default (see the Host sample).
-Console.WriteLine("Quick mode: in-process measurement");
+// reading: use Suite mode's WithIsolation() (below) or Harness mode, which isolates by
+// default (see the Harness sample).
+Console.WriteLine("Single mode: in-process measurement");
 
 var inProcess = Benchmark.Run(
     () => Thread.SpinWait(5_000),
-    quickOptions,
-    "quick/in-process");
+    singleOptions,
+    "single/in-process");
 
 await inProcess.PrintAsync();
 

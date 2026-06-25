@@ -2,17 +2,17 @@ using NBenchmark;
 using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
-await BenchmarkHost.Create(args)
-    .AddFromAssembly<HostBenchmarks>()
+await BenchmarkHarness.Create(args)
+    .AddFromAssembly<HarnessBenchmarks>()
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 
-public class HostBenchmarks
+public class HarnessBenchmarks
 {
-    // Host mode is isolated by default: this class runs in its own clean-room child
+    // Harness mode is isolated by default: this class runs in its own clean-room child
     // process, so JIT, GC, and thread-pool state from other classes can't bias it.
-    // Pass --in-process (or call WithIsolation(false)) to run everything in the host.
+    // Pass --in-process (or call WithIsolation(false)) to run everything in the harness.
     [Benchmark]
     public int Compute() => 42;
 
@@ -25,9 +25,9 @@ public class HostBenchmarks
     [IsolatedProcess]
     public int Isolated() => 7;
 
-    // Opt back into the host process for this benchmark only - handy when a benchmark
-    // must observe state shared with the host, or when child startup would dominate.
+    // Opt back into the harness process for this benchmark only - handy when a benchmark
+    // must observe state shared with the harness, or when child startup would dominate.
     [Benchmark]
     [InProcess]
-    public int InHost() => 13;
+    public int InHarness() => 13;
 }

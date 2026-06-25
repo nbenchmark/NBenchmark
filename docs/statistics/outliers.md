@@ -124,13 +124,13 @@ public sealed class KeepFastestDetector(double fraction) : IOutlierDetector
 }
 ```
 
-Register it through `MeasurementOptions.OutlierDetector`, the suite builder, or the host:
+Register it through `MeasurementOptions.OutlierDetector`, the suite builder, or the harness:
 
 ```csharp
 // Suite mode
 .WithOutlierDetector(new KeepFastestDetector(0.90))
 
-// Quick / Host mode
+// Single / Harness mode
 new MeasurementOptions { OutlierDetector = new KeepFastestDetector(0.90) }
 ```
 

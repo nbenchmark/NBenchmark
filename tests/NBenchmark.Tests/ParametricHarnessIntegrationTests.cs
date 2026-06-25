@@ -4,14 +4,14 @@ using Xunit;
 namespace NBenchmark.Tests;
 
 [Collection("ConsoleCapture")]
-public class ParametricHostIntegrationTests
+public class ParametricHarnessIntegrationTests
 {
     [Fact]
     public async Task RunAsync_Produces_One_Result_Per_BenchmarkCase()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHost.Create(["--filter", "ParametricHostBenchmarks.*", "--iterations", "5", "--warmup", "2"])
-                .AddFromAssembly<ParametricHostBenchmarks>()
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync()
@@ -19,54 +19,54 @@ public class ParametricHostIntegrationTests
 
         Assert.Equal(5, results.Count);
 
-        Assert.Contains(results, r => r.Name == "ParametricHostBenchmarks.Compute(n=100)");
-        Assert.Contains(results, r => r.Name == "ParametricHostBenchmarks.Compute(n=1000)");
+        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Compute(n=100)");
+        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Compute(n=1000)");
     }
 
     [Fact]
     public async Task RunAsync_Produces_One_Result_Per_BenchmarkCases_Tuple()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHost.Create(["--filter", "ParametricHostBenchmarks.*", "--iterations", "5", "--warmup", "2"])
-                .AddFromAssembly<ParametricHostBenchmarks>()
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync()
         );
 
-        Assert.Contains(results, r => r.Name == "ParametricHostBenchmarks.Multiply(a=2, b=3)");
-        Assert.Contains(results, r => r.Name == "ParametricHostBenchmarks.Multiply(a=5, b=7)");
-        Assert.Contains(results, r => r.Name == "ParametricHostBenchmarks.Multiply(a=10, b=20)");
+        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Multiply(a=2, b=3)");
+        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Multiply(a=5, b=7)");
+        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Multiply(a=10, b=20)");
     }
 
     [Fact]
     public async Task Filter_Matches_Argument_Values()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHost.Create(["--filter", "ParametricHostBenchmarks.Compute(n=100)", "--iterations", "5", "--warmup", "2"])
-                .AddFromAssembly<ParametricHostBenchmarks>()
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.Compute(n=100)", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync()
         );
 
         Assert.Single(results);
-        Assert.Equal("ParametricHostBenchmarks.Compute(n=100)", results[0].Name);
+        Assert.Equal("ParametricHarnessBenchmarks.Compute(n=100)", results[0].Name);
     }
 
     [Fact]
     public async Task Filter_Matches_Named_Tuple_Values()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHost.Create(["--filter", "ParametricHostBenchmarks.Multiply(a=10, b=20)", "--iterations", "5", "--warmup", "2"])
-                .AddFromAssembly<ParametricHostBenchmarks>()
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.Multiply(a=10, b=20)", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync()
         );
 
         Assert.Single(results);
-        Assert.Equal("ParametricHostBenchmarks.Multiply(a=10, b=20)", results[0].Name);
+        Assert.Equal("ParametricHarnessBenchmarks.Multiply(a=10, b=20)", results[0].Name);
     }
 
     [Fact]
@@ -74,8 +74,8 @@ public class ParametricHostIntegrationTests
     {
         var stdout = CaptureConsoleOutput(() =>
         {
-            BenchmarkHost.Create(["--filter", "ParametricHostBenchmarks.*", "--list"])
-                .AddFromAssembly<ParametricHostBenchmarks>()
+            BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--list"])
+                .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync().GetAwaiter().GetResult();
@@ -92,24 +92,24 @@ public class ParametricHostIntegrationTests
     public async Task RunAsync_Populates_ParameterSet_On_Results()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHost.Create(["--filter", "ParametricHostBenchmarks.*", "--iterations", "5", "--warmup", "2"])
-                .AddFromAssembly<ParametricHostBenchmarks>()
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync()
         );
 
-        var compute100 = results.First(r => r.Name == "ParametricHostBenchmarks.Compute(n=100)");
+        var compute100 = results.First(r => r.Name == "ParametricHarnessBenchmarks.Compute(n=100)");
         Assert.Single(compute100.ParameterSet);
         Assert.Equal("n", compute100.ParameterSet[0].Name);
         Assert.Equal(100, compute100.ParameterSet[0].Value);
 
-        var compute1000 = results.First(r => r.Name == "ParametricHostBenchmarks.Compute(n=1000)");
+        var compute1000 = results.First(r => r.Name == "ParametricHarnessBenchmarks.Compute(n=1000)");
         Assert.Single(compute1000.ParameterSet);
         Assert.Equal("n", compute1000.ParameterSet[0].Name);
         Assert.Equal(1000, compute1000.ParameterSet[0].Value);
 
-        var multiply = results.First(r => r.Name == "ParametricHostBenchmarks.Multiply(a=2, b=3)");
+        var multiply = results.First(r => r.Name == "ParametricHarnessBenchmarks.Multiply(a=2, b=3)");
         Assert.Equal(2, multiply.ParameterSet.Count);
         Assert.Equal("a", multiply.ParameterSet[0].Name);
         Assert.Equal(2, multiply.ParameterSet[0].Value);
@@ -121,8 +121,8 @@ public class ParametricHostIntegrationTests
     public async Task RunAsync_All_Baseline_Cases_Have_IsBaseline_True()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHost.Create(["--filter", "BaselineParametricHostBenchmarks.*", "--iterations", "5", "--warmup", "2"])
-                .AddFromAssembly<BaselineParametricHostBenchmarks>()
+            await BenchmarkHarness.Create(["--filter", "BaselineParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2"])
+                .AddFromAssembly<BaselineParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync()
@@ -167,7 +167,7 @@ public class ParametricHostIntegrationTests
     }
 }
 
-public class ParametricHostBenchmarks
+public class ParametricHarnessBenchmarks
 {
     [BenchmarkCase(100)]
     [BenchmarkCase(1000)]
@@ -186,7 +186,7 @@ public class ParametricHostBenchmarks
     }
 }
 
-public class BaselineParametricHostBenchmarks
+public class BaselineParametricHarnessBenchmarks
 {
     [BenchmarkCase(10)]
     [BenchmarkCase(100)]

@@ -4,18 +4,18 @@ using Xunit;
 
 namespace NBenchmark.Tests;
 
-public class HostModePerClassSignificanceTests
+public class HarnessModePerClassSignificanceTests
 {
     [Fact]
-    public async Task HostIsolated_PerClassSignificance_EachClassHasOwnBaseline()
+    public async Task HarnessIsolated_PerClassSignificance_EachClassHasOwnBaseline()
     {
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
-        var host = (BenchmarkHost)Activator.CreateInstance(typeof(BenchmarkHost), true)!;
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
-        host
-            .AddFromAssembly(typeof(HostModePerClassSignificanceTests).Assembly)
-            .WithCategoryFilter(["host-perclass"])
+        harness
+            .AddFromAssembly(typeof(HarnessModePerClassSignificanceTests).Assembly)
+            .WithCategoryFilter(["harness-perclass"])
             .WithOptions(new MeasurementOptions
             {
                 Iterations = 20,
@@ -24,9 +24,9 @@ public class HostModePerClassSignificanceTests
             })
             .WithIsolation();
 
-        using (WithFakeLauncher(SimulateHostChildRun))
+        using (WithFakeLauncher(SimulateHarnessChildRun))
         {
-            var results = await host.RunAsync();
+            var results = await harness.RunAsync();
 
             Assert.Equal(5, results.Count);
 
@@ -60,15 +60,15 @@ public class HostModePerClassSignificanceTests
     }
 
     [Fact]
-    public async Task HostIsolated_CrossClassSignificance_SingleBaselineAcrossClasses()
+    public async Task HarnessIsolated_CrossClassSignificance_SingleBaselineAcrossClasses()
     {
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
-        var host = (BenchmarkHost)Activator.CreateInstance(typeof(BenchmarkHost), true)!;
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
-        host
-            .AddFromAssembly(typeof(HostModePerClassSignificanceTests).Assembly)
-            .WithCategoryFilter(["host-perclass"])
+        harness
+            .AddFromAssembly(typeof(HarnessModePerClassSignificanceTests).Assembly)
+            .WithCategoryFilter(["harness-perclass"])
             .WithOptions(new MeasurementOptions
             {
                 Iterations = 20,
@@ -78,9 +78,9 @@ public class HostModePerClassSignificanceTests
             .WithIsolation()
             .WithCrossClassSignificance();
 
-        using (WithFakeLauncher(SimulateHostChildRun))
+        using (WithFakeLauncher(SimulateHarnessChildRun))
         {
-            var results = await host.RunAsync();
+            var results = await harness.RunAsync();
 
             Assert.Equal(5, results.Count);
 
@@ -109,7 +109,7 @@ public class HostModePerClassSignificanceTests
         }
     }
 
-    private static Task<IReadOnlyList<IsolatedResultItem>> SimulateHostChildRun(
+    private static Task<IReadOnlyList<IsolatedResultItem>> SimulateHarnessChildRun(
         IsolatedRunRequest request,
         CancellationToken ct)
     {
@@ -215,7 +215,7 @@ public class HostModePerClassSignificanceTests
     }
 }
 
-[BenchmarkCategory("host-perclass")]
+[BenchmarkCategory("harness-perclass")]
 public class AlphaBenchmarks
 {
     [Benchmark(Baseline = true)]
@@ -225,7 +225,7 @@ public class AlphaBenchmarks
     public void AlphaSlow() => Thread.SpinWait(256);
 }
 
-[BenchmarkCategory("host-perclass")]
+[BenchmarkCategory("harness-perclass")]
 public class BetaBenchmarks
 {
     [Benchmark(Baseline = true)]

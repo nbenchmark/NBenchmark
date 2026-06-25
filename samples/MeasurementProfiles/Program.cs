@@ -14,15 +14,15 @@ static string AllocateAndConcat(int count)
     return result;
 }
 
-// Quick mode: run the same benchmark under both profiles.
-Console.WriteLine("=== Quick Mode: Realistic ===");
+// Single mode: run the same benchmark under both profiles.
+Console.WriteLine("=== Single Mode: Realistic ===");
 
 Benchmark.Run(
     () => AllocateAndConcat(100),
     MeasurementOptions.For(MeasurementProfile.Realistic),
     "string-concat/realistic").Print();
 
-Console.WriteLine("\n=== Quick Mode: Independent ===");
+Console.WriteLine("\n=== Single Mode: Independent ===");
 
 Benchmark.Run(
     () => AllocateAndConcat(100),

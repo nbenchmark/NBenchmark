@@ -2,7 +2,7 @@ using NBenchmark;
 using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
-// By default, Host mode computes significance per class: each class gets its own
+// By default, Harness mode computes significance per class: each class gets its own
 // baseline, and the console reporter renders one comparison table per class.
 // This means benchmarks in StringBenchmarks_Legacy cannot be compared against
 // benchmarks in StringBenchmarks_Optimized with a Sig column.
@@ -17,7 +17,7 @@ using NBenchmark.Reporters.Console;
 //   dotnet run --project samples/CrossClassSignificance
 //   dotnet run --project samples/CrossClassSignificance -- --cross-class
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly(typeof(CrossClassSignificance.StringBenchmarks_Legacy).Assembly)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())

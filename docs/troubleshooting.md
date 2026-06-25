@@ -40,7 +40,7 @@ This page maps symptoms you may see in benchmark output to their likely causes a
 
 | Symptom | Likely cause | Configuration fix |
 |---|---|---|
-| `[Benchmark]` method not discovered | Method is static, class is abstract, or assembly not registered | Use `--list` to verify what the host finds - see [Host mode: listing](./usage-modes/host-mode.md#listing-benchmarks-without-running). Check the class is public, not abstract, and the method is an instance method |
+| `[Benchmark]` method not discovered | Method is static, class is abstract, or assembly not registered | Use `--list` to verify what the host finds - see [Harness mode: listing](./usage-modes/harness-mode.md#listing-benchmarks-without-running). Check the class is public, not abstract, and the method is an instance method |
 | "Could not instantiate MyClass" | No public parameterless constructor | Add one, use `[BenchmarkSetup]`, or add `NBenchmark.DependencyInjection` - see [FAQ: instantiation](./faq.md#the-host-throws-could-not-instantiate-myclass-how-do-i-fix-it) |
 | Benchmarks run in different order each time | Random order is the default (prevents systematic bias) | Use `--order declaration` or `.WithRunOrder(RunOrder.Declaration)` for source order - see [Configuration](./reference/configuration.md#forcegcbetweenbenchmarks) |
 

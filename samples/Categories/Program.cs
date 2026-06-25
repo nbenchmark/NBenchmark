@@ -2,7 +2,7 @@ using NBenchmark;
 using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly<CategorizedBenchmarks>()
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())

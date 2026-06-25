@@ -56,13 +56,13 @@ Advanced mode shows everything in Standard **plus** a per-benchmark stats block.
 
 ## Setting the detail level
 
-### `WithDetail()` (Host and Suite modes)
+### `WithDetail()` (Harness and Suite modes)
 
-Both `BenchmarkHost` and `BenchmarkSuite` expose a `WithDetail(ReportDetail)` method. The detail level is stamped onto all registered reporters, so calling `WithDetail` before or after `WithReporter` works in either order.
+Both `BenchmarkHarness` and `BenchmarkSuite` expose a `WithDetail(ReportDetail)` method. The detail level is stamped onto all registered reporters, so calling `WithDetail` before or after `WithReporter` works in either order.
 
 ```csharp
-// Host mode
-var host = BenchmarkHost.Create(args);
+// Harness mode
+var host = BenchmarkHarness.Create(args);
 host.WithDetail(ReportDetail.Advanced)
     .WithReporter(new ConsoleReporter())
     .RunAsync();
@@ -74,7 +74,7 @@ suite.WithDetail(ReportDetail.Standard)
      .RunAsync();
 ```
 
-### `--detail` flag (Host mode)
+### `--detail` flag (Harness mode)
 
 ```bash
 dotnet run -- --detail advanced
@@ -90,9 +90,9 @@ dotnet run -- --detail simple
 
 The `--detail` flag affects all registered reporters. JSON always emits the full record regardless of detail level.
 
-### Quick mode
+### Single mode
 
-Quick mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail and does not support `WithDetail()`.
+Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail and does not support `WithDetail()`.
 
 ## Reporter behaviour
 

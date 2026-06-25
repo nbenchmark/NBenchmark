@@ -1,16 +1,16 @@
 ---
-title: "Host mode: BenchmarkHost"
+title: "Harness mode: BenchmarkHarness"
 description: Attribute-based benchmark discovery with a built-in command-line interface.
 order: 3
 ---
 
-# Host mode: BenchmarkHost
+# Harness mode: BenchmarkHarness
 
 > **Tip:** Prefer not to create a project? Install the [global tool](./global-tool.md) once and run `dotnet benchmark` against any assembly with `[Benchmark]` methods.
 >
-> **Advanced features:** [Parameterized benchmarks](../features/parameterized-host.md), [categories](../features/categories.md), [isolated runs](../features/isolated-runs.md), [dependency injection](../features/dependency-injection.md), [multi-runtime comparison](../features/multi-runtime.md), and [multiple launches](../features/multiple-launches.md) are covered in the Features section.
+> **Advanced features:** [Parameterized benchmarks](../features/parameterized-harness.md), [categories](../features/categories.md), [isolated runs](../features/isolated-runs.md), [dependency injection](../features/dependency-injection.md), [multi-runtime comparison](../features/multi-runtime.md), and [multiple launches](../features/multiple-launches.md) are covered in the Features section.
 
-`BenchmarkHost` discovers benchmarks by scanning assemblies for `[Benchmark]`-decorated methods. It also parses command-line arguments, so you can filter, configure, and drive runs entirely from the terminal without recompiling.
+`BenchmarkHarness` discovers benchmarks by scanning assemblies for `[Benchmark]`-decorated methods. It also parses command-line arguments, so you can filter, configure, and drive runs entirely from the terminal without recompiling.
 
 This mode is designed for **dedicated benchmark projects** - a separate console project that you run against your library.
 
@@ -49,7 +49,7 @@ using NBenchmark;
 using NBenchmark.Reporters.Console;
 using NBenchmark.Attributes;
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly<StringBenchmarks>()
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
@@ -145,7 +145,7 @@ public void Sort(int n)
 
 Each case becomes a separate benchmark entry in the output, named `MethodName(name=value, ...)` using the method's parameter names. For programmatic case sources, generated values, or large parameter sweeps, use `[BenchmarkCases]` with a source method that yields named value tuples.
 
-See [Parameterized benchmarks: Host mode](../features/parameterized-host.md) for the full API, display name rules, baselines, significance, filtering, and a comparison with suite mode.
+See [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) for the full API, display name rules, baselines, significance, filtering, and a comparison with suite mode.
 
 ### Lifecycle attributes
 
@@ -194,7 +194,7 @@ public class DatabaseBenchmarks
 
 ### `[IsolatedProcess]`
 
-Host mode is **isolated by default**: every benchmark class runs in its own freshly spawned child process, so it is not influenced by JIT, GC, or thread-pool state warmed up by other classes. You don't need any attribute to get this behavior.
+Harness mode is **isolated by default**: every benchmark class runs in its own freshly spawned child process, so it is not influenced by JIT, GC, or thread-pool state warmed up by other classes. You don't need any attribute to get this behavior.
 
 Use the isolation attributes to change the granularity:
 
@@ -252,7 +252,7 @@ var services = new ServiceCollection()
     .AddTransient<OrderBenchmarks>()
     .BuildServiceProvider();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .UseDependencyInjection<OrderBenchmarks>(services)
     .RunAsync();
 
@@ -270,7 +270,7 @@ See the [Dependency Injection guide](../features/dependency-injection.md) for th
 Call `AddFromAssembly` once per assembly:
 
 ```csharp
-BenchmarkHost.Create(args)
+BenchmarkHarness.Create(args)
     .AddFromAssembly<StringBenchmarks>()
     .AddFromAssembly<DatabaseBenchmarks>()
     .AddFromAssembly(typeof(SomeOtherClass).Assembly)
@@ -282,7 +282,7 @@ BenchmarkHost.Create(args)
 Use `WithOptions` to set defaults that the CLI can override:
 
 ```csharp
-BenchmarkHost.Create(args)
+BenchmarkHarness.Create(args)
     .AddFromAssembly<MyBenchmarks>()
     .WithOptions(new MeasurementOptions
     {
@@ -301,12 +301,12 @@ By default benchmarks run in **random** order to reduce systematic bias. Call `W
 
 ## Cross-class significance
 
-By default, Host mode computes significance **per class**: each discovered class gets its own baseline, and `Sig` / `Magnitude` are relative to that class's baseline. The console reporter renders one comparison table per class.
+By default, Harness mode computes significance **per class**: each discovered class gets its own baseline, and `Sig` / `Magnitude` are relative to that class's baseline. The console reporter renders one comparison table per class.
 
 When comparing implementations that live in separate classes (e.g. a legacy version and a refactored version), pass `--cross-class` on the CLI or call `WithCrossClassSignificance()` in code to compute significance across all classes in a single comparison table. The baseline is chosen from the whole group, and the reporter adds a `Class` column so rows can be distinguished.
 
 ```csharp
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .WithCrossClassSignificance()
     .RunAsync();
 ```
@@ -357,7 +357,7 @@ dotnet run -- --dry-run
 
 ## Next steps
 
-- [Parameterized benchmarks: Host mode](../features/parameterized-host.md) - `[BenchmarkCase]` and `[BenchmarkCases]` in depth
+- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - `[BenchmarkCase]` and `[BenchmarkCases]` in depth
 - [Multi-runtime comparison](../features/multi-runtime.md) - compare across .NET runtimes
 - [Multiple launches](../features/multiple-launches.md) - measure run-to-run variance
 - [CLI Reference](../reference/cli.md) - all command-line flags

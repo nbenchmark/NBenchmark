@@ -92,7 +92,7 @@ public class PerClassStateResetTests
     }
 
     [Fact]
-    public async Task Host_PerClass_With_IStateReset_Calls_ResetAsync_Between_Methods()
+    public async Task Harness_PerClass_With_IStateReset_Calls_ResetAsync_Between_Methods()
     {
         // Integration test: a PerClass benchmark class implementing IStateReset must have
         // ResetAsync called between benchmark methods. We use --dry-run with a pinned
@@ -101,36 +101,36 @@ public class PerClassStateResetTests
         ResetTrackingBenchmarks.ResetCallCount = 0;
         ResetTrackingBenchmarks.SharedState = 0;
 
-        var host = BenchmarkHost.Create([
+        var harness = BenchmarkHarness.Create([
             "--filter", "ResetTrackingBenchmarks.*",
             "--in-process",
             "--iterations", "1",
             "--warmup", "1",
         ]);
-        host.AddFromAssembly(typeof(ResetTrackingBenchmarks).Assembly);
+        harness.AddFromAssembly(typeof(ResetTrackingBenchmarks).Assembly);
 
-        await host.RunAsync();
+        await harness.RunAsync();
 
         // Two [Benchmark] methods -> ResetAsync fires once between them (N-1 = 1).
         Assert.Equal(1, ResetTrackingBenchmarks.ResetCallCount);
     }
 
     [Fact]
-    public async Task Host_PerClass_Without_IStateReset_Does_Not_Call_Reset()
+    public async Task Harness_PerClass_Without_IStateReset_Does_Not_Call_Reset()
     {
         // A PerClass class that does NOT implement IStateReset must not fire any reset
         // (the hook is null). This confirms the typeof(IStateReset).IsAssignableFrom guard.
         NoResetBenchmarks.ResetCallCount = 0;
 
-        var host = BenchmarkHost.Create([
+        var harness = BenchmarkHarness.Create([
             "--filter", "NoResetBenchmarks.*",
             "--in-process",
             "--iterations", "1",
             "--warmup", "1",
         ]);
-        host.AddFromAssembly(typeof(NoResetBenchmarks).Assembly);
+        harness.AddFromAssembly(typeof(NoResetBenchmarks).Assembly);
 
-        await host.RunAsync();
+        await harness.RunAsync();
 
         Assert.Equal(0, NoResetBenchmarks.ResetCallCount);
     }

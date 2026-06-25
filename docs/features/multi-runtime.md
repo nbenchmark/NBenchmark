@@ -6,7 +6,7 @@ order: 5
 
 # Multi-runtime comparison
 
-NBenchmark can run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare the results side-by-side. This is available in Suite mode (`WithRuntimes`), Host mode (`--runtimes` CLI flag), and Host mode via the `[Runtimes]` attribute.
+NBenchmark can run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare the results side-by-side. This is available in Suite mode (`WithRuntimes`), Harness mode (`--runtimes` CLI flag), and Harness mode via the `[Runtimes]` attribute.
 
 ## Project setup
 
@@ -32,7 +32,7 @@ var results = await new BenchmarkSuite("string-concat")
     .RunAsync();
 ```
 
-## Host mode: `--runtimes` CLI flag
+## Harness mode: `--runtimes` CLI flag
 
 Pass the runtimes on the command line. Both short (`net8`) and full (`net8.0`) forms are accepted:
 
@@ -44,7 +44,7 @@ dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output
 
 When `--runtimes` is specified, the host builds the project for each target framework via `dotnet build -f <tfm>`, runs the benchmarks in a child process under that runtime, and aggregates the results.
 
-## Host mode: `[Runtimes]` attribute
+## Harness mode: `[Runtimes]` attribute
 
 Instead of passing `--runtimes` on the CLI, you can declare the runtimes on the benchmark class itself:
 
@@ -61,7 +61,7 @@ public class StringBenchmarks
 
 ```bash
 # No --runtimes flag needed - the attribute drives the build
-dotnet run --project samples/MultiRuntimeHost
+dotnet run --project samples/MultiRuntimeHarness
 ```
 
 ### How `--runtimes` and `[Runtimes]` interact
@@ -83,11 +83,11 @@ The console and markdown reporters add a "Runtime" column when results span mult
 ## Samples
 
 - [MultiRuntimeSuite sample](../samples.md#multiruntimesuite---suite-mode-multi-runtime) - Suite mode multi-runtime
-- [MultiRuntimeHost sample](../samples.md#multiruntimehost---host-mode-multi-runtime) - Host mode multi-runtime
+- [MultiRuntimeHost sample](../samples.md#multiruntimehost---harness-mode-multi-runtime) - Harness mode multi-runtime
 
 ## See also
 
 - [Suite mode](../usage-modes/suite-mode.md) - the full fluent API
-- [Host mode](../usage-modes/host-mode.md) - attribute-based discovery and CLI
+- [Harness mode](../usage-modes/harness-mode.md) - attribute-based discovery and CLI
 - [Isolated runs](./isolated-runs.md) - the underlying process isolation model
-- [CLI reference](../reference/cli.md) - all `BenchmarkHost` flags
+- [CLI reference](../reference/cli.md) - all `BenchmarkHarness` flags

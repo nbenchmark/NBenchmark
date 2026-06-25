@@ -47,16 +47,16 @@ await new BenchmarkSuite("name")
     .RunAsync();
 ```
 
-### BenchmarkHost (Host mode)
+### BenchmarkHarness (Harness mode)
 
 ```csharp
-BenchmarkHost.Create(args)
+BenchmarkHarness.Create(args)
     .WithReporter(new ConsoleReporter())
     .WithReporter(new JsonReporter("results/"))
     .RunAsync();
 ```
 
-### Benchmark (Quick mode) - extension methods
+### Benchmark (Single mode) - extension methods
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
@@ -91,7 +91,7 @@ The output directory is created automatically if it does not exist.
 
 ## Using the CLI reporter flag
 
-With `BenchmarkHost`, the `--reporter` CLI flag adds reporters by name:
+With `BenchmarkHarness`, the `--reporter` CLI flag adds reporters by name:
 
 ```bash
 dotnet run -- --reporter markdown --output ./results
@@ -102,13 +102,13 @@ dotnet run -- --reporter console   # works when NBenchmark.Reporters.Console is 
 
 The `--reporter` flag constructs reporters through `ReporterRegistry.TryCreate`, which handles both built-in reporters (`json`/`markdown`/`csv`) and any reporters self-registered by external packages.
 
-External packages (like `NBenchmark.Reporters.Console`) self-register via `[ModuleInitializer]` + `ReporterRegistry.Register()`. The `--reporter flag` discovers available reporters automatically - no per-reporter code changes needed in `BenchmarkHost`.
+External packages (like `NBenchmark.Reporters.Console`) self-register via `[ModuleInitializer]` + `ReporterRegistry.Register()`. The `--reporter flag` discovers available reporters automatically - no per-reporter code changes needed in `BenchmarkHarness`.
 
 If you reference an unknown reporter name, the host prints the list of available reporters plus a hint about the `console` package.
 
 ## Detail levels
 
-Reporters support three detail levels - **Simple** (default), **Standard**, and **Advanced** - that control how much statistical information is included in the output. Set the level via `WithDetail(ReportDetail.Standard)` on both `BenchmarkHost` and `BenchmarkSuite`, or via the `--detail standard` CLI flag in host mode. See the [Report Detail Levels guide](./report-detail-levels.md) for the full column reference.
+Reporters support three detail levels - **Simple** (default), **Standard**, and **Advanced** - that control how much statistical information is included in the output. Set the level via `WithDetail(ReportDetail.Standard)` on both `BenchmarkHarness` and `BenchmarkSuite`, or via the `--detail standard` CLI flag in harness mode. See the [Report Detail Levels guide](./report-detail-levels.md) for the full column reference.
 
 ## Writing a custom reporter
 

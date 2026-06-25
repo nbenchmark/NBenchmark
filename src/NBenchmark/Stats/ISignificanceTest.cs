@@ -5,7 +5,7 @@ namespace NBenchmark.Stats;
 ///     how the engine decides whether benchmarks differ - for example to swap in a custom
 ///     bootstrap or Bayesian comparison, or a post-hoc procedure tuned to your latency
 ///     distribution. Register it with <see cref="MeasurementOptions.SignificanceTest" />,
-///     <c>BenchmarkSuite.WithSignificanceTest(...)</c>, or <c>BenchmarkHost.WithOptions(...)</c>.
+///     <c>BenchmarkSuite.WithSignificanceTest(...)</c>, or <c>BenchmarkHarness.WithOptions(...)</c>.
 ///     <para>
 ///         The default strategy (<see cref="DefaultSignificanceTest" />) selects the
 ///         appropriate built-in test by group count: the two-sample

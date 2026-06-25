@@ -230,7 +230,7 @@ foreach (var r in results)
 
 ## Next steps
 
-- [Parameterized benchmarks: Host mode](./parameterized-host.md) - the `[BenchmarkCase]` / `[BenchmarkCases]` attribute API
+- [Parameterized benchmarks: Harness mode](./parameterized-harness.md) - the `[BenchmarkCase]` / `[BenchmarkCases]` attribute API
 - [Suite mode](../usage-modes/suite-mode.md) - the full fluent API
 - [Categories](./categories.md) - tag and filter benchmarks
 - [Configuration](../reference/configuration.md) - all measurement options

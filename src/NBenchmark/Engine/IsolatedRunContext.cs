@@ -13,7 +13,7 @@ internal enum IsolatedRunKind
 }
 
 /// <summary>
-///     The resolved per-benchmark isolation decision in Host mode, after layering the
+///     The resolved per-benchmark isolation decision in Harness mode, after layering the
 ///     global <c>--in-process</c> flag on top of the discovered <c>IsolationMode</c>.
 /// </summary>
 internal enum IsolationDecision

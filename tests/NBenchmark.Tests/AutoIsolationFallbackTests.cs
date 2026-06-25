@@ -17,8 +17,8 @@ public class AutoIsolationFallbackTests
 
         var launches = new List<IsolatedRunRequest>();
 
-        var host = (BenchmarkHost)Activator.CreateInstance(typeof(BenchmarkHost), true)!;
-        host.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+        harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithIsolation();
@@ -29,7 +29,7 @@ public class AutoIsolationFallbackTests
             return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req));
         }))
         {
-            var results = await host.RunAsync();
+            var results = await harness.RunAsync();
         }
 
         // Two benchmarks, auto-upgraded to PerBenchmark -> 2 launches, each with 1 display name.
@@ -42,8 +42,8 @@ public class AutoIsolationFallbackTests
     {
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
-        var host = (BenchmarkHost)Activator.CreateInstance(typeof(BenchmarkHost), true)!;
-        host.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+        harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithIsolation();
@@ -52,7 +52,7 @@ public class AutoIsolationFallbackTests
         using (WithFakeLauncher((req, ct) =>
                    Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req))))
         {
-            results = await host.RunAsync();
+            results = await harness.RunAsync();
         }
 
         var classResults = results.Where(r => r.ClassName == "FactoryNoResetBenchmarks").ToList();
@@ -76,8 +76,8 @@ public class AutoIsolationFallbackTests
 
         var launches = new List<IsolatedRunRequest>();
 
-        var host = (BenchmarkHost)Activator.CreateInstance(typeof(BenchmarkHost), true)!;
-        host.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+        harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-reset"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithIsolation();
@@ -88,7 +88,7 @@ public class AutoIsolationFallbackTests
             return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req));
         }))
         {
-            var results = await host.RunAsync();
+            var results = await harness.RunAsync();
         }
 
         // PerClass with IStateReset -> 1 launch with both display names (not upgraded).
@@ -101,8 +101,8 @@ public class AutoIsolationFallbackTests
     {
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
-        var host = (BenchmarkHost)Activator.CreateInstance(typeof(BenchmarkHost), true)!;
-        host.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+        harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-reset"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithIsolation();
@@ -111,7 +111,7 @@ public class AutoIsolationFallbackTests
         using (WithFakeLauncher((req, ct) =>
                    Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req))))
         {
-            results = await host.RunAsync();
+            results = await harness.RunAsync();
         }
 
         var classResults = results.Where(r => r.ClassName == "FactoryWithResetBenchmarks").ToList();
@@ -131,8 +131,8 @@ public class AutoIsolationFallbackTests
         // Explicit [InProcess] on the method wins over the auto-upgrade rule.
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
-        var host = (BenchmarkHost)Activator.CreateInstance(typeof(BenchmarkHost), true)!;
-        host.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+        harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-inprocess"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithIsolation();
@@ -141,7 +141,7 @@ public class AutoIsolationFallbackTests
         using (WithFakeLauncher((req, ct) =>
                    Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req))))
         {
-            results = await host.RunAsync();
+            results = await harness.RunAsync();
         }
 
         // The [InProcess] method runs in-process, so no isolated result for it.
@@ -163,8 +163,8 @@ public class AutoIsolationFallbackTests
 
         var launches = new List<IsolatedRunRequest>();
 
-        var host = (BenchmarkHost)Activator.CreateInstance(typeof(BenchmarkHost), true)!;
-        host.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+        harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-nofactory"])
             .WithIsolation();
 
@@ -174,7 +174,7 @@ public class AutoIsolationFallbackTests
             return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req));
         }))
         {
-            var results = await host.RunAsync();
+            var results = await harness.RunAsync();
         }
 
         // No factory -> PerClass stays PerClass -> 1 launch with both display names.

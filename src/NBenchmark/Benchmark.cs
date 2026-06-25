@@ -3,7 +3,7 @@ using NBenchmark.Engine;
 namespace NBenchmark;
 
 /// <summary>
-///     Quick mode entry point: measure a single piece of code. The four overloads
+///     Single mode entry point: measure a single piece of code. The four overloads
 ///     are thin adapters on top of <see cref="BenchmarkRunner" />.
 /// </summary>
 public static class Benchmark

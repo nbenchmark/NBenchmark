@@ -125,7 +125,7 @@ Progress output is a live, updating line per benchmark:
 ──────────────── Completed in 1.9s ────────────────
 ```
 
-## Using with Benchmark (Quick mode)
+## Using with Benchmark (Single mode)
 
 ```csharp
 using NBenchmark.Reporters.Console;

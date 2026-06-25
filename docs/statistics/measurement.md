@@ -80,8 +80,8 @@ Under the **Independent** profile (`--profile independent`), the variance is low
 ### Setting the profile
 
 ```csharp
-// In code (BenchmarkHost)
-await BenchmarkHost.Create(args)
+// In code (BenchmarkHarness)
+await BenchmarkHarness.Create(args)
     .WithMeasurementProfile(MeasurementProfile.Independent)
     .RunAsync();
 
@@ -116,7 +116,7 @@ dotnet run -- --profile realistic --no-allocations
 
 ### Timer resolution
 
-NBenchmark uses `System.Diagnostics.Stopwatch`, which wraps the platform's high-resolution performance counter. The resolution is printed at the start of each `BenchmarkHost` run:
+NBenchmark uses `System.Diagnostics.Stopwatch`, which wraps the platform's high-resolution performance counter. The resolution is printed at the start of each `BenchmarkHarness` run:
 
 ```
 Timer resolution: 1,000,000,000 ticks/s (1.00 ns per tick)
