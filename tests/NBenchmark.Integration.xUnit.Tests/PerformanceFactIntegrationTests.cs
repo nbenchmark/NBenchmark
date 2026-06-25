@@ -13,6 +13,7 @@ public sealed class PerformanceFactIntegrationTests
     public PerformanceFactIntegrationTests(ITestOutputHelper output)
     {
         _output = output;
+        BenchmarkAssert.ResetHostAssessment();
     }
 
     [Fact]
@@ -130,9 +131,8 @@ public sealed class PerformanceFactIntegrationTests
         {
             var baselineJson = """
                                {
-                                 "generatedAt": "2025-01-01T00:00:00Z",
                                  "results": [
-                                   { "name": "BaselineTest", "mean": 100 }
+                                   { "name": "BaselineTest", "mean": 100, "median": 90, "samples": [95, 100, 105, 98, 102] }
                                  ]
                                }
                                """;
@@ -147,7 +147,7 @@ public sealed class PerformanceFactIntegrationTests
             var outcome = BenchmarkRunner.Instance.Run("BaselineTest", SimpleWork, spec);
             var result = outcome.Result;
 
-            var violations = RegressionBaseline.Check(result, baselinePath, 10.0);
+            var violations = RegressionBaseline.Check(result, outcome.RawSamples, baselinePath, 10.0);
 
             Assert.Empty(violations);
         }
@@ -243,7 +243,7 @@ public sealed class PerformanceFactIntegrationTests
             AllocMax = null,
         };
 
-        var violations = PerformanceTestCase.ValidateResult(errored, data);
+        var violations = PerformanceTestCase.ValidateResult(errored, [], data);
 
         Assert.Contains(violations, v => v.Contains("Benchmark errored") && v.Contains("Something exploded"));
     }
@@ -277,7 +277,30 @@ public sealed class PerformanceFactIntegrationTests
             AllocMax = null,
         };
 
-        var violations = PerformanceTestCase.ValidateResult(ok, data);
+        var violations = PerformanceTestCase.ValidateResult(ok, [], data);
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void ValidateResult_Applies_Tolerance_From_Data_On_Shared_Runner()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        var data = new PerformanceTestData(
+            500,
+            -1,
+            -1,
+            null,
+            1.2,
+            0,
+            0,
+            false,
+            OutlierMode.IqrFence,
+            0.95,
+            1.25);
+
+        var violations = PerformanceTestCase.ValidateResult(CreateResult("SharedRunner", 610), [], data);
 
         Assert.Empty(violations);
     }
@@ -293,7 +316,8 @@ public sealed class PerformanceFactIntegrationTests
             0,
             false,
             OutlierMode.RemoveTop5Percent,
-            0.95);
+            0.95,
+            1.0);
 
     private static void VoidMethod()
     {
@@ -303,4 +327,31 @@ public sealed class PerformanceFactIntegrationTests
     private static ValueTask ValueTaskMethod() => default;
     private static Task<int> TaskIntMethod() => Task.FromResult(42);
     private static async ValueTask<int> ValueTaskIntMethod() => await Task.FromResult(42);
+
+    private static BenchmarkResult CreateResult(string name, double mean)
+    {
+        return new BenchmarkResult
+        {
+            Name = name,
+            Mean = mean,
+            Median = mean,
+            Percentiles = [],
+            Min = mean,
+            Max = mean,
+            StandardDeviation = 0,
+            MeasuredIterations = 100,
+            WarmupIterations = 25,
+            Q1 = mean,
+            Q3 = mean,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 100,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
+        };
+    }
 }

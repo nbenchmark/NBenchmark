@@ -30,6 +30,7 @@ public sealed class PerformanceAttribute : NUnitAttribute, ISimpleTestBuilder, I
     public bool MeasureAllocations { get; init; }
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; init; } = 0.95;
+    public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
 
     public TestMethod BuildFrom(IMethodInfo method, Test? suite)
     {

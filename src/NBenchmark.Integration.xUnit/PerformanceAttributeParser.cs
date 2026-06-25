@@ -27,6 +27,7 @@ internal static class PerformanceAttributeParser
             MeasureAllocations = ParseBool(attribute, nameof(PerformanceFactAttribute.MeasureAllocations)),
             OutlierMode = NormalizeOutlierMode(ParseOutlierMode(attribute), true),
             ConfidenceLevel = NormalizeConfidenceLevel(ParseDouble(attribute, nameof(PerformanceFactAttribute.ConfidenceLevel))),
+            MaxAbsoluteThresholdTolerance = NormalizeTolerance(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxAbsoluteThresholdTolerance))),
         };
     }
 
@@ -49,6 +50,7 @@ internal static class PerformanceAttributeParser
             MeasureAllocations = runtime.MeasureAllocations,
             OutlierMode = NormalizeOutlierMode(runtime.OutlierMode, false),
             ConfidenceLevel = NormalizeConfidenceLevel(runtime.ConfidenceLevel),
+            MaxAbsoluteThresholdTolerance = NormalizeTolerance(runtime.MaxAbsoluteThresholdTolerance),
         };
 
         return true;
@@ -94,6 +96,8 @@ internal static class PerformanceAttributeParser
 
     private static double NormalizeConfidenceLevel(double value) => value is > 0 and <= 1 ? value : DefaultConfidenceLevel;
 
+    private static double NormalizeTolerance(double value) => value > 0 ? value : 1.0;
+
     private static OutlierMode NormalizeOutlierMode(OutlierMode value, bool treatNoneAsUnset)
     {
         if (treatNoneAsUnset && value == OutlierMode.None)
@@ -120,5 +124,6 @@ internal static class PerformanceAttributeParser
         public bool MeasureAllocations { get; init; }
         public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
         public double ConfidenceLevel { get; init; } = 0.95;
+        public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
     }
 }

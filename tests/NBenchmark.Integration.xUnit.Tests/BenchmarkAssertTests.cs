@@ -1,3 +1,4 @@
+using NBenchmark.Engine;
 using NBenchmark.Integration.Abstractions;
 using Xunit;
 
@@ -5,6 +6,11 @@ namespace NBenchmark.Integration.xUnit.Tests;
 
 public sealed class BenchmarkAssertTests
 {
+    public BenchmarkAssertTests()
+    {
+        BenchmarkAssert.ResetHostAssessment();
+    }
+
     [Fact]
     public void Validate_Returns_No_Violations_When_All_Thresholds_Are_Met()
     {
@@ -96,6 +102,77 @@ public sealed class BenchmarkAssertTests
         var violations = BenchmarkAssert.Validate(result, thresholds);
 
         Assert.Equal(3, violations.Count);
+    }
+
+    [Fact]
+    public void Validate_Applies_Tolerance_On_Shared_Runner()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        var result = CreateResult(610);
+        var thresholds = new PerformanceThresholds
+        {
+            MaxMeanNs = 500,
+            MaxAbsoluteThresholdTolerance = 1.25,
+        };
+
+        var violations = BenchmarkAssert.Validate(result, thresholds);
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Tolerance_Not_Enough_On_Shared_Runner()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        var result = CreateResult(700);
+        var thresholds = new PerformanceThresholds
+        {
+            MaxMeanNs = 500,
+            MaxAbsoluteThresholdTolerance = 1.25,
+        };
+
+        var violations = BenchmarkAssert.Validate(result, thresholds);
+
+        Assert.Single(violations);
+        Assert.Contains("relaxed to 625", violations[0]);
+    }
+
+    [Fact]
+    public void Validate_Does_Not_Apply_Tolerance_On_Dedicated_Host()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(8, false, false));
+
+        var result = CreateResult(610);
+        var thresholds = new PerformanceThresholds
+        {
+            MaxMeanNs = 500,
+            MaxAbsoluteThresholdTolerance = 1.25,
+        };
+
+        var violations = BenchmarkAssert.Validate(result, thresholds);
+
+        Assert.Single(violations);
+        Assert.DoesNotContain("relaxed", violations[0]);
+    }
+
+    [Fact]
+    public void Validate_Does_Not_Apply_Tolerance_When_Tolerance_Is_Default()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        var result = CreateResult(610);
+        var thresholds = new PerformanceThresholds
+        {
+            MaxMeanNs = 500,
+            MaxAbsoluteThresholdTolerance = 1.0,
+        };
+
+        var violations = BenchmarkAssert.Validate(result, thresholds);
+
+        Assert.Single(violations);
+        Assert.DoesNotContain("relaxed", violations[0]);
     }
 
     private static BenchmarkResult CreateResult(

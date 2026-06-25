@@ -157,6 +157,45 @@ public class EnvironmentControlTests
     }
 
     [Fact]
+    public void AssessHost_Returns_CoreCount()
+    {
+        var assessment = EnvironmentControl.AssessHost();
+
+        Assert.Equal(Environment.ProcessorCount, assessment.CoreCount);
+    }
+
+    [Fact]
+    public void AssessHost_IsMacOS_Matches_Platform()
+    {
+        var assessment = EnvironmentControl.AssessHost();
+
+        Assert.Equal(OperatingSystem.IsMacOS(), assessment.IsMacOS);
+    }
+
+    [Fact]
+    public void AssessHost_IsSharedRunner_True_When_Less_Than_4_Cores()
+    {
+        // This test only asserts when the host actually has < 4 cores.
+        if (Environment.ProcessorCount >= 4)
+            return;
+
+        var assessment = EnvironmentControl.AssessHost();
+
+        Assert.True(assessment.IsSharedRunner);
+    }
+
+    [Fact]
+    public void AssessHost_IsSharedRunner_True_On_MacOS()
+    {
+        if (!OperatingSystem.IsMacOS())
+            return;
+
+        var assessment = EnvironmentControl.AssessHost();
+
+        Assert.True(assessment.IsSharedRunner);
+    }
+
+    [Fact]
     public void Apply_DedicatedHostGuidance_LowCoreCount_Warns()
     {
         // This test only asserts when the host actually has < 4 cores; on bigger hosts

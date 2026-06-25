@@ -16,7 +16,7 @@ namespace NBenchmark.Engine;
 ///     preemption, shared-host jitter) before the timer starts.
 ///     </para>
 /// </summary>
-internal static class EnvironmentControl
+public static class EnvironmentControl
 {
     /// <summary>
     ///     Applies <paramref name="options" /> to the current process and returns a scope
@@ -97,40 +97,49 @@ internal static class EnvironmentControl
     }
 
     /// <summary>
+    ///     Assesses the current host for benchmark suitability. Returns a
+    ///     <see cref="HostAssessment" /> with the core count, macOS flag, and a
+    ///     <see cref="HostAssessment.IsSharedRunner" /> flag that is <c>true</c> when
+    ///     the host looks like a shared or unsuitable benchmark environment (fewer than
+    ///     4 logical CPUs, or macOS with its unobservable frequency scaling).
+    /// </summary>
+    public static HostAssessment AssessHost()
+    {
+        var coreCount = Environment.ProcessorCount;
+        var isMac = OperatingSystem.IsMacOS();
+        var isShared = coreCount < 4 || isMac;
+
+        return new HostAssessment(coreCount, isMac, isShared);
+    }
+
+    /// <summary>
     ///     Emits a non-fatal warning when the host looks like a shared or unsuitable
     ///     benchmark environment. Called after the apply attempt so the message can note
     ///     whether affinity/priority were actually applied.
     /// </summary>
     private static void EmitDedicatedHostGuidance(bool affinityApplied, bool priorityApplied)
     {
+        var assessment = AssessHost();
         var warnings = new List<string>();
-        var coreCount = Environment.ProcessorCount;
 
-        if (coreCount < 4)
+        if (assessment.IsSharedRunner && assessment.CoreCount < 4)
         {
             warnings.Add(
-                $"Only {coreCount} logical CPU(s) detected. Microbenchmarking on a "
+                $"Only {assessment.CoreCount} logical CPU(s) detected. Microbenchmarking on a "
                 + "shared-tenant host (common in CI) inflates noise; pin to a dedicated host when "
                 + "comparing baselines.");
         }
 
-        if (OperatingSystem.IsMacOS())
+        if (assessment.IsMacOS)
         {
-            // macOS exposes no managed power-line or frequency-scaling signal; thermal
-            // throttling and battery power are the dominant hidden noise sources on
-            // laptops. Surface a general caution.
             warnings.Add(
                 "On macOS, frequency scaling and thermal throttling are not directly observable. "
                 + "Run on wall power with minimal background load, and prefer a dedicated Linux/Windows "
                 + "host for CI regression gates.");
         }
 
-        if (!priorityApplied && coreCount >= 4)
+        if (!priorityApplied && assessment.CoreCount >= 4)
         {
-            // On a suitably sized host, actively suggest the flag rather than just
-            // describing the problem. Skipped on small hosts where the shared-tenant
-            // warning already covers the noise story and priority elevation is less
-            // useful (the OS scheduler has nowhere to move preempted work).
             warnings.Add(
                 "Process priority was not raised. Add --priority high (or WithProcessPriority) "
                 + "to reduce preemption by unrelated OS work and tighten the measurement tail.");
