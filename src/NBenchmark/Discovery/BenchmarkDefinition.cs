@@ -48,7 +48,7 @@ public sealed record BenchmarkMethodDefinition(
 
     /// <summary>
     ///     The isolation intent declared by attributes on this benchmark or its class,
-    ///     before the global <c>--in-process</c> flag is applied. Host mode treats
+    ///     before the global <c>--in-process</c> flag is applied. Harness mode treats
     ///     <see cref="IsolationMode.Default" /> as per-class isolation.
     /// </summary>
     internal IsolationMode Isolation { get; init; }
@@ -68,11 +68,11 @@ public sealed record BenchmarkMethodDefinition(
 
 /// <summary>
 ///     The isolation intent a discovered benchmark declares through attributes, before
-///     the host layers on the global <c>--in-process</c> flag.
+///     the harness layers on the global <c>--in-process</c> flag.
 /// </summary>
 internal enum IsolationMode
 {
-    /// <summary>No attribute - Host mode isolates this benchmark with its class siblings.</summary>
+    /// <summary>No attribute - Harness mode isolates this benchmark with its class siblings.</summary>
     Default,
 
     /// <summary><c>[InProcess]</c> - run in the host process, never a child.</summary>

@@ -25,7 +25,7 @@ internal sealed record CliArgs
     public ReportDetail Detail { get; init; } = ReportDetail.Simple;
 
     /// <summary>
-    ///     When true, every benchmark runs in the host process, overriding Host mode's
+    ///     When true, every benchmark runs in the host process, overriding Harness mode's
     ///     isolated-by-default execution and any <c>[IsolatedProcess]</c> attributes.
     /// </summary>
     public bool InProcess { get; init; }
@@ -83,14 +83,14 @@ internal sealed record CliArgs
     /// <summary>
     ///     Comma-separated list of logical CPU cores to pin the benchmark process to
     ///     (e.g. "0" or "2,3"). <c>null</c> leaves affinity untouched. Parsed into
-    ///     <see cref="EnvironmentOptions.CpuAffinity" /> by the host.
+    ///     <see cref="EnvironmentOptions.CpuAffinity" /> by the harness.
     /// </summary>
     public IReadOnlyList<int>? CpuAffinity { get; init; }
 
     /// <summary>
     ///     The process priority to request for the benchmark run. <c>null</c> leaves
     ///     priority untouched. Mapped into <see cref="EnvironmentOptions.ProcessPriority" />
-    ///     by the host.
+    ///     by the harness.
     /// </summary>
     public ProcessPriorityClass? ProcessPriority { get; init; }
 
@@ -103,7 +103,7 @@ internal sealed record CliArgs
     public bool DedicatedHostGuidance { get; init; }
 
     /// <summary>
-    ///     Target framework monikers to benchmark under. When non-empty, the host builds
+    ///     Target framework monikers to benchmark under. When non-empty, the harness builds
     ///     and runs the benchmark project under each specified runtime and aggregates
     ///     results for cross-runtime comparison.
     /// </summary>

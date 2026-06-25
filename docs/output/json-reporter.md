@@ -139,7 +139,7 @@ The `detail` and `profile` fields in the envelope report the active detail level
 - `BenchmarkResult` is serialised with all properties, including `ConfidenceIntervalLower` and `ConfidenceIntervalUpper` (computed from `Mean ± MarginOfError`).
 - The `autoTune` object is `null` for dry-run and errored results; for pinned runs the stop reasons are `explicitCount`.
 
-## Using with Benchmark (Quick mode)
+## Using with Benchmark (Single mode)
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
@@ -147,7 +147,7 @@ await result.ToJsonAsync("results/");
 await result.ToJsonAsync("results/", "benchmarks.json");
 ```
 
-## CLI usage (BenchmarkHost)
+## CLI usage (BenchmarkHarness)
 
 ```bash
 dotnet run -- --reporter json

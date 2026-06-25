@@ -151,11 +151,11 @@ To make it available from the `--reporter` CLI flag, register it with the global
 ReporterRegistry.Register("my-reporter", "Custom console output", _ => new MyReporter());
 ```
 
-The registration can happen in a `[ModuleInitializer]` in your package or at app startup before `BenchmarkHost.Create(args)` is called.
+The registration can happen in a `[ModuleInitializer]` in your package or at app startup before `BenchmarkHarness.Create(args)` is called.
 
 ---
 
-## BenchmarkHost (Host mode)
+## BenchmarkHarness (Harness mode)
 
 ### Can I run benchmarks in source order instead of random order?
 
@@ -188,16 +188,16 @@ Use `--list` to check what NBenchmark finds before running.
 
 ### The host throws "Could not instantiate MyClass". How do I fix it?
 
-`BenchmarkHost` creates benchmark class instances using `Activator.CreateInstance`, which requires a **public parameterless constructor**. There are three ways to satisfy this:
+`BenchmarkHarness` creates benchmark class instances using `Activator.CreateInstance`, which requires a **public parameterless constructor**. There are three ways to satisfy this:
 
 1. **Add a parameterless constructor** that initialises dependencies itself (simplest, but couples the benchmark class to the dependency).
 2. **Use `[BenchmarkSetup]`** to populate fields on a parameterless-constructed instance.
 3. **Use the `NBenchmark.DependencyInjection` companion package** to resolve the class from an `IServiceProvider`:
 
    ```csharp
-   await BenchmarkHost.Create(args)
-       .UseDependencyInjection<MyBenchmarks>(services)
-       .RunAsync();
+    await BenchmarkHarness.Create(args)
+        .UseDependencyInjection<MyBenchmarks>(services)
+        .RunAsync();
    ```
 
    This is the cleanest approach when you already have a DI container in your application. See the [Dependency Injection guide](./features/dependency-injection.md) for full details.
@@ -214,7 +214,7 @@ var services = new ServiceCollection()
     .AddTransient<OrderBenchmarks>()
     .BuildServiceProvider();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .UseDependencyInjection<OrderBenchmarks>(services)
     .RunAsync();
 
@@ -235,7 +235,7 @@ var container = new ContainerBuilder()
     .RegisterType<SqlOrderRepository>().As<IOrderRepository>()
     .Build();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .UseDependencyInjection<OrderBenchmarks>(container.Resolve<IServiceProvider>())
     .RunAsync();
 ```

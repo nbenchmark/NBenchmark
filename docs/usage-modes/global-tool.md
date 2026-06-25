@@ -6,7 +6,7 @@ order: 4
 
 # Global Tool: dotnet benchmark
 
-The `dotnet benchmark` global tool wraps `BenchmarkHost` into a single command. Install it once, then run benchmarks against any .NET assembly without creating a dedicated host project.
+The `dotnet benchmark` global tool wraps `BenchmarkHarness` into a single command. Install it once, then run benchmarks against any .NET assembly without creating a dedicated host project.
 
 ```bash
 dotnet tool install -g NBenchmark.Tool
@@ -15,7 +15,7 @@ dotnet benchmark
 
 ## When to use the tool
 
-The tool replaces Host mode when you want to benchmark an existing project without adding a `Program.cs`, `Main`, and NuGet references. It is the fastest path from "I have a project with `[Benchmark]` methods" to "I have results."
+The tool replaces Harness mode when you want to benchmark an existing project without adding a `Program.cs`, `Main`, and NuGet references. It is the fastest path from "I have a project with `[Benchmark]` methods" to "I have results."
 
 | You want to... | Use |
 |---|---|
@@ -76,7 +76,7 @@ dotnet benchmark --assembly ./Lib1.dll --assembly ./Lib2.dll
 
 ## All host flags pass through
 
-Every flag supported by `BenchmarkHost` works unchanged:
+Every flag supported by `BenchmarkHarness` works unchanged:
 
 ```bash
 dotnet benchmark --filter "*Sort*"
@@ -103,7 +103,7 @@ dotnet benchmark --reporter json --reporter markdown  # both files
 
 ## Process isolation
 
-The tool inherits Host mode's isolated-by-default execution. Each benchmark class runs in a clean child process unless you pass `--in-process`.
+The tool inherits Harness mode's isolated-by-default execution. Each benchmark class runs in a clean child process unless you pass `--in-process`.
 
 ```bash
 dotnet benchmark                              # isolated (default)
@@ -141,7 +141,7 @@ dotnet benchmark --assembly ./new/MyApp.dll --reporter json --output ./after
 
 ## See also
 
-- [Host mode](./host-mode.md) - the project-based alternative
+- [Harness mode](./harness-mode.md) - the project-based alternative
 - [CLI reference](../reference/cli.md) - all available flags
 - [Reporters](../output/index.md) - output formats
 - [Configuration](../reference/configuration.md) - measurement options

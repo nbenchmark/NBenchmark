@@ -15,13 +15,13 @@ Three opt-in controls are available. All default to off, all are restored when t
 Pin the benchmark process to specific logical CPU cores to eliminate inter-core migration noise. When the OS scheduler moves a benchmark thread between cores, the cold L1/L2 cache on the new core inflates a handful of samples; pinning keeps the thread on one core so the cache stays warm.
 
 ```csharp
-// Suite / Host fluent API
+// Suite / Harness fluent API
 new BenchmarkSuite("MySuite")
     .WithHardwareAffinity(2, 3)
     .Add(...)
     .RunAsync();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .WithHardwareAffinity(2, 3)
     .RunAsync();
 ```
@@ -114,7 +114,7 @@ new BenchmarkSuite("MySuite")
 
 ## Isolated-process propagation
 
-In [Host mode](../usage-modes/host-mode.md) the host runs each discovered class in a child process by default. Environment controls are propagated to those children via the isolated-run request, so each child pins itself to the same cores and priority as the parent - the clean-room CLR runs under the same hardware constraints as the parent's in-process benchmarks.
+In [Harness mode](../usage-modes/harness-mode.md) the host runs each discovered class in a child process by default. Environment controls are propagated to those children via the isolated-run request, so each child pins itself to the same cores and priority as the parent - the clean-room CLR runs under the same hardware constraints as the parent's in-process benchmarks.
 
 Suite-mode isolation (`WithIsolation()`) re-runs the entry point in the child, so the child re-derives the same `MeasurementOptions` (including `Environment`) and applies it itself. No extra wiring is needed.
 

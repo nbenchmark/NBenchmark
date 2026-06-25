@@ -4,7 +4,7 @@ namespace NBenchmark.Engine;
 ///     Per-benchmark configuration passed to <see cref="BenchmarkRunner" />.
 ///     A value-type to keep the runner's spec-list storage free of per-element
 ///     heap allocations when used by <c>BenchmarkSuite</c> and
-///     <c>BenchmarkHost</c>.
+///     <c>BenchmarkHarness</c>.
 /// </summary>
 public readonly record struct RunSpec
 {

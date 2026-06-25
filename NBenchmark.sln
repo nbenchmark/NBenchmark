@@ -10,11 +10,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.Reporters.Consol
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{5D20AA90-6969-D8BD-9DCD-8634F4692FDA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Quick", "samples\Quick\Quick.csproj", "{B1F50383-81DC-405B-8210-FD283DE48B30}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Single", "samples\Single\Single.csproj", "{B1F50383-81DC-405B-8210-FD283DE48B30}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Suite", "samples\Suite\Suite.csproj", "{7FEAE202-C720-4293-B8B9-D5C2BCD36631}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Host", "samples\Host\Host.csproj", "{E7688918-FC16-4DBE-80A7-89544BE798F7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Harness", "samples\Harness\Harness.csproj", "{E7688918-FC16-4DBE-80A7-89544BE798F7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBenchmark.DependencyInjection.Tests", "tests\NBenchmark.DependencyInjection.Tests\NBenchmark.DependencyInjection.Tests.csproj", "{570FCCF5-1D1E-42F7-9F66-615B305AEF13}"
 EndProject
@@ -70,7 +70,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuiteParameters", "samples\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiRuntimeSuite", "samples\MultiRuntimeSuite\MultiRuntimeSuite.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiRuntimeHost", "samples\MultiRuntimeHost\MultiRuntimeHost.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiRuntimeHarness", "samples\MultiRuntimeHarness\MultiRuntimeHarness.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiLaunch", "samples\MultiLaunch\MultiLaunch.csproj", "{C99D149B-5982-4EB3-B20E-EECF53233562}"
 EndProject

@@ -9,7 +9,7 @@ namespace NBenchmark.Stats;
 ///         domain-specific rejection filter). Register it with
 ///         <see cref="MeasurementOptions.OutlierDetector" />,
 ///         <c>BenchmarkSuite.WithOutlierDetector(...)</c>, or
-///         <c>BenchmarkHost.WithOptions(...)</c>. The built-in
+///         <c>BenchmarkHarness.WithOptions(...)</c>. The built-in
 ///         <see cref="OutlierMode" /> values map onto the detectors in
 ///         <see cref="OutlierDetectors" />.
 ///     </para>

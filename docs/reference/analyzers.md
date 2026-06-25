@@ -106,7 +106,7 @@ If a `[Benchmark]` method body contains only pure operations (local variable ass
 - No `await` expressions
 - No object or array allocations
 
-These diagnostics are `Error` severity in host mode because a benchmark with no observable work is not a measurement issue - it is an invalid benchmark definition. The build fails so the problem is caught in CI/CD before the suite runs.
+These diagnostics are `Error` severity in harness mode because a benchmark with no observable work is not a measurement issue - it is an invalid benchmark definition. The build fails so the problem is caught in CI/CD before the suite runs.
 
 ```csharp
 // Bad - build fails with NB0005
@@ -186,7 +186,7 @@ var opts2 = new MeasurementOptions() with { Iterations = 200000 };
 
 When a lambda expression passed to an `Action` overload of `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, or `Benchmark.RunRawAsync()` has no observable side effects, the JIT may eliminate it. An empty lambda or one that only assigns to a local variable has no observable effect on the program state.
 
-NB0010 is a `Warning` because quick mode is intended for ad-hoc exploration. Warnings do not break the build, so you can start with a simple lambda and iterate.
+NB0010 is a `Warning` because Single mode is intended for ad-hoc exploration. Warnings do not break the build, so you can start with a simple lambda and iterate.
 
 ```csharp
 // Warning - empty lambda, nothing to measure
@@ -258,7 +258,7 @@ The runtime warning is opt-out: set `SuppressPerClassIndependenceWarning` to `tr
 
 ```csharp
 // Suppress the runtime warning
-var host = BenchmarkHost.Create(args)
+var host = BenchmarkHarness.Create(args)
     .WithOptions(new MeasurementOptions { SuppressPerClassIndependenceWarning = true });
 ```
 
@@ -290,14 +290,14 @@ Diagnostics use the default severity listed in the table above. The default is c
 - **Errors** mean the benchmark cannot run or will produce meaningless results. NB0002, NB0003, NB0004, NB0005, NB0006, NB0007, NB0008, and NB0009 are errors.
 - **Warnings** mean the code can run but the measurements may be invalid. NB0001, NB0010, NB0011, and NB0013 are warnings.
 
-You can override the severity of any diagnostic in `.editorconfig`. For example, to make all throwaway-lambda warnings errors in quick mode too:
+You can override the severity of any diagnostic in `.editorconfig`. For example, to make all throwaway-lambda warnings errors in Single mode too:
 
 ```ini
 [*.cs]
 dotnet_diagnostic.NB0010.severity = error
 ```
 
-Or to downgrade host-mode body-effect errors to warnings in a legacy codebase while you migrate:
+Or to downgrade harness-mode body-effect errors to warnings in a legacy codebase while you migrate:
 
 ```ini
 [*.cs]

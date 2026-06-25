@@ -15,7 +15,7 @@ var result = Benchmark.Run(() => MandelbrotCalculation(name: "Mandelbrot calcula
 result.Print();
 ```
 
-[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-quick.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-quick.png)
+[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-single.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-single.png)
 
 ## Why NBenchmark?
 
@@ -29,7 +29,7 @@ result.Print();
 
 ## Three modes, one engine
 
-### 1. Quick Mode (Ad-hoc)
+### 1. Single Mode (Ad-hoc)
 
 The fastest way to get a reliable number. No setup required.
 
@@ -53,7 +53,7 @@ var results = await new BenchmarkSuite("sorting")
 
 [![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)
 
-### 3. Host Mode (CLI)
+### 3. Harness Mode (CLI)
 
 Attribute-based discovery with a built-in CLI. Designed for dedicated benchmark projects.
 
@@ -76,10 +76,10 @@ public class StringBenchmarks
     public string Create() => new string(new[] { 'a', 'b', 'c' });
 }
 
-await BenchmarkHost.Create(args).AddFromAssembly<StringBenchmarks>().RunAsync();
+await BenchmarkHarness.Create(args).AddFromAssembly<StringBenchmarks>().RunAsync();
 ```
 
-[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-host.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-host.png)
+[![NBenchmark console output showing median, mean, P95, P99, StdDev, CV, and confidence interval for a benchmark](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-harness.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-harness.png)
 
 ## Performance Gates (CI/CD)
 
@@ -92,7 +92,7 @@ public void CriticalPath_ShouldBeFast() => ProcessOrder(testOrder);
 
 ## Multi-Runtime Comparison
 
-Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in Suite mode (`WithRuntimes`), Host mode (`--runtimes` CLI flag), and Host mode via the `[Runtimes]` attribute.
+Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in Suite mode (`WithRuntimes`), Harness mode (`--runtimes` CLI flag), and Harness mode via the `[Runtimes]` attribute.
 
 ```bash
 dotnet run -- --runtimes net8,net9,net10

@@ -88,7 +88,7 @@ All fields are `null` when the corresponding toggle was off, when diagnostics ar
 ### Programmatic (any mode)
 
 ```csharp
-// Quick mode
+// Single mode
 var result = Benchmark.Run(() => MyMethod(), options: new MeasurementOptions
 {
     Diagnostics = DiagnosticsOptions.All,
@@ -100,8 +100,8 @@ await new BenchmarkSuite("MySuite")
     .Add("MethodA", () => MethodA())
     .RunAsync();
 
-// Host mode
-BenchmarkHost.Create(args)
+// Harness mode
+BenchmarkHarness.Create(args)
     .WithDiagnostics(DiagnosticsMode.GcAndCpu)
     .RunAsync();
 ```
@@ -122,7 +122,7 @@ var options = new MeasurementOptions
 };
 ```
 
-### CLI (Host mode)
+### CLI (Harness mode)
 
 ```bash
 # Default - GC counts only

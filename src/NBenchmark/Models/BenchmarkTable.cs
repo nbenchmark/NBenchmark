@@ -7,9 +7,9 @@ namespace NBenchmark;
 public sealed record BenchmarkTable
 {
     /// <summary>
-    ///     When set by the host, <see cref="BuildPerClass" /> returns a single combined table
+    ///     When set by the harness, <see cref="BuildPerClass" /> returns a single combined table
     ///     with a <see cref="BenchmarkRow.ClassName" /> column instead of one table per class.
-    ///     The host sets this before calling reporters and clears it after.
+    ///     The harness sets this before calling reporters and clears it after.
     /// </summary>
     public static bool CrossClassMode { get; set; }
 
@@ -103,7 +103,7 @@ public sealed record BenchmarkTable
     }
 
     /// <summary>
-    ///     Builds a single comparison table for a parameterised benchmark group (one class in host
+    ///     Builds a single comparison table for a parameterised benchmark group (one class in Harness
     ///     mode, or the whole suite in suite mode). Parameter values become columns; rows are grouped
     ///     by parameter set in first-appearance order and ordered by median within each group, with
     ///     the baseline, ratio and significance computed independently per parameter group.

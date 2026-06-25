@@ -16,17 +16,17 @@ Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from a r
 
 Run a benchmark body across multiple input values using `WithParameter` and typed `Add` lambdas. Each parameter combination produces a separate benchmark entry.
 
-## [Parameterized benchmarks: Host mode](./parameterized-host.md)
+## [Parameterized benchmarks: Harness mode](./parameterized-harness.md)
 
 Run a benchmark body across multiple input values using the `[BenchmarkCase]` and `[BenchmarkCases]` attributes. Includes a comparison with the suite-mode API.
 
 ## [Isolated runs](./isolated-runs.md)
 
-Run Suite and Host benchmarks in clean child processes when runtime state contamination matters more than raw execution speed. Host mode is isolated by default; suites opt in with `WithIsolation()`.
+Run Suite and Harness benchmarks in clean child processes when runtime state contamination matters more than raw execution speed. Harness mode is isolated by default; suites opt in with `WithIsolation()`.
 
 ## [Multi-runtime comparison](./multi-runtime.md)
 
-Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in Suite mode (`WithRuntimes`), Host mode (`--runtimes` CLI flag), and Host mode via the `[Runtimes]` attribute.
+Run the same benchmarks across multiple .NET runtimes (net8.0, net9.0, net10.0) and compare results side-by-side. Available in Suite mode (`WithRuntimes`), Harness mode (`--runtimes` CLI flag), and Harness mode via the `[Runtimes]` attribute.
 
 ## [Multiple launches](./multiple-launches.md)
 
@@ -38,7 +38,7 @@ Pin benchmarks to CPU cores, raise process priority, and detect noisy hosts to r
 
 ## [Dependency injection](./dependency-injection.md)
 
-Use `Microsoft.Extensions.DependencyInjection` (or any container that exposes an `IServiceProvider`) to give benchmark classes constructor dependencies. Host mode only.
+Use `Microsoft.Extensions.DependencyInjection` (or any container that exposes an `IServiceProvider`) to give benchmark classes constructor dependencies. Harness mode only.
 
 ## [State isolation](./state-isolation.md)
 

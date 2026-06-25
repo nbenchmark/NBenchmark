@@ -6,7 +6,7 @@ order: 7
 
 # Dependency Injection
 
-By default, `BenchmarkHost` instantiates benchmark classes with `Activator.CreateInstance`, which means the class must have a public parameterless constructor. The `NBenchmark.DependencyInjection` companion package lifts that constraint: it resolves benchmark classes from an `IServiceProvider`, so constructor dependencies are injected automatically.
+By default, `BenchmarkHarness` instantiates benchmark classes with `Activator.CreateInstance`, which means the class must have a public parameterless constructor. The `NBenchmark.DependencyInjection` companion package lifts that constraint: it resolves benchmark classes from an `IServiceProvider`, so constructor dependencies are injected automatically.
 
 ## Install
 
@@ -31,7 +31,7 @@ var services = new ServiceCollection()
     .AddTransient<OrderBenchmarks>()
     .BuildServiceProvider();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .UseDependencyInjection<OrderBenchmarks>(services)   // one call: discovery + DI
     .WithReporter(new ConsoleReporter())
     .RunAsync();
@@ -76,7 +76,7 @@ var services = new ServiceCollection()
     .AddTransient<InventoryBenchmarks>()
     .BuildServiceProvider();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly<OrderBenchmarks>()
     .AddFromAssembly<InventoryBenchmarks>()
     .UseScopedDependencyInjection<OrderBenchmarks>(services)
@@ -85,7 +85,7 @@ await BenchmarkHost.Create(args)
 
 ## Lifetime and disposal semantics
 
-The DI integration matches how `BenchmarkHost` manages benchmark instances: **a fresh instance per `[Benchmark]` method**. This is the same lifetime the host uses for plain parameterless classes, so DI users get a one-to-one mapping between methods and instances.
+The DI integration matches how `BenchmarkHarness` manages benchmark instances: **a fresh instance per `[Benchmark]` method**. This is the same lifetime the host uses for plain parameterless classes, so DI users get a one-to-one mapping between methods and instances.
 
 | Method | Instance lifetime | Scope lifetime |
 |---|---|---|
@@ -104,7 +104,7 @@ var services = new ServiceCollection()
     .AddTransient<OrderBenchmarks>()
     .BuildServiceProvider();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly<OrderBenchmarks>()
     .UseScopedDependencyInjection<OrderBenchmarks>(services)
     .RunAsync();
@@ -139,7 +139,7 @@ public sealed class MyBenchmarks
 }
 ```
 
-The container resolves all constructor parameters from registered services. If a service is missing, the host logs an error and skips the suite rather than crashing the run.
+The container resolves all constructor parameters from registered services. If a service is missing, the harness logs an error and skips the suite rather than crashing the run.
 
 ## Using a non-Microsoft container
 
@@ -150,7 +150,7 @@ var container = new ContainerBuilder()
     .RegisterType<SqlOrderRepository>().As<IOrderRepository>()
     .Build();
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .UseDependencyInjection<OrderBenchmarks>(container.Resolve<IServiceProvider>())
     .RunAsync();
 ```
@@ -170,12 +170,12 @@ host.WithInstanceFactory(type =>
 
 This is what the `NBenchmark.DependencyInjection` package does internally. Under `PerMethod`, the factory is called once per `[Benchmark]` method and the returned instance is used for that one method only. If you need one instance shared across all benchmark methods in a class, add `[InstanceLifetime(InstanceLifetime.PerClass)]`.
 
-## A note on Quick mode and Suite mode
+## A note on Single mode and Suite mode
 
-The DI integration only affects **Host mode** (`BenchmarkHost`), where classes are discovered reflectively and instantiated. Quick mode (`Benchmark.Run`) and Suite mode (`BenchmarkSuite`) take lambdas directly, so dependencies are captured in the closure - no DI package needed:
+The DI integration only affects **Harness mode** (`BenchmarkHarness`), where classes are discovered reflectively and instantiated. Single mode (`Benchmark.Run`) and Suite mode (`BenchmarkSuite`) take lambdas directly, so dependencies are captured in the closure - no DI package needed:
 
 ```csharp
-// Quick mode - dependencies captured in the closure
+// Single mode - dependencies captured in the closure
 var result = Benchmark.Run(() => repository.GetCount());
 
 // Suite mode - same closure trick
@@ -193,19 +193,19 @@ This error fires when `Activator.CreateInstance` cannot construct your benchmark
 
 1. **Add a parameterless constructor** to the benchmark class. This is the simplest fix if the class has no real dependencies.
 2. **Install `NBenchmark.Analyzers`** for compile-time detection (NB0001). The analyzer catches the missing constructor before you run, saving a debug cycle.
-3. **Use `WithServiceProvider` or `WithInstanceFactory`** on `BenchmarkHost` to resolve instances from your DI container. If you already have an `IServiceProvider`:
+3. **Use `WithServiceProvider` or `WithInstanceFactory`** on `BenchmarkHarness` to resolve instances from your DI container. If you already have an `IServiceProvider`:
 
    ```csharp
-   await BenchmarkHost.Create(args)
-       .AddFromAssembly<MyBenchmarks>()
-       .WithServiceProvider(services)
-       .RunAsync();
+    await BenchmarkHarness.Create(args)
+        .AddFromAssembly<MyBenchmarks>()
+        .WithServiceProvider(services)
+        .RunAsync();
    ```
 
    `WithServiceProvider` is a core-library method (no extra package needed). For scoped lifetime (e.g. EF Core's `DbContext`), install `NBenchmark.DependencyInjection` and use `WithScopedServiceProvider` or `UseScopedDependencyInjection<T>` instead.
 
 ## Next steps
 
-- [Host mode: BenchmarkHost](../usage-modes/host-mode.md) - full reference for the host mode
+- [Harness mode: BenchmarkHarness](../usage-modes/harness-mode.md) - full reference for the harness mode
 - [Samples](../samples.md) - see the `samples/DependencyInjection/` project for a complete working example
 - [FAQ](../faq.md#my-benchmark-class-needs-dependencies-how-do-i-inject-them) - common questions

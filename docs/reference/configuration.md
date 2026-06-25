@@ -210,7 +210,7 @@ All measurement settings are controlled by `MeasurementOptions`. The defaults ar
 
 ### Using MeasurementOptions
 
-#### With Benchmark (Quick mode)
+#### With Benchmark (Single mode)
 
 ```csharp
 var options = new MeasurementOptions
@@ -236,12 +236,12 @@ await new BenchmarkSuite("name")
     .RunAsync();
 ```
 
-#### With BenchmarkHost (Host mode)
+#### With BenchmarkHarness (Harness mode)
 
 Call `WithOptions` or use CLI flags. CLI flags always take priority over `WithOptions`:
 
 ```csharp
-BenchmarkHost.Create(args)
+BenchmarkHarness.Create(args)
     .WithOptions(new MeasurementOptions { Iterations = 500 })
     ...
 ```
@@ -308,10 +308,10 @@ Calibration matters for **fast bodies**: a method that runs in a few nanoseconds
 
 Auto-calibration is skipped (K stays `1`) when per-iteration `IterationSetup`/`IterationTeardown` is configured, or when `ForceGcBeforeEachIteration` is on, since those make a batch unrepresentative of a single call. An explicit `OpsPerSample` is always honoured.
 
-BenchmarkSuite/BenchmarkHost fluent method: `.WithOpsPerSample(64)`  
+BenchmarkSuite/BenchmarkHarness fluent method: `.WithOpsPerSample(64)`  
 CLI flag: `--ops-per-sample <n>` (pins K). The calibration target is `AutoTune.TargetSampleDurationNs`.
 
-Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per method via `[Benchmark]` - it is set suite- or host-wide only (`.WithOpsPerSample(n)` or `--ops-per-sample n`).
+Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per method via `[Benchmark]` - it is set suite- or harness-wide only (`.WithOpsPerSample(n)` or `--ops-per-sample n`).
 
 ### LaunchCount
 
@@ -330,9 +330,9 @@ Use multiple launches when single-run noise is a concern and you want to see how
 
 **Dry-run interaction:** When `--dry-run` (Iterations=0, WarmupIterations=0) is combined with `LaunchCount > 1`, exactly one dry launch is performed. The extra launches would not add information since dry runs skip the body.
 
-**Isolation interaction:** When the benchmark runs in a child process (host mode default, or `WithIsolation()` in suite mode), the parent spawns N children. The child process is unaware of the launch count.
+**Isolation interaction:** When the benchmark runs in a child process (Harness mode default, or `WithIsolation()` in suite mode), the parent spawns N children. The child process is unaware of the launch count.
 
-**Attribute override:** In Host mode each `[Benchmark]` can override the launch count per-method:
+**Attribute override:** In Harness mode each `[Benchmark]` can override the launch count per-method:
 
 ```csharp
 // This method runs 5 independent launches regardless of the host setting.
@@ -359,7 +359,7 @@ Bounds and steers the adaptive measurement loop - the warmup plateau rule, the C
 | `AutoTuneOptions.Default` | 8 | 30 | 0.025 (±2.5%) | The balanced default. |
 | `AutoTuneOptions.Thorough` | 16 | 100 | 0.01 (±1%) | Publication-grade numbers. |
 
-Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/host) or `--auto-tune thorough` on the CLI, or build your own `AutoTuneOptions` record. The individual knobs:
+Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `--auto-tune thorough` on the CLI, or build your own `AutoTuneOptions` record. The individual knobs:
 
 | Knob | Default | Meaning |
 |---|---|---|
@@ -380,7 +380,7 @@ Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/host) or `--a
 
 The interval's confidence level is `ConfidenceLevel` (below) - the CI-width rule targets that same level, so it is not duplicated on `AutoTune`.
 
-BenchmarkSuite/BenchmarkHost fluent method: `.WithAutoTune(AutoTunePreset.Quick)` or `.WithAutoTune(customOptions)`  
+BenchmarkSuite/BenchmarkHarness fluent method: `.WithAutoTune(AutoTunePreset.Quick)` or `.WithAutoTune(customOptions)`  
 CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--autotune-cap-behavior`.
 
 ### Profile
@@ -406,7 +406,7 @@ options with { ForceGcBeforeEachIterationOverride = true }
 options with { MeasureAllocationsOverride = false }
 ```
 
-BenchmarkHost fluent method: `.WithMeasurementProfile(MeasurementProfile.Independent)`
+BenchmarkHarness fluent method: `.WithMeasurementProfile(MeasurementProfile.Independent)`
 BenchmarkSuite fluent method: `.WithMeasurementProfile(MeasurementProfile.Independent)`
 CLI flag: `--profile independent`
 
@@ -483,7 +483,7 @@ var options = new MeasurementOptions
 };
 ```
 
-BenchmarkSuite/BenchmarkHost fluent methods: `.WithDiagnostics(DiagnosticsMode.All)` or `.WithDiagnostics(DiagnosticsOptions.All)`  
+BenchmarkSuite/BenchmarkHarness fluent methods: `.WithDiagnostics(DiagnosticsMode.All)` or `.WithDiagnostics(DiagnosticsOptions.All)`  
 CLI flag: `--diagnostics <none|gc|gcandcpu|all>`
 
 > [!NOTE]
@@ -658,14 +658,14 @@ var options = new MeasurementOptions
 };
 ```
 
-BenchmarkSuite/BenchmarkHost fluent methods: `.WithHardwareAffinity(2, 3)`, `.WithProcessPriority(ProcessPriorityClass.High)`, `.WithDedicatedHostGuidance()`  
+BenchmarkSuite/BenchmarkHarness fluent methods: `.WithHardwareAffinity(2, 3)`, `.WithProcessPriority(ProcessPriorityClass.High)`, `.WithDedicatedHostGuidance()`  
 CLI flags: `--cpu-affinity <list>`, `--priority <level>`, `--dedicated-host-guidance`
 
 This is the proactive counterpart to the statistical noise handling in [Outlier Trimming](../statistics/outliers.md): trimming reacts to noise after the fact; environment control reduces it at the source. See [Environment control](../features/environment-control.md) for the full model, platform notes, and isolated-process propagation.
 
-## Applying options per-method (Host mode)
+## Applying options per-method (Harness mode)
 
-In Host mode, the `[Benchmark]` attribute accepts per-method overrides that take priority over the host-level options:
+In Harness mode, the `[Benchmark]` attribute accepts per-method overrides that take priority over the host-level options:
 
 ```csharp
 // This method uses 1000 iterations regardless of the host setting.

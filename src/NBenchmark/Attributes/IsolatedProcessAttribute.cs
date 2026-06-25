@@ -4,7 +4,7 @@ namespace NBenchmark.Attributes;
 ///     Forces a benchmark (or an entire benchmark class) into its own dedicated child
 ///     process - the finest isolation granularity.
 ///     <para>
-///         Host mode is isolated-by-default: each discovered class already runs in its
+///         Harness mode is isolated-by-default: each discovered class already runs in its
 ///         own clean-room child process, so a warmed-up thread pool, JIT artifacts, and
 ///         background GC pressure from one class never bleed into another. Within a class,
 ///         the benchmarks share that single child. Apply <c>[IsolatedProcess]</c> to a

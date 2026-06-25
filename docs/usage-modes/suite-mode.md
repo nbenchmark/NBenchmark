@@ -258,6 +258,6 @@ Errored benchmarks have `result.Errored == true` and a message in `result.ErrorM
 - [Multi-runtime comparison](../features/multi-runtime.md) - compare across .NET runtimes
 - [Multiple launches](../features/multiple-launches.md) - measure run-to-run variance
 - [Isolated runs](../features/isolated-runs.md) - run in a clean child process
-- [Host mode: BenchmarkHost](./host-mode.md) - attribute-based discovery and CLI control
+- [Harness mode: BenchmarkHarness](./harness-mode.md) - attribute-based discovery and CLI control
 - [Configuration](../reference/configuration.md) - full options reference
 - [Reporters](../output/index.md) - all available reporters

@@ -32,11 +32,11 @@ Console.WriteLine();
 Console.WriteLine(new string('-', 70));
 Console.WriteLine();
 
-// ── Host mode with attribute-based LaunchCount ───────────────────────────────────────
+// ── Harness mode with attribute-based LaunchCount ───────────────────────────────────────
 // The [Benchmark(LaunchCount = 3)] attribute overrides the default per-method.
 // Pass --launch-count 5 on the CLI to override all methods to 5 instead.
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly<CpuBenchmarks>()
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())

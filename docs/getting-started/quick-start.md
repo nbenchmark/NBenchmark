@@ -112,7 +112,7 @@ Now that you have measured one thing, here is a natural progression:
 
 1. **[Key Concepts](./key-concepts.md)** - understand what warmup, outlier trimming, and the Error column mean in practice
 2. **[Suite mode](../usage-modes/suite-mode.md)** - compare multiple implementations side-by-side (you already saw the basics above; this page covers parameters, isolation, and multi-runtime)
-3. **[Host mode](../usage-modes/host-mode.md)** - need dependency injection, attribute-based discovery, or CLI control? Host mode is the next level
+3. **[Harness mode](../usage-modes/harness-mode.md)** - need dependency injection, attribute-based discovery, or CLI control? Harness mode is the next level
 4. **[Reporters and output](../output/index.md)** - save results to JSON, Markdown, or CSV, and add the optional console reporter for colour-coded tables
 5. **[Configuration](../reference/configuration.md)** - tune for noisy CI, fast feedback, or publication-grade precision
 6. **[Reading Your Results](../output/reading-your-results.md)** - understand every column, indicator, and warning in the output

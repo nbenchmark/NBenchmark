@@ -8,7 +8,7 @@ using NBenchmark.Reporters.Console;
 // Use [BenchmarkCase(...)] for a short inline list of literal arguments.
 // Use [BenchmarkCases(nameof(Source))] for programmatic, named, or generated cases.
 //
-// In Host mode each class renders as a single comparison table: parameter values
+// In Harness mode each class renders as a single comparison table: parameter values
 // become columns. When competing benchmarks share a parameter group the baseline,
 // ratio and significance are computed per group; when a single method is swept the
 // Ratio column shows each point's scaling factor against the fastest point. Keep
@@ -17,7 +17,7 @@ using NBenchmark.Reporters.Console;
 // Run with: dotnet run --project samples/Parametric -- --list
 // Run with: dotnet run --project samples/Parametric -- --filter "*LinearSearch*"
 
-await BenchmarkHost.Create(args)
+await BenchmarkHarness.Create(args)
     .AddFromAssembly(typeof(Program).Assembly)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())

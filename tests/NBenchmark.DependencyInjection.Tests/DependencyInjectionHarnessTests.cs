@@ -4,7 +4,7 @@ using Xunit;
 
 namespace NBenchmark.DependencyInjection.Tests;
 
-public class DependencyInjectionHostTests
+public class DependencyInjectionHarnessTests
 {
     [Fact]
     public async Task WithServiceProvider_Resolves_Benchmark_With_Constructor_Dependencies()
@@ -18,7 +18,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1"])
+            await BenchmarkHarness.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1"])
                 .AddFromAssembly<DependentBenchmark>()
                 .WithServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -40,7 +40,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "ScopedDependentBenchmark.*", "--dry-run"])
+            await BenchmarkHarness.Create(["--filter", "ScopedDependentBenchmark.*", "--dry-run"])
                 .AddFromAssembly<ScopedDependentBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -64,7 +64,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "DisposableBenchmark.*", "--dry-run"])
+            await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run"])
                 .AddFromAssembly<DisposableBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -84,7 +84,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "UnresolvableBenchmark.*", "--dry-run"])
+            await BenchmarkHarness.Create(["--filter", "UnresolvableBenchmark.*", "--dry-run"])
                 .AddFromAssembly<UnresolvableBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithIsolation(false)
@@ -104,7 +104,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1"])
+            await BenchmarkHarness.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1"])
                 .UseDependencyInjection<DependentBenchmark>(services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -126,7 +126,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "DisposableBenchmark.*", "--dry-run"])
+            await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run"])
                 .UseScopedDependencyInjection<DisposableBenchmark>(services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -143,7 +143,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<ParameterlessBenchmark>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -160,7 +160,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<ParameterlessBenchmark>()
                 .WithInstanceFactory(type =>
                 {
@@ -190,7 +190,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<PerMethodScopeBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -219,7 +219,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<PerMethodScopeBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -242,7 +242,7 @@ public class DependencyInjectionHostTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "PerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "PerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<PerClassScopeBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -259,13 +259,13 @@ public class DependencyInjectionHostTests
     {
         var services = new ServiceCollection()
             .AddSingleton(new DisposableTracker())
-            .AddTransient<HostPerClassScopeBenchmark>()
+            .AddTransient<HarnessPerClassScopeBenchmark>()
             .BuildServiceProvider();
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHost.Create(["--filter", "HostPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
-                .AddFromAssembly<HostPerClassScopeBenchmark>()
+            await BenchmarkHarness.Create(["--filter", "HarnessPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+                .AddFromAssembly<HarnessPerClassScopeBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithInstanceLifetime(InstanceLifetime.PerClass)
                 .WithRunOrder(RunOrder.Declaration)
@@ -421,11 +421,11 @@ public sealed class PerClassScopeBenchmark : IDisposable
     public int Second() => 2;
 }
 
-public sealed class HostPerClassScopeBenchmark : IDisposable
+public sealed class HarnessPerClassScopeBenchmark : IDisposable
 {
     private readonly DisposableTracker _tracker;
 
-    public HostPerClassScopeBenchmark(DisposableTracker tracker)
+    public HarnessPerClassScopeBenchmark(DisposableTracker tracker)
     {
         _tracker = tracker;
     }

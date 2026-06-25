@@ -1,12 +1,12 @@
 ---
 title: CLI Reference
-description: All command-line flags accepted by BenchmarkHost.
+description: All command-line flags accepted by BenchmarkHarness.
 order: 1
 ---
 
 # CLI Reference
 
-When using `BenchmarkHost` (Host mode), all configuration can be driven from the command line. `BenchmarkHost.Create(args)` parses `args` automatically - no argument-parsing library required.
+When using `BenchmarkHarness` (Harness mode), all configuration can be driven from the command line. `BenchmarkHarness.Create(args)` parses `args` automatically - no argument-parsing library required.
 
 ## Usage
 
@@ -211,7 +211,7 @@ Has no effect when `--order declaration` is used.
 
 ### `--in-process`
 
-Disable process isolation for the whole run. Host mode is isolated by default - each benchmark class runs in its own child process - and this flag forces every benchmark to run in the host process instead. It overrides `[IsolatedProcess]` and is equivalent to calling `WithIsolation(false)` in code.
+Disable process isolation for the whole run. Harness mode is isolated by default - each benchmark class runs in its own child process - and this flag forces every benchmark to run in the host process instead. It overrides `[IsolatedProcess]` and is equivalent to calling `WithIsolation(false)` in code.
 
 ```bash
 dotnet run -- --in-process
@@ -322,7 +322,7 @@ dotnet run -- --detail simple
 
 The `--detail` flag affects all registered reporters. File-based reporters emit different column sets. Console reporter prints the stats block below each row; Markdown reporter appends a per-benchmark details section after the table. JSON always emits the full record regardless of detail level.
 
-In host mode you can also set the detail level programmatically with `WithDetail(ReportDetail.Advanced)` before calling `RunAsync`.
+In harness mode you can also set the detail level programmatically with `WithDetail(ReportDetail.Advanced)` before calling `RunAsync`.
 
 See [Report Detail Levels](../output/report-detail-levels.md) for the full column reference and `WithDetail()` examples for suite mode.
 
@@ -448,7 +448,7 @@ Indices must be non-negative and within the host's logical core count (0 to `Env
 
 **Platform support:** processor affinity is applied on Linux and Windows. On macOS the BCL does not expose the `setaffinity` syscall, so the flag is accepted but skipped with a warning - use a Linux or Windows host for affinity-pinned CI gates. See [Environment control](../features/environment-control.md) for the full model.
 
-Programmatic equivalent: `WithHardwareAffinity(2, 3)` (suite/host) or `new MeasurementOptions { Environment = new EnvironmentOptions { CpuAffinity = [2, 3] } }`.
+Programmatic equivalent: `WithHardwareAffinity(2, 3)` (suite/harness) or `new MeasurementOptions { Environment = new EnvironmentOptions { CpuAffinity = [2, 3] } }`.
 
 ---
 
@@ -471,7 +471,7 @@ dotnet run -- --priority high
 
 `high` is the recommended value for dedicated benchmark hosts. `realtime` can starve the OS and is discouraged. See [Environment control](../features/environment-control.md) for the rationale and the `--dedicated-host-guidance` probe that suggests this flag.
 
-Programmatic equivalent: `WithProcessPriority(ProcessPriorityClass.High)` (suite/host).
+Programmatic equivalent: `WithProcessPriority(ProcessPriorityClass.High)` (suite/harness).
 
 ---
 
@@ -485,7 +485,7 @@ dotnet run -- --dedicated-host-guidance
 
 Use it on CI runners and dev laptops to surface hidden noise sources before you trust a comparison. See [Environment control](../features/environment-control.md) for what the probe checks.
 
-Programmatic equivalent: `WithDedicatedHostGuidance()` (suite/host).
+Programmatic equivalent: `WithDedicatedHostGuidance()` (suite/harness).
 
 ---
 

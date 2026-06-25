@@ -13,10 +13,10 @@ When two or more benchmarks have been run, NBenchmark tests whether their differ
 | Exactly 2 | [Mann-Whitney U](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) (pairwise) | Does the candidate differ from the baseline? |
 | 3 or more | [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) (omnibus) + post-hoc Mann-Whitney U with [Holm-Bonferroni](https://en.wikipedia.org/wiki/Holm%E2%80%93Bonferroni_method) correction | Does each candidate differ from the baseline? (gated on the omnibus) |
 
-### Scope: suite mode versus Host mode
+### Scope: suite mode versus Harness mode
 
 - In **suite mode** (`BenchmarkSuite`), significance is computed across every benchmark in that one suite. A single baseline is chosen from the whole suite.
-- In **Host mode** (`BenchmarkHost`), significance is computed **per class** by default. Each discovered class gets its own baseline, and `Sig` / `Magnitude` are relative to that class's baseline. The console reporter renders one comparison table per class.
+- In **Harness mode** (`BenchmarkHarness`), significance is computed **per class** by default. Each discovered class gets its own baseline, and `Sig` / `Magnitude` are relative to that class's baseline. The console reporter renders one comparison table per class.
 - Pass `--cross-class` on the CLI or call `WithCrossClassSignificance()` in code to compute significance across all classes in a single comparison table. The baseline is chosen from the whole group, and the reporter adds a `Class` column so rows can be distinguished. Use this when comparing implementations that live in separate classes (e.g. a legacy version and a refactored version). Cross-class mode is opt-in because mixing unrelated benchmark classes into one significance table produces a baseline that may be semantically meaningless.
 
 ## Interpreting the output
@@ -52,7 +52,7 @@ The sign convention is: **positive delta = candidate tends to be slower than bas
 
 ### Practical-significance gate
 
-Set `MeasurementOptions.MinimumPracticalEffect` (or use `BenchmarkSuite.WithMinimumPracticalEffect(...)` / `BenchmarkHost.WithMinimumPracticalEffect(...)`) to require a minimum practical-effect score in `[0, 1]` for a comparison to count as meaningful. Built-in Mann-Whitney tests map this score to `|delta|`; custom tests can map any effect metric by returning `EffectSize.PracticalValue` in `PairwiseComparison`.
+Set `MeasurementOptions.MinimumPracticalEffect` (or use `BenchmarkSuite.WithMinimumPracticalEffect(...)` / `BenchmarkHarness.WithMinimumPracticalEffect(...)`) to require a minimum practical-effect score in `[0, 1]` for a comparison to count as meaningful. Built-in Mann-Whitney tests map this score to `|delta|`; custom tests can map any effect metric by returning `EffectSize.PracticalValue` in `PairwiseComparison`.
 
 - Comparisons with practical effect below the threshold are reported with `Magnitude = neg` (so a sub-threshold result is never labelled `large`).
 - The Sig verdict is downgraded from `Significant` to `NotSignificant` even when the p-value is below alpha.
@@ -235,13 +235,13 @@ public sealed class MedianRatioSignificanceTest(double thresholdPercent) : ISign
 }
 ```
 
-Register it through `MeasurementOptions.SignificanceTest`, the suite builder, or the host:
+Register it through `MeasurementOptions.SignificanceTest`, the suite builder, or the harness:
 
 ```csharp
 // Suite mode
 .WithSignificanceTest(new MedianRatioSignificanceTest(thresholdPercent: 25))
 
-// Quick / Host mode
+// Single / Harness mode
 new MeasurementOptions { SignificanceTest = new MedianRatioSignificanceTest(25) }
 ```
 

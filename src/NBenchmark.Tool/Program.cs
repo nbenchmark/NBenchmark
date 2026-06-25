@@ -82,14 +82,14 @@ if (assemblies.Count == 0)
 // Force load of the console reporter assembly before CLI parsing resolves reporter names.
 _ = typeof(ConsoleReporter);
 
-var host = BenchmarkHost.Create([.. remainingArgs]);
+var harness = BenchmarkHarness.Create([.. remainingArgs]);
 
 if (!HasReporterFlag(remainingArgs))
-    host.WithReporter(new ConsoleReporter());
+    harness.WithReporter(new ConsoleReporter());
 
 foreach (var asm in assemblies)
 {
-    host.AddFromAssembly(asm);
+    harness.AddFromAssembly(asm);
 }
 
 var benchmarkAssemblyPaths = assemblies
@@ -107,7 +107,7 @@ Environment.SetEnvironmentVariable(
 
 try
 {
-    await host.RunAsync();
+    await harness.RunAsync();
 }
 finally
 {
@@ -352,13 +352,13 @@ static bool HasReporterFlag(List<string> args)
 
 static void PrintToolHelp()
 {
-    Console.WriteLine("Usage: dotnet benchmark [--project <path>] [--assembly <path>] [host-options...]");
+    Console.WriteLine("Usage: dotnet benchmark [--project <path>] [--assembly <path>] [harness-options...]");
     Console.WriteLine();
     Console.WriteLine("Tool options:");
     Console.WriteLine("  --project <path>    Build and benchmark a .NET project (.csproj or directory)");
     Console.WriteLine("  --assembly <path>   Benchmark a specific assembly (.dll). Repeatable.");
     Console.WriteLine();
-    Console.WriteLine("All BenchmarkHost flags pass through unchanged:");
+    Console.WriteLine("All BenchmarkHarness flags pass through unchanged:");
     Console.WriteLine("  --filter, --iterations, --warmup, --reporter, --output, --confidence,");
     Console.WriteLine("  --alpha, --outlier, --auto-tune, --ops-per-sample, --ci-target,");
     Console.WriteLine("  --min-samples, --max-samples, --min-warmup, --max-warmup,");
