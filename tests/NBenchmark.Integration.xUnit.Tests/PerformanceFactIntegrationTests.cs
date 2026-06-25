@@ -123,38 +123,21 @@ public sealed class PerformanceFactIntegrationTests
     }
 
     [Fact]
-    public void PerformanceFact_With_Baseline_Regression_Passes()
+    public void PerformanceFact_With_Calibration_Passes()
     {
-        var baselinePath = Path.GetTempFileName();
-
-        try
+        var spec = new RunSpec
         {
-            var baselineJson = """
-                               {
-                                 "results": [
-                                   { "name": "BaselineTest", "mean": 100, "median": 90, "samples": [95, 100, 105, 98, 102] }
-                                 ]
-                               }
-                               """;
+            Options = MeasurementOptions.Default with { Iterations = 10, WarmupIterations = 5 },
+        };
 
-            File.WriteAllText(baselinePath, baselineJson);
+        var outcome = BenchmarkRunner.Instance.Run("CalibrationTest", SimpleWork, spec);
+        var result = outcome.Result;
 
-            var spec = new RunSpec
-            {
-                Options = MeasurementOptions.Default with { Iterations = 10, WarmupIterations = 5 },
-            };
+        // With a loose ratio, the calibration check should pass
+        var data = PerformanceTestData.FromThresholds(new PerformanceFactAttribute { MaxSlowdownRatio = 1000.0 });
+        var violations = PerformanceTestCase.ValidateResult(result, outcome.RawSamples, null, null, data);
 
-            var outcome = BenchmarkRunner.Instance.Run("BaselineTest", SimpleWork, spec);
-            var result = outcome.Result;
-
-            var violations = RegressionBaseline.Check(result, outcome.RawSamples, baselinePath, 10.0);
-
-            Assert.Empty(violations);
-        }
-        finally
-        {
-            File.Delete(baselinePath);
-        }
+        Assert.Empty(violations);
     }
 
     [Fact]
@@ -213,6 +196,39 @@ public sealed class PerformanceFactIntegrationTests
     }
 
     [Fact]
+    public void ResolveReferenceMethod_Uses_Benchmark_Arguments_When_Signature_Matches()
+    {
+        var benchmarkMethod = typeof(ReferenceResolutionFixture).GetMethod(
+            nameof(ReferenceResolutionFixture.CandidateWithArgs),
+            BindingFlags.Instance | BindingFlags.Public)!;
+
+        var (referenceMethod, referenceArgs) = PerformanceTestCase.ResolveReferenceMethod(
+            benchmarkMethod,
+            "Reference",
+            [42]);
+
+        Assert.Single(referenceMethod.GetParameters());
+        Assert.Single(referenceArgs);
+        Assert.Equal(42, referenceArgs[0]);
+    }
+
+    [Fact]
+    public void ResolveReferenceMethod_Falls_Back_To_Parameterless_Reference()
+    {
+        var benchmarkMethod = typeof(ReferenceResolutionFixture).GetMethod(
+            nameof(ReferenceResolutionFixture.CandidateWithArgs),
+            BindingFlags.Instance | BindingFlags.Public)!;
+
+        var (referenceMethod, referenceArgs) = PerformanceTestCase.ResolveReferenceMethod(
+            benchmarkMethod,
+            "ZeroOnlyReference",
+            [42]);
+
+        Assert.Empty(referenceMethod.GetParameters());
+        Assert.Empty(referenceArgs);
+    }
+
+    [Fact]
     public void ValidateResult_Fails_When_Benchmark_Errored()
     {
         var data = NewDefaultData();
@@ -243,7 +259,7 @@ public sealed class PerformanceFactIntegrationTests
             AllocMax = null,
         };
 
-        var violations = PerformanceTestCase.ValidateResult(errored, [], data);
+        var violations = PerformanceTestCase.ValidateResult(errored, [], null, null, data);
 
         Assert.Contains(violations, v => v.Contains("Benchmark errored") && v.Contains("Something exploded"));
     }
@@ -277,7 +293,7 @@ public sealed class PerformanceFactIntegrationTests
             AllocMax = null,
         };
 
-        var violations = PerformanceTestCase.ValidateResult(ok, [], data);
+        var violations = PerformanceTestCase.ValidateResult(ok, [], null, null, data);
 
         Assert.Empty(violations);
     }
@@ -292,7 +308,7 @@ public sealed class PerformanceFactIntegrationTests
             -1,
             -1,
             null,
-            1.2,
+            0,
             0,
             0,
             false,
@@ -300,7 +316,7 @@ public sealed class PerformanceFactIntegrationTests
             0.95,
             1.25);
 
-        var violations = PerformanceTestCase.ValidateResult(CreateResult("SharedRunner", 610), [], data);
+        var violations = PerformanceTestCase.ValidateResult(CreateResult("SharedRunner", 610), [], null, null, data);
 
         Assert.Empty(violations);
     }
@@ -310,8 +326,8 @@ public sealed class PerformanceFactIntegrationTests
             -1,
             -1,
             -1,
-            null,
-            1.2,
+            null,   // referenceMethod (was baselinePath)
+            0,
             0,
             0,
             false,
@@ -353,5 +369,24 @@ public sealed class PerformanceFactIntegrationTests
             AllocP95 = null,
             AllocMax = null,
         };
+    }
+
+    private sealed class ReferenceResolutionFixture
+    {
+        public void CandidateWithArgs(int value)
+        {
+        }
+
+        private static void Reference(int value)
+        {
+        }
+
+        private static void Reference()
+        {
+        }
+
+        private static void ZeroOnlyReference()
+        {
+        }
     }
 }

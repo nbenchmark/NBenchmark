@@ -7,7 +7,7 @@ internal static class PerformanceAttributeParser
 {
     private const double UnsetDouble = -1;
     private const long UnsetLong = -1;
-    private const double DefaultMaxSlowdownRatio = 1.2;
+    private const double DefaultMaxSlowdownRatio = 0;
     private const double DefaultConfidenceLevel = 0.95;
 
     internal static IPerformanceThresholds Parse(IAttributeInfo attribute)
@@ -20,7 +20,7 @@ internal static class PerformanceAttributeParser
             MaxMeanNs = NormalizeThreshold(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxMeanNs))),
             MaxP95Ns = NormalizeThreshold(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxP95Ns))),
             MaxAllocatedBytes = NormalizeThreshold(ParseLong(attribute, nameof(PerformanceFactAttribute.MaxAllocatedBytes))),
-            BaselinePath = NormalizeBaselinePath(ParseString(attribute, nameof(PerformanceFactAttribute.BaselinePath))),
+            ReferenceMethod = NormalizeReferenceMethod(ParseString(attribute, nameof(PerformanceFactAttribute.ReferenceMethod))),
             MaxSlowdownRatio = NormalizeSlowdownRatio(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxSlowdownRatio))),
             Iterations = NormalizeIterations(ParseInt(attribute, nameof(PerformanceFactAttribute.Iterations))),
             WarmupIterations = NormalizeIterations(ParseInt(attribute, nameof(PerformanceFactAttribute.WarmupIterations))),
@@ -43,7 +43,7 @@ internal static class PerformanceAttributeParser
             MaxMeanNs = NormalizeThreshold(runtime.MaxMeanNs),
             MaxP95Ns = NormalizeThreshold(runtime.MaxP95Ns),
             MaxAllocatedBytes = NormalizeThreshold(runtime.MaxAllocatedBytes),
-            BaselinePath = NormalizeBaselinePath(runtime.BaselinePath),
+            ReferenceMethod = NormalizeReferenceMethod(runtime.ReferenceMethod),
             MaxSlowdownRatio = NormalizeSlowdownRatio(runtime.MaxSlowdownRatio),
             Iterations = NormalizeIterations(runtime.Iterations),
             WarmupIterations = NormalizeIterations(runtime.WarmupIterations),
@@ -88,7 +88,7 @@ internal static class PerformanceAttributeParser
 
     private static long NormalizeThreshold(long value) => value > 0 ? value : UnsetLong;
 
-    private static string? NormalizeBaselinePath(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+    private static string? NormalizeReferenceMethod(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     private static int NormalizeIterations(int value) => value > 0 ? value : 0;
 
@@ -117,8 +117,8 @@ internal static class PerformanceAttributeParser
         public double MaxMeanNs { get; init; } = -1;
         public double MaxP95Ns { get; init; } = -1;
         public long MaxAllocatedBytes { get; init; } = -1;
-        public string? BaselinePath { get; init; }
-        public double MaxSlowdownRatio { get; init; } = 1.2;
+        public string? ReferenceMethod { get; init; }
+        public double MaxSlowdownRatio { get; init; } = 0;
         public int Iterations { get; init; }
         public int WarmupIterations { get; init; }
         public bool MeasureAllocations { get; init; }

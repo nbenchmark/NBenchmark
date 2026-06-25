@@ -44,7 +44,7 @@ public sealed class PerformanceCommandTests
             AllocMax = null,
         };
 
-        var violations = PerformanceCommand.ValidateResult(errored, [], data);
+        var violations = PerformanceCommand.ValidateResult(errored, [], null, null, data);
 
         Assert.That(violations, Has.Some.Contains("Benchmark errored"));
         Assert.That(violations, Has.Some.Contains("Something exploded"));
@@ -79,7 +79,7 @@ public sealed class PerformanceCommandTests
             AllocMax = null,
         };
 
-        var violations = PerformanceCommand.ValidateResult(ok, [], data);
+        var violations = PerformanceCommand.ValidateResult(ok, [], null, null, data);
 
         Assert.That(violations, Is.Empty);
     }
@@ -95,9 +95,10 @@ public sealed class PerformanceCommandTests
             MaxP95Ns = -1,
             MaxAllocatedBytes = -1,
             MaxAbsoluteThresholdTolerance = 1.25,
+            MaxSlowdownRatio = 0,
         };
 
-        var violations = PerformanceCommand.ValidateResult(CreateResult("SharedRunner", 610), [], data);
+        var violations = PerformanceCommand.ValidateResult(CreateResult("SharedRunner", 610), [], null, null, data);
 
         Assert.That(violations, Is.Empty);
     }
@@ -117,6 +118,39 @@ public sealed class PerformanceCommandTests
         Assert.That(built, Is.True);
         Assert.That(isAsync, Is.EqualTo(expectedIsAsync));
         Assert.That(body, Is.Not.Null);
+    }
+
+    [Test]
+    public void ResolveReferenceMethod_Uses_Benchmark_Arguments_When_Signature_Matches()
+    {
+        var benchmarkMethod = typeof(ReferenceResolutionFixture).GetMethod(
+            nameof(ReferenceResolutionFixture.CandidateWithArgs),
+            BindingFlags.Instance | BindingFlags.Public)!;
+
+        var (referenceMethod, referenceArgs) = PerformanceCommand.ResolveReferenceMethod(
+            benchmarkMethod,
+            "Reference",
+            [42]);
+
+        Assert.That(referenceMethod.GetParameters().Length, Is.EqualTo(1));
+        Assert.That(referenceArgs.Length, Is.EqualTo(1));
+        Assert.That(referenceArgs[0], Is.EqualTo(42));
+    }
+
+    [Test]
+    public void ResolveReferenceMethod_Falls_Back_To_Parameterless_Reference()
+    {
+        var benchmarkMethod = typeof(ReferenceResolutionFixture).GetMethod(
+            nameof(ReferenceResolutionFixture.CandidateWithArgs),
+            BindingFlags.Instance | BindingFlags.Public)!;
+
+        var (referenceMethod, referenceArgs) = PerformanceCommand.ResolveReferenceMethod(
+            benchmarkMethod,
+            "ZeroOnlyReference",
+            [42]);
+
+        Assert.That(referenceMethod.GetParameters().Length, Is.EqualTo(0));
+        Assert.That(referenceArgs.Length, Is.EqualTo(0));
     }
 
     private static void VoidMethod()
@@ -161,8 +195,8 @@ public sealed class PerformanceCommandTests
             MaxMeanNs = -1,
             MaxP95Ns = -1,
             MaxAllocatedBytes = -1,
-            BaselinePath = null,
-            MaxSlowdownRatio = 1.2,
+            ReferenceMethod = null,
+            MaxSlowdownRatio = 0,
             Iterations = 0,
             WarmupIterations = 0,
             MeasureAllocations = false,
@@ -175,7 +209,7 @@ public sealed class PerformanceCommandTests
         public double MaxMeanNs { get; init; }
         public double MaxP95Ns { get; init; }
         public long MaxAllocatedBytes { get; init; }
-        public string? BaselinePath { get; init; }
+        public string? ReferenceMethod { get; init; }
         public double MaxSlowdownRatio { get; init; } = 1.2;
         public int Iterations { get; init; }
         public int WarmupIterations { get; init; }
@@ -183,6 +217,25 @@ public sealed class PerformanceCommandTests
         public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
         public double ConfidenceLevel { get; init; } = 0.95;
         public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
+    }
+
+    private sealed class ReferenceResolutionFixture
+    {
+        public void CandidateWithArgs(int value)
+        {
+        }
+
+        private static void Reference(int value)
+        {
+        }
+
+        private static void Reference()
+        {
+        }
+
+        private static void ZeroOnlyReference()
+        {
+        }
     }
 }
 
@@ -264,6 +317,7 @@ public sealed class PerformanceAssertIntegrationTests
             {
                 MaxMeanNs = 500,
                 MaxAbsoluteThresholdTolerance = 1.25,
+                MaxSlowdownRatio = 0,
             });
     }
 

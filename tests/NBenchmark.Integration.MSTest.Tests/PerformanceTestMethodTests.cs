@@ -44,7 +44,7 @@ public sealed class PerformanceTestMethodTests
             AllocMax = null,
         };
 
-        var violations = PerformanceTestMethodAttribute.ValidateResult(errored, [], thresholds);
+        var violations = PerformanceTestMethodAttribute.ValidateResult(errored, [], null, null, thresholds);
 
         Assert.IsTrue(violations.Any(v => v.Contains("Benchmark errored") && v.Contains("Something exploded")));
     }
@@ -78,7 +78,7 @@ public sealed class PerformanceTestMethodTests
             AllocMax = null,
         };
 
-        var violations = PerformanceTestMethodAttribute.ValidateResult(ok, [], thresholds);
+        var violations = PerformanceTestMethodAttribute.ValidateResult(ok, [], null, null, thresholds);
 
         Assert.AreEqual(0, violations.Count);
     }
@@ -94,9 +94,10 @@ public sealed class PerformanceTestMethodTests
             MaxP95Ns = -1,
             MaxAllocatedBytes = -1,
             MaxAbsoluteThresholdTolerance = 1.25,
+            MaxSlowdownRatio = 0,
         };
 
-        var violations = PerformanceTestMethodAttribute.ValidateResult(CreateResult("SharedRunner", 610), [], thresholds);
+        var violations = PerformanceTestMethodAttribute.ValidateResult(CreateResult("SharedRunner", 610), [], null, null, thresholds);
 
         Assert.AreEqual(0, violations.Count);
     }
@@ -117,6 +118,39 @@ public sealed class PerformanceTestMethodTests
         Assert.IsTrue(built);
         Assert.AreEqual(expectedIsAsync, isAsync);
         Assert.IsNotNull(body);
+    }
+
+    [TestMethod]
+    public void ResolveReferenceMethod_Uses_Benchmark_Arguments_When_Signature_Matches()
+    {
+        var benchmarkMethod = typeof(ReferenceResolutionFixture).GetMethod(
+            nameof(ReferenceResolutionFixture.CandidateWithArgs),
+            BindingFlags.Instance | BindingFlags.Public)!;
+
+        var (referenceMethod, referenceArgs) = PerformanceTestMethodAttribute.ResolveReferenceMethod(
+            benchmarkMethod,
+            "Reference",
+            [42]);
+
+        Assert.AreEqual(1, referenceMethod.GetParameters().Length);
+        Assert.AreEqual(1, referenceArgs.Length);
+        Assert.AreEqual(42, referenceArgs[0]);
+    }
+
+    [TestMethod]
+    public void ResolveReferenceMethod_Falls_Back_To_Parameterless_Reference()
+    {
+        var benchmarkMethod = typeof(ReferenceResolutionFixture).GetMethod(
+            nameof(ReferenceResolutionFixture.CandidateWithArgs),
+            BindingFlags.Instance | BindingFlags.Public)!;
+
+        var (referenceMethod, referenceArgs) = PerformanceTestMethodAttribute.ResolveReferenceMethod(
+            benchmarkMethod,
+            "ZeroOnlyReference",
+            [42]);
+
+        Assert.AreEqual(0, referenceMethod.GetParameters().Length);
+        Assert.AreEqual(0, referenceArgs.Length);
     }
 
     [TestMethod]
@@ -189,6 +223,7 @@ public sealed class PerformanceTestMethodTests
             {
                 MaxMeanNs = 500,
                 MaxAbsoluteThresholdTolerance = 1.25,
+                MaxSlowdownRatio = 0,
             });
     }
 
@@ -242,8 +277,8 @@ public sealed class PerformanceTestMethodTests
             MaxMeanNs = -1,
             MaxP95Ns = -1,
             MaxAllocatedBytes = -1,
-            BaselinePath = null,
-            MaxSlowdownRatio = 1.2,
+            ReferenceMethod = null,
+            MaxSlowdownRatio = 0,
             Iterations = 0,
             WarmupIterations = 0,
             MeasureAllocations = false,
@@ -256,7 +291,7 @@ public sealed class PerformanceTestMethodTests
         public double MaxMeanNs { get; init; }
         public double MaxP95Ns { get; init; }
         public long MaxAllocatedBytes { get; init; }
-        public string? BaselinePath { get; init; }
+        public string? ReferenceMethod { get; init; }
         public double MaxSlowdownRatio { get; init; } = 1.2;
         public int Iterations { get; init; }
         public int WarmupIterations { get; init; }
@@ -264,5 +299,24 @@ public sealed class PerformanceTestMethodTests
         public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
         public double ConfidenceLevel { get; init; } = 0.95;
         public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
+    }
+
+    private sealed class ReferenceResolutionFixture
+    {
+        public void CandidateWithArgs(int value)
+        {
+        }
+
+        private static void Reference(int value)
+        {
+        }
+
+        private static void Reference()
+        {
+        }
+
+        private static void ZeroOnlyReference()
+        {
+        }
     }
 }

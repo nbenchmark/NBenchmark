@@ -97,6 +97,15 @@ public static class PerformanceAssert
     {
         var violations = new List<string>();
 
+        if (!string.IsNullOrWhiteSpace(options.ReferenceMethod))
+        {
+            violations.Add(
+                "ReferenceMethod is not supported in the PerformanceAssert assert pattern. " +
+                "Use the attribute pattern ([PerformanceTestMethod] on a test method) to compare against a reference method, " +
+                "or use calibration mode (leave ReferenceMethod null).");
+            return violations;
+        }
+
         if (result.Errored)
             violations.Add($"Benchmark errored: {result.ErrorMessage}");
 
@@ -106,16 +115,16 @@ public static class PerformanceAssert
             MaxP95Ns = options.MaxP95Ns >= 0 ? options.MaxP95Ns : null,
             MaxAllocatedBytes = options.MaxAllocatedBytes >= 0 ? options.MaxAllocatedBytes : null,
             MaxAbsoluteThresholdTolerance = options.MaxAbsoluteThresholdTolerance,
-            BaselinePath = options.BaselinePath,
-            MaxSlowdownRatio = options.MaxSlowdownRatio > 0 ? options.MaxSlowdownRatio : 1.2,
-            Iterations = options.Iterations,
-            WarmupIterations = options.WarmupIterations,
         };
 
         violations.AddRange(BenchmarkAssert.Validate(result, thresholds));
 
-        if (!string.IsNullOrWhiteSpace(options.BaselinePath))
-            violations.AddRange(RegressionBaseline.Check(result, rawSamples, options.BaselinePath!, thresholds.MaxSlowdownRatio));
+        if (options.MaxSlowdownRatio > 0 && !result.Errored)
+        {
+            var calibration = PerformanceCalibration.Run();
+            violations.AddRange(RelativeComparison.Check(
+                result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, options.MaxSlowdownRatio));
+        }
 
         return violations;
     }
