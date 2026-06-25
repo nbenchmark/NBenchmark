@@ -20,6 +20,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
     public bool MeasureAllocations { get; init; }
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; init; } = 0.95;
+    public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
 
     public override Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
@@ -35,6 +36,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         var instance = methodInfo.IsStatic ? null : CreateInstance(methodInfo);
 
         BenchmarkResult result;
+        double[] rawSamples;
 
         try
         {
@@ -49,6 +51,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                             .GetAwaiter().GetResult();
 
                         result = outcome.Result;
+                        rawSamples = outcome.RawSamples;
                     }
                     else
                         return Task.FromResult<TestResult[]>([CreateErrorResult($"Unsupported async body type for method {methodInfo.Name}.")]);
@@ -61,6 +64,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                             name, actionBody, runSpec, CancellationToken.None);
 
                         result = outcome.Result;
+                        rawSamples = outcome.RawSamples;
                     }
                     else
                         return Task.FromResult<TestResult[]>([CreateErrorResult($"Unsupported sync body type for method {methodInfo.Name}.")]);
@@ -74,7 +78,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
             return Task.FromResult<TestResult[]>([CreateErrorResult(ex)]);
         }
 
-        var violations = ValidateResult(result, this);
+        var violations = ValidateResult(result, rawSamples, this);
 
         var testResult = new TestResult
         {
@@ -99,7 +103,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         return Task.FromResult<TestResult[]>([testResult]);
     }
 
-    internal static IReadOnlyList<string> ValidateResult(BenchmarkResult result, IPerformanceThresholds thresholds)
+    internal static IReadOnlyList<string> ValidateResult(BenchmarkResult result, double[] rawSamples, IPerformanceThresholds thresholds)
     {
         var violations = new List<string>();
 
@@ -111,12 +115,13 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
             MaxMeanNs = thresholds.MaxMeanNs >= 0 ? thresholds.MaxMeanNs : null,
             MaxP95Ns = thresholds.MaxP95Ns >= 0 ? thresholds.MaxP95Ns : null,
             MaxAllocatedBytes = thresholds.MaxAllocatedBytes >= 0 ? thresholds.MaxAllocatedBytes : null,
+            MaxAbsoluteThresholdTolerance = thresholds.MaxAbsoluteThresholdTolerance,
         };
 
         violations.AddRange(BenchmarkAssert.Validate(result, thresholdBag));
 
         if (!string.IsNullOrWhiteSpace(thresholds.BaselinePath))
-            violations.AddRange(RegressionBaseline.Check(result, thresholds.BaselinePath!, thresholds.MaxSlowdownRatio));
+            violations.AddRange(RegressionBaseline.Check(result, rawSamples, thresholds.BaselinePath!, thresholds.MaxSlowdownRatio));
 
         return violations;
     }

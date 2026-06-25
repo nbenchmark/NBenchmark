@@ -12,4 +12,5 @@ public interface IPerformanceThresholds
     public bool MeasureAllocations { get; }
     public OutlierMode OutlierMode { get; }
     public double ConfidenceLevel { get; }
+    public double MaxAbsoluteThresholdTolerance { get; }
 }

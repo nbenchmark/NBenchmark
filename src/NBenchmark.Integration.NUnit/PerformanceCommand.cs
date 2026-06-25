@@ -38,6 +38,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
                 throw new InvalidOperationException($"Could not build body for method {methodInfo.Name}.");
 
             BenchmarkResult result;
+            double[] rawSamples;
 
             if (isAsync)
             {
@@ -49,6 +50,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
                     .GetAwaiter().GetResult();
 
                 result = outcome.Result;
+                rawSamples = outcome.RawSamples;
             }
             else
             {
@@ -58,11 +60,12 @@ public sealed class PerformanceCommand : DelegatingTestCommand
                     name, actionBody, runSpec, context.CancellationToken);
 
                 result = outcome.Result;
+                rawSamples = outcome.RawSamples;
             }
 
             WriteMetrics(context, result);
 
-            var violations = ValidateResult(result, _attribute);
+            var violations = ValidateResult(result, rawSamples, _attribute);
 
             if (violations.Count > 0)
             {
@@ -80,7 +83,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
         return context.CurrentResult;
     }
 
-    internal static IReadOnlyList<string> ValidateResult(BenchmarkResult result, IPerformanceThresholds thresholds)
+    internal static IReadOnlyList<string> ValidateResult(BenchmarkResult result, double[] rawSamples, IPerformanceThresholds thresholds)
     {
         var violations = new List<string>();
 
@@ -92,12 +95,13 @@ public sealed class PerformanceCommand : DelegatingTestCommand
             MaxMeanNs = thresholds.MaxMeanNs >= 0 ? thresholds.MaxMeanNs : null,
             MaxP95Ns = thresholds.MaxP95Ns >= 0 ? thresholds.MaxP95Ns : null,
             MaxAllocatedBytes = thresholds.MaxAllocatedBytes >= 0 ? thresholds.MaxAllocatedBytes : null,
+            MaxAbsoluteThresholdTolerance = thresholds.MaxAbsoluteThresholdTolerance,
         };
 
         violations.AddRange(BenchmarkAssert.Validate(result, thresholdBag));
 
         if (!string.IsNullOrWhiteSpace(thresholds.BaselinePath))
-            violations.AddRange(RegressionBaseline.Check(result, thresholds.BaselinePath!, thresholds.MaxSlowdownRatio));
+            violations.AddRange(RegressionBaseline.Check(result, rawSamples, thresholds.BaselinePath!, thresholds.MaxSlowdownRatio));
 
         return violations;
     }

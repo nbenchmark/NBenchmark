@@ -1,6 +1,20 @@
 using System.Text.Json;
+using NBenchmark.Stats;
 
 namespace NBenchmark.Integration.Abstractions;
+
+public sealed class BaselineEnvelope
+{
+    public List<BaselineEntry> Results { get; init; } = [];
+}
+
+public sealed class BaselineEntry
+{
+    public required string Name { get; init; }
+    public double Mean { get; init; }
+    public double Median { get; init; }
+    public required double[] Samples { get; init; }
+}
 
 public static class RegressionBaseline
 {
@@ -12,8 +26,10 @@ public static class RegressionBaseline
 
     public static IReadOnlyList<string> Check(
         BenchmarkResult result,
+        double[] currentSamples,
         string baselinePath,
-        double maxSlowdownRatio)
+        double maxSlowdownRatio,
+        double significanceLevel = 0.05)
     {
         var violations = new List<string>();
 
@@ -55,6 +71,14 @@ public static class RegressionBaseline
             return violations;
         }
 
+        if (currentSamples is null || currentSamples.Length == 0)
+        {
+            violations.Add(
+                "Current run produced no raw samples; cannot run significance test. " +
+                "Ensure the benchmark completed successfully with measurement iterations > 0.");
+            return violations;
+        }
+
         if (baseline.Mean <= 0)
         {
             if (result.Mean > 0)
@@ -66,26 +90,19 @@ public static class RegressionBaseline
             return violations;
         }
 
+        var mwu = MannWhitneyU.Test(baseline.Samples, currentSamples);
+        var statisticallySignificant = !double.IsNaN(mwu.PValue) && mwu.PValue < significanceLevel;
         var ratio = result.Mean / baseline.Mean;
+        var practicallySignificant = ratio > maxSlowdownRatio;
 
-        if (ratio > maxSlowdownRatio)
+        if (statisticallySignificant && practicallySignificant)
         {
             violations.Add(
                 $"Regression detected: mean {result.Mean:F2} ns vs baseline {baseline.Mean:F2} ns " +
-                $"(ratio {ratio:F2}x exceeds max {maxSlowdownRatio:F2}x)");
+                $"(ratio {ratio:F2}x, p={mwu.PValue:F4}, Cliff's delta={mwu.CliffsDelta:F3}). " +
+                $"Significant slowdown exceeding {maxSlowdownRatio:F2}x ratio gate.");
         }
 
         return violations;
-    }
-
-    private sealed class BaselineEnvelope
-    {
-        public List<BaselineEntry> Results { get; init; } = [];
-    }
-
-    private sealed class BaselineEntry
-    {
-        public required string Name { get; init; }
-        public double Mean { get; init; }
     }
 }

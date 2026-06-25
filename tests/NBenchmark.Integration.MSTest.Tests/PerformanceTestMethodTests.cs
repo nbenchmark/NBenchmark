@@ -7,6 +7,12 @@ namespace NBenchmark.Integration.MSTest.Tests;
 [TestClass]
 public sealed class PerformanceTestMethodTests
 {
+    [TestInitialize]
+    public void TestInitialize()
+    {
+        BenchmarkAssert.ResetHostAssessment();
+    }
+
     [TestMethod]
     public void ValidateResult_Fails_When_Benchmark_Errored()
     {
@@ -38,7 +44,7 @@ public sealed class PerformanceTestMethodTests
             AllocMax = null,
         };
 
-        var violations = PerformanceTestMethodAttribute.ValidateResult(errored, thresholds);
+        var violations = PerformanceTestMethodAttribute.ValidateResult(errored, [], thresholds);
 
         Assert.IsTrue(violations.Any(v => v.Contains("Benchmark errored") && v.Contains("Something exploded")));
     }
@@ -72,7 +78,25 @@ public sealed class PerformanceTestMethodTests
             AllocMax = null,
         };
 
-        var violations = PerformanceTestMethodAttribute.ValidateResult(ok, thresholds);
+        var violations = PerformanceTestMethodAttribute.ValidateResult(ok, [], thresholds);
+
+        Assert.AreEqual(0, violations.Count);
+    }
+
+    [TestMethod]
+    public void ValidateResult_Applies_Tolerance_From_Thresholds_On_Shared_Runner()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        var thresholds = new PerformanceTestThresholds
+        {
+            MaxMeanNs = 500,
+            MaxP95Ns = -1,
+            MaxAllocatedBytes = -1,
+            MaxAbsoluteThresholdTolerance = 1.25,
+        };
+
+        var violations = PerformanceTestMethodAttribute.ValidateResult(CreateResult("SharedRunner", 610), [], thresholds);
 
         Assert.AreEqual(0, violations.Count);
     }
@@ -154,6 +178,20 @@ public sealed class PerformanceTestMethodTests
         Assert.IsTrue(result.MeanAllocatedBytes > 0);
     }
 
+    [TestMethod]
+    public void PerformanceAssert_Validate_Applies_Tolerance_From_Options_On_Shared_Runner()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        PerformanceAssert.Validate(
+            CreateResult("SharedRunner", 610),
+            new PerformanceAssertionOptions
+            {
+                MaxMeanNs = 500,
+                MaxAbsoluteThresholdTolerance = 1.25,
+            });
+    }
+
     private static void VoidMethod()
     {
     }
@@ -170,6 +208,33 @@ public sealed class PerformanceTestMethodTests
     private static void SlowWork() => Thread.Sleep(1);
     private static byte[] AllocatingWork() => new byte[1024];
     private static void ThrowingWork() => throw new InvalidOperationException("test failure");
+
+    private static BenchmarkResult CreateResult(string name, double mean)
+    {
+        return new BenchmarkResult
+        {
+            Name = name,
+            Mean = mean,
+            Median = mean,
+            Percentiles = [],
+            Min = mean,
+            Max = mean,
+            StandardDeviation = 0,
+            MeasuredIterations = 100,
+            WarmupIterations = 25,
+            Q1 = mean,
+            Q3 = mean,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 100,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
+        };
+    }
 
     private static IPerformanceThresholds NewDefaultThresholds() =>
         new PerformanceTestThresholds
@@ -198,5 +263,6 @@ public sealed class PerformanceTestMethodTests
         public bool MeasureAllocations { get; init; }
         public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
         public double ConfidenceLevel { get; init; } = 0.95;
+        public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
     }
 }

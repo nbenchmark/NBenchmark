@@ -7,6 +7,12 @@ namespace NBenchmark.Integration.NUnit.Tests;
 
 public sealed class PerformanceCommandTests
 {
+    [SetUp]
+    public void SetUp()
+    {
+        BenchmarkAssert.ResetHostAssessment();
+    }
+
     [Test]
     public void ValidateResult_Fails_When_Benchmark_Errored()
     {
@@ -38,7 +44,7 @@ public sealed class PerformanceCommandTests
             AllocMax = null,
         };
 
-        var violations = PerformanceCommand.ValidateResult(errored, data);
+        var violations = PerformanceCommand.ValidateResult(errored, [], data);
 
         Assert.That(violations, Has.Some.Contains("Benchmark errored"));
         Assert.That(violations, Has.Some.Contains("Something exploded"));
@@ -73,7 +79,25 @@ public sealed class PerformanceCommandTests
             AllocMax = null,
         };
 
-        var violations = PerformanceCommand.ValidateResult(ok, data);
+        var violations = PerformanceCommand.ValidateResult(ok, [], data);
+
+        Assert.That(violations, Is.Empty);
+    }
+
+    [Test]
+    public void ValidateResult_Applies_Tolerance_From_Thresholds_On_Shared_Runner()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        var data = new PerformanceTestThresholds
+        {
+            MaxMeanNs = 500,
+            MaxP95Ns = -1,
+            MaxAllocatedBytes = -1,
+            MaxAbsoluteThresholdTolerance = 1.25,
+        };
+
+        var violations = PerformanceCommand.ValidateResult(CreateResult("SharedRunner", 610), [], data);
 
         Assert.That(violations, Is.Empty);
     }
@@ -104,6 +128,33 @@ public sealed class PerformanceCommandTests
     private static Task<int> TaskIntMethod() => Task.FromResult(42);
     private static async ValueTask<int> ValueTaskIntMethod() => await Task.FromResult(42);
 
+    private static BenchmarkResult CreateResult(string name, double mean)
+    {
+        return new BenchmarkResult
+        {
+            Name = name,
+            Mean = mean,
+            Median = mean,
+            Percentiles = [],
+            Min = mean,
+            Max = mean,
+            StandardDeviation = 0,
+            MeasuredIterations = 100,
+            WarmupIterations = 25,
+            Q1 = mean,
+            Q3 = mean,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 100,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
+        };
+    }
+
     private static IPerformanceThresholds NewDefaultThresholds() =>
         new PerformanceTestThresholds
         {
@@ -131,11 +182,18 @@ public sealed class PerformanceCommandTests
         public bool MeasureAllocations { get; init; }
         public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
         public double ConfidenceLevel { get; init; } = 0.95;
+        public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
     }
 }
 
 public sealed class PerformanceAssertIntegrationTests
 {
+    [SetUp]
+    public void SetUp()
+    {
+        BenchmarkAssert.ResetHostAssessment();
+    }
+
     [Test]
     public void PerformanceAssert_Run_Passes_When_Performance_Is_Within_Thresholds()
     {
@@ -195,8 +253,49 @@ public sealed class PerformanceAssertIntegrationTests
         Assert.That(result.MeanAllocatedBytes, Is.GreaterThan(0));
     }
 
+    [Test]
+    public void PerformanceAssert_Validate_Applies_Tolerance_From_Options_On_Shared_Runner()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        PerformanceAssert.Validate(
+            CreateResult("SharedRunner", 610),
+            new PerformanceAssertionOptions
+            {
+                MaxMeanNs = 500,
+                MaxAbsoluteThresholdTolerance = 1.25,
+            });
+    }
+
     private static void SimpleWork()
     {
+    }
+
+    private static BenchmarkResult CreateResult(string name, double mean)
+    {
+        return new BenchmarkResult
+        {
+            Name = name,
+            Mean = mean,
+            Median = mean,
+            Percentiles = [],
+            Min = mean,
+            Max = mean,
+            StandardDeviation = 0,
+            MeasuredIterations = 100,
+            WarmupIterations = 25,
+            Q1 = mean,
+            Q3 = mean,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 100,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
+        };
     }
 
     private static void SlowWork() => Thread.Sleep(1);

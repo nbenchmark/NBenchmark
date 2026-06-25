@@ -19,4 +19,5 @@ public sealed class PerformanceFactAttribute : FactAttribute, IPerformanceThresh
     public bool MeasureAllocations { get; init; }
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; init; } = 0.95;
+    public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
 }

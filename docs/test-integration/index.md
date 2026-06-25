@@ -68,28 +68,9 @@ public void Repository_Query_Is_Fast_Enough()
 }
 ```
 
-## Thresholds reference
-
-All three packages share the same set of threshold properties. A threshold of `-1` (double) or `-1` (long) means the check is disabled. Omitting a property is equivalent to `-1`.
-
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `MaxMeanNs` | `double` | -1 (disabled) | Maximum allowed mean execution time in nanoseconds. |
-| `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles` (the default set includes `0.95`). If P95 was not computed, a clear error message guides you to check the configuration. |
-| `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
-| `BaselinePath` | `string?` | null | Path to a JSON baseline file. Fails if the benchmark regresses beyond `MaxSlowdownRatio`. |
-| `MaxSlowdownRatio` | `double` | 1.2 | Maximum allowed slowdown relative to the baseline (1.2 = 20% regression). |
-| `Iterations` | `int` | 0 (use default) | Override the number of measured samples. `0` uses the framework default (auto-resolved). |
-| `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup samples. `0` uses the framework default (auto-detected). |
-| `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
-| `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
-| `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |
-
-See [Configuration](../reference/configuration.md) for a full explanation of each option.
-
 ## Baseline regression checks
 
-Any integration package can compare the current run against a stored baseline. Save a baseline JSON file from a known-good run using `Benchmark.Run(...).ToJsonAsync(...)`, then reference it via `BaselinePath`.
+Any integration package can compare the current run against a stored baseline. Save a baseline JSON file from a known-good run using `await BaselineWriter.WriteAsync(Benchmark.RunRaw(...), path)`, then reference it via `BaselinePath`.
 
 ```csharp
 // xUnit - attribute pattern
@@ -99,13 +80,49 @@ Any integration package can compare the current run against a stored baseline. S
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-The test fails if:
+The test fails when the slowdown is **both** statistically significant (Mann-Whitney U p-value below the significance level) **and** practically meaningful (mean ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
+
+The test also fails if:
 
 - The baseline file is missing.
 - The benchmark name is not found in the file.
-- The measured median exceeds `baseline.median × MaxSlowdownRatio`.
 
 See [Statistics: Significance Testing](../statistics/significance.md) for how the comparison is performed.
+
+## Thresholds reference
+
+All three packages share the same set of threshold properties. A threshold of `-1` (double) or `-1` (long) means the check is disabled. Omitting a property is equivalent to `-1`.
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `MaxMeanNs` | `double` | -1 (disabled) | Maximum allowed mean execution time in nanoseconds. |
+| `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles` (the default set includes `0.95`). If P95 was not computed, a clear error message guides you to check the configuration. |
+| `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
+| `BaselinePath` | `string?` | null | Path to a JSON baseline file. Fails if the benchmark regresses beyond `MaxSlowdownRatio` (significance + ratio gate). |
+| `MaxSlowdownRatio` | `double` | 1.2 | Maximum allowed slowdown relative to the baseline (1.2 = 20% regression). Used as the practical-effect floor on top of the significance test. |
+| `Iterations` | `int` | 0 (use default) | Override the number of measured samples. `0` uses the framework default (auto-resolved). |
+| `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup samples. `0` uses the framework default (auto-detected). |
+| `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
+| `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
+| `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |
+| `MaxAbsoluteThresholdTolerance` | `double` | 1.0 | Multiplier applied to absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) when a shared runner or high-jitter host is detected. Set to e.g. `1.25` for 25% relaxation on shared CI runners. |
+
+See [Configuration](../reference/configuration.md) for a full explanation of each option.
+
+## SLA-style hard limits
+
+Absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) are susceptible to shared-runner noise in CI. Prefer `BaselinePath` + `MaxSlowdownRatio` for regression gates; use absolute thresholds only when you have a hard SLA.
+
+On shared CI runners, set `MaxAbsoluteThresholdTolerance` to relax absolute thresholds for jitter:
+
+```csharp
+[PerformanceFact(
+    MaxMeanNs = 500_000,
+    MaxAbsoluteThresholdTolerance = 1.25)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+```
+
+When a shared runner or high-jitter host is detected, the effective threshold becomes `500_000 × 1.25 = 625_000 ns`. On a dedicated host, the original `500_000 ns` threshold applies.
 
 ## Per-framework reference
 

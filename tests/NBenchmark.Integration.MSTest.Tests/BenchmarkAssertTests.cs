@@ -1,3 +1,4 @@
+using NBenchmark.Engine;
 using NBenchmark.Integration.Abstractions;
 
 namespace NBenchmark.Integration.MSTest.Tests;
@@ -5,6 +6,12 @@ namespace NBenchmark.Integration.MSTest.Tests;
 [TestClass]
 public sealed class BenchmarkAssertTests
 {
+    [TestInitialize]
+    public void TestInitialize()
+    {
+        BenchmarkAssert.ResetHostAssessment();
+    }
+
     [TestMethod]
     public void Validate_Returns_No_Violations_When_All_Thresholds_Are_Met()
     {
@@ -98,6 +105,77 @@ public sealed class BenchmarkAssertTests
         Assert.AreEqual(3, violations.Count);
     }
 
+    [TestMethod]
+    public void Validate_Applies_Tolerance_On_Shared_Runner()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        var result = CreateResult(610);
+        var thresholds = new PerformanceThresholds
+        {
+            MaxMeanNs = 500,
+            MaxAbsoluteThresholdTolerance = 1.25,
+        };
+
+        var violations = BenchmarkAssert.Validate(result, thresholds);
+
+        Assert.AreEqual(0, violations.Count);
+    }
+
+    [TestMethod]
+    public void Validate_Fails_When_Tolerance_Not_Enough_On_Shared_Runner()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        var result = CreateResult(700);
+        var thresholds = new PerformanceThresholds
+        {
+            MaxMeanNs = 500,
+            MaxAbsoluteThresholdTolerance = 1.25,
+        };
+
+        var violations = BenchmarkAssert.Validate(result, thresholds);
+
+        Assert.AreEqual(1, violations.Count);
+        Assert.IsTrue(violations[0].Contains("relaxed to 625"));
+    }
+
+    [TestMethod]
+    public void Validate_Does_Not_Apply_Tolerance_On_Dedicated_Host()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(8, false, false));
+
+        var result = CreateResult(610);
+        var thresholds = new PerformanceThresholds
+        {
+            MaxMeanNs = 500,
+            MaxAbsoluteThresholdTolerance = 1.25,
+        };
+
+        var violations = BenchmarkAssert.Validate(result, thresholds);
+
+        Assert.AreEqual(1, violations.Count);
+        Assert.IsFalse(violations[0].Contains("relaxed"));
+    }
+
+    [TestMethod]
+    public void Validate_Does_Not_Apply_Tolerance_When_Tolerance_Is_Default()
+    {
+        BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
+
+        var result = CreateResult(610);
+        var thresholds = new PerformanceThresholds
+        {
+            MaxMeanNs = 500,
+            MaxAbsoluteThresholdTolerance = 1.0,
+        };
+
+        var violations = BenchmarkAssert.Validate(result, thresholds);
+
+        Assert.AreEqual(1, violations.Count);
+        Assert.IsFalse(violations[0].Contains("relaxed"));
+    }
+
     private static BenchmarkResult CreateResult(
         double mean = 100,
         double p95 = 150,
@@ -112,6 +190,9 @@ public sealed class BenchmarkAssertTests
             Min = mean * 0.5,
             Max = p95 * 1.5,
             StandardDeviation = mean * 0.1,
+            MeanAllocatedBytes = allocations,
+            MeasuredIterations = 100,
+            WarmupIterations = 25,
             Q1 = mean * 0.7,
             Q3 = mean * 1.2,
             InterquartileRange = mean * 0.5,
@@ -123,9 +204,6 @@ public sealed class BenchmarkAssertTests
             AllocMedian = allocations,
             AllocP95 = allocations,
             AllocMax = allocations,
-            MeanAllocatedBytes = allocations,
-            MeasuredIterations = 100,
-            WarmupIterations = 25,
         };
     }
 }

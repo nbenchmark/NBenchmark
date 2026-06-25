@@ -10,8 +10,9 @@ public sealed class RegressionBaselineTests
     public void Check_Returns_Violation_When_File_Does_Not_Exist()
     {
         var result = CreateResult("MyBenchmark", 500);
+        var samples = GenerateSamples(500, 100);
 
-        var violations = RegressionBaseline.Check(result, "/nonexistent/baseline.json", 1.2);
+        var violations = RegressionBaseline.Check(result, samples, "/nonexistent/baseline.json", 1.2);
 
         Assert.Single(violations);
         Assert.Contains("not found", violations[0]);
@@ -22,8 +23,9 @@ public sealed class RegressionBaselineTests
     {
         var baselinePath = WriteBaselineJson("OtherBenchmark", 400);
         var result = CreateResult("MyBenchmark", 500);
+        var samples = GenerateSamples(500, 100);
 
-        var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
+        var violations = RegressionBaseline.Check(result, samples, baselinePath, 1.2);
 
         Assert.Single(violations);
         Assert.Contains("not found in baseline", violations[0]);
@@ -34,8 +36,9 @@ public sealed class RegressionBaselineTests
     {
         var baselinePath = WriteBaselineJson("MyBenchmark", 400);
         var result = CreateResult("MyBenchmark", 440);
+        var samples = GenerateSamples(440, 100);
 
-        var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
+        var violations = RegressionBaseline.Check(result, samples, baselinePath, 1.2);
 
         Assert.Empty(violations);
     }
@@ -45,8 +48,9 @@ public sealed class RegressionBaselineTests
     {
         var baselinePath = WriteBaselineJson("MyBenchmark", 400);
         var result = CreateResult("MyBenchmark", 600);
+        var samples = GenerateSamples(600, 100);
 
-        var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
+        var violations = RegressionBaseline.Check(result, samples, baselinePath, 1.2);
 
         Assert.Single(violations);
         Assert.Contains("Regression detected", violations[0]);
@@ -60,7 +64,8 @@ public sealed class RegressionBaselineTests
         File.WriteAllText(path, "not valid json");
 
         var result = CreateResult("MyBenchmark", 500);
-        var violations = RegressionBaseline.Check(result, path, 1.2);
+        var samples = GenerateSamples(500, 100);
+        var violations = RegressionBaseline.Check(result, samples, path, 1.2);
 
         Assert.Single(violations);
         Assert.Contains("Failed to parse", violations[0]);
@@ -73,8 +78,9 @@ public sealed class RegressionBaselineTests
     {
         var baselinePath = WriteBaselineJson("MyBenchmark", 0);
         var result = CreateResult("MyBenchmark", 500);
+        var samples = GenerateSamples(500, 100);
 
-        var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
+        var violations = RegressionBaseline.Check(result, samples, baselinePath, 1.2);
 
         Assert.Single(violations);
         Assert.Contains("Regression detected", violations[0]);
@@ -85,8 +91,9 @@ public sealed class RegressionBaselineTests
     {
         var baselinePath = WriteBaselineJson("MyBenchmark", 0);
         var result = CreateResult("MyBenchmark", 0);
+        var samples = GenerateSamples(0, 100);
 
-        var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
+        var violations = RegressionBaseline.Check(result, samples, baselinePath, 1.2);
 
         Assert.Empty(violations);
     }
@@ -96,26 +103,78 @@ public sealed class RegressionBaselineTests
     {
         var baselinePath = WriteBaselineJson("mybenchmark", 400);
         var result = CreateResult("MyBenchmark", 420);
+        var samples = GenerateSamples(420, 100);
 
-        var violations = RegressionBaseline.Check(result, baselinePath, 1.2);
+        var violations = RegressionBaseline.Check(result, samples, baselinePath, 1.2);
 
         Assert.Empty(violations);
     }
 
-    private static string WriteBaselineJson(string name, double mean)
+    [Fact]
+    public void Check_Returns_Violation_When_Current_Samples_Are_Empty()
+    {
+        var baselinePath = WriteBaselineJson("MyBenchmark", 400);
+        var result = CreateResult("MyBenchmark", 500);
+
+        var violations = RegressionBaseline.Check(result, [], baselinePath, 1.2);
+
+        Assert.Single(violations);
+        Assert.Contains("no raw samples", violations[0]);
+    }
+
+    [Fact]
+    public void Check_Passes_When_Significant_But_Ratio_Within_Gate()
+    {
+        var baselineSamples = GenerateSamples(400, 100);
+        var baselinePath = WriteBaselineJson("MyBenchmark", 400, baselineSamples);
+        var result = CreateResult("MyBenchmark", 420);
+        var currentSamples = GenerateSamples(420, 100);
+
+        var violations = RegressionBaseline.Check(result, currentSamples, baselinePath, 1.2);
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void Check_Passes_When_Noisy_But_Not_Significant()
+    {
+        var baselineSamples = GenerateSamples(400, 100);
+        var baselinePath = WriteBaselineJson("MyBenchmark", 400, baselineSamples);
+        var result = CreateResult("MyBenchmark", 600);
+        var currentSamples = GenerateSamples(400, 100);
+
+        var violations = RegressionBaseline.Check(result, currentSamples, baselinePath, 1.2);
+
+        Assert.Empty(violations);
+    }
+
+    private static string WriteBaselineJson(string name, double mean, double[]? samples = null)
     {
         var path = Path.GetTempFileName();
 
+        var entry = new
+        {
+            name,
+            mean,
+            median = mean * 0.9,
+            samples = samples ?? GenerateSamples(mean, 100),
+        };
+
         var json = JsonSerializer.Serialize(new
         {
-            results = new[]
-            {
-                new { name, mean },
-            },
+            results = new[] { entry },
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
         File.WriteAllText(path, json);
         return path;
+    }
+
+    private static double[] GenerateSamples(double mean, int count)
+    {
+        var samples = new double[count];
+        for (var i = 0; i < count; i++)
+            samples[i] = mean + (i % 10 - 5) * 0.05 * mean;
+        return samples;
     }
 
     private static BenchmarkResult CreateResult(string name, double mean)

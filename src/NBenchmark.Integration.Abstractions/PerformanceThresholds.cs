@@ -9,4 +9,5 @@ public sealed class PerformanceThresholds
     public double MaxSlowdownRatio { get; init; } = 1.2;
     public int Iterations { get; init; } = 0;
     public int WarmupIterations { get; init; } = 0;
+    public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
 }

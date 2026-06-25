@@ -14,9 +14,9 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
-        var result = Benchmark.Run(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken);
-        Validate(result, resolvedOptions);
-        return result;
+        var outcome = Benchmark.RunRaw(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken);
+        Validate(outcome.Result, outcome.RawSamples, resolvedOptions);
+        return outcome.Result;
     }
 
     public static BenchmarkResult Run<T>(
@@ -28,9 +28,9 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(action);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
-        var result = Benchmark.Run(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken);
-        Validate(result, resolvedOptions);
-        return result;
+        var outcome = Benchmark.RunRaw(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken);
+        Validate(outcome.Result, outcome.RawSamples, resolvedOptions);
+        return outcome.Result;
     }
 
     public static async Task<BenchmarkResult> RunAsync(
@@ -43,11 +43,11 @@ public static class PerformanceAssert
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
 
-        var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken)
+        var outcome = await Benchmark.RunRawAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        Validate(result, resolvedOptions);
-        return result;
+        Validate(outcome.Result, outcome.RawSamples, resolvedOptions);
+        return outcome.Result;
     }
 
     public static async Task<BenchmarkResult> RunAsync<T>(
@@ -60,11 +60,11 @@ public static class PerformanceAssert
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
 
-        var result = await Benchmark.RunAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken)
+        var outcome = await Benchmark.RunRawAsync(action, MeasurementOptionsBuilder.Build(resolvedOptions), name, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        Validate(result, resolvedOptions);
-        return result;
+        Validate(outcome.Result, outcome.RawSamples, resolvedOptions);
+        return outcome.Result;
     }
 
     public static void Validate(BenchmarkResult result, PerformanceAssertionOptions? options = null)
@@ -72,7 +72,7 @@ public static class PerformanceAssert
         ArgumentNullException.ThrowIfNull(result);
 
         var resolvedOptions = options ?? new PerformanceAssertionOptions();
-        var violations = CollectViolations(result, resolvedOptions);
+        var violations = CollectViolations(result, [], resolvedOptions);
 
         if (violations.Count == 0)
             return;
@@ -80,7 +80,21 @@ public static class PerformanceAssert
         Assert.Fail(BuildFailureMessage(result, violations));
     }
 
-    private static List<string> CollectViolations(BenchmarkResult result, PerformanceAssertionOptions options)
+    public static void Validate(BenchmarkResult result, double[] rawSamples, PerformanceAssertionOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(rawSamples);
+
+        var resolvedOptions = options ?? new PerformanceAssertionOptions();
+        var violations = CollectViolations(result, rawSamples, resolvedOptions);
+
+        if (violations.Count == 0)
+            return;
+
+        Assert.Fail(BuildFailureMessage(result, violations));
+    }
+
+    private static List<string> CollectViolations(BenchmarkResult result, double[] rawSamples, PerformanceAssertionOptions options)
     {
         var violations = new List<string>();
 
@@ -92,6 +106,7 @@ public static class PerformanceAssert
             MaxMeanNs = options.MaxMeanNs >= 0 ? options.MaxMeanNs : null,
             MaxP95Ns = options.MaxP95Ns >= 0 ? options.MaxP95Ns : null,
             MaxAllocatedBytes = options.MaxAllocatedBytes >= 0 ? options.MaxAllocatedBytes : null,
+            MaxAbsoluteThresholdTolerance = options.MaxAbsoluteThresholdTolerance,
             BaselinePath = options.BaselinePath,
             MaxSlowdownRatio = options.MaxSlowdownRatio > 0 ? options.MaxSlowdownRatio : 1.2,
             Iterations = options.Iterations,
@@ -101,7 +116,7 @@ public static class PerformanceAssert
         violations.AddRange(BenchmarkAssert.Validate(result, thresholds));
 
         if (!string.IsNullOrWhiteSpace(options.BaselinePath))
-            violations.AddRange(RegressionBaseline.Check(result, options.BaselinePath!, thresholds.MaxSlowdownRatio));
+            violations.AddRange(RegressionBaseline.Check(result, rawSamples, options.BaselinePath!, thresholds.MaxSlowdownRatio));
 
         return violations;
     }

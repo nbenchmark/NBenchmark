@@ -99,6 +99,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                     var name = $"{TestMethod.TestClass.Class.Name}.{TestMethod.Method.Name}";
 
                     BenchmarkResult result;
+                    double[] rawSamples;
 
                     if (TryBuildBody(methodInfo, instance, methodArgs, out var body, out var isAsync))
                     {
@@ -110,6 +111,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                                     name, taskBody, runSpec, cancellationTokenSource.Token);
 
                                 result = outcome.Result;
+                                rawSamples = outcome.RawSamples;
                             }
                             else
                                 throw new InvalidOperationException("Async body must be Func<Task>.");
@@ -122,6 +124,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                                     name, actionBody, runSpec, cancellationTokenSource.Token);
 
                                 result = outcome.Result;
+                                rawSamples = outcome.RawSamples;
                             }
                             else
                                 throw new InvalidOperationException("Sync body must be Action.");
@@ -130,7 +133,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                     else
                         throw new InvalidOperationException($"Could not build body for method {methodInfo.Name}.");
 
-                    var violations = ValidateResult(result, data);
+                    var violations = ValidateResult(result, rawSamples, data);
                     var output = MetricsFormatter.Format(result);
 
                     if (violations.Count > 0)
@@ -173,7 +176,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         return Activator.CreateInstance(testClass)!;
     }
 
-    internal static IReadOnlyList<string> ValidateResult(BenchmarkResult result, PerformanceTestData data)
+    internal static IReadOnlyList<string> ValidateResult(BenchmarkResult result, double[] rawSamples, PerformanceTestData data)
     {
         var violations = new List<string>();
 
@@ -185,12 +188,13 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
             MaxMeanNs = data.MaxMeanNs >= 0 ? data.MaxMeanNs : null,
             MaxP95Ns = data.MaxP95Ns >= 0 ? data.MaxP95Ns : null,
             MaxAllocatedBytes = data.MaxAllocatedBytes >= 0 ? data.MaxAllocatedBytes : null,
+            MaxAbsoluteThresholdTolerance = data.MaxAbsoluteThresholdTolerance,
         };
 
         violations.AddRange(BenchmarkAssert.Validate(result, thresholds));
 
         if (!string.IsNullOrWhiteSpace(data.BaselinePath))
-            violations.AddRange(RegressionBaseline.Check(result, data.BaselinePath!, data.MaxSlowdownRatio));
+            violations.AddRange(RegressionBaseline.Check(result, rawSamples, data.BaselinePath!, data.MaxSlowdownRatio));
 
         return violations;
     }
