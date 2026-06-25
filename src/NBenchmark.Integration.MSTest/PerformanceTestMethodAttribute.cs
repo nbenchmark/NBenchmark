@@ -13,8 +13,8 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
     public double MaxMeanNs { get; init; } = -1;
     public double MaxP95Ns { get; init; } = -1;
     public long MaxAllocatedBytes { get; init; } = -1;
-    public string? BaselinePath { get; init; }
-    public double MaxSlowdownRatio { get; init; } = 1.2;
+    public string? ReferenceMethod { get; init; }
+    public double MaxSlowdownRatio { get; init; } = 0;
     public int Iterations { get; init; }
     public int WarmupIterations { get; init; }
     public bool MeasureAllocations { get; init; }
@@ -35,11 +35,62 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
 
         var instance = methodInfo.IsStatic ? null : CreateInstance(methodInfo);
 
-        BenchmarkResult result;
-        double[] rawSamples;
+        BenchmarkResult? refResult = null;
+        double[]? refSamples = null;
+        BenchmarkResult result = null!;
+        double[] rawSamples = null!;
 
         try
         {
+            if (!string.IsNullOrWhiteSpace(ReferenceMethod))
+            {
+                MethodInfo refMethodInfo;
+                object?[] refArgs;
+
+                try
+                {
+                    (refMethodInfo, refArgs) = ResolveReferenceMethod(methodInfo, ReferenceMethod, args);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Task.FromResult<TestResult[]>([CreateErrorResult(ex.Message)]);
+                }
+
+                if (!TryBuildBody(refMethodInfo, instance, refArgs, out var refBody, out var refIsAsync))
+                    return Task.FromResult<TestResult[]>([CreateErrorResult(
+                        $"Could not build body for reference method {ReferenceMethod}.")]);
+
+                var refName = $"{testMethod.TestClassName}.{ReferenceMethod}";
+
+                if (refIsAsync)
+                {
+                    if (refBody is Func<Task> refTaskBody)
+                    {
+                        var refOutcome = BenchmarkRunner.Instance.RunAsync(
+                                refName, refTaskBody, runSpec, CancellationToken.None)
+                            .GetAwaiter().GetResult();
+                        refResult = refOutcome.Result;
+                        refSamples = refOutcome.RawSamples;
+                    }
+                    else
+                        return Task.FromResult<TestResult[]>([CreateErrorResult(
+                            $"Unsupported async body type for reference method {ReferenceMethod}.")]);
+                }
+                else
+                {
+                    if (refBody is Action refActionBody)
+                    {
+                        var refOutcome = BenchmarkRunner.Instance.Run(
+                            refName, refActionBody, runSpec, CancellationToken.None);
+                        refResult = refOutcome.Result;
+                        refSamples = refOutcome.RawSamples;
+                    }
+                    else
+                        return Task.FromResult<TestResult[]>([CreateErrorResult(
+                            $"Unsupported sync body type for reference method {ReferenceMethod}.")]);
+                }
+            }
+
             if (TryBuildBody(methodInfo, instance, args, out var body, out var isAsync))
             {
                 if (isAsync)
@@ -78,7 +129,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
             return Task.FromResult<TestResult[]>([CreateErrorResult(ex)]);
         }
 
-        var violations = ValidateResult(result, rawSamples, this);
+        var violations = ValidateResult(result, rawSamples, refResult, refSamples, this);
 
         var testResult = new TestResult
         {
@@ -103,7 +154,10 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         return Task.FromResult<TestResult[]>([testResult]);
     }
 
-    internal static IReadOnlyList<string> ValidateResult(BenchmarkResult result, double[] rawSamples, IPerformanceThresholds thresholds)
+    internal static IReadOnlyList<string> ValidateResult(
+        BenchmarkResult result, double[] rawSamples,
+        BenchmarkResult? refResult, double[]? refSamples,
+        IPerformanceThresholds thresholds)
     {
         var violations = new List<string>();
 
@@ -120,8 +174,20 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
 
         violations.AddRange(BenchmarkAssert.Validate(result, thresholdBag));
 
-        if (!string.IsNullOrWhiteSpace(thresholds.BaselinePath))
-            violations.AddRange(RegressionBaseline.Check(result, rawSamples, thresholds.BaselinePath!, thresholds.MaxSlowdownRatio));
+        if (thresholds.MaxSlowdownRatio > 0 && !result.Errored)
+        {
+            if (refResult is not null && refSamples is not null)
+            {
+                violations.AddRange(RelativeComparison.Check(
+                    result, rawSamples, refResult, refSamples, thresholds.MaxSlowdownRatio));
+            }
+            else
+            {
+                var calibration = PerformanceCalibration.Run();
+                violations.AddRange(RelativeComparison.Check(
+                    result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, thresholds.MaxSlowdownRatio));
+            }
+        }
 
         return violations;
     }
@@ -161,6 +227,20 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         return Expression.Lambda<Action>(call).Compile();
     }
 
+    private static Action BuildReturningSyncBody(MethodInfo method, object? instance, object?[] args)
+    {
+        var call = BuildCall(method, instance, args);
+        var consumeField = typeof(ReturnSink).GetField(nameof(ReturnSink.Hole))!;
+        var typedField = Expression.Field(null, consumeField);
+        var assign = Expression.Assign(typedField, Expression.Convert(call, typeof(object)));
+        return Expression.Lambda<Action>(assign).Compile();
+    }
+
+    private static class ReturnSink
+    {
+        public static object? Hole = new object();
+    }
+
     internal static bool TryBuildBody(
         MethodInfo method,
         object? instance,
@@ -190,9 +270,88 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
             return true;
         }
 
-        body = null!;
+        body = BuildReturningSyncBody(method, instance, args);
         isAsync = false;
-        return false;
+        return true;
+    }
+
+    internal static (MethodInfo Method, object?[] Args) ResolveReferenceMethod(
+        MethodInfo benchmarkMethod,
+        string referenceMethodName,
+        object?[] benchmarkArgs)
+    {
+        var declaringType = benchmarkMethod.DeclaringType
+                            ?? throw new InvalidOperationException(
+                                $"Method {benchmarkMethod.Name} has no declaring type.");
+
+        var candidates = declaringType
+            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance)
+            .Where(m => string.Equals(m.Name, referenceMethodName, StringComparison.Ordinal))
+            .ToArray();
+
+        if (candidates.Length == 0)
+        {
+            throw new InvalidOperationException(
+                $"ReferenceMethod '{referenceMethodName}' not found on class '{declaringType.Name}'.");
+        }
+
+        var compatibleWithBenchmarkArgs = candidates
+            .Where(m => ParametersCompatible(m.GetParameters(), benchmarkArgs))
+            .ToArray();
+
+        if (compatibleWithBenchmarkArgs.Length == 1)
+            return (compatibleWithBenchmarkArgs[0], benchmarkArgs);
+
+        if (compatibleWithBenchmarkArgs.Length > 1)
+        {
+            throw new InvalidOperationException(
+                $"ReferenceMethod '{referenceMethodName}' is ambiguous on class '{declaringType.Name}' for the current test arguments.");
+        }
+
+        var parameterless = candidates
+            .Where(m => m.GetParameters().Length == 0)
+            .ToArray();
+
+        if (parameterless.Length == 1)
+            return (parameterless[0], []);
+
+        if (parameterless.Length > 1)
+        {
+            throw new InvalidOperationException(
+                $"ReferenceMethod '{referenceMethodName}' is ambiguous on class '{declaringType.Name}'.");
+        }
+
+        throw new InvalidOperationException(
+            $"ReferenceMethod '{referenceMethodName}' on class '{declaringType.Name}' must either accept the same arguments as '{benchmarkMethod.Name}' or be parameterless.");
+    }
+
+    private static bool ParametersCompatible(ParameterInfo[] parameters, object?[] args)
+    {
+        if (parameters.Length != args.Length)
+            return false;
+
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            var parameterType = parameters[i].ParameterType;
+
+            if (parameterType.IsByRef)
+                parameterType = parameterType.GetElementType()!;
+
+            var arg = args[i];
+
+            if (arg is null)
+            {
+                if (parameterType.IsValueType && Nullable.GetUnderlyingType(parameterType) is null)
+                    return false;
+
+                continue;
+            }
+
+            if (!parameterType.IsInstanceOfType(arg))
+                return false;
+        }
+
+        return true;
     }
 
     private static Func<Task> BuildAsyncBody(MethodInfo method, object? instance, object?[] args)

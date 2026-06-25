@@ -206,4 +206,33 @@ public record BenchmarkResult
 
         return null;
     }
+
+    /// <summary>
+    ///     Factory that produces a <see cref="BenchmarkResult" /> from a calibration
+    ///     benchmark's raw timings. Used by the test-integration comparison path.
+    /// </summary>
+    public static BenchmarkResult FromCalibration(string name, double mean, double median, double[] samples)
+    {
+        return new BenchmarkResult
+        {
+            Name = name,
+            Mean = mean,
+            Median = median,
+            Min = samples.Min(),
+            Max = samples.Max(),
+            StandardDeviation = 0,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = samples.Length,
+            MeasuredIterations = samples.Length,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
+        };
+    }
 }

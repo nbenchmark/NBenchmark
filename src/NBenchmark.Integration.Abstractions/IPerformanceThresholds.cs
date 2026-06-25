@@ -5,7 +5,7 @@ public interface IPerformanceThresholds
     public double MaxMeanNs { get; }
     public double MaxP95Ns { get; }
     public long MaxAllocatedBytes { get; }
-    public string? BaselinePath { get; }
+    public string? ReferenceMethod { get; }
     public double MaxSlowdownRatio { get; }
     public int Iterations { get; }
     public int WarmupIterations { get; }

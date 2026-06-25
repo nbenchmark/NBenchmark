@@ -12,8 +12,8 @@ public sealed class PerformanceFactAttribute : FactAttribute, IPerformanceThresh
     public double MaxMeanNs { get; init; } = -1;
     public double MaxP95Ns { get; init; } = -1;
     public long MaxAllocatedBytes { get; init; } = -1;
-    public string? BaselinePath { get; init; }
-    public double MaxSlowdownRatio { get; init; } = 1.2;
+    public string? ReferenceMethod { get; init; }
+    public double MaxSlowdownRatio { get; init; } = 0;
     public int Iterations { get; init; }
     public int WarmupIterations { get; init; }
     public bool MeasureAllocations { get; init; }

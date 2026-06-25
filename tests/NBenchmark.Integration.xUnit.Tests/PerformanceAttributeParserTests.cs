@@ -15,8 +15,8 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(-1, parsed.MaxMeanNs);
         Assert.Equal(-1, parsed.MaxP95Ns);
         Assert.Equal(-1, parsed.MaxAllocatedBytes);
-        Assert.Null(parsed.BaselinePath);
-        Assert.Equal(1.2, parsed.MaxSlowdownRatio);
+        Assert.Null(parsed.ReferenceMethod);
+        Assert.Equal(0, parsed.MaxSlowdownRatio);
         Assert.Equal(0, parsed.Iterations);
         Assert.Equal(0, parsed.WarmupIterations);
         Assert.False(parsed.MeasureAllocations);
@@ -32,7 +32,7 @@ public sealed class PerformanceAttributeParserTests
             MaxMeanNs = 123,
             MaxP95Ns = 456,
             MaxAllocatedBytes = 1024,
-            BaselinePath = "baseline.json",
+            ReferenceMethod = "ReferenceMethod",
             MaxSlowdownRatio = 1.5,
             Iterations = 42,
             WarmupIterations = 7,
@@ -58,7 +58,7 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(123, parsed.MaxMeanNs);
         Assert.Equal(456, parsed.MaxP95Ns);
         Assert.Equal(1024, parsed.MaxAllocatedBytes);
-        Assert.Equal("baseline.json", parsed.BaselinePath);
+        Assert.Equal("ReferenceMethod", parsed.ReferenceMethod);
         Assert.Equal(1.5, parsed.MaxSlowdownRatio);
         Assert.Equal(42, parsed.Iterations);
         Assert.Equal(7, parsed.WarmupIterations);
@@ -77,8 +77,8 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(-1, parsed.MaxMeanNs);
         Assert.Equal(-1, parsed.MaxP95Ns);
         Assert.Equal(-1, parsed.MaxAllocatedBytes);
-        Assert.Null(parsed.BaselinePath);
-        Assert.Equal(1.2, parsed.MaxSlowdownRatio);
+        Assert.Null(parsed.ReferenceMethod);
+        Assert.Equal(0, parsed.MaxSlowdownRatio);
         Assert.Equal(0, parsed.Iterations);
         Assert.Equal(0, parsed.WarmupIterations);
         Assert.False(parsed.MeasureAllocations);
@@ -94,7 +94,7 @@ public sealed class PerformanceAttributeParserTests
             [nameof(PerformanceFactAttribute.MaxMeanNs)] = 250d,
             [nameof(PerformanceFactAttribute.MaxP95Ns)] = 400d,
             [nameof(PerformanceFactAttribute.MaxAllocatedBytes)] = 4096L,
-            [nameof(PerformanceFactAttribute.BaselinePath)] = "my-baseline.json",
+            [nameof(PerformanceFactAttribute.ReferenceMethod)] = "MyReference",
             [nameof(PerformanceFactAttribute.MaxSlowdownRatio)] = 1.8d,
             [nameof(PerformanceFactAttribute.Iterations)] = 64,
             [nameof(PerformanceFactAttribute.WarmupIterations)] = 8,
@@ -108,7 +108,7 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(250, parsed.MaxMeanNs);
         Assert.Equal(400, parsed.MaxP95Ns);
         Assert.Equal(4096, parsed.MaxAllocatedBytes);
-        Assert.Equal("my-baseline.json", parsed.BaselinePath);
+        Assert.Equal("MyReference", parsed.ReferenceMethod);
         Assert.Equal(1.8, parsed.MaxSlowdownRatio);
         Assert.Equal(64, parsed.Iterations);
         Assert.Equal(8, parsed.WarmupIterations);

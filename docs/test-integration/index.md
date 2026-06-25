@@ -38,7 +38,7 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-If the measured mean exceeds `500_000 ns` (500 µs), the test fails with a message describing the violation.
+If the measured mean exceeds `500_000 ns` (500 us), the test fails with a message describing the violation.
 
 ### Assert pattern (NUnit and MSTest)
 
@@ -68,24 +68,47 @@ public void Repository_Query_Is_Fast_Enough()
 }
 ```
 
-## Baseline regression checks
+## Relative regression checks
 
-Any integration package can compare the current run against a stored baseline. Save a baseline JSON file from a known-good run using `await BaselineWriter.WriteAsync(Benchmark.RunRaw(...), path)`, then reference it via `BaselinePath`.
+Regression checks compare your benchmark against a reference point that runs in the same test session, so the comparison is hardware-independent. A fast developer machine and a slow CI runner produce the same ratio. No stored files, no environment mismatch, no CI workflow setup.
+
+### Calibration mode (zero config)
+
+When you set `MaxSlowdownRatio` without `ReferenceMethod`, the test runs a built-in CPU-bound calibration benchmark alongside your method. The ratio between your method and the calibration is stable across hardware for CPU-bound work - both scale with machine speed. For allocation-heavy or I/O-bound benchmarks, the ratio to a CPU calibration loop is less stable across hardware; use `ReferenceMethod` to compare against a method with a similar resource profile, or use absolute thresholds with `MaxAbsoluteThresholdTolerance`.
 
 ```csharp
-// xUnit - attribute pattern
-[PerformanceFact(
-    BaselinePath = "baselines/parse-json.json",
-    MaxSlowdownRatio = 1.1)]   // fail if more than 10% slower
+// xUnit
+[PerformanceFact(MaxSlowdownRatio = 5.0)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+
+// NUnit
+[Performance(MaxSlowdownRatio = 5.0)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+
+// MSTest
+[PerformanceTestMethod(MaxSlowdownRatio = 5.0)]
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-The test fails when the slowdown is **both** statistically significant (Mann-Whitney U p-value below the significance level) **and** practically meaningful (mean ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
+The test fails when the slowdown is **both** statistically significant (Mann-Whitney U p-value below the significance level) **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
 
-The test also fails if:
+Failure output includes ratio and significance details (`ratio`, `p`, and Cliff's delta) when a slowdown breaches the gate. A practical tuning workflow is to start with a loose value (for example `MaxSlowdownRatio = 10.0`) and tighten it based on several runs in your CI environment.
 
-- The baseline file is missing.
-- The benchmark name is not found in the file.
+### ReferenceMethod mode (compare two implementations)
+
+When you have two implementations to compare, point `ReferenceMethod` at the baseline implementation. Both methods run in the same test session; the candidate must not exceed `MaxSlowdownRatio` relative to the reference.
+
+```csharp
+// xUnit
+[PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse))]
+public void OptimisedParse() => OptimisedParser.Parse(Payload);
+
+private static void NaiveParse() => NaiveParser.Parse(Payload);
+```
+
+The reference method can be private. It runs with the same measurement options as the candidate (iterations, warmup, outlier mode, confidence level). This keeps the comparison apples-to-apples: if the candidate uses `Iterations = 300`, the reference also runs 300 iterations. Wall-clock cost for the test is therefore candidate + reference durations.
+
+`ReferenceMethod` is only available in the attribute pattern. The assert pattern (`PerformanceAssert.Run`) supports calibration mode only.
 
 See [Statistics: Significance Testing](../statistics/significance.md) for how the comparison is performed.
 
@@ -98,8 +121,8 @@ All three packages share the same set of threshold properties. A threshold of `-
 | `MaxMeanNs` | `double` | -1 (disabled) | Maximum allowed mean execution time in nanoseconds. |
 | `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles` (the default set includes `0.95`). If P95 was not computed, a clear error message guides you to check the configuration. |
 | `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
-| `BaselinePath` | `string?` | null | Path to a JSON baseline file. Fails if the benchmark regresses beyond `MaxSlowdownRatio` (significance + ratio gate). |
-| `MaxSlowdownRatio` | `double` | 1.2 | Maximum allowed slowdown relative to the baseline (1.2 = 20% regression). Used as the practical-effect floor on top of the significance test. |
+| `MaxSlowdownRatio` | `double` | 0 (disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g. `5.0` = 5x the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
+| `ReferenceMethod` | `string?` | null | Name of a method on the same class to use as the reference for ratio comparison. When null, calibration mode runs (built-in CPU-bound benchmark). When set, both methods run in the same test session. |
 | `Iterations` | `int` | 0 (use default) | Override the number of measured samples. `0` uses the framework default (auto-resolved). |
 | `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup samples. `0` uses the framework default (auto-detected). |
 | `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
@@ -111,7 +134,7 @@ See [Configuration](../reference/configuration.md) for a full explanation of eac
 
 ## SLA-style hard limits
 
-Absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) are susceptible to shared-runner noise in CI. Prefer `BaselinePath` + `MaxSlowdownRatio` for regression gates; use absolute thresholds only when you have a hard SLA.
+Absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) are susceptible to shared-runner noise in CI. Prefer `MaxSlowdownRatio` (calibration or `ReferenceMethod`) for regression gates; use absolute thresholds only when you have a hard SLA.
 
 On shared CI runners, set `MaxAbsoluteThresholdTolerance` to relax absolute thresholds for jitter:
 
@@ -122,7 +145,7 @@ On shared CI runners, set `MaxAbsoluteThresholdTolerance` to relax absolute thre
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-When a shared runner or high-jitter host is detected, the effective threshold becomes `500_000 × 1.25 = 625_000 ns`. On a dedicated host, the original `500_000 ns` threshold applies.
+When a shared runner or high-jitter host is detected, the effective threshold becomes `500_000 x 1.25 = 625_000 ns`. On a dedicated host, the original `500_000 ns` threshold applies.
 
 ## Per-framework reference
 

@@ -87,16 +87,18 @@ See the [thresholds reference](./index.md#thresholds-reference) for the complete
 
 ```csharp
 [PerformanceFact(
-    MaxMeanNs        = 100_000,    // fail if mean > 100 µs
-    MaxP95Ns         = 300_000,    // fail if P95  > 300 µs
+    MaxMeanNs        = 100_000,    // fail if mean > 100 us
+    MaxP95Ns         = 300_000,    // fail if P95  > 300 us
     MaxAllocatedBytes = 4096,      // fail if mean allocs > 4 KiB per op
-    BaselinePath     = "baselines/my-benchmark.json",
-    MaxSlowdownRatio = 1.15,       // fail if >15% slower than baseline
+    MaxSlowdownRatio = 5.0,       // fail if >5x the calibration benchmark
+    ReferenceMethod  = nameof(ReferenceImpl),  // compare against this method instead of calibration
     Iterations       = 300,
     WarmupIterations = 30,
     OutlierMode      = OutlierMode.IqrFence,
     ConfidenceLevel  = 0.99)]
 public void CriticalPath() { /* ... */ }
+
+private static void ReferenceImpl() { /* ... */ }
 ```
 
 ## Failure output

@@ -16,7 +16,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         double maxMeanNs,
         double maxP95Ns,
         long maxAllocatedBytes,
-        string? baselinePath,
+        string? referenceMethod,
         double maxSlowdownRatio,
         int iterations,
         int warmupIterations,
@@ -29,7 +29,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         MaxMeanNs = maxMeanNs;
         MaxP95Ns = maxP95Ns;
         MaxAllocatedBytes = maxAllocatedBytes;
-        BaselinePath = baselinePath;
+        ReferenceMethod = referenceMethod;
         MaxSlowdownRatio = maxSlowdownRatio;
         Iterations = iterations;
         WarmupIterations = warmupIterations;
@@ -44,8 +44,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     public double MaxMeanNs { get; private set; } = -1;
     public double MaxP95Ns { get; private set; } = -1;
     public long MaxAllocatedBytes { get; private set; } = -1;
-    public string? BaselinePath { get; private set; }
-    public double MaxSlowdownRatio { get; private set; } = 1.2;
+    public string? ReferenceMethod { get; private set; }
+    public double MaxSlowdownRatio { get; private set; } = 0;
     public int Iterations { get; private set; }
     public int WarmupIterations { get; private set; }
     public bool MeasureAllocations { get; private set; }
@@ -58,7 +58,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         info.AddValue(nameof(MaxMeanNs), MaxMeanNs);
         info.AddValue(nameof(MaxP95Ns), MaxP95Ns);
         info.AddValue(nameof(MaxAllocatedBytes), MaxAllocatedBytes);
-        info.AddValue(nameof(BaselinePath), BaselinePath ?? NullSentinel);
+        info.AddValue(nameof(ReferenceMethod), ReferenceMethod ?? NullSentinel);
         info.AddValue(nameof(MaxSlowdownRatio), MaxSlowdownRatio);
         info.AddValue(nameof(Iterations), Iterations);
         info.AddValue(nameof(WarmupIterations), WarmupIterations);
@@ -74,8 +74,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         MaxMeanNs = info.GetValue<double>(nameof(MaxMeanNs));
         MaxP95Ns = info.GetValue<double>(nameof(MaxP95Ns));
         MaxAllocatedBytes = info.GetValue<long>(nameof(MaxAllocatedBytes));
-        var baselinePath = info.GetValue<string>(nameof(BaselinePath));
-        BaselinePath = baselinePath == NullSentinel ? null : baselinePath;
+        var referenceMethod = info.GetValue<string>(nameof(ReferenceMethod));
+        ReferenceMethod = referenceMethod == NullSentinel ? null : referenceMethod;
         MaxSlowdownRatio = info.GetValue<double>(nameof(MaxSlowdownRatio));
         Iterations = info.GetValue<int>(nameof(Iterations));
         WarmupIterations = info.GetValue<int>(nameof(WarmupIterations));
@@ -92,7 +92,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
             thresholds.MaxMeanNs,
             thresholds.MaxP95Ns,
             thresholds.MaxAllocatedBytes,
-            thresholds.BaselinePath,
+            thresholds.ReferenceMethod,
             thresholds.MaxSlowdownRatio,
             thresholds.Iterations,
             thresholds.WarmupIterations,
