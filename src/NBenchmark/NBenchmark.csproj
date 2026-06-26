@@ -5,6 +5,7 @@
     <RootNamespace>NBenchmark</RootNamespace>
     <PackageId>NBenchmark</PackageId>
     <Description>NBenchmark is the easiest way to measure the speed of your .NET code. With zero setup and a focus on simplicity, you can go from installation to your first accurate benchmark in seconds-perfect for quick checks and full performance suites alike.</Description>
+    <PackageReadme>../../README.md</PackageReadme>
     <PackageTags>benchmark;performance;measurement;microbenchmark</PackageTags>
   </PropertyGroup>
 
