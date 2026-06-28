@@ -22,6 +22,7 @@ public sealed class BenchmarkSuite(string name)
     private string[]? _pendingCategories;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
+    private IMeasurementObserver _observer = NullMeasurementObserver.Instance;
     private RunOrder _runOrder = RunOrder.Random;
     private IReadOnlyList<RuntimeMoniker> _runtimes = [];
     private Action? _suiteSetup;
@@ -664,6 +665,19 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
+    ///     Attaches a non-perturbing measurement observer that receives live per-sample,
+    ///     per-detector, and phase-transition events during the adaptive measurement loop.
+    ///     The observer MUST return immediately from each callback - never block, allocate on
+    ///     the hot path, or do I/O - because the loop calls it between samples on the
+    ///     measurement thread. The default is <see cref="NullMeasurementObserver" />.
+    /// </summary>
+    public BenchmarkSuite WithObserver(IMeasurementObserver observer)
+    {
+        _observer = observer ?? NullMeasurementObserver.Instance;
+        return this;
+    }
+
+    /// <summary>
     ///     Tags every subsequent benchmark added to the suite with the supplied categories.
     ///     <c>.WithCategories()</c> does not affect benchmarks already added.
     /// </summary>
@@ -745,6 +759,7 @@ public sealed class BenchmarkSuite(string name)
 
             var results = await RunInProcessCoreAsync(
                 NullBenchmarkProgress.Instance,
+                NullMeasurementObserver.Instance,
                 RunOrder.Declaration,
                 false,
                 false,
@@ -782,6 +797,7 @@ public sealed class BenchmarkSuite(string name)
 
         return await RunInProcessCoreAsync(
             _progress,
+            _observer,
             _runOrder,
             true,
             true,
@@ -791,6 +807,7 @@ public sealed class BenchmarkSuite(string name)
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunInProcessCoreAsync(
         IBenchmarkProgress progress,
+        IMeasurementObserver observer,
         RunOrder order,
         bool applySignificance,
         bool applyReporters,
@@ -831,7 +848,8 @@ public sealed class BenchmarkSuite(string name)
                 {
                     var (launchResults, launchSamples) = await SuiteRunner.RunAsync(
                         envelopes, effectiveOrder, null, _options, 0,
-                        filteredBenchmarks.Count, NullBenchmarkProgress.Instance, cancellationToken).ConfigureAwait(false);
+                        filteredBenchmarks.Count, NullBenchmarkProgress.Instance, cancellationToken,
+                        onBetweenBenchmarksAsync: null, NullMeasurementObserver.Instance).ConfigureAwait(false);
 
                     allLaunchResults.Add(launchResults);
                     allLaunchSamples.Add(launchSamples);
@@ -843,7 +861,8 @@ public sealed class BenchmarkSuite(string name)
             {
                 (results, rawSamples) = await SuiteRunner.RunAsync(
                     envelopes, effectiveOrder, null, _options, 0,
-                    filteredBenchmarks.Count, progress, cancellationToken).ConfigureAwait(false);
+                    filteredBenchmarks.Count, progress, cancellationToken,
+                    onBetweenBenchmarksAsync: null, observer).ConfigureAwait(false);
             }
         }
         finally
@@ -996,6 +1015,7 @@ public sealed class BenchmarkSuite(string name)
             rawSamples[$"{envelope.Name}\0{result.RuntimeMoniker}"] = raw;
 
             await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+            _observer.OnResult(result);
         }
 
         await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
@@ -1144,6 +1164,7 @@ public sealed class BenchmarkSuite(string name)
                         allResults.Add(result);
 
                         await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+                        _observer.OnResult(result);
                     }
                 }
                 finally

@@ -24,6 +24,7 @@ internal static class AdaptiveLoop
         RunSpec spec,
         IClock clock,
         IBenchmarkProgress progress,
+        IMeasurementObserver observer,
         CancellationToken ct)
     {
         var o = spec.Options;
@@ -36,6 +37,7 @@ internal static class AdaptiveLoop
         var k = o.OpsPerSample ?? 1;
         double accumulatedNs = 0;
         long totalBodyInvocations = 0;
+        var attached = observer != NullMeasurementObserver.Instance;
 
         // Start the tuning-wall-clock span here, after the runner's pre-loop progress callback, so
         // the reported time covers only the adaptive loop's own work.
@@ -58,6 +60,9 @@ internal static class AdaptiveLoop
 
         if (autoTune.EnableJitterCalibration)
         {
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Jitter, PhaseTransition.Starting));
+
             jitterMetric = JitterCalibrator.Run(
                 autoTune.JitterCalibrationSamples,
                 autoTune.JitterCalibrationWorkPerSample,
@@ -65,14 +70,23 @@ internal static class AdaptiveLoop
 
             if (ShouldSwitchDetector(o, autoTune, jitterMetric))
                 detectorSwitched = true;
+
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(
+                    name, MeasurementPhase.Jitter, PhaseTransition.Completed,
+                    JitterMetric: jitterMetric, DetectorSwitched: detectorSwitched));
         }
 
         // ----- Phase A: ops-per-sample calibration -----
         var calibrationCapped = false;
         var calibrationSamples = 0;
+        var calibrationOrdinal = 0;
 
         if (calibrate)
         {
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Calibration, PhaseTransition.Starting));
+
             var calibrator = new OpCountCalibrator(
                 autoTune.TargetSampleDurationNs,
                 Math.Min(autoTune.MaxOpsPerSample, MeasurementOptions.MaxOpsPerSampleLimit));
@@ -98,12 +112,20 @@ internal static class AdaptiveLoop
                     accumulatedNs += elapsed;
                     calibrationSamples++;
 
+                    if (attached)
+                    {
+                        observer.OnSample(new SampleEvent(name, calibrationOrdinal++, elapsed / probeK, probeK, 0, Warmup: true));
+                    }
+
                     if (elapsed < best)
                         best = elapsed;
                 }
 
                 var resolved = calibrator.Feed(best);
                 k = calibrator.OpsPerSample;
+
+                if (attached)
+                    observer.OnDetector(new DetectorStateEvent(name, MeasurementPhase.Calibration, calibrationSamples, best, 0.0, 0.0, k));
 
                 if (resolved)
                     break;
@@ -114,6 +136,10 @@ internal static class AdaptiveLoop
                     break;
                 }
             }
+
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(
+                    name, MeasurementPhase.Calibration, PhaseTransition.Completed, ResolvedK: k));
         }
 
         // ----- Phase B: warmup -----
@@ -127,6 +153,9 @@ internal static class AdaptiveLoop
         }
         else if (o.WarmupIterations is { } explicitWarmup)
         {
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
+
             for (var i = 0; i < explicitWarmup; i++)
             {
                 ct.ThrowIfCancellationRequested();
@@ -139,8 +168,13 @@ internal static class AdaptiveLoop
         }
         else
         {
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
+
             var detector = new WarmupPlateauDetector(autoTune);
             warmupStop = WarmupStopReason.Settled;
+            var warmupOrdinal = 0;
+            var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
 
             while (true)
             {
@@ -148,6 +182,14 @@ internal static class AdaptiveLoop
                 var (elapsed, _, _) = AcquireSampleSync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
+
+                if (attached)
+                {
+                    var warmupPerOp = elapsed / k;
+                    if (warmupOrdinal % warmupInterval == 0)
+                        observer.OnSample(new SampleEvent(name, warmupOrdinal, warmupPerOp, k, 0, Warmup: true));
+                    warmupOrdinal++;
+                }
 
                 if (detector.Feed(elapsed / k))
                 {
@@ -164,6 +206,11 @@ internal static class AdaptiveLoop
 
             resolvedWarmup = detector.Count;
         }
+
+        if (attached)
+            observer.OnPhase(new MeasurementPhaseEvent(
+                name, MeasurementPhase.Warmup, PhaseTransition.Completed,
+                ResolvedWarmup: resolvedWarmup, WarmupStop: warmupStop));
 
         progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
 
@@ -203,9 +250,13 @@ internal static class AdaptiveLoop
         var reportedTotal = explicitSamples ?? 0;
         var progressInterval = ProgressCadence(explicitSamples ?? autoTune.MaxSamples);
 
+        if (attached)
+            observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Measurement, PhaseTransition.Starting));
+
         var measureStartTimestamp = clock.GetTimestamp();
         var sampleCount = 0;
         SampleStopReason sampleStop;
+        var detectorEmitted = false;
 
         try
         {
@@ -220,6 +271,13 @@ internal static class AdaptiveLoop
                 allocations?.Add(allocDelta / k);
                 diagnosticsList?.Add(diagDelta);
                 sampleCount++;
+
+                if (attached)
+                {
+                    var allocPerOp = measureAllocations ? allocDelta / k : 0L;
+                    if (sampleCount % progressInterval == 0)
+                        observer.OnSample(new SampleEvent(name, sampleCount - 1, perOp, k, allocPerOp, Warmup: false));
+                }
 
                 if (sampleCount % progressInterval == 0)
                     progress.OnIterationCompleted(name, sampleCount, reportedTotal).GetAwaiter().GetResult();
@@ -237,6 +295,15 @@ internal static class AdaptiveLoop
                 else if (ci.Feed(perOp))
                 {
                     sampleStop = ci.StopReason;
+
+                    if (attached)
+                    {
+                        observer.OnDetector(new DetectorStateEvent(
+                            name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
+                            ci.AchievedRelativeHalfWidth, k));
+                        detectorEmitted = true;
+                    }
+
                     break;
                 }
 
@@ -251,6 +318,17 @@ internal static class AdaptiveLoop
         {
             if (diagnostics.Exceptions)
                 ExceptionCounter.Unsubscribe();
+        }
+
+        if (attached)
+        {
+            if (ci is not null && !detectorEmitted)
+                observer.OnDetector(new DetectorStateEvent(
+                    name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
+                    ci.AchievedRelativeHalfWidth, k));
+
+            observer.OnPhase(new MeasurementPhaseEvent(
+                name, MeasurementPhase.Measurement, PhaseTransition.Completed, SampleStop: sampleStop));
         }
 
         var measuredDuration = clock.GetElapsedTime(measureStartTimestamp);
@@ -284,6 +362,7 @@ internal static class AdaptiveLoop
         RunSpec spec,
         IClock clock,
         IBenchmarkProgress progress,
+        IMeasurementObserver observer,
         CancellationToken ct)
     {
         var o = spec.Options;
@@ -296,6 +375,7 @@ internal static class AdaptiveLoop
         var k = o.OpsPerSample ?? 1;
         double accumulatedNs = 0;
         long totalBodyInvocations = 0;
+        var attached = observer != NullMeasurementObserver.Instance;
 
         // Start the tuning-wall-clock span here, after the runner's pre-loop progress callback, so
         // the reported time covers only the adaptive loop's own work.
@@ -318,6 +398,9 @@ internal static class AdaptiveLoop
 
         if (autoTune.EnableJitterCalibration)
         {
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Jitter, PhaseTransition.Starting));
+
             jitterMetric = JitterCalibrator.Run(
                 autoTune.JitterCalibrationSamples,
                 autoTune.JitterCalibrationWorkPerSample,
@@ -325,14 +408,23 @@ internal static class AdaptiveLoop
 
             if (ShouldSwitchDetector(o, autoTune, jitterMetric))
                 detectorSwitched = true;
+
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(
+                    name, MeasurementPhase.Jitter, PhaseTransition.Completed,
+                    JitterMetric: jitterMetric, DetectorSwitched: detectorSwitched));
         }
 
         // ----- Phase A: ops-per-sample calibration -----
         var calibrationCapped = false;
         var calibrationSamples = 0;
+        var calibrationOrdinal = 0;
 
         if (calibrate)
         {
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Calibration, PhaseTransition.Starting));
+
             var calibrator = new OpCountCalibrator(
                 autoTune.TargetSampleDurationNs,
                 Math.Min(autoTune.MaxOpsPerSample, MeasurementOptions.MaxOpsPerSampleLimit));
@@ -360,12 +452,18 @@ internal static class AdaptiveLoop
                     accumulatedNs += elapsed;
                     calibrationSamples++;
 
+                    if (attached)
+                        observer.OnSample(new SampleEvent(name, calibrationOrdinal++, elapsed / probeK, probeK, 0, Warmup: true));
+
                     if (elapsed < best)
                         best = elapsed;
                 }
 
                 var resolved = calibrator.Feed(best);
                 k = calibrator.OpsPerSample;
+
+                if (attached)
+                    observer.OnDetector(new DetectorStateEvent(name, MeasurementPhase.Calibration, calibrationSamples, best, 0.0, 0.0, k));
 
                 if (resolved)
                     break;
@@ -376,6 +474,10 @@ internal static class AdaptiveLoop
                     break;
                 }
             }
+
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(
+                    name, MeasurementPhase.Calibration, PhaseTransition.Completed, ResolvedK: k));
         }
 
         // ----- Phase B: warmup -----
@@ -389,6 +491,9 @@ internal static class AdaptiveLoop
         }
         else if (o.WarmupIterations is { } explicitWarmup)
         {
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
+
             for (var i = 0; i < explicitWarmup; i++)
             {
                 ct.ThrowIfCancellationRequested();
@@ -401,8 +506,13 @@ internal static class AdaptiveLoop
         }
         else
         {
+            if (attached)
+                observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
+
             var detector = new WarmupPlateauDetector(autoTune);
             warmupStop = WarmupStopReason.Settled;
+            var warmupOrdinal = 0;
+            var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
 
             while (true)
             {
@@ -410,6 +520,14 @@ internal static class AdaptiveLoop
                 var (elapsed, _, _) = await AcquireSampleAsync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None).ConfigureAwait(false);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
+
+                if (attached)
+                {
+                    var warmupPerOp = elapsed / k;
+                    if (warmupOrdinal % warmupInterval == 0)
+                        observer.OnSample(new SampleEvent(name, warmupOrdinal, warmupPerOp, k, 0, Warmup: true));
+                    warmupOrdinal++;
+                }
 
                 if (detector.Feed(elapsed / k))
                 {
@@ -426,6 +544,11 @@ internal static class AdaptiveLoop
 
             resolvedWarmup = detector.Count;
         }
+
+        if (attached)
+            observer.OnPhase(new MeasurementPhaseEvent(
+                name, MeasurementPhase.Warmup, PhaseTransition.Completed,
+                ResolvedWarmup: resolvedWarmup, WarmupStop: warmupStop));
 
         await progress.OnWarmupCompleted(name).ConfigureAwait(false);
 
@@ -465,9 +588,13 @@ internal static class AdaptiveLoop
         var reportedTotal = explicitSamples ?? 0;
         var progressInterval = ProgressCadence(explicitSamples ?? autoTune.MaxSamples);
 
+        if (attached)
+            observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Measurement, PhaseTransition.Starting));
+
         var measureStartTimestamp = clock.GetTimestamp();
         var sampleCount = 0;
         SampleStopReason sampleStop;
+        var detectorEmitted = false;
 
         try
         {
@@ -486,6 +613,13 @@ internal static class AdaptiveLoop
                 diagnosticsList?.Add(diagDelta);
                 sampleCount++;
 
+                if (attached)
+                {
+                    var allocPerOp = measureAllocations ? allocDelta / k : 0L;
+                    if (sampleCount % progressInterval == 0)
+                        observer.OnSample(new SampleEvent(name, sampleCount - 1, perOp, k, allocPerOp, Warmup: false));
+                }
+
                 if (sampleCount % progressInterval == 0)
                     await progress.OnIterationCompleted(name, sampleCount, reportedTotal).ConfigureAwait(false);
 
@@ -502,6 +636,15 @@ internal static class AdaptiveLoop
                 else if (ci.Feed(perOp))
                 {
                     sampleStop = ci.StopReason;
+
+                    if (attached)
+                    {
+                        observer.OnDetector(new DetectorStateEvent(
+                            name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
+                            ci.AchievedRelativeHalfWidth, k));
+                        detectorEmitted = true;
+                    }
+
                     break;
                 }
 
@@ -516,6 +659,17 @@ internal static class AdaptiveLoop
         {
             if (diagnostics.Exceptions)
                 ExceptionCounter.Unsubscribe();
+        }
+
+        if (attached)
+        {
+            if (ci is not null && !detectorEmitted)
+                observer.OnDetector(new DetectorStateEvent(
+                    name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
+                    ci.AchievedRelativeHalfWidth, k));
+
+            observer.OnPhase(new MeasurementPhaseEvent(
+                name, MeasurementPhase.Measurement, PhaseTransition.Completed, SampleStop: sampleStop));
         }
 
         var measuredDuration = clock.GetElapsedTime(measureStartTimestamp);

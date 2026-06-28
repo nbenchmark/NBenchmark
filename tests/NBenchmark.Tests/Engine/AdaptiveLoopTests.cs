@@ -292,6 +292,7 @@ public class AdaptiveLoopTests
             spec,
             clock,
             NullBenchmarkProgress.Instance,
+            NullMeasurementObserver.Instance,
             CancellationToken.None);
 
         Assert.Equal(4, result.PerOpTimings.Length);
@@ -597,6 +598,7 @@ public class AdaptiveLoopTests
             spec,
             clock,
             NullBenchmarkProgress.Instance,
+            NullMeasurementObserver.Instance,
             CancellationToken.None);
 
         Assert.True(result.Diagnostic.OutlierDetectorSwitched);
@@ -620,6 +622,6 @@ public class AdaptiveLoopTests
         };
 
         return AdaptiveLoop.Run(
-            "bench", body, spec, clock, NullBenchmarkProgress.Instance, CancellationToken.None);
+            "bench", body, spec, clock, NullBenchmarkProgress.Instance, NullMeasurementObserver.Instance, CancellationToken.None);
     }
 }

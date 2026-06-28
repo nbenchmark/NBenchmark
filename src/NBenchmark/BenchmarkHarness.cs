@@ -22,6 +22,7 @@ public sealed class BenchmarkHarness
     private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
+    private IMeasurementObserver _observer = NullMeasurementObserver.Instance;
     private RunOrder _runOrder = RunOrder.Random;
 
     private BenchmarkHarness()
@@ -93,6 +94,12 @@ public sealed class BenchmarkHarness
     {
         _progress = progress;
         _progressExplicitlySet = true;
+        return this;
+    }
+
+    public BenchmarkHarness WithObserver(IMeasurementObserver observer)
+    {
+        _observer = observer ?? NullMeasurementObserver.Instance;
         return this;
     }
 
@@ -915,10 +922,11 @@ public sealed class BenchmarkHarness
                 for (var launchIdx = 0; launchIdx < effectiveClassLaunchCount; launchIdx++)
                 {
                     var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+                    var observer = launchIdx == 0 ? _observer : NullMeasurementObserver.Instance;
 
                     var (results, samples) = await SuiteRunner.RunAsync(
                         envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset, observer).ConfigureAwait(false);
 
                     allLaunchResults.Add(results);
                     allLaunchSamples.Add(samples);
@@ -937,7 +945,7 @@ public sealed class BenchmarkHarness
             {
                 var (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                    startIndex, totalBenchmarks, _progress, cancellationToken, betweenBenchmarksReset).ConfigureAwait(false);
+                    startIndex, totalBenchmarks, _progress, cancellationToken, betweenBenchmarksReset, _observer).ConfigureAwait(false);
 
                 ApplyPerClassIndependenceWarning(results, suite, suiteOptions);
                 allResults.AddRange(results);
@@ -1012,10 +1020,11 @@ public sealed class BenchmarkHarness
                     for (var launchIdx = 0; launchIdx < perMethodLaunchCount; launchIdx++)
                     {
                         var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+                        var observer = launchIdx == 0 ? _observer : NullMeasurementObserver.Instance;
 
                         var (results, samples) = await SuiteRunner.RunAsync(
                             [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                            startIndex, totalBenchmarks, progress, cancellationToken).ConfigureAwait(false);
+                            startIndex, totalBenchmarks, progress, cancellationToken, onBetweenBenchmarksAsync: null, observer).ConfigureAwait(false);
 
                         perLaunchResults.AddRange(results);
                         perLaunchSamples.Add(samples);
@@ -1039,7 +1048,7 @@ public sealed class BenchmarkHarness
                 {
                     var (results, samples) = await SuiteRunner.RunAsync(
                         [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, _progress, cancellationToken).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, _progress, cancellationToken, onBetweenBenchmarksAsync: null, _observer).ConfigureAwait(false);
 
                     allResults.AddRange(results);
 
@@ -1277,6 +1286,7 @@ public sealed class BenchmarkHarness
             rawSamples[name] = raw;
 
             await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+            _observer.OnResult(result);
         }
     }
 
@@ -1432,7 +1442,8 @@ public sealed class BenchmarkHarness
 
                 (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, RunOrder.Declaration, null, options,
-                    0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken, betweenBenchmarksReset).ConfigureAwait(false);
+                    0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken, betweenBenchmarksReset,
+                    NullMeasurementObserver.Instance).ConfigureAwait(false);
 
                 ApplyPerClassIndependenceWarning(results, suite, options);
             }
@@ -1486,7 +1497,8 @@ public sealed class BenchmarkHarness
 
                 var (batchResults, batchSamples) = await SuiteRunner.RunAsync(
                     [envelope], RunOrder.Declaration, null, options,
-                    0, 1, NullBenchmarkProgress.Instance, cancellationToken).ConfigureAwait(false);
+                    0, 1, NullBenchmarkProgress.Instance, cancellationToken,
+                    onBetweenBenchmarksAsync: null, NullMeasurementObserver.Instance).ConfigureAwait(false);
 
                 results.AddRange(batchResults);
 

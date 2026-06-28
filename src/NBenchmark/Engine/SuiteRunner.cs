@@ -14,7 +14,8 @@ internal static class SuiteRunner
         int totalBenchmarks,
         IBenchmarkProgress progress,
         CancellationToken cancellationToken,
-        Func<Task>? onBetweenBenchmarksAsync = null)
+        Func<Task>? onBetweenBenchmarksAsync = null,
+        IMeasurementObserver? observer = null)
     {
         ArgumentNullException.ThrowIfNull(envelopes);
         ArgumentNullException.ThrowIfNull(progress);
@@ -37,6 +38,7 @@ internal static class SuiteRunner
                 IsBaseline = envelope.IsBaseline,
                 Categories = envelope.Categories,
                 Progress = progress,
+                Observer = observer ?? NullMeasurementObserver.Instance,
             };
 
             await progress.OnBenchmarkStarting(envelope.Name, startIndex + index + 1, totalBenchmarks).ConfigureAwait(false);
