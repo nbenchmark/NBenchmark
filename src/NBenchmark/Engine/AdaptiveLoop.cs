@@ -1,3 +1,4 @@
+using NBenchmark.Diagnostics;
 using NBenchmark.Engine.Detectors;
 using NBenchmark.Stats;
 
@@ -60,6 +61,8 @@ internal static class AdaptiveLoop
 
         if (autoTune.EnableJitterCalibration)
         {
+            NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Jitter);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Jitter, PhaseTransition.Starting));
 
@@ -70,6 +73,15 @@ internal static class AdaptiveLoop
 
             if (ShouldSwitchDetector(o, autoTune, jitterMetric))
                 detectorSwitched = true;
+
+            NBenchmarkDiagnostics.RecordJitterMetric(jitterMetric!.Value);
+
+            if (detectorSwitched)
+                NBenchmarkDiagnostics.RecordJitterSwitch();
+
+            NBenchmarkDiagnostics.OnPhaseCompleted(
+                name, MeasurementPhase.Jitter,
+                jitterMetric: jitterMetric, detectorSwitched: detectorSwitched);
 
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(
@@ -84,6 +96,8 @@ internal static class AdaptiveLoop
 
         if (calibrate)
         {
+            NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Calibration);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Calibration, PhaseTransition.Starting));
 
@@ -112,6 +126,8 @@ internal static class AdaptiveLoop
                     accumulatedNs += elapsed;
                     calibrationSamples++;
 
+                    NBenchmarkDiagnostics.RecordSample(elapsed / probeK, -1);
+
                     if (attached)
                     {
                         observer.OnSample(new SampleEvent(name, calibrationOrdinal++, elapsed / probeK, probeK, 0, Warmup: true));
@@ -137,6 +153,8 @@ internal static class AdaptiveLoop
                 }
             }
 
+            NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Calibration, resolvedK: k);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(
                     name, MeasurementPhase.Calibration, PhaseTransition.Completed, ResolvedK: k));
@@ -153,6 +171,8 @@ internal static class AdaptiveLoop
         }
         else if (o.WarmupIterations is { } explicitWarmup)
         {
+            NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Warmup);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
 
@@ -168,6 +188,8 @@ internal static class AdaptiveLoop
         }
         else
         {
+            NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Warmup);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
 
@@ -182,6 +204,8 @@ internal static class AdaptiveLoop
                 var (elapsed, _, _) = AcquireSampleSync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
+
+                NBenchmarkDiagnostics.RecordSample(elapsed / k, -1);
 
                 if (attached)
                 {
@@ -206,6 +230,8 @@ internal static class AdaptiveLoop
 
             resolvedWarmup = detector.Count;
         }
+
+        NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Warmup, resolvedWarmup: resolvedWarmup, warmupStop: warmupStop);
 
         if (attached)
             observer.OnPhase(new MeasurementPhaseEvent(
@@ -250,6 +276,8 @@ internal static class AdaptiveLoop
         var reportedTotal = explicitSamples ?? 0;
         var progressInterval = ProgressCadence(explicitSamples ?? autoTune.MaxSamples);
 
+        NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Measurement);
+
         if (attached)
             observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Measurement, PhaseTransition.Starting));
 
@@ -271,6 +299,8 @@ internal static class AdaptiveLoop
                 allocations?.Add(allocDelta / k);
                 diagnosticsList?.Add(diagDelta);
                 sampleCount++;
+
+                NBenchmarkDiagnostics.RecordSample(perOp, measureAllocations ? allocDelta / k : -1L);
 
                 if (attached)
                 {
@@ -296,6 +326,8 @@ internal static class AdaptiveLoop
                 {
                     sampleStop = ci.StopReason;
 
+                    NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
+
                     if (attached)
                     {
                         observer.OnDetector(new DetectorStateEvent(
@@ -319,6 +351,11 @@ internal static class AdaptiveLoop
             if (diagnostics.Exceptions)
                 ExceptionCounter.Unsubscribe();
         }
+
+        if (ci is not null && !detectorEmitted)
+            NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
+
+        NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Measurement, sampleStop: sampleStop);
 
         if (attached)
         {
@@ -398,6 +435,8 @@ internal static class AdaptiveLoop
 
         if (autoTune.EnableJitterCalibration)
         {
+            NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Jitter);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Jitter, PhaseTransition.Starting));
 
@@ -408,6 +447,15 @@ internal static class AdaptiveLoop
 
             if (ShouldSwitchDetector(o, autoTune, jitterMetric))
                 detectorSwitched = true;
+
+            NBenchmarkDiagnostics.RecordJitterMetric(jitterMetric!.Value);
+
+            if (detectorSwitched)
+                NBenchmarkDiagnostics.RecordJitterSwitch();
+
+            NBenchmarkDiagnostics.OnPhaseCompleted(
+                name, MeasurementPhase.Jitter,
+                jitterMetric: jitterMetric, detectorSwitched: detectorSwitched);
 
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(
@@ -422,6 +470,8 @@ internal static class AdaptiveLoop
 
         if (calibrate)
         {
+            NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Calibration);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Calibration, PhaseTransition.Starting));
 
@@ -452,6 +502,8 @@ internal static class AdaptiveLoop
                     accumulatedNs += elapsed;
                     calibrationSamples++;
 
+                    NBenchmarkDiagnostics.RecordSample(elapsed / probeK, -1);
+
                     if (attached)
                         observer.OnSample(new SampleEvent(name, calibrationOrdinal++, elapsed / probeK, probeK, 0, Warmup: true));
 
@@ -475,6 +527,8 @@ internal static class AdaptiveLoop
                 }
             }
 
+            NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Calibration, resolvedK: k);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(
                     name, MeasurementPhase.Calibration, PhaseTransition.Completed, ResolvedK: k));
@@ -491,6 +545,8 @@ internal static class AdaptiveLoop
         }
         else if (o.WarmupIterations is { } explicitWarmup)
         {
+            NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Warmup);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
 
@@ -506,6 +562,8 @@ internal static class AdaptiveLoop
         }
         else
         {
+            NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Warmup);
+
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
 
@@ -520,6 +578,8 @@ internal static class AdaptiveLoop
                 var (elapsed, _, _) = await AcquireSampleAsync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None).ConfigureAwait(false);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
+
+                NBenchmarkDiagnostics.RecordSample(elapsed / k, -1);
 
                 if (attached)
                 {
@@ -544,6 +604,8 @@ internal static class AdaptiveLoop
 
             resolvedWarmup = detector.Count;
         }
+
+        NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Warmup, resolvedWarmup: resolvedWarmup, warmupStop: warmupStop);
 
         if (attached)
             observer.OnPhase(new MeasurementPhaseEvent(
@@ -588,6 +650,8 @@ internal static class AdaptiveLoop
         var reportedTotal = explicitSamples ?? 0;
         var progressInterval = ProgressCadence(explicitSamples ?? autoTune.MaxSamples);
 
+        NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Measurement);
+
         if (attached)
             observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Measurement, PhaseTransition.Starting));
 
@@ -613,6 +677,8 @@ internal static class AdaptiveLoop
                 diagnosticsList?.Add(diagDelta);
                 sampleCount++;
 
+                NBenchmarkDiagnostics.RecordSample(perOp, measureAllocations ? allocDelta / k : -1L);
+
                 if (attached)
                 {
                     var allocPerOp = measureAllocations ? allocDelta / k : 0L;
@@ -637,6 +703,8 @@ internal static class AdaptiveLoop
                 {
                     sampleStop = ci.StopReason;
 
+                    NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
+
                     if (attached)
                     {
                         observer.OnDetector(new DetectorStateEvent(
@@ -660,6 +728,11 @@ internal static class AdaptiveLoop
             if (diagnostics.Exceptions)
                 ExceptionCounter.Unsubscribe();
         }
+
+        if (ci is not null && !detectorEmitted)
+            NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
+
+        NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Measurement, sampleStop: sampleStop);
 
         if (attached)
         {

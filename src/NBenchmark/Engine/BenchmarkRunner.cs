@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using NBenchmark.Diagnostics;
 
 namespace NBenchmark.Engine;
 
@@ -49,6 +50,8 @@ public sealed class BenchmarkRunner
         var progress = spec.Progress;
         var observer = spec.Observer;
 
+        NBenchmarkDiagnostics.ResetBenchmarkState();
+
         try
         {
             progress.OnWarmupStarting(name, PlannedWarmup(options)).GetAwaiter().GetResult();
@@ -58,12 +61,14 @@ public sealed class BenchmarkRunner
                 RunFixedWarmupSync(body, spec, ct);
                 var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
                 progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
+                NBenchmarkDiagnostics.RecordResult(dryRun.Result);
                 observer.OnResult(dryRun.Result);
                 return dryRun;
             }
 
             var adaptive = AdaptiveLoop.Run(name, body, spec, _clock, progress, observer, ct);
             var success = BuildSuccessOutcome(name, spec, totalStartTimestamp, adaptive);
+            NBenchmarkDiagnostics.RecordResult(success.Result);
             observer.OnResult(success.Result);
             return success;
         }
@@ -74,6 +79,7 @@ public sealed class BenchmarkRunner
         catch (Exception ex)
         {
             var errored = BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
+            NBenchmarkDiagnostics.RecordResult(errored.Result);
             observer.OnResult(errored.Result);
             return errored;
         }
@@ -86,6 +92,8 @@ public sealed class BenchmarkRunner
         var progress = spec.Progress;
         var observer = spec.Observer;
 
+        NBenchmarkDiagnostics.ResetBenchmarkState();
+
         try
         {
             await progress.OnWarmupStarting(name, PlannedWarmup(options)).ConfigureAwait(false);
@@ -95,6 +103,7 @@ public sealed class BenchmarkRunner
                 await RunFixedWarmupAsync(body, spec, ct).ConfigureAwait(false);
                 var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
                 await progress.OnWarmupCompleted(name).ConfigureAwait(false);
+                NBenchmarkDiagnostics.RecordResult(dryRun.Result);
                 observer.OnResult(dryRun.Result);
                 return dryRun;
             }
@@ -104,6 +113,7 @@ public sealed class BenchmarkRunner
                 .ConfigureAwait(false);
 
             var success = BuildSuccessOutcome(name, spec, totalStartTimestamp, adaptive);
+            NBenchmarkDiagnostics.RecordResult(success.Result);
             observer.OnResult(success.Result);
             return success;
         }
@@ -114,6 +124,7 @@ public sealed class BenchmarkRunner
         catch (Exception ex)
         {
             var errored = BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
+            NBenchmarkDiagnostics.RecordResult(errored.Result);
             observer.OnResult(errored.Result);
             return errored;
         }

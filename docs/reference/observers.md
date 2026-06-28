@@ -176,5 +176,5 @@ public class LoggingObserver : IMeasurementObserver
 
 ## See also
 
-- `docs/reference/cli.md` - the CLI surface.
+- `docs/reference/bcl-instrumentation.md` - the `System.Diagnostics` Meter/ActivitySource instrumentation.
 - `docs/reference/configuration.md` - the `MeasurementOptions` surface.
