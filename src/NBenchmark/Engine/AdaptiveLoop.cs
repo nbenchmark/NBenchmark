@@ -355,7 +355,11 @@ internal static class AdaptiveLoop
         if (ci is not null && !detectorEmitted)
             NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
 
-        NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Measurement, sampleStop: sampleStop);
+        NBenchmarkDiagnostics.OnPhaseCompleted(
+            name, MeasurementPhase.Measurement,
+            sampleStop: sampleStop,
+            achievedCiWidth: ci?.AchievedRelativeHalfWidth,
+            ciTarget: autoTune.CiTarget);
 
         if (attached)
         {
@@ -732,7 +736,11 @@ internal static class AdaptiveLoop
         if (ci is not null && !detectorEmitted)
             NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
 
-        NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Measurement, sampleStop: sampleStop);
+        NBenchmarkDiagnostics.OnPhaseCompleted(
+            name, MeasurementPhase.Measurement,
+            sampleStop: sampleStop,
+            achievedCiWidth: ci?.AchievedRelativeHalfWidth,
+            ciTarget: autoTune.CiTarget);
 
         if (attached)
         {

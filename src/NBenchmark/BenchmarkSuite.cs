@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using NBenchmark.Diagnostics;
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
@@ -837,83 +838,93 @@ public sealed class BenchmarkSuite(string name)
         var ordered = ApplyExecutionOrder(expanded, order);
         var filteredBenchmarks = ApplyCategoryFilter(ordered);
         var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
-        await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
-        // Apply opt-in hardware/OS controls for the duration of the in-process run. The
-        // scope restores the prior process state on dispose. Isolated suite children
-        // re-run this same entry point and re-derive _options, so they apply the same
-        // settings themselves; Host-mode children receive settings via MeasurementOverrides.
-        using var _ = EnvironmentControl.Apply(_options.Environment);
+        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, profile: _options.Profile.ToString(), runtime: _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
 
-        _suiteSetup?.Invoke();
-
-        var envelopes = filteredBenchmarks
-            .Select(b => b with { IsBaseline = _baselineName is not null && b.OriginalName == _baselineName })
-            .ToList();
-
-        List<BenchmarkResult> results;
-        Dictionary<string, double[]> rawSamples;
-
+        List<BenchmarkResult> results = [];
         try
         {
-            var effectiveOrder = _parameterDefs.Count > 0 ? RunOrder.Declaration : order;
+            await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
-            if (_options.LaunchCount > 1)
+            // Apply opt-in hardware/OS controls for the duration of the in-process run. The
+            // scope restores the prior process state on dispose. Isolated suite children
+            // re-run this same entry point and re-derive _options, so they apply the same
+            // settings themselves; Host-mode children receive settings via MeasurementOverrides.
+            using var _ = EnvironmentControl.Apply(_options.Environment);
+
+            _suiteSetup?.Invoke();
+
+            var envelopes = filteredBenchmarks
+                .Select(b => b with { IsBaseline = _baselineName is not null && b.OriginalName == _baselineName })
+                .ToList();
+
+            Dictionary<string, double[]> rawSamples;
+
+            try
             {
-                var allLaunchResults = new List<IReadOnlyList<BenchmarkResult>>();
-                var allLaunchSamples = new List<Dictionary<string, double[]>>();
+                var effectiveOrder = _parameterDefs.Count > 0 ? RunOrder.Declaration : order;
 
-                for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
+                if (_options.LaunchCount > 1)
                 {
-                    var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
-                    var (launchResults, launchSamples) = await SuiteRunner.RunAsync(
-                        envelopes, effectiveOrder, null, _options, 0,
-                        filteredBenchmarks.Count, NullBenchmarkProgress.Instance, cancellationToken,
-                        onBetweenBenchmarksAsync: null, launchObserver).ConfigureAwait(false);
+                    var allLaunchResults = new List<IReadOnlyList<BenchmarkResult>>();
+                    var allLaunchSamples = new List<Dictionary<string, double[]>>();
 
-                    allLaunchResults.Add(launchResults);
-                    allLaunchSamples.Add(launchSamples);
+                    for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
+                    {
+                        var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
+                        var (launchResults, launchSamples) = await SuiteRunner.RunAsync(
+                            envelopes, effectiveOrder, null, _options, 0,
+                            filteredBenchmarks.Count, NullBenchmarkProgress.Instance, cancellationToken,
+                            onBetweenBenchmarksAsync: null, launchObserver).ConfigureAwait(false);
+
+                        allLaunchResults.Add(launchResults);
+                        allLaunchSamples.Add(launchSamples);
+                    }
+
+                    (results, rawSamples) = AggregateSuiteLaunches(allLaunchResults, allLaunchSamples);
                 }
-
-                (results, rawSamples) = AggregateSuiteLaunches(allLaunchResults, allLaunchSamples);
+                else
+                {
+                    (results, rawSamples) = await SuiteRunner.RunAsync(
+                        envelopes, effectiveOrder, null, _options, 0,
+                        filteredBenchmarks.Count, progress, cancellationToken,
+                        onBetweenBenchmarksAsync: null, observer).ConfigureAwait(false);
+                }
             }
-            else
+            finally
             {
-                (results, rawSamples) = await SuiteRunner.RunAsync(
-                    envelopes, effectiveOrder, null, _options, 0,
-                    filteredBenchmarks.Count, progress, cancellationToken,
-                    onBetweenBenchmarksAsync: null, observer).ConfigureAwait(false);
+                _suiteTeardown?.Invoke();
             }
+
+            await progress.OnSuiteCompleted(results).ConfigureAwait(false);
+
+            // SuiteRunner keys raw samples by benchmark name; the significance and payload paths
+            // need the composite name+runtime key so multi-runtime results don't collide.
+            rawSamples = ToCompositeKeys(results, rawSamples);
+
+            if (applySignificance)
+                ApplyPerParameterSignificance(results, rawSamples);
+
+            if (writeChildPayload)
+            {
+                await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, rawSamples, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (applyReporters)
+            {
+                foreach (var reporter in _reporters)
+                {
+                    await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            return results;
         }
         finally
         {
-            _suiteTeardown?.Invoke();
+            NBenchmarkDiagnostics.OnSuiteCompleted(results);
         }
-
-        await progress.OnSuiteCompleted(results).ConfigureAwait(false);
-
-        // SuiteRunner keys raw samples by benchmark name; the significance and payload paths
-        // need the composite name+runtime key so multi-runtime results don't collide.
-        rawSamples = ToCompositeKeys(results, rawSamples);
-
-        if (applySignificance)
-            ApplyPerParameterSignificance(results, rawSamples);
-
-        if (writeChildPayload)
-        {
-            await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, rawSamples, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        if (applyReporters)
-        {
-            foreach (var reporter in _reporters)
-            {
-                await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
-            }
-        }
-
-        return results;
     }
 
     private static (List<BenchmarkResult> Results, Dictionary<string, double[]> RawSamples) AggregateSuiteLaunches(
@@ -965,90 +976,100 @@ public sealed class BenchmarkSuite(string name)
         var expanded = ExpandEnvelopes();
         var filteredBenchmarks = ApplyCategoryFilter(expanded);
         var displayNames = filteredBenchmarks.Select(b => b.Name).ToList();
-        await _progress.OnSuiteStarting(displayNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
-        var request = new IsolatedRunRequest
-        {
-            Kind = IsolatedRunKind.Suite,
-            InvocationOrdinal = invocationOrdinal,
-            CallerFilePath = callerFilePath,
-            CallerLineNumber = callerLineNumber,
-            CallerMemberName = callerMemberName,
-            SuiteName = Name,
-            BenchmarkDisplayNames = displayNames,
-        };
-
-        IReadOnlyList<IsolatedResultItem> items;
-
-        if (_options.LaunchCount > 1)
-        {
-            var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
-
-            for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
-            {
-                var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                    .ConfigureAwait(false);
-
-                allLaunchItems.Add(launchItems);
-            }
-
-            items = AggregateIsolatedLaunches(allLaunchItems, displayNames, filteredBenchmarks);
-        }
-        else
-            items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
-
-        var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
-        var observer = ResolveObserver();
+        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, profile: _options.Profile.ToString(), runtime: _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
 
         var results = new List<BenchmarkResult>(filteredBenchmarks.Count);
-        var rawSamples = new Dictionary<string, double[]>(filteredBenchmarks.Count);
-
-        for (var i = 0; i < filteredBenchmarks.Count; i++)
+        try
         {
-            var envelope = filteredBenchmarks[i];
-            var isBaseline = _baselineName is not null && envelope.OriginalName == _baselineName;
+            await _progress.OnSuiteStarting(displayNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
-            await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count).ConfigureAwait(false);
-
-            BenchmarkResult result;
-            double[] raw;
-
-            if (byName.TryGetValue(envelope.Name, out var item))
+            var request = new IsolatedRunRequest
             {
-                result = item.Result with { IsBaseline = isBaseline, Description = envelope.Description };
-                raw = item.RawSamples;
+                Kind = IsolatedRunKind.Suite,
+                InvocationOrdinal = invocationOrdinal,
+                CallerFilePath = callerFilePath,
+                CallerLineNumber = callerLineNumber,
+                CallerMemberName = callerMemberName,
+                SuiteName = Name,
+                BenchmarkDisplayNames = displayNames,
+            };
+
+            IReadOnlyList<IsolatedResultItem> items;
+
+            if (_options.LaunchCount > 1)
+            {
+                var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
+
+                for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
+                {
+                    var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    allLaunchItems.Add(launchItems);
+                }
+
+                items = AggregateIsolatedLaunches(allLaunchItems, displayNames, filteredBenchmarks);
             }
             else
+                items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
+
+            var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
+            var observer = ResolveObserver();
+
+            var rawSamples = new Dictionary<string, double[]>(filteredBenchmarks.Count);
+
+            for (var i = 0; i < filteredBenchmarks.Count; i++)
             {
-                var message = $"Isolated child did not return a result for '{envelope.Name}'.";
+                var envelope = filteredBenchmarks[i];
+                var isBaseline = _baselineName is not null && envelope.OriginalName == _baselineName;
 
-                result = OutcomeBuilder.Build(
-                    new RunOutcome.Errored(new InvalidOperationException(message), message),
-                    envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
-                    _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
-                    envelope.Categories).Result;
+                await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count).ConfigureAwait(false);
 
-                raw = [];
+                BenchmarkResult result;
+                double[] raw;
+
+                if (byName.TryGetValue(envelope.Name, out var item))
+                {
+                    result = item.Result with { IsBaseline = isBaseline, Description = envelope.Description };
+                    raw = item.RawSamples;
+                }
+                else
+                {
+                    var message = $"Isolated child did not return a result for '{envelope.Name}'.";
+
+                    result = OutcomeBuilder.Build(
+                        new RunOutcome.Errored(new InvalidOperationException(message), message),
+                        envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
+                        _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
+                        envelope.Categories).Result;
+
+                    raw = [];
+                }
+
+                result = result with { ParameterSet = envelope.ParameterSet };
+                results.Add(result);
+                rawSamples[$"{envelope.Name}\0{result.RuntimeMoniker}"] = raw;
+
+                await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+                observer.OnResult(result);
             }
 
-            result = result with { ParameterSet = envelope.ParameterSet };
-            results.Add(result);
-            rawSamples[$"{envelope.Name}\0{result.RuntimeMoniker}"] = raw;
+            await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
 
-            await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
-            observer.OnResult(result);
+            ApplyPerParameterSignificance(results, rawSamples);
+
+            foreach (var reporter in _reporters)
+            {
+                await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
+            }
+
+            return results;
         }
-
-        await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
-
-        ApplyPerParameterSignificance(results, rawSamples);
-
-        foreach (var reporter in _reporters)
+        finally
         {
-            await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
+            NBenchmarkDiagnostics.OnSuiteCompleted(results);
         }
-
-        return results;
     }
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunMultiRuntimeSuiteAsync(
@@ -1088,129 +1109,138 @@ public sealed class BenchmarkSuite(string name)
         var filteredBenchmarks = ApplyCategoryFilter(expanded);
         var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
 
-        await _progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
-
-        // Apply opt-in hardware/OS controls to the parent process for the duration of the
-        // multi-runtime run, mirroring the single-runtime suite path. Each spawned child
-        // re-runs this entry point and re-derives _options, so it applies the same settings
-        // itself; this scope covers the parent's own launch/aggregation work.
-        using var _ = EnvironmentControl.Apply(_options.Environment);
-
-        _suiteSetup?.Invoke();
+        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, profile: _options.Profile.ToString(), runtime: _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
 
         try
         {
-            var observer = ResolveObserver();
+            await _progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
-            foreach (var build in successfulBuilds)
+            // Apply opt-in hardware/OS controls to the parent process for the duration of the
+            // multi-runtime run, mirroring the single-runtime suite path. Each spawned child
+            // re-runs this entry point and re-derives _options, so it applies the same settings
+            // itself; this scope covers the parent's own launch/aggregation work.
+            using var _ = EnvironmentControl.Apply(_options.Environment);
+
+            _suiteSetup?.Invoke();
+
+            try
             {
-                var tfm = build.Moniker.ToTargetFramework();
+                var observer = ResolveObserver();
 
-                try
+                foreach (var build in successfulBuilds)
                 {
-                    Console.WriteLine($"  Running under {tfm}...");
+                    var tfm = build.Moniker.ToTargetFramework();
 
-                    var request = new IsolatedRunRequest
+                    try
                     {
-                        Kind = IsolatedRunKind.Suite,
-                        InvocationOrdinal = invocationOrdinal,
-                        CallerFilePath = callerFilePath,
-                        CallerLineNumber = callerLineNumber,
-                        CallerMemberName = callerMemberName,
-                        SuiteName = Name,
-                        BenchmarkDisplayNames = envelopeNames,
-                        RuntimeMoniker = build.Moniker,
-                        EntryAssemblyPath = build.DllPath,
-                    };
+                        Console.WriteLine($"  Running under {tfm}...");
 
-                    IReadOnlyList<IsolatedResultItem> items;
-
-                    if (_options.LaunchCount > 1)
-                    {
-                        var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
-
-                        for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
+                        var request = new IsolatedRunRequest
                         {
-                            var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                                .ConfigureAwait(false);
+                            Kind = IsolatedRunKind.Suite,
+                            InvocationOrdinal = invocationOrdinal,
+                            CallerFilePath = callerFilePath,
+                            CallerLineNumber = callerLineNumber,
+                            CallerMemberName = callerMemberName,
+                            SuiteName = Name,
+                            BenchmarkDisplayNames = envelopeNames,
+                            RuntimeMoniker = build.Moniker,
+                            EntryAssemblyPath = build.DllPath,
+                        };
 
-                            allLaunchItems.Add(launchItems);
-                        }
+                        IReadOnlyList<IsolatedResultItem> items;
 
-                        items = AggregateIsolatedLaunches(allLaunchItems, envelopeNames, filteredBenchmarks);
-                    }
-                    else
-                    {
-                        items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                            .ConfigureAwait(false);
-                    }
-
-                    var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
-
-                    for (var i = 0; i < filteredBenchmarks.Count; i++)
-                    {
-                        var envelope = filteredBenchmarks[i];
-                        var isBaseline = _baselineName is not null && envelope.OriginalName == _baselineName;
-
-                        await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count)
-                            .ConfigureAwait(false);
-
-                        BenchmarkResult result;
-
-                        if (byName.TryGetValue(envelope.Name, out var item))
+                        if (_options.LaunchCount > 1)
                         {
-                            result = item.Result with
+                            var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
+
+                            for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
                             {
-                                IsBaseline = isBaseline,
-                                Description = envelope.Description,
-                                RuntimeMoniker = tfm,
-                            };
+                                var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                                    .ConfigureAwait(false);
 
-                            if (item.RawSamples.Length > 0)
-                                rawSamples[$"{envelope.Name}\0{tfm}"] = item.RawSamples;
+                                allLaunchItems.Add(launchItems);
+                            }
+
+                            items = AggregateIsolatedLaunches(allLaunchItems, envelopeNames, filteredBenchmarks);
                         }
                         else
                         {
-                            var message = $"Isolated child did not return a result for '{envelope.Name}'.";
-
-                            result = OutcomeBuilder.Build(
-                                    new RunOutcome.Errored(new InvalidOperationException(message), message),
-                                    envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
-                                    _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
-                                    envelope.Categories).Result with
-                                {
-                                    RuntimeMoniker = tfm,
-                                };
+                            items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                                .ConfigureAwait(false);
                         }
 
-                        result = result with { ParameterSet = envelope.ParameterSet };
-                        allResults.Add(result);
+                        var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
 
-                        await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
-                        observer.OnResult(result);
+                        for (var i = 0; i < filteredBenchmarks.Count; i++)
+                        {
+                            var envelope = filteredBenchmarks[i];
+                            var isBaseline = _baselineName is not null && envelope.OriginalName == _baselineName;
+
+                            await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count)
+                                .ConfigureAwait(false);
+
+                            BenchmarkResult result;
+
+                            if (byName.TryGetValue(envelope.Name, out var item))
+                            {
+                                result = item.Result with
+                                {
+                                    IsBaseline = isBaseline,
+                                    Description = envelope.Description,
+                                    RuntimeMoniker = tfm,
+                                };
+
+                                if (item.RawSamples.Length > 0)
+                                    rawSamples[$"{envelope.Name}\0{tfm}"] = item.RawSamples;
+                            }
+                            else
+                            {
+                                var message = $"Isolated child did not return a result for '{envelope.Name}'.";
+
+                                result = OutcomeBuilder.Build(
+                                        new RunOutcome.Errored(new InvalidOperationException(message), message),
+                                        envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
+                                        _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
+                                        envelope.Categories).Result with
+                                    {
+                                        RuntimeMoniker = tfm,
+                                    };
+                            }
+
+                            result = result with { ParameterSet = envelope.ParameterSet };
+                            allResults.Add(result);
+
+                            await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+                            observer.OnResult(result);
+                        }
+                    }
+                    finally
+                    {
+                        MultiRuntimeOrchestrator.TryDeleteBuildOutput(build.OutputDirectory);
                     }
                 }
-                finally
-                {
-                    MultiRuntimeOrchestrator.TryDeleteBuildOutput(build.OutputDirectory);
-                }
             }
+            finally
+            {
+                _suiteTeardown?.Invoke();
+            }
+
+            await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
+
+            ApplyPerParameterSignificance(allResults, rawSamples);
+
+            foreach (var reporter in _reporters)
+            {
+                await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+            }
+
+            return allResults;
         }
         finally
         {
-            _suiteTeardown?.Invoke();
+            NBenchmarkDiagnostics.OnSuiteCompleted(allResults);
         }
-
-        await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
-
-        ApplyPerParameterSignificance(allResults, rawSamples);
-
-        foreach (var reporter in _reporters)
-        {
-            await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
-        }
-
-        return allResults;
     }
 
     private static IReadOnlyList<IsolatedResultItem> AggregateIsolatedLaunches(

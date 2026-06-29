@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using NBenchmark.Diagnostics;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using NBenchmark.Lifecycle;
@@ -434,77 +435,92 @@ public sealed class BenchmarkHarness
 
         var totalBenchmarks = allNames.Count;
 
-        await _progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
+        NBenchmarkDiagnostics.OnSuiteStarting(
+            _cliArgs.Filter ?? "harness",
+            totalBenchmarks,
+            profile: _options.Profile.ToString(),
+            runtime: _cliArgs.Runtimes is { Count: > 0 } runtimes ? string.Join(",", runtimes.Select(r => r.ToTargetFramework())) : null,
+            seed: _cliArgs.Seed,
+            runOrder: (_cliArgs.RunOrder ?? _runOrder).ToString());
 
-        // Under --dry-run, --in-process, or WithIsolation(false), nothing is spawned. A
-        // dry run never invokes a body, so isolation would only add process overhead.
-        var inProcessGlobal = _cliArgs.InProcess || !_isolationEnabled || _cliArgs.DryRun;
-
-        var runningIndex = 0;
-
-        foreach (var suite in filtered)
+        try
         {
-            var suiteResultStart = allResults.Count;
-            var inProcess = new List<BenchmarkMethodDefinition>();
-            var perClass = new List<BenchmarkMethodDefinition>();
-            var perBenchmark = new List<BenchmarkMethodDefinition>();
-            var autoUpgradedResultNames = new HashSet<string>();
+            await _progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
 
-            foreach (var benchmark in suite.Benchmarks)
+            // Under --dry-run, --in-process, or WithIsolation(false), nothing is spawned. A
+            // dry run never invokes a body, so isolation would only add process overhead.
+            var inProcessGlobal = _cliArgs.InProcess || !_isolationEnabled || _cliArgs.DryRun;
+
+            var runningIndex = 0;
+
+            foreach (var suite in filtered)
             {
-                var decision = ResolveIsolation(benchmark, suite, inProcessGlobal, _instanceFactory is not null, out var autoUpgraded);
+                var suiteResultStart = allResults.Count;
+                var inProcess = new List<BenchmarkMethodDefinition>();
+                var perClass = new List<BenchmarkMethodDefinition>();
+                var perBenchmark = new List<BenchmarkMethodDefinition>();
+                var autoUpgradedResultNames = new HashSet<string>();
 
-                if (autoUpgraded)
-                    autoUpgradedResultNames.Add($"{suite.Type.Name}.{benchmark.DisplayName}");
-
-                switch (decision)
+                foreach (var benchmark in suite.Benchmarks)
                 {
-                    case IsolationDecision.InProcess:
-                        inProcess.Add(benchmark);
-                        break;
-                    case IsolationDecision.PerBenchmark:
-                        perBenchmark.Add(benchmark);
-                        break;
-                    default:
-                        perClass.Add(benchmark);
-                        break;
+                    var decision = ResolveIsolation(benchmark, suite, inProcessGlobal, _instanceFactory is not null, out var autoUpgraded);
+
+                    if (autoUpgraded)
+                        autoUpgradedResultNames.Add($"{suite.Type.Name}.{benchmark.DisplayName}");
+
+                    switch (decision)
+                    {
+                        case IsolationDecision.InProcess:
+                            inProcess.Add(benchmark);
+                            break;
+                        case IsolationDecision.PerBenchmark:
+                            perBenchmark.Add(benchmark);
+                            break;
+                        default:
+                            perClass.Add(benchmark);
+                            break;
+                    }
                 }
+
+                if (inProcess.Count > 0)
+                {
+                    await RunInProcessSuiteAsync(
+                        suite with { Benchmarks = inProcess }, suiteOptions, runningIndex, totalBenchmarks,
+                        allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+
+                    runningIndex += inProcess.Count;
+                }
+
+                if (perClass.Count > 0)
+                {
+                    await RunIsolatedGroupAsync(
+                        suite, perClass, runningIndex, totalBenchmarks,
+                        allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+
+                    runningIndex += perClass.Count;
+                }
+
+                foreach (var benchmark in perBenchmark)
+                {
+                    await RunIsolatedGroupAsync(
+                        suite, [benchmark], runningIndex, totalBenchmarks,
+                        allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+
+                    runningIndex++;
+                }
+
+                // Attach the auto-isolation upgrade warning to every result that was
+                // auto-upgraded from PerClass to PerBenchmark by the b-factory rule.
+                if (autoUpgradedResultNames.Count > 0)
+                    ApplyAutoIsolationUpgradeWarning(allResults, autoUpgradedResultNames, suiteResultStart);
             }
 
-            if (inProcess.Count > 0)
-            {
-                await RunInProcessSuiteAsync(
-                    suite with { Benchmarks = inProcess }, suiteOptions, runningIndex, totalBenchmarks,
-                    allResults, rawSamples, cancellationToken).ConfigureAwait(false);
-
-                runningIndex += inProcess.Count;
-            }
-
-            if (perClass.Count > 0)
-            {
-                await RunIsolatedGroupAsync(
-                    suite, perClass, runningIndex, totalBenchmarks,
-                    allResults, rawSamples, cancellationToken).ConfigureAwait(false);
-
-                runningIndex += perClass.Count;
-            }
-
-            foreach (var benchmark in perBenchmark)
-            {
-                await RunIsolatedGroupAsync(
-                    suite, [benchmark], runningIndex, totalBenchmarks,
-                    allResults, rawSamples, cancellationToken).ConfigureAwait(false);
-
-                runningIndex++;
-            }
-
-            // Attach the auto-isolation upgrade warning to every result that was
-            // auto-upgraded from PerClass to PerBenchmark by the b-factory rule.
-            if (autoUpgradedResultNames.Count > 0)
-                ApplyAutoIsolationUpgradeWarning(allResults, autoUpgradedResultNames, suiteResultStart);
+            await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
         }
-
-        await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
+        finally
+        {
+            NBenchmarkDiagnostics.OnSuiteCompleted(allResults);
+        }
 
         // SuiteRunner and the isolated-launch aggregators key raw samples by benchmark name;
         // ApplyPerClassSignificance needs the composite name+runtime key so multi-runtime

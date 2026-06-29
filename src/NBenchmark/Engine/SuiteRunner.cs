@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using NBenchmark.Diagnostics;
 
 namespace NBenchmark.Engine;
 
@@ -43,20 +44,48 @@ internal static class SuiteRunner
 
             await progress.OnBenchmarkStarting(envelope.Name, startIndex + index + 1, totalBenchmarks).ConfigureAwait(false);
 
+            NBenchmarkDiagnostics.OnBenchmarkRunStarting(envelope.Name, envelope.ClassName, envelope.IsBaseline, envelope.ParameterSet);
+
             MeasurementOutcome outcome;
+            BenchmarkResult completedResult;
 
             try
             {
-                outcome = await envelope.RunAsync(spec, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    outcome = await envelope.RunAsync(spec, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    outcome = OutcomeBuilder.Build(
+                        new RunOutcome.Errored(ex),
+                        envelope.Name,
+                        envelope.ClassName,
+                        envelope.Description,
+                        envelope.IsBaseline,
+                        spec.Options,
+                        TimeSpan.Zero,
+                        TimeSpan.Zero,
+                        0,
+                        null,
+                        envelope.Categories);
+                }
+
+                completedResult = outcome.Result with { ParameterSet = envelope.ParameterSet };
+
+                results.Add(completedResult);
+                rawSamples[envelope.Name] = outcome.RawSamples;
+
+                NBenchmarkDiagnostics.OnBenchmarkRunCompleted(completedResult);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                outcome = OutcomeBuilder.Build(
-                    new RunOutcome.Errored(ex),
+                var cancelledOutcome = OutcomeBuilder.Build(
+                    new RunOutcome.Errored(new OperationCanceledException(cancellationToken), "Cancelled"),
                     envelope.Name,
                     envelope.ClassName,
                     envelope.Description,
@@ -67,12 +96,11 @@ internal static class SuiteRunner
                     0,
                     null,
                     envelope.Categories);
+
+                completedResult = cancelledOutcome.Result with { ParameterSet = envelope.ParameterSet };
+                NBenchmarkDiagnostics.OnBenchmarkRunCompleted(completedResult);
+                throw;
             }
-
-            var completedResult = outcome.Result with { ParameterSet = envelope.ParameterSet };
-
-            results.Add(completedResult);
-            rawSamples[envelope.Name] = outcome.RawSamples;
 
             await progress.OnBenchmarkCompleted(completedResult).ConfigureAwait(false);
 
