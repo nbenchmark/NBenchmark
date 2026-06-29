@@ -224,6 +224,11 @@ public class TelemetryResourceTests
         foreach (var name in ManagedEnvVars)
             saved[name] = Environment.GetEnvironmentVariable(name);
 
+        // Clear every managed var so real CI env vars (e.g. GITHUB_ACTIONS on a GitHub runner)
+        // do not leak into tests that set a different provider.
+        foreach (var name in ManagedEnvVars)
+            Environment.SetEnvironmentVariable(name, null);
+
         foreach (var (name, value) in vars)
             Environment.SetEnvironmentVariable(name, value);
 
