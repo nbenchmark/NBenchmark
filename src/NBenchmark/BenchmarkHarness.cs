@@ -39,6 +39,22 @@ public sealed class BenchmarkHarness
         harness._cliArgs = cliArgs;
         harness._detail = cliArgs.Detail;
 
+        // Mirror --otlp-endpoint into the env var the ChildProcessLauncher forwards to isolated
+        // children. Setting it here (in both parent and child) means a re-run entry point in the
+        // child picks up the same endpoint from its own env. A child never receives --otlp-endpoint
+        // as a CLI arg (the request payload does not carry it), so this env-var mirror is the
+        // channel. When the user already set OTEL_EXPORTER_OTLP_ENDPOINT, the explicit flag wins
+        // so an SDK wired against the standard variable picks it up without extra configuration.
+        if (!string.IsNullOrEmpty(cliArgs.OtlpEndpoint))
+        {
+            Environment.SetEnvironmentVariable(
+                ChildProcessLauncher.OtelEndpointEnvVar,
+                cliArgs.OtlpEndpoint);
+
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+                Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", cliArgs.OtlpEndpoint);
+        }
+
         foreach (var name in cliArgs.ReporterNames)
         {
             if (ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out var reporter))
@@ -127,6 +143,18 @@ public sealed class BenchmarkHarness
             1 => _observers[0],
             _ => new CompositeMeasurementObserver(_observers),
         };
+
+    /// <summary>
+    ///     The observer names forwarded to isolated children so they can activate the same
+    ///     registry-resolved observers as the parent. Only CLI-supplied names
+    ///     (<c>--observer &lt;name&gt;</c>) cross the process boundary: programmatic observer
+    ///     instances added via <see cref="WithObserver(IMeasurementObserver)" /> are live
+    ///     objects and cannot be serialized. The child resolves each name through
+    ///     <see cref="ObserverRegistry" />, which is populated identically by
+    ///     <c>[ModuleInitializer]</c> self-registration in the child's fresh process.
+    /// </summary>
+    private IReadOnlyList<string> ResolveObserverNames()
+        => _cliArgs.ObserverNames;
 
     public BenchmarkHarness WithInstanceFactory(Func<Type, object> factory)
     {
@@ -690,6 +718,7 @@ public sealed class BenchmarkHarness
                 Overrides = MeasurementOverrides.FromCliArgs(_cliArgs),
                 RuntimeMoniker = moniker,
                 EntryAssemblyPath = entryAssemblyPath,
+                ObserverNames = ResolveObserverNames(),
             };
 
             var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
@@ -1274,6 +1303,11 @@ public sealed class BenchmarkHarness
             DisplayPrefix = suite.Type.Name,
             BenchmarkDisplayNames = benchmarks.Select(b => b.DisplayName).ToList(),
             Overrides = MeasurementOverrides.FromCliArgs(_cliArgs),
+            // Forward the resolved observer names so isolated children activate the same
+            // observers (e.g. the dashboard, an OTLP exporter) as the parent. The child resolves
+            // them through ObserverRegistry, which is populated identically by [ModuleInitializer]
+            // self-registration in the child's fresh process.
+            ObserverNames = ResolveObserverNames(),
         };
 
         IReadOnlyList<IsolatedResultItem> items;
@@ -1426,11 +1460,11 @@ public sealed class BenchmarkHarness
 
             if (suite.Lifetime == InstanceLifetime.PerClass)
             {
-                return await RunPerClassHostChildAsync(suite, selected, options, cancellationToken)
+                return await RunPerClassHostChildAsync(suite, selected, options, ResolveChildObserver(request), cancellationToken)
                     .ConfigureAwait(false);
             }
 
-            return await RunPerMethodHostChildAsync(suite, selected, options, cancellationToken)
+            return await RunPerMethodHostChildAsync(suite, selected, options, ResolveChildObserver(request), cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -1441,10 +1475,43 @@ public sealed class BenchmarkHarness
         return Array.Empty<BenchmarkResult>();
     }
 
+    /// <summary>
+    ///     Resolves the observer names forwarded by the parent into a single
+    ///     <see cref="IMeasurementObserver" /> the child's measurement loop should see. The
+    ///     child re-runs the entry assembly, so <c>[ModuleInitializer]</c> self-registration
+    ///     populates <see cref="ObserverRegistry" /> identically and the names resolve to the
+    ///     same factories. An empty list collapses to <see cref="NullMeasurementObserver.Instance" />
+    ///     so the hot-path guard stays false and the child pays no dispatch cost.
+    /// </summary>
+    private static IMeasurementObserver ResolveChildObserver(IsolatedRunRequest request)
+    {
+        if (request.ObserverNames.Count == 0)
+            return NullMeasurementObserver.Instance;
+
+        var resolved = new List<IMeasurementObserver>(request.ObserverNames.Count);
+
+        foreach (var name in request.ObserverNames)
+        {
+            if (ObserverRegistry.TryCreate(name, out var observer)
+                && observer != NullMeasurementObserver.Instance)
+            {
+                resolved.Add(observer);
+            }
+        }
+
+        return resolved.Count switch
+        {
+            0 => NullMeasurementObserver.Instance,
+            1 => resolved[0],
+            _ => new CompositeMeasurementObserver(resolved),
+        };
+    }
+
     private async Task<IReadOnlyList<BenchmarkResult>> RunPerClassHostChildAsync(
         BenchmarkSuiteDefinition suite,
         IReadOnlyList<BenchmarkMethodDefinition> selected,
         MeasurementOptions options,
+        IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
         var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
@@ -1484,7 +1551,7 @@ public sealed class BenchmarkHarness
                 (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, RunOrder.Declaration, null, options,
                     0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken, betweenBenchmarksReset,
-                    NullMeasurementObserver.Instance).ConfigureAwait(false);
+                    observer).ConfigureAwait(false);
 
                 ApplyPerClassIndependenceWarning(results, suite, options);
             }
@@ -1504,6 +1571,7 @@ public sealed class BenchmarkHarness
         BenchmarkSuiteDefinition suite,
         IReadOnlyList<BenchmarkMethodDefinition> selected,
         MeasurementOptions options,
+        IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
         var results = new List<BenchmarkResult>();
@@ -1539,7 +1607,7 @@ public sealed class BenchmarkHarness
                 var (batchResults, batchSamples) = await SuiteRunner.RunAsync(
                     [envelope], RunOrder.Declaration, null, options,
                     0, 1, NullBenchmarkProgress.Instance, cancellationToken,
-                    onBetweenBenchmarksAsync: null, NullMeasurementObserver.Instance).ConfigureAwait(false);
+                    onBetweenBenchmarksAsync: null, observer).ConfigureAwait(false);
 
                 results.AddRange(batchResults);
 

@@ -111,6 +111,15 @@ internal sealed record CliArgs
     public IReadOnlyList<RuntimeMoniker> Runtimes { get; init; } = [];
 
     /// <summary>
+    ///     The OTLP endpoint an OpenTelemetry SDK in the entry assembly should export to. When
+    ///     set, the harness mirrors this into the <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> environment
+    ///     variable before spawning isolated children, so children stream to the same collector
+    ///     as the parent. <c>null</c> leaves the env var untouched (the SDK uses its own default
+    ///     or whatever the user already configured).
+    /// </summary>
+    public string? OtlpEndpoint { get; init; }
+
+    /// <summary>
     ///     Pure parse: tokenises <paramref name="args" />, validates ranges, and returns
     ///     both the structured result and any error messages. No console I/O, no
     ///     <c>Environment.ExitCode</c> mutation.
@@ -158,6 +167,7 @@ internal sealed record CliArgs
         ProcessPriorityClass? processPriority = null;
         var crossClass = false;
         var dedicatedHostGuidance = false;
+        string? otlpEndpoint = null;
 
         var errors = new List<string>();
 
@@ -447,6 +457,16 @@ internal sealed record CliArgs
                 case "--dedicated-host-guidance":
                     dedicatedHostGuidance = true;
                     break;
+                case "--otlp-endpoint" when i + 1 < args.Length:
+                    var endpointStr = args[++i];
+
+                    if (Uri.TryCreate(endpointStr, UriKind.Absolute, out var endpointUri)
+                        && (endpointUri.Scheme == Uri.UriSchemeHttp || endpointUri.Scheme == Uri.UriSchemeHttps))
+                        otlpEndpoint = endpointStr;
+                    else
+                        errors.Add($"Invalid --otlp-endpoint value '{endpointStr}'. Must be an absolute http:// or https:// URL.");
+
+                    break;
                 case "--runtimes" when i + 1 < args.Length:
                     var runtimesRaw = args[++i];
                     var runtimeParts = runtimesRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -469,7 +489,7 @@ internal sealed record CliArgs
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
                     or "--launch-count" or "--percentiles" or "--runtimes"
-                    or "--cpu-affinity" or "--priority":
+                    or "--cpu-affinity" or "--priority" or "--otlp-endpoint":
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -520,6 +540,7 @@ internal sealed record CliArgs
             CpuAffinity = cpuAffinity,
             ProcessPriority = processPriority,
             DedicatedHostGuidance = dedicatedHostGuidance,
+            OtlpEndpoint = otlpEndpoint,
         }, errors);
     }
 
@@ -693,6 +714,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --cpu-affinity <list>  Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)");
         Console.WriteLine("  --priority <level>     Process priority: normal, idle, belownormal, abovenormal, high, realtime");
         Console.WriteLine("  --dedicated-host-guidance  Warn when the host looks noisy (low core count, unraisable priority, macOS throttling)");
+        Console.WriteLine("  --otlp-endpoint <url>  OTLP endpoint for the OpenTelemetry SDK (http:// or https://); forwarded to isolated children");
         Console.WriteLine("  --help, -h             Show this help text");
     }
 }

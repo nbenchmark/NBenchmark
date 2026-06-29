@@ -161,4 +161,63 @@ public class IsolatedRunApisTests
     }
 
     private static string CurrentFilePath([CallerFilePath] string path = "") => path;
+
+    [Fact]
+    public async Task IsolatedRunRequest_ObserverNames_RoundTrip_Through_Serialization()
+    {
+        // ObserverNames is the field that lets a parent forward its --observer names to an
+        // isolated child. The child resolves each name through ObserverRegistry, so the names
+        // must survive the JSON round-trip the ChildProcessLauncher uses for the request file.
+        var request = new IsolatedRunRequest
+        {
+            Kind = IsolatedRunKind.Host,
+            DeclaringTypeFullName = "MyClass",
+            BenchmarkDisplayNames = ["MethodA", "MethodB"],
+            ObserverNames = ["live", "logging"],
+        };
+
+        var path = Path.Combine(Path.GetTempPath(), $"nbench-obs-request-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            await ChildProcessLauncher.WriteRequestAsync(path, request, CancellationToken.None);
+            var read = await ChildProcessLauncher.ReadRequestAsync(path);
+
+            Assert.Equal(IsolatedRunKind.Host, read.Kind);
+            Assert.Equal("MyClass", read.DeclaringTypeFullName);
+            Assert.Equal(["live", "logging"], read.ObserverNames);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task IsolatedRunRequest_ObserverNames_Defaults_To_Empty()
+    {
+        // When the parent does not forward any observers, the field defaults to empty so the
+        // child runs with NullMeasurementObserver.Instance (no hot-path cost).
+        var request = new IsolatedRunRequest
+        {
+            Kind = IsolatedRunKind.Suite,
+            SuiteName = "test",
+        };
+
+        var path = Path.Combine(Path.GetTempPath(), $"nbench-obs-empty-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            await ChildProcessLauncher.WriteRequestAsync(path, request, CancellationToken.None);
+            var read = await ChildProcessLauncher.ReadRequestAsync(path);
+
+            Assert.Empty(read.ObserverNames);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
 }

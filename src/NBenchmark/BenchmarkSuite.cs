@@ -698,6 +698,37 @@ public sealed class BenchmarkSuite(string name)
         };
 
     /// <summary>
+    ///     Resolves observer names forwarded by a parent (via <see cref="IsolatedRunRequest.ObserverNames" />)
+    ///     into a single <see cref="IMeasurementObserver" /> for an isolated suite child. The child
+    ///     re-runs the entry assembly, so <c>[ModuleInitializer]</c> self-registration populates
+    ///     <see cref="ObserverRegistry" /> identically and the names resolve to the same factories.
+    ///     An empty list collapses to <see cref="NullMeasurementObserver.Instance" />.
+    /// </summary>
+    private static IMeasurementObserver ResolveChildObservers(IReadOnlyList<string> names)
+    {
+        if (names.Count == 0)
+            return NullMeasurementObserver.Instance;
+
+        var resolved = new List<IMeasurementObserver>(names.Count);
+
+        foreach (var name in names)
+        {
+            if (ObserverRegistry.TryCreate(name, out var observer)
+                && observer != NullMeasurementObserver.Instance)
+            {
+                resolved.Add(observer);
+            }
+        }
+
+        return resolved.Count switch
+        {
+            0 => NullMeasurementObserver.Instance,
+            1 => resolved[0],
+            _ => new CompositeMeasurementObserver(resolved),
+        };
+    }
+
+    /// <summary>
     ///     Tags every subsequent benchmark added to the suite with the supplied categories.
     ///     <c>.WithCategories()</c> does not affect benchmarks already added.
     /// </summary>
@@ -777,9 +808,16 @@ public sealed class BenchmarkSuite(string name)
             var isTarget = IsolatedRunContext.IsSuiteRequestMatch(
                 invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, Name);
 
+            // Resolve observers the parent forwarded by name (registry-resolvable only; the
+            // suite's programmatic observers are instances and cannot cross a process
+            // boundary). An empty list collapses to NullMeasurementObserver.Instance.
+            var childObserver = IsolatedRunContext.TryGetActiveRequest(out var childRequest)
+                ? ResolveChildObservers(childRequest.ObserverNames)
+                : NullMeasurementObserver.Instance;
+
             var results = await RunInProcessCoreAsync(
                 NullBenchmarkProgress.Instance,
-                NullMeasurementObserver.Instance,
+                childObserver,
                 RunOrder.Declaration,
                 false,
                 false,
@@ -787,8 +825,7 @@ public sealed class BenchmarkSuite(string name)
                 cancellationToken).ConfigureAwait(false);
 
             // Stamp RuntimeMoniker on child results before returning/writing payload.
-            if (IsolatedRunContext.TryGetActiveRequest(out var childRequest)
-                && childRequest.RuntimeMoniker is { } runtimeMoniker)
+            if (childRequest is not null && childRequest.RuntimeMoniker is { } runtimeMoniker)
             {
                 var tfm = runtimeMoniker.ToTargetFramework();
                 results = results.Select(r => r with { RuntimeMoniker = tfm }).ToList();

@@ -25,6 +25,31 @@ internal static class ChildProcessLauncher
     internal const string RequestPathEnvVar = "NBENCHMARK_ISOLATED_REQUEST_PATH";
     internal const string OutputPathEnvVar = "NBENCHMARK_ISOLATED_OUTPUT_PATH";
 
+    /// <summary>
+    ///     The OTLP endpoint the parent was told to export to (via <c>--otlp-endpoint</c> or
+    ///     the standard <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> env var). When set, the launcher
+    ///     forwards it to every spawned child so isolated children stream their telemetry to
+    ///     the same collector as the parent - this is the cross-process channel that the
+    ///     in-memory <c>IBenchmarkProgress</c> callback cannot provide.
+    /// </summary>
+    internal const string OtelEndpointEnvVar = "NBENCHMARK_OTEL_ENDPOINT";
+
+    /// <summary>
+    ///     The OTel-standard env vars forwarded verbatim to children so the OpenTelemetry SDK
+    ///     (when the user has wired one in their entry point) picks up the same exporter and
+    ///     resource attributes in the child as in the parent. A child that re-runs the entry
+    ///     assembly re-runs the user's SDK wiring, so these are the only values needed.
+    /// </summary>
+    private static readonly string[] OtelStandardEnvVars =
+    [
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_PROTOCOL",
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        "OTEL_EXPORTER_OTLP_TIMEOUT",
+        "OTEL_RESOURCE_ATTRIBUTES",
+        "OTEL_SERVICE_NAME",
+    ];
+
     private const int StdoutTailLines = 20;
 
     internal static readonly JsonSerializerOptions SerializerOptions = new()
@@ -85,10 +110,7 @@ internal static class ChildProcessLauncher
         else
             psi.FileName = processPath!;
 
-        foreach (var (name, value) in environmentVariables)
-        {
-            psi.Environment[name] = value;
-        }
+        ApplyTelemetryEnvironment(psi, environmentVariables);
 
         return psi;
     }
@@ -115,12 +137,48 @@ internal static class ChildProcessLauncher
         psi.ArgumentList.Add("exec");
         psi.ArgumentList.Add(entryAssemblyPath);
 
+        ApplyTelemetryEnvironment(psi, environmentVariables);
+
+        return psi;
+    }
+
+    /// <summary>
+    ///     Applies the caller-supplied environment variables and the inherited OpenTelemetry
+    ///     exporter/resource variables to <paramref name="psi" />. The OTel variables are
+    ///     forwarded so an isolated child streams to the same collector as the parent - the
+    ///     in-memory observer callback cannot cross the process boundary, so OTLP is the
+    ///     cross-process channel. Caller-supplied variables win over the inherited OTel ones
+    ///     so a caller can override the endpoint for a specific child if needed.
+    /// </summary>
+    private static void ApplyTelemetryEnvironment(
+        ProcessStartInfo psi,
+        params (string Name, string Value)[] environmentVariables)
+    {
+        // Forward the OTel-standard exporter and resource variables first so caller-supplied
+        // variables (added afterwards) can override any of them.
+        foreach (var name in OtelStandardEnvVars)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+
+            if (!string.IsNullOrEmpty(value))
+                psi.Environment[name] = value;
+        }
+
+        // The NBenchmark-specific endpoint (set by --otlp-endpoint) is also mirrored into the
+        // OTel-standard OTEL_EXPORTER_OTLP_ENDPOINT variable when the user has not set it
+        // themselves, so an SDK wired only against the standard variable still picks it up.
+        var nbenchmarkEndpoint = Environment.GetEnvironmentVariable(OtelEndpointEnvVar);
+
+        if (!string.IsNullOrEmpty(nbenchmarkEndpoint)
+            && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+        {
+            psi.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"] = nbenchmarkEndpoint;
+        }
+
         foreach (var (name, value) in environmentVariables)
         {
             psi.Environment[name] = value;
         }
-
-        return psi;
     }
 
     public static async Task WritePayloadAsync(

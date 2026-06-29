@@ -145,6 +145,15 @@ internal static class NBenchmarkDiagnostics
                 activity.SetTag("nbenchmark.seed", seed.Value);
             if (runOrder is not null)
                 activity.SetTag("nbenchmark.run_order", runOrder);
+
+            // Resource attributes (commit SHA, branch, CI run id, host, runtime) are stamped on
+            // the root span so a backend can join every child span and metric onto the run
+            // without each emit point repeating them. Read once per process; cached afterwards.
+            foreach (var (key, value) in TelemetryResource.Attributes)
+            {
+                activity.SetTag(key, value);
+            }
+
             _currentSuiteActivity = activity;
         }
     }

@@ -821,6 +821,68 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_OtlpEndpoint_HttpUrl_SetsValue()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "http://localhost:4317"]);
+
+        Assert.Empty(errors);
+        Assert.Equal("http://localhost:4317", result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_HttpsUrl_SetsValue()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "https://collector.example.com:4318"]);
+
+        Assert.Empty(errors);
+        Assert.Equal("https://collector.example.com:4318", result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_InvalidUrl_AddsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "not-a-url"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.OtlpEndpoint);
+        Assert.Contains(errors, e => e.Contains("--otlp-endpoint") && e.Contains("http://"));
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_RelativeUrl_AddsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "/path"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_FtpScheme_AddsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "ftp://localhost:4317"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_MissingValue_AddsError()
+    {
+        var (_, errors) = CliArgs.ParseCore(["--otlp-endpoint"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Contains(errors, e => e.Contains("Missing value") && e.Contains("--otlp-endpoint"));
+    }
+
+    [Fact]
     public void PrintHelp_WritesUsageToStdout()
     {
         var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp());
@@ -835,6 +897,7 @@ public class CliArgsTests
         Assert.Contains("--cpu-affinity", stdout);
         Assert.Contains("--priority", stdout);
         Assert.Contains("--dedicated-host-guidance", stdout);
+        Assert.Contains("--otlp-endpoint", stdout);
     }
 
     private static string CaptureConsoleOutput(Action action)
