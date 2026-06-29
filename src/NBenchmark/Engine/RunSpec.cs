@@ -19,6 +19,7 @@ public readonly record struct RunSpec
     public Action? IterationSetup { get; init; }
     public Action? IterationTeardown { get; init; }
     public IBenchmarkProgress Progress { get; init; } = NullBenchmarkProgress.Instance;
+    public IMeasurementObserver Observer { get; init; } = NullMeasurementObserver.Instance;
 
     /// <summary>
     ///     The class that declared the benchmark. Empty for suite-mode entries that are not

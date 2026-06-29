@@ -270,6 +270,18 @@ internal sealed record IsolatedRunRequest
     public MeasurementOverrides Overrides { get; init; } = new();
 
     /// <summary>
+    ///     Observer names the parent resolved from <c>--observer</c> flags and programmatic
+    ///     <c>WithObserver</c> calls. The child resolves each through
+    ///     <c>NBenchmark.Reporters.ObserverRegistry</c> so the same observers (e.g. the
+    ///     <c>live</c> dashboard observer, an OTLP-exporting observer) fire in the child as in
+    ///     the parent. Empty when the parent attached no observer, in which case the child runs
+    ///     with <c>NullMeasurementObserver.Instance</c>. The child re-runs the entry assembly, so
+    ///     <c>[ModuleInitializer]</c> self-registration populates the registry identically - the
+    ///     names resolve to the same factories.
+    /// </summary>
+    public IReadOnlyList<string> ObserverNames { get; init; } = [];
+
+    /// <summary>
     ///     The runtime the parent built this child for. When set, the child stamps
     ///     <see cref="RuntimeMonikerExtensions.ToTargetFramework" /> onto every
     ///     <see cref="BenchmarkResult.RuntimeMoniker" /> it produces.

@@ -20,6 +20,7 @@ internal sealed record CliArgs
     public double? Alpha { get; init; }
     public OutlierMode? OutlierMode { get; init; }
     public IReadOnlyList<string> ReporterNames { get; init; } = [];
+    public IReadOnlyList<string> ObserverNames { get; init; } = [];
     public IReadOnlyList<string> CategoryFilterInclude { get; init; } = [];
     public IReadOnlyList<string> CategoryFilterExclude { get; init; } = [];
     public ReportDetail Detail { get; init; } = ReportDetail.Simple;
@@ -110,6 +111,15 @@ internal sealed record CliArgs
     public IReadOnlyList<RuntimeMoniker> Runtimes { get; init; } = [];
 
     /// <summary>
+    ///     The OTLP endpoint an OpenTelemetry SDK in the entry assembly should export to. When
+    ///     set, the harness mirrors this into the <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> environment
+    ///     variable before spawning isolated children, so children stream to the same collector
+    ///     as the parent. <c>null</c> leaves the env var untouched (the SDK uses its own default
+    ///     or whatever the user already configured).
+    /// </summary>
+    public string? OtlpEndpoint { get; init; }
+
+    /// <summary>
     ///     Pure parse: tokenises <paramref name="args" />, validates ranges, and returns
     ///     both the structured result and any error messages. No console I/O, no
     ///     <c>Environment.ExitCode</c> mutation.
@@ -128,6 +138,7 @@ internal sealed record CliArgs
         int? warmupIterations = null;
         double? confidenceLevel = null;
         var reporterNames = new List<string>();
+        var observerNames = new List<string>();
         var categoryInclude = new List<string>();
         var categoryExclude = new List<string>();
         var detail = ReportDetail.Simple;
@@ -156,6 +167,7 @@ internal sealed record CliArgs
         ProcessPriorityClass? processPriority = null;
         var crossClass = false;
         var dedicatedHostGuidance = false;
+        string? otlpEndpoint = null;
 
         var errors = new List<string>();
 
@@ -198,6 +210,9 @@ internal sealed record CliArgs
                     break;
                 case "--reporter" when i + 1 < args.Length:
                     reporterNames.Add(args[++i]);
+                    break;
+                case "--observer" when i + 1 < args.Length:
+                    observerNames.Add(args[++i]);
                     break;
                 case "--confidence" when i + 1 < args.Length:
                     if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var conf)
@@ -442,6 +457,16 @@ internal sealed record CliArgs
                 case "--dedicated-host-guidance":
                     dedicatedHostGuidance = true;
                     break;
+                case "--otlp-endpoint" when i + 1 < args.Length:
+                    var endpointStr = args[++i];
+
+                    if (Uri.TryCreate(endpointStr, UriKind.Absolute, out var endpointUri)
+                        && (endpointUri.Scheme == Uri.UriSchemeHttp || endpointUri.Scheme == Uri.UriSchemeHttps))
+                        otlpEndpoint = endpointStr;
+                    else
+                        errors.Add($"Invalid --otlp-endpoint value '{endpointStr}'. Must be an absolute http:// or https:// URL.");
+
+                    break;
                 case "--runtimes" when i + 1 < args.Length:
                     var runtimesRaw = args[++i];
                     var runtimeParts = runtimesRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -459,12 +484,12 @@ internal sealed record CliArgs
 
                     break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
-                    or "--reporter" or "--category" or "--exclude-category" or "--confidence" or "--order"
+                    or "--reporter" or "--observer" or "--category" or "--exclude-category" or "--confidence" or "--order"
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
                     or "--launch-count" or "--percentiles" or "--runtimes"
-                    or "--cpu-affinity" or "--priority":
+                    or "--cpu-affinity" or "--priority" or "--otlp-endpoint":
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -489,6 +514,7 @@ internal sealed record CliArgs
             Alpha = alpha,
             OutlierMode = outlierMode,
             ReporterNames = reporterNames,
+            ObserverNames = observerNames,
             CategoryFilterInclude = categoryInclude,
             CategoryFilterExclude = categoryExclude,
             Detail = detail,
@@ -514,6 +540,7 @@ internal sealed record CliArgs
             CpuAffinity = cpuAffinity,
             ProcessPriority = processPriority,
             DedicatedHostGuidance = dedicatedHostGuidance,
+            OtlpEndpoint = otlpEndpoint,
         }, errors);
     }
 
@@ -532,6 +559,15 @@ internal sealed record CliArgs
             {
                 allErrors.Add(
                     $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
+            }
+        }
+
+        foreach (var name in cliArgs.ObserverNames)
+        {
+            if (!ObserverRegistry.TryCreate(name, out _))
+            {
+                allErrors.Add(
+                    $"Unknown observer: '{name}'. Valid: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}.");
             }
         }
 
@@ -643,6 +679,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --iterations <n>       Pin measured sample count (default: auto, CI-driven)");
         Console.WriteLine("  --warmup <n>           Pin warmup sample count (default: auto, plateau-driven)");
         Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}");
+        Console.WriteLine($"  --observer <type>      Attach measurement observer: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}");
+        Console.WriteLine("                         (repeatable; multiple observers are composed into a fan-out)");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
         Console.WriteLine("  --alpha <0-1>          Significance level for the significance test (default: 0.05)");
@@ -676,6 +714,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --cpu-affinity <list>  Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)");
         Console.WriteLine("  --priority <level>     Process priority: normal, idle, belownormal, abovenormal, high, realtime");
         Console.WriteLine("  --dedicated-host-guidance  Warn when the host looks noisy (low core count, unraisable priority, macOS throttling)");
+        Console.WriteLine("  --otlp-endpoint <url>  OTLP endpoint for the OpenTelemetry SDK (http:// or https://); forwarded to isolated children");
         Console.WriteLine("  --help, -h             Show this help text");
     }
 }

@@ -8,6 +8,15 @@ namespace NBenchmark.Tests;
 [Collection("ConsoleCapture")]
 public class BenchmarkHarnessCliTests
 {
+    private const string OtlpEndpointEnvVar = "OTEL_EXPORTER_OTLP_ENDPOINT";
+    private const string NBenchmarkOtelEndpointEnvVar = "NBENCHMARK_OTEL_ENDPOINT";
+
+    private static readonly string[] ManagedTelemetryEnvVars =
+    [
+        OtlpEndpointEnvVar,
+        NBenchmarkOtelEndpointEnvVar,
+    ];
+
     [Fact]
     public void Help_Flag_Returns_Empty_And_Prints_Help()
     {
@@ -18,6 +27,34 @@ public class BenchmarkHarnessCliTests
         });
 
         Assert.Contains("Usage:", stdout);
+    }
+
+    [Fact]
+    public async Task RunAsync_OtlpEndpoint_Does_Not_Leak_Environment_Variables_When_Unset()
+    {
+        using var _ = WithTelemetryEnv();
+
+        await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHarness.Create(["--help", "--otlp-endpoint", "http://collector:4317"])
+                .RunAsync());
+
+        Assert.Null(Environment.GetEnvironmentVariable(NBenchmarkOtelEndpointEnvVar));
+        Assert.Null(Environment.GetEnvironmentVariable(OtlpEndpointEnvVar));
+    }
+
+    [Fact]
+    public async Task RunAsync_OtlpEndpoint_Preserves_Explicit_Otel_Endpoint_And_Restores_NBenchmark_Endpoint()
+    {
+        using var _ = WithTelemetryEnv([
+            (OtlpEndpointEnvVar, "http://explicit:4317"),
+        ]);
+
+        await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHarness.Create(["--help", "--otlp-endpoint", "http://collector:4318"])
+                .RunAsync());
+
+        Assert.Equal("http://explicit:4317", Environment.GetEnvironmentVariable(OtlpEndpointEnvVar));
+        Assert.Null(Environment.GetEnvironmentVariable(NBenchmarkOtelEndpointEnvVar));
     }
 
     [Fact]
@@ -123,6 +160,96 @@ public class BenchmarkHarnessCliTests
 
         Assert.Equal(2, results.Count);
         Assert.All(results, r => Assert.False(r.Errored));
+    }
+
+    [Fact]
+    public async Task RunAsync_Observer_Flag_Attaches_Registry_Built_Observer()
+    {
+        // Register a capturing observer factory into ObserverRegistry, then activate it via
+        // --observer from the CLI. The harness should build the observer via the registry and
+        // attach it; OnResult fires for every benchmark.
+        var observer = new CapturingObserver();
+        ObserverRegistry.Reset();
+        ObserverRegistry.Register("capturing", "Captures results for tests", () => observer);
+
+        try
+        {
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--warmup", "0", "--iterations", "1", "--observer", "capturing"])
+                    .AddFromAssembly<TestBenchmarks>()
+                    .WithRunOrder(RunOrder.Declaration)
+                    .RunAsync();
+            });
+
+            // TestBenchmarks has two methods; the registry-built observer receives both results.
+            Assert.Equal(2, observer.Results.Count);
+            Assert.Contains(observer.Results, r => r.Name == "TestBenchmarks.Fast");
+            Assert.Contains(observer.Results, r => r.Name == "TestBenchmarks.FastBaseline");
+        }
+        finally
+        {
+            ObserverRegistry.Reset();
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_Observer_Flag_Unknown_Name_Writes_Error_And_Sets_ExitCode()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            var stderr = string.Empty;
+
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                stderr = CaptureConsoleError(() =>
+                {
+                    var harness = BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--observer", "bogus-observer"]);
+                    harness.RunAsync().GetAwaiter().GetResult();
+                });
+            });
+
+            Assert.Contains("Unknown observer", stderr);
+            Assert.Contains("bogus-observer", stderr);
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+            ObserverRegistry.Reset();
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_Multiple_Observer_Flags_Compose_Observers()
+    {
+        var a = new CapturingObserver();
+        var b = new CapturingObserver();
+        ObserverRegistry.Reset();
+        ObserverRegistry.Register("obs-a", "First test observer", () => a);
+        ObserverRegistry.Register("obs-b", "Second test observer", () => b);
+
+        try
+        {
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--warmup", "0", "--iterations", "1", "--observer", "obs-a", "--observer", "obs-b"])
+                    .AddFromAssembly<TestBenchmarks>()
+                    .WithRunOrder(RunOrder.Declaration)
+                    .RunAsync();
+            });
+
+            // Both registry-built observers receive every result (composite fan-out from CLI).
+            Assert.Equal(2, a.Results.Count);
+            Assert.Equal(2, b.Results.Count);
+        }
+        finally
+        {
+            ObserverRegistry.Reset();
+        }
     }
 
     [Fact]
@@ -699,6 +826,38 @@ public class BenchmarkHarnessCliTests
         }
     }
 
+    private static IDisposable WithTelemetryEnv(IEnumerable<(string Name, string? Value)> vars)
+    {
+        var saved = new Dictionary<string, string?>();
+
+        foreach (var name in ManagedTelemetryEnvVars)
+            saved[name] = Environment.GetEnvironmentVariable(name);
+
+        foreach (var name in ManagedTelemetryEnvVars)
+            Environment.SetEnvironmentVariable(name, null);
+
+        foreach (var (name, value) in vars)
+            Environment.SetEnvironmentVariable(name, value);
+
+        return new EnvVarScope(saved);
+    }
+
+    private static IDisposable WithTelemetryEnv(params (string Name, string Value)[] vars)
+        => WithTelemetryEnv(vars.Select(v => (v.Name, (string?)v.Value)));
+
+    private sealed class EnvVarScope : IDisposable
+    {
+        private readonly Dictionary<string, string?> _saved;
+
+        public EnvVarScope(Dictionary<string, string?> saved) => _saved = saved;
+
+        public void Dispose()
+        {
+            foreach (var (name, value) in _saved)
+                Environment.SetEnvironmentVariable(name, value);
+        }
+    }
+
     private sealed class CustomNamedReporter : IReporter
     {
         public int ReportCount { get; private set; }
@@ -716,6 +875,25 @@ public class BenchmarkHarnessCliTests
             ReportCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class CapturingObserver : IMeasurementObserver
+    {
+        public List<BenchmarkResult> Results { get; } = [];
+
+        public void OnPhase(in MeasurementPhaseEvent e)
+        {
+        }
+
+        public void OnSample(in SampleEvent e)
+        {
+        }
+
+        public void OnDetector(in DetectorStateEvent e)
+        {
+        }
+
+        public void OnResult(BenchmarkResult result) => Results.Add(result);
     }
 
     private sealed class OrderingProgress : IBenchmarkProgress

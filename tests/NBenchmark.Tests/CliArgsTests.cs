@@ -25,6 +25,7 @@ public class CliArgsTests
         Assert.Null(result.WarmupIterations);
         Assert.Null(result.ConfidenceLevel);
         Assert.Empty(result.ReporterNames);
+        Assert.Empty(result.ObserverNames);
     }
 
     [Fact]
@@ -329,6 +330,45 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_Observer_Known_AddsName()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--observer", "live"]);
+        Assert.Empty(errors);
+        var name = Assert.Single(result.ObserverNames);
+        Assert.Equal("live", name);
+    }
+
+    [Fact]
+    public void ParseCore_Observer_Unknown_StoresName()
+    {
+        // ParseCore is a pure parser; observer-name validation happens in Parse() against
+        // ObserverRegistry, so an unknown name is stored without error here (mirrors reporter).
+        var (result, errors) = CliArgs.ParseCore(["--observer", "unknown-observer"]);
+
+        Assert.Empty(errors);
+        Assert.Equal(["unknown-observer"], result.ObserverNames);
+    }
+
+    [Fact]
+    public void ParseCore_MultipleObservers_AddsAll()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--observer", "live", "--observer", "logging"]);
+        Assert.Empty(errors);
+        Assert.Equal(2, result.ObserverNames.Count);
+        Assert.Contains("live", result.ObserverNames);
+        Assert.Contains("logging", result.ObserverNames);
+    }
+
+    [Fact]
+    public void ParseCore_Observer_And_Reporter_Can_Coexist()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--reporter", "json", "--observer", "live"]);
+        Assert.Empty(errors);
+        Assert.Equal(["json"], result.ReporterNames);
+        Assert.Equal(["live"], result.ObserverNames);
+    }
+
+    [Fact]
     public void ParseCore_MultipleFlags_AllApplied()
     {
         var (result, errors) = CliArgs.ParseCore(["--filter", "Foo*", "--iterations", "50", "--reporter", "json"]);
@@ -532,6 +572,26 @@ public class CliArgsTests
             var stderr = CaptureConsoleError(() => CliArgs.Parse(["--reporter", "unknown-reporter"]));
 
             Assert.Contains("unknown-reporter", stderr);
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+        }
+    }
+
+    [Fact]
+    public void Parse_ObserverUnknown_WritesError()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            var stderr = CaptureConsoleError(() => CliArgs.Parse(["--observer", "unknown-observer"]));
+
+            Assert.Contains("Unknown observer", stderr);
+            Assert.Contains("unknown-observer", stderr);
             Assert.Equal(1, Environment.ExitCode);
         }
         finally
@@ -761,6 +821,68 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_OtlpEndpoint_HttpUrl_SetsValue()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "http://localhost:4317"]);
+
+        Assert.Empty(errors);
+        Assert.Equal("http://localhost:4317", result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_HttpsUrl_SetsValue()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "https://collector.example.com:4318"]);
+
+        Assert.Empty(errors);
+        Assert.Equal("https://collector.example.com:4318", result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_InvalidUrl_AddsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "not-a-url"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.OtlpEndpoint);
+        Assert.Contains(errors, e => e.Contains("--otlp-endpoint") && e.Contains("http://"));
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_RelativeUrl_AddsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "/path"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_FtpScheme_AddsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--otlp-endpoint", "ftp://localhost:4317"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Null(result.OtlpEndpoint);
+    }
+
+    [Fact]
+    public void ParseCore_OtlpEndpoint_MissingValue_AddsError()
+    {
+        var (_, errors) = CliArgs.ParseCore(["--otlp-endpoint"]);
+
+        Assert.NotEmpty(errors);
+        Assert.Contains(errors, e => e.Contains("Missing value") && e.Contains("--otlp-endpoint"));
+    }
+
+    [Fact]
     public void PrintHelp_WritesUsageToStdout()
     {
         var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp());
@@ -775,6 +897,7 @@ public class CliArgsTests
         Assert.Contains("--cpu-affinity", stdout);
         Assert.Contains("--priority", stdout);
         Assert.Contains("--dedicated-host-guidance", stdout);
+        Assert.Contains("--otlp-endpoint", stdout);
     }
 
     private static string CaptureConsoleOutput(Action action)

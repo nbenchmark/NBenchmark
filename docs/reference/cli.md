@@ -172,6 +172,21 @@ Reporters from external packages self-register through the same mechanism: refer
 
 ---
 
+### `--observer <type>`
+
+Attach a measurement observer by name. Observers receive live per-sample, per-detector, and phase-transition events during the adaptive measurement loop (see [Measurement Observer](observers.md) for the event model). Repeatable; multiple `--observer` flags compose the observers into a fan-out so every attached observer receives every event.
+
+The core `NBenchmark` package ships no observers - `ObserverRegistry.Available` is empty until an external package self-registers one. The `NBenchmark.Live` package (planned) will register a `live` observer for the embedded web dashboard; any external package can register additional observers through the same mechanism.
+
+```bash
+dotnet run -- --observer live
+dotnet run -- --observer live --observer logging
+```
+
+Observers from external packages self-register through the same mechanism as reporters: reference the package, use `--observer <name>` from the CLI. No per-observer configuration needed in the host.
+
+---
+
 ### `--output <directory>`
 
 Set the output directory for file reporters. Must be a path under the current working directory. The directory is created automatically if it does not exist. Default: current directory.
@@ -489,6 +504,19 @@ Programmatic equivalent: `WithDedicatedHostGuidance()` (suite/harness).
 
 ---
 
+### `--otlp-endpoint <url>`
+
+Set the OTLP endpoint an OpenTelemetry SDK in the entry assembly should export to. The value must be an absolute `http://` or `https://` URL. The harness mirrors it into the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable before spawning isolated children, so children stream their telemetry to the same collector as the parent. When `OTEL_EXPORTER_OTLP_ENDPOINT` is already set in the environment, the explicit flag does not override it.
+
+This is the cross-process channel for live telemetry: the in-memory `IMeasurementObserver` callback cannot cross the process boundary, so OTLP export is how isolated children stream live data to a collector. See [BCL instrumentation](bcl-instrumentation.md#cross-process-streaming) for the full topology and the env vars forwarded to children.
+
+```bash
+dotnet run -- --otlp-endpoint http://localhost:4317
+dotnet run -- --otlp-endpoint https://collector.example.com:4318
+```
+
+---
+
 ### `--threshold-pct <n>`
 
 Causes the run to fail with **exit code 1** if any benchmark regresses more than `n`% against the baseline. `n` must be a positive integer (1 or greater). The regression check compares median execution times: a benchmark is considered regressed if `candidate.Median / baseline.Median > 1.0 + (n / 100.0)`.
@@ -506,7 +534,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown diagnostics mode (`--diagnostics`), unknown reporter name (`--reporter`), unknown priority level (`--priority`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown diagnostics mode (`--diagnostics`), unknown reporter name (`--reporter`), unknown observer name (`--observer`), unknown priority level (`--priority`), invalid detail level (`--detail`), invalid OTLP endpoint URL (`--otlp-endpoint`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
 When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 
@@ -530,6 +558,9 @@ dotnet run -- --cpu-affinity 2,3 --priority high --dedicated-host-guidance
 
 # Collect all diagnostics (GC counts, heap info, exceptions, CPU time)
 dotnet run -- --diagnostics all --detail standard
+
+# Stream live telemetry to a local OTLP collector (isolated children inherit the endpoint)
+dotnet run -- --otlp-endpoint http://localhost:4317
 
 # Check what will run before committing to a full benchmark
 dotnet run -- --list

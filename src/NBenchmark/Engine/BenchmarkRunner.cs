@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using NBenchmark.Diagnostics;
 
 namespace NBenchmark.Engine;
 
@@ -47,6 +48,9 @@ public sealed class BenchmarkRunner
         var totalStartTimestamp = _clock.GetTimestamp();
         var options = spec.Options;
         var progress = spec.Progress;
+        var observer = spec.Observer;
+
+        NBenchmarkDiagnostics.ResetBenchmarkState();
 
         try
         {
@@ -57,11 +61,16 @@ public sealed class BenchmarkRunner
                 RunFixedWarmupSync(body, spec, ct);
                 var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
                 progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
+                NBenchmarkDiagnostics.RecordResult(dryRun.Result);
+                observer.OnResult(dryRun.Result);
                 return dryRun;
             }
 
-            var adaptive = AdaptiveLoop.Run(name, body, spec, _clock, progress, ct);
-            return BuildSuccessOutcome(name, spec, totalStartTimestamp, adaptive);
+            var adaptive = AdaptiveLoop.Run(name, body, spec, _clock, progress, observer, ct);
+            var success = BuildSuccessOutcome(name, spec, totalStartTimestamp, adaptive);
+            NBenchmarkDiagnostics.RecordResult(success.Result);
+            observer.OnResult(success.Result);
+            return success;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -69,7 +78,10 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
+            var errored = BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
+            NBenchmarkDiagnostics.RecordResult(errored.Result);
+            observer.OnResult(errored.Result);
+            return errored;
         }
     }
 
@@ -78,6 +90,9 @@ public sealed class BenchmarkRunner
         var totalStartTimestamp = _clock.GetTimestamp();
         var options = spec.Options;
         var progress = spec.Progress;
+        var observer = spec.Observer;
+
+        NBenchmarkDiagnostics.ResetBenchmarkState();
 
         try
         {
@@ -88,14 +103,19 @@ public sealed class BenchmarkRunner
                 await RunFixedWarmupAsync(body, spec, ct).ConfigureAwait(false);
                 var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
                 await progress.OnWarmupCompleted(name).ConfigureAwait(false);
+                NBenchmarkDiagnostics.RecordResult(dryRun.Result);
+                observer.OnResult(dryRun.Result);
                 return dryRun;
             }
 
             var adaptive = await AdaptiveLoop
-                .RunAsync(name, body, spec, _clock, progress, ct)
+                .RunAsync(name, body, spec, _clock, progress, observer, ct)
                 .ConfigureAwait(false);
 
-            return BuildSuccessOutcome(name, spec, totalStartTimestamp, adaptive);
+            var success = BuildSuccessOutcome(name, spec, totalStartTimestamp, adaptive);
+            NBenchmarkDiagnostics.RecordResult(success.Result);
+            observer.OnResult(success.Result);
+            return success;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -103,7 +123,10 @@ public sealed class BenchmarkRunner
         }
         catch (Exception ex)
         {
-            return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
+            var errored = BuildErroredOutcome(name, spec, totalStartTimestamp, ex);
+            NBenchmarkDiagnostics.RecordResult(errored.Result);
+            observer.OnResult(errored.Result);
+            return errored;
         }
     }
 
