@@ -33,7 +33,7 @@ var suite = new BenchmarkSuite("example")
     .WithObserver(myObserver);
 
 // Harness mode
-BenchmarkHost.Create(args)
+BenchmarkHarness.Create(args)
     .WithObserver(myObserver);
 ```
 
@@ -45,9 +45,26 @@ var spec = new RunSpec { Observer = myObserver };
 runner.Run("myBenchmark", () => Work(), spec);
 ```
 
+In Harness mode, observers can also be activated from the CLI via `--observer <name>` (see [CLI Reference](cli.md#--observer-type)). The CLI resolves the name through `ObserverRegistry` - external packages self-register their observers via `[ModuleInitializer]`, the same pattern reporters use.
+
+## Multiple observers
+
+`WithObserver` is additive and repeatable: each call appends another observer rather than replacing the previous one. Multiple attached observers are composed into a `CompositeMeasurementObserver` fan-out so every observer receives every event.
+
+```csharp
+var suite = new BenchmarkSuite("example")
+    .Add("myBenchmark", () => Work())
+    .WithObserver(dashboardObserver)
+    .WithObserver(loggingObserver);
+```
+
+The composite wraps each per-observer dispatch in a try/catch so one throwing observer cannot kill the stream for the others. The observer contract is "must not throw"; the try/catch is defence-in-depth that isolates a misbehaving observer rather than propagating. Exceptions are traced (via `System.Diagnostics.Trace`) so a host with a `TraceListener` attached can see why an observer stopped receiving events.
+
+The same stacking applies to the CLI: `--observer live --observer logging` composes both observers into a single fan-out. The `--observer` flag is repeatable, mirroring `--reporter`.
+
 ## Default
 
-If no observer is attached, `NullMeasurementObserver.Instance` (a no-op singleton) is used. When unattached, the engine performs a single reference comparison (`observer != NullMeasurementObserver.Instance`) per hot-path entry and skips all struct construction. This is the zero-cost fast path.
+If no observer is attached, `NullMeasurementObserver.Instance` (a no-op singleton) is used. When unattached, the engine performs a single reference comparison (`observer != NullMeasurementObserver.Instance`) per hot-path entry and skips all struct construction. This is the zero-cost fast path. An empty observer list (no `WithObserver` calls and no `--observer` flags) collapses to the null singleton via `ResolveObserver()`, so the hot-path guard stays false and the loop pays no dispatch cost.
 
 ## Event types
 

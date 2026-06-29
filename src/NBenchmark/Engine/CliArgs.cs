@@ -20,6 +20,7 @@ internal sealed record CliArgs
     public double? Alpha { get; init; }
     public OutlierMode? OutlierMode { get; init; }
     public IReadOnlyList<string> ReporterNames { get; init; } = [];
+    public IReadOnlyList<string> ObserverNames { get; init; } = [];
     public IReadOnlyList<string> CategoryFilterInclude { get; init; } = [];
     public IReadOnlyList<string> CategoryFilterExclude { get; init; } = [];
     public ReportDetail Detail { get; init; } = ReportDetail.Simple;
@@ -128,6 +129,7 @@ internal sealed record CliArgs
         int? warmupIterations = null;
         double? confidenceLevel = null;
         var reporterNames = new List<string>();
+        var observerNames = new List<string>();
         var categoryInclude = new List<string>();
         var categoryExclude = new List<string>();
         var detail = ReportDetail.Simple;
@@ -198,6 +200,9 @@ internal sealed record CliArgs
                     break;
                 case "--reporter" when i + 1 < args.Length:
                     reporterNames.Add(args[++i]);
+                    break;
+                case "--observer" when i + 1 < args.Length:
+                    observerNames.Add(args[++i]);
                     break;
                 case "--confidence" when i + 1 < args.Length:
                     if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var conf)
@@ -459,7 +464,7 @@ internal sealed record CliArgs
 
                     break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
-                    or "--reporter" or "--category" or "--exclude-category" or "--confidence" or "--order"
+                    or "--reporter" or "--observer" or "--category" or "--exclude-category" or "--confidence" or "--order"
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
@@ -489,6 +494,7 @@ internal sealed record CliArgs
             Alpha = alpha,
             OutlierMode = outlierMode,
             ReporterNames = reporterNames,
+            ObserverNames = observerNames,
             CategoryFilterInclude = categoryInclude,
             CategoryFilterExclude = categoryExclude,
             Detail = detail,
@@ -532,6 +538,15 @@ internal sealed record CliArgs
             {
                 allErrors.Add(
                     $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
+            }
+        }
+
+        foreach (var name in cliArgs.ObserverNames)
+        {
+            if (!ObserverRegistry.TryCreate(name, out _))
+            {
+                allErrors.Add(
+                    $"Unknown observer: '{name}'. Valid: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}.");
             }
         }
 
@@ -643,6 +658,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --iterations <n>       Pin measured sample count (default: auto, CI-driven)");
         Console.WriteLine("  --warmup <n>           Pin warmup sample count (default: auto, plateau-driven)");
         Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}");
+        Console.WriteLine($"  --observer <type>      Attach measurement observer: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}");
+        Console.WriteLine("                         (repeatable; multiple observers are composed into a fan-out)");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
         Console.WriteLine("  --alpha <0-1>          Significance level for the significance test (default: 0.05)");

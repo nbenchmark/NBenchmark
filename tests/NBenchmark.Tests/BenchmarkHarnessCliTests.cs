@@ -126,6 +126,96 @@ public class BenchmarkHarnessCliTests
     }
 
     [Fact]
+    public async Task RunAsync_Observer_Flag_Attaches_Registry_Built_Observer()
+    {
+        // Register a capturing observer factory into ObserverRegistry, then activate it via
+        // --observer from the CLI. The harness should build the observer via the registry and
+        // attach it; OnResult fires for every benchmark.
+        var observer = new CapturingObserver();
+        ObserverRegistry.Reset();
+        ObserverRegistry.Register("capturing", "Captures results for tests", () => observer);
+
+        try
+        {
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--warmup", "0", "--iterations", "1", "--observer", "capturing"])
+                    .AddFromAssembly<TestBenchmarks>()
+                    .WithRunOrder(RunOrder.Declaration)
+                    .RunAsync();
+            });
+
+            // TestBenchmarks has two methods; the registry-built observer receives both results.
+            Assert.Equal(2, observer.Results.Count);
+            Assert.Contains(observer.Results, r => r.Name == "TestBenchmarks.Fast");
+            Assert.Contains(observer.Results, r => r.Name == "TestBenchmarks.FastBaseline");
+        }
+        finally
+        {
+            ObserverRegistry.Reset();
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_Observer_Flag_Unknown_Name_Writes_Error_And_Sets_ExitCode()
+    {
+        var prev = Environment.ExitCode;
+        Environment.ExitCode = 0;
+
+        try
+        {
+            var stderr = string.Empty;
+
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                stderr = CaptureConsoleError(() =>
+                {
+                    var harness = BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--observer", "bogus-observer"]);
+                    harness.RunAsync().GetAwaiter().GetResult();
+                });
+            });
+
+            Assert.Contains("Unknown observer", stderr);
+            Assert.Contains("bogus-observer", stderr);
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = prev;
+            ObserverRegistry.Reset();
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_Multiple_Observer_Flags_Compose_Observers()
+    {
+        var a = new CapturingObserver();
+        var b = new CapturingObserver();
+        ObserverRegistry.Reset();
+        ObserverRegistry.Register("obs-a", "First test observer", () => a);
+        ObserverRegistry.Register("obs-b", "Second test observer", () => b);
+
+        try
+        {
+            await CaptureConsoleOutputAsync(async () =>
+            {
+                await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--warmup", "0", "--iterations", "1", "--observer", "obs-a", "--observer", "obs-b"])
+                    .AddFromAssembly<TestBenchmarks>()
+                    .WithRunOrder(RunOrder.Declaration)
+                    .RunAsync();
+            });
+
+            // Both registry-built observers receive every result (composite fan-out from CLI).
+            Assert.Equal(2, a.Results.Count);
+            Assert.Equal(2, b.Results.Count);
+        }
+        finally
+        {
+            ObserverRegistry.Reset();
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_Category_Filter_Includes_Only_Matching_Benchmarks()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
@@ -716,6 +806,25 @@ public class BenchmarkHarnessCliTests
             ReportCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class CapturingObserver : IMeasurementObserver
+    {
+        public List<BenchmarkResult> Results { get; } = [];
+
+        public void OnPhase(in MeasurementPhaseEvent e)
+        {
+        }
+
+        public void OnSample(in SampleEvent e)
+        {
+        }
+
+        public void OnDetector(in DetectorStateEvent e)
+        {
+        }
+
+        public void OnResult(BenchmarkResult result) => Results.Add(result);
     }
 
     private sealed class OrderingProgress : IBenchmarkProgress

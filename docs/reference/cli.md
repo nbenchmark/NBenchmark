@@ -172,6 +172,21 @@ Reporters from external packages self-register through the same mechanism: refer
 
 ---
 
+### `--observer <type>`
+
+Attach a measurement observer by name. Observers receive live per-sample, per-detector, and phase-transition events during the adaptive measurement loop (see [Measurement Observer](observers.md) for the event model). Repeatable; multiple `--observer` flags compose the observers into a fan-out so every attached observer receives every event.
+
+The core `NBenchmark` package ships no observers - `ObserverRegistry.Available` is empty until an external package self-registers one. The `NBenchmark.Live` package (planned) will register a `live` observer for the embedded web dashboard; any external package can register additional observers through the same mechanism.
+
+```bash
+dotnet run -- --observer live
+dotnet run -- --observer live --observer logging
+```
+
+Observers from external packages self-register through the same mechanism as reporters: reference the package, use `--observer <name>` from the CLI. No per-observer configuration needed in the host.
+
+---
+
 ### `--output <directory>`
 
 Set the output directory for file reporters. Must be a path under the current working directory. The directory is created automatically if it does not exist. Default: current directory.
@@ -506,7 +521,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown diagnostics mode (`--diagnostics`), unknown reporter name (`--reporter`), unknown priority level (`--priority`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown diagnostics mode (`--diagnostics`), unknown reporter name (`--reporter`), unknown observer name (`--observer`), unknown priority level (`--priority`), invalid detail level (`--detail`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
 When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 

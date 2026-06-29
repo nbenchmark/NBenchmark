@@ -22,7 +22,7 @@ public sealed class BenchmarkSuite(string name)
     private string[]? _pendingCategories;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
-    private IMeasurementObserver _observer = NullMeasurementObserver.Instance;
+    private readonly List<IMeasurementObserver> _observers = [];
     private RunOrder _runOrder = RunOrder.Random;
     private IReadOnlyList<RuntimeMoniker> _runtimes = [];
     private Action? _suiteSetup;
@@ -670,12 +670,31 @@ public sealed class BenchmarkSuite(string name)
     ///     The observer MUST return immediately from each callback - never block, allocate on
     ///     the hot path, or do I/O - because the loop calls it between samples on the
     ///     measurement thread. The default is <see cref="NullMeasurementObserver" />.
+    ///     Repeatable: each call adds another observer, and all attached observers receive
+    ///     every event through a <see cref="CompositeMeasurementObserver" /> fan-out.
     /// </summary>
     public BenchmarkSuite WithObserver(IMeasurementObserver observer)
     {
-        _observer = observer ?? NullMeasurementObserver.Instance;
+        if (observer is not null && observer != NullMeasurementObserver.Instance)
+            _observers.Add(observer);
+
         return this;
     }
+
+    /// <summary>
+    ///     Resolves the attached observer list to the single <see cref="IMeasurementObserver" />
+    ///     the engine should see. An empty list collapses to <see cref="NullMeasurementObserver.Instance" />
+    ///     so the hot-path guard (<c>observer != NullMeasurementObserver.Instance</c>) stays false and
+    ///     the loop pays no dispatch cost. A single observer is returned as-is. Two or more are
+    ///     wrapped in a <see cref="CompositeMeasurementObserver" />.
+    /// </summary>
+    private IMeasurementObserver ResolveObserver()
+        => _observers.Count switch
+        {
+            0 => NullMeasurementObserver.Instance,
+            1 => _observers[0],
+            _ => new CompositeMeasurementObserver(_observers),
+        };
 
     /// <summary>
     ///     Tags every subsequent benchmark added to the suite with the supplied categories.
@@ -797,7 +816,7 @@ public sealed class BenchmarkSuite(string name)
 
         return await RunInProcessCoreAsync(
             _progress,
-            _observer,
+            ResolveObserver(),
             _runOrder,
             true,
             true,
@@ -846,10 +865,11 @@ public sealed class BenchmarkSuite(string name)
 
                 for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
                 {
+                    var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
                     var (launchResults, launchSamples) = await SuiteRunner.RunAsync(
                         envelopes, effectiveOrder, null, _options, 0,
                         filteredBenchmarks.Count, NullBenchmarkProgress.Instance, cancellationToken,
-                        onBetweenBenchmarksAsync: null, NullMeasurementObserver.Instance).ConfigureAwait(false);
+                        onBetweenBenchmarksAsync: null, launchObserver).ConfigureAwait(false);
 
                     allLaunchResults.Add(launchResults);
                     allLaunchSamples.Add(launchSamples);
@@ -978,6 +998,7 @@ public sealed class BenchmarkSuite(string name)
             items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
 
         var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
+        var observer = ResolveObserver();
 
         var results = new List<BenchmarkResult>(filteredBenchmarks.Count);
         var rawSamples = new Dictionary<string, double[]>(filteredBenchmarks.Count);
@@ -1015,7 +1036,7 @@ public sealed class BenchmarkSuite(string name)
             rawSamples[$"{envelope.Name}\0{result.RuntimeMoniker}"] = raw;
 
             await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
-            _observer.OnResult(result);
+            observer.OnResult(result);
         }
 
         await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
@@ -1079,6 +1100,8 @@ public sealed class BenchmarkSuite(string name)
 
         try
         {
+            var observer = ResolveObserver();
+
             foreach (var build in successfulBuilds)
             {
                 var tfm = build.Moniker.ToTargetFramework();
@@ -1164,7 +1187,7 @@ public sealed class BenchmarkSuite(string name)
                         allResults.Add(result);
 
                         await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
-                        _observer.OnResult(result);
+                        observer.OnResult(result);
                     }
                 }
                 finally

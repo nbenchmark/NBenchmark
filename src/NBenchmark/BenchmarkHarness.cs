@@ -22,7 +22,7 @@ public sealed class BenchmarkHarness
     private MeasurementOptions _options = MeasurementOptions.Default;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
-    private IMeasurementObserver _observer = NullMeasurementObserver.Instance;
+    private readonly List<IMeasurementObserver> _observers = [];
     private RunOrder _runOrder = RunOrder.Random;
 
     private BenchmarkHarness()
@@ -42,6 +42,12 @@ public sealed class BenchmarkHarness
         {
             if (ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out var reporter))
                 harness._reporters.Add(reporter);
+        }
+
+        foreach (var name in cliArgs.ObserverNames)
+        {
+            if (ObserverRegistry.TryCreate(name, out var observer))
+                harness._observers.Add(observer);
         }
 
         return harness;
@@ -99,9 +105,27 @@ public sealed class BenchmarkHarness
 
     public BenchmarkHarness WithObserver(IMeasurementObserver observer)
     {
-        _observer = observer ?? NullMeasurementObserver.Instance;
+        if (observer is not null && observer != NullMeasurementObserver.Instance)
+            _observers.Add(observer);
+
         return this;
     }
+
+    /// <summary>
+    ///     Resolves the attached observer list to the single <see cref="IMeasurementObserver" />
+    ///     the engine should see. An empty list collapses to <see cref="NullMeasurementObserver.Instance" />
+    ///     so the hot-path guard (<c>observer != NullMeasurementObserver.Instance</c>) stays false and
+    ///     the loop pays no dispatch cost. A single observer is returned as-is. Two or more are
+    ///     wrapped in a <see cref="CompositeMeasurementObserver" /> that fans out with per-dispatch
+    ///     try/catch isolation.
+    /// </summary>
+    private IMeasurementObserver ResolveObserver()
+        => _observers.Count switch
+        {
+            0 => NullMeasurementObserver.Instance,
+            1 => _observers[0],
+            _ => new CompositeMeasurementObserver(_observers),
+        };
 
     public BenchmarkHarness WithInstanceFactory(Func<Type, object> factory)
     {
@@ -922,7 +946,7 @@ public sealed class BenchmarkHarness
                 for (var launchIdx = 0; launchIdx < effectiveClassLaunchCount; launchIdx++)
                 {
                     var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
-                    var observer = launchIdx == 0 ? _observer : NullMeasurementObserver.Instance;
+                    var observer = launchIdx == 0 ? ResolveObserver() : NullMeasurementObserver.Instance;
 
                     var (results, samples) = await SuiteRunner.RunAsync(
                         envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
@@ -945,7 +969,7 @@ public sealed class BenchmarkHarness
             {
                 var (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                    startIndex, totalBenchmarks, _progress, cancellationToken, betweenBenchmarksReset, _observer).ConfigureAwait(false);
+                    startIndex, totalBenchmarks, _progress, cancellationToken, betweenBenchmarksReset, ResolveObserver()).ConfigureAwait(false);
 
                 ApplyPerClassIndependenceWarning(results, suite, suiteOptions);
                 allResults.AddRange(results);
@@ -1020,7 +1044,7 @@ public sealed class BenchmarkHarness
                     for (var launchIdx = 0; launchIdx < perMethodLaunchCount; launchIdx++)
                     {
                         var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
-                        var observer = launchIdx == 0 ? _observer : NullMeasurementObserver.Instance;
+                        var observer = launchIdx == 0 ? ResolveObserver() : NullMeasurementObserver.Instance;
 
                         var (results, samples) = await SuiteRunner.RunAsync(
                             [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
@@ -1048,7 +1072,7 @@ public sealed class BenchmarkHarness
                 {
                     var (results, samples) = await SuiteRunner.RunAsync(
                         [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, _progress, cancellationToken, onBetweenBenchmarksAsync: null, _observer).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, _progress, cancellationToken, onBetweenBenchmarksAsync: null, ResolveObserver()).ConfigureAwait(false);
 
                     allResults.AddRange(results);
 
@@ -1256,6 +1280,7 @@ public sealed class BenchmarkHarness
             items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
 
         var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
+        var observer = ResolveObserver();
 
         foreach (var benchmark in benchmarks)
         {
@@ -1286,7 +1311,7 @@ public sealed class BenchmarkHarness
             rawSamples[name] = raw;
 
             await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
-            _observer.OnResult(result);
+            observer.OnResult(result);
         }
     }
 
