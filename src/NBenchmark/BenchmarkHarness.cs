@@ -39,22 +39,6 @@ public sealed class BenchmarkHarness
         harness._cliArgs = cliArgs;
         harness._detail = cliArgs.Detail;
 
-        // Mirror --otlp-endpoint into the env var the ChildProcessLauncher forwards to isolated
-        // children. Setting it here (in both parent and child) means a re-run entry point in the
-        // child picks up the same endpoint from its own env. A child never receives --otlp-endpoint
-        // as a CLI arg (the request payload does not carry it), so this env-var mirror is the
-        // channel. When the user already set OTEL_EXPORTER_OTLP_ENDPOINT, the explicit flag wins
-        // so an SDK wired against the standard variable picks it up without extra configuration.
-        if (!string.IsNullOrEmpty(cliArgs.OtlpEndpoint))
-        {
-            Environment.SetEnvironmentVariable(
-                ChildProcessLauncher.OtelEndpointEnvVar,
-                cliArgs.OtlpEndpoint);
-
-            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
-                Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", cliArgs.OtlpEndpoint);
-        }
-
         foreach (var name in cliArgs.ReporterNames)
         {
             if (ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out var reporter))
@@ -355,9 +339,52 @@ public sealed class BenchmarkHarness
 
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
     {
+        // Mirror --otlp-endpoint for the duration of this run so isolated children inherit the
+        // same exporter endpoint without leaking env-var mutations to subsequent runs in the same
+        // process. Keep OTEL_EXPORTER_OTLP_ENDPOINT authoritative when the user already set it.
+        using var _ = ApplyCliOtelEndpointScope(_cliArgs.OtlpEndpoint);
+
         return await IsolatedRunContext
             .WithCurrentRequestAsync(() => RunCoreAsync(cancellationToken))
             .ConfigureAwait(false);
+    }
+
+    private static IDisposable ApplyCliOtelEndpointScope(string? endpoint)
+    {
+        if (string.IsNullOrEmpty(endpoint))
+            return NoopScope.Instance;
+
+        var previousNBenchmarkEndpoint = Environment.GetEnvironmentVariable(ChildProcessLauncher.OtelEndpointEnvVar);
+        var previousOtlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+
+        Environment.SetEnvironmentVariable(ChildProcessLauncher.OtelEndpointEnvVar, endpoint);
+
+        if (string.IsNullOrEmpty(previousOtlpEndpoint))
+            Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint);
+
+        return new OtlpEndpointScope(previousNBenchmarkEndpoint, previousOtlpEndpoint);
+    }
+
+    private sealed class OtlpEndpointScope(string? previousNBenchmarkEndpoint, string? previousOtlpEndpoint) : IDisposable
+    {
+        public void Dispose()
+        {
+            Environment.SetEnvironmentVariable(ChildProcessLauncher.OtelEndpointEnvVar, previousNBenchmarkEndpoint);
+            Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", previousOtlpEndpoint);
+        }
+    }
+
+    private sealed class NoopScope : IDisposable
+    {
+        public static readonly NoopScope Instance = new();
+
+        private NoopScope()
+        {
+        }
+
+        public void Dispose()
+        {
+        }
     }
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(CancellationToken cancellationToken)

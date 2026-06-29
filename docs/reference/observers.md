@@ -91,8 +91,8 @@ public readonly record struct MeasurementPhaseEvent(
 - `DetectorSwitched`: meaningful only for Phase 0 `Completed` events (true = IQR -> MAD auto-switch)
 - `ResolvedK`: set on `Calibration` completed; the calibrated ops-per-sample count (null when calibration was skipped)
 - `ResolvedWarmup`: set on `Warmup` completed; the number of warmup iterations that ran (null when warmup was skipped)
-- `WarmupStop`: set on `Warmup` completed; why warmup stopped (`ExplicitCount`, `Plateau`, `MaxWarmup`, `MaxTuningTime`)
-- `SampleStop`: set on `Measurement` completed; why measurement stopped (`ExplicitCount`, `CiWidth`, `MaxTuningTime`, `MaxSamples`)
+- `WarmupStop`: set on `Warmup` completed; why warmup stopped (`ExplicitCount`, `Settled`, `MaxCeiling`, `WallClockCap`)
+- `SampleStop`: set on `Measurement` completed; why measurement stopped (`ExplicitCount`, `CiTargetMet`, `MaxCeiling`, `WallClockCap`)
 
 ### SampleEvent
 
@@ -121,11 +121,11 @@ public readonly record struct DetectorStateEvent(
     int CurrentK);
 ```
 
-Emitted after a detector has been fed a new sample. During calibration, `Mean`/`StdDev`/`CiHalfWidth` reflect the calibrator's probe readings (the CI fields are not meaningful until measurement). During measurement, `CiHalfWidth` is the live convergence curve - the single most useful "why did it stop" signal.
+Emitted after detector updates. During calibration, `Mean`/`StdDev`/`CiHalfWidth` reflect the calibrator's probe readings (the CI fields are not meaningful until measurement). During measurement, this event is emitted when the stop rule resolves (or at phase completion fallback) and `CiHalfWidth` provides the convergence signal.
 
 ### BenchmarkResult
 
-The final result fires once per benchmark from `BenchmarkRunner.OnResult`. This is the fully assembled result including trimmed statistics, significance, and diagnostics.
+The final result fires once per benchmark from `BenchmarkRunner.OnResult`. It contains the runner-assembled per-benchmark statistics and diagnostics (before any suite-level post-processing such as cross-benchmark significance grouping).
 
 ## Lifecycle of events
 
@@ -134,15 +134,15 @@ A typical benchmark with auto-warmup and auto-measurement emits events in this o
 1. `OnPhase(MeasurementPhase.Jitter, Starting)` - if jitter calibration is enabled
 2. `OnPhase(MeasurementPhase.Jitter, Completed)` - with JitterMetric and DetectorSwitched
 3. `OnPhase(MeasurementPhase.Calibration, Starting)` - if OpsPerSample is null (auto)
-4. `OnSample(Warmup=true)` - one per calibration probe (throttled)
-5. `OnDetector(Calibration)` - after each probe
+4. `OnSample(Warmup=true)` - one per calibration probe
+5. `OnDetector(Calibration)` - after each calibration step (one calibrated `K` candidate)
 6. `OnPhase(MeasurementPhase.Calibration, Completed)` - with ResolvedK
 7. `OnPhase(MeasurementPhase.Warmup, Starting)`
 8. `OnSample(Warmup=true)` - throttled per batch
 9. `OnPhase(MeasurementPhase.Warmup, Completed)` - with WarmupStop and ResolvedWarmup
 10. `OnPhase(MeasurementPhase.Measurement, Starting)`
 11. `OnSample(Warmup=false)` - throttled per batch
-12. `OnDetector(Measurement)` - after each sample
+12. `OnDetector(Measurement)` - when measurement resolves (CI target met or max ceiling)
 13. `OnPhase(MeasurementPhase.Measurement, Completed)` - with SampleStop
 14. `OnResult(result)` - final assembled BenchmarkResult
 

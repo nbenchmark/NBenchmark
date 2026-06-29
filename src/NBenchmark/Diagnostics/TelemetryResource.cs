@@ -224,8 +224,24 @@ internal static class TelemetryResource
         if (process is null)
             return null;
 
-        var stdout = process.StandardOutput.ReadToEnd().Trim();
-        process.WaitForExit(2000);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+
+        if (!process.WaitForExit(2000))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Best-effort timeout cleanup; failure to kill does not change caller behavior
+                // (the metadata field is simply omitted).
+            }
+
+            return null;
+        }
+
+        var stdout = stdoutTask.GetAwaiter().GetResult().Trim();
         return stdout.Length > 0 ? stdout : null;
     }
 }

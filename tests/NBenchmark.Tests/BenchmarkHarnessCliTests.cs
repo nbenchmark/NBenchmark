@@ -8,6 +8,15 @@ namespace NBenchmark.Tests;
 [Collection("ConsoleCapture")]
 public class BenchmarkHarnessCliTests
 {
+    private const string OtlpEndpointEnvVar = "OTEL_EXPORTER_OTLP_ENDPOINT";
+    private const string NBenchmarkOtelEndpointEnvVar = "NBENCHMARK_OTEL_ENDPOINT";
+
+    private static readonly string[] ManagedTelemetryEnvVars =
+    [
+        OtlpEndpointEnvVar,
+        NBenchmarkOtelEndpointEnvVar,
+    ];
+
     [Fact]
     public void Help_Flag_Returns_Empty_And_Prints_Help()
     {
@@ -18,6 +27,34 @@ public class BenchmarkHarnessCliTests
         });
 
         Assert.Contains("Usage:", stdout);
+    }
+
+    [Fact]
+    public async Task RunAsync_OtlpEndpoint_Does_Not_Leak_Environment_Variables_When_Unset()
+    {
+        using var _ = WithTelemetryEnv();
+
+        await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHarness.Create(["--help", "--otlp-endpoint", "http://collector:4317"])
+                .RunAsync());
+
+        Assert.Null(Environment.GetEnvironmentVariable(NBenchmarkOtelEndpointEnvVar));
+        Assert.Null(Environment.GetEnvironmentVariable(OtlpEndpointEnvVar));
+    }
+
+    [Fact]
+    public async Task RunAsync_OtlpEndpoint_Preserves_Explicit_Otel_Endpoint_And_Restores_NBenchmark_Endpoint()
+    {
+        using var _ = WithTelemetryEnv([
+            (OtlpEndpointEnvVar, "http://explicit:4317"),
+        ]);
+
+        await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHarness.Create(["--help", "--otlp-endpoint", "http://collector:4318"])
+                .RunAsync());
+
+        Assert.Equal("http://explicit:4317", Environment.GetEnvironmentVariable(OtlpEndpointEnvVar));
+        Assert.Null(Environment.GetEnvironmentVariable(NBenchmarkOtelEndpointEnvVar));
     }
 
     [Fact]
@@ -786,6 +823,38 @@ public class BenchmarkHarnessCliTests
         finally
         {
             Console.SetOut(original);
+        }
+    }
+
+    private static IDisposable WithTelemetryEnv(IEnumerable<(string Name, string? Value)> vars)
+    {
+        var saved = new Dictionary<string, string?>();
+
+        foreach (var name in ManagedTelemetryEnvVars)
+            saved[name] = Environment.GetEnvironmentVariable(name);
+
+        foreach (var name in ManagedTelemetryEnvVars)
+            Environment.SetEnvironmentVariable(name, null);
+
+        foreach (var (name, value) in vars)
+            Environment.SetEnvironmentVariable(name, value);
+
+        return new EnvVarScope(saved);
+    }
+
+    private static IDisposable WithTelemetryEnv(params (string Name, string Value)[] vars)
+        => WithTelemetryEnv(vars.Select(v => (v.Name, (string?)v.Value)));
+
+    private sealed class EnvVarScope : IDisposable
+    {
+        private readonly Dictionary<string, string?> _saved;
+
+        public EnvVarScope(Dictionary<string, string?> saved) => _saved = saved;
+
+        public void Dispose()
+        {
+            foreach (var (name, value) in _saved)
+                Environment.SetEnvironmentVariable(name, value);
         }
     }
 
