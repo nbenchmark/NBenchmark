@@ -1,9 +1,38 @@
 namespace NBenchmark.Engine;
 
-internal static class ThresholdCheck
+/// <summary>
+///     Threshold-based regression detection: compares each successful benchmark's median
+///     against a baseline (the <see cref="BenchmarkResult.IsBaseline" /> flag, or the
+///     fastest by median when no baseline is declared) and flags any candidate whose median
+///     exceeds the baseline by more than a configured percentage. Public so an external
+///     consumer (for example NBenchmark.Studio) can reuse the same baseline-selection and
+///     ratio-gate logic that the engine uses for its <c>--threshold-pct</c> exit-code gate,
+///     instead of reimplementing a weaker version.
+/// </summary>
+public static class ThresholdCheck
 {
+    /// <summary>
+    ///     Returns the regressed benchmark names when one or more candidates exceed the
+    ///     baseline by more than <paramref name="thresholdPct" /> percent; otherwise
+    ///     <c>(false, [])</c>. Convenience overload for callers that only need the names.
+    /// </summary>
     public static (bool HasRegression, IReadOnlyList<string> RegressedNames) HasRegression(
         IReadOnlyList<BenchmarkResult> results, int thresholdPct)
+    {
+        if (thresholdPct <= 0)
+            throw new ArgumentOutOfRangeException(nameof(thresholdPct), "Must be a positive integer (1 or greater).");
+
+        var verdict = Check(results, thresholdPct);
+        return (verdict.HasRegression, verdict.RegressedNames);
+    }
+
+    /// <summary>
+    ///     Returns a <see cref="RegressionVerdict" /> carrying the baseline, the regressed
+    ///     candidates with their ratio and delta against the baseline, and the sorted
+    ///     regressed names. Use this overload when the caller needs the structured per-benchmark
+    ///     values (for example to build a regression-alert UI) rather than just the names.
+    /// </summary>
+    public static RegressionVerdict Check(IReadOnlyList<BenchmarkResult> results, int thresholdPct)
     {
         if (thresholdPct <= 0)
             throw new ArgumentOutOfRangeException(nameof(thresholdPct), "Must be a positive integer (1 or greater).");
@@ -11,12 +40,13 @@ internal static class ThresholdCheck
         var successful = results.Where(r => !r.Errored).ToList();
 
         if (successful.Count <= 1)
-            return (false, Array.Empty<string>());
+            return RegressionVerdict.None;
 
         var baseline = successful.FirstOrDefault(r => r.IsBaseline)
                        ?? successful.MinBy(r => r.Median)!;
 
-        var regressed = new List<string>();
+        var regressedCandidates = new List<RegressionCandidate>();
+        var regressedNames = new List<string>();
 
         if (baseline.Median <= 0)
         {
@@ -29,7 +59,10 @@ internal static class ThresholdCheck
                     continue;
 
                 if (result.Median > 0)
-                    regressed.Add(result.Name);
+                {
+                    regressedCandidates.Add(new RegressionCandidate(result.Name, result.Median, baseline.Median, double.NaN, result.Median));
+                    regressedNames.Add(result.Name);
+                }
             }
         }
         else
@@ -44,15 +77,48 @@ internal static class ThresholdCheck
                     continue;
 
                 if (result.Median > thresholdMedian)
-                    regressed.Add(result.Name);
+                {
+                    regressedCandidates.Add(new RegressionCandidate(result.Name, result.Median, baseline.Median, result.Median / baseline.Median, result.Median - baseline.Median));
+                    regressedNames.Add(result.Name);
+                }
             }
         }
 
-        if (regressed.Count == 0)
-            return (false, Array.Empty<string>());
+        if (regressedCandidates.Count == 0)
+            return RegressionVerdict.None;
 
-        regressed.Sort(StringComparer.Ordinal);
+        regressedNames.Sort(StringComparer.Ordinal);
 
-        return (true, regressed);
+        return new RegressionVerdict(
+            HasRegression: true,
+            baseline.Name,
+            regressedCandidates,
+            regressedNames);
     }
 }
+
+/// <summary>
+///     A structured regression-detection result: the baseline the comparison was made
+///     against, the candidates that exceeded the threshold (with their ratio and delta),
+///     and the regressed names sorted ascending. Returned by
+///     <see cref="ThresholdCheck.Check" />.
+/// </summary>
+/// <param name="HasRegression"><c>true</c> when at least one candidate exceeded the threshold.</param>
+/// <param name="BaselineName">The name of the benchmark the comparison was made against.</param>
+/// <param name="RegressedCandidates">One entry per regressed candidate, in evaluation order.</param>
+/// <param name="RegressedNames">The regressed candidate names, sorted ascending by ordinal.</param>
+public sealed record RegressionVerdict(
+    bool HasRegression,
+    string BaselineName,
+    IReadOnlyList<RegressionCandidate> RegressedCandidates,
+    IReadOnlyList<string> RegressedNames)
+{
+    internal static RegressionVerdict None { get; } = new(false, "", [], []);
+}
+
+/// <summary>
+///     One regressed candidate: its median, the baseline median, the ratio
+///     (<c>candidate / baseline</c>, <c>NaN</c> when the baseline median is zero), and the
+///     absolute delta in nanoseconds. Built by <see cref="ThresholdCheck.Check" />.
+/// </summary>
+public sealed record RegressionCandidate(string Name, double CandidateMedian, double BaselineMedian, double Ratio, double DeltaNs);

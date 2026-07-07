@@ -19,6 +19,13 @@ internal static class AdaptiveLoop
     // prematurely freeze K at 1. Small enough that calibration stays cheap.
     private const int CalibrationSamplesPerStep = 5;
 
+    // Cached phase string literals for the per-sample OTLP tags. Using literals (instead of
+    // MeasurementPhase.ToString()) keeps the RecordSample hot path allocation-free: the tag
+    // value is a reference to an interned string, not a fresh allocation per sample.
+    private const string CalibrationPhaseTag = "calibration";
+    private const string WarmupPhaseTag = "warmup";
+    private const string MeasurementPhaseTag = "measurement";
+
     public static AdaptiveResult Run(
         string name,
         Action body,
@@ -126,7 +133,7 @@ internal static class AdaptiveLoop
                     accumulatedNs += elapsed;
                     calibrationSamples++;
 
-                    NBenchmarkDiagnostics.RecordSample(elapsed / probeK, -1);
+                    NBenchmarkDiagnostics.RecordSample(name, warmup: true, CalibrationPhaseTag, elapsed / probeK, -1);
 
                     if (attached)
                     {
@@ -205,7 +212,7 @@ internal static class AdaptiveLoop
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
 
-                NBenchmarkDiagnostics.RecordSample(elapsed / k, -1);
+                NBenchmarkDiagnostics.RecordSample(name, warmup: true, WarmupPhaseTag, elapsed / k, -1);
 
                 if (attached)
                 {
@@ -300,7 +307,7 @@ internal static class AdaptiveLoop
                 diagnosticsList?.Add(diagDelta);
                 sampleCount++;
 
-                NBenchmarkDiagnostics.RecordSample(perOp, measureAllocations ? allocDelta / k : -1L);
+                NBenchmarkDiagnostics.RecordSample(name, warmup: false, MeasurementPhaseTag, perOp, measureAllocations ? allocDelta / k : -1L);
 
                 if (attached)
                 {
@@ -506,7 +513,7 @@ internal static class AdaptiveLoop
                     accumulatedNs += elapsed;
                     calibrationSamples++;
 
-                    NBenchmarkDiagnostics.RecordSample(elapsed / probeK, -1);
+                    NBenchmarkDiagnostics.RecordSample(name, warmup: true, CalibrationPhaseTag, elapsed / probeK, -1);
 
                     if (attached)
                         observer.OnSample(new SampleEvent(name, calibrationOrdinal++, elapsed / probeK, probeK, 0, Warmup: true));
@@ -583,7 +590,7 @@ internal static class AdaptiveLoop
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
 
-                NBenchmarkDiagnostics.RecordSample(elapsed / k, -1);
+                NBenchmarkDiagnostics.RecordSample(name, warmup: true, WarmupPhaseTag, elapsed / k, -1);
 
                 if (attached)
                 {
@@ -681,7 +688,7 @@ internal static class AdaptiveLoop
                 diagnosticsList?.Add(diagDelta);
                 sampleCount++;
 
-                NBenchmarkDiagnostics.RecordSample(perOp, measureAllocations ? allocDelta / k : -1L);
+                NBenchmarkDiagnostics.RecordSample(name, warmup: false, MeasurementPhaseTag, perOp, measureAllocations ? allocDelta / k : -1L);
 
                 if (attached)
                 {

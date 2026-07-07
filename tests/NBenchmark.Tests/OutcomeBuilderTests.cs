@@ -54,7 +54,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 3, (long)allocations.Average(), 0, 0, 0, null, null, 0, null),
+                new ProcessedMeasurements(stats, 3, (long)allocations.Average(), 0, 0, 0, null, null, 0, null, []),
                 rawTimings),
             "bench", "",
             "desc",
@@ -105,7 +105,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 4, (long)allocations.Average(), 0, 0, 0, null, null, 0, null),
+                new ProcessedMeasurements(stats, 4, (long)allocations.Average(), 0, 0, 0, null, null, 0, null, []),
                 [1, 2, 3, 4]),
             "b", "", null, false,
             new MeasurementOptions(),
@@ -122,7 +122,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 3, null, 0, 0, 0, null, null, 0, null),
+                new ProcessedMeasurements(stats, 3, null, 0, 0, 0, null, null, 0, null, []),
                 [1, 2, 3]),
             "b", "", null, false,
             new MeasurementOptions(),
@@ -140,7 +140,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null),
+                new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null, []),
                 [1]),
             "b", "", null, false,
             options,
@@ -158,7 +158,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null),
+                new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null, []),
                 [1]),
             "b", "", null, false,
             new MeasurementOptions(),
@@ -188,7 +188,7 @@ public class OutcomeBuilderTests
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
-                new ProcessedMeasurements(stats, 47, null, 0, 0, 0, null, null, 0, null),
+                new ProcessedMeasurements(stats, 47, null, 0, 0, 0, null, null, 0, null, []),
                 [1, 2, 3]),
             "b", "", null, false,
             new MeasurementOptions(),

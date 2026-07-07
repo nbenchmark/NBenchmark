@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using NBenchmark.Diagnostics;
 using NBenchmark.Engine;
+using NBenchmark.Observers;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
 

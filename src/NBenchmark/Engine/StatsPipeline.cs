@@ -3,15 +3,23 @@ using NBenchmark.Stats;
 
 namespace NBenchmark.Engine;
 
-internal static class StatsPipeline
+/// <summary>
+///     The full trim -> summary -> warnings pipeline that turns raw per-op timings and
+///     allocation deltas into a <see cref="ProcessedMeasurements" />. Exposed so an
+///     external consumer that has captured raw samples (for example NBenchmark.Studio,
+///     ingesting OTLP) can run exactly the same statistical processing the engine uses,
+///     without reimplementing outlier trimming and warning generation.
+/// </summary>
+public static class StatsPipeline
 {
     public static ProcessedMeasurements Run(
         double[] rawTimings,
         long[]? rawAllocations,
         MeasurementOptions options)
     {
-        var timingsForStats = (double[])rawTimings.Clone();
-        var trimResult = OutlierTrim.TrimDetailed(timingsForStats, options.ResolveOutlierDetector());
+        // OutlierTrim.TrimDetailed clones internally and does not mutate the input, so
+        // rawTimings stays in arrival order and TrimmedOrdinals map back correctly.
+        var trimResult = OutlierTrim.TrimDetailed(rawTimings, options.ResolveOutlierDetector());
 
         Debug.Assert(IsSorted(trimResult.Kept),
             "OutlierTrim must produce sorted output; Percentile.Compute requires sorted input.");
@@ -37,7 +45,8 @@ internal static class StatsPipeline
                 trimResult.LowerFence,
                 trimResult.UpperFence,
                 outliersRemoved,
-                rawAllocations)
+                rawAllocations,
+                trimResult.TrimmedOrdinals)
             { Warnings = warnings };
     }
 
@@ -82,7 +91,13 @@ internal static class StatsPipeline
     }
 }
 
-internal sealed record ProcessedMeasurements(
+/// <summary>
+///     The processed output of <see cref="StatsPipeline.Run" />: the summary statistics, the
+///     measured (post-trim) iteration count, mean allocations, the quartile statistics and
+///     fence boundaries, the outlier count, the raw allocation samples, the original
+///     ordinals of every trimmed sample, and any warnings the pipeline produced.
+/// </summary>
+public sealed record ProcessedMeasurements(
     StatsSummary Stats,
     int MeasuredIterations,
     long? MeanAllocatedBytes,
@@ -92,7 +107,8 @@ internal sealed record ProcessedMeasurements(
     double? LowerFence,
     double? UpperFence,
     int OutliersRemoved,
-    long[]? RawAllocations)
+    long[]? RawAllocations,
+    int[] TrimmedOrdinals)
 {
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public DiagnosticsResult? DiagnosticsResult { get; init; }

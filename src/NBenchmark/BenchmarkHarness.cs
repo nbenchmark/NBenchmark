@@ -4,7 +4,9 @@ using NBenchmark.Diagnostics;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using NBenchmark.Lifecycle;
+using NBenchmark.Observers;
 using NBenchmark.Reporters;
+using NBenchmark.Stats;
 
 namespace NBenchmark;
 

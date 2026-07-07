@@ -1,8 +1,16 @@
 using NBenchmark.Stats;
 
-namespace NBenchmark;
+namespace NBenchmark.Stats;
 
-internal static class Significance
+/// <summary>
+///     Applies statistical significance testing to a set of benchmark results.
+///     Public so external consumers (for example NBenchmark.Studio) can reuse the
+///     same Mann-Whitney / Kruskal-Wallis pipeline that the engine uses for its
+///     significance comparisons, avoiding duplication of the baseline selection
+///     (via <see cref="BenchmarkResult.IsBaseline" /> or fastest-by-median fallback)
+///     and the p-value verdict assignment logic.
+/// </summary>
+public static class Significance
 {
     public static void ApplyIfEnabled(
         List<BenchmarkResult> results,

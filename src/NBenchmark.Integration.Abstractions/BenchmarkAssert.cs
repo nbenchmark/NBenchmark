@@ -39,26 +39,27 @@ public static class BenchmarkAssert
         var violations = new List<string>();
 
         var host = GetHostAssessment();
-        var jitter = result.AutoTune?.JitterMetric;
-        var needsRelaxation = host.IsSharedRunner
-            || (jitter.HasValue && jitter.Value > AutoTuneOptions.Default.JitterAutoSwitchThreshold);
+        var needsRelaxation = RegressionTolerance.NeedsRelaxation(
+            result,
+            host.IsSharedRunner,
+            AutoTuneOptions.Default.JitterAutoSwitchThreshold);
         var configuredTolerance = thresholds.MaxAbsoluteThresholdTolerance > 0
             ? thresholds.MaxAbsoluteThresholdTolerance
             : 1.0;
-        var tolerance = needsRelaxation ? configuredTolerance : 1.0;
+        var toleranceMultiplier = needsRelaxation ? configuredTolerance : 1.0;
 
         if (thresholds.MaxMeanNs.HasValue)
         {
-            var effectiveMax = thresholds.MaxMeanNs.Value * tolerance;
+            var verdict = RegressionTolerance.Evaluate(result.Mean, thresholds.MaxMeanNs.Value, toleranceMultiplier);
 
-            if (result.Mean > effectiveMax)
+            if (verdict.ExceedsThreshold)
             {
                 var message = $"Mean {result.Mean:F2} ns exceeds maximum {thresholds.MaxMeanNs.Value:F2} ns";
 
-                if (tolerance > 1.0)
-                    message += $" (relaxed to {effectiveMax:F2} ns for shared-runner jitter tolerance)";
+                if (verdict.Relaxed)
+                    message += $" (relaxed to {verdict.EffectiveThreshold:F2} ns for shared-runner jitter tolerance)";
 
-                message += $" (excess: {result.Mean - effectiveMax:F2} ns)";
+                message += $" (excess: {verdict.Excess:F2} ns)";
 
                 violations.Add(message);
             }
@@ -68,16 +69,16 @@ public static class BenchmarkAssert
 
         if (thresholds.MaxP95Ns.HasValue && p95.HasValue)
         {
-            var effectiveMax = thresholds.MaxP95Ns.Value * tolerance;
+            var verdict = RegressionTolerance.Evaluate(p95.Value, thresholds.MaxP95Ns.Value, toleranceMultiplier);
 
-            if (p95.Value > effectiveMax)
+            if (verdict.ExceedsThreshold)
             {
                 var message = $"P95 {p95.Value:F2} ns exceeds maximum {thresholds.MaxP95Ns.Value:F2} ns";
 
-                if (tolerance > 1.0)
-                    message += $" (relaxed to {effectiveMax:F2} ns for shared-runner jitter tolerance)";
+                if (verdict.Relaxed)
+                    message += $" (relaxed to {verdict.EffectiveThreshold:F2} ns for shared-runner jitter tolerance)";
 
-                message += $" (excess: {p95.Value - effectiveMax:F2} ns)";
+                message += $" (excess: {verdict.Excess:F2} ns)";
 
                 violations.Add(message);
             }
@@ -92,15 +93,20 @@ public static class BenchmarkAssert
         if (thresholds.MaxAllocatedBytes.HasValue
             && result.MeanAllocatedBytes.HasValue)
         {
-            var effectiveMaxDouble = thresholds.MaxAllocatedBytes.Value * tolerance;
-            var effectiveMax = effectiveMaxDouble >= long.MaxValue ? long.MaxValue : (long)effectiveMaxDouble;
+            var verdict = RegressionTolerance.Evaluate(
+                result.MeanAllocatedBytes.Value,
+                thresholds.MaxAllocatedBytes.Value,
+                toleranceMultiplier);
 
-            if (result.MeanAllocatedBytes.Value > effectiveMax)
+            if (verdict.ExceedsThreshold)
             {
+                var effectiveMax = verdict.EffectiveThreshold >= long.MaxValue
+                    ? long.MaxValue
+                    : (long)verdict.EffectiveThreshold;
                 var message = $"Mean allocated bytes {result.MeanAllocatedBytes.Value} exceeds maximum " +
                               $"{thresholds.MaxAllocatedBytes.Value}";
 
-                if (tolerance > 1.0)
+                if (verdict.Relaxed)
                     message += $" (relaxed to {effectiveMax} for shared-runner jitter tolerance)";
 
                 message += $" (excess: {result.MeanAllocatedBytes.Value - effectiveMax})";

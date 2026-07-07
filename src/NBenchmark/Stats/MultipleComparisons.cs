@@ -1,6 +1,13 @@
 namespace NBenchmark.Stats;
 
-internal static class MultipleComparisons
+/// <summary>
+///     Multiple-comparison correction helpers. When several benchmarks are compared
+///     against a baseline in one run, the raw per-comparison p-values overstate
+///     significance (more comparisons means more chances for a false positive).
+///     <see cref="HolmBonferroni" /> adjusts the raw p-values so the family-wise error
+///     rate stays at or below the per-comparison significance level.
+/// </summary>
+public static class MultipleComparisons
 {
     public static double[] HolmBonferroni(IReadOnlyList<double> rawPValues)
     {

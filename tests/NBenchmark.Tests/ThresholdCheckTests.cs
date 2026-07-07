@@ -323,4 +323,158 @@ public class ThresholdCheckTests
         Assert.Single(regressed);
         Assert.Equal("slow", regressed[0]);
     }
+
+    [Fact]
+    public void Check_ExceedsThreshold_ReturnsVerdictWithRatioAndDelta()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("baseline", median: 100, isBaseline: true),
+            MakeResult("slow", median: 150, isBaseline: false),
+        };
+
+        var verdict = ThresholdCheck.Check(results, 10);
+
+        Assert.True(verdict.HasRegression);
+        Assert.Equal("baseline", verdict.BaselineName);
+        Assert.Single(verdict.RegressedCandidates);
+        Assert.Single(verdict.RegressedNames);
+
+        var candidate = verdict.RegressedCandidates[0];
+        Assert.Equal("slow", candidate.Name);
+        Assert.Equal(150d, candidate.CandidateMedian);
+        Assert.Equal(100d, candidate.BaselineMedian);
+        Assert.Equal(1.5, candidate.Ratio, 12);
+        Assert.Equal(50d, candidate.DeltaNs, 12);
+        Assert.Equal("slow", verdict.RegressedNames[0]);
+    }
+
+    [Fact]
+    public void Check_WithinThreshold_ReturnsNoneVerdict()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("baseline", median: 100, isBaseline: true),
+            MakeResult("candidate", median: 105, isBaseline: false),
+        };
+
+        var verdict = ThresholdCheck.Check(results, 10);
+
+        Assert.False(verdict.HasRegression);
+        Assert.Equal(string.Empty, verdict.BaselineName);
+        Assert.Empty(verdict.RegressedCandidates);
+        Assert.Empty(verdict.RegressedNames);
+    }
+
+    [Fact]
+    public void Check_MultipleRegressed_CandidatesInEvaluationOrder_NamesSortedAscending()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("baseline", median: 100, isBaseline: true),
+            MakeResult("zeta", median: 200, isBaseline: false),
+            MakeResult("alpha", median: 150, isBaseline: false),
+        };
+
+        var verdict = ThresholdCheck.Check(results, 10);
+
+        Assert.True(verdict.HasRegression);
+        Assert.Equal(2, verdict.RegressedCandidates.Count);
+        Assert.Equal(2, verdict.RegressedNames.Count);
+
+        // RegressedCandidates preserve evaluation order (input order).
+        Assert.Equal("zeta", verdict.RegressedCandidates[0].Name);
+        Assert.Equal("alpha", verdict.RegressedCandidates[1].Name);
+
+        // RegressedNames are sorted ascending by ordinal (string ordinal sort).
+        Assert.Equal("alpha", verdict.RegressedNames[0]);
+        Assert.Equal("zeta", verdict.RegressedNames[1]);
+    }
+
+    [Fact]
+    public void Check_BaselineMedianZero_RatioIsNaN_DeltaIsCandidateMedian()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("baseline", median: 0, isBaseline: true),
+            MakeResult("candidate", median: 100, isBaseline: false),
+        };
+
+        var verdict = ThresholdCheck.Check(results, 10);
+
+        Assert.True(verdict.HasRegression);
+        var candidate = verdict.RegressedCandidates[0];
+        Assert.Equal(double.NaN, candidate.Ratio);
+        Assert.Equal(100d, candidate.DeltaNs, 12);
+    }
+
+    [Fact]
+    public void Check_ImplicitBaseline_UsesFastestByMedian_AsBaselineName()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("slow", median: 200, isBaseline: false),
+            MakeResult("fast", median: 50, isBaseline: false),
+        };
+
+        var verdict = ThresholdCheck.Check(results, 10);
+
+        Assert.True(verdict.HasRegression);
+        Assert.Equal("fast", verdict.BaselineName);
+        Assert.Single(verdict.RegressedCandidates);
+        Assert.Equal("slow", verdict.RegressedCandidates[0].Name);
+        Assert.Equal(4.0, verdict.RegressedCandidates[0].Ratio, 12);
+    }
+
+    [Fact]
+    public void Check_SingleSuccessfulBenchmark_ReturnsNoneVerdict()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("solo", median: 100, isBaseline: false),
+        };
+
+        var verdict = ThresholdCheck.Check(results, 10);
+
+        Assert.False(verdict.HasRegression);
+        Assert.Equal(RegressionVerdict.None.BaselineName, verdict.BaselineName);
+    }
+
+    [Fact]
+    public void Check_ZeroThreshold_Throws()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("baseline", median: 100, isBaseline: true),
+            MakeResult("slow", median: 150, isBaseline: false),
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => ThresholdCheck.Check(results, 0));
+    }
+
+    private static BenchmarkResult MakeResult(string name, double median, bool isBaseline)
+    {
+        return new BenchmarkResult
+        {
+            Name = name,
+            Mean = median,
+            Median = median,
+            Percentiles = [],
+            Min = median * 0.85,
+            Max = median * 1.2,
+            StandardDeviation = median * 0.05,
+            IsBaseline = isBaseline,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 0,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
+        };
+    }
 }

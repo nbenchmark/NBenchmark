@@ -54,6 +54,21 @@ public record BenchmarkResult
     public required int OutliersRemoved { get; init; }
     public required int N { get; init; }
 
+    /// <summary>
+    ///     Ordinals (zero-based positions in the original raw-sample stream) of every sample
+    ///     that the outlier detector discarded, sorted ascending by value (matching the order
+    ///     of the discarded values themselves). Empty when no samples were trimmed or when
+    ///     the result was not produced by the stats pipeline (dry-run, errored, or built
+    ///     from a calibration factory).
+    ///     <para>
+    ///         Use this to flag individual raw samples as trimmed without re-running the
+    ///         outlier detector. The ordinals refer to positions in
+    ///         <see cref="MeasurementOutcome.RawSamples" /> when the result came from a
+    ///         measured run.
+    ///     </para>
+    /// </summary>
+    public IReadOnlyList<int> TrimmedOrdinals { get; init; } = [];
+
     public required double Skewness { get; init; }
     public required double Kurtosis { get; init; }
     public required double Mad { get; init; }
