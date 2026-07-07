@@ -1,3 +1,4 @@
+using NBenchmark.Observers;
 using NBenchmark.Reporters;
 using Xunit;
 

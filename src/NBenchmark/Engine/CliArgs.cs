@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using NBenchmark.Observers;
 using NBenchmark.Reporters;
 
 namespace NBenchmark.Engine;

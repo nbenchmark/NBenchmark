@@ -272,7 +272,7 @@ internal sealed record IsolatedRunRequest
     /// <summary>
     ///     Observer names the parent resolved from <c>--observer</c> flags and programmatic
     ///     <c>WithObserver</c> calls. The child resolves each through
-    ///     <c>NBenchmark.Reporters.ObserverRegistry</c> so the same observers (e.g. the
+    ///     <c>NBenchmark.Observers.ObserverRegistry</c> so the same observers (e.g. the
     ///     <c>live</c> dashboard observer, an OTLP-exporting observer) fire in the child as in
     ///     the parent. Empty when the parent attached no observer, in which case the child runs
     ///     with <c>NullMeasurementObserver.Instance</c>. The child re-runs the entry assembly, so

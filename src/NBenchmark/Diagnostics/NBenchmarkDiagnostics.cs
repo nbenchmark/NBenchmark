@@ -3,10 +3,42 @@ using System.Diagnostics.Metrics;
 
 namespace NBenchmark.Diagnostics;
 
+/// <summary>
+///     Owns the <see cref="Meter" /> and <see cref="ActivitySource" /> that NBenchmark emits
+///     diagnostics through, plus the per-sample/per-phase record methods the adaptive loop
+///     calls. The instruments are stamped with <c>nbenchmark.*</c> names so a downstream
+///     OpenTelemetry SDK (or an in-process <see cref="MeterListener" />) can pick them up.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The class itself is <c>internal</c> because it also owns mutable process-wide
+///         state (the running gauges, the current activity stack) that is not safe for
+///         external callers to touch. The two stable seams are exposed as public static
+///         properties: <see cref="Meter" /> and <see cref="ActivitySource" />. A host that
+///         runs NBenchmark in-process (for example NBenchmark.Studio) can attach its own
+///         <see cref="MeterListener" /> / <see cref="ActivityListener" /> to these without
+///         paying OTLP serialize->parse overhead, and without depending on internal record
+///         methods.
+///     </para>
+///     <para>
+///         Per-sample histograms are stamped with a <see cref="TagList" /> carrying the
+///         benchmark name, a warmup flag, and the current phase, so an OTLP backend (or
+///         Studio's <c>OtlpMapper</c>) can attribute each data point back to the benchmark
+///         and phase that produced it. <see cref="RecordSample" /> is called from the
+///         measurement thread; the tag values are passed in already in scope so the
+///         additional cost is a value-type <see cref="TagList" /> and one tagged
+///         <c>Record</c> call, which is negligible relative to the body being measured.
+///         When no listener is attached, <c>Record</c> short-circuits and the tags are
+///         never serialized.
+///     </para>
+/// </remarks>
 internal static class NBenchmarkDiagnostics
 {
-    internal static readonly ActivitySource ActivitySource = new("NBenchmark");
-    internal static readonly Meter Meter = new("NBenchmark");
+    /// <summary>The <see cref="ActivitySource" /> for NBenchmark spans. Use this to attach an <see cref="ActivityListener" />.</summary>
+    public static ActivitySource ActivitySource { get; } = new("NBenchmark");
+
+    /// <summary>The <see cref="Meter" /> for NBenchmark instruments. Use this to attach a <see cref="MeterListener" />.</summary>
+    public static Meter Meter { get; } = new("NBenchmark");
 
     private static readonly Histogram<double> HSampleDuration =
         Meter.CreateHistogram<double>("nbenchmark.sample.duration", "ns/op", "Per-op sample duration in nanoseconds");
@@ -79,11 +111,22 @@ internal static class NBenchmarkDiagnostics
             "Total outliers removed");
     }
 
-    internal static void RecordSample(double perOpNs, long allocDelta)
+    internal static void RecordSample(string benchmarkName, bool warmup, string phase, double perOpNs, long allocDelta)
     {
-        HSampleDuration.Record(perOpNs);
+        // TagList is a value type; Histogram<T>.Record has a tagged overload with negligible
+        // overhead. The phase string is a cached literal from the caller (see AdaptiveLoop),
+        // so this path performs no per-sample allocation. When no MeterListener is attached,
+        // Record short-circuits before touching the tags.
+        var tags = new TagList
+        {
+            { "benchmark", benchmarkName },
+            { "warmup", warmup },
+            { "phase", phase },
+        };
+
+        HSampleDuration.Record(perOpNs, tags);
         if (allocDelta >= 0)
-            HAllocBytes.Record(allocDelta);
+            HAllocBytes.Record(allocDelta, tags);
         _sampleCount++;
     }
 
@@ -290,15 +333,19 @@ internal static class NBenchmarkDiagnostics
 
         // GC collection counters: emitted from the post-run DiagnosticsResult so the counter
         // reflects the measurement-phase delta (DiagnosticMeter computes Gen0/1/2 as
-        // after - before across the measured loop).
+        // after - before across the measured loop). The benchmark name tag lets an OTLP-only
+        // isolated-child run attribute GC metrics per benchmark (the suite/run span is not
+        // visible to a pure metric exporter).
         if (result.Diagnostics is { } diag)
         {
+            var tags = new TagList { { "benchmark", result.Name } };
+
             if (diag.Gen0Collections is { } gen0 && gen0 > 0)
-                CGcGen0.Add(gen0);
+                CGcGen0.Add(gen0, tags);
             if (diag.Gen1Collections is { } gen1 && gen1 > 0)
-                CGcGen1.Add(gen1);
+                CGcGen1.Add(gen1, tags);
             if (diag.Gen2Collections is { } gen2 && gen2 > 0)
-                CGcGen2.Add(gen2);
+                CGcGen2.Add(gen2, tags);
         }
     }
 }

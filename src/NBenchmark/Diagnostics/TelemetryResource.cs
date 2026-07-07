@@ -24,7 +24,7 @@ namespace NBenchmark.Diagnostics;
 ///         are honoured verbatim - they are the OpenTelemetry-standard way to attach arbitrary
 ///         resource attributes, so a user who has already configured them for the rest of their
 ///         service does not have to repeat themselves. NBenchmark-specific attributes use the
-///         <c>nbenchmark.*</c> namespace to avoid collisions with the standard OTel schema.
+///     <c>nbenchmark.*</c> namespace to avoid collisions with the standard OTel schema.
 ///     </para>
 ///     <para>
 ///         <see cref="NBenchmarkDiagnostics.OnSuiteStarting" /> stamps every returned attribute
@@ -33,8 +33,14 @@ namespace NBenchmark.Diagnostics;
 ///         to repeat them. The BCL <c>ActivitySource</c>/<c>Meter</c> emit only what the SDK
 ///         listens for, so attributes that nothing consumes are free.
 ///     </para>
+///     <para>
+///         External consumers (for example NBenchmark.Studio) can read <see cref="Attributes" />
+///         to display CI metadata (commit SHA, branch, CI provider, machine name, OS, runtime)
+///         in a run detail view, without duplicating the environment-variable and git-inspection
+///         logic.
+///     </para>
 /// </remarks>
-internal static class TelemetryResource
+public static class TelemetryResource
 {
     private static IReadOnlyDictionary<string, object?>? _cached;
 
@@ -44,7 +50,7 @@ internal static class TelemetryResource
     ///     <c>service.name</c>, <c>nbenchmark.commit_sha</c>) and is safe to enumerate while
     ///     stamping onto an <c>Activity</c>.
     /// </summary>
-    internal static IReadOnlyDictionary<string, object?> Attributes => _cached ??= Build();
+    public static IReadOnlyDictionary<string, object?> Attributes => _cached ??= Build();
 
     /// <summary>
     ///     Clears the cached attributes so the next <see cref="Attributes" /> access re-reads the

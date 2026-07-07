@@ -52,22 +52,45 @@ public sealed class DiagnosticsTests : IDisposable
     [Fact]
     public void RecordSample_Emits_Duration_Histogram()
     {
-        NBenchmarkDiagnostics.RecordSample(42.5, 128);
+        NBenchmarkDiagnostics.RecordSample("bench-a", warmup: false, "measurement", 42.5, 128);
         Assert.Contains(42.5, _durationValues);
     }
 
     [Fact]
     public void RecordSample_Emits_Alloc_Histogram()
     {
-        NBenchmarkDiagnostics.RecordSample(100.0, 256);
+        NBenchmarkDiagnostics.RecordSample("bench-a", warmup: false, "measurement", 100.0, 256);
         Assert.Contains(256, _allocValues);
     }
 
     [Fact]
     public void RecordSample_Does_Not_Emit_Alloc_When_Negative()
     {
-        NBenchmarkDiagnostics.RecordSample(50.0, -1);
+        NBenchmarkDiagnostics.RecordSample("bench-a", warmup: false, "measurement", 50.0, -1);
         Assert.DoesNotContain(-1L, _allocValues);
+    }
+
+    [Fact]
+    public void RecordSample_Stamps_Benchmark_Warmup_And_Phase_Tags()
+    {
+        var capturedTags = new List<KeyValuePair<string, object?>>();
+
+        _meterListener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
+        {
+            if (instrument.Name == "nbenchmark.sample.duration")
+            {
+                _durationValues.Add(value);
+                var e = tags.GetEnumerator();
+                while (e.MoveNext())
+                    capturedTags.Add(e.Current);
+            }
+        });
+
+        NBenchmarkDiagnostics.RecordSample("MyBench", warmup: true, "warmup", 77.7, -1);
+
+        Assert.Contains(capturedTags, t => t.Key == "benchmark" && Equals(t.Value, "MyBench"));
+        Assert.Contains(capturedTags, t => t.Key == "warmup" && Equals(t.Value, true));
+        Assert.Contains(capturedTags, t => t.Key == "phase" && Equals(t.Value, "warmup"));
     }
 
     [Fact]

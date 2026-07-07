@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
-namespace NBenchmark.Reporters;
+namespace NBenchmark.Observers;
 
 /// <summary>Metadata about a registered observer factory.</summary>
 public sealed record ObserverInfo(string Name, string Description);
