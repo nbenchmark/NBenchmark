@@ -18,7 +18,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1"])
+            await BenchmarkHarness.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1"])
                 .AddFromAssembly<DependentBenchmark>()
                 .WithServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -40,7 +40,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "ScopedDependentBenchmark.*", "--dry-run"])
+            await BenchmarkHarness.Create(["--filter", "ScopedDependentBenchmark.*", "--dry-run", "--launch-count", "1"])
                 .AddFromAssembly<ScopedDependentBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -64,7 +64,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run"])
+            await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run", "--launch-count", "1"])
                 .AddFromAssembly<DisposableBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -104,7 +104,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1"])
+            await BenchmarkHarness.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1"])
                 .UseDependencyInjection<DependentBenchmark>(services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -126,7 +126,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run"])
+            await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run", "--launch-count", "1"])
                 .UseScopedDependencyInjection<DisposableBenchmark>(services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -143,7 +143,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<ParameterlessBenchmark>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -160,7 +160,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<ParameterlessBenchmark>()
                 .WithInstanceFactory(type =>
                 {
@@ -190,7 +190,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<PerMethodScopeBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -219,7 +219,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<PerMethodScopeBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -242,7 +242,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "PerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "PerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<PerClassScopeBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -264,7 +264,7 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "HarnessPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "HarnessPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<HarnessPerClassScopeBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithInstanceLifetime(InstanceLifetime.PerClass)

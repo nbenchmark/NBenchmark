@@ -387,7 +387,7 @@ dotnet run -- --help
 
 ### `--launch-count <n>`
 
-Repeat each benchmark N times as separate launches. Statistics (mean, stddev, median, CI) are computed across launch medians, and the best launch (lowest median) is displayed as the primary result. An aggregation table appears below the main results when `n > 1`. Valid range: `1` to `100`. Default: `1`.
+Repeat each benchmark N times as separate launches. Statistics (mean, stddev, median, CI) are computed across launch medians, and the best launch (lowest median) is displayed as the primary result. An aggregation table appears below the main results when `n > 1`. Valid range: `1` to `100`. Harness-mode default: `3` when the user has not explicitly pinned launch count.
 
 ```bash
 dotnet run -- --launch-count 3

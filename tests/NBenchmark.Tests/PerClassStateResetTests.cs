@@ -106,6 +106,7 @@ public class PerClassStateResetTests
             "--in-process",
             "--iterations", "1",
             "--warmup", "1",
+            "--launch-count", "1",
         ]);
         harness.AddFromAssembly(typeof(ResetTrackingBenchmarks).Assembly);
 
@@ -127,6 +128,7 @@ public class PerClassStateResetTests
             "--in-process",
             "--iterations", "1",
             "--warmup", "1",
+            "--launch-count", "1",
         ]);
         harness.AddFromAssembly(typeof(NoResetBenchmarks).Assembly);
 

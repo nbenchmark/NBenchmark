@@ -166,7 +166,7 @@ public class CompositeMeasurementObserverTests
         var a = new RecordingObserver();
         var b = new RecordingObserver();
 
-        await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--warmup", "0", "--iterations", "1"])
+        await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--warmup", "0", "--iterations", "1", "--launch-count", "1"])
             .AddFromAssembly<TestBenchmarks>()
             .WithRunOrder(RunOrder.Declaration)
             .WithObserver(a)

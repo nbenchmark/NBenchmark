@@ -21,6 +21,7 @@ public class AutoIsolationFallbackTests
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
+            .WithLaunchCount(1)
             .WithIsolation();
 
         using (WithFakeLauncher((req, ct) =>
@@ -46,6 +47,7 @@ public class AutoIsolationFallbackTests
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
+            .WithLaunchCount(1)
             .WithIsolation();
 
         IReadOnlyList<BenchmarkResult> results;
@@ -80,6 +82,7 @@ public class AutoIsolationFallbackTests
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-reset"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
+            .WithLaunchCount(1)
             .WithIsolation();
 
         using (WithFakeLauncher((req, ct) =>
@@ -105,6 +108,7 @@ public class AutoIsolationFallbackTests
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-reset"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
+            .WithLaunchCount(1)
             .WithIsolation();
 
         IReadOnlyList<BenchmarkResult> results;
@@ -135,6 +139,7 @@ public class AutoIsolationFallbackTests
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-inprocess"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
+            .WithLaunchCount(1)
             .WithIsolation();
 
         IReadOnlyList<BenchmarkResult> results;
@@ -166,6 +171,7 @@ public class AutoIsolationFallbackTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-nofactory"])
+            .WithLaunchCount(1)
             .WithIsolation();
 
         using (WithFakeLauncher((req, ct) =>

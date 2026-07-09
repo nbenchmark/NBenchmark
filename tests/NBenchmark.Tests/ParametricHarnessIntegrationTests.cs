@@ -10,7 +10,7 @@ public class ParametricHarnessIntegrationTests
     public async Task RunAsync_Produces_One_Result_Per_BenchmarkCase()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2"])
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -27,7 +27,7 @@ public class ParametricHarnessIntegrationTests
     public async Task RunAsync_Produces_One_Result_Per_BenchmarkCases_Tuple()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2"])
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -43,7 +43,7 @@ public class ParametricHarnessIntegrationTests
     public async Task Filter_Matches_Argument_Values()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.Compute(n=100)", "--iterations", "5", "--warmup", "2"])
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.Compute(n=100)", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -58,7 +58,7 @@ public class ParametricHarnessIntegrationTests
     public async Task Filter_Matches_Named_Tuple_Values()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.Multiply(a=10, b=20)", "--iterations", "5", "--warmup", "2"])
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.Multiply(a=10, b=20)", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -92,7 +92,7 @@ public class ParametricHarnessIntegrationTests
     public async Task RunAsync_Populates_ParameterSet_On_Results()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2"])
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -121,7 +121,7 @@ public class ParametricHarnessIntegrationTests
     public async Task RunAsync_All_Baseline_Cases_Have_IsBaseline_True()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "BaselineParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2"])
+            await BenchmarkHarness.Create(["--filter", "BaselineParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<BaselineParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)

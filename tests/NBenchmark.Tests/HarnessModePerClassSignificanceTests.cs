@@ -16,6 +16,7 @@ public class HarnessModePerClassSignificanceTests
         harness
             .AddFromAssembly(typeof(HarnessModePerClassSignificanceTests).Assembly)
             .WithCategoryFilter(["harness-perclass"])
+            .WithLaunchCount(1)
             .WithOptions(new MeasurementOptions
             {
                 Iterations = 20,
@@ -69,6 +70,7 @@ public class HarnessModePerClassSignificanceTests
         harness
             .AddFromAssembly(typeof(HarnessModePerClassSignificanceTests).Assembly)
             .WithCategoryFilter(["harness-perclass"])
+            .WithLaunchCount(1)
             .WithOptions(new MeasurementOptions
             {
                 Iterations = 20,

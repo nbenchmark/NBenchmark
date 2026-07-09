@@ -376,6 +376,78 @@ public class AdaptiveLoopTests
     }
 
     [Fact]
+    public void MaxCeiling_With_Unmet_CiTarget_Adds_Warning()
+    {
+        // Noisy signal alternating between two values: the CI half-width never shrinks to the
+        // target, so the loop runs to the MaxSamples ceiling without converging.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = null, // auto -> CI detector
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                MinSamples = 4,
+                MaxSamples = 20,
+                BatchSize = 2,
+                CiTarget = 0.001, // unreachable for the noisy signal
+                EnableJitterCalibration = false,
+            },
+        };
+
+        // Alternating 1000/2000 ns -> mean 1500, stddev ~500, CV ~33%. The CI half-width at
+        // n=20 is t*se/mean ~= 2.09 * 500/sqrt(20) / 1500 ~= 15.6%, far above 0.1%.
+        var clock = new ScriptedClock(call => call % 2 == 0 ? 1000.0 : 2000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.Equal(SampleStopReason.MaxCeiling, result.Diagnostic.SampleStop);
+        Assert.Equal(20, result.PerOpTimings.Length);
+        Assert.True(result.Diagnostic.AchievedRelativeCiWidth > options.AutoTune.CiTarget);
+        Assert.Single(result.Warnings);
+        Assert.Contains("sample ceiling", result.Warnings[0]);
+        Assert.Contains("20", result.Warnings[0]);
+        Assert.Contains("--max-samples", result.Warnings[0]);
+    }
+
+    [Fact]
+    public void MaxCeiling_With_Met_CiTarget_Adds_No_Warning()
+    {
+        // A quiet signal that meets the CI target exactly at the MaxSamples ceiling should not
+        // emit the MaxCeiling warning: the loop converged, it just happened to land on the
+        // boundary. The warning is for the *unmet target* case, not the ceiling per se.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = null,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                MinSamples = 4,
+                MaxSamples = 32,
+                BatchSize = 8,
+                CiTarget = 0.025,
+                EnableJitterCalibration = false,
+            },
+        };
+
+        // Zero-variance signal: CI half-width is 0, met at the first cadence point (32).
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        // The CI target is met at 32 (the first cadence multiple >= MinSamples), so the loop
+        // stops with CiTargetMet, not MaxCeiling - no warning either way. This test guards the
+        // boundary: a body that converges exactly at the ceiling is not warned.
+        Assert.Equal(SampleStopReason.CiTargetMet, result.Diagnostic.SampleStop);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
     public void JitterCalibration_Runs_By_Default_And_Reports_Metric()
     {
         var options = MeasurementOptions.Default with

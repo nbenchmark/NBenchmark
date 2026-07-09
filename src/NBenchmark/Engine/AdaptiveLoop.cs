@@ -400,6 +400,8 @@ internal static class AdaptiveLoop
             clock.GetElapsedTime(tuningStartTimestamp),
             calibrationCapped,
             autoTune.MaxTuningTime,
+            autoTune.CiTarget,
+            autoTune.MaxSamples,
             jitterMetric,
             detectorSwitched);
     }
@@ -781,6 +783,8 @@ internal static class AdaptiveLoop
             clock.GetElapsedTime(tuningStartTimestamp),
             calibrationCapped,
             autoTune.MaxTuningTime,
+            autoTune.CiTarget,
+            autoTune.MaxSamples,
             jitterMetric,
             detectorSwitched);
     }
@@ -808,6 +812,8 @@ internal static class AdaptiveLoop
         TimeSpan tuningWallClock,
         bool calibrationCapped,
         TimeSpan maxTuningTime,
+        double ciTarget,
+        int maxSamples,
         double? jitterMetric,
         bool detectorSwitched)
     {
@@ -832,7 +838,9 @@ internal static class AdaptiveLoop
             OutlierDetectorSwitched = detectorSwitched,
         };
 
-        var warnings = BuildWallClockCapWarnings(warmupStop, sampleStop, calibrationCapped, maxTuningTime);
+        var warnings = BuildStopWarnings(
+            warmupStop, sampleStop, calibrationCapped, maxTuningTime,
+            achievedCi, ciTarget, maxSamples);
 
         if (detectorSwitched)
         {
@@ -911,11 +919,14 @@ internal static class AdaptiveLoop
         ];
     }
 
-    private static IReadOnlyList<string> BuildWallClockCapWarnings(
+    private static IReadOnlyList<string> BuildStopWarnings(
         WarmupStopReason warmupStop,
         SampleStopReason sampleStop,
         bool calibrationCapped,
-        TimeSpan maxTuningTime)
+        TimeSpan maxTuningTime,
+        double achievedCi,
+        double ciTarget,
+        int maxSamples)
     {
         var capLabel = BenchmarkFormatter.FormatDuration(maxTuningTime);
 
@@ -936,6 +947,20 @@ internal static class AdaptiveLoop
                 $"Measurement stopped at the wall-clock tuning cap ({capLabel}) "
                 + "before reaching the confidence-interval target. The reported error margin may be wider than requested. "
                 + "Consider increasing --max-tuning-time or pinning --iterations.",
+            ];
+        }
+
+        if (sampleStop == SampleStopReason.MaxCeiling && achievedCi > ciTarget)
+        {
+            return
+            [
+                $"Measurement stopped at the sample ceiling ({maxSamples:N0}) "
+                + $"before reaching the confidence-interval target (achieved ±{achievedCi * 100:F1}% vs target ±{ciTarget * 100:F1}%). "
+                + "The reported error margin is wider than requested. "
+                + "Consider increasing --max-samples, loosening --ci-target if the body is genuinely noisy, "
+                + "or pinning --iterations for a deterministic count. For short bodies (<100 ns), the variance is often "
+                + "dominated by timer overhead and scheduler jitter rather than the code under test - use --launch-count "
+                + "to measure across-launch spread, which is usually the more honest signal.",
             ];
         }
 

@@ -695,7 +695,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --max-warmup <n>       Maximum warmup samples in auto mode (default: 10000)");
         Console.WriteLine("  --max-tuning-time <s>  Wall-clock cap per benchmark, in seconds (default: 20)");
         Console.WriteLine("  --autotune-cap-behavior <mode>  Cap handling: warn (default) or error");
-        Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (default: 1)");
+        Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (harness default: 3)");
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");
         Console.WriteLine("  --list                 List discovered benchmarks without running");

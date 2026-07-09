@@ -321,6 +321,8 @@ LaunchCount = 1   // default
 
 The number of times to repeat each benchmark as a separate launch, typed as `int`:
 
+`MeasurementOptions` default is `1`; Harness mode applies `3` by default when launch count is not explicitly pinned via `WithLaunchCount`, `WithOptions`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`.
+
 | Value | Behaviour |
 |---|---|
 | `1` **(default)** | Run the benchmark once. No aggregation. |
