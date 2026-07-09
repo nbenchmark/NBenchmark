@@ -59,7 +59,7 @@ public static class Significance
             return;
 
         var baseline = successful.FirstOrDefault(r => r.IsBaseline)
-                       ?? successful.MinBy(r => r.Median)!;
+                   ?? successful.MinBy(r => r.LaunchStatistics?.LaunchMedian ?? r.Median)!;
 
         var groups = new List<SampleGroup>();
         var baselineIndex = -1;

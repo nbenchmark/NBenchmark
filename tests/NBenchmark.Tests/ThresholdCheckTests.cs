@@ -427,6 +427,44 @@ public class ThresholdCheckTests
     }
 
     [Fact]
+    public void Check_WithLaunchStatistics_UsesLaunchMedianForComparison()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("baseline", median: 100, isBaseline: true) with
+            {
+                LaunchStatistics = new LaunchStatistics
+                {
+                    LaunchCount = 3,
+                    LaunchMean = 110,
+                    LaunchStandardDeviation = 5,
+                    LaunchMedian = 110,
+                },
+            },
+            MakeResult("candidate", median: 105, isBaseline: false) with
+            {
+                LaunchStatistics = new LaunchStatistics
+                {
+                    LaunchCount = 3,
+                    LaunchMean = 140,
+                    LaunchStandardDeviation = 7,
+                    LaunchMedian = 140,
+                },
+            },
+        };
+
+        // Best-launch medians would not trip a 20% gate (105 vs 100), but launch medians do
+        // (140 vs 110 => ~27%).
+        var verdict = ThresholdCheck.Check(results, 20);
+
+        Assert.True(verdict.HasRegression);
+        var candidate = Assert.Single(verdict.RegressedCandidates);
+        Assert.Equal("candidate", candidate.Name);
+        Assert.Equal(140d, candidate.CandidateMedian);
+        Assert.Equal(110d, candidate.BaselineMedian);
+    }
+
+    [Fact]
     public void Check_SingleSuccessfulBenchmark_ReturnsNoneVerdict()
     {
         var results = new List<BenchmarkResult>

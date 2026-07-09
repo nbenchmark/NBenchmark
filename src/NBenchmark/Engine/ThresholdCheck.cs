@@ -43,42 +43,46 @@ public static class ThresholdCheck
             return RegressionVerdict.None;
 
         var baseline = successful.FirstOrDefault(r => r.IsBaseline)
-                       ?? successful.MinBy(r => r.Median)!;
+                   ?? successful.MinBy(ComparisonMedian)!;
+
+        var baselineMedian = ComparisonMedian(baseline);
 
         var regressedCandidates = new List<RegressionCandidate>();
         var regressedNames = new List<string>();
 
-        if (baseline.Median <= 0)
+        if (baselineMedian <= 0)
         {
             // Ratio comparison is undefined at zero; treat any positive candidate median as slower.
             for (var i = 0; i < successful.Count; i++)
             {
                 var result = successful[i];
+                var candidateMedian = ComparisonMedian(result);
 
                 if (ReferenceEquals(result, baseline))
                     continue;
 
-                if (result.Median > 0)
+                if (candidateMedian > 0)
                 {
-                    regressedCandidates.Add(new RegressionCandidate(result.Name, result.Median, baseline.Median, double.NaN, result.Median));
+                    regressedCandidates.Add(new RegressionCandidate(result.Name, candidateMedian, baselineMedian, double.NaN, candidateMedian));
                     regressedNames.Add(result.Name);
                 }
             }
         }
         else
         {
-            var thresholdMedian = baseline.Median * (1.0 + thresholdPct / 100.0);
+            var thresholdMedian = baselineMedian * (1.0 + thresholdPct / 100.0);
 
             for (var i = 0; i < successful.Count; i++)
             {
                 var result = successful[i];
+                var candidateMedian = ComparisonMedian(result);
 
                 if (ReferenceEquals(result, baseline))
                     continue;
 
-                if (result.Median > thresholdMedian)
+                if (candidateMedian > thresholdMedian)
                 {
-                    regressedCandidates.Add(new RegressionCandidate(result.Name, result.Median, baseline.Median, result.Median / baseline.Median, result.Median - baseline.Median));
+                    regressedCandidates.Add(new RegressionCandidate(result.Name, candidateMedian, baselineMedian, candidateMedian / baselineMedian, candidateMedian - baselineMedian));
                     regressedNames.Add(result.Name);
                 }
             }
@@ -95,6 +99,9 @@ public static class ThresholdCheck
             regressedCandidates,
             regressedNames);
     }
+
+    private static double ComparisonMedian(BenchmarkResult result)
+        => result.LaunchStatistics?.LaunchMedian ?? result.Median;
 }
 
 /// <summary>

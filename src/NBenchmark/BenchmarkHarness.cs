@@ -1188,14 +1188,9 @@ public sealed class BenchmarkHarness
                     var best = LaunchAggregator.BestLaunch(perLaunchResults);
                     allResults.Add(best with { LaunchStatistics = stats });
 
-                    var bestIndex = perLaunchResults.IndexOf(best);
-
-                    if (bestIndex >= 0 && bestIndex < perLaunchSamples.Count)
+                    foreach (var kvp in PoolRawSamplesByName(perLaunchSamples))
                     {
-                        foreach (var kvp in perLaunchSamples[bestIndex])
-                        {
-                            rawSamples[kvp.Key] = kvp.Value;
-                        }
+                        rawSamples[kvp.Key] = kvp.Value;
                     }
                 }
                 else
@@ -1231,6 +1226,7 @@ public sealed class BenchmarkHarness
         var names = allLaunchResults[0].Select(r => r.Name).ToList();
         var aggregated = new List<BenchmarkResult>(names.Count);
         var samples = new Dictionary<string, double[]>(names.Count);
+        var pooledSamples = PoolRawSamplesByName(allLaunchSamples);
 
         foreach (var name in names)
         {
@@ -1247,14 +1243,33 @@ public sealed class BenchmarkHarness
             var best = LaunchAggregator.BestLaunch(perLaunch);
             aggregated.Add(best with { LaunchStatistics = stats });
 
-            var bestIndex = perLaunch.IndexOf(best);
-
-            if (bestIndex >= 0 && bestIndex < allLaunchSamples.Count
-                               && allLaunchSamples[bestIndex].TryGetValue(name, out var launchSamples))
+            if (pooledSamples.TryGetValue(name, out var launchSamples))
                 samples[name] = launchSamples;
         }
 
         return (aggregated, samples);
+    }
+
+    private static Dictionary<string, double[]> PoolRawSamplesByName(
+        IReadOnlyList<Dictionary<string, double[]>> perLaunchSamples)
+    {
+        var pooled = new Dictionary<string, List<double>>(StringComparer.Ordinal);
+
+        foreach (var launch in perLaunchSamples)
+        {
+            foreach (var (name, samples) in launch)
+            {
+                if (!pooled.TryGetValue(name, out var bucket))
+                {
+                    bucket = [];
+                    pooled[name] = bucket;
+                }
+
+                bucket.AddRange(samples);
+            }
+        }
+
+        return pooled.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray(), StringComparer.Ordinal);
     }
 
     private static IReadOnlyList<BenchmarkMethodDefinition> OrderBenchmarksForRun(
@@ -1494,14 +1509,10 @@ public sealed class BenchmarkHarness
             var best = LaunchAggregator.BestLaunch(perLaunchResults);
             var aggregatedResult = best with { LaunchStatistics = stats };
 
-            var bestIndex = perLaunchResults.IndexOf(best);
-
-            var rawSamples = bestIndex >= 0 && bestIndex < allLaunchItems.Count
-                ? allLaunchItems[bestIndex]
-                    .Where(item => item.Result.Name == name)
-                    .Select(item => item.RawSamples)
-                    .FirstOrDefault() ?? []
-                : [];
+            var rawSamples = allLaunchItems
+                .SelectMany(launchItems => launchItems.Where(item => item.Result.Name == name))
+                .SelectMany(item => item.RawSamples)
+                .ToArray();
 
             aggregated.Add(new IsolatedResultItem
             {

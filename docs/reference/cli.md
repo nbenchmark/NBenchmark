@@ -519,7 +519,9 @@ dotnet run -- --otlp-endpoint https://collector.example.com:4318
 
 ### `--threshold-pct <n>`
 
-Causes the run to fail with **exit code 1** if any benchmark regresses more than `n`% against the baseline. `n` must be a positive integer (1 or greater). The regression check compares median execution times: a benchmark is considered regressed if `candidate.Median / baseline.Median > 1.0 + (n / 100.0)`.
+Causes the run to fail with **exit code 1** if any benchmark regresses more than `n`% against the baseline. `n` must be a positive integer (1 or greater). The regression check compares median execution times: a benchmark is considered regressed if `candidateMedian / baselineMedian > 1.0 + (n / 100.0)`.
+
+When launch aggregation is present (`LaunchStatistics`), `candidateMedian` and `baselineMedian` come from the cross-launch median (`LaunchMedian`) rather than a single launch median. Otherwise they come from `BenchmarkResult.Median`.
 
 If the selected baseline median is `0`, ratio math is undefined. In that case, any non-baseline benchmark with a positive median is treated as regressed.
 

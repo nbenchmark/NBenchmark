@@ -182,6 +182,49 @@ public class SignificanceStrategyTests
     }
 
     [Fact]
+    public void ComputeSignificance_ImplicitBaseline_UsesLaunchMedianWhenPresent()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            Result("a") with
+            {
+                Median = 10,
+                LaunchStatistics = new LaunchStatistics
+                {
+                    LaunchCount = 3,
+                    LaunchMean = 30,
+                    LaunchStandardDeviation = 2,
+                    LaunchMedian = 30,
+                },
+            },
+            Result("b") with
+            {
+                Median = 12,
+                LaunchStatistics = new LaunchStatistics
+                {
+                    LaunchCount = 3,
+                    LaunchMean = 20,
+                    LaunchStandardDeviation = 2,
+                    LaunchMedian = 20,
+                },
+            },
+        };
+
+        var rawSamples = new Dictionary<string, double[]>
+        {
+            ["a"] = Cluster(30),
+            ["b"] = Cluster(10),
+        };
+
+        Significance.ComputeSignificance(results, rawSamples);
+
+        // Launch medians make "b" the implicit baseline (faster typical launch), so
+        // "a" is tested as the candidate.
+        Assert.Equal(SignificanceVerdict.NotTested, results.Single(r => r.Name == "b").SignificanceVerdict);
+        Assert.Equal(SignificanceVerdict.Significant, results.Single(r => r.Name == "a").SignificanceVerdict);
+    }
+
+    [Fact]
     public void ComputeSignificance_HonorsCustomSignificanceTest()
     {
         var results = new List<BenchmarkResult>
