@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MSTest.Analyzers" />
     <PackageReference Include="MSTest.TestFramework"/>
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
   </ItemGroup>
