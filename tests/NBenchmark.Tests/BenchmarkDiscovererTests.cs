@@ -31,8 +31,8 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(IsolatedMethodBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(IsolatedMethodBenchmarks));
 
-        Assert.Equal(IsolationMode.PerBenchmark, suite.Benchmarks.First(b => b.Method.Name == "Isolated").Isolation);
-        Assert.Equal(IsolationMode.Default, suite.Benchmarks.First(b => b.Method.Name == "Plain").Isolation);
+        Assert.Equal(BenchmarkIsolationIntent.PerBenchmark, suite.Benchmarks.First(b => b.Method.Name == "Isolated").Isolation);
+        Assert.Equal(BenchmarkIsolationIntent.HarnessDefault, suite.Benchmarks.First(b => b.Method.Name == "Plain").Isolation);
     }
 
     [Fact]
@@ -41,8 +41,8 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(InProcessMethodBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(InProcessMethodBenchmarks));
 
-        Assert.Equal(IsolationMode.InProcess, suite.Benchmarks.First(b => b.Method.Name == "Forced").Isolation);
-        Assert.Equal(IsolationMode.Default, suite.Benchmarks.First(b => b.Method.Name == "Plain").Isolation);
+        Assert.Equal(BenchmarkIsolationIntent.InProcess, suite.Benchmarks.First(b => b.Method.Name == "Forced").Isolation);
+        Assert.Equal(BenchmarkIsolationIntent.HarnessDefault, suite.Benchmarks.First(b => b.Method.Name == "Plain").Isolation);
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(IsolatedClassBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(IsolatedClassBenchmarks));
 
-        Assert.All(suite.Benchmarks, b => Assert.Equal(IsolationMode.PerBenchmark, b.Isolation));
+        Assert.All(suite.Benchmarks, b => Assert.Equal(BenchmarkIsolationIntent.PerBenchmark, b.Isolation));
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(InProcessClassBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(InProcessClassBenchmarks));
 
-        Assert.All(suite.Benchmarks, b => Assert.Equal(IsolationMode.InProcess, b.Isolation));
+        Assert.All(suite.Benchmarks, b => Assert.Equal(BenchmarkIsolationIntent.InProcess, b.Isolation));
     }
 
     [Fact]
@@ -69,8 +69,8 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(MixedIsolationBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(MixedIsolationBenchmarks));
 
-        Assert.Equal(IsolationMode.InProcess, suite.Benchmarks.First(b => b.Method.Name == "OptedOut").Isolation);
-        Assert.Equal(IsolationMode.PerBenchmark, suite.Benchmarks.First(b => b.Method.Name == "Inherited").Isolation);
+        Assert.Equal(BenchmarkIsolationIntent.InProcess, suite.Benchmarks.First(b => b.Method.Name == "OptedOut").Isolation);
+        Assert.Equal(BenchmarkIsolationIntent.PerBenchmark, suite.Benchmarks.First(b => b.Method.Name == "Inherited").Isolation);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class BenchmarkDiscovererTests
         var suites = new BenchmarkDiscoverer().Discover(typeof(DerivedIsolatedBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(DerivedIsolatedBenchmarks));
 
-        Assert.All(suite.Benchmarks, b => Assert.Equal(IsolationMode.PerBenchmark, b.Isolation));
+        Assert.All(suite.Benchmarks, b => Assert.Equal(BenchmarkIsolationIntent.PerBenchmark, b.Isolation));
     }
 
     [Fact]
