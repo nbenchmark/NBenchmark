@@ -523,23 +523,23 @@ public sealed class BenchmarkDiscoverer
         return result;
     }
 
-    private static BenchmarkIsolationIntent ResolveIsolationMode(MethodInfo method)
+    private static IsolationMode ResolveIsolationMode(MethodInfo method)
     {
         if (method.GetCustomAttribute<InProcessAttribute>(true) is not null)
-            return BenchmarkIsolationIntent.InProcess;
+            return IsolationMode.InProcess;
 
         if (method.GetCustomAttribute<IsolatedProcessAttribute>(true) is not null)
-            return BenchmarkIsolationIntent.PerBenchmark;
+            return IsolationMode.PerBenchmark;
 
         var declaringType = method.DeclaringType;
 
         if (declaringType?.GetCustomAttribute<InProcessAttribute>(true) is not null)
-            return BenchmarkIsolationIntent.InProcess;
+            return IsolationMode.InProcess;
 
         if (declaringType?.GetCustomAttribute<IsolatedProcessAttribute>(true) is not null)
-            return BenchmarkIsolationIntent.PerBenchmark;
+            return IsolationMode.PerBenchmark;
 
-        return BenchmarkIsolationIntent.HarnessDefault;
+        return IsolationMode.Default;
     }
 
     private static IReadOnlyList<string> ResolveCategories(MemberInfo member)

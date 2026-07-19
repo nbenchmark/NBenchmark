@@ -12,12 +12,7 @@ public sealed record BenchmarkSuiteDefinition(
 {
     public InstanceLifetime Lifetime { get; init; } = InstanceLifetime.PerMethod;
 
-    /// <summary>
-    ///     The runtimes this class declares through <c>[Runtimes(...)]</c>. Empty when the class
-    ///     does not opt into cross-runtime execution. This is declared class metadata: a discovery
-    ///     consumer can display it, but it does not itself trigger a multi-runtime run.
-    /// </summary>
-    public IReadOnlyList<RuntimeMoniker> Runtimes { get; init; } = [];
+    internal IReadOnlyList<RuntimeMoniker> Runtimes { get; init; } = [];
 }
 
 public sealed record BenchmarkMethodDefinition(
@@ -54,10 +49,9 @@ public sealed record BenchmarkMethodDefinition(
     /// <summary>
     ///     The isolation intent declared by attributes on this benchmark or its class,
     ///     before the global <c>--in-process</c> flag is applied. Harness mode treats
-    ///     <see cref="BenchmarkIsolationIntent.HarnessDefault" /> as per-class isolation.
-    ///     This is declared intent, not the effective runtime decision.
+    ///     <see cref="IsolationMode.Default" /> as per-class isolation.
     /// </summary>
-    public BenchmarkIsolationIntent Isolation { get; init; }
+    internal IsolationMode Isolation { get; init; }
 
     /// <summary>
     ///     Categories assigned to this benchmark through class-level and method-level
@@ -74,16 +68,12 @@ public sealed record BenchmarkMethodDefinition(
 
 /// <summary>
 ///     The isolation intent a discovered benchmark declares through attributes, before
-///     the harness layers on the global <c>--in-process</c> flag. This expresses declared
-///     intent, not the effective runtime decision the harness ultimately makes.
+///     the harness layers on the global <c>--in-process</c> flag.
 /// </summary>
-public enum BenchmarkIsolationIntent
+internal enum IsolationMode
 {
-    /// <summary>
-    ///     No attribute - Harness mode isolates this benchmark with its class siblings
-    ///     (per-class isolation when Harness isolation is enabled).
-    /// </summary>
-    HarnessDefault,
+    /// <summary>No attribute - Harness mode isolates this benchmark with its class siblings.</summary>
+    Default,
 
     /// <summary><c>[InProcess]</c> - run in the host process, never a child.</summary>
     InProcess,

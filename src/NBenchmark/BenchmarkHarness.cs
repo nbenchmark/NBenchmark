@@ -28,8 +28,6 @@ public sealed class BenchmarkHarness
     private readonly List<Assembly> _assemblies = [];
     private readonly List<string> _categoryFilterExclude = [];
     private readonly List<string> _categoryFilterInclude = [];
-    private readonly List<BenchmarkSelection> _selections = [];
-    private string? _filter;
     private readonly List<IReporter> _reporters = [];
     private CliArgs _cliArgs = new();
     private bool _crossClass;
@@ -88,14 +86,6 @@ public sealed class BenchmarkHarness
 
         return harness;
     }
-
-    /// <summary>
-    ///     Creates a harness with exactly the same defaults as
-    ///     <c>Create(Array.Empty&lt;string&gt;())</c>, for programmatic hosts - such as an embedding
-    ///     UI - that configure the run through the fluent builders rather than command-line
-    ///     arguments.
-    /// </summary>
-    public static BenchmarkHarness Create() => Create([]);
 
     public BenchmarkHarness AddFromAssembly<T>()
     {
@@ -405,102 +395,6 @@ public sealed class BenchmarkHarness
         return this;
     }
 
-    /// <summary>
-    ///     Filters discovered benchmarks by a glob pattern matched against
-    ///     <c>ClassName.BenchmarkDisplayName</c> - the programmatic equivalent of the
-    ///     <c>--filter</c> CLI flag. When both are supplied, the CLI flag takes precedence.
-    /// </summary>
-    public BenchmarkHarness WithFilter(string glob)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(glob);
-        _filter = glob;
-        return this;
-    }
-
-    /// <summary>
-    ///     Pins the number of measured samples to collect. <c>0</c> is a dry run; a positive value
-    ///     pins an exact count. Equivalent to <see cref="MeasurementOptions.Iterations" />. An
-    ///     explicit <c>--iterations</c> CLI value takes precedence.
-    /// </summary>
-    public BenchmarkHarness WithIterations(int iterations)
-    {
-        _options = _options with { Iterations = iterations };
-        return this;
-    }
-
-    /// <summary>
-    ///     Pins the number of warmup samples to discard before measurement. <c>0</c> skips warmup;
-    ///     a positive value pins an exact count. Equivalent to
-    ///     <see cref="MeasurementOptions.WarmupIterations" />. An explicit <c>--warmup</c> CLI value
-    ///     takes precedence.
-    /// </summary>
-    public BenchmarkHarness WithWarmup(int warmup)
-    {
-        _options = _options with { WarmupIterations = warmup };
-        return this;
-    }
-
-    /// <summary>
-    ///     Selects the outlier-detection strategy, clearing any custom
-    ///     <see cref="MeasurementOptions.OutlierDetector" />. Equivalent to
-    ///     <see cref="MeasurementOptions.OutlierMode" />. An explicit <c>--outlier-mode</c> CLI value
-    ///     takes precedence.
-    /// </summary>
-    public BenchmarkHarness WithOutlierMode(OutlierMode mode)
-    {
-        _options = _options with { OutlierMode = mode, OutlierDetector = null };
-        return this;
-    }
-
-    /// <summary>
-    ///     Sets the confidence level for the interval reported on the mean (e.g. 0.95 for 95%).
-    ///     Must be strictly between 0 and 1. Equivalent to
-    ///     <see cref="MeasurementOptions.ConfidenceLevel" />. An explicit <c>--confidence</c> CLI
-    ///     value takes precedence.
-    /// </summary>
-    public BenchmarkHarness WithConfidenceLevel(double confidence)
-    {
-        _options = _options with { ConfidenceLevel = confidence };
-        return this;
-    }
-
-    /// <summary>
-    ///     Restricts the run to an exact set of discovered benchmarks, each identified by declaring
-    ///     type full name and display name (see <see cref="BenchmarkSelection" />). This is the
-    ///     programmatic equivalent of a checkbox picker and composes with <see cref="WithFilter" />
-    ///     and the category filters by intersection. Requested identities that match no discovered
-    ///     benchmark are reported together as a validation error when the run starts, rather than
-    ///     silently running a smaller set than requested.
-    /// </summary>
-    public BenchmarkHarness WithSelection(IEnumerable<BenchmarkSelection> selections)
-    {
-        ArgumentNullException.ThrowIfNull(selections);
-
-        foreach (var selection in selections)
-        {
-            if (selection is null)
-                throw new ArgumentException("Selection entries cannot be null.", nameof(selections));
-
-            if (string.IsNullOrWhiteSpace(selection.DeclaringTypeFullName))
-            {
-                throw new ArgumentException(
-                    "BenchmarkSelection.DeclaringTypeFullName cannot be null, empty, or whitespace.",
-                    nameof(selections));
-            }
-
-            if (string.IsNullOrWhiteSpace(selection.DisplayName))
-            {
-                throw new ArgumentException(
-                    "BenchmarkSelection.DisplayName cannot be null, empty, or whitespace.",
-                    nameof(selections));
-            }
-
-            _selections.Add(selection);
-        }
-
-        return this;
-    }
-
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
     {
         // Mirror --otlp-endpoint for the duration of this run so isolated children inherit the
@@ -607,10 +501,8 @@ public sealed class BenchmarkHarness
             return Array.Empty<BenchmarkResult>();
         }
 
-        var filtered = FilterSuites(allSuites, _cliArgs.Filter ?? _filter, _cliArgs.CategoryFilterInclude, _cliArgs.CategoryFilterExclude, _categoryFilterInclude,
+        var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude, _cliArgs.CategoryFilterExclude, _categoryFilterInclude,
             _categoryFilterExclude);
-
-        filtered = ApplySelection(filtered);
 
         if (_cliArgs.ListOnly)
         {
@@ -657,7 +549,7 @@ public sealed class BenchmarkHarness
         var totalBenchmarks = allNames.Count;
 
         NBenchmarkDiagnostics.OnSuiteStarting(
-            _cliArgs.Filter ?? _filter ?? "harness",
+            _cliArgs.Filter ?? "harness",
             totalBenchmarks,
             profile: _options.Profile.ToString(),
             runtime: _cliArgs.Runtimes is { Count: > 0 } runtimes ? string.Join(",", runtimes.Select(r => r.ToTargetFramework())) : null,
@@ -807,10 +699,8 @@ public sealed class BenchmarkHarness
         var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
         var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
 
-        var filtered = FilterSuites(allSuites, _cliArgs.Filter ?? _filter, _cliArgs.CategoryFilterInclude,
+        var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude,
             _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);
-
-        filtered = ApplySelection(filtered);
 
         var allResults = new List<BenchmarkResult>();
         var rawSamples = new Dictionary<string, double[]>();
@@ -1455,10 +1345,10 @@ public sealed class BenchmarkHarness
         if (inProcessGlobal)
             return IsolationDecision.InProcess;
 
-        if (benchmark.Isolation == BenchmarkIsolationIntent.InProcess)
+        if (benchmark.Isolation == IsolationMode.InProcess)
             return IsolationDecision.InProcess;
 
-        if (benchmark.Isolation == BenchmarkIsolationIntent.PerBenchmark)
+        if (benchmark.Isolation == IsolationMode.PerBenchmark)
             return IsolationDecision.PerBenchmark;
 
         // PerClass default. Auto-upgrade to PerBenchmark when the instance is
@@ -1947,60 +1837,6 @@ public sealed class BenchmarkHarness
         return filtered;
     }
 
-    /// <summary>
-    ///     Narrows the already glob/category-filtered suites to the exact identities requested via
-    ///     <see cref="WithSelection" />. With no selection set, the suites pass through unchanged.
-    ///     Requested identities that match no benchmark in the filtered set are reported together as
-    ///     a validation error, so a selection that would silently drop work is surfaced instead.
-    /// </summary>
-    private IReadOnlyList<BenchmarkSuiteDefinition> ApplySelection(
-        IReadOnlyList<BenchmarkSuiteDefinition> suites)
-    {
-        if (_selections.Count == 0)
-            return suites;
-
-        var requested = new HashSet<BenchmarkSelection>(_selections);
-        var matched = new HashSet<BenchmarkSelection>();
-
-        var selected = suites
-            .Select(suite => suite with
-            {
-                Benchmarks = suite.Benchmarks
-                    .Where(b =>
-                    {
-                        var identity = new BenchmarkSelection(
-                            suite.Type.FullName ?? suite.Type.Name, b.DisplayName);
-
-                        if (!requested.Contains(identity))
-                            return false;
-
-                        matched.Add(identity);
-                        return true;
-                    })
-                    .ToList(),
-            })
-            .Where(suite => suite.Benchmarks.Count > 0)
-            .ToList();
-
-        if (matched.Count != requested.Count)
-        {
-            var missing = requested
-                .Where(r => !matched.Contains(r))
-                .Select(r => $"{r.DeclaringTypeFullName}.{r.DisplayName}")
-                .OrderBy(s => s, StringComparer.Ordinal)
-                .ToList();
-
-            var missingList = string.Join(", ", missing);
-
-            throw new InvalidOperationException(
-                $"WithSelection requested {missing.Count} benchmark(s) not found in the discovered, "
-                + $"filtered set: {missingList}. A selection identity is the declaring "
-                + "type full name plus the discovered display name.");
-        }
-
-        return selected;
-    }
-
     private static void AddCategories(List<string> target, IEnumerable<string> source, string paramName)
     {
         foreach (var category in source)
@@ -2039,13 +1875,8 @@ public sealed class BenchmarkHarness
         var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
         var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
 
-        var filtered = FilterSuites(allSuites, _cliArgs.Filter ?? _filter, _cliArgs.CategoryFilterInclude,
+        var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude,
             _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);
-
-        // Narrow to the selected identities before aggregating runtimes so a WithSelection run
-        // that targets classes declaring no [Runtimes] is not forced cross-runtime by unrelated
-        // discovered classes. Mirrors the ApplySelection step on the execution paths.
-        filtered = ApplySelection(filtered);
 
         return AggregateRuntimes(filtered);
     }
