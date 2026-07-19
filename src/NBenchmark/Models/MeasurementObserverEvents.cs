@@ -5,7 +5,10 @@ namespace NBenchmark;
 ///     <see cref="MeasurementPhaseEvent.Phase" /> and <see cref="SampleEvent" /> (via the
 ///     <see cref="SampleEvent.Warmup" /> flag). Each benchmark runs through them in order:
 ///     jitter, calibration, warmup, measurement. A pinned configuration short-circuits a
-///     phase but still reports its boundary.
+///     phase but still reports its boundary. <see cref="SuiteCompleted" /> is emitted once
+///     per <c>RunAsync</c> (not per benchmark) after the suite finishes, carrying the run-end
+///     sentinel plus a <see cref="MeasurementPhaseEvent.Succeeded" /> flag distinguishing a
+///     clean completion from a harness-level crash.
 /// </summary>
 public enum MeasurementPhase
 {
@@ -30,6 +33,17 @@ public enum MeasurementPhase
     ///     <see cref="SampleStopReason" />.
     /// </summary>
     Measurement = 3,
+
+    /// <summary>
+    ///     Suite/harness completed (or crashed). Emitted exactly once per <c>RunAsync</c> after
+    ///     the suite finishes - on the success path before the method returns, and from the
+    ///     <c>finally</c> with <see cref="MeasurementPhaseEvent.Succeeded" /> = <c>false</c> when
+    ///     a harness-level exception prevented the success-path emit. The
+    ///     <see cref="MeasurementPhaseEvent.BenchmarkName" /> is empty - this is a suite-level
+    ///     event, not a per-benchmark one. Consumers (e.g. a live-streaming observer) treat it
+    ///     as the authoritative run-end sentinel.
+    /// </summary>
+    SuiteCompleted = 4,
 }
 
 /// <summary>Whether a phase is starting or completed, reported on <see cref="MeasurementPhaseEvent" />.</summary>
@@ -48,11 +62,19 @@ public enum PhaseTransition
 ///     when it ends (outcome fields populated for that phase).
 /// </summary>
 /// <remarks>
-///     Which outcome fields are set on completion depends on the phase: jitter reports
-///     <see cref="JitterMetric" /> and <see cref="DetectorSwitched" />; calibration reports
-///     <see cref="ResolvedK" />; warmup reports <see cref="WarmupStop" /> and
-///     <see cref="ResolvedWarmup" />; measurement reports <see cref="SampleStop" />.
-///     Fields not relevant to a phase are null.
+///     <para>
+///         Which outcome fields are set on completion depends on the phase: jitter reports
+///         <see cref="JitterMetric" /> and <see cref="DetectorSwitched" />; calibration reports
+///         <see cref="ResolvedK" />; warmup reports <see cref="WarmupStop" /> and
+///         <see cref="ResolvedWarmup" />; measurement reports <see cref="SampleStop" />.
+///         Fields not relevant to a phase are null.
+///     </para>
+///     <para>
+///         <see cref="MeasurementPhase.SuiteCompleted" /> events use <see cref="Succeeded" />:
+///         <c>true</c> on the success-path emit, <c>false</c> when emitted from the
+///         <c>finally</c> after a harness-level exception. The <see cref="BenchmarkName" /> is
+///         empty for suite-completed events.
+///     </para>
 /// </remarks>
 public readonly record struct MeasurementPhaseEvent(
     string BenchmarkName,
@@ -63,7 +85,8 @@ public readonly record struct MeasurementPhaseEvent(
     int? ResolvedK = null,
     int? ResolvedWarmup = null,
     WarmupStopReason? WarmupStop = null,
-    SampleStopReason? SampleStop = null);
+    SampleStopReason? SampleStop = null,
+    bool Succeeded = true);
 
 /// <summary>
 ///     One timed sample. Emitted between samples, outside the timed region. The

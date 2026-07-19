@@ -565,7 +565,7 @@ internal sealed record CliArgs
 
         foreach (var name in cliArgs.ObserverNames)
         {
-            if (!ObserverRegistry.TryCreate(name, out _))
+            if (!ObserverRegistry.IsRegistered(name))
             {
                 allErrors.Add(
                     $"Unknown observer: '{name}'. Valid: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}.");
@@ -680,7 +680,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --iterations <n>       Pin measured sample count (default: auto, CI-driven)");
         Console.WriteLine("  --warmup <n>           Pin warmup sample count (default: auto, plateau-driven)");
         Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}{FormatAutoAttached()}");
-        Console.WriteLine($"  --observer <type>      Attach measurement observer: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}");
+        Console.WriteLine($"  --observer <type>      Attach measurement observer: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}{FormatAutoAttachedObservers()}");
         Console.WriteLine("                         (repeatable; multiple observers are composed into a fan-out)");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
@@ -722,6 +722,16 @@ internal sealed record CliArgs
     private static string FormatAutoAttached()
     {
         var names = ReporterRegistry.AutoAttached;
+
+        if (names.Count == 0)
+            return string.Empty;
+
+        return $" (auto-attached: {string.Join(", ", names.Select(r => r.Name))})";
+    }
+
+    private static string FormatAutoAttachedObservers()
+    {
+        var names = ObserverRegistry.AutoAttached;
 
         if (names.Count == 0)
             return string.Empty;

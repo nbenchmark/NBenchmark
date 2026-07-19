@@ -86,4 +86,18 @@ public sealed class ChannelMeasurementObserver : IMeasurementObserver
     {
         _writer.TryComplete();
     }
+
+    /// <summary>
+    ///     Completes the channel writer so a reader awaiting
+    ///     <see cref="ChannelReader{T}.Completion" /> stops blocking after the buffered events
+    ///     drain. The harness and suite wrap the resolved observer in a <c>using</c>, so this
+    ///     runs automatically at the end of <c>RunAsync</c> without the caller needing to call
+    ///     <see cref="Complete" /> explicitly. The channel itself is GC'd; there are no
+    ///     unmanaged resources to release. Safe to call multiple times (subsequent
+    ///     <see cref="ChannelWriter{T}.TryComplete" /> calls are no-ops).
+    /// </summary>
+    public void Dispose()
+    {
+        _writer.TryComplete();
+    }
 }

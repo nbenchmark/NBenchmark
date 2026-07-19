@@ -13,13 +13,35 @@ namespace NBenchmark;
 ///     two are invoked from the same emit points in <c>AdaptiveLoop</c> but address different
 ///     consumers. <see cref="NullMeasurementObserver" /> is the default; the loop pays one
 ///     null check per sample when no observer is attached.
+///     <para>
+///         The interface extends <see cref="IDisposable" /> via a default no-op
+///         <c>Dispose</c> member (a default interface member, C# 8 / .NET Core 3.0+). Implementations
+///         that own long-lived resources (an <c>HttpClient</c>, a pump task, a channel writer)
+///         override <c>Dispose</c> to tear them down; implementations with no resources inherit
+///         the no-op and require no code change. The harness and suite wrap the resolved
+///         observer in a <c>using</c> so the dispose runs on both the success and exception
+///         paths at the end of <c>RunAsync</c>.
+///     </para>
 /// </remarks>
-public interface IMeasurementObserver
+public interface IMeasurementObserver : IDisposable
 {
     /// <summary>
-    ///     Reports a phase transition (jitter, calibration, warmup, measurement) - starting or
-    ///     completed - with the phase's resolved outcome where applicable (jitter metric, resolved
-    ///     K, warmup stop reason, sample stop reason).
+    ///     The registry name this observer was constructed under, or <c>null</c> for a
+    ///     programmatically attached instance not registered through
+    ///     <see cref="Observers.ObserverRegistry" />. Used by <c>BenchmarkHarness.ResolveObserver</c>
+    ///     and <c>BenchmarkSuite.ResolveObserver</c> to dedup an auto-attached observer against a
+    ///     programmatic <c>.WithObserver(...)</c> instance of the same name, mirroring
+    ///     <see cref="Reporters.IReporter.Name" /> dedup in
+    ///     <see cref="Reporters.ReporterRegistry.InvokeReportersAsync" />. Default is
+    ///     <c>null</c> so existing implementations that do not declare a name continue to
+    ///     compile and run unchanged.
+    /// </summary>
+    string? Name => null;
+
+    /// <summary>
+    ///     Reports a phase transition (jitter, calibration, warmup, measurement, suite-completed)
+    ///     - starting or completed - with the phase's resolved outcome where applicable
+    ///     (jitter metric, resolved K, warmup stop reason, sample stop reason, success flag).
     /// </summary>
     void OnPhase(in MeasurementPhaseEvent e);
 
@@ -46,6 +68,16 @@ public interface IMeasurementObserver
     ///     consumer sees every benchmark in the run.
     /// </summary>
     void OnResult(BenchmarkResult result);
+
+    /// <summary>
+    ///     Disposes resources held by this observer. The default implementation is a no-op so
+    ///     implementations with no unmanaged resources inherit it without code change. The
+    ///     harness and suite wrap the resolved observer in a <c>using</c>, so this runs on both
+    ///     the success and exception paths at the end of <c>RunAsync</c>. Implementations that
+    ///     override this MUST guard against double-dispose (the <c>using</c> may run after an
+    ///     explicit <c>Dispose</c> call from a test or a user).
+    /// </summary>
+    void IDisposable.Dispose() { }
 }
 
 /// <summary>

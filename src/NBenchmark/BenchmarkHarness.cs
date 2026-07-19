@@ -172,19 +172,86 @@ public sealed class BenchmarkHarness
 
     /// <summary>
     ///     Resolves the attached observer list to the single <see cref="IMeasurementObserver" />
-    ///     the engine should see. An empty list collapses to <see cref="NullMeasurementObserver.Instance" />
-    ///     so the hot-path guard (<c>observer != NullMeasurementObserver.Instance</c>) stays false and
-    ///     the loop pays no dispatch cost. A single observer is returned as-is. Two or more are
-    ///     wrapped in a <see cref="CompositeMeasurementObserver" /> that fans out with per-dispatch
-    ///     try/catch isolation.
+    ///     the engine should see. Composes three sources: programmatic instances added via
+    ///     <see cref="WithObserver(IMeasurementObserver)" />, CLI-supplied names
+    ///     (<c>--observer &lt;name&gt;</c>) resolved through <see cref="ObserverRegistry" />,
+    ///     and auto-attached observers registered via
+    ///     <see cref="ObserverRegistry.RegisterAutoAttach" /> (e.g. a live-streaming observer
+    ///     that fires on every <c>RunAsync</c> without explicit opt-in). Dedup is by name across
+    ///     all three sources so <c>.WithObserver(new StudioLiveObserver())</c> and
+    ///     <c>--observer studio</c> and the auto-attached <c>studio</c> registration produce one
+    ///     <c>studio</c> stream, not three.
     /// </summary>
+    /// <remarks>
+    ///     An empty result collapses to <see cref="NullMeasurementObserver.Instance" /> so the
+    ///     hot-path guard (<c>observer != NullMeasurementObserver.Instance</c>) stays false and
+    ///     the loop pays no dispatch cost. Two or more observers are wrapped in a
+    ///     <see cref="CompositeMeasurementObserver" /> that fans out with per-dispatch try/catch
+    ///     isolation. The resolved observer is disposed by the caller's <c>using</c> at the end
+    ///     of <c>RunAsync</c>; the composite's <c>Dispose</c> fans out to each child.
+    /// </remarks>
     private IMeasurementObserver ResolveObserver()
-        => _observers.Count switch
+    {
+        // Programmatic instances, named or anonymous. A programmatic StudioLiveObserver
+        // has Name = "studio"; a programmatic ChannelMeasurementObserver has Name = null.
+        // The list may contain duplicates when the user passes --observer <name> AND
+        // .WithObserver(new ...()) for the same observer: BenchmarkHarness.Create(args)
+        // resolves --observer <name> via TryCreate and adds the result to _observers, then
+        // .WithObserver(...) adds the programmatic instance. Dedup by Name (last wins) so
+        // the user's programmatic .WithObserver(...) call takes precedence over the CLI
+        // flag - the programmatic call is the more deliberate attachment. Anonymous
+        // observers (Name = null) are always kept.
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var programmatic = new List<IMeasurementObserver>(_observers.Count);
+        for (var i = _observers.Count - 1; i >= 0; i--)
+        {
+            var observer = _observers[i];
+            if (observer == NullMeasurementObserver.Instance)
+                continue;
+
+            if (!string.IsNullOrEmpty(observer.Name))
+            {
+                if (!seenNames.Add(observer.Name))
+                    continue; // earlier occurrence of the same name - the later (programmatic) wins
+            }
+
+            programmatic.Add(observer);
+        }
+
+        programmatic.Reverse(); // restore declaration order for composite dispatch
+
+        // Build the dedup set from BOTH programmatic-attach names and CLI names so a
+        // programmatic .WithObserver(new ...()) suppresses the auto-attached entry of the
+        // same name (mirroring IReporter.Name dedup in ReporterRegistry.InvokeReportersAsync).
+        var explicitNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in _cliArgs.ObserverNames)
+            explicitNames.Add(name);
+        foreach (var observer in programmatic)
+        {
+            if (!string.IsNullOrEmpty(observer.Name))
+                explicitNames.Add(observer.Name);
+        }
+
+        var autoAttached = ObserverRegistry.CreateAutoAttachedObservers(explicitNames);
+
+        if (programmatic.Count == 0 && autoAttached.Count == 0)
+            return NullMeasurementObserver.Instance;
+
+        if (programmatic.Count == 1 && autoAttached.Count == 0)
+            return programmatic[0];
+
+        // Wrap programmatic + auto-attached in a composite. The composite's per-dispatch
+        // try/catch isolates a throwing auto-attached observer.
+        var all = new List<IMeasurementObserver>(programmatic.Count + autoAttached.Count);
+        all.AddRange(programmatic);
+        all.AddRange(autoAttached);
+        return all.Count switch
         {
             0 => NullMeasurementObserver.Instance,
-            1 => _observers[0],
-            _ => new CompositeMeasurementObserver(_observers),
+            1 => all[0],
+            _ => new CompositeMeasurementObserver(all),
         };
+    }
 
     /// <summary>
     ///     The observer names forwarded to isolated children so they can activate the same
@@ -556,6 +623,13 @@ public sealed class BenchmarkHarness
             seed: _cliArgs.Seed,
             runOrder: (_cliArgs.RunOrder ?? _runOrder).ToString());
 
+        // Resolve the observer once for the whole run so auto-attached observers (e.g. a
+        // live-streaming observer) see one stream per RunAsync, not one per per-class group.
+        // The using disposes the observer (and its composite children) on both the success
+        // and exception paths; the composite's Dispose fans out with try/catch isolation.
+        using var observer = ResolveObserver();
+        var sentinelEmitted = false;
+
         try
         {
             await _progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
@@ -599,7 +673,7 @@ public sealed class BenchmarkHarness
                 {
                     await RunInProcessSuiteAsync(
                         suite with { Benchmarks = inProcess }, suiteOptions, runningIndex, totalBenchmarks,
-                        allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+                        allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
 
                     runningIndex += inProcess.Count;
                 }
@@ -608,7 +682,7 @@ public sealed class BenchmarkHarness
                 {
                     await RunIsolatedGroupAsync(
                         suite, perClass, runningIndex, totalBenchmarks,
-                        allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+                        allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
 
                     runningIndex += perClass.Count;
                 }
@@ -617,7 +691,7 @@ public sealed class BenchmarkHarness
                 {
                     await RunIsolatedGroupAsync(
                         suite, [benchmark], runningIndex, totalBenchmarks,
-                        allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+                        allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
 
                     runningIndex++;
                 }
@@ -629,9 +703,31 @@ public sealed class BenchmarkHarness
             }
 
             await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
+
+            // SuiteCompleted sentinel: emit on the success path with Succeeded = true. A
+            // live-streaming observer treats this as the authoritative run-end signal.
+            observer.OnPhase(new MeasurementPhaseEvent(
+                BenchmarkName: string.Empty,
+                Phase: MeasurementPhase.SuiteCompleted,
+                Transition: PhaseTransition.Completed,
+                Succeeded: true));
+            sentinelEmitted = true;
         }
         finally
         {
+            // If the try block did not reach its success-path emit (a harness-level
+            // exception prevented it), emit the sentinel here with Succeeded = false so a
+            // live-streaming observer can finalise the run as Failed rather than leaving it
+            // stuck as Running until the idle timeout fires.
+            if (!sentinelEmitted)
+            {
+                observer.OnPhase(new MeasurementPhaseEvent(
+                    BenchmarkName: string.Empty,
+                    Phase: MeasurementPhase.SuiteCompleted,
+                    Transition: PhaseTransition.Completed,
+                    Succeeded: false));
+            }
+
             NBenchmarkDiagnostics.OnSuiteCompleted(allResults);
         }
 
@@ -712,75 +808,103 @@ public sealed class BenchmarkHarness
         // own measurement/aggregation work.
         using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
 
-        foreach (var build in successfulBuilds)
+        // Resolve the observer once for the whole multi-runtime run so auto-attached
+        // observers see one stream per RunAsync, mirroring the single-runtime path. The
+        // using disposes the observer on both the success and exception paths.
+        using var observer = ResolveObserver();
+        var sentinelEmitted = false;
+        try
         {
-            var tfm = build.Moniker.ToTargetFramework();
+            foreach (var build in successfulBuilds)
+            {
+                var tfm = build.Moniker.ToTargetFramework();
 
+                try
+                {
+                    Console.WriteLine($"Running benchmarks under {tfm}...");
+
+                    var runtimeResults = await RunForRuntimeAsync(
+                            build.Moniker, build.DllPath!, filtered, observer, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    foreach (var item in runtimeResults)
+                    {
+                        allResults.Add(item.Result);
+                        rawSamples[$"{item.Result.Name}\0{tfm}"] = item.RawSamples;
+                    }
+                }
+                finally
+                {
+                    MultiRuntimeOrchestrator.TryDeleteBuildOutput(build.OutputDirectory);
+                }
+            }
+
+            ApplyPerClassSignificance(allResults, rawSamples, suiteOptions, _cliArgs.CrossClass || _crossClass);
+
+            if (_cliArgs.ThresholdPct.HasValue)
+            {
+                var threshold = _cliArgs.ThresholdPct.Value;
+                var regressedNames = new List<string>();
+
+                // Threshold comparisons only make sense within the same runtime - net8 will
+                // always look "slower" than net10, which would false-positive every net8 row.
+                foreach (var runtimeGroup in allResults.GroupBy(r => r.RuntimeMoniker))
+                {
+                    if (ThresholdCheck.HasRegression(runtimeGroup.ToList(), threshold) is (true, var names))
+                        regressedNames.AddRange(names);
+                }
+
+                if (regressedNames.Count > 0)
+                {
+                    Console.Error.WriteLine(
+                        $"Regression threshold exceeded ({threshold}%). "
+                        + $"Regressed benchmarks: {string.Join(", ", regressedNames)}");
+
+                    Environment.ExitCode = 1;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
+                ApplyOutputDirectory(_cliArgs.OutputDir);
+
+            BenchmarkTable.CrossClassMode = _cliArgs.CrossClass || _crossClass;
             try
             {
-                Console.WriteLine($"Running benchmarks under {tfm}...");
-
-                var runtimeResults = await RunForRuntimeAsync(
-                        build.Moniker, build.DllPath!, filtered, cancellationToken)
-                    .ConfigureAwait(false);
-
-                foreach (var item in runtimeResults)
-                {
-                    allResults.Add(item.Result);
-                    rawSamples[$"{item.Result.Name}\0{tfm}"] = item.RawSamples;
-                }
+                await InvokeReportersAsync(allResults, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
-                MultiRuntimeOrchestrator.TryDeleteBuildOutput(build.OutputDirectory);
-            }
-        }
-
-        ApplyPerClassSignificance(allResults, rawSamples, suiteOptions, _cliArgs.CrossClass || _crossClass);
-
-        if (_cliArgs.ThresholdPct.HasValue)
-        {
-            var threshold = _cliArgs.ThresholdPct.Value;
-            var regressedNames = new List<string>();
-
-            // Threshold comparisons only make sense within the same runtime - net8 will
-            // always look "slower" than net10, which would false-positive every net8 row.
-            foreach (var runtimeGroup in allResults.GroupBy(r => r.RuntimeMoniker))
-            {
-                if (ThresholdCheck.HasRegression(runtimeGroup.ToList(), threshold) is (true, var names))
-                    regressedNames.AddRange(names);
+                BenchmarkTable.CrossClassMode = false;
             }
 
-            if (regressedNames.Count > 0)
-            {
-                Console.Error.WriteLine(
-                    $"Regression threshold exceeded ({threshold}%). "
-                    + $"Regressed benchmarks: {string.Join(", ", regressedNames)}");
+            // SuiteCompleted sentinel: emit on the success path with Succeeded = true.
+            observer.OnPhase(new MeasurementPhaseEvent(
+                BenchmarkName: string.Empty,
+                Phase: MeasurementPhase.SuiteCompleted,
+                Transition: PhaseTransition.Completed,
+                Succeeded: true));
+            sentinelEmitted = true;
 
-                Environment.ExitCode = 1;
-            }
-        }
-
-        if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
-            ApplyOutputDirectory(_cliArgs.OutputDir);
-
-        BenchmarkTable.CrossClassMode = _cliArgs.CrossClass || _crossClass;
-        try
-        {
-            await InvokeReportersAsync(allResults, cancellationToken).ConfigureAwait(false);
+            return allResults;
         }
         finally
         {
-            BenchmarkTable.CrossClassMode = false;
+            if (!sentinelEmitted)
+            {
+                observer.OnPhase(new MeasurementPhaseEvent(
+                    BenchmarkName: string.Empty,
+                    Phase: MeasurementPhase.SuiteCompleted,
+                    Transition: PhaseTransition.Completed,
+                    Succeeded: false));
+            }
         }
-
-        return allResults;
     }
 
     private async Task<IReadOnlyList<IsolatedResultItem>> RunForRuntimeAsync(
         RuntimeMoniker moniker,
         string entryAssemblyPath,
         IReadOnlyList<BenchmarkSuiteDefinition> filteredSuites,
+        IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
         var allItems = new List<IsolatedResultItem>();
@@ -805,7 +929,12 @@ public sealed class BenchmarkHarness
 
             foreach (var item in items)
             {
-                allItems.Add(item with { Result = item.Result with { RuntimeMoniker = tfm } });
+                var stamped = item with { Result = item.Result with { RuntimeMoniker = tfm } };
+                allItems.Add(stamped);
+                // The parent emits OnResult for each child result so the observer sees every
+                // benchmark across all runtimes in one stream. The child has its own observer
+                // (resolved from the forwarded names); this is the parent-side aggregation.
+                observer.OnResult(stamped.Result);
             }
         }
 
@@ -1001,17 +1130,18 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
         if (suite.Lifetime == InstanceLifetime.PerClass)
         {
             await RunPerClassInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
-                allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+                allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
         }
         else
         {
             await RunPerMethodInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
-                allResults, rawSamples, cancellationToken).ConfigureAwait(false);
+                allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -1022,6 +1152,7 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
         var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
@@ -1070,11 +1201,11 @@ public sealed class BenchmarkHarness
                 for (var launchIdx = 0; launchIdx < effectiveClassLaunchCount; launchIdx++)
                 {
                     var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
-                    var observer = launchIdx == 0 ? ResolveObserver() : NullMeasurementObserver.Instance;
+                    var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
 
                     var (results, samples) = await SuiteRunner.RunAsync(
                         envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset, observer).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset, launchObserver).ConfigureAwait(false);
 
                     allLaunchResults.Add(results);
                     allLaunchSamples.Add(samples);
@@ -1093,7 +1224,7 @@ public sealed class BenchmarkHarness
             {
                 var (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                    startIndex, totalBenchmarks, _progress, cancellationToken, betweenBenchmarksReset, ResolveObserver()).ConfigureAwait(false);
+                    startIndex, totalBenchmarks, _progress, cancellationToken, betweenBenchmarksReset, observer).ConfigureAwait(false);
 
                 ApplyPerClassIndependenceWarning(results, suite, suiteOptions);
                 allResults.AddRange(results);
@@ -1117,6 +1248,7 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
         var orderedBenchmarks = OrderBenchmarksForRun(suite.Benchmarks, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed);
@@ -1168,11 +1300,11 @@ public sealed class BenchmarkHarness
                     for (var launchIdx = 0; launchIdx < perMethodLaunchCount; launchIdx++)
                     {
                         var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
-                        var observer = launchIdx == 0 ? ResolveObserver() : NullMeasurementObserver.Instance;
+                        var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
 
                         var (results, samples) = await SuiteRunner.RunAsync(
                             [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                            startIndex, totalBenchmarks, progress, cancellationToken, onBetweenBenchmarksAsync: null, observer).ConfigureAwait(false);
+                            startIndex, totalBenchmarks, progress, cancellationToken, onBetweenBenchmarksAsync: null, launchObserver).ConfigureAwait(false);
 
                         perLaunchResults.AddRange(results);
                         perLaunchSamples.Add(samples);
@@ -1191,7 +1323,7 @@ public sealed class BenchmarkHarness
                 {
                     var (results, samples) = await SuiteRunner.RunAsync(
                         [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, _progress, cancellationToken, onBetweenBenchmarksAsync: null, ResolveObserver()).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, _progress, cancellationToken, onBetweenBenchmarksAsync: null, observer).ConfigureAwait(false);
 
                     allResults.AddRange(results);
 
@@ -1372,6 +1504,7 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
         var effectiveLaunchCount = _cliArgs.LaunchCount ?? EffectiveBaseOptions.LaunchCount;
@@ -1424,7 +1557,6 @@ public sealed class BenchmarkHarness
             items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
 
         var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
-        var observer = ResolveObserver();
 
         foreach (var benchmark in benchmarks)
         {
@@ -1567,20 +1699,18 @@ public sealed class BenchmarkHarness
 
     /// <summary>
     ///     Resolves the observer names forwarded by the parent into a single
-    ///     <see cref="IMeasurementObserver" /> the child's measurement loop should see. The
-    ///     child re-runs the entry assembly, so <c>[ModuleInitializer]</c> self-registration
-    ///     populates <see cref="ObserverRegistry" /> identically and the names resolve to the
-    ///     same factories. An empty list collapses to <see cref="NullMeasurementObserver.Instance" />
-    ///     so the hot-path guard stays false and the child pays no dispatch cost.
+    /// <see cref="IMeasurementObserver" /> the child's measurement loop should see. The
+    /// child re-runs the entry assembly, so <c>[ModuleInitializer]</c> self-registration
+    /// populates <see cref="ObserverRegistry" /> identically and the names resolve to the
+    /// same factories. An empty list collapses to <see cref="NullMeasurementObserver.Instance" />
+    /// so the hot-path guard stays false and the child pays no dispatch cost.
     /// </summary>
     private static IMeasurementObserver ResolveChildObserver(IsolatedRunRequest request)
     {
-        if (request.ObserverNames.Count == 0)
-            return NullMeasurementObserver.Instance;
+        var names = request.ObserverNames;
+        var resolved = new List<IMeasurementObserver>(names.Count);
 
-        var resolved = new List<IMeasurementObserver>(request.ObserverNames.Count);
-
-        foreach (var name in request.ObserverNames)
+        foreach (var name in names)
         {
             if (ObserverRegistry.TryCreate(name, out var observer)
                 && observer != NullMeasurementObserver.Instance)
@@ -1588,6 +1718,15 @@ public sealed class BenchmarkHarness
                 resolved.Add(observer);
             }
         }
+
+        // Auto-attached observers also fire in children. EnsureExtensionsLoaded (called by
+        // CreateAutoAttachedObservers) has loaded NBenchmark.* assemblies (including
+        // NBenchmark.Studio, if referenced) and their [ModuleInitializer]s have registered
+        // auto-attached observers. Dedup against the request's explicit observer names so
+        // --observer studio does not double-attach. Mirrors the parent-side ResolveObserver.
+        var explicitNames = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+        var autoAttached = ObserverRegistry.CreateAutoAttachedObservers(explicitNames);
+        resolved.AddRange(autoAttached);
 
         return resolved.Count switch
         {

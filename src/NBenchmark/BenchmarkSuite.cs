@@ -685,30 +685,91 @@ public sealed class BenchmarkSuite(string name)
 
     /// <summary>
     ///     Resolves the attached observer list to the single <see cref="IMeasurementObserver" />
-    ///     the engine should see. An empty list collapses to <see cref="NullMeasurementObserver.Instance" />
-    ///     so the hot-path guard (<c>observer != NullMeasurementObserver.Instance</c>) stays false and
-    ///     the loop pays no dispatch cost. A single observer is returned as-is. Two or more are
-    ///     wrapped in a <see cref="CompositeMeasurementObserver" />.
+    ///     the engine should see. Composes three sources: programmatic instances added via
+    ///     <see cref="WithObserver(IMeasurementObserver)" />, CLI-supplied names resolved
+    ///     through <see cref="ObserverRegistry" /> (in harness-hosted children), and
+    ///     auto-attached observers registered via
+    ///     <see cref="ObserverRegistry.RegisterAutoAttach" />. Dedup is by name across all
+    ///     three sources so <c>.WithObserver(new StudioLiveObserver())</c> and the auto-attached
+    ///     <c>studio</c> registration produce one <c>studio</c> stream, not two. An empty
+    ///     result collapses to <see cref="NullMeasurementObserver.Instance" /> so the hot-path
+    ///     guard stays false and the loop pays no dispatch cost.
     /// </summary>
     private IMeasurementObserver ResolveObserver()
-        => _observers.Count switch
+    {
+        // Dedup by Name (last wins) so two programmatic .WithObserver(...) calls for the
+        // same named observer fire the later (more deliberate) instance, not both.
+        // Anonymous observers (Name = null) are always kept. Mirrors the harness-side
+        // ResolveObserver dedup.
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var programmatic = new List<IMeasurementObserver>(_observers.Count);
+        for (var i = _observers.Count - 1; i >= 0; i--)
+        {
+            var observer = _observers[i];
+            if (observer == NullMeasurementObserver.Instance)
+                continue;
+
+            if (!string.IsNullOrEmpty(observer.Name))
+            {
+                if (!seenNames.Add(observer.Name))
+                    continue;
+            }
+
+            programmatic.Add(observer);
+        }
+
+        programmatic.Reverse();
+
+        var explicitNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var observer in programmatic)
+        {
+            if (!string.IsNullOrEmpty(observer.Name))
+                explicitNames.Add(observer.Name);
+        }
+
+        var autoAttached = ObserverRegistry.CreateAutoAttachedObservers(explicitNames);
+
+        if (programmatic.Count == 0 && autoAttached.Count == 0)
+            return NullMeasurementObserver.Instance;
+
+        if (programmatic.Count == 1 && autoAttached.Count == 0)
+            return programmatic[0];
+
+        var all = new List<IMeasurementObserver>(programmatic.Count + autoAttached.Count);
+        all.AddRange(programmatic);
+        all.AddRange(autoAttached);
+        return all.Count switch
         {
             0 => NullMeasurementObserver.Instance,
-            1 => _observers[0],
-            _ => new CompositeMeasurementObserver(_observers),
+            1 => all[0],
+            _ => new CompositeMeasurementObserver(all),
         };
+    }
 
     /// <summary>
     ///     Resolves observer names forwarded by a parent (via <see cref="IsolatedRunRequest.ObserverNames" />)
     ///     into a single <see cref="IMeasurementObserver" /> for an isolated suite child. The child
     ///     re-runs the entry assembly, so <c>[ModuleInitializer]</c> self-registration populates
     ///     <see cref="ObserverRegistry" /> identically and the names resolve to the same factories.
-    ///     An empty list collapses to <see cref="NullMeasurementObserver.Instance" />.
+    ///     Auto-attached observers also fire in children (dedup'd against the forwarded explicit
+    ///     names so <c>--observer studio</c> does not double-attach). An empty list collapses to
+    ///     <see cref="NullMeasurementObserver.Instance" />.
     /// </summary>
     private static IMeasurementObserver ResolveChildObservers(IReadOnlyList<string> names)
     {
         if (names.Count == 0)
-            return NullMeasurementObserver.Instance;
+        {
+            // No explicit names forwarded, but auto-attached observers still fire in the
+            // child (e.g. a live-streaming observer referenced by the parent's entry
+            // assembly). Resolve them with an empty dedup set.
+            var autoAttachedOnly = ObserverRegistry.CreateAutoAttachedObservers(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            return autoAttachedOnly.Count switch
+            {
+                0 => NullMeasurementObserver.Instance,
+                1 => autoAttachedOnly[0],
+                _ => new CompositeMeasurementObserver(autoAttachedOnly),
+            };
+        }
 
         var resolved = new List<IMeasurementObserver>(names.Count);
 
@@ -720,6 +781,14 @@ public sealed class BenchmarkSuite(string name)
                 resolved.Add(observer);
             }
         }
+
+        // Auto-attached observers also fire in children. EnsureExtensionsLoaded (called by
+        // CreateAutoAttachedObservers) has loaded NBenchmark.* assemblies (including
+        // NBenchmark.Studio, if referenced) and their [ModuleInitializer]s have registered
+        // auto-attached observers. Dedup against the request's explicit observer names.
+        var explicitNames = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+        var autoAttached = ObserverRegistry.CreateAutoAttachedObservers(explicitNames);
+        resolved.AddRange(autoAttached);
 
         return resolved.Count switch
         {
@@ -853,9 +922,10 @@ public sealed class BenchmarkSuite(string name)
         if (!_progressExplicitlySet)
             _progress = new DefaultConsoleProgress();
 
+        using var observer = ResolveObserver();
         return await RunInProcessCoreAsync(
             _progress,
-            ResolveObserver(),
+            observer,
             _runOrder,
             true,
             true,
@@ -880,6 +950,7 @@ public sealed class BenchmarkSuite(string name)
         NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, profile: _options.Profile.ToString(), runtime: _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
 
         List<BenchmarkResult> results = [];
+        var sentinelEmitted = false;
         try
         {
             await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
@@ -936,6 +1007,15 @@ public sealed class BenchmarkSuite(string name)
 
             await progress.OnSuiteCompleted(results).ConfigureAwait(false);
 
+            // SuiteCompleted sentinel: emit on the success path with Succeeded = true. A
+            // live-streaming observer treats this as the authoritative run-end signal.
+            observer.OnPhase(new MeasurementPhaseEvent(
+                BenchmarkName: string.Empty,
+                Phase: MeasurementPhase.SuiteCompleted,
+                Transition: PhaseTransition.Completed,
+                Succeeded: true));
+            sentinelEmitted = true;
+
             // SuiteRunner keys raw samples by benchmark name; the significance and payload paths
             // need the composite name+runtime key so multi-runtime results don't collide.
             rawSamples = ToCompositeKeys(results, rawSamples);
@@ -958,6 +1038,19 @@ public sealed class BenchmarkSuite(string name)
         }
         finally
         {
+            // If the try block did not reach its success-path emit (a suite-level
+            // exception prevented it), emit the sentinel here with Succeeded = false so a
+            // live-streaming observer can finalise the run as Failed rather than leaving it
+            // stuck as Running until the idle timeout fires.
+            if (!sentinelEmitted)
+            {
+                observer.OnPhase(new MeasurementPhaseEvent(
+                    BenchmarkName: string.Empty,
+                    Phase: MeasurementPhase.SuiteCompleted,
+                    Transition: PhaseTransition.Completed,
+                    Succeeded: false));
+            }
+
             NBenchmarkDiagnostics.OnSuiteCompleted(results);
         }
     }
@@ -1035,6 +1128,8 @@ public sealed class BenchmarkSuite(string name)
         NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, profile: _options.Profile.ToString(), runtime: _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
 
         var results = new List<BenchmarkResult>(filteredBenchmarks.Count);
+        using var observer = ResolveObserver();
+        var sentinelEmitted = false;
         try
         {
             await _progress.OnSuiteStarting(displayNames, filteredBenchmarks.Count).ConfigureAwait(false);
@@ -1070,7 +1165,6 @@ public sealed class BenchmarkSuite(string name)
                 items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
 
             var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
-            var observer = ResolveObserver();
 
             var rawSamples = new Dictionary<string, double[]>(filteredBenchmarks.Count);
 
@@ -1112,6 +1206,14 @@ public sealed class BenchmarkSuite(string name)
 
             await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
 
+            // SuiteCompleted sentinel: emit on the success path with Succeeded = true.
+            observer.OnPhase(new MeasurementPhaseEvent(
+                BenchmarkName: string.Empty,
+                Phase: MeasurementPhase.SuiteCompleted,
+                Transition: PhaseTransition.Completed,
+                Succeeded: true));
+            sentinelEmitted = true;
+
             ApplyPerParameterSignificance(results, rawSamples);
 
             await InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
@@ -1120,6 +1222,15 @@ public sealed class BenchmarkSuite(string name)
         }
         finally
         {
+            if (!sentinelEmitted)
+            {
+                observer.OnPhase(new MeasurementPhaseEvent(
+                    BenchmarkName: string.Empty,
+                    Phase: MeasurementPhase.SuiteCompleted,
+                    Transition: PhaseTransition.Completed,
+                    Succeeded: false));
+            }
+
             NBenchmarkDiagnostics.OnSuiteCompleted(results);
         }
     }
@@ -1163,6 +1274,8 @@ public sealed class BenchmarkSuite(string name)
 
         NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, profile: _options.Profile.ToString(), runtime: _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
 
+        using var observer = ResolveObserver();
+        var sentinelEmitted = false;
         try
         {
             await _progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
@@ -1177,8 +1290,6 @@ public sealed class BenchmarkSuite(string name)
 
             try
             {
-                var observer = ResolveObserver();
-
                 foreach (var build in successfulBuilds)
                 {
                     var tfm = build.Moniker.ToTargetFramework();
@@ -1280,6 +1391,14 @@ public sealed class BenchmarkSuite(string name)
 
             await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
 
+            // SuiteCompleted sentinel: emit on the success path with Succeeded = true.
+            observer.OnPhase(new MeasurementPhaseEvent(
+                BenchmarkName: string.Empty,
+                Phase: MeasurementPhase.SuiteCompleted,
+                Transition: PhaseTransition.Completed,
+                Succeeded: true));
+            sentinelEmitted = true;
+
             ApplyPerParameterSignificance(allResults, rawSamples);
 
             await InvokeReportersAsync(allResults, cancellationToken).ConfigureAwait(false);
@@ -1288,6 +1407,15 @@ public sealed class BenchmarkSuite(string name)
         }
         finally
         {
+            if (!sentinelEmitted)
+            {
+                observer.OnPhase(new MeasurementPhaseEvent(
+                    BenchmarkName: string.Empty,
+                    Phase: MeasurementPhase.SuiteCompleted,
+                    Transition: PhaseTransition.Completed,
+                    Succeeded: false));
+            }
+
             NBenchmarkDiagnostics.OnSuiteCompleted(allResults);
         }
     }
