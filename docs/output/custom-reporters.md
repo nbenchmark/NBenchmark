@@ -40,6 +40,56 @@ ReporterRegistry.Register("my-reporter", "Custom output", _ => new MyReporter())
 
 After registration, `--reporter my-reporter` works from the CLI.
 
+## Auto-attached reporters
+
+Reporters come in two flavours:
+
+- **Explicit opt-in** reporters, registered via `ReporterRegistry.Register`. These only fire when the user passes `--reporter <name>` on the CLI or calls `.WithReporter(...)` programmatically. The built-in `json`, `markdown`, and `csv` reporters, and the optional `console` reporter, are all explicit opt-in.
+- **Auto-attached** reporters, registered via `ReporterRegistry.RegisterAutoAttach`. These fire on **every** run, after the user's explicit reporters, with no opt-in required. They are designed for side-effect reporters that integrate with an external system - for example, a reporter that writes run results to a file inbox for a separate Studio process to ingest.
+
+The two registration paths are mutually exclusive: the same name cannot be registered via both `Register` and `RegisterAutoAttach` (case-insensitive). Auto-attached reporters are listed separately on `ReporterRegistry.AutoAttached` and shown in the `--reporter` flag's help line so users can see what is auto-firing.
+
+### Self-registering an auto-attached reporter
+
+External packages self-register their auto-attached reporters via a `[ModuleInitializer]` that calls `ReporterRegistry.RegisterAutoAttach`, mirroring how `NBenchmark.Reporters.Console` self-registers the `console` reporter via `Register`. The `[ModuleInitializer]` runs when the package's assembly is loaded by the host process, which happens on the first call to `ReporterRegistry.Available`, `ReporterRegistry.AutoAttached`, or `ReporterRegistry.CreateAutoAttachedReporters`.
+
+```csharp
+using System.Runtime.CompilerServices;
+using NBenchmark.Reporters;
+
+namespace MyPackage.Reporters;
+
+internal static class MyReporterRegistration
+{
+    [ModuleInitializer]
+    internal static void Register() =>
+        ReporterRegistry.RegisterAutoAttach(
+            "my-sink",
+            "Writes run results to a file inbox for MyTool to ingest",
+            (_, detail) => new MySinkReporter { Detail = detail });
+}
+```
+
+Reference the package from the user's benchmark project and the reporter fires on every `BenchmarkHarness.RunAsync` and `BenchmarkSuite.RunAsync` call - no per-run setup required.
+
+### Dedup with explicit reporters
+
+If the user also adds an auto-attached reporter as an explicit reporter (via `--reporter <name>` or `.WithReporter(...)` with an instance whose `Name` matches the auto-attached reporter's name), the auto-attached one is skipped for that run so the reporter does not fire twice. The dedup is by canonical name, case-insensitive.
+
+### Resilience
+
+A misbehaving auto-attached reporter cannot kill the run. Each auto-attached reporter's `ReportAsync` is wrapped in try/catch with `Trace.TraceWarning`; the exception is logged and the run continues to the next reporter. This mirrors `CompositeMeasurementObserver`'s per-dispatch isolation. The user's `BenchmarkResult` list is still returned from `RunAsync` and any subsequent explicit reporters still run.
+
+### CI / opt-out convention
+
+Because auto-attached reporters fire on every run by design, packages that ship one are expected to follow a standard opt-out convention so CI pipelines and explicit opt-out users are not polluted with side-effect writes:
+
+- The reporter's `ReportAsync` should no-op when the `CI=true` environment variable is set (the standard convention set by GitHub Actions, GitLab CI, Azure Pipelines, etc.).
+- The reporter should also accept a package-specific disable env var (e.g. `NBENCHMARK_MYTOOL_DISABLE=1`) as an explicit escape hatch for users who want the package referenced locally but do not want every benchmark run written to the sink.
+- Both guards should run before any directory creation or file I/O so a CI runner with neither env var set pays only the cost of two `GetEnvironmentVariable` calls.
+
+The contract is convention, not enforced by NBenchmark - the package owning the reporter is responsible for honouring it.
+
 ## Using BenchmarkTable in a custom reporter
 
 For reporters that produce comparison tables, use `BenchmarkTable.Build(results)` rather than working with `IReadOnlyList<BenchmarkResult>` directly. It centralises the logic you would otherwise duplicate:

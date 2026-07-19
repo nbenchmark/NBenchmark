@@ -170,6 +170,8 @@ dotnet run -- --reporter console
 
 Reporters from external packages self-register through the same mechanism: reference the package, use `--reporter <name>` from the CLI. No per-reporter configuration needed in the host.
 
+The `--help` output also lists auto-attached reporters in a separate section after the explicit reporter list (e.g. `(auto-attached: studio)`). Auto-attached reporters fire on every run after the explicit reporters without requiring `--reporter`; see the [Custom Reporters](../output/custom-reporters.md#auto-attached-reporters) page for the full contract. Passing `--reporter <name>` for an auto-attached reporter is not supported - the auto-attached one is already firing, and adding an explicit reporter instance with the same canonical name via `.WithReporter(...)` is dedup'd out so it does not fire twice.
+
 ---
 
 ### `--observer <type>`

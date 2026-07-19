@@ -153,6 +153,10 @@ ReporterRegistry.Register("my-reporter", "Custom console output", _ => new MyRep
 
 The registration can happen in a `[ModuleInitializer]` in your package or at app startup before `BenchmarkHarness.Create(args)` is called.
 
+### What is an auto-attached reporter?
+
+Auto-attached reporters fire on **every** run after the user's explicit reporters, with no opt-in required. They are registered via `ReporterRegistry.RegisterAutoAttach` (distinct from `Register`, which only makes a reporter *available* via `--reporter`). They are designed for side-effect reporters that integrate with an external system - for example, a reporter that writes run results to a file inbox for a separate Studio process to ingest. See the [Custom Reporters](output/custom-reporters.md#auto-attached-reporters) page for the full contract, including the `CI=true` opt-out convention and dedup with explicit reporters.
+
 ---
 
 ## BenchmarkHarness (Harness mode)
