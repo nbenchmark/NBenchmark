@@ -951,10 +951,7 @@ public sealed class BenchmarkSuite(string name)
 
             if (applyReporters)
             {
-                foreach (var reporter in _reporters)
-                {
-                    await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
-                }
+                await InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
             }
 
             return results;
@@ -1117,10 +1114,7 @@ public sealed class BenchmarkSuite(string name)
 
             ApplyPerParameterSignificance(results, rawSamples);
 
-            foreach (var reporter in _reporters)
-            {
-                await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
-            }
+            await InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
 
             return results;
         }
@@ -1288,10 +1282,7 @@ public sealed class BenchmarkSuite(string name)
 
             ApplyPerParameterSignificance(allResults, rawSamples);
 
-            foreach (var reporter in _reporters)
-            {
-                await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
-            }
+            await InvokeReportersAsync(allResults, cancellationToken).ConfigureAwait(false);
 
             return allResults;
         }
@@ -1492,6 +1483,12 @@ public sealed class BenchmarkSuite(string name)
         }
 
         return composite;
+    }
+
+    private async Task InvokeReportersAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
+    {
+        await ReporterRegistry.InvokeReportersAsync(_reporters, _detail, results, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private void ApplyPerParameterSignificance(List<BenchmarkResult> results, Dictionary<string, double[]> rawSamples)

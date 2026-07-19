@@ -658,10 +658,7 @@ public sealed class BenchmarkHarness
         BenchmarkTable.CrossClassMode = _cliArgs.CrossClass || _crossClass;
         try
         {
-            foreach (var reporter in _reporters)
-            {
-                await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
-            }
+            await InvokeReportersAsync(allResults, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -770,10 +767,7 @@ public sealed class BenchmarkHarness
         BenchmarkTable.CrossClassMode = _cliArgs.CrossClass || _crossClass;
         try
         {
-            foreach (var reporter in _reporters)
-            {
-                await reporter.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
-            }
+            await InvokeReportersAsync(allResults, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -1801,6 +1795,12 @@ public sealed class BenchmarkHarness
             if (ReporterRegistry.TryCreate(_reporters[i].Name, outputDir, _detail, out var rebuilt))
                 _reporters[i] = rebuilt;
         }
+    }
+
+    private async Task InvokeReportersAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
+    {
+        await ReporterRegistry.InvokeReportersAsync(_reporters, _detail, results, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static IReadOnlyList<BenchmarkSuiteDefinition> FilterSuites(

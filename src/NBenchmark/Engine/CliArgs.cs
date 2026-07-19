@@ -679,7 +679,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --exclude-category <name> Exclude benchmarks tagged with this category (repeatable, OR)");
         Console.WriteLine("  --iterations <n>       Pin measured sample count (default: auto, CI-driven)");
         Console.WriteLine("  --warmup <n>           Pin warmup sample count (default: auto, plateau-driven)");
-        Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}");
+        Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}{FormatAutoAttached()}");
         Console.WriteLine($"  --observer <type>      Attach measurement observer: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}");
         Console.WriteLine("                         (repeatable; multiple observers are composed into a fan-out)");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
@@ -717,5 +717,15 @@ internal sealed record CliArgs
         Console.WriteLine("  --dedicated-host-guidance  Warn when the host looks noisy (low core count, unraisable priority, macOS throttling)");
         Console.WriteLine("  --otlp-endpoint <url>  OTLP endpoint for the OpenTelemetry SDK (http:// or https://); forwarded to isolated children");
         Console.WriteLine("  --help, -h             Show this help text");
+    }
+
+    private static string FormatAutoAttached()
+    {
+        var names = ReporterRegistry.AutoAttached;
+
+        if (names.Count == 0)
+            return string.Empty;
+
+        return $" (auto-attached: {string.Join(", ", names.Select(r => r.Name))})";
     }
 }

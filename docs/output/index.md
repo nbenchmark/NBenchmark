@@ -112,4 +112,4 @@ Reporters support three detail levels - **Simple** (default), **Standard**, and 
 
 ## Writing a custom reporter
 
-See the [Custom Reporters](./custom-reporters.md) page for a step-by-step guide to implementing `IReporter`, registering it with `ReporterRegistry`, and using `BenchmarkTable` for comparison output.
+See the [Custom Reporters](./custom-reporters.md) page for a step-by-step guide to implementing `IReporter`, registering it with `ReporterRegistry`, and using `BenchmarkTable` for comparison output. That page also documents **auto-attached reporters** (`ReporterRegistry.RegisterAutoAttach`) - side-effect reporters that fire on every run after the user's explicit reporters, with no opt-in required.
