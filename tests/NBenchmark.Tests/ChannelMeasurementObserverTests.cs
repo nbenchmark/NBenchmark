@@ -209,4 +209,49 @@ public class ChannelMeasurementObserverTests
 
         Assert.Equal(50, count);
     }
+
+    [Fact]
+    public async Task Dispose_Completes_Channel_So_Async_Consumer_Stops_Blocking()
+    {
+        // The harness/suite wrap the resolved observer in a `using`, so Dispose must
+        // complete the channel writer. Without this, a reader awaiting ReadAllAsync
+        // (or Reader.Completion) would hang indefinitely after the run finishes.
+        var observer = new ChannelMeasurementObserver(capacity: 16);
+        var reader = observer.Reader;
+
+        observer.OnSample(new SampleEvent("b", 0, 1.0, 1, 0, false));
+
+        using (observer)
+        {
+            // The using disposes the observer, which completes the channel writer.
+        }
+
+        // The buffered event is still readable after dispose.
+        Assert.True(reader.TryRead(out _));
+        Assert.False(reader.TryRead(out _));
+        // The reader's Completion task is now complete, so an async consumer does not hang.
+        Assert.True(reader.Completion.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task Dispose_Allows_Async_Consumer_To_Drain_And_Exit()
+    {
+        var observer = new ChannelMeasurementObserver(capacity: 256);
+        var reader = observer.Reader;
+
+        for (var i = 0; i < 10; i++)
+        {
+            observer.OnSample(new SampleEvent("b", i, i * 1.0, 1, 0, false));
+        }
+
+        observer.Dispose();
+
+        var count = 0;
+        await foreach (var _ in reader.ReadAllAsync())
+        {
+            count++;
+        }
+
+        Assert.Equal(10, count);
+    }
 }

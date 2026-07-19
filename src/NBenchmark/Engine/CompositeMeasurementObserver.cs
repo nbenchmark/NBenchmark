@@ -117,4 +117,31 @@ public sealed class CompositeMeasurementObserver : IMeasurementObserver
             }
         }
     }
+
+    /// <summary>
+    ///     Fans <c>Dispose</c> out to each child in a try/catch (mirroring the per-dispatch
+    ///     isolation of <see cref="OnPhase" /> / <see cref="OnSample" /> /
+    ///     <see cref="OnDetector" /> / <see cref="OnResult" />), so a throwing
+    ///     <c>Dispose</c> from one observer cannot prevent the others from disposing. Called by
+    ///     the harness/suite <c>using</c> on the resolved observer at the end of
+    ///     <c>RunAsync</c>; the composite is the resolution shape whenever two or more observers
+    ///     are attached (auto-attached + explicit, or multiple programmatic), so every child's
+    ///     <c>Dispose</c> runs on both the success and exception paths.
+    /// </summary>
+    public void Dispose()
+    {
+        foreach (var observer in _observers)
+        {
+            try
+            {
+                observer.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceWarning(
+                    "NBenchmark: observer '{0}' threw from Dispose and was skipped: {1}",
+                    observer.GetType().FullName, ex.Message);
+            }
+        }
+    }
 }
