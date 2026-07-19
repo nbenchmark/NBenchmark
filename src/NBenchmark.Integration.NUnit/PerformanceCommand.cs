@@ -45,25 +45,31 @@ public sealed class PerformanceCommand : DelegatingTestCommand
                 var (refMethodInfo, refArgs) = ResolveReferenceMethod(methodInfo, _attribute.ReferenceMethod, args);
 
                 if (!TryBuildBody(refMethodInfo, instance, refArgs, out var refBody, out var refIsAsync))
+                {
                     throw new InvalidOperationException(
                         $"Could not build body for reference method {_attribute.ReferenceMethod}.");
+                }
 
                 var refName = $"{testMethod.Method.TypeInfo.FullName}.{_attribute.ReferenceMethod}";
 
                 if (refIsAsync)
                 {
                     var refTaskBody = (Func<Task>)refBody;
+
                     var refOutcome = BenchmarkRunner.Instance.RunAsync(
                             refName, refTaskBody, runSpec, context.CancellationToken)
                         .GetAwaiter().GetResult();
+
                     refResult = refOutcome.Result;
                     refSamples = refOutcome.RawSamples;
                 }
                 else
                 {
                     var refActionBody = (Action)refBody;
+
                     var refOutcome = BenchmarkRunner.Instance.Run(
                         refName, refActionBody, runSpec, context.CancellationToken);
+
                     refResult = refOutcome.Result;
                     refSamples = refOutcome.RawSamples;
                 }
@@ -145,6 +151,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
             else
             {
                 var calibration = PerformanceCalibration.Run();
+
                 violations.AddRange(RelativeComparison.Check(
                     result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, thresholds.MaxSlowdownRatio));
             }
@@ -168,11 +175,6 @@ public sealed class PerformanceCommand : DelegatingTestCommand
         var typedField = Expression.Field(null, consumeField);
         var assign = Expression.Assign(typedField, Expression.Convert(call, typeof(object)));
         return Expression.Lambda<Action>(assign).Compile();
-    }
-
-    private static class ReturnSink
-    {
-        public static object? Hole = new object();
     }
 
     internal static bool TryBuildBody(
@@ -352,4 +354,9 @@ public sealed class PerformanceCommand : DelegatingTestCommand
     }
 
     private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask) => valueTask.AsTask();
+
+    private static class ReturnSink
+    {
+        public static object? Hole = new();
+    }
 }

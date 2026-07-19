@@ -13,10 +13,7 @@ public class ObserverRegistryTests : IDisposable
     public void Dispose() => ObserverRegistry.Reset();
 
     [Fact]
-    public void Available_Is_Empty_By_Default()
-    {
-        Assert.Empty(ObserverRegistry.Available);
-    }
+    public void Available_Is_Empty_By_Default() => Assert.Empty(ObserverRegistry.Available);
 
     [Fact]
     public void TryCreate_Unknown_Name_Returns_False()

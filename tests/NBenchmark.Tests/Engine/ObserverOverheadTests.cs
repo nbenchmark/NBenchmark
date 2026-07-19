@@ -45,6 +45,7 @@ public class ObserverOverheadTests
             new RunSpec { Options = options, Observer = NullMeasurementObserver.Instance });
 
         var observer = new RecordingObserver();
+
         var observedOutcome = BenchmarkRunner.Instance.Run(
             "busywait-observed",
             () => BusyWait(targetMicros),
@@ -60,6 +61,7 @@ public class ObserverOverheadTests
         // that exceeds the body's own variance.
         var cv = nullOutcome.Result.CoefficientOfVariation;
         var tolerance = Math.Max(0.05, 3.0 * cv); // floor at 5% to avoid dividing by a tiny CV
+
         var medianShift = Math.Abs(observedOutcome.Result.Median - nullOutcome.Result.Median)
                           / nullOutcome.Result.Median;
 
@@ -81,6 +83,7 @@ public class ObserverOverheadTests
         };
 
         var observer = new RecordingObserver();
+
         // NullBenchmarkProgress-equivalent: pass the null singleton but wrap it so we can count calls.
         // The contract is that the loop checks `observer != NullMeasurementObserver.Instance`, so a
         // distinct no-op observer would still pay the dispatch cost. The null singleton must be the

@@ -57,8 +57,12 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                 }
 
                 if (!TryBuildBody(refMethodInfo, instance, refArgs, out var refBody, out var refIsAsync))
-                    return Task.FromResult<TestResult[]>([CreateErrorResult(
-                        $"Could not build body for reference method {ReferenceMethod}.")]);
+                {
+                    return Task.FromResult<TestResult[]>([
+                        CreateErrorResult(
+                            $"Could not build body for reference method {ReferenceMethod}."),
+                    ]);
+                }
 
                 var refName = $"{testMethod.TestClassName}.{ReferenceMethod}";
 
@@ -69,12 +73,17 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                         var refOutcome = BenchmarkRunner.Instance.RunAsync(
                                 refName, refTaskBody, runSpec, CancellationToken.None)
                             .GetAwaiter().GetResult();
+
                         refResult = refOutcome.Result;
                         refSamples = refOutcome.RawSamples;
                     }
                     else
-                        return Task.FromResult<TestResult[]>([CreateErrorResult(
-                            $"Unsupported async body type for reference method {ReferenceMethod}.")]);
+                    {
+                        return Task.FromResult<TestResult[]>([
+                            CreateErrorResult(
+                                $"Unsupported async body type for reference method {ReferenceMethod}."),
+                        ]);
+                    }
                 }
                 else
                 {
@@ -82,12 +91,17 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                     {
                         var refOutcome = BenchmarkRunner.Instance.Run(
                             refName, refActionBody, runSpec, CancellationToken.None);
+
                         refResult = refOutcome.Result;
                         refSamples = refOutcome.RawSamples;
                     }
                     else
-                        return Task.FromResult<TestResult[]>([CreateErrorResult(
-                            $"Unsupported sync body type for reference method {ReferenceMethod}.")]);
+                    {
+                        return Task.FromResult<TestResult[]>([
+                            CreateErrorResult(
+                                $"Unsupported sync body type for reference method {ReferenceMethod}."),
+                        ]);
+                    }
                 }
             }
 
@@ -184,6 +198,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
             else
             {
                 var calibration = PerformanceCalibration.Run();
+
                 violations.AddRange(RelativeComparison.Check(
                     result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, thresholds.MaxSlowdownRatio));
             }
@@ -234,11 +249,6 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         var typedField = Expression.Field(null, consumeField);
         var assign = Expression.Assign(typedField, Expression.Convert(call, typeof(object)));
         return Expression.Lambda<Action>(assign).Compile();
-    }
-
-    private static class ReturnSink
-    {
-        public static object? Hole = new object();
     }
 
     internal static bool TryBuildBody(
@@ -418,4 +428,9 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
     }
 
     private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask) => valueTask.AsTask();
+
+    private static class ReturnSink
+    {
+        public static object? Hole = new();
+    }
 }

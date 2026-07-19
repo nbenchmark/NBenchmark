@@ -190,7 +190,7 @@ internal sealed record MeasurementOverrides
             result = result with { EnableHistogram = false };
 
         if (Diagnostics.HasValue)
-            result = result with { Diagnostics = NBenchmark.DiagnosticsOptions.FromMode(Diagnostics.Value) };
+            result = result with { Diagnostics = DiagnosticsOptions.FromMode(Diagnostics.Value) };
 
         if (Environment is not null)
             result = result with { Environment = MergeEnvironment(result.Environment, Environment) };
@@ -208,9 +208,7 @@ internal sealed record MeasurementOverrides
         if (cliArgs.CpuAffinity is null
             && cliArgs.ProcessPriority is null
             && !cliArgs.DedicatedHostGuidance)
-        {
             return null;
-        }
 
         return new EnvironmentOptions
         {

@@ -46,18 +46,21 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         if (Detail == ReportDetail.Simple)
         {
             baseHeaders += ",OpsPerSecond";
+
             sb.AppendLine(
                 $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,Detail,Profile");
         }
         else if (Detail == ReportDetail.Standard)
         {
             baseHeaders += ",Mean,OpsPerSecond";
+
             sb.AppendLine(
                 $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile");
         }
         else
         {
             baseHeaders += ",Mean,OpsPerSecond";
+
             sb.AppendLine(
                 $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories");
         }
@@ -90,6 +93,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
             if (Detail == ReportDetail.Simple)
             {
                 var simpleDiag = row.Diagnostics;
+
                 sb.AppendLine(
                     $"{commonData},{row.OperationsPerSecond:F1}," +
                     $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
@@ -127,9 +131,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                                $"{profile}";
 
                 if (Detail == ReportDetail.Standard)
-                {
                     sb.AppendLine(fullData);
-                }
                 else
                 {
                     var lowerFence = row.LowerFence?.ToString("F1") ?? "";
@@ -145,9 +147,11 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     var atSampleStop = autoTune?.SampleStop.ToString() ?? "";
                     var atCiWidth = autoTune is null ? "" : autoTune.AchievedRelativeCiWidth.ToString("F4");
                     var atTuningMs = autoTune is null ? "" : autoTune.TuningWallClock.TotalMilliseconds.ToString("F1");
+
                     var atJitterMetric = autoTune?.JitterMetric.HasValue == true
                         ? autoTune.JitterMetric.Value.ToString("F4")
                         : "";
+
                     var atDetectorSwitched = autoTune?.OutlierDetectorSwitched == true ? "true" : "";
 
                     var safeCategories = string.Join("; ", row.Categories).Replace("\"", "\"\"");

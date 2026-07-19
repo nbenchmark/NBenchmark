@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using NBenchmark.Diagnostics;
@@ -8,10 +7,10 @@ namespace NBenchmark.Tests.Engine;
 
 public sealed class DiagnosticsTests : IDisposable
 {
-    private readonly MeterListener _meterListener = new();
     private readonly ActivityListener _activityListener = new();
-    private readonly List<double> _durationValues = [];
     private readonly List<long> _allocValues = [];
+    private readonly List<double> _durationValues = [];
+    private readonly MeterListener _meterListener = new();
     private readonly List<Activity> _startedActivities = [];
 
     public DiagnosticsTests()
@@ -34,8 +33,10 @@ public sealed class DiagnosticsTests : IDisposable
         _meterListener.Start();
 
         _activityListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
         _activityListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
             ActivitySamplingResult.AllData;
+
         _activityListener.ActivityStarted = a => _startedActivities.Add(a);
         _activityListener.ActivityStopped = _ => { };
 
@@ -52,21 +53,21 @@ public sealed class DiagnosticsTests : IDisposable
     [Fact]
     public void RecordSample_Emits_Duration_Histogram()
     {
-        NBenchmarkDiagnostics.RecordSample("bench-a", warmup: false, "measurement", 42.5, 128);
+        NBenchmarkDiagnostics.RecordSample("bench-a", false, "measurement", 42.5, 128);
         Assert.Contains(42.5, _durationValues);
     }
 
     [Fact]
     public void RecordSample_Emits_Alloc_Histogram()
     {
-        NBenchmarkDiagnostics.RecordSample("bench-a", warmup: false, "measurement", 100.0, 256);
+        NBenchmarkDiagnostics.RecordSample("bench-a", false, "measurement", 100.0, 256);
         Assert.Contains(256, _allocValues);
     }
 
     [Fact]
     public void RecordSample_Does_Not_Emit_Alloc_When_Negative()
     {
-        NBenchmarkDiagnostics.RecordSample("bench-a", warmup: false, "measurement", 50.0, -1);
+        NBenchmarkDiagnostics.RecordSample("bench-a", false, "measurement", 50.0, -1);
         Assert.DoesNotContain(-1L, _allocValues);
     }
 
@@ -81,12 +82,15 @@ public sealed class DiagnosticsTests : IDisposable
             {
                 _durationValues.Add(value);
                 var e = tags.GetEnumerator();
+
                 while (e.MoveNext())
+                {
                     capturedTags.Add(e.Current);
+                }
             }
         });
 
-        NBenchmarkDiagnostics.RecordSample("MyBench", warmup: true, "warmup", 77.7, -1);
+        NBenchmarkDiagnostics.RecordSample("MyBench", true, "warmup", 77.7, -1);
 
         Assert.Contains(capturedTags, t => t.Key == "benchmark" && Equals(t.Value, "MyBench"));
         Assert.Contains(capturedTags, t => t.Key == "warmup" && Equals(t.Value, true));
@@ -100,18 +104,22 @@ public sealed class DiagnosticsTests : IDisposable
 
         double capturedCiHalf = 0, capturedMean = 0;
         using var captureListener = new MeterListener();
+
         captureListener.InstrumentPublished = (instrument, listener) =>
         {
             if (instrument.Meter.Name == "NBenchmark")
                 listener.EnableMeasurementEvents(instrument);
         };
+
         captureListener.SetMeasurementEventCallback<double>((instrument, value, _, _) =>
         {
             if (instrument.Name == "nbenchmark.ci.relative_half_width")
                 capturedCiHalf = value;
+
             if (instrument.Name == "nbenchmark.sample.mean_per_op")
                 capturedMean = value;
         });
+
         captureListener.Start();
         captureListener.RecordObservableInstruments();
 
@@ -123,16 +131,19 @@ public sealed class DiagnosticsTests : IDisposable
     public void RecordOutliersRemoved_Emits_Counter()
     {
         using var captureListener = new MeterListener();
+
         captureListener.InstrumentPublished = (instrument, listener) =>
         {
             if (instrument.Name == "nbenchmark.outliers.removed")
                 listener.EnableMeasurementEvents(instrument);
         };
+
         captureListener.SetMeasurementEventCallback<long>((_, value, _, _) =>
         {
             if (value > 0)
                 Assert.True(true); // reached
         });
+
         captureListener.Start();
 
         NBenchmarkDiagnostics.RecordOutliersRemoved(5);
@@ -144,13 +155,16 @@ public sealed class DiagnosticsTests : IDisposable
         NBenchmarkDiagnostics.RecordJitterMetric(0.15);
 
         using var captureListener = new MeterListener();
+
         captureListener.InstrumentPublished = (instrument, listener) =>
         {
             if (instrument.Name == "nbenchmark.jitter.metric")
                 listener.EnableMeasurementEvents(instrument);
         };
+
         captureListener.SetMeasurementEventCallback<double>((_, value, _, _) =>
             Assert.Equal(0.15, value));
+
         captureListener.Start();
         captureListener.RecordObservableInstruments();
     }
@@ -159,13 +173,16 @@ public sealed class DiagnosticsTests : IDisposable
     public void RecordJitterSwitch_Emits_Counter()
     {
         using var captureListener = new MeterListener();
+
         captureListener.InstrumentPublished = (instrument, listener) =>
         {
             if (instrument.Name == "nbenchmark.jitter.detector_switches")
                 listener.EnableMeasurementEvents(instrument);
         };
+
         captureListener.SetMeasurementEventCallback<long>((_, value, _, _) =>
             Assert.Equal(1, value));
+
         captureListener.Start();
 
         NBenchmarkDiagnostics.RecordJitterSwitch();
@@ -179,6 +196,7 @@ public sealed class DiagnosticsTests : IDisposable
         var activity = _startedActivities.Count > 0
             ? _startedActivities[^1]
             : null;
+
         Assert.NotNull(activity);
         Assert.Equal("nbenchmark.phase.measurement", activity.DisplayName);
         Assert.Equal("bench-a", activity.GetTagItem("nbenchmark.benchmark.name"));
@@ -191,8 +209,10 @@ public sealed class DiagnosticsTests : IDisposable
         var stopped = false;
         using var stopListener = new ActivityListener();
         stopListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
         stopListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
             ActivitySamplingResult.AllData;
+
         stopListener.ActivityStopped = _ => stopped = true;
         ActivitySource.AddActivityListener(stopListener);
 
@@ -223,7 +243,7 @@ public sealed class DiagnosticsTests : IDisposable
     [Fact]
     public void OnSuiteStarting_Creates_Suite_Span_With_Tags()
     {
-        NBenchmarkDiagnostics.OnSuiteStarting("my-suite", 3, profile: "Realistic", runtime: "net8", seed: 42, runOrder: "Random");
+        NBenchmarkDiagnostics.OnSuiteStarting("my-suite", 3, "Realistic", "net8", 42, "Random");
 
         var activity = _startedActivities.Count > 0 ? _startedActivities[^1] : null;
         Assert.NotNull(activity);
@@ -245,8 +265,10 @@ public sealed class DiagnosticsTests : IDisposable
         var stoppedActivities = new List<Activity>();
         using var stopListener = new ActivityListener();
         stopListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
         stopListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
             ActivitySamplingResult.AllData;
+
         stopListener.ActivityStopped = a => stoppedActivities.Add(a);
         ActivitySource.AddActivityListener(stopListener);
 
@@ -272,7 +294,7 @@ public sealed class DiagnosticsTests : IDisposable
     [Fact]
     public void OnBenchmarkRunStarting_Creates_Run_Span_With_Tags()
     {
-        NBenchmarkDiagnostics.OnBenchmarkRunStarting("MyClass.Fast", "MyClass", isBaseline: true);
+        NBenchmarkDiagnostics.OnBenchmarkRunStarting("MyClass.Fast", "MyClass", true);
 
         var activity = _startedActivities.Count > 0 ? _startedActivities[^1] : null;
         Assert.NotNull(activity);
@@ -297,8 +319,10 @@ public sealed class DiagnosticsTests : IDisposable
         var stoppedActivities = new List<Activity>();
         using var stopListener = new ActivityListener();
         stopListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
         stopListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
             ActivitySamplingResult.AllData;
+
         stopListener.ActivityStopped = a => stoppedActivities.Add(a);
         ActivitySource.AddActivityListener(stopListener);
 
@@ -310,7 +334,7 @@ public sealed class DiagnosticsTests : IDisposable
             AllocMedian = null, AllocP95 = null, AllocMax = null,
         };
 
-        NBenchmarkDiagnostics.OnBenchmarkRunStarting("b", "C", isBaseline: false);
+        NBenchmarkDiagnostics.OnBenchmarkRunStarting("b", "C", false);
         NBenchmarkDiagnostics.OnBenchmarkRunCompleted(result);
 
         var runSpan = stoppedActivities.FirstOrDefault(a => a.DisplayName == "benchmark.run");
@@ -327,12 +351,15 @@ public sealed class DiagnosticsTests : IDisposable
         var stoppedActivities = new List<Activity>();
         using var stopListener = new ActivityListener();
         stopListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
         stopListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
             ActivitySamplingResult.AllData;
+
         stopListener.ActivityStopped = a => stoppedActivities.Add(a);
         ActivitySource.AddActivityListener(stopListener);
 
         NBenchmarkDiagnostics.OnPhaseStarting("b", MeasurementPhase.Jitter);
+
         NBenchmarkDiagnostics.OnPhaseCompleted(
             "b", MeasurementPhase.Jitter,
             jitterMetric: 0.20,
@@ -352,12 +379,15 @@ public sealed class DiagnosticsTests : IDisposable
         var stoppedActivities = new List<Activity>();
         using var stopListener = new ActivityListener();
         stopListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
         stopListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
             ActivitySamplingResult.AllData;
+
         stopListener.ActivityStopped = a => stoppedActivities.Add(a);
         ActivitySource.AddActivityListener(stopListener);
 
         NBenchmarkDiagnostics.OnPhaseStarting("b", MeasurementPhase.Warmup);
+
         NBenchmarkDiagnostics.OnPhaseCompleted(
             "b", MeasurementPhase.Warmup,
             warmupStop: WarmupStopReason.Settled);
@@ -373,15 +403,18 @@ public sealed class DiagnosticsTests : IDisposable
         var stoppedActivities = new List<Activity>();
         using var stopListener = new ActivityListener();
         stopListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
         stopListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
             ActivitySamplingResult.AllData;
+
         stopListener.ActivityStopped = a => stoppedActivities.Add(a);
         ActivitySource.AddActivityListener(stopListener);
 
         NBenchmarkDiagnostics.OnPhaseStarting("b", MeasurementPhase.Measurement);
+
         NBenchmarkDiagnostics.OnPhaseCompleted(
             "b", MeasurementPhase.Measurement,
-            sampleStop: SampleStopReason.CiTargetMet,
+            SampleStopReason.CiTargetMet,
             achievedCiWidth: 0.024,
             ciTarget: 0.025);
 
@@ -399,15 +432,18 @@ public sealed class DiagnosticsTests : IDisposable
         var stoppedActivities = new List<Activity>();
         using var stopListener = new ActivityListener();
         stopListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
         stopListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
             ActivitySamplingResult.AllData;
+
         stopListener.ActivityStopped = a => stoppedActivities.Add(a);
         ActivitySource.AddActivityListener(stopListener);
 
         NBenchmarkDiagnostics.OnPhaseStarting("b", MeasurementPhase.Measurement);
+
         NBenchmarkDiagnostics.OnPhaseCompleted(
             "b", MeasurementPhase.Measurement,
-            sampleStop: SampleStopReason.WallClockCap);
+            SampleStopReason.WallClockCap);
 
         var phaseSpan = stoppedActivities.FirstOrDefault(a => a.DisplayName == "nbenchmark.phase.measurement");
         Assert.NotNull(phaseSpan);
@@ -420,15 +456,18 @@ public sealed class DiagnosticsTests : IDisposable
         var stoppedActivities = new List<Activity>();
         using var stopListener = new ActivityListener();
         stopListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
         stopListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
             ActivitySamplingResult.AllData;
+
         stopListener.ActivityStopped = a => stoppedActivities.Add(a);
         ActivitySource.AddActivityListener(stopListener);
 
         NBenchmarkDiagnostics.OnPhaseStarting("b", MeasurementPhase.Measurement);
+
         NBenchmarkDiagnostics.OnPhaseCompleted(
             "b", MeasurementPhase.Measurement,
-            sampleStop: SampleStopReason.ExplicitCount,
+            SampleStopReason.ExplicitCount,
             achievedCiWidth: 0.01,
             ciTarget: 0.025);
 
@@ -445,16 +484,19 @@ public sealed class DiagnosticsTests : IDisposable
 
         double capturedOpsPerSec = 0;
         using var captureListener = new MeterListener();
+
         captureListener.InstrumentPublished = (instrument, listener) =>
         {
             if (instrument.Meter.Name == "NBenchmark")
                 listener.EnableMeasurementEvents(instrument);
         };
+
         captureListener.SetMeasurementEventCallback<double>((instrument, value, _, _) =>
         {
             if (instrument.Name == "nbenchmark.ops_per_second")
                 capturedOpsPerSec = value;
         });
+
         captureListener.Start();
         captureListener.RecordObservableInstruments();
 
@@ -466,20 +508,29 @@ public sealed class DiagnosticsTests : IDisposable
     {
         long gen0 = 0, gen1 = 0, gen2 = 0;
         using var captureListener = new MeterListener();
+
         captureListener.InstrumentPublished = (instrument, listener) =>
         {
             if (instrument.Name is "nbenchmark.gc.gen0" or "nbenchmark.gc.gen1" or "nbenchmark.gc.gen2")
                 listener.EnableMeasurementEvents(instrument);
         };
+
         captureListener.SetMeasurementEventCallback<long>((instrument, value, _, _) =>
         {
             switch (instrument.Name)
             {
-                case "nbenchmark.gc.gen0": gen0 += value; break;
-                case "nbenchmark.gc.gen1": gen1 += value; break;
-                case "nbenchmark.gc.gen2": gen2 += value; break;
+                case "nbenchmark.gc.gen0":
+                    gen0 += value;
+                    break;
+                case "nbenchmark.gc.gen1":
+                    gen1 += value;
+                    break;
+                case "nbenchmark.gc.gen2":
+                    gen2 += value;
+                    break;
             }
         });
+
         captureListener.Start();
 
         var result = new BenchmarkResult
@@ -512,20 +563,29 @@ public sealed class DiagnosticsTests : IDisposable
         long gen0 = 0, gen1 = 0;
         var gen2Emitted = false;
         using var captureListener = new MeterListener();
+
         captureListener.InstrumentPublished = (instrument, listener) =>
         {
             if (instrument.Name is "nbenchmark.gc.gen0" or "nbenchmark.gc.gen1" or "nbenchmark.gc.gen2")
                 listener.EnableMeasurementEvents(instrument);
         };
+
         captureListener.SetMeasurementEventCallback<long>((instrument, value, _, _) =>
         {
             switch (instrument.Name)
             {
-                case "nbenchmark.gc.gen0": gen0 += value; break;
-                case "nbenchmark.gc.gen1": gen1 += value; break;
-                case "nbenchmark.gc.gen2": gen2Emitted = true; break;
+                case "nbenchmark.gc.gen0":
+                    gen0 += value;
+                    break;
+                case "nbenchmark.gc.gen1":
+                    gen1 += value;
+                    break;
+                case "nbenchmark.gc.gen2":
+                    gen2Emitted = true;
+                    break;
             }
         });
+
         captureListener.Start();
 
         var result = new BenchmarkResult
@@ -557,11 +617,13 @@ public sealed class DiagnosticsTests : IDisposable
     {
         long gen0 = 0;
         using var captureListener = new MeterListener();
+
         captureListener.InstrumentPublished = (instrument, listener) =>
         {
             if (instrument.Name == "nbenchmark.gc.gen0")
                 listener.EnableMeasurementEvents(instrument);
         };
+
         captureListener.SetMeasurementEventCallback<long>((_, value, _, _) => gen0 += value);
         captureListener.Start();
 

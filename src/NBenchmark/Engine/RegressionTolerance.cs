@@ -59,13 +59,13 @@ public static class RegressionTolerance
         var exceeds = measuredValue > effectiveThreshold;
 
         return new ToleranceVerdict(
-            MeasuredValue: measuredValue,
-            ConfiguredThreshold: configuredThreshold,
-            ToleranceMultiplier: toleranceMultiplier,
-            EffectiveThreshold: effectiveThreshold,
-            ExceedsThreshold: exceeds,
-            Excess: exceeds ? measuredValue - effectiveThreshold : 0,
-            Relaxed: toleranceMultiplier > 1.0);
+            measuredValue,
+            configuredThreshold,
+            toleranceMultiplier,
+            effectiveThreshold,
+            exceeds,
+            exceeds ? measuredValue - effectiveThreshold : 0,
+            toleranceMultiplier > 1.0);
     }
 
     /// <summary>

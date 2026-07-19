@@ -20,7 +20,7 @@ public class MeasurementEventTests
     [Fact]
     public void Sample_Constructor_Sets_Kind_And_SampleEvent()
     {
-        var sample = new SampleEvent("b", 5, 12.5, 4, 80L, Warmup: false);
+        var sample = new SampleEvent("b", 5, 12.5, 4, 80L, false);
         var ev = new MeasurementEvent(sample);
 
         Assert.Equal(MeasurementEvent.EventKind.Sample, ev.Kind);
@@ -109,9 +109,9 @@ public class MeasurementEventTests
         var ev = default(MeasurementEvent);
 
         Assert.Equal(MeasurementEvent.EventKind.Phase, ev.Kind);
-        Assert.Equal(default(MeasurementPhaseEvent), ev.PhaseEvent);
-        Assert.Equal(default(SampleEvent), ev.SampleEvent);
-        Assert.Equal(default(DetectorStateEvent), ev.DetectorStateEvent);
+        Assert.Equal(default, ev.PhaseEvent);
+        Assert.Equal(default, ev.SampleEvent);
+        Assert.Equal(default, ev.DetectorStateEvent);
         Assert.Null(ev.Result);
     }
 

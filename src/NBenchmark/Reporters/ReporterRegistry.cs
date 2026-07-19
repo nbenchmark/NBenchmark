@@ -193,8 +193,11 @@ public static class ReporterRegistry
         }
 
         var explicitNames = new HashSet<string>(explicitReporters.Count, StringComparer.OrdinalIgnoreCase);
+
         foreach (var reporter in explicitReporters)
+        {
             explicitNames.Add(reporter.Name);
+        }
 
         foreach (var autoReporter in CreateAutoAttachedReporters(detail, explicitNames))
         {

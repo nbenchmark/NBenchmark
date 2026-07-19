@@ -91,9 +91,11 @@ internal static class AdaptiveLoop
                 jitterMetric: jitterMetric, detectorSwitched: detectorSwitched);
 
             if (attached)
+            {
                 observer.OnPhase(new MeasurementPhaseEvent(
                     name, MeasurementPhase.Jitter, PhaseTransition.Completed,
-                    JitterMetric: jitterMetric, DetectorSwitched: detectorSwitched));
+                    jitterMetric, detectorSwitched));
+            }
         }
 
         // ----- Phase A: ops-per-sample calibration -----
@@ -133,12 +135,10 @@ internal static class AdaptiveLoop
                     accumulatedNs += elapsed;
                     calibrationSamples++;
 
-                    NBenchmarkDiagnostics.RecordSample(name, warmup: true, CalibrationPhaseTag, elapsed / probeK, -1);
+                    NBenchmarkDiagnostics.RecordSample(name, true, CalibrationPhaseTag, elapsed / probeK, -1);
 
                     if (attached)
-                    {
-                        observer.OnSample(new SampleEvent(name, calibrationOrdinal++, elapsed / probeK, probeK, 0, Warmup: true));
-                    }
+                        observer.OnSample(new SampleEvent(name, calibrationOrdinal++, elapsed / probeK, probeK, 0, true));
 
                     if (elapsed < best)
                         best = elapsed;
@@ -163,8 +163,10 @@ internal static class AdaptiveLoop
             NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Calibration, resolvedK: k);
 
             if (attached)
+            {
                 observer.OnPhase(new MeasurementPhaseEvent(
                     name, MeasurementPhase.Calibration, PhaseTransition.Completed, ResolvedK: k));
+            }
         }
 
         // ----- Phase B: warmup -----
@@ -212,13 +214,15 @@ internal static class AdaptiveLoop
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
 
-                NBenchmarkDiagnostics.RecordSample(name, warmup: true, WarmupPhaseTag, elapsed / k, -1);
+                NBenchmarkDiagnostics.RecordSample(name, true, WarmupPhaseTag, elapsed / k, -1);
 
                 if (attached)
                 {
                     var warmupPerOp = elapsed / k;
+
                     if (warmupOrdinal % warmupInterval == 0)
-                        observer.OnSample(new SampleEvent(name, warmupOrdinal, warmupPerOp, k, 0, Warmup: true));
+                        observer.OnSample(new SampleEvent(name, warmupOrdinal, warmupPerOp, k, 0, true));
+
                     warmupOrdinal++;
                 }
 
@@ -241,9 +245,11 @@ internal static class AdaptiveLoop
         NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Warmup, resolvedWarmup: resolvedWarmup, warmupStop: warmupStop);
 
         if (attached)
+        {
             observer.OnPhase(new MeasurementPhaseEvent(
                 name, MeasurementPhase.Warmup, PhaseTransition.Completed,
                 ResolvedWarmup: resolvedWarmup, WarmupStop: warmupStop));
+        }
 
         progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
 
@@ -307,13 +313,14 @@ internal static class AdaptiveLoop
                 diagnosticsList?.Add(diagDelta);
                 sampleCount++;
 
-                NBenchmarkDiagnostics.RecordSample(name, warmup: false, MeasurementPhaseTag, perOp, measureAllocations ? allocDelta / k : -1L);
+                NBenchmarkDiagnostics.RecordSample(name, false, MeasurementPhaseTag, perOp, measureAllocations ? allocDelta / k : -1L);
 
                 if (attached)
                 {
                     var allocPerOp = measureAllocations ? allocDelta / k : 0L;
+
                     if (sampleCount % progressInterval == 0)
-                        observer.OnSample(new SampleEvent(name, sampleCount - 1, perOp, k, allocPerOp, Warmup: false));
+                        observer.OnSample(new SampleEvent(name, sampleCount - 1, perOp, k, allocPerOp, false));
                 }
 
                 if (sampleCount % progressInterval == 0)
@@ -340,6 +347,7 @@ internal static class AdaptiveLoop
                         observer.OnDetector(new DetectorStateEvent(
                             name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
                             ci.AchievedRelativeHalfWidth, k));
+
                         detectorEmitted = true;
                     }
 
@@ -364,16 +372,18 @@ internal static class AdaptiveLoop
 
         NBenchmarkDiagnostics.OnPhaseCompleted(
             name, MeasurementPhase.Measurement,
-            sampleStop: sampleStop,
+            sampleStop,
             achievedCiWidth: ci?.AchievedRelativeHalfWidth,
             ciTarget: autoTune.CiTarget);
 
         if (attached)
         {
             if (ci is not null && !detectorEmitted)
+            {
                 observer.OnDetector(new DetectorStateEvent(
                     name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
                     ci.AchievedRelativeHalfWidth, k));
+            }
 
             observer.OnPhase(new MeasurementPhaseEvent(
                 name, MeasurementPhase.Measurement, PhaseTransition.Completed, SampleStop: sampleStop));
@@ -471,9 +481,11 @@ internal static class AdaptiveLoop
                 jitterMetric: jitterMetric, detectorSwitched: detectorSwitched);
 
             if (attached)
+            {
                 observer.OnPhase(new MeasurementPhaseEvent(
                     name, MeasurementPhase.Jitter, PhaseTransition.Completed,
-                    JitterMetric: jitterMetric, DetectorSwitched: detectorSwitched));
+                    jitterMetric, detectorSwitched));
+            }
         }
 
         // ----- Phase A: ops-per-sample calibration -----
@@ -515,10 +527,10 @@ internal static class AdaptiveLoop
                     accumulatedNs += elapsed;
                     calibrationSamples++;
 
-                    NBenchmarkDiagnostics.RecordSample(name, warmup: true, CalibrationPhaseTag, elapsed / probeK, -1);
+                    NBenchmarkDiagnostics.RecordSample(name, true, CalibrationPhaseTag, elapsed / probeK, -1);
 
                     if (attached)
-                        observer.OnSample(new SampleEvent(name, calibrationOrdinal++, elapsed / probeK, probeK, 0, Warmup: true));
+                        observer.OnSample(new SampleEvent(name, calibrationOrdinal++, elapsed / probeK, probeK, 0, true));
 
                     if (elapsed < best)
                         best = elapsed;
@@ -543,8 +555,10 @@ internal static class AdaptiveLoop
             NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Calibration, resolvedK: k);
 
             if (attached)
+            {
                 observer.OnPhase(new MeasurementPhaseEvent(
                     name, MeasurementPhase.Calibration, PhaseTransition.Completed, ResolvedK: k));
+            }
         }
 
         // ----- Phase B: warmup -----
@@ -592,13 +606,15 @@ internal static class AdaptiveLoop
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
 
-                NBenchmarkDiagnostics.RecordSample(name, warmup: true, WarmupPhaseTag, elapsed / k, -1);
+                NBenchmarkDiagnostics.RecordSample(name, true, WarmupPhaseTag, elapsed / k, -1);
 
                 if (attached)
                 {
                     var warmupPerOp = elapsed / k;
+
                     if (warmupOrdinal % warmupInterval == 0)
-                        observer.OnSample(new SampleEvent(name, warmupOrdinal, warmupPerOp, k, 0, Warmup: true));
+                        observer.OnSample(new SampleEvent(name, warmupOrdinal, warmupPerOp, k, 0, true));
+
                     warmupOrdinal++;
                 }
 
@@ -621,9 +637,11 @@ internal static class AdaptiveLoop
         NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Warmup, resolvedWarmup: resolvedWarmup, warmupStop: warmupStop);
 
         if (attached)
+        {
             observer.OnPhase(new MeasurementPhaseEvent(
                 name, MeasurementPhase.Warmup, PhaseTransition.Completed,
                 ResolvedWarmup: resolvedWarmup, WarmupStop: warmupStop));
+        }
 
         await progress.OnWarmupCompleted(name).ConfigureAwait(false);
 
@@ -690,13 +708,14 @@ internal static class AdaptiveLoop
                 diagnosticsList?.Add(diagDelta);
                 sampleCount++;
 
-                NBenchmarkDiagnostics.RecordSample(name, warmup: false, MeasurementPhaseTag, perOp, measureAllocations ? allocDelta / k : -1L);
+                NBenchmarkDiagnostics.RecordSample(name, false, MeasurementPhaseTag, perOp, measureAllocations ? allocDelta / k : -1L);
 
                 if (attached)
                 {
                     var allocPerOp = measureAllocations ? allocDelta / k : 0L;
+
                     if (sampleCount % progressInterval == 0)
-                        observer.OnSample(new SampleEvent(name, sampleCount - 1, perOp, k, allocPerOp, Warmup: false));
+                        observer.OnSample(new SampleEvent(name, sampleCount - 1, perOp, k, allocPerOp, false));
                 }
 
                 if (sampleCount % progressInterval == 0)
@@ -723,6 +742,7 @@ internal static class AdaptiveLoop
                         observer.OnDetector(new DetectorStateEvent(
                             name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
                             ci.AchievedRelativeHalfWidth, k));
+
                         detectorEmitted = true;
                     }
 
@@ -747,16 +767,18 @@ internal static class AdaptiveLoop
 
         NBenchmarkDiagnostics.OnPhaseCompleted(
             name, MeasurementPhase.Measurement,
-            sampleStop: sampleStop,
+            sampleStop,
             achievedCiWidth: ci?.AchievedRelativeHalfWidth,
             ciTarget: autoTune.CiTarget);
 
         if (attached)
         {
             if (ci is not null && !detectorEmitted)
+            {
                 observer.OnDetector(new DetectorStateEvent(
                     name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
                     ci.AchievedRelativeHalfWidth, k));
+            }
 
             observer.OnPhase(new MeasurementPhaseEvent(
                 name, MeasurementPhase.Measurement, PhaseTransition.Completed, SampleStop: sampleStop));
@@ -851,7 +873,7 @@ internal static class AdaptiveLoop
         // The effective detector is non-null only when the loop auto-switched it; the caller
         // (BenchmarkRunner) inspects this to build an effective options record for the stats
         // pipeline. When no switch happened, the caller uses the options' configured detector.
-        IOutlierDetector? effectiveDetector = detectorSwitched
+        var effectiveDetector = detectorSwitched
             ? OutlierDetectors.MedianAbsoluteDeviation
             : null;
 
@@ -874,13 +896,17 @@ internal static class AdaptiveLoop
     ///     fires only when all of the following hold:
     ///     <list type="bullet">
     ///         <item>The jitter metric is a finite, positive value (the probe produced usable data).</item>
-    ///         <item><see cref="AutoTuneOptions.JitterAutoSwitchThreshold" /> is positive (a non-positive
-    ///         value disables the auto-switch while keeping the probe).</item>
+    ///         <item>
+    ///             <see cref="AutoTuneOptions.JitterAutoSwitchThreshold" /> is positive (a non-positive
+    ///             value disables the auto-switch while keeping the probe).
+    ///         </item>
     ///         <item>The metric exceeds the threshold.</item>
     ///         <item>The user has not pinned a custom <see cref="MeasurementOptions.OutlierDetector" />.</item>
-    ///         <item>The configured <see cref="MeasurementOptions.OutlierMode" /> is the default
-    ///         <c>IqrFence</c> - switching from any other explicitly-chosen mode would override user
-    ///         intent.</item>
+    ///         <item>
+    ///             The configured <see cref="MeasurementOptions.OutlierMode" /> is the default
+    ///             <c>IqrFence</c> - switching from any other explicitly-chosen mode would override user
+    ///             intent.
+    ///         </item>
     ///     </list>
     /// </summary>
     private static bool ShouldSwitchDetector(MeasurementOptions o, AutoTuneOptions autoTune, double? jitterMetric)

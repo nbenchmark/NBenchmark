@@ -8,10 +8,7 @@ namespace NBenchmark.Integration.NUnit.Tests;
 public sealed class PerformanceCommandTests
 {
     [SetUp]
-    public void SetUp()
-    {
-        BenchmarkAssert.ResetHostAssessment();
-    }
+    public void SetUp() => BenchmarkAssert.ResetHostAssessment();
 
     [Test]
     public void ValidateResult_Fails_When_Benchmark_Errored()
@@ -242,10 +239,7 @@ public sealed class PerformanceCommandTests
 public sealed class PerformanceAssertIntegrationTests
 {
     [SetUp]
-    public void SetUp()
-    {
-        BenchmarkAssert.ResetHostAssessment();
-    }
+    public void SetUp() => BenchmarkAssert.ResetHostAssessment();
 
     [Test]
     public void PerformanceAssert_Run_Passes_When_Performance_Is_Within_Thresholds()

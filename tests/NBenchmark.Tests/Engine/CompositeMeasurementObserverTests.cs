@@ -21,7 +21,7 @@ public class CompositeMeasurementObserverTests
         var composite = new CompositeMeasurementObserver([a, b]);
 
         var phase = new MeasurementPhaseEvent("bench", MeasurementPhase.Measurement, PhaseTransition.Starting);
-        var sample = new SampleEvent("bench", 0, 100.0, 1, 0, Warmup: false);
+        var sample = new SampleEvent("bench", 0, 100.0, 1, 0, false);
         var detector = new DetectorStateEvent("bench", MeasurementPhase.Measurement, 1, 100.0, 0.0, 0.05, 1);
         var result = MakeResult("bench");
 
@@ -48,7 +48,7 @@ public class CompositeMeasurementObserverTests
         var throwing = new ThrowingObserver(new InvalidOperationException("boom"));
         var composite = new CompositeMeasurementObserver([throwing, healthy]);
 
-        var sample = new SampleEvent("bench", 0, 100.0, 1, 0, Warmup: false);
+        var sample = new SampleEvent("bench", 0, 100.0, 1, 0, false);
         var result = MakeResult("bench");
 
         // The throwing observer throws from OnSample and OnResult; the composite catches and
@@ -64,16 +64,18 @@ public class CompositeMeasurementObserverTests
     public void Isolation_Throwing_From_OnPhase_Does_Not_Stop_OnSample()
     {
         var healthy = new RecordingObserver();
+
         var throwing = new ThrowingObserver(new InvalidOperationException("phase boom"))
         {
             ThrowOnPhase = true,
             ThrowOnSample = false,
             ThrowOnResult = false,
         };
+
         var composite = new CompositeMeasurementObserver([throwing, healthy]);
 
         var phase = new MeasurementPhaseEvent("bench", MeasurementPhase.Warmup, PhaseTransition.Starting);
-        var sample = new SampleEvent("bench", 0, 50.0, 1, 0, Warmup: true);
+        var sample = new SampleEvent("bench", 0, 50.0, 1, 0, true);
 
         composite.OnPhase(in phase);
         composite.OnSample(in sample);
@@ -216,34 +218,39 @@ public class CompositeMeasurementObserverTests
     private sealed class ThrowingObserver : IMeasurementObserver
     {
         private readonly Exception _exception;
-        public bool ThrowOnPhase { get; set; }
-        public bool ThrowOnSample { get; set; } = true;
-        public bool ThrowOnDetector { get; set; }
-        public bool ThrowOnResult { get; set; } = true;
 
         public ThrowingObserver(Exception exception)
         {
             _exception = exception;
         }
 
+        public bool ThrowOnPhase { get; set; }
+        public bool ThrowOnSample { get; set; } = true;
+        public bool ThrowOnDetector { get; set; }
+        public bool ThrowOnResult { get; set; } = true;
+
         public void OnPhase(in MeasurementPhaseEvent e)
         {
-            if (ThrowOnPhase) throw _exception;
+            if (ThrowOnPhase)
+                throw _exception;
         }
 
         public void OnSample(in SampleEvent e)
         {
-            if (ThrowOnSample) throw _exception;
+            if (ThrowOnSample)
+                throw _exception;
         }
 
         public void OnDetector(in DetectorStateEvent e)
         {
-            if (ThrowOnDetector) throw _exception;
+            if (ThrowOnDetector)
+                throw _exception;
         }
 
         public void OnResult(BenchmarkResult result)
         {
-            if (ThrowOnResult) throw _exception;
+            if (ThrowOnResult)
+                throw _exception;
         }
     }
 }

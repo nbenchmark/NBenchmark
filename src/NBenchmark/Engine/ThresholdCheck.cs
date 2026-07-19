@@ -43,7 +43,7 @@ public static class ThresholdCheck
             return RegressionVerdict.None;
 
         var baseline = successful.FirstOrDefault(r => r.IsBaseline)
-                   ?? successful.MinBy(ComparisonMedian)!;
+                       ?? successful.MinBy(ComparisonMedian)!;
 
         var baselineMedian = ComparisonMedian(baseline);
 
@@ -82,7 +82,9 @@ public static class ThresholdCheck
 
                 if (candidateMedian > thresholdMedian)
                 {
-                    regressedCandidates.Add(new RegressionCandidate(result.Name, candidateMedian, baselineMedian, candidateMedian / baselineMedian, candidateMedian - baselineMedian));
+                    regressedCandidates.Add(new RegressionCandidate(result.Name, candidateMedian, baselineMedian, candidateMedian / baselineMedian,
+                        candidateMedian - baselineMedian));
+
                     regressedNames.Add(result.Name);
                 }
             }
@@ -94,7 +96,7 @@ public static class ThresholdCheck
         regressedNames.Sort(StringComparer.Ordinal);
 
         return new RegressionVerdict(
-            HasRegression: true,
+            true,
             baseline.Name,
             regressedCandidates,
             regressedNames);

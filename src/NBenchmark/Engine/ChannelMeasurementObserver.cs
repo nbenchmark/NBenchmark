@@ -39,6 +39,7 @@ public sealed class ChannelMeasurementObserver : IMeasurementObserver
             FullMode = BoundedChannelFullMode.DropOldest,
             SingleWriter = false,
         });
+
         _writer = _channel.Writer;
     }
 
@@ -49,20 +50,11 @@ public sealed class ChannelMeasurementObserver : IMeasurementObserver
     /// </summary>
     public ChannelReader<MeasurementEvent> Reader => _channel.Reader;
 
-    public void OnPhase(in MeasurementPhaseEvent e)
-    {
-        _writer.TryWrite(new MeasurementEvent(e));
-    }
+    public void OnPhase(in MeasurementPhaseEvent e) => _writer.TryWrite(new MeasurementEvent(e));
 
-    public void OnSample(in SampleEvent e)
-    {
-        _writer.TryWrite(new MeasurementEvent(e));
-    }
+    public void OnSample(in SampleEvent e) => _writer.TryWrite(new MeasurementEvent(e));
 
-    public void OnDetector(in DetectorStateEvent e)
-    {
-        _writer.TryWrite(new MeasurementEvent(e));
-    }
+    public void OnDetector(in DetectorStateEvent e) => _writer.TryWrite(new MeasurementEvent(e));
 
     public void OnResult(BenchmarkResult result)
     {
@@ -77,17 +69,6 @@ public sealed class ChannelMeasurementObserver : IMeasurementObserver
     }
 
     /// <summary>
-    ///     Signals that no more events will be written. Call this when the benchmark run
-    ///     completes so the reader pump can stop (the reader will see
-    ///     <see cref="ChannelReader{T}.Completion" /> complete after all buffered events
-    ///     are drained).
-    /// </summary>
-    public void Complete()
-    {
-        _writer.TryComplete();
-    }
-
-    /// <summary>
     ///     Completes the channel writer so a reader awaiting
     ///     <see cref="ChannelReader{T}.Completion" /> stops blocking after the buffered events
     ///     drain. The harness and suite wrap the resolved observer in a <c>using</c>, so this
@@ -96,8 +77,13 @@ public sealed class ChannelMeasurementObserver : IMeasurementObserver
     ///     unmanaged resources to release. Safe to call multiple times (subsequent
     ///     <see cref="ChannelWriter{T}.TryComplete" /> calls are no-ops).
     /// </summary>
-    public void Dispose()
-    {
-        _writer.TryComplete();
-    }
+    public void Dispose() => _writer.TryComplete();
+
+    /// <summary>
+    ///     Signals that no more events will be written. Call this when the benchmark run
+    ///     completes so the reader pump can stop (the reader will see
+    ///     <see cref="ChannelReader{T}.Completion" /> complete after all buffered events
+    ///     are drained).
+    /// </summary>
+    public void Complete() => _writer.TryComplete();
 }

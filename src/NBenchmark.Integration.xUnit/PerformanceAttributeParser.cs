@@ -118,7 +118,7 @@ internal static class PerformanceAttributeParser
         public double MaxP95Ns { get; init; } = -1;
         public long MaxAllocatedBytes { get; init; } = -1;
         public string? ReferenceMethod { get; init; }
-        public double MaxSlowdownRatio { get; init; } = 0;
+        public double MaxSlowdownRatio { get; init; }
         public int Iterations { get; init; }
         public int WarmupIterations { get; init; }
         public bool MeasureAllocations { get; init; }

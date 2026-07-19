@@ -329,8 +329,8 @@ public class ThresholdCheckTests
     {
         var results = new List<BenchmarkResult>
         {
-            MakeResult("baseline", median: 100, isBaseline: true),
-            MakeResult("slow", median: 150, isBaseline: false),
+            MakeResult("baseline", 100, true),
+            MakeResult("slow", 150, false),
         };
 
         var verdict = ThresholdCheck.Check(results, 10);
@@ -354,8 +354,8 @@ public class ThresholdCheckTests
     {
         var results = new List<BenchmarkResult>
         {
-            MakeResult("baseline", median: 100, isBaseline: true),
-            MakeResult("candidate", median: 105, isBaseline: false),
+            MakeResult("baseline", 100, true),
+            MakeResult("candidate", 105, false),
         };
 
         var verdict = ThresholdCheck.Check(results, 10);
@@ -371,9 +371,9 @@ public class ThresholdCheckTests
     {
         var results = new List<BenchmarkResult>
         {
-            MakeResult("baseline", median: 100, isBaseline: true),
-            MakeResult("zeta", median: 200, isBaseline: false),
-            MakeResult("alpha", median: 150, isBaseline: false),
+            MakeResult("baseline", 100, true),
+            MakeResult("zeta", 200, false),
+            MakeResult("alpha", 150, false),
         };
 
         var verdict = ThresholdCheck.Check(results, 10);
@@ -396,8 +396,8 @@ public class ThresholdCheckTests
     {
         var results = new List<BenchmarkResult>
         {
-            MakeResult("baseline", median: 0, isBaseline: true),
-            MakeResult("candidate", median: 100, isBaseline: false),
+            MakeResult("baseline", 0, true),
+            MakeResult("candidate", 100, false),
         };
 
         var verdict = ThresholdCheck.Check(results, 10);
@@ -413,8 +413,8 @@ public class ThresholdCheckTests
     {
         var results = new List<BenchmarkResult>
         {
-            MakeResult("slow", median: 200, isBaseline: false),
-            MakeResult("fast", median: 50, isBaseline: false),
+            MakeResult("slow", 200, false),
+            MakeResult("fast", 50, false),
         };
 
         var verdict = ThresholdCheck.Check(results, 10);
@@ -431,7 +431,7 @@ public class ThresholdCheckTests
     {
         var results = new List<BenchmarkResult>
         {
-            MakeResult("baseline", median: 100, isBaseline: true) with
+            MakeResult("baseline", 100, true) with
             {
                 LaunchStatistics = new LaunchStatistics
                 {
@@ -441,7 +441,7 @@ public class ThresholdCheckTests
                     LaunchMedian = 110,
                 },
             },
-            MakeResult("candidate", median: 105, isBaseline: false) with
+            MakeResult("candidate", 105, false) with
             {
                 LaunchStatistics = new LaunchStatistics
                 {
@@ -469,7 +469,7 @@ public class ThresholdCheckTests
     {
         var results = new List<BenchmarkResult>
         {
-            MakeResult("solo", median: 100, isBaseline: false),
+            MakeResult("solo", 100, false),
         };
 
         var verdict = ThresholdCheck.Check(results, 10);
@@ -483,8 +483,8 @@ public class ThresholdCheckTests
     {
         var results = new List<BenchmarkResult>
         {
-            MakeResult("baseline", median: 100, isBaseline: true),
-            MakeResult("slow", median: 150, isBaseline: false),
+            MakeResult("baseline", 100, true),
+            MakeResult("slow", 150, false),
         };
 
         Assert.Throws<ArgumentOutOfRangeException>(() => ThresholdCheck.Check(results, 0));

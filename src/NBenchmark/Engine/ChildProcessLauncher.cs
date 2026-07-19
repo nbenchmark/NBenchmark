@@ -34,6 +34,8 @@ internal static class ChildProcessLauncher
     /// </summary>
     internal const string OtelEndpointEnvVar = "NBENCHMARK_OTEL_ENDPOINT";
 
+    private const int StdoutTailLines = 20;
+
     /// <summary>
     ///     The OTel-standard env vars forwarded verbatim to children so the OpenTelemetry SDK
     ///     (when the user has wired one in their entry point) picks up the same exporter and
@@ -49,8 +51,6 @@ internal static class ChildProcessLauncher
         "OTEL_RESOURCE_ATTRIBUTES",
         "OTEL_SERVICE_NAME",
     ];
-
-    private const int StdoutTailLines = 20;
 
     internal static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -171,9 +171,7 @@ internal static class ChildProcessLauncher
 
         if (!string.IsNullOrEmpty(nbenchmarkEndpoint)
             && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
-        {
             psi.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"] = nbenchmarkEndpoint;
-        }
 
         foreach (var (name, value) in environmentVariables)
         {

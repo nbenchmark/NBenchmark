@@ -265,7 +265,7 @@ public sealed class BenchmarkRunner
                 ? (double)adaptive.ExceptionCount.Value / measuredOps
                 : null,
             CpuTimeNsPerOp = opts.CpuTime
-                ? (double)sumCpuTicks * 100.0 / measuredOps
+                ? sumCpuTicks * 100.0 / measuredOps
                 : null,
             CpuWallRatio = opts.CpuTime && adaptive.MeasuredDuration.Ticks > 0
                 ? (double)sumCpuTicks / adaptive.MeasuredDuration.Ticks

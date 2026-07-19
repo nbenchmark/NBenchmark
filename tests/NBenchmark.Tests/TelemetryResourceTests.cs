@@ -24,10 +24,13 @@ public class TelemetryResourceTests
         GitHubActions, GitHubRunId, GitHubSha, GitHubRef,
         GitLabCi, GitCommit, GitBranch,
         OtelResourceAttributes, OtelServiceName,
+
         // GitLab-specific vars used by the GitLab test.
         "CI_PIPELINE_ID", "CI_COMMIT_SHA", "CI_COMMIT_BRANCH", "CI_REPOSITORY_URL", "CI_JOB_URL", "CI_COMMIT_REF_NAME",
+
         // GitHub-specific vars used by the GitHub test.
         "GITHUB_RUN_ATTEMPT", "GITHUB_REPOSITORY", "GITHUB_SERVER_URL", "GITHUB_HEAD_REF",
+
         // Azure Pipelines / others.
         "AZURE_PIPELINES", "TF_BUILD", "BUILD_BUILDID", "BUILD_BUILDURI",
         "CIRCLECI", "CIRCLE_BUILD_NUM", "CIRCLE_BUILD_URL",
@@ -48,12 +51,7 @@ public class TelemetryResourceTests
     [Fact]
     public void Build_Reads_GitHub_Actions_RunId_And_Sha()
     {
-        using var _ = WithEnv(new[]
-        {
-            (GitHubActions, "true"),
-            (GitHubRunId, "1234567890"),
-            (GitHubSha, "abcdef1234567890"),
-        });
+        using var _ = WithEnv((GitHubActions, "true"), (GitHubRunId, "1234567890"), (GitHubSha, "abcdef1234567890"));
 
         var attrs = TelemetryResource.Build();
 
@@ -65,12 +63,7 @@ public class TelemetryResourceTests
     [Fact]
     public void Build_Reads_GitLab_PipelineId()
     {
-        using var _ = WithEnv(new[]
-        {
-            (GitLabCi, "true"),
-            ("CI_PIPELINE_ID", "567890"),
-            ("CI_COMMIT_SHA", "fedcba0987654321"),
-        });
+        using var _ = WithEnv((GitLabCi, "true"), ("CI_PIPELINE_ID", "567890"), ("CI_COMMIT_SHA", "fedcba0987654321"));
 
         var attrs = TelemetryResource.Build();
 
@@ -98,6 +91,7 @@ public class TelemetryResourceTests
         var attrs = TelemetryResource.Build();
 
         Assert.Equal(Environment.MachineName, attrs["nbenchmark.host.machine_name"]);
+
         // OS is one of "windows", "macos", "linux" - the exact value depends on the runner.
         Assert.Contains((string)attrs["nbenchmark.host.os"]!, new[] { "windows", "macos", "linux" });
         Assert.True(attrs.ContainsKey("nbenchmark.host.arch"));
@@ -107,10 +101,7 @@ public class TelemetryResourceTests
     [Fact]
     public void Build_Parses_OtelResourceAttributes_EnvVar()
     {
-        using var _ = WithEnv(new[]
-        {
-            (OtelResourceAttributes, "deployment.environment=production,service.version=1.2.3"),
-        });
+        using var _ = WithEnv((OtelResourceAttributes, "deployment.environment=production,service.version=1.2.3"));
 
         var attrs = TelemetryResource.Build();
 
@@ -121,10 +112,7 @@ public class TelemetryResourceTests
     [Fact]
     public void Build_OtelResourceAttributes_With_Malformed_Pair_Is_Skipped()
     {
-        using var _ = WithEnv(new[]
-        {
-            (OtelResourceAttributes, "valid=ok,missing-equals,bad=,also=good"),
-        });
+        using var _ = WithEnv((OtelResourceAttributes, "valid=ok,missing-equals,bad=,also=good"));
 
         var attrs = TelemetryResource.Build();
 
@@ -137,10 +125,7 @@ public class TelemetryResourceTests
     [Fact]
     public void Build_OtelServiceName_Sets_ServiceName()
     {
-        using var _ = WithEnv(new[]
-        {
-            (OtelServiceName, "my-benchmark-service"),
-        });
+        using var _ = WithEnv((OtelServiceName, "my-benchmark-service"));
 
         var attrs = TelemetryResource.Build();
 
@@ -150,11 +135,7 @@ public class TelemetryResourceTests
     [Fact]
     public void Build_GitCommit_EnvVar_Fallback_When_No_Ci_Sha_Present()
     {
-        using var _ = WithEnv(new[]
-        {
-            (GitCommit, "local-sha-123"),
-            (GitBranch, "feature-branch"),
-        });
+        using var _ = WithEnv((GitCommit, "local-sha-123"), (GitBranch, "feature-branch"));
 
         var attrs = TelemetryResource.Build();
 
@@ -165,12 +146,7 @@ public class TelemetryResourceTests
     [Fact]
     public void Build_GitHub_Sha_Takes_Precedence_Over_Git_Commit_EnvVar()
     {
-        using var _ = WithEnv(new[]
-        {
-            (GitHubActions, "true"),
-            (GitHubSha, "ci-sha"),
-            (GitCommit, "local-sha"),
-        });
+        using var _ = WithEnv((GitHubActions, "true"), (GitHubSha, "ci-sha"), (GitCommit, "local-sha"));
 
         var attrs = TelemetryResource.Build();
 
@@ -180,12 +156,10 @@ public class TelemetryResourceTests
     [Fact]
     public void Attributes_Is_Cached_Across_Calls()
     {
-        using var _ = WithEnv(new[]
-        {
-            (GitHubRunId, "cached-run-id"),
-        });
+        using var _ = WithEnv((GitHubRunId, "cached-run-id"));
 
         var first = TelemetryResource.Attributes;
+
         // Mutate the env after the first read. The cache should still hold the original value.
         Environment.SetEnvironmentVariable(GitHubRunId, "different-run-id");
         var second = TelemetryResource.Attributes;
@@ -197,10 +171,7 @@ public class TelemetryResourceTests
     [Fact]
     public void ResetForTesting_Clears_The_Cache()
     {
-        using var _ = WithEnv(new[]
-        {
-            (GitHubRunId, "first-run"),
-        });
+        using var _ = WithEnv((GitHubRunId, "first-run"));
 
         var first = TelemetryResource.Attributes;
         Assert.Equal("first-run", first["nbenchmark.ci_run_id"]);
@@ -222,15 +193,21 @@ public class TelemetryResourceTests
         var saved = new Dictionary<string, string?>();
 
         foreach (var name in ManagedEnvVars)
+        {
             saved[name] = Environment.GetEnvironmentVariable(name);
+        }
 
         // Clear every managed var so real CI env vars (e.g. GITHUB_ACTIONS on a GitHub runner)
         // do not leak into tests that set a different provider.
         foreach (var name in ManagedEnvVars)
+        {
             Environment.SetEnvironmentVariable(name, null);
+        }
 
         foreach (var (name, value) in vars)
+        {
             Environment.SetEnvironmentVariable(name, value);
+        }
 
         return new EnvScope(saved);
     }
@@ -246,12 +223,17 @@ public class TelemetryResourceTests
     {
         private readonly Dictionary<string, string?> _saved;
 
-        public EnvScope(Dictionary<string, string?> saved) => _saved = saved;
+        public EnvScope(Dictionary<string, string?> saved)
+        {
+            _saved = saved;
+        }
 
         public void Dispose()
         {
             foreach (var (name, value) in _saved)
+            {
                 Environment.SetEnvironmentVariable(name, value);
+            }
 
             // Reset the cache so a subsequent test in the same process re-reads the
             // (now-restored) environment.

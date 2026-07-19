@@ -3,7 +3,7 @@ namespace NBenchmark.Lifecycle;
 /// <summary>
 ///     Implemented by a benchmark class that uses <c>[InstanceLifetime(InstanceLifetime.PerClass)]</c>
 ///     to declare how its shared instance state is reset between <c>[Benchmark]</c> methods. When the
-    ///     harness detects that the benchmark class implements this interface, it invokes
+///     harness detects that the benchmark class implements this interface, it invokes
 ///     <see cref="ResetAsync" /> between benchmark methods (after one method completes and before the
 ///     next method's warmup phase) so each method observes a clean slate and the
 ///     statistical-independence assumption of the significance test is preserved.
@@ -23,5 +23,5 @@ public interface IStateReset
     ///     method's teardown and before the next method's warmup. The cancellation token is the
     ///     run-level token; implementations should forward it to any async work they await.
     /// </summary>
-    Task ResetAsync(CancellationToken cancellationToken);
+    public Task ResetAsync(CancellationToken cancellationToken);
 }

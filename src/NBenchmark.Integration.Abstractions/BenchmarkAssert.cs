@@ -39,13 +39,16 @@ public static class BenchmarkAssert
         var violations = new List<string>();
 
         var host = GetHostAssessment();
+
         var needsRelaxation = RegressionTolerance.NeedsRelaxation(
             result,
             host.IsSharedRunner,
             AutoTuneOptions.Default.JitterAutoSwitchThreshold);
+
         var configuredTolerance = thresholds.MaxAbsoluteThresholdTolerance > 0
             ? thresholds.MaxAbsoluteThresholdTolerance
             : 1.0;
+
         var toleranceMultiplier = needsRelaxation ? configuredTolerance : 1.0;
 
         if (thresholds.MaxMeanNs.HasValue)
@@ -103,6 +106,7 @@ public static class BenchmarkAssert
                 var effectiveMax = verdict.EffectiveThreshold >= long.MaxValue
                     ? long.MaxValue
                     : (long)verdict.EffectiveThreshold;
+
                 var message = $"Mean allocated bytes {result.MeanAllocatedBytes.Value} exceeds maximum " +
                               $"{thresholds.MaxAllocatedBytes.Value}";
 

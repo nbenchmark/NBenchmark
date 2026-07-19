@@ -43,7 +43,8 @@ public class ParametricHarnessIntegrationTests
     public async Task Filter_Matches_Argument_Values()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.Compute(n=100)", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
+            await BenchmarkHarness
+                .Create(["--filter", "ParametricHarnessBenchmarks.Compute(n=100)", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -58,7 +59,9 @@ public class ParametricHarnessIntegrationTests
     public async Task Filter_Matches_Named_Tuple_Values()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.Multiply(a=10, b=20)", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
+            await BenchmarkHarness.Create([
+                    "--filter", "ParametricHarnessBenchmarks.Multiply(a=10, b=20)", "--iterations", "5", "--warmup", "2", "--launch-count", "1",
+                ])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)

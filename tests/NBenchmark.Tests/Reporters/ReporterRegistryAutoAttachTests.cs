@@ -22,10 +22,7 @@ public class ReporterRegistryAutoAttachTests : IDisposable
     }
 
     [Fact]
-    public void AutoAttached_Starts_Empty_After_Reset()
-    {
-        Assert.Empty(ReporterRegistry.AutoAttached);
-    }
+    public void AutoAttached_Starts_Empty_After_Reset() => Assert.Empty(ReporterRegistry.AutoAttached);
 
     [Fact]
     public void RegisterAutoAttach_Throws_On_Duplicate_Name_Case_Insensitive()
@@ -59,8 +56,10 @@ public class ReporterRegistryAutoAttachTests : IDisposable
     {
         Assert.Throws<ArgumentNullException>(() =>
             ReporterRegistry.RegisterAutoAttach(null!, "d", (_, _) => new StubReporter()));
+
         Assert.Throws<ArgumentNullException>(() =>
             ReporterRegistry.RegisterAutoAttach("auto", null!, (_, _) => new StubReporter()));
+
         Assert.Throws<ArgumentNullException>(() =>
             ReporterRegistry.RegisterAutoAttach("auto", "d", null!));
     }
@@ -69,6 +68,7 @@ public class ReporterRegistryAutoAttachTests : IDisposable
     public void CreateAutoAttachedReporters_Returns_Fresh_Instances_Per_Call()
     {
         var factoryCallCount = 0;
+
         ReporterRegistry.RegisterAutoAttach(
             "auto",
             "auto",
@@ -90,7 +90,8 @@ public class ReporterRegistryAutoAttachTests : IDisposable
     [Fact]
     public void CreateAutoAttachedReporters_Passes_Detail_To_Factory()
     {
-        ReportDetail captured = ReportDetail.Simple;
+        var captured = ReportDetail.Simple;
+
         ReporterRegistry.RegisterAutoAttach(
             "auto",
             "auto",
@@ -200,6 +201,7 @@ public class ReporterRegistryAutoAttachTests : IDisposable
 
         Assert.DoesNotContain(ReporterRegistry.Available, r => r.Name == "explicit");
         Assert.Empty(ReporterRegistry.AutoAttached);
+
         // Seeds preserved
         Assert.Contains(ReporterRegistry.Available, r => r.Name == "json");
         Assert.Contains(ReporterRegistry.Available, r => r.Name == "markdown");

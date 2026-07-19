@@ -8,10 +8,7 @@ namespace NBenchmark.Integration.MSTest.Tests;
 public sealed class PerformanceTestMethodTests
 {
     [TestInitialize]
-    public void TestInitialize()
-    {
-        BenchmarkAssert.ResetHostAssessment();
-    }
+    public void TestInitialize() => BenchmarkAssert.ResetHostAssessment();
 
     [TestMethod]
     public void ValidateResult_Fails_When_Benchmark_Errored()

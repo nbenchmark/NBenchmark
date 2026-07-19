@@ -1,4 +1,3 @@
-using NBenchmark.Attributes;
 using NBenchmark.Reporters;
 using Xunit;
 
@@ -103,6 +102,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
     {
         var callCount = 0;
         var explicitInstance = new CountingAutoReporter("dedup", () => callCount++);
+
         // Register an auto-attached reporter with the same canonical name. The dedup contract:
         // when the user adds an explicit reporter instance whose Name matches an auto-attached
         // reporter, the auto-attached one is skipped (not double-fired). This mirrors the case
@@ -129,6 +129,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
     {
         var callCount = 0;
         var observedResultCounts = new List<int>();
+
         var capturing = new CountingAutoReporter(
             "capture",
             () => callCount++,
@@ -148,6 +149,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
         // Fires once with the post-aggregation list (not per launch).
         Assert.Equal(1, callCount);
         Assert.Single(observedResultCounts);
+
         // TestBenchmarks has two methods; the aggregated list should have exactly 2 entries.
         Assert.Equal(2, observedResultCounts[0]);
     }
@@ -157,10 +159,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
     {
         ReporterRegistry.RegisterAutoAttach("studio", "Studio inbox", (_, _) => new CountingAutoReporter("studio", () => { }));
 
-        var stdout = CaptureConsoleOutput(() =>
-        {
-            BenchmarkHarness.Create(["--help"]).RunAsync().GetAwaiter().GetResult();
-        });
+        var stdout = CaptureConsoleOutput(() => { BenchmarkHarness.Create(["--help"]).RunAsync().GetAwaiter().GetResult(); });
 
         Assert.Contains("auto-attached: studio", stdout);
     }
@@ -169,10 +168,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
     public void Help_Output_Omits_AutoAttached_Section_When_None_Registered()
     {
         // After Reset() in the ctor, AutoAttached is empty.
-        var stdout = CaptureConsoleOutput(() =>
-        {
-            BenchmarkHarness.Create(["--help"]).RunAsync().GetAwaiter().GetResult();
-        });
+        var stdout = CaptureConsoleOutput(() => { BenchmarkHarness.Create(["--help"]).RunAsync().GetAwaiter().GetResult(); });
 
         Assert.DoesNotContain("auto-attached:", stdout);
     }

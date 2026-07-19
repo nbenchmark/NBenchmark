@@ -139,7 +139,7 @@ public static class ObserverRegistry
         lock (_lock)
         {
             entry = _entries.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase))
-                ?? _autoAttachEntries.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
+                    ?? _autoAttachEntries.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
         }
 
         if (entry is not null)
@@ -270,6 +270,7 @@ public static class ObserverRegistry
             _autoAttachEntries = new List<Entry>(_autoAttachInitialState);
             _availableCache = null;
             _autoAttachedCache = null;
+
             // Re-arm the extension-load latch so a test that triggered EnsureExtensionsLoaded
             // can be re-run from a clean slate. Without this the latch stays set for the whole
             // process and the registry cannot be re-tested once any test has read Available /

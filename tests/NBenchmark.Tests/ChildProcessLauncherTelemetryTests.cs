@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using NBenchmark.Engine;
 using Xunit;
 
@@ -6,6 +5,9 @@ namespace NBenchmark.Tests;
 
 public class ChildProcessLauncherTelemetryTests
 {
+    // The NBenchmark-specific endpoint env var.
+    private const string NbenchmarkEndpointEnvVar = "NBENCHMARK_OTEL_ENDPOINT";
+
     // The OTel-standard env vars the launcher forwards from parent to child. Mirrored from
     // ChildProcessLauncher.OtelStandardEnvVars so the test stays close to the contract.
     private static readonly string[] OtelEnvVars =
@@ -15,9 +17,6 @@ public class ChildProcessLauncherTelemetryTests
         "OTEL_RESOURCE_ATTRIBUTES",
         "OTEL_SERVICE_NAME",
     ];
-
-    // The NBenchmark-specific endpoint env var.
-    private const string NbenchmarkEndpointEnvVar = "NBENCHMARK_OTEL_ENDPOINT";
 
     private static readonly string[] ManagedEnvVars =
     [
@@ -30,7 +29,7 @@ public class ChildProcessLauncherTelemetryTests
     [Fact]
     public void BuildStartInfo_Forwards_OtelExporterEndpoint_To_Child()
     {
-        using var _ = WithEnv([("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4317")]);
+        using var _ = WithEnv(("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4317"));
 
         var psi = ChildProcessLauncher.BuildStartInfo();
 
@@ -40,7 +39,7 @@ public class ChildProcessLauncherTelemetryTests
     [Fact]
     public void BuildStartInfo_Forwards_OtelResourceAttributes_To_Child()
     {
-        using var _ = WithEnv([("OTEL_RESOURCE_ATTRIBUTES", "deployment.environment=ci")]);
+        using var _ = WithEnv(("OTEL_RESOURCE_ATTRIBUTES", "deployment.environment=ci"));
 
         var psi = ChildProcessLauncher.BuildStartInfo();
 
@@ -50,7 +49,7 @@ public class ChildProcessLauncherTelemetryTests
     [Fact]
     public void BuildStartInfo_Forwards_OtelServiceName_To_Child()
     {
-        using var _ = WithEnv([("OTEL_SERVICE_NAME", "nbench-ci")]);
+        using var _ = WithEnv(("OTEL_SERVICE_NAME", "nbench-ci"));
 
         var psi = ChildProcessLauncher.BuildStartInfo();
 
@@ -62,7 +61,7 @@ public class ChildProcessLauncherTelemetryTests
     {
         // The NBenchmark-specific endpoint is mirrored into the OTel-standard var so an SDK
         // wired only against OTEL_EXPORTER_OTLP_ENDPOINT still picks it up.
-        using var _ = WithEnv([(NbenchmarkEndpointEnvVar, "http://mirror-target:4318")]);
+        using var _ = WithEnv((NbenchmarkEndpointEnvVar, "http://mirror-target:4318"));
 
         var psi = ChildProcessLauncher.BuildStartInfo();
 
@@ -76,10 +75,7 @@ public class ChildProcessLauncherTelemetryTests
         // When the user has set OTEL_EXPORTER_OTLP_ENDPOINT explicitly, the NBenchmark-specific
         // endpoint does not override it. The standard var wins so a user who configured the SDK
         // directly is not surprised.
-        using var _ = WithEnv([
-            ("OTEL_EXPORTER_OTLP_ENDPOINT", "http://explicit:4317"),
-            (NbenchmarkEndpointEnvVar, "http://mirror:4318"),
-        ]);
+        using var _ = WithEnv(("OTEL_EXPORTER_OTLP_ENDPOINT", "http://explicit:4317"), (NbenchmarkEndpointEnvVar, "http://mirror:4318"));
 
         var psi = ChildProcessLauncher.BuildStartInfo();
 
@@ -89,7 +85,7 @@ public class ChildProcessLauncherTelemetryTests
     [Fact]
     public void BuildStartInfo_Caller_Supplied_Vars_Win_Over_Inherited_Otel_Vars()
     {
-        using var _ = WithEnv([("OTEL_EXPORTER_OTLP_ENDPOINT", "http://inherited:4317")]);
+        using var _ = WithEnv(("OTEL_EXPORTER_OTLP_ENDPOINT", "http://inherited:4317"));
 
         var psi = ChildProcessLauncher.BuildStartInfo(
             ("OTEL_EXPORTER_OTLP_ENDPOINT", "http://overridden:4318"));
@@ -100,11 +96,12 @@ public class ChildProcessLauncherTelemetryTests
     [Fact]
     public void BuildStartInfo_WithEntryAssembly_Forwards_Otel_Vars_To_Child()
     {
-        using var _ = WithEnv([("OTEL_EXPORTER_OTLP_ENDPOINT", "http://cross-runtime:4317")]);
+        using var _ = WithEnv(("OTEL_EXPORTER_OTLP_ENDPOINT", "http://cross-runtime:4317"));
 
         var psi = ChildProcessLauncher.BuildStartInfo("/path/to/child.dll");
 
         Assert.Equal("http://cross-runtime:4317", psi.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+
         // The cross-runtime overload uses `dotnet exec <assembly>`.
         Assert.Equal("dotnet", psi.FileName);
         Assert.Equal("exec", psi.ArgumentList[0]);
@@ -119,7 +116,9 @@ public class ChildProcessLauncherTelemetryTests
         var psi = ChildProcessLauncher.BuildStartInfo();
 
         foreach (var name in OtelEnvVars)
+        {
             Assert.False(psi.Environment.ContainsKey(name), $"{name} should not be set when the parent has no OTel env vars");
+        }
     }
 
     private static IDisposable WithEnv(IEnumerable<(string Name, string? Value)> vars)
@@ -127,10 +126,14 @@ public class ChildProcessLauncherTelemetryTests
         var saved = new Dictionary<string, string?>();
 
         foreach (var name in ManagedEnvVars)
+        {
             saved[name] = Environment.GetEnvironmentVariable(name);
+        }
 
         foreach (var (name, value) in vars)
+        {
             Environment.SetEnvironmentVariable(name, value);
+        }
 
         return new EnvScope(saved);
     }
@@ -146,12 +149,17 @@ public class ChildProcessLauncherTelemetryTests
     {
         private readonly Dictionary<string, string?> _saved;
 
-        public EnvScope(Dictionary<string, string?> saved) => _saved = saved;
+        public EnvScope(Dictionary<string, string?> saved)
+        {
+            _saved = saved;
+        }
 
         public void Dispose()
         {
             foreach (var (name, value) in _saved)
+            {
                 Environment.SetEnvironmentVariable(name, value);
+            }
         }
     }
 }

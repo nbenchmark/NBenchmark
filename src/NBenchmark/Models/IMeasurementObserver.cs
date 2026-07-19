@@ -36,38 +36,7 @@ public interface IMeasurementObserver : IDisposable
     ///     <c>null</c> so existing implementations that do not declare a name continue to
     ///     compile and run unchanged.
     /// </summary>
-    string? Name => null;
-
-    /// <summary>
-    ///     Reports a phase transition (jitter, calibration, warmup, measurement, suite-completed)
-    ///     - starting or completed - with the phase's resolved outcome where applicable
-    ///     (jitter metric, resolved K, warmup stop reason, sample stop reason, success flag).
-    /// </summary>
-    void OnPhase(in MeasurementPhaseEvent e);
-
-    /// <summary>
-    ///     Reports one timed sample. Called between samples, after the per-op nanoseconds are
-    ///     computed and before the next body invocation - outside the timed region. The
-    ///     <see cref="SampleEvent.Warmup" /> flag distinguishes calibration/warmup samples from
-    ///     measured samples so a consumer can plot the warmup-settling curve live.
-    /// </summary>
-    void OnSample(in SampleEvent e);
-
-    /// <summary>
-    ///     Reports a snapshot of the running detector state: running mean, sample standard
-    ///     deviation, confidence-interval half-width, sample count, and current ops-per-sample
-    ///     (<c>K</c>). Emitted after a detector update so a consumer can plot the autotune
-    ///     convergence curve live.
-    /// </summary>
-    void OnDetector(in DetectorStateEvent e);
-
-    /// <summary>
-    ///     Reports the post-trim summary result for one benchmark, mirroring
-    ///     <see cref="IBenchmarkProgress.OnBenchmarkCompleted" />. Fires after the runner builds
-    ///     the <see cref="BenchmarkResult" /> - for success, dry-run, and errored outcomes - so a
-    ///     consumer sees every benchmark in the run.
-    /// </summary>
-    void OnResult(BenchmarkResult result);
+    public string? Name => null;
 
     /// <summary>
     ///     Disposes resources held by this observer. The default implementation is a no-op so
@@ -77,7 +46,40 @@ public interface IMeasurementObserver : IDisposable
     ///     override this MUST guard against double-dispose (the <c>using</c> may run after an
     ///     explicit <c>Dispose</c> call from a test or a user).
     /// </summary>
-    void IDisposable.Dispose() { }
+    void IDisposable.Dispose()
+    {
+    }
+
+    /// <summary>
+    ///     Reports a phase transition (jitter, calibration, warmup, measurement, suite-completed)
+    ///     - starting or completed - with the phase's resolved outcome where applicable
+    ///     (jitter metric, resolved K, warmup stop reason, sample stop reason, success flag).
+    /// </summary>
+    public void OnPhase(in MeasurementPhaseEvent e);
+
+    /// <summary>
+    ///     Reports one timed sample. Called between samples, after the per-op nanoseconds are
+    ///     computed and before the next body invocation - outside the timed region. The
+    ///     <see cref="SampleEvent.Warmup" /> flag distinguishes calibration/warmup samples from
+    ///     measured samples so a consumer can plot the warmup-settling curve live.
+    /// </summary>
+    public void OnSample(in SampleEvent e);
+
+    /// <summary>
+    ///     Reports a snapshot of the running detector state: running mean, sample standard
+    ///     deviation, confidence-interval half-width, sample count, and current ops-per-sample
+    ///     (<c>K</c>). Emitted after a detector update so a consumer can plot the autotune
+    ///     convergence curve live.
+    /// </summary>
+    public void OnDetector(in DetectorStateEvent e);
+
+    /// <summary>
+    ///     Reports the post-trim summary result for one benchmark, mirroring
+    ///     <see cref="IBenchmarkProgress.OnBenchmarkCompleted" />. Fires after the runner builds
+    ///     the <see cref="BenchmarkResult" /> - for success, dry-run, and errored outcomes - so a
+    ///     consumer sees every benchmark in the run.
+    /// </summary>
+    public void OnResult(BenchmarkResult result);
 }
 
 /// <summary>

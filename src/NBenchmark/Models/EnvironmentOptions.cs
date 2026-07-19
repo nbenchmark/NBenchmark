@@ -16,6 +16,8 @@ namespace NBenchmark;
 /// </summary>
 public record EnvironmentOptions
 {
+    public static readonly EnvironmentOptions Default = new();
+
     /// <summary>
     ///     The set of CPU cores the benchmark process is pinned to (processor affinity).
     ///     Core indices are zero-based and logical (as reported by the OS); out-of-range
@@ -51,8 +53,6 @@ public record EnvironmentOptions
     /// </summary>
     public bool DedicatedHostGuidance { get; init; }
 
-    public static readonly EnvironmentOptions Default = new();
-
     /// <summary>
     ///     Parses a comma-separated list of non-negative integers (e.g. <c>"0"</c> or
     ///     <c>"2,3"</c>) into an affinity list. Whitespace is tolerated. Returns
@@ -80,8 +80,10 @@ public record EnvironmentOptions
                 throw new FormatException($"'{parts[i]}' is not a valid non-negative CPU index.");
 
             if (idx >= coreCount)
+            {
                 throw new FormatException(
                     $"CPU index {idx} is out of range for this host (0..{coreCount - 1}).");
+            }
 
             result[i] = idx;
         }

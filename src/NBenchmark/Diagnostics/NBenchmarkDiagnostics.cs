@@ -35,10 +35,10 @@ namespace NBenchmark.Diagnostics;
 internal static class NBenchmarkDiagnostics
 {
     /// <summary>The <see cref="ActivitySource" /> for NBenchmark spans. Use this to attach an <see cref="ActivityListener" />.</summary>
-    public static ActivitySource ActivitySource { get; } = new("NBenchmark");
+    private static ActivitySource ActivitySource { get; } = new("NBenchmark");
 
     /// <summary>The <see cref="Meter" /> for NBenchmark instruments. Use this to attach a <see cref="MeterListener" />.</summary>
-    public static Meter Meter { get; } = new("NBenchmark");
+    private static Meter Meter { get; } = new("NBenchmark");
 
     private static readonly Histogram<double> HSampleDuration =
         Meter.CreateHistogram<double>("nbenchmark.sample.duration", "ns/op", "Per-op sample duration in nanoseconds");
@@ -125,8 +125,10 @@ internal static class NBenchmarkDiagnostics
         };
 
         HSampleDuration.Record(perOpNs, tags);
+
         if (allocDelta >= 0)
             HAllocBytes.Record(allocDelta, tags);
+
         _sampleCount++;
     }
 
@@ -137,10 +139,7 @@ internal static class NBenchmarkDiagnostics
         _opsPerSecond = mean > 0 ? 1e9 / mean : 0;
     }
 
-    internal static void RecordJitterMetric(double metric)
-    {
-        _jitterMetric = metric;
-    }
+    internal static void RecordJitterMetric(double metric) => _jitterMetric = metric;
 
     internal static void RecordOutliersRemoved(long count)
     {
@@ -163,29 +162,30 @@ internal static class NBenchmarkDiagnostics
         _sampleCount = 0;
     }
 
-    internal static void RecordJitterSwitch()
-    {
-        CJitterSwitches.Add(1);
-    }
+    internal static void RecordJitterSwitch() => CJitterSwitches.Add(1);
 
-    internal static void OnSuiteStarting(string suiteName, int benchmarkCount, string? profile = null, string? runtime = null, int? seed = null, string? runOrder = null)
+    internal static void OnSuiteStarting(string suiteName, int benchmarkCount, string? profile = null, string? runtime = null, int? seed = null,
+        string? runOrder = null)
     {
         _currentSuiteActivity?.Dispose();
 
         var activity = ActivitySource.StartActivity(
-            "benchmark.suite",
-            ActivityKind.Internal);
+            "benchmark.suite");
 
         if (activity is not null)
         {
             activity.SetTag("nbenchmark.suite.name", suiteName);
             activity.SetTag("nbenchmark.suite.benchmark_count", benchmarkCount);
+
             if (profile is not null)
                 activity.SetTag("nbenchmark.profile", profile);
+
             if (runtime is not null)
                 activity.SetTag("nbenchmark.runtime", runtime);
+
             if (seed.HasValue)
                 activity.SetTag("nbenchmark.seed", seed.Value);
+
             if (runOrder is not null)
                 activity.SetTag("nbenchmark.run_order", runOrder);
 
@@ -218,17 +218,19 @@ internal static class NBenchmarkDiagnostics
         _currentRunActivity?.Dispose();
 
         var activity = ActivitySource.StartActivity(
-            "benchmark.run",
-            ActivityKind.Internal);
+            "benchmark.run");
 
         if (activity is not null)
         {
             activity.SetTag("nbenchmark.name", benchmarkName);
             activity.SetTag("nbenchmark.class", className);
+
             if (isBaseline)
                 activity.SetTag("nbenchmark.baseline", true);
+
             if (parameters is { Count: > 0 })
                 activity.SetTag("nbenchmark.parameter_set", string.Join(",", parameters.Select(p => $"{p.Name}={p.Value}")));
+
             _currentRunActivity = activity;
         }
     }
@@ -254,8 +256,7 @@ internal static class NBenchmarkDiagnostics
         _currentActivity?.Dispose();
 
         var activity = ActivitySource.StartActivity(
-            $"nbenchmark.phase.{phase.ToString().ToLowerInvariant()}",
-            ActivityKind.Internal);
+            $"nbenchmark.phase.{phase.ToString().ToLowerInvariant()}");
 
         if (activity is not null)
         {
@@ -288,14 +289,19 @@ internal static class NBenchmarkDiagnostics
 
         if (sampleStop.HasValue)
             activity.SetTag("nbenchmark.sample_stop_reason", sampleStop.Value.ToString());
+
         if (warmupStop.HasValue)
             activity.SetTag("nbenchmark.warmup_stop_reason", warmupStop.Value.ToString());
+
         if (resolvedK > 0)
             activity.SetTag("nbenchmark.resolved_k", resolvedK);
+
         if (resolvedWarmup > 0)
             activity.SetTag("nbenchmark.resolved_warmup", resolvedWarmup);
+
         if (jitterMetric.HasValue)
             activity.SetTag("nbenchmark.jitter_metric", jitterMetric.Value);
+
         if (detectorSwitched.HasValue)
             activity.SetTag("nbenchmark.detector_switched", detectorSwitched.Value);
 
@@ -303,22 +309,26 @@ internal static class NBenchmarkDiagnostics
         // A trace UI renders these as markers on the flame-graph row, making the autotune
         // decision visible at a glance.
         if (detectorSwitched is true)
+        {
             activity.AddEvent(new ActivityEvent("detector.switched", tags: new ActivityTagsCollection
             {
                 { "nbenchmark.from", "IqrFence" },
                 { "nbenchmark.to", "MedianAbsoluteDeviation" },
                 { "nbenchmark.jitter_metric", jitterMetric ?? 0 },
             }));
+        }
 
         if (warmupStop == WarmupStopReason.Settled)
             activity.AddEvent(new ActivityEvent("warmup.plateau_reached"));
 
         if (sampleStop == SampleStopReason.CiTargetMet && achievedCiWidth.HasValue && ciTarget.HasValue)
+        {
             activity.AddEvent(new ActivityEvent("measurement.ci_target_met", tags: new ActivityTagsCollection
             {
                 { "nbenchmark.achieved_ci_width", achievedCiWidth.Value },
                 { "nbenchmark.ci_target", ciTarget.Value },
             }));
+        }
 
         if (sampleStop == SampleStopReason.WallClockCap || warmupStop == WarmupStopReason.WallClockCap)
             activity.AddEvent(new ActivityEvent("phase.cap_hit"));
@@ -342,8 +352,10 @@ internal static class NBenchmarkDiagnostics
 
             if (diag.Gen0Collections is { } gen0 && gen0 > 0)
                 CGcGen0.Add(gen0, tags);
+
             if (diag.Gen1Collections is { } gen1 && gen1 > 0)
                 CGcGen1.Add(gen1, tags);
+
             if (diag.Gen2Collections is { } gen2 && gen2 > 0)
                 CGcGen2.Add(gen2, tags);
         }

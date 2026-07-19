@@ -1,5 +1,4 @@
 using NBenchmark.Engine;
-using NBenchmark.Engine.Detectors;
 using Xunit;
 
 namespace NBenchmark.Tests.Engine;
@@ -60,7 +59,7 @@ public class MeasurementObserverTests
         Assert.Single(
             observer.Phases,
             e => e.Phase == MeasurementPhase.Warmup && e.Transition == PhaseTransition.Starting
-                && e.WarmupStop is null);
+                                                    && e.WarmupStop is null);
 
         var warmupCompleted = Assert.Single(
             observer.Phases,
@@ -72,7 +71,7 @@ public class MeasurementObserverTests
         Assert.Single(
             observer.Phases,
             e => e.Phase == MeasurementPhase.Measurement && e.Transition == PhaseTransition.Starting
-                && e.SampleStop is null);
+                                                         && e.SampleStop is null);
 
         var measurementCompleted = Assert.Single(
             observer.Phases,
@@ -229,6 +228,7 @@ public class MeasurementObserverTests
             Iterations = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
+
             // Default AutoTune has EnableJitterCalibration = true.
         };
 
@@ -269,6 +269,7 @@ public class MeasurementObserverTests
         var clock = new ScriptedClock(1000.0);
 
         var observer = new RecordingObserver();
+
         // Use the runner path (not AdaptiveLoop.Run directly) so OnResult fires - it's emitted by
         // BenchmarkRunner, not the loop. Inject the scripted clock via the internal runner ctor.
         var runner = new BenchmarkRunner(clock);

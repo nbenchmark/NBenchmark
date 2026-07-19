@@ -22,10 +22,7 @@ public class ObserverRegistryAutoAttachTests : IDisposable
     }
 
     [Fact]
-    public void AutoAttached_Starts_Empty_After_Reset()
-    {
-        Assert.Empty(ObserverRegistry.AutoAttached);
-    }
+    public void AutoAttached_Starts_Empty_After_Reset() => Assert.Empty(ObserverRegistry.AutoAttached);
 
     [Fact]
     public void RegisterAutoAttach_Throws_On_Duplicate_Name_Case_Insensitive()
@@ -59,8 +56,10 @@ public class ObserverRegistryAutoAttachTests : IDisposable
     {
         Assert.Throws<ArgumentNullException>(() =>
             ObserverRegistry.RegisterAutoAttach(null!, "d", () => new StubObserver("x")));
+
         Assert.Throws<ArgumentNullException>(() =>
             ObserverRegistry.RegisterAutoAttach("auto", null!, () => new StubObserver("x")));
+
         Assert.Throws<ArgumentNullException>(() =>
             ObserverRegistry.RegisterAutoAttach("auto", "d", null!));
     }
@@ -69,6 +68,7 @@ public class ObserverRegistryAutoAttachTests : IDisposable
     public void CreateAutoAttachedObservers_Returns_Fresh_Instances_Per_Call()
     {
         var factoryCallCount = 0;
+
         ObserverRegistry.RegisterAutoAttach(
             "auto",
             "auto",

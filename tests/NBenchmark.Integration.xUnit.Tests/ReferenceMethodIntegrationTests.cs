@@ -1,4 +1,3 @@
-using NBenchmark.Integration.Abstractions;
 using Xunit;
 
 namespace NBenchmark.Integration.xUnit.Tests;
@@ -9,6 +8,7 @@ public sealed class ReferenceMethodIntegrationTests
     public void ReferenceMethod_Resolves_Private_Method()
     {
         var data = PerformanceTestData.FromThresholds(new PerformanceFactAttribute { MaxSlowdownRatio = 1.5 });
+
         var result = PerformanceTestCase.ValidateResult(
             CreateOkResult("Test.PrivateRef"),
             CreateSamples(100, 50),
@@ -23,6 +23,7 @@ public sealed class ReferenceMethodIntegrationTests
     public void ReferenceMethod_With_Async_Returning_Method_Passes()
     {
         var data = PerformanceTestData.FromThresholds(new PerformanceFactAttribute { MaxSlowdownRatio = 1.5 });
+
         var result = PerformanceTestCase.ValidateResult(
             CreateOkResult("Test.AsyncRef"),
             CreateSamples(100, 50),
@@ -37,6 +38,7 @@ public sealed class ReferenceMethodIntegrationTests
     public void ReferenceMethod_Regression_Fails_When_Candidate_Much_Slower()
     {
         var data = PerformanceTestData.FromThresholds(new PerformanceFactAttribute { MaxSlowdownRatio = 1.2 });
+
         var violations = PerformanceTestCase.ValidateResult(
             CreateOkResultWithMean("Test.SlowCandidate", 600),
             CreateSamples(600, 100),
@@ -52,6 +54,7 @@ public sealed class ReferenceMethodIntegrationTests
     public void ReferenceMethod_Void_Reference_Passes()
     {
         var data = PerformanceTestData.FromThresholds(new PerformanceFactAttribute { MaxSlowdownRatio = 1.5 });
+
         var result = PerformanceTestCase.ValidateResult(
             CreateOkResult("Test.VoidRef"),
             CreateSamples(100, 50),
@@ -91,8 +94,12 @@ public sealed class ReferenceMethodIntegrationTests
     private static double[] CreateSamples(double mean, int count)
     {
         var samples = new double[count];
+
         for (var i = 0; i < count; i++)
+        {
             samples[i] = mean + (i % 10 - 5) * 0.05 * mean;
+        }
+
         return samples;
     }
 }

@@ -67,13 +67,14 @@ public static class RelativeComparison
         var violations = new List<string>();
 
         if (candidateResult.Errored)
-            return new RelativeComparisonVerdict([], double.NaN, double.NaN, double.NaN, IsRegression: false);
+            return new RelativeComparisonVerdict([], double.NaN, double.NaN, double.NaN, false);
 
         if (referenceResult.Errored)
         {
             violations.Add(
                 $"Reference method '{referenceResult.Name}' errored: {referenceResult.ErrorMessage}; cannot compare.");
-            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, IsRegression: false);
+
+            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false);
         }
 
         if (candidateSamples is null || candidateSamples.Length == 0)
@@ -81,7 +82,8 @@ public static class RelativeComparison
             violations.Add(
                 "Current run produced no raw samples; cannot run significance test. " +
                 "Ensure the benchmark completed successfully with measurement iterations > 0.");
-            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, IsRegression: false);
+
+            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false);
         }
 
         if (referenceSamples is null || referenceSamples.Length == 0)
@@ -89,7 +91,8 @@ public static class RelativeComparison
             violations.Add(
                 "Reference produced no raw samples; cannot run significance test. " +
                 "Ensure the reference benchmark completed successfully.");
-            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, IsRegression: false);
+
+            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false);
         }
 
         if (referenceResult.Mean <= 0)
@@ -100,7 +103,7 @@ public static class RelativeComparison
                     $"Regression detected: mean {candidateResult.Mean:F2} ns exceeds non-positive reference {referenceResult.Mean:F2} ns.");
             }
 
-            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, IsRegression: violations.Count > 0);
+            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, violations.Count > 0);
         }
 
         var mwu = MannWhitneyU.Test(referenceSamples, candidateSamples);

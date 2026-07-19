@@ -1,5 +1,3 @@
-using NBenchmark.Stats;
-
 namespace NBenchmark.Stats;
 
 /// <summary>
@@ -59,7 +57,7 @@ public static class Significance
             return;
 
         var baseline = successful.FirstOrDefault(r => r.IsBaseline)
-                   ?? successful.MinBy(r => r.LaunchStatistics?.LaunchMedian ?? r.Median)!;
+                       ?? successful.MinBy(r => r.LaunchStatistics?.LaunchMedian ?? r.Median)!;
 
         var groups = new List<SampleGroup>();
         var baselineIndex = -1;

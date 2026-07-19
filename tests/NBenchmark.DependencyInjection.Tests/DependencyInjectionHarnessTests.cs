@@ -18,7 +18,9 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1"])
+            await BenchmarkHarness.Create([
+                    "--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1",
+                ])
                 .AddFromAssembly<DependentBenchmark>()
                 .WithServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
@@ -104,7 +106,9 @@ public class DependencyInjectionHarnessTests
 
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1"])
+            await BenchmarkHarness.Create([
+                    "--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1",
+                ])
                 .UseDependencyInjection<DependentBenchmark>(services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)

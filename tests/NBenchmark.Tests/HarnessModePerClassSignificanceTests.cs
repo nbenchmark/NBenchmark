@@ -106,6 +106,7 @@ public class HarnessModePerClassSignificanceTests
             {
                 Assert.True(candidate.SignificanceVerdict == SignificanceVerdict.Significant,
                     $"Expected {candidate.Name} to be significant vs global baseline; got {candidate.SignificanceVerdict} (p={candidate.PValue})");
+
                 Assert.NotNull(candidate.Effect);
             }
         }

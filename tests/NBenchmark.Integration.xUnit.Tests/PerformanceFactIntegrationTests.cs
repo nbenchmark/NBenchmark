@@ -326,7 +326,7 @@ public sealed class PerformanceFactIntegrationTests
             -1,
             -1,
             -1,
-            null,   // referenceMethod (was baselinePath)
+            null, // referenceMethod (was baselinePath)
             0,
             0,
             0,

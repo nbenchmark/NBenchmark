@@ -1,5 +1,3 @@
-using NBenchmark.Integration.Abstractions;
-
 namespace NBenchmark.Integration.MSTest.Tests;
 
 [TestClass]
@@ -87,8 +85,12 @@ public sealed class ReferenceMethodIntegrationTests
     private static double[] CreateSamples(double mean, int count)
     {
         var samples = new double[count];
+
         for (var i = 0; i < count; i++)
+        {
             samples[i] = mean + (i % 10 - 5) * 0.05 * mean;
+        }
+
         return samples;
     }
 }

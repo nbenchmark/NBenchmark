@@ -217,7 +217,7 @@ public class OutlierTrimTests
             // sortedSamples is sorted ascending: [10, 20, 20, 20, 30].
             // Keep [10, 20, 30]; discard two of the 20s.
             var kept = new List<double> { sortedSamples[0], sortedSamples[1], sortedSamples[4] };
-            var discarded = new double[] { sortedSamples[2], sortedSamples[3] };
+            var discarded = new[] { sortedSamples[2], sortedSamples[3] };
 
             return new OutlierClassification
             {

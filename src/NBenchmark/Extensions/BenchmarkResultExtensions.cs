@@ -26,7 +26,8 @@ public static class BenchmarkResultExtensions
 
         if (detail == ReportDetail.Simple)
         {
-            Console.WriteLine($"  │  Median: {BenchmarkFormatter.FormatNs(result.Median),-14} Ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond)}");
+            Console.WriteLine(
+                $"  │  Median: {BenchmarkFormatter.FormatNs(result.Median),-14} Ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond)}");
 
             if (!string.IsNullOrEmpty(allocText))
                 Console.WriteLine($"  │{allocText}");

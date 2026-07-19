@@ -110,6 +110,7 @@ public sealed class BenchmarkAssertTests
         BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
 
         var result = CreateResult(610);
+
         var thresholds = new PerformanceThresholds
         {
             MaxMeanNs = 500,
@@ -127,6 +128,7 @@ public sealed class BenchmarkAssertTests
         BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
 
         var result = CreateResult(700);
+
         var thresholds = new PerformanceThresholds
         {
             MaxMeanNs = 500,
@@ -145,6 +147,7 @@ public sealed class BenchmarkAssertTests
         BenchmarkAssert.SetHostAssessment(new HostAssessment(8, false, false));
 
         var result = CreateResult(610);
+
         var thresholds = new PerformanceThresholds
         {
             MaxMeanNs = 500,
@@ -163,6 +166,7 @@ public sealed class BenchmarkAssertTests
         BenchmarkAssert.SetHostAssessment(new HostAssessment(2, false, true));
 
         var result = CreateResult(610);
+
         var thresholds = new PerformanceThresholds
         {
             MaxMeanNs = 500,

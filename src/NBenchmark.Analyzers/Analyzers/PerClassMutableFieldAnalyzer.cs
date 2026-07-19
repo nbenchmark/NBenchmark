@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -89,9 +90,7 @@ public sealed class PerClassMutableFieldAnalyzer : DiagnosticAnalyzer
                         .FirstOrDefault(v => v.Identifier.Text == field.Name);
 
                     if (variable is not null)
-                    {
                         context.ReportDiagnostic(Diagnostic.Create(Rule, variable.Identifier.GetLocation(), type.Name, field.Name));
-                    }
                 }
             }
         }
@@ -168,7 +167,7 @@ public sealed class PerClassMutableFieldAnalyzer : DiagnosticAnalyzer
         if (value is INamedTypeSymbol namedMember)
             return namedMember.Name == memberName;
 
-        var ordinal = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+        var ordinal = Convert.ToInt32(value, CultureInfo.InvariantCulture);
 
         foreach (var member in enumType.GetMembers())
         {
@@ -193,9 +192,7 @@ public sealed class PerClassMutableFieldAnalyzer : DiagnosticAnalyzer
                 && !field.IsStatic
                 && !field.IsReadOnly
                 && !field.IsConst)
-            {
                 fields.Add(field);
-            }
         }
 
         return fields;

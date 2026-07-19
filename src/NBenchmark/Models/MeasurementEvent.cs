@@ -16,7 +16,7 @@ public readonly record struct MeasurementEvent
         PhaseEvent = phase;
         SampleEvent = sample;
         DetectorStateEvent = detector;
-        _result = result;
+        Result = result;
     }
 
     public MeasurementEvent(MeasurementPhaseEvent e)
@@ -47,7 +47,5 @@ public readonly record struct MeasurementEvent
 
     public DetectorStateEvent DetectorStateEvent { get; }
 
-    private readonly BenchmarkResult? _result;
-
-    public BenchmarkResult? Result => _result;
+    public BenchmarkResult? Result { get; }
 }

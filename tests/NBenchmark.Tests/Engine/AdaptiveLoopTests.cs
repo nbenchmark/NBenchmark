@@ -502,11 +502,13 @@ public class AdaptiveLoopTests
     public void JitterCalibration_AutoSwitches_To_Mad_When_Jitter_Exceeds_Threshold()
     {
         var jitterSamples = 8;
+
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
             WarmupIterations = 0,
             Iterations = 3,
+
             // Leave OutlierMode at the default IqrFence so the auto-switch is eligible.
             MeasureAllocationsOverride = false,
             AutoTune = AutoTuneOptions.Default with
@@ -522,15 +524,17 @@ public class AdaptiveLoopTests
         // (Phase A calibration is skipped because OpsPerSample is pinned, warmup is 0, so the
         // next calls are the 3 measured samples) return a constant 1000 ns.
         var clock = new ScriptedClock(call => call < jitterSamples
-            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            ? call % 2 == 0 ? 500.0 : 1500.0
             : 1000.0);
 
         var result = RunSync(() => { }, options, clock);
 
         Assert.True(result.Diagnostic.OutlierDetectorSwitched);
         Assert.NotNull(result.Diagnostic.JitterMetric);
+
         Assert.True(result.Diagnostic.JitterMetric!.Value > 0.10,
             $"jitter metric {result.Diagnostic.JitterMetric} should exceed threshold 0.10");
+
         Assert.NotNull(result.EffectiveOutlierDetector);
         Assert.Equal("MAD (3×)", result.EffectiveOutlierDetector!.Name);
 
@@ -544,6 +548,7 @@ public class AdaptiveLoopTests
     public void JitterCalibration_Does_Not_Switch_When_OutlierMode_Is_Not_Default_IqrFence()
     {
         var jitterSamples = 8;
+
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
@@ -560,7 +565,7 @@ public class AdaptiveLoopTests
         };
 
         var clock = new ScriptedClock(call => call < jitterSamples
-            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            ? call % 2 == 0 ? 500.0 : 1500.0
             : 1000.0);
 
         var result = RunSync(() => { }, options, clock);
@@ -578,11 +583,13 @@ public class AdaptiveLoopTests
     public void JitterCalibration_Does_Not_Switch_When_Custom_OutlierDetector_Is_Set()
     {
         var jitterSamples = 8;
+
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
             WarmupIterations = 0,
             Iterations = 3,
+
             // Custom detector pinned -> switch is not eligible, even with OutlierMode at default.
             OutlierDetector = OutlierDetectors.None,
             MeasureAllocationsOverride = false,
@@ -595,7 +602,7 @@ public class AdaptiveLoopTests
         };
 
         var clock = new ScriptedClock(call => call < jitterSamples
-            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            ? call % 2 == 0 ? 500.0 : 1500.0
             : 1000.0);
 
         var result = RunSync(() => { }, options, clock);
@@ -611,6 +618,7 @@ public class AdaptiveLoopTests
     public void JitterCalibration_Disabled_AutoSwitch_With_NonPositive_Threshold_Still_Reports_Metric()
     {
         var jitterSamples = 8;
+
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
@@ -626,7 +634,7 @@ public class AdaptiveLoopTests
         };
 
         var clock = new ScriptedClock(call => call < jitterSamples
-            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            ? call % 2 == 0 ? 500.0 : 1500.0
             : 1000.0);
 
         var result = RunSync(() => { }, options, clock);
@@ -644,6 +652,7 @@ public class AdaptiveLoopTests
     public async Task JitterCalibration_AutoSwitches_In_Async_Path()
     {
         var jitterSamples = 8;
+
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
@@ -659,7 +668,7 @@ public class AdaptiveLoopTests
         };
 
         var clock = new ScriptedClock(call => call < jitterSamples
-            ? (call % 2 == 0 ? 500.0 : 1500.0)
+            ? call % 2 == 0 ? 500.0 : 1500.0
             : 1000.0);
 
         var spec = new RunSpec { Options = options };

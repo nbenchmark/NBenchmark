@@ -70,6 +70,7 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
         Assert.Equal(1, thrown.CallCount);
         Assert.Equal(1, captureAfter.CallCount);
         Assert.Single(captureAfter.Results);
+
         // The run returned normally despite the throwing auto-attached reporter.
         Assert.Single(results);
     }

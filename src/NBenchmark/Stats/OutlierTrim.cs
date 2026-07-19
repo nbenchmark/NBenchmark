@@ -60,7 +60,9 @@ public static class OutlierTrim
         var indices = new int[timings.Length];
 
         for (var i = 0; i < indices.Length; i++)
+        {
             indices[i] = i;
+        }
 
         Array.Sort(sorted, indices);
 

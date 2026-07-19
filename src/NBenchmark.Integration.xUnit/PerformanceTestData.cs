@@ -45,7 +45,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     public double MaxP95Ns { get; private set; } = -1;
     public long MaxAllocatedBytes { get; private set; } = -1;
     public string? ReferenceMethod { get; private set; }
-    public double MaxSlowdownRatio { get; private set; } = 0;
+    public double MaxSlowdownRatio { get; private set; }
     public int Iterations { get; private set; }
     public int WarmupIterations { get; private set; }
     public bool MeasureAllocations { get; private set; }

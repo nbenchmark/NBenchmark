@@ -312,13 +312,13 @@ internal sealed record CliArgs
                     var diagStr = args[++i];
 
                     if (string.Equals(diagStr, "none", StringComparison.OrdinalIgnoreCase))
-                        diagnostics = NBenchmark.DiagnosticsMode.None;
+                        diagnostics = DiagnosticsMode.None;
                     else if (string.Equals(diagStr, "gc", StringComparison.OrdinalIgnoreCase))
-                        diagnostics = NBenchmark.DiagnosticsMode.Gc;
+                        diagnostics = DiagnosticsMode.Gc;
                     else if (string.Equals(diagStr, "gcandcpu", StringComparison.OrdinalIgnoreCase))
-                        diagnostics = NBenchmark.DiagnosticsMode.GcAndCpu;
+                        diagnostics = DiagnosticsMode.GcAndCpu;
                     else if (string.Equals(diagStr, "all", StringComparison.OrdinalIgnoreCase))
-                        diagnostics = NBenchmark.DiagnosticsMode.All;
+                        diagnostics = DiagnosticsMode.All;
                     else
                         errors.Add($"Invalid --diagnostics value '{diagStr}'. Must be 'none', 'gc', 'gcandcpu', or 'all'.");
 
@@ -450,9 +450,11 @@ internal sealed record CliArgs
                     if (TryParseProcessPriority(priorityStr, out var parsedPriority))
                         processPriority = parsedPriority;
                     else
+                    {
                         errors.Add(
                             $"Invalid --priority value '{priorityStr}'. Must be one of: "
                             + "normal, idle, belownormal, abovenormal, high, realtime.");
+                    }
 
                     break;
                 case "--dedicated-host-guidance":
@@ -680,7 +682,10 @@ internal sealed record CliArgs
         Console.WriteLine("  --iterations <n>       Pin measured sample count (default: auto, CI-driven)");
         Console.WriteLine("  --warmup <n>           Pin warmup sample count (default: auto, plateau-driven)");
         Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}{FormatAutoAttached()}");
-        Console.WriteLine($"  --observer <type>      Attach measurement observer: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}{FormatAutoAttachedObservers()}");
+
+        Console.WriteLine(
+            $"  --observer <type>      Attach measurement observer: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}{FormatAutoAttachedObservers()}");
+
         Console.WriteLine("                         (repeatable; multiple observers are composed into a fan-out)");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");

@@ -78,6 +78,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         // suppresses the auto-attached entry. This is the programmatic-attach dedup path.
         var programmatic = new CapturingAutoObserver("auto");
         var autoFactoryCallCount = 0;
+
         ObserverRegistry.RegisterAutoAttach(
             "auto",
             "auto",
@@ -106,6 +107,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
     {
         var programmatic = new CapturingAutoObserver("studio");
         var autoFactoryCallCount = 0;
+
         ObserverRegistry.RegisterAutoAttach(
             "studio",
             "auto",

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using NBenchmark.Engine;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -17,22 +16,13 @@ public class EnvironmentOptionsTests
     }
 
     [Fact]
-    public void ParseCpuAffinity_Null_Returns_Null()
-    {
-        Assert.Null(EnvironmentOptions.ParseCpuAffinity(null));
-    }
+    public void ParseCpuAffinity_Null_Returns_Null() => Assert.Null(EnvironmentOptions.ParseCpuAffinity(null));
 
     [Fact]
-    public void ParseCpuAffinity_Blank_Returns_Null()
-    {
-        Assert.Null(EnvironmentOptions.ParseCpuAffinity("   "));
-    }
+    public void ParseCpuAffinity_Blank_Returns_Null() => Assert.Null(EnvironmentOptions.ParseCpuAffinity("   "));
 
     [Fact]
-    public void ParseCpuAffinity_Single_Parses()
-    {
-        Assert.Equal([0], EnvironmentOptions.ParseCpuAffinity("0"));
-    }
+    public void ParseCpuAffinity_Single_Parses() => Assert.Equal([0], EnvironmentOptions.ParseCpuAffinity("0"));
 
     [Fact]
     public void ParseCpuAffinity_List_Parses()
@@ -48,22 +38,13 @@ public class EnvironmentOptionsTests
     }
 
     [Fact]
-    public void ParseCpuAffinity_Trims_Whitespace()
-    {
-        Assert.Equal([0, 1], EnvironmentOptions.ParseCpuAffinity(" 0 , 1 "));
-    }
+    public void ParseCpuAffinity_Trims_Whitespace() => Assert.Equal([0, 1], EnvironmentOptions.ParseCpuAffinity(" 0 , 1 "));
 
     [Fact]
-    public void ParseCpuAffinity_Negative_Throws()
-    {
-        Assert.Throws<FormatException>(() => EnvironmentOptions.ParseCpuAffinity("-1"));
-    }
+    public void ParseCpuAffinity_Negative_Throws() => Assert.Throws<FormatException>(() => EnvironmentOptions.ParseCpuAffinity("-1"));
 
     [Fact]
-    public void ParseCpuAffinity_NonNumeric_Throws()
-    {
-        Assert.Throws<FormatException>(() => EnvironmentOptions.ParseCpuAffinity("foo"));
-    }
+    public void ParseCpuAffinity_NonNumeric_Throws() => Assert.Throws<FormatException>(() => EnvironmentOptions.ParseCpuAffinity("foo"));
 
     [Fact]
     public void ParseCpuAffinity_OutOfRange_Throws()
@@ -85,10 +66,7 @@ public class EnvironmentOptionsTests
     }
 
     [Fact]
-    public void MeasurementOptions_Default_Environment_IsNull()
-    {
-        Assert.Null(MeasurementOptions.Default.Environment);
-    }
+    public void MeasurementOptions_Default_Environment_IsNull() => Assert.Null(MeasurementOptions.Default.Environment);
 
     [Fact]
     public void MeasurementOptions_Environment_Can_Be_Set()

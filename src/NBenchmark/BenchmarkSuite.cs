@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using NBenchmark.Diagnostics;
 using NBenchmark.Engine;
@@ -12,6 +13,7 @@ public sealed class BenchmarkSuite(string name)
     private readonly List<BenchmarkEnvelope> _benchmarks = [];
     private readonly List<string> _categoryFilterExclude = [];
     private readonly List<string> _categoryFilterInclude = [];
+    private readonly List<IMeasurementObserver> _observers = [];
 
     private readonly List<ParameterDef> _parameterDefs = [];
     private readonly List<ParameterizedAdd> _parameterizedFactories = [];
@@ -24,7 +26,6 @@ public sealed class BenchmarkSuite(string name)
     private string[]? _pendingCategories;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
-    private readonly List<IMeasurementObserver> _observers = [];
     private RunOrder _runOrder = RunOrder.Random;
     private IReadOnlyList<RuntimeMoniker> _runtimes = [];
     private Action? _suiteSetup;
@@ -584,10 +585,12 @@ public sealed class BenchmarkSuite(string name)
     public BenchmarkSuite WithHardwareAffinity(params int[] cores)
     {
         ArgumentNullException.ThrowIfNull(cores);
+
         _options = _options with
         {
             Environment = (_options.Environment ?? new EnvironmentOptions()) with { CpuAffinity = cores },
         };
+
         return this;
     }
 
@@ -598,12 +601,13 @@ public sealed class BenchmarkSuite(string name)
     ///     restored when the run completes. A refused elevation (common on locked-down CI
     ///     runners) is surfaced as a warning, not an error.
     /// </summary>
-    public BenchmarkSuite WithProcessPriority(System.Diagnostics.ProcessPriorityClass priority)
+    public BenchmarkSuite WithProcessPriority(ProcessPriorityClass priority)
     {
         _options = _options with
         {
             Environment = (_options.Environment ?? new EnvironmentOptions()) with { ProcessPriority = priority },
         };
+
         return this;
     }
 
@@ -619,6 +623,7 @@ public sealed class BenchmarkSuite(string name)
         {
             Environment = (_options.Environment ?? new EnvironmentOptions()) with { DedicatedHostGuidance = enabled },
         };
+
         return this;
     }
 
@@ -703,9 +708,11 @@ public sealed class BenchmarkSuite(string name)
         // ResolveObserver dedup.
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var programmatic = new List<IMeasurementObserver>(_observers.Count);
+
         for (var i = _observers.Count - 1; i >= 0; i--)
         {
             var observer = _observers[i];
+
             if (observer == NullMeasurementObserver.Instance)
                 continue;
 
@@ -721,6 +728,7 @@ public sealed class BenchmarkSuite(string name)
         programmatic.Reverse();
 
         var explicitNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var observer in programmatic)
         {
             if (!string.IsNullOrEmpty(observer.Name))
@@ -738,6 +746,7 @@ public sealed class BenchmarkSuite(string name)
         var all = new List<IMeasurementObserver>(programmatic.Count + autoAttached.Count);
         all.AddRange(programmatic);
         all.AddRange(autoAttached);
+
         return all.Count switch
         {
             0 => NullMeasurementObserver.Instance,
@@ -763,6 +772,7 @@ public sealed class BenchmarkSuite(string name)
             // child (e.g. a live-streaming observer referenced by the parent's entry
             // assembly). Resolve them with an empty dedup set.
             var autoAttachedOnly = ObserverRegistry.CreateAutoAttachedObservers(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
             return autoAttachedOnly.Count switch
             {
                 0 => NullMeasurementObserver.Instance,
@@ -777,9 +787,7 @@ public sealed class BenchmarkSuite(string name)
         {
             if (ObserverRegistry.TryCreate(name, out var observer)
                 && observer != NullMeasurementObserver.Instance)
-            {
                 resolved.Add(observer);
-            }
         }
 
         // Auto-attached observers also fire in children. EnsureExtensionsLoaded (called by
@@ -923,6 +931,7 @@ public sealed class BenchmarkSuite(string name)
             _progress = new DefaultConsoleProgress();
 
         using var observer = ResolveObserver();
+
         return await RunInProcessCoreAsync(
             _progress,
             observer,
@@ -947,10 +956,12 @@ public sealed class BenchmarkSuite(string name)
         var filteredBenchmarks = ApplyCategoryFilter(ordered);
         var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
 
-        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, profile: _options.Profile.ToString(), runtime: _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
+        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, _options.Profile.ToString(),
+            _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
 
         List<BenchmarkResult> results = [];
         var sentinelEmitted = false;
+
         try
         {
             await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
@@ -981,10 +992,11 @@ public sealed class BenchmarkSuite(string name)
                     for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
                     {
                         var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
+
                         var (launchResults, launchSamples) = await SuiteRunner.RunAsync(
                             envelopes, effectiveOrder, null, _options, 0,
                             filteredBenchmarks.Count, NullBenchmarkProgress.Instance, cancellationToken,
-                            onBetweenBenchmarksAsync: null, launchObserver).ConfigureAwait(false);
+                            null, launchObserver).ConfigureAwait(false);
 
                         allLaunchResults.Add(launchResults);
                         allLaunchSamples.Add(launchSamples);
@@ -997,7 +1009,7 @@ public sealed class BenchmarkSuite(string name)
                     (results, rawSamples) = await SuiteRunner.RunAsync(
                         envelopes, effectiveOrder, null, _options, 0,
                         filteredBenchmarks.Count, progress, cancellationToken,
-                        onBetweenBenchmarksAsync: null, observer).ConfigureAwait(false);
+                        null, observer).ConfigureAwait(false);
                 }
             }
             finally
@@ -1010,10 +1022,11 @@ public sealed class BenchmarkSuite(string name)
             // SuiteCompleted sentinel: emit on the success path with Succeeded = true. A
             // live-streaming observer treats this as the authoritative run-end signal.
             observer.OnPhase(new MeasurementPhaseEvent(
-                BenchmarkName: string.Empty,
-                Phase: MeasurementPhase.SuiteCompleted,
-                Transition: PhaseTransition.Completed,
+                string.Empty,
+                MeasurementPhase.SuiteCompleted,
+                PhaseTransition.Completed,
                 Succeeded: true));
+
             sentinelEmitted = true;
 
             // SuiteRunner keys raw samples by benchmark name; the significance and payload paths
@@ -1030,9 +1043,7 @@ public sealed class BenchmarkSuite(string name)
             }
 
             if (applyReporters)
-            {
                 await InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
-            }
 
             return results;
         }
@@ -1045,9 +1056,9 @@ public sealed class BenchmarkSuite(string name)
             if (!sentinelEmitted)
             {
                 observer.OnPhase(new MeasurementPhaseEvent(
-                    BenchmarkName: string.Empty,
-                    Phase: MeasurementPhase.SuiteCompleted,
-                    Transition: PhaseTransition.Completed,
+                    string.Empty,
+                    MeasurementPhase.SuiteCompleted,
+                    PhaseTransition.Completed,
                     Succeeded: false));
             }
 
@@ -1125,11 +1136,13 @@ public sealed class BenchmarkSuite(string name)
         var filteredBenchmarks = ApplyCategoryFilter(expanded);
         var displayNames = filteredBenchmarks.Select(b => b.Name).ToList();
 
-        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, profile: _options.Profile.ToString(), runtime: _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
+        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, _options.Profile.ToString(),
+            _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
 
         var results = new List<BenchmarkResult>(filteredBenchmarks.Count);
         using var observer = ResolveObserver();
         var sentinelEmitted = false;
+
         try
         {
             await _progress.OnSuiteStarting(displayNames, filteredBenchmarks.Count).ConfigureAwait(false);
@@ -1208,10 +1221,11 @@ public sealed class BenchmarkSuite(string name)
 
             // SuiteCompleted sentinel: emit on the success path with Succeeded = true.
             observer.OnPhase(new MeasurementPhaseEvent(
-                BenchmarkName: string.Empty,
-                Phase: MeasurementPhase.SuiteCompleted,
-                Transition: PhaseTransition.Completed,
+                string.Empty,
+                MeasurementPhase.SuiteCompleted,
+                PhaseTransition.Completed,
                 Succeeded: true));
+
             sentinelEmitted = true;
 
             ApplyPerParameterSignificance(results, rawSamples);
@@ -1225,9 +1239,9 @@ public sealed class BenchmarkSuite(string name)
             if (!sentinelEmitted)
             {
                 observer.OnPhase(new MeasurementPhaseEvent(
-                    BenchmarkName: string.Empty,
-                    Phase: MeasurementPhase.SuiteCompleted,
-                    Transition: PhaseTransition.Completed,
+                    string.Empty,
+                    MeasurementPhase.SuiteCompleted,
+                    PhaseTransition.Completed,
                     Succeeded: false));
             }
 
@@ -1272,10 +1286,12 @@ public sealed class BenchmarkSuite(string name)
         var filteredBenchmarks = ApplyCategoryFilter(expanded);
         var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
 
-        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, profile: _options.Profile.ToString(), runtime: _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
+        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, _options.Profile.ToString(),
+            _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
 
         using var observer = ResolveObserver();
         var sentinelEmitted = false;
+
         try
         {
             await _progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
@@ -1393,10 +1409,11 @@ public sealed class BenchmarkSuite(string name)
 
             // SuiteCompleted sentinel: emit on the success path with Succeeded = true.
             observer.OnPhase(new MeasurementPhaseEvent(
-                BenchmarkName: string.Empty,
-                Phase: MeasurementPhase.SuiteCompleted,
-                Transition: PhaseTransition.Completed,
+                string.Empty,
+                MeasurementPhase.SuiteCompleted,
+                PhaseTransition.Completed,
                 Succeeded: true));
+
             sentinelEmitted = true;
 
             ApplyPerParameterSignificance(allResults, rawSamples);
@@ -1410,9 +1427,9 @@ public sealed class BenchmarkSuite(string name)
             if (!sentinelEmitted)
             {
                 observer.OnPhase(new MeasurementPhaseEvent(
-                    BenchmarkName: string.Empty,
-                    Phase: MeasurementPhase.SuiteCompleted,
-                    Transition: PhaseTransition.Completed,
+                    string.Empty,
+                    MeasurementPhase.SuiteCompleted,
+                    PhaseTransition.Completed,
                     Succeeded: false));
             }
 

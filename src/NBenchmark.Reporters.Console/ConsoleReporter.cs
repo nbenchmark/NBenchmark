@@ -97,6 +97,7 @@ public sealed class ConsoleReporter : IReporter
     private static void RenderSimpleFooter(BenchmarkTable benchTable)
     {
         var count = benchTable.Rows.Count(r => !r.Errored);
+
         AnsiConsole.MarkupLine(
             $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · CI {benchTable.ConfidenceLevel * 100:0.#}%[/]");
     }
@@ -146,9 +147,7 @@ public sealed class ConsoleReporter : IReporter
             .AddColumn(new TableColumn("[bold]Median[/]").RightAligned().NoWrap());
 
         if (!isSimple)
-        {
             table.AddColumn(new TableColumn("[bold]Mean[/]").RightAligned().NoWrap());
-        }
 
         table
             .AddColumn(new TableColumn("[bold]Ops/s[/]").RightAligned().NoWrap())
@@ -202,6 +201,7 @@ public sealed class ConsoleReporter : IReporter
                 if (hasComparisons)
                 {
                     errorCols.Add("[dim]-[/]");
+
                     if (!isSimple)
                         errorCols.Add("[dim]-[/]");
                 }
@@ -271,6 +271,7 @@ public sealed class ConsoleReporter : IReporter
                 };
 
                 rowCols.Add(sigIcon);
+
                 if (!isSimple)
                     rowCols.Add(RenderMagnitude(row.Effect));
             }
@@ -484,33 +485,37 @@ public sealed class ConsoleReporter : IReporter
             }
 
             if (hasHeap)
+            {
                 cells.Add(new Markup(diag.HeapCommittedBytes.HasValue
                     ? BenchmarkFormatter.FormatBytes(diag.HeapCommittedBytes.Value)
                     : string.Empty));
+            }
 
             if (hasCpu)
             {
                 if (diag.CpuWallRatio.HasValue)
                 {
                     var cpuRatio = diag.CpuWallRatio.Value;
+
                     var cpuColor = cpuRatio switch
                     {
                         >= 0.85 => "green",
                         >= 0.50 => "yellow",
                         _ => "red",
                     };
+
                     cells.Add(new Markup($"[{cpuColor}]{cpuRatio * 100:F0}%[/]"));
                 }
                 else
-                {
                     cells.Add(new Markup(string.Empty));
-                }
             }
 
             if (hasExc)
+            {
                 cells.Add(new Markup(diag.ExceptionCountPerOp.HasValue
                     ? $"{diag.ExceptionCountPerOp.Value:F4}"
                     : string.Empty));
+            }
 
             table.AddRow(cells.ToArray());
         }
@@ -669,6 +674,7 @@ public sealed class ConsoleReporter : IReporter
             MeasurementProfile.Independent => "independent (per-iteration GC, between-benchmark GC, no alloc tracking)",
             _ => "realistic (no per-iteration GC, no between-benchmark GC, alloc tracking on)",
         };
+
         AnsiConsole.MarkupLine($"[grey]Profile:[/] [dim]{profileLabel}[/]");
 
         AnsiConsole.MarkupLine(

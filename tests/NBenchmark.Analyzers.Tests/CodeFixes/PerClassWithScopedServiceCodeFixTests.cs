@@ -136,6 +136,6 @@ public sealed class PerClassWithScopedServiceCodeFixTests
                 source,
                 fixedSource,
                 "NB0011",
-                preferredCodeActionTitle: "Implement IStateReset");
+                "Implement IStateReset");
     }
 }

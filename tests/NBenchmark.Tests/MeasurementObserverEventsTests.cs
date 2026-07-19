@@ -20,9 +20,9 @@ public class MeasurementObserverEventsTests
     [Fact]
     public void SampleEvent_Has_Value_Equality()
     {
-        var a = new SampleEvent("bench", 3, 12.5, 4, 80L, Warmup: false);
-        var b = new SampleEvent("bench", 3, 12.5, 4, 80L, Warmup: false);
-        var c = new SampleEvent("bench", 3, 12.5, 4, 80L, Warmup: true);
+        var a = new SampleEvent("bench", 3, 12.5, 4, 80L, false);
+        var b = new SampleEvent("bench", 3, 12.5, 4, 80L, false);
+        var c = new SampleEvent("bench", 3, 12.5, 4, 80L, true);
 
         Assert.Equal(a, b);
         Assert.NotEqual(a, c);
@@ -49,7 +49,7 @@ public class MeasurementObserverEventsTests
     {
         var e = new MeasurementPhaseEvent(
             "b", MeasurementPhase.Jitter, PhaseTransition.Completed,
-            JitterMetric: 0.21, DetectorSwitched: true);
+            0.21, true);
 
         Assert.Equal("b", e.BenchmarkName);
         Assert.Equal(MeasurementPhase.Jitter, e.Phase);

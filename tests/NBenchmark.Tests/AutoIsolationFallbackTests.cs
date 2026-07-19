@@ -18,6 +18,7 @@ public class AutoIsolationFallbackTests
         var launches = new List<IsolatedRunRequest>();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
@@ -25,10 +26,10 @@ public class AutoIsolationFallbackTests
             .WithIsolation();
 
         using (WithFakeLauncher((req, ct) =>
-        {
-            launches.Add(req);
-            return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req));
-        }))
+               {
+                   launches.Add(req);
+                   return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req));
+               }))
         {
             var results = await harness.RunAsync();
         }
@@ -44,6 +45,7 @@ public class AutoIsolationFallbackTests
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
@@ -51,6 +53,7 @@ public class AutoIsolationFallbackTests
             .WithIsolation();
 
         IReadOnlyList<BenchmarkResult> results;
+
         using (WithFakeLauncher((req, ct) =>
                    Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req))))
         {
@@ -79,6 +82,7 @@ public class AutoIsolationFallbackTests
         var launches = new List<IsolatedRunRequest>();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-reset"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
@@ -86,10 +90,10 @@ public class AutoIsolationFallbackTests
             .WithIsolation();
 
         using (WithFakeLauncher((req, ct) =>
-        {
-            launches.Add(req);
-            return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req));
-        }))
+               {
+                   launches.Add(req);
+                   return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req));
+               }))
         {
             var results = await harness.RunAsync();
         }
@@ -105,6 +109,7 @@ public class AutoIsolationFallbackTests
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-reset"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
@@ -112,6 +117,7 @@ public class AutoIsolationFallbackTests
             .WithIsolation();
 
         IReadOnlyList<BenchmarkResult> results;
+
         using (WithFakeLauncher((req, ct) =>
                    Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req))))
         {
@@ -136,6 +142,7 @@ public class AutoIsolationFallbackTests
         IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-inprocess"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
@@ -143,6 +150,7 @@ public class AutoIsolationFallbackTests
             .WithIsolation();
 
         IReadOnlyList<BenchmarkResult> results;
+
         using (WithFakeLauncher((req, ct) =>
                    Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req))))
         {
@@ -169,16 +177,17 @@ public class AutoIsolationFallbackTests
         var launches = new List<IsolatedRunRequest>();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-nofactory"])
             .WithLaunchCount(1)
             .WithIsolation();
 
         using (WithFakeLauncher((req, ct) =>
-        {
-            launches.Add(req);
-            return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req));
-        }))
+               {
+                   launches.Add(req);
+                   return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(SimulateChildRun(req));
+               }))
         {
             var results = await harness.RunAsync();
         }
@@ -254,12 +263,16 @@ public class AutoIsolationFallbackTests
         private readonly IProcessLauncher _prior;
         private bool _disposed;
 
-        public Restorer(IProcessLauncher prior) => _prior = prior;
+        public Restorer(IProcessLauncher prior)
+        {
+            _prior = prior;
+        }
 
         public void Dispose()
         {
             if (_disposed)
                 return;
+
             ChildProcessLauncher.Current = _prior;
             _disposed = true;
         }
@@ -272,10 +285,14 @@ public class AutoIsolationFallbackTests
 public class FactoryNoResetBenchmarks
 {
     [Benchmark]
-    public void MethodA() { }
+    public void MethodA()
+    {
+    }
 
     [Benchmark]
-    public void MethodB() { }
+    public void MethodB()
+    {
+    }
 }
 
 // PerClass + factory + IStateReset -> should stay PerClass.
@@ -283,13 +300,17 @@ public class FactoryNoResetBenchmarks
 [InstanceLifetime(InstanceLifetime.PerClass)]
 public class FactoryWithResetBenchmarks : IStateReset
 {
-    [Benchmark]
-    public void MethodA() { }
-
-    [Benchmark]
-    public void MethodB() { }
-
     public Task ResetAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    [Benchmark]
+    public void MethodA()
+    {
+    }
+
+    [Benchmark]
+    public void MethodB()
+    {
+    }
 }
 
 // PerClass + factory + [InProcess] on one method -> that method stays in-process.
@@ -299,10 +320,14 @@ public class FactoryInProcessBenchmarks
 {
     [Benchmark]
     [InProcess]
-    public void InProcessMethod() { }
+    public void InProcessMethod()
+    {
+    }
 
     [Benchmark]
-    public void IsolatedMethod() { }
+    public void IsolatedMethod()
+    {
+    }
 }
 
 // PerClass + no factory + no IStateReset -> should stay PerClass (no factory to trigger rule).
@@ -310,11 +335,13 @@ public class FactoryInProcessBenchmarks
 [InstanceLifetime(InstanceLifetime.PerClass)]
 public class NoFactoryBenchmarks
 {
-    public NoFactoryBenchmarks() { }
+    [Benchmark]
+    public void MethodA()
+    {
+    }
 
     [Benchmark]
-    public void MethodA() { }
-
-    [Benchmark]
-    public void MethodB() { }
+    public void MethodB()
+    {
+    }
 }

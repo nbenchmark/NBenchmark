@@ -104,6 +104,7 @@ public static class PerformanceAssert
                 "ReferenceMethod is not supported in the PerformanceAssert assert pattern. " +
                 "Use the attribute pattern ([Performance] on a test method) to compare against a reference method, " +
                 "or use calibration mode (leave ReferenceMethod null).");
+
             return violations;
         }
 
@@ -123,6 +124,7 @@ public static class PerformanceAssert
         if (options.MaxSlowdownRatio > 0 && !result.Errored)
         {
             var calibration = PerformanceCalibration.Run();
+
             violations.AddRange(RelativeComparison.Check(
                 result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, options.MaxSlowdownRatio));
         }

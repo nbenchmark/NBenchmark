@@ -1,5 +1,3 @@
-using System.Threading.Channels;
-using System.Threading.Tasks;
 using NBenchmark.Engine;
 using Xunit;
 
@@ -34,7 +32,7 @@ public class ChannelMeasurementObserverTests
     [Fact]
     public void Constructor_Creates_Channel_With_Specified_Capacity()
     {
-        var observer = new ChannelMeasurementObserver(capacity: 64);
+        var observer = new ChannelMeasurementObserver(64);
 
         Assert.NotNull(observer.Reader);
     }
@@ -56,7 +54,7 @@ public class ChannelMeasurementObserverTests
     public void OnSample_Writes_To_Channel()
     {
         var observer = new ChannelMeasurementObserver();
-        var sample = new SampleEvent("b", 3, 12.5, 4, 80L, Warmup: false);
+        var sample = new SampleEvent("b", 3, 12.5, 4, 80L, false);
 
         observer.OnSample(sample);
 
@@ -140,7 +138,7 @@ public class ChannelMeasurementObserverTests
     [Fact]
     public void Complete_Signals_Reader_Completion()
     {
-        var observer = new ChannelMeasurementObserver(capacity: 16);
+        var observer = new ChannelMeasurementObserver(16);
 
         observer.OnSample(new SampleEvent("b", 0, 1.0, 1, 0, false));
         observer.Complete();
@@ -157,7 +155,7 @@ public class ChannelMeasurementObserverTests
         // (ordinals 2 and 3). The test asserts both that the channel did not throw or block
         // AND that it dropped the oldest two (ordinals 0 and 1), so an implementation that
         // incorrectly dropped everything would fail.
-        var observer = new ChannelMeasurementObserver(capacity: 2);
+        var observer = new ChannelMeasurementObserver(2);
 
         observer.OnSample(new SampleEvent("b", 0, 1.0, 1, 0, false));
         observer.OnSample(new SampleEvent("b", 1, 1.0, 1, 0, false));
@@ -165,8 +163,11 @@ public class ChannelMeasurementObserverTests
         observer.OnSample(new SampleEvent("b", 3, 1.0, 1, 0, false));
 
         var readOrdinals = new List<int>();
+
         while (observer.Reader.TryRead(out var ev))
+        {
             readOrdinals.Add(ev.SampleEvent.Ordinal);
+        }
 
         Assert.Equal([2, 3], readOrdinals);
     }
@@ -174,7 +175,7 @@ public class ChannelMeasurementObserverTests
     [Fact]
     public void Burst_Writes_All_Events_Within_Capacity()
     {
-        var observer = new ChannelMeasurementObserver(capacity: 1024);
+        var observer = new ChannelMeasurementObserver(1024);
 
         for (var i = 0; i < 100; i++)
         {
@@ -182,8 +183,11 @@ public class ChannelMeasurementObserverTests
         }
 
         var count = 0;
+
         while (observer.Reader.TryRead(out _))
+        {
             count++;
+        }
 
         Assert.Equal(100, count);
     }
@@ -191,7 +195,7 @@ public class ChannelMeasurementObserverTests
     [Fact]
     public async Task Async_Consumer_Can_Drain_Channel()
     {
-        var observer = new ChannelMeasurementObserver(capacity: 256);
+        var observer = new ChannelMeasurementObserver(256);
         var reader = observer.Reader;
 
         for (var i = 0; i < 50; i++)
@@ -202,6 +206,7 @@ public class ChannelMeasurementObserverTests
         observer.Complete();
 
         var count = 0;
+
         await foreach (var _ in reader.ReadAllAsync())
         {
             count++;
@@ -216,7 +221,7 @@ public class ChannelMeasurementObserverTests
         // The harness/suite wrap the resolved observer in a `using`, so Dispose must
         // complete the channel writer. Without this, a reader awaiting ReadAllAsync
         // (or Reader.Completion) would hang indefinitely after the run finishes.
-        var observer = new ChannelMeasurementObserver(capacity: 16);
+        var observer = new ChannelMeasurementObserver(16);
         var reader = observer.Reader;
 
         observer.OnSample(new SampleEvent("b", 0, 1.0, 1, 0, false));
@@ -229,6 +234,7 @@ public class ChannelMeasurementObserverTests
         // The buffered event is still readable after dispose.
         Assert.True(reader.TryRead(out _));
         Assert.False(reader.TryRead(out _));
+
         // The reader's Completion task is now complete, so an async consumer does not hang.
         Assert.True(reader.Completion.IsCompletedSuccessfully);
     }
@@ -236,7 +242,7 @@ public class ChannelMeasurementObserverTests
     [Fact]
     public async Task Dispose_Allows_Async_Consumer_To_Drain_And_Exit()
     {
-        var observer = new ChannelMeasurementObserver(capacity: 256);
+        var observer = new ChannelMeasurementObserver(256);
         var reader = observer.Reader;
 
         for (var i = 0; i < 10; i++)
@@ -247,6 +253,7 @@ public class ChannelMeasurementObserverTests
         observer.Dispose();
 
         var count = 0;
+
         await foreach (var _ in reader.ReadAllAsync())
         {
             count++;

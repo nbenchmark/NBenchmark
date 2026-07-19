@@ -427,19 +427,25 @@ public sealed class MarkdownReporter : IReporter
             }
 
             if (hasHeap)
+            {
                 line.Append(diag.HeapCommittedBytes.HasValue
                     ? $" {BenchmarkFormatter.FormatBytes(diag.HeapCommittedBytes.Value)} |"
                     : "  |");
+            }
 
             if (hasCpu)
+            {
                 line.Append(diag.CpuWallRatio.HasValue
                     ? $" {diag.CpuWallRatio.Value * 100:F0}% |"
                     : "  |");
+            }
 
             if (hasExc)
+            {
                 line.Append(diag.ExceptionCountPerOp.HasValue
                     ? $" {diag.ExceptionCountPerOp.Value:F4} |"
                     : "  |");
+            }
 
             sb.AppendLine(line.ToString());
         }
@@ -530,8 +536,10 @@ public sealed class MarkdownReporter : IReporter
     private static void RenderSimpleFooter(StringBuilder sb, BenchmarkTable table)
     {
         var count = table.Rows.Count(r => !r.Errored);
+
         sb.AppendLine(
             $"{count} benchmark(s) · {table.TotalDuration.TotalSeconds:F1}s total · CI {table.ConfidenceLevel * 100:0.#}%");
+
         sb.AppendLine();
     }
 

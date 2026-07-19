@@ -115,6 +115,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                                 {
                                     var refOutcome = await BenchmarkRunner.Instance.RunAsync(
                                         refName, refTaskBody, runSpec, cancellationTokenSource.Token);
+
                                     refResult = refOutcome.Result;
                                     refSamples = refOutcome.RawSamples;
                                 }
@@ -127,6 +128,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                                 {
                                     var refOutcome = BenchmarkRunner.Instance.Run(
                                         refName, refActionBody, runSpec, cancellationTokenSource.Token);
+
                                     refResult = refOutcome.Result;
                                     refSamples = refOutcome.RawSamples;
                                 }
@@ -135,8 +137,10 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                             }
                         }
                         else
+                        {
                             throw new InvalidOperationException(
                                 $"Could not build body for reference method {data.ReferenceMethod}.");
+                        }
                     }
 
                     BenchmarkResult result;
@@ -247,6 +251,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
             else
             {
                 var calibration = PerformanceCalibration.Run();
+
                 violations.AddRange(RelativeComparison.Check(
                     result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, data.MaxSlowdownRatio));
             }
@@ -270,11 +275,6 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         // Store the return value in a static field so the JIT cannot elide the call.
         var assign = Expression.Assign(typedField, Expression.Convert(call, typeof(object)));
         return Expression.Lambda<Action>(assign).Compile();
-    }
-
-    private static class ReturnSink
-    {
-        public static object? Hole = new object();
     }
 
     internal static bool TryBuildBody(
@@ -474,5 +474,10 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         return ex is AggregateException agg
             ? agg.InnerException ?? ex
             : ex;
+    }
+
+    private static class ReturnSink
+    {
+        public static object? Hole = new();
     }
 }

@@ -1,7 +1,4 @@
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.Linq;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace NBenchmark.Tests.Engine;
@@ -14,6 +11,7 @@ public sealed class DiagnosticsIntegrationTests
         var histogramsSeen = new HashSet<string>();
 
         using var listener = new MeterListener();
+
         listener.InstrumentPublished = (instrument, meterListener) =>
         {
             if (instrument.Meter.Name == "NBenchmark")
@@ -22,6 +20,7 @@ public sealed class DiagnosticsIntegrationTests
                 meterListener.EnableMeasurementEvents(instrument);
             }
         };
+
         listener.SetMeasurementEventCallback<double>((_, _, _, _) => { });
         listener.SetMeasurementEventCallback<long>((_, _, _, _) => { });
         listener.Start();

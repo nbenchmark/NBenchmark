@@ -11,6 +11,8 @@ public static class PerformanceCalibration
 
     private static readonly Lazy<CalibrationResult> Cached = new(RunCalibration);
 
+    private static long Accumulator;
+
     public static CalibrationResult Run() => Cached.Value;
 
     public static BenchmarkResult CreateBenchmarkResult()
@@ -43,8 +45,6 @@ public static class PerformanceCalibration
 
         return new CalibrationResult(mean, median, samples);
     }
-
-    private static long Accumulator;
 
     private static long BusyWeight(int iterations)
     {

@@ -444,7 +444,8 @@ public sealed record BenchmarkTable
                 lines.Add($"  Gen0: {diag.Gen0Collections.Value}   Gen1: {diag.Gen1Collections ?? 0}   Gen2: {diag.Gen2Collections ?? 0}");
 
             if (diag.HeapCommittedBytes.HasValue)
-                lines.Add($"  Heap: {BenchmarkFormatter.FormatBytes(diag.HeapCommittedBytes.Value)} (fragmented {BenchmarkFormatter.FormatBytes(diag.HeapFragmentedBytes ?? 0)})");
+                lines.Add(
+                    $"  Heap: {BenchmarkFormatter.FormatBytes(diag.HeapCommittedBytes.Value)} (fragmented {BenchmarkFormatter.FormatBytes(diag.HeapFragmentedBytes ?? 0)})");
 
             if (diag.CpuWallRatio.HasValue)
                 lines.Add($"  CPU: {diag.CpuWallRatio.Value * 100:F0}% ({BenchmarkFormatter.FormatNs(diag.CpuTimeNsPerOp ?? 0)}/op)");
@@ -465,7 +466,7 @@ public sealed record BenchmarkTable
     public static string FormatAutoTuneSummary(AutoTuneDiagnostic diagnostic)
     {
         var summary = $"auto-tuned: {diagnostic.ResolvedSamples:N0} samples × {diagnostic.OpsPerSample:N0} ops, "
-               + $"warmup {diagnostic.ResolvedWarmup:N0}, CI ±{diagnostic.AchievedRelativeCiWidth * 100:F1}%";
+                      + $"warmup {diagnostic.ResolvedWarmup:N0}, CI ±{diagnostic.AchievedRelativeCiWidth * 100:F1}%";
 
         if (diagnostic.JitterMetric.HasValue)
             summary += $", jitter {diagnostic.JitterMetric.Value:F2}";

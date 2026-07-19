@@ -146,9 +146,10 @@ public sealed class PerClassWithScopedServiceCodeFixProvider : CodeFixProvider
             return document;
 
         var fullIStateResetName = iStateReset.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
         var resetMethod = SyntaxFactory.MethodDeclaration(
-            SyntaxFactory.ParseTypeName("System.Threading.Tasks.Task"),
-            "ResetAsync")
+                SyntaxFactory.ParseTypeName("System.Threading.Tasks.Task"),
+                "ResetAsync")
             .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword)))
             .WithParameterList(SyntaxFactory.ParameterList(
                 SyntaxFactory.SingletonSeparatedList(
@@ -159,36 +160,40 @@ public sealed class PerClassWithScopedServiceCodeFixProvider : CodeFixProvider
 
         // Add the interface to the base list if not already present, plus a using directive.
         var baseTypes = typeDecl.BaseList?.Types ?? new SeparatedSyntaxList<BaseTypeSyntax>();
+
         var alreadyImplements = baseTypes.Any(bt =>
             bt.Type.ToString() is "IStateReset"
-            or "NBenchmark.Lifecycle.IStateReset"
-            or "global::NBenchmark.Lifecycle.IStateReset");
+                or "NBenchmark.Lifecycle.IStateReset"
+                or "global::NBenchmark.Lifecycle.IStateReset");
 
-        TypeDeclarationSyntax newTypeDecl = typeDecl
+        var newTypeDecl = typeDecl
             .AddMembers(resetMethod);
 
         if (!alreadyImplements)
         {
             var baseType = SyntaxFactory.SimpleBaseType(
                 SyntaxFactory.ParseTypeName(fullIStateResetName));
+
             newTypeDecl = newTypeDecl.WithBaseList(
                 (newTypeDecl.BaseList ?? SyntaxFactory.BaseList())
-                    .AddTypes(baseType));
+                .AddTypes(baseType));
         }
 
         var newRoot = root.ReplaceNode(typeDecl, newTypeDecl);
 
         // Ensure a using directive for NBenchmark.Lifecycle is present.
         var compilationRoot = (CompilationUnitSyntax)newRoot;
+
         var hasUsing = compilationRoot.Usings.Any(u =>
             u.Name?.ToString() is "NBenchmark.Lifecycle"
-            or "global::NBenchmark.Lifecycle");
+                or "global::NBenchmark.Lifecycle");
 
         if (!hasUsing)
         {
             var usingDirective = SyntaxFactory.UsingDirective(
-                SyntaxFactory.ParseName("NBenchmark.Lifecycle"))
+                    SyntaxFactory.ParseName("NBenchmark.Lifecycle"))
                 .NormalizeWhitespace();
+
             compilationRoot = compilationRoot.AddUsings(usingDirective);
             newRoot = compilationRoot;
         }

@@ -86,6 +86,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
         // checks both lists), and the ResolveObserver dedup suppresses the auto-attached
         // entry of the same name so the observer fires once, not twice.
         var factoryCallCount = 0;
+
         ObserverRegistry.RegisterAutoAttach(
             "auto",
             "auto",
@@ -97,7 +98,9 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1", "--observer", "auto"])
+            await BenchmarkHarness.Create([
+                    "--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1", "--observer", "auto",
+                ])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();
@@ -116,16 +119,20 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
         // The realistic composition: the user registers "explicit" explicitly via Register
         // and passes --observer explicit; a package auto-attaches "other". Both fire.
         var explicitObserver = new CapturingAutoObserver("explicit");
+
         ObserverRegistry.Register(
             "explicit",
             "explicit",
             () => explicitObserver);
+
         var auto = new CapturingAutoObserver("other");
         ObserverRegistry.RegisterAutoAttach("other", "auto", () => auto);
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1", "--observer", "explicit"])
+            await BenchmarkHarness.Create([
+                    "--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1", "--observer", "explicit",
+                ])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();
@@ -145,6 +152,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
         // drops the CLI-duplicated one, so the observer fires once, not twice.
         var cliCallCount = 0;
         var programmaticCallCount = 0;
+
         ObserverRegistry.Register(
             "dup",
             "explicit",
@@ -159,9 +167,12 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
         // resolves --observer dup via TryCreate and adds to _observers. The dedup in
         // ResolveObserver keeps the first (programmatic) and drops the CLI duplicate.
         var programmatic = new CountingAutoObserver("dup");
+
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1", "--observer", "dup"])
+            await BenchmarkHarness.Create([
+                    "--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1", "--observer", "dup",
+                ])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithObserver(programmatic)
@@ -171,6 +182,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
         // The programmatic instance is kept; the CLI-duplicated instance (from TryCreate)
         // is dedup'd out by name. Only the programmatic observer's Dispose is called once.
         Assert.Equal(1, programmatic.DisposeCallCount);
+
         // The CLI factory was called once by TryCreate in BenchmarkHarness.Create, but the
         // result was dedup'd out of the composite. The auto-attached factory is not called.
         Assert.Equal(1, cliCallCount);
@@ -180,6 +192,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
     public async Task Programmatic_Named_Observer_Suppresses_AutoAttached_Of_Same_Name()
     {
         var programmatic = new CapturingAutoObserver("studio");
+
         ObserverRegistry.RegisterAutoAttach(
             "studio",
             "auto",

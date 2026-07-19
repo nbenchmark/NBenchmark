@@ -25,7 +25,11 @@ public class PerClassStateResetTests
             envelopes, RunOrder.Declaration, null, MeasurementOptions.Default,
             0, 3,
             NullBenchmarkProgress.Instance, CancellationToken.None,
-            () => { fireCount++; return Task.CompletedTask; });
+            () =>
+            {
+                fireCount++;
+                return Task.CompletedTask;
+            });
 
         Assert.Equal(2, fireCount);
     }
@@ -40,7 +44,11 @@ public class PerClassStateResetTests
             envelopes, RunOrder.Declaration, null, MeasurementOptions.Default,
             0, 1,
             NullBenchmarkProgress.Instance, CancellationToken.None,
-            () => { fireCount++; return Task.CompletedTask; });
+            () =>
+            {
+                fireCount++;
+                return Task.CompletedTask;
+            });
 
         Assert.Equal(0, fireCount);
     }
@@ -70,6 +78,7 @@ public class PerClassStateResetTests
         // The hook must fire after OnBenchmarkCompleted and before the next OnBenchmarkStarting.
         // We track the order of events: a-start, a-complete, [hook], b-start, b-complete.
         var progress = new CapturingProgress();
+
         var envelopes = new[]
         {
             StaticEnvelope("a"),
@@ -84,7 +93,11 @@ public class PerClassStateResetTests
             envelopes, RunOrder.Declaration, null, MeasurementOptions.Default,
             0, 2,
             progress, CancellationToken.None,
-            () => { eventLog.Add("hook"); return Task.CompletedTask; });
+            () =>
+            {
+                eventLog.Add("hook");
+                return Task.CompletedTask;
+            });
 
         Assert.Equal(
             new[] { "a-starting", "a-completed", "hook", "b-starting", "b-completed" },
@@ -108,6 +121,7 @@ public class PerClassStateResetTests
             "--warmup", "1",
             "--launch-count", "1",
         ]);
+
         harness.AddFromAssembly(typeof(ResetTrackingBenchmarks).Assembly);
 
         await harness.RunAsync();
@@ -130,6 +144,7 @@ public class PerClassStateResetTests
             "--warmup", "1",
             "--launch-count", "1",
         ]);
+
         harness.AddFromAssembly(typeof(NoResetBenchmarks).Assembly);
 
         await harness.RunAsync();
@@ -182,6 +197,13 @@ public class ResetTrackingBenchmarks : IStateReset
     public static int ResetCallCount;
     public static int SharedState;
 
+    public Task ResetAsync(CancellationToken cancellationToken)
+    {
+        ResetCallCount++;
+        SharedState = 0;
+        return Task.CompletedTask;
+    }
+
     [Benchmark]
     public void MethodA()
     {
@@ -190,17 +212,7 @@ public class ResetTrackingBenchmarks : IStateReset
     }
 
     [Benchmark]
-    public void MethodB()
-    {
-        SharedState++;
-    }
-
-    public Task ResetAsync(CancellationToken cancellationToken)
-    {
-        ResetCallCount++;
-        SharedState = 0;
-        return Task.CompletedTask;
-    }
+    public void MethodB() => SharedState++;
 }
 
 [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -209,8 +221,12 @@ public class NoResetBenchmarks
     public static int ResetCallCount;
 
     [Benchmark]
-    public void MethodA() { }
+    public void MethodA()
+    {
+    }
 
     [Benchmark]
-    public void MethodB() { }
+    public void MethodB()
+    {
+    }
 }

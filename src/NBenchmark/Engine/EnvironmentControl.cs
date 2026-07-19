@@ -10,10 +10,10 @@ namespace NBenchmark.Engine;
 ///     scope that restores the prior process affinity and priority on dispose, so a
 ///     run never leaves the host in an elevated or pinned state.
 ///     <para>
-///     This is the proactive counterpart to the statistical noise handling in
-///     <c>OutlierDetectors</c> and <c>BimodalDetector</c>: those modules react to noise
-///     after the fact; this module reduces noise at the source (CPU migration, priority
-///     preemption, shared-host jitter) before the timer starts.
+///         This is the proactive counterpart to the statistical noise handling in
+///         <c>OutlierDetectors</c> and <c>BimodalDetector</c>: those modules react to noise
+///         after the fact; this module reduces noise at the source (CPU migration, priority
+///         preemption, shared-host jitter) before the timer starts.
 ///     </para>
 /// </summary>
 public static class EnvironmentControl
@@ -33,13 +33,12 @@ public static class EnvironmentControl
     public static IDisposable Apply(EnvironmentOptions? options)
     {
         if (options is null || (options.CpuAffinity is null
-                && options.ProcessPriority is null
-                && !options.DedicatedHostGuidance))
-        {
+                                && options.ProcessPriority is null
+                                && !options.DedicatedHostGuidance))
             return NoOpScope.Instance;
-        }
 
         var process = Process.GetCurrentProcess();
+
         // ProcessorAffinity is only supported on Linux and Windows. Capture the prior
         // mask only on those platforms so RestoreScope has something valid to write back;
         // on macOS affinity is never applied, so no prior value is needed.
@@ -149,8 +148,11 @@ public static class EnvironmentControl
             return;
 
         Console.Error.WriteLine("Dedicated-host guidance:");
+
         foreach (var w in warnings)
+        {
             Console.Error.WriteLine($"  - {w}");
+        }
     }
 
     /// <summary>
@@ -176,10 +178,12 @@ public static class EnvironmentControl
             mask |= 1L << idx;
         }
 
-        if (IntPtr.Size < 8 && (mask >> (IntPtr.Size * 8)) != 0)
+        if (IntPtr.Size < 8 && mask >> (IntPtr.Size * 8) != 0)
+        {
             throw new ArgumentException(
                 "CPU affinity mask exceeds the addressable bit width on this 32-bit host.",
                 nameof(affinity));
+        }
 
         if (mask == 0)
             throw new ArgumentException("CPU affinity list is empty.", nameof(affinity));
@@ -194,10 +198,10 @@ public static class EnvironmentControl
     /// </summary>
     private static bool IsApplyOrRestoreException(Exception ex)
         => ex is ArgumentException
-           or Win32Exception
-           or InvalidOperationException
-           or PlatformNotSupportedException
-           or UnauthorizedAccessException;
+            or Win32Exception
+            or InvalidOperationException
+            or PlatformNotSupportedException
+            or UnauthorizedAccessException;
 
     /// <summary>
     ///     <see cref="Process.ProcessorAffinity" /> is only supported on Linux and
@@ -226,11 +230,11 @@ public static class EnvironmentControl
     /// </summary>
     private sealed class RestoreScope : IDisposable
     {
-        private readonly Process _process;
-        private readonly IntPtr _priorAffinity;
-        private readonly ProcessPriorityClass _priorPriority;
         private readonly bool _affinityApplied;
+        private readonly IntPtr _priorAffinity;
         private readonly bool _priorityApplied;
+        private readonly ProcessPriorityClass _priorPriority;
+        private readonly Process _process;
         private bool _disposed;
 
         public RestoreScope(

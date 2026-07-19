@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -24,7 +23,7 @@ namespace NBenchmark.Diagnostics;
 ///         are honoured verbatim - they are the OpenTelemetry-standard way to attach arbitrary
 ///         resource attributes, so a user who has already configured them for the rest of their
 ///         service does not have to repeat themselves. NBenchmark-specific attributes use the
-///     <c>nbenchmark.*</c> namespace to avoid collisions with the standard OTel schema.
+///         <c>nbenchmark.*</c> namespace to avoid collisions with the standard OTel schema.
 ///     </para>
 ///     <para>
 ///         <see cref="NBenchmarkDiagnostics.OnSuiteStarting" /> stamps every returned attribute
@@ -105,12 +104,16 @@ public static class TelemetryResource
         AddIfPresent(attrs, "nbenchmark.ci_run_id",
             "GITHUB_RUN_ID", "CI_PIPELINE_ID", "BUILD_BUILDID", "CIRCLE_BUILD_NUM",
             "APPVEYOR_BUILD_ID", "TEAMCITY_BUILDID", "BUILDKITE_BUILD_ID", "TRAVIS_BUILD_ID");
+
         AddIfPresent(attrs, "nbenchmark.ci_run_url",
             "GITHUB_SERVER_URL", "CI_JOB_URL", "BUILD_BUILDURI", "CIRCLE_BUILD_URL");
+
         AddIfPresent(attrs, "nbenchmark.ci_repository",
             "GITHUB_REPOSITORY", "CI_REPOSITORY_URL");
+
         AddIfPresent(attrs, "nbenchmark.ci_ref",
             "GITHUB_REF", "CI_COMMIT_REF_NAME");
+
         AddIfPresent(attrs, "nbenchmark.ci_attempt",
             "GITHUB_RUN_ATTEMPT");
     }
@@ -140,11 +143,13 @@ public static class TelemetryResource
         // `nbenchmark.host.runtime` key to avoid colliding with the `nbenchmark.runtime` tag
         // OnSuiteStarting sets from the runtimes parameter (the TFM list, e.g. "net8,net9").
         attrs["nbenchmark.host.machine_name"] = Environment.MachineName;
+
         attrs["nbenchmark.host.os"] =
             OperatingSystem.IsWindows() ? "windows"
             : OperatingSystem.IsMacOS() ? "macos"
             : OperatingSystem.IsLinux() ? "linux"
             : Environment.OSVersion.Platform.ToString().ToLowerInvariant();
+
         attrs["nbenchmark.host.arch"] = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
         attrs["nbenchmark.host.runtime"] = RuntimeInformation.FrameworkDescription;
     }
@@ -236,7 +241,7 @@ public static class TelemetryResource
         {
             try
             {
-                process.Kill(entireProcessTree: true);
+                process.Kill(true);
             }
             catch
             {

@@ -10,8 +10,12 @@ using NBenchmark.Reporters.Console;
 // 500 give the JIT time to settle and tighten the confidence interval). Only the
 // reporter rendering differs across the three runs.
 await new BenchmarkSuite("sorting-simple")
-    .Add("bubble", () => { var a = Enumerable.Range(0, 100).Reverse().ToArray(); Array.Sort(a); })
-    .Add("linq",   () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
+    .Add("bubble", () =>
+    {
+        var a = Enumerable.Range(0, 100).Reverse().ToArray();
+        Array.Sort(a);
+    })
+    .Add("linq", () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
     .WithWarmup(25).WithIterations(500).WithOpsPerSample(1)
     .WithDetail(ReportDetail.Simple)
@@ -27,8 +31,12 @@ await new BenchmarkSuite("sorting-simple")
 // auto, a pinned value = fixed), not by ReportDetail. All three runs here pin
 // OpsPerSample=1 so calibration does not vary run to run.
 await new BenchmarkSuite("sorting-standard")
-    .Add("bubble", () => { var a = Enumerable.Range(0, 100).Reverse().ToArray(); Array.Sort(a); })
-    .Add("linq",   () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
+    .Add("bubble", () =>
+    {
+        var a = Enumerable.Range(0, 100).Reverse().ToArray();
+        Array.Sort(a);
+    })
+    .Add("linq", () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
     .WithWarmup(25).WithIterations(500).WithOpsPerSample(1)
     .WithDetail(ReportDetail.Standard)
@@ -41,8 +49,12 @@ await new BenchmarkSuite("sorting-standard")
 //
 // Same pinned measurement as Runs 1 and 2.
 await new BenchmarkSuite("sorting-advanced")
-    .Add("bubble", () => { var a = Enumerable.Range(0, 100).Reverse().ToArray(); Array.Sort(a); })
-    .Add("linq",   () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
+    .Add("bubble", () =>
+    {
+        var a = Enumerable.Range(0, 100).Reverse().ToArray();
+        Array.Sort(a);
+    })
+    .Add("linq", () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
     .WithWarmup(25).WithIterations(500).WithOpsPerSample(1)
     .WithDetail(ReportDetail.Advanced)

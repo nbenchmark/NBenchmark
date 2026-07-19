@@ -937,6 +937,7 @@ public class BenchmarkTableTests
         };
 
         BenchmarkTable.CrossClassMode = true;
+
         try
         {
             var tables = BenchmarkTable.BuildPerClass(results);
@@ -961,6 +962,7 @@ public class BenchmarkTableTests
         };
 
         BenchmarkTable.CrossClassMode = true;
+
         try
         {
             var table = Assert.Single(BenchmarkTable.BuildPerClass(results));

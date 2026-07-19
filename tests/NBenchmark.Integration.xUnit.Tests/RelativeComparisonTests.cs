@@ -1,5 +1,4 @@
 using NBenchmark.Integration.Abstractions;
-using NBenchmark.Stats;
 using Xunit;
 
 namespace NBenchmark.Integration.xUnit.Tests;
@@ -15,7 +14,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 50);
 
         var violations = RelativeComparison.Check(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.Empty(violations);
     }
@@ -29,7 +28,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 100);
 
         var violations = RelativeComparison.Check(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.Single(violations);
         Assert.Contains("Regression detected", violations[0]);
@@ -45,7 +44,7 @@ public sealed class RelativeComparisonTests
         var candidateSamples = GenerateSamples(200, 100);
 
         var violations = RelativeComparison.Check(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.Empty(violations);
     }
@@ -59,7 +58,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 100);
 
         var violations = RelativeComparison.Check(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.Empty(violations);
     }
@@ -73,7 +72,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = new double[] { 200 };
 
         var violations = RelativeComparison.Check(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.Empty(violations);
     }
@@ -86,7 +85,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 50);
 
         var violations = RelativeComparison.Check(
-            candidate, [], reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, [], reference, referenceSamples, 1.2);
 
         Assert.Single(violations);
         Assert.Contains("no raw samples", violations[0]);
@@ -100,7 +99,7 @@ public sealed class RelativeComparisonTests
         var candidateSamples = GenerateSamples(600, 50);
 
         var violations = RelativeComparison.Check(
-            candidate, candidateSamples, reference, [], maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, [], 1.2);
 
         Assert.Single(violations);
         Assert.Contains("no raw samples", violations[0]);
@@ -115,7 +114,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(0, 50);
 
         var violations = RelativeComparison.Check(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.Single(violations);
         Assert.Contains("non-positive reference", violations[0]);
@@ -130,7 +129,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 100);
 
         var verdict = RelativeComparison.CheckStructured(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.True(verdict.IsRegression);
         Assert.Single(verdict.Violations);
@@ -149,7 +148,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 50);
 
         var verdict = RelativeComparison.CheckStructured(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.False(verdict.IsRegression);
         Assert.Empty(verdict.Violations);
@@ -169,7 +168,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 100);
 
         var verdict = RelativeComparison.CheckStructured(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.False(verdict.IsRegression);
         Assert.Empty(verdict.Violations);
@@ -188,7 +187,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 50);
 
         var verdict = RelativeComparison.CheckStructured(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.False(verdict.IsRegression);
         Assert.Empty(verdict.Violations);
@@ -207,7 +206,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 50);
 
         var verdict = RelativeComparison.CheckStructured(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.False(verdict.IsRegression);
         Assert.Single(verdict.Violations);
@@ -225,7 +224,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 50);
 
         var verdict = RelativeComparison.CheckStructured(
-            candidate, [], reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, [], reference, referenceSamples, 1.2);
 
         Assert.False(verdict.IsRegression);
         Assert.Single(verdict.Violations);
@@ -244,7 +243,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(0, 50);
 
         var verdict = RelativeComparison.CheckStructured(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.True(verdict.IsRegression);
         Assert.Single(verdict.Violations);
@@ -262,7 +261,7 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(0, 50);
 
         var verdict = RelativeComparison.CheckStructured(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.False(verdict.IsRegression);
         Assert.Empty(verdict.Violations);
@@ -281,10 +280,10 @@ public sealed class RelativeComparisonTests
         var referenceSamples = GenerateSamples(200, 100);
 
         var structured = RelativeComparison.CheckStructured(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         var strings = RelativeComparison.Check(
-            candidate, candidateSamples, reference, referenceSamples, maxSlowdownRatio: 1.2);
+            candidate, candidateSamples, reference, referenceSamples, 1.2);
 
         Assert.Equal(structured.Violations, strings);
     }
@@ -319,8 +318,12 @@ public sealed class RelativeComparisonTests
     private static double[] GenerateSamples(double mean, int count)
     {
         var samples = new double[count];
+
         for (var i = 0; i < count; i++)
+        {
             samples[i] = mean + (i % 10 - 5) * 0.05 * mean;
+        }
+
         return samples;
     }
 }

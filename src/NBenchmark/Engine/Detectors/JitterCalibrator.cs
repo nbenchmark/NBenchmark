@@ -20,6 +20,9 @@ namespace NBenchmark.Engine.Detectors;
 /// </remarks>
 internal static class JitterCalibrator
 {
+    /// <summary>Escaped accumulator state, so the busy-weight loop is not dead-code-eliminated.</summary>
+    public static long Accumulator;
+
     /// <summary>
     ///     Runs the jitter probe and returns a robust jitter metric: the ratio of the median
     ///     absolute deviation to the median (<c>MAD / median</c>) of the per-sample timings.
@@ -65,9 +68,6 @@ internal static class JitterCalibrator
 
         return RobustJitterMetric(samples);
     }
-
-    /// <summary>Escaped accumulator state, so the busy-weight loop is not dead-code-eliminated.</summary>
-    public static long Accumulator;
 
     /// <summary>
     ///     A deterministic, allocation-free CPU-bound loop. The multiply-accumulate pattern

@@ -271,6 +271,7 @@ public class ReporterTests
             Assert.Contains(
                 "| | Benchmark | Median | Mean | Ops/s | Ratio | Scale | Sig | Magnitude | Alloc/op |",
                 content);
+
             Assert.Contains("|:---:|---|---:|---:|---:|:---:|---|---:|---:|---:|", content);
         }
         finally
@@ -414,6 +415,7 @@ public class ReporterTests
         try
         {
             var reporter = new CsvReporter(tempDir, "out.csv", ReportDetail.Advanced);
+
             var result = MakeResult("alpha", 100) with
             {
                 Diagnostics = new DiagnosticsResult
