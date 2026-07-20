@@ -151,7 +151,6 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
         // Name = "x". The ResolveObserver dedup keeps the first (programmatic) instance and
         // drops the CLI-duplicated one, so the observer fires once, not twice.
         var cliCallCount = 0;
-        var programmaticCallCount = 0;
 
         ObserverRegistry.Register(
             "dup",
