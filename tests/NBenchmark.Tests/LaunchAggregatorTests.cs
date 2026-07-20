@@ -1,4 +1,5 @@
 using NBenchmark.Engine;
+using NBenchmark.Stats;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -115,6 +116,67 @@ public class LaunchAggregatorTests
         // For 2 launches, t-value at df=1 is 12.706, so CI should be wide
         Assert.True(stats.LaunchConfidenceIntervalLower < 100);
         Assert.True(stats.LaunchConfidenceIntervalUpper > 120);
+    }
+
+    [Fact]
+    public void Aggregate_ThreeLaunches_At_99Percent_Uses_StudentT_CriticalValue()
+    {
+        // The previous TValue implementation scaled a hardcoded 95% t-table by z/z95, which is
+        // wrong for t-quantiles. At df=2, CL=0.99 it returned 5.66 vs the true 9.925 - a CI
+        // ~43% too narrow. The fix delegates to StudentT.CriticalValue, which is accurate to
+        // <1% even at low df. This test pins the corrected behaviour: the CI must reflect
+        // t(0.99, df=2) ~= 9.925, not the scaled 5.66.
+        var medians = new double[] { 100, 110, 120 };
+        var results = medians.Select(m => CreateResult("test", m, m, 0, 100)).ToList();
+
+        const double cl = 0.99;
+
+        var stats = LaunchAggregator.Aggregate(results, cl);
+
+        Assert.Equal(3, stats.LaunchCount);
+        Assert.Equal(110.0, stats.LaunchMean, 10);
+
+        // Sample stddev of [100, 110, 120] is 10; se = 10 / sqrt(3) ~= 5.7735.
+        // t(0.99, df=2) ~= 9.925 -> margin ~= 57.32. The old code returned 5.66 -> margin ~= 32.66.
+        // We assert the corrected margin is within 1e-2 of the Student-t-derived value, which
+        // both documents the fix and guards against a regression to the scaled approximation.
+        Assert.NotNull(stats.LaunchConfidenceIntervalLower);
+        Assert.NotNull(stats.LaunchConfidenceIntervalUpper);
+
+        var tCritical = StudentT.CriticalValue(cl, degreesOfFreedom: medians.Length - 1);
+        var sampleStdDev = Math.Sqrt(medians.Sum(m => (m - stats.LaunchMean) * (m - stats.LaunchMean))
+                                     / (medians.Length - 1));
+        var expectedMargin = tCritical * sampleStdDev / Math.Sqrt(medians.Length);
+        var expectedLower = stats.LaunchMean - expectedMargin;
+        var expectedUpper = stats.LaunchMean + expectedMargin;
+
+        Assert.Equal(expectedLower, stats.LaunchConfidenceIntervalLower!.Value, 2);
+        Assert.Equal(expectedUpper, stats.LaunchConfidenceIntervalUpper!.Value, 2);
+
+        // Sanity check: the corrected CI is materially wider than the old scaled approximation.
+        Assert.True(expectedMargin > 50.0,
+            $"corrected margin {expectedMargin:F2} should exceed the old 32.66 approximation");
+    }
+
+    [Fact]
+    public void Aggregate_At_95Percent_Matches_StudentT_CriticalValue()
+    {
+        // Cross-check the 95% path against StudentT directly - the old code was accurate at
+        // CL=0.95, so this guards against accidental regressions for the common case.
+        var medians = new double[] { 100, 110, 120 };
+        var results = medians.Select(m => CreateResult("test", m, m, 0, 100)).ToList();
+
+        const double cl = 0.95;
+
+        var stats = LaunchAggregator.Aggregate(results, cl);
+
+        var tCritical = StudentT.CriticalValue(cl, degreesOfFreedom: medians.Length - 1);
+        var sampleStdDev = Math.Sqrt(medians.Sum(m => (m - stats.LaunchMean) * (m - stats.LaunchMean))
+                                     / (medians.Length - 1));
+        var expectedMargin = tCritical * sampleStdDev / Math.Sqrt(medians.Length);
+
+        Assert.Equal(stats.LaunchMean - expectedMargin, stats.LaunchConfidenceIntervalLower!.Value, 2);
+        Assert.Equal(stats.LaunchMean + expectedMargin, stats.LaunchConfidenceIntervalUpper!.Value, 2);
     }
 
     [Fact]

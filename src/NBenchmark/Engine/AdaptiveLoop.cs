@@ -19,6 +19,15 @@ internal static class AdaptiveLoop
     // prematurely freeze K at 1. Small enough that calibration stays cheap.
     private const int CalibrationSamplesPerStep = 5;
 
+    // A body whose first calibration probe already spans three orders of magnitude over the target
+    // sample duration cannot resolve to K > 1 - the doubling search would only ever settle on the
+    // very first candidate (K = 1). Running the remaining probes is pure waste (a 2 s body would
+    // burn 8 s of the default 20 s budget on four extra probes that all clear the target). Once
+    // the first probe clears the short-circuit factor, break out of the probe loop and feed that
+    // single reading. Post-warmup K recalibration (WS3) is the safety net for extreme cold-start
+    // skew where the first probe is a fluke.
+    private const int SlowBodyShortCircuitFactor = 1000;
+
     // Cached phase string literals for the per-sample OTLP tags. Using literals (instead of
     // MeasurementPhase.ToString()) keeps the RecordSample hot path allocation-free: the tag
     // value is a reference to an interned string, not a fresh allocation per sample.
@@ -142,6 +151,13 @@ internal static class AdaptiveLoop
 
                     if (elapsed < best)
                         best = elapsed;
+
+                    // Short-circuit slow bodies: a probe that already spans many times the target
+                    // sample duration cannot resolve to K > 1 (the doubling search would settle on
+                    // the very first candidate anyway), and the remaining probes would just burn the
+                    // tuning budget. Feed the single reading and move on.
+                    if (probe == 0 && elapsed >= autoTune.TargetSampleDurationNs * SlowBodyShortCircuitFactor)
+                        break;
                 }
 
                 var resolved = calibrator.Feed(best);
@@ -412,6 +428,7 @@ internal static class AdaptiveLoop
             autoTune.MaxTuningTime,
             autoTune.CiTarget,
             autoTune.MaxSamples,
+            explicitSamples,
             jitterMetric,
             detectorSwitched);
     }
@@ -534,6 +551,13 @@ internal static class AdaptiveLoop
 
                     if (elapsed < best)
                         best = elapsed;
+
+                    // Short-circuit slow bodies: a probe that already spans many times the target
+                    // sample duration cannot resolve to K > 1 (the doubling search would settle on
+                    // the very first candidate anyway), and the remaining probes would just burn the
+                    // tuning budget. Feed the single reading and move on.
+                    if (probe == 0 && elapsed >= autoTune.TargetSampleDurationNs * SlowBodyShortCircuitFactor)
+                        break;
                 }
 
                 var resolved = calibrator.Feed(best);
@@ -807,6 +831,7 @@ internal static class AdaptiveLoop
             autoTune.MaxTuningTime,
             autoTune.CiTarget,
             autoTune.MaxSamples,
+            explicitSamples,
             jitterMetric,
             detectorSwitched);
     }
@@ -836,6 +861,7 @@ internal static class AdaptiveLoop
         TimeSpan maxTuningTime,
         double ciTarget,
         int maxSamples,
+        int? explicitSamples,
         double? jitterMetric,
         bool detectorSwitched)
     {
@@ -862,7 +888,7 @@ internal static class AdaptiveLoop
 
         var warnings = BuildStopWarnings(
             warmupStop, sampleStop, calibrationCapped, maxTuningTime,
-            achievedCi, ciTarget, maxSamples);
+            achievedCi, ciTarget, maxSamples, sampleCount, explicitSamples);
 
         if (detectorSwitched)
         {
@@ -952,7 +978,9 @@ internal static class AdaptiveLoop
         TimeSpan maxTuningTime,
         double achievedCi,
         double ciTarget,
-        int maxSamples)
+        int maxSamples,
+        int sampleCount,
+        int? explicitSamples)
     {
         var capLabel = BenchmarkFormatter.FormatDuration(maxTuningTime);
 
@@ -968,6 +996,21 @@ internal static class AdaptiveLoop
 
         if (sampleStop == SampleStopReason.WallClockCap)
         {
+            // When the user pinned --iterations, the cap prevented the loop from collecting the
+            // requested count. The auto-mode text ("pinning --iterations") would be misleading
+            // because iterations were already pinned; say how many of the requested samples were
+            // collected and point at --max-tuning-time or a lower pinned count instead.
+            if (explicitSamples is { } pinned and > 0)
+            {
+                return
+                [
+                    $"Measurement stopped at the wall-clock tuning cap ({capLabel}) "
+                    + $"after collecting {sampleCount} of the pinned {pinned} iterations. "
+                    + "The reported statistics are based on fewer samples than requested. "
+                    + "Consider increasing --max-tuning-time or reducing --iterations.",
+                ];
+            }
+
             return
             [
                 $"Measurement stopped at the wall-clock tuning cap ({capLabel}) "

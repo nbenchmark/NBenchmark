@@ -149,6 +149,43 @@ public class AdaptiveLoopTests
     }
 
     [Fact]
+    public void SlowBody_ShortCircuits_Calibration_After_First_Probe()
+    {
+        var bodyCalls = 0;
+
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = null, // auto-calibrate
+            WarmupIterations = 0,
+            Iterations = 3,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false }, // isolate Phase A
+        };
+
+        // Each sample spans 10 ms (10,000,000 ns) - 10,000x the default TargetSampleDurationNs
+        // (1,000 ns), well above the SlowBodyShortCircuitFactor of 1,000. The doubling search
+        // would settle on K = 1 after a single probe, so running the remaining 4 probes is pure
+        // waste (today this step alone burns 40 ms of in-body time for a 10 ms body).
+        var clock = new ScriptedClock(10_000_000.0);
+
+        var result = RunSync(() => bodyCalls++, options, clock);
+
+        // K resolves to 1 (the slow body clears the target on the first probe).
+        Assert.Equal(1, result.Diagnostic.OpsPerSample);
+
+        // Calibration ran exactly 1 probe at K = 1 (today: 5). With K = 1, each probe invokes the
+        // body once, so calibration contributes 1 body call; the 3 pinned measured samples add 3
+        // more. Body calls: 1 calibration + 0 warmup + 3 measured = 4 (today: 5 + 0 + 3 = 8).
+        Assert.Equal(4, bodyCalls);
+        Assert.Equal(4, result.Diagnostic.TotalBodyInvocations);
+
+        // The 3 measured samples each read 10,000,000 ns / K = 10,000,000 ns per op.
+        Assert.Equal(3, result.PerOpTimings.Length);
+        Assert.All(result.PerOpTimings, t => Assert.Equal(10_000_000.0, t));
+    }
+
+    [Fact]
     public void Setup_Makes_Body_Ineligible_For_Calibration_So_K_Stays_One()
     {
         var bodyCalls = 0;
@@ -238,6 +275,44 @@ public class AdaptiveLoopTests
         Assert.Single(result.Warnings);
         Assert.Contains("wall-clock tuning cap", result.Warnings[0]);
         Assert.Contains("--max-tuning-time", result.Warnings[0]);
+    }
+
+    [Fact]
+    public void WallClock_Cap_With_Pinned_Iterations_Reports_Collected_Of_Pinned()
+    {
+        // When the user pinned --iterations and the cap fires before that count is reached, the
+        // warning must not suggest "pinning --iterations" (they already did). Instead it should
+        // report how many of the requested samples were collected and suggest a lower pinned
+        // count or a larger cap.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = 1_000, // pinned count, far above what the cap allows
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50) }, // 5000 ns
+        };
+
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        // The 5000 ns cap fires after 5 of the pinned 1000 iterations.
+        Assert.Equal(SampleStopReason.WallClockCap, result.Diagnostic.SampleStop);
+        Assert.Equal(5, result.PerOpTimings.Length);
+        Assert.Single(result.Warnings);
+
+        // The pinned-iterations message names both counts and points at --iterations, not
+        // "pinning --iterations". Use the raw value (5) directly so the assertion is robust to
+        // culture-dependent thousands separators in :N0 formatting.
+        var warning = result.Warnings[0];
+        Assert.Contains("wall-clock tuning cap", warning);
+        Assert.Contains("after collecting 5 of the pinned", warning);
+        Assert.Contains("iterations", warning);
+        Assert.Contains("--max-tuning-time", warning);
+        Assert.Contains("reducing --iterations", warning);
+        Assert.DoesNotContain("pinning --iterations", warning);
     }
 
     [Fact]

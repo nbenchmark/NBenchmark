@@ -225,26 +225,82 @@ public record BenchmarkResult
     /// <summary>
     ///     Factory that produces a <see cref="BenchmarkResult" /> from a calibration
     ///     benchmark's raw timings. Used by the test-integration comparison path.
+    ///     <para>
+    ///         The provided <paramref name="mean" /> and <paramref name="median" /> are kept
+    ///         as-supplied (the test-integration caller computes them independently of
+    ///         <see cref="StatsSummary" />). The remaining descriptive statistics - standard
+    ///         deviation, standard error, margin of error, confidence level, min, max, skewness,
+    ///         kurtosis, MAD, and the quartiles - are computed from <paramref name="samples" />
+    ///         rather than reported as zeros, so the result mirrors a real benchmark's shape and
+    ///         feeds the test-integration comparison path with honest numbers.
+    ///     </para>
     /// </summary>
     public static BenchmarkResult FromCalibration(string name, double mean, double median, double[] samples)
     {
+        ArgumentNullException.ThrowIfNull(samples);
+
+        if (samples.Length == 0)
+        {
+            return new BenchmarkResult
+            {
+                Name = name,
+                Mean = mean,
+                Median = median,
+                Min = 0,
+                Max = 0,
+                StandardDeviation = 0,
+                Q1 = 0,
+                Q3 = 0,
+                InterquartileRange = 0,
+                OutliersRemoved = 0,
+                N = 0,
+                MeasuredIterations = 0,
+                Skewness = 0,
+                Kurtosis = 0,
+                Mad = 0,
+                AllocMedian = null,
+                AllocP95 = null,
+                AllocMax = null,
+            };
+        }
+
+        // Compute the full descriptive-statistics summary from the samples. Disable the
+        // histogram and reported percentiles - FromCalibration is not a measured run, so the
+        // result carries no histogram and the default percentile set is left empty to match the
+        // previous behaviour and avoid surprising the test-integration comparison path.
+        var stats = StatsSummary.Compute(samples, enableHistogram: false, reportedPercentiles: []);
+
+        // Quartiles use the same nearest-rank convention the stats pipeline uses for the raw
+        // sample set (OutlierTrim computes Q1/Q3 on the raw, pre-trim array). StatsSummary
+        // does not surface Q1/Q3, so compute them on the sorted samples StatsSummary already
+        // normalised internally. Build a sorted copy so the public FromCalibration contract
+        // (the input array is never mutated) holds.
+        var sorted = (double[])samples.Clone();
+        Array.Sort(sorted);
+
+        var q1 = Percentile.Compute(sorted, 0.25);
+        var q3 = Percentile.Compute(sorted, 0.75);
+
         return new BenchmarkResult
         {
             Name = name,
             Mean = mean,
             Median = median,
-            Min = samples.Min(),
-            Max = samples.Max(),
-            StandardDeviation = 0,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            Min = stats.Min,
+            Max = stats.Max,
+            StandardDeviation = stats.StandardDeviation,
+            StandardError = stats.StandardError,
+            MarginOfError = stats.MarginOfError,
+            ConfidenceLevel = stats.ConfidenceLevel,
+            Q1 = q1,
+            Q3 = q3,
+            InterquartileRange = q3 - q1,
             OutliersRemoved = 0,
             N = samples.Length,
             MeasuredIterations = samples.Length,
-            Skewness = 0,
-            Kurtosis = 0,
-            Mad = 0,
+            Skewness = stats.Skewness,
+            Kurtosis = stats.Kurtosis,
+            Mad = stats.Mad,
             AllocMedian = null,
             AllocP95 = null,
             AllocMax = null,
