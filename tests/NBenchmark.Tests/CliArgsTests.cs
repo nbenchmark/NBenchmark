@@ -504,7 +504,7 @@ public class CliArgsTests
         Assert.Contains("Missing value", error);
     }
 
-    // ---------- WS2: --warmup-budget-fraction and --cap-grace-factor ----------
+    // ---------- Grace-ceiling and budget-share CLI flags ----------
 
     [Theory]
     [InlineData("0.4", 0.4)]
@@ -587,6 +587,63 @@ public class CliArgsTests
 
         var error = Assert.Single(errors);
         Assert.Contains("Missing value", error);
+    }
+
+    // ---------- Warmup time floor and JIT-quiescence gate CLI flags ----------
+
+    [Theory]
+    [InlineData("100", 100)]
+    [InlineData("25", 25)]
+    [InlineData("0", 0)]
+    [InlineData("250.5", 250.5)]
+    public void ParseCore_MinWarmupTime_Valid_SetsMilliseconds(string value, double expectedMs)
+    {
+        var (result, _) = CliArgs.ParseCore(["--min-warmup-time", value]);
+        Assert.Equal(TimeSpan.FromMilliseconds(expectedMs), result.MinWarmupTime);
+    }
+
+    [Fact]
+    public void ParseCore_MinWarmupTime_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.MinWarmupTime);
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("bogus")]
+    public void ParseCore_MinWarmupTime_Invalid_ReturnsError(string value)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--min-warmup-time", value]);
+
+        Assert.Null(result.MinWarmupTime);
+        var error = Assert.Single(errors);
+        Assert.Contains("Invalid --min-warmup-time", error);
+    }
+
+    [Fact]
+    public void ParseCore_MinWarmupTime_MissingValue_ReturnsError()
+    {
+        var (_, errors) = CliArgs.ParseCore(["--min-warmup-time"]);
+
+        var error = Assert.Single(errors);
+        Assert.Contains("Missing value", error);
+    }
+
+    [Fact]
+    public void ParseCore_NoJitQuiescence_SetsFlag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--no-jit-quiescence"]);
+
+        Assert.True(result.NoJitQuiescence);
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void ParseCore_NoJitQuiescence_Default_IsFalse()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.False(result.NoJitQuiescence);
     }
 
     [Fact]

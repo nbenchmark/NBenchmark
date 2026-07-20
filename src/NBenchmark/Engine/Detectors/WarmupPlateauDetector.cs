@@ -10,14 +10,19 @@ internal sealed class WarmupPlateauDetector
 {
     private readonly int _batchSize;
     private readonly double _epsilon;
+    private readonly double _jitGateDeactivateNs;
     private readonly int _maxWarmup;
     private readonly int _minWarmup;
+    private readonly double _minWarmupTimeNs;
     private readonly int _patience;
+    private readonly bool _requireJitQuiescence;
     private int _batchCount;
 
     private double _batchSum;
     private double _best = double.PositiveInfinity;
+    private long _lastBatchJitCount;
     private int _nonImproving;
+    private double _warmupElapsedNs;
 
     public WarmupPlateauDetector(AutoTuneOptions options)
         : this(options, perSampleEstimateNs: 0.0)
@@ -50,6 +55,13 @@ internal sealed class WarmupPlateauDetector
         _epsilon = options.WarmupEpsilon;
         _patience = Math.Max(1, options.PlateauPatience);
         _batchSize = ResolveBatchSize(options.BatchSize, perSampleEstimateNs);
+        _minWarmupTimeNs = Math.Max(0, options.MinWarmupTime.Ticks * 100.0);
+        _requireJitQuiescence = options.RequireJitQuiescence;
+
+        // The JIT-quiescence gate stops blocking once warmup has run 4 x the time floor, so a busy
+        // host that JITs unrelated code cannot hold warmup open forever. A zero floor leaves this at
+        // zero, which disables the gate (WarmupGates treats a zero deactivation threshold as off).
+        _jitGateDeactivateNs = _minWarmupTimeNs * 4.0;
     }
 
     private static int ResolveBatchSize(int configured, double perSampleEstimateNs)
@@ -77,10 +89,19 @@ internal sealed class WarmupPlateauDetector
     public int Count { get; private set; }
 
     /// <summary>
-    ///     Reports the per-op nanoseconds of one warmup sample. Returns <c>true</c> when warmup is
-    ///     resolved (the caller should move to measurement).
+    ///     The mean per-op nanoseconds of the most recently completed batch, or <c>0</c> before the
+    ///     first batch completes. This is the warm steady-state estimate the caller feeds into
+    ///     post-warmup ops-per-sample recalibration (<see cref="WarmupRecalibration" />).
     /// </summary>
-    public bool Feed(double perOpNs)
+    public double LastBatchMeanPerOp { get; private set; }
+
+    /// <summary>
+    ///     Reports one warmup sample: its per-op nanoseconds (for the plateau rule), its raw elapsed
+    ///     nanoseconds (for the <see cref="AutoTuneOptions.MinWarmupTime" /> floor), and the process
+    ///     JIT compiled-method count read just after the sample (for the JIT-quiescence gate).
+    ///     Returns <c>true</c> when warmup is resolved (the caller should move to measurement).
+    /// </summary>
+    public bool Feed(double perOpNs, double elapsedNs, long jitCompiledMethodCount)
     {
         if (Resolved)
             return true;
@@ -88,6 +109,11 @@ internal sealed class WarmupPlateauDetector
         Count++;
         _batchSum += perOpNs;
         _batchCount++;
+        _warmupElapsedNs += elapsedNs;
+
+        // Capture the JIT baseline on the first sample so the first batch's delta is well-defined.
+        if (Count == 1)
+            _lastBatchJitCount = jitCompiledMethodCount;
 
         if (Count >= _maxWarmup)
         {
@@ -102,6 +128,11 @@ internal sealed class WarmupPlateauDetector
         var batchMean = _batchSum / _batchCount;
         _batchSum = 0;
         _batchCount = 0;
+        LastBatchMeanPerOp = batchMean;
+
+        // Methods the JIT compiled during this batch (a proxy for in-flight tier-1 promotion).
+        var jitDelta = jitCompiledMethodCount - _lastBatchJitCount;
+        _lastBatchJitCount = jitCompiledMethodCount;
 
         // "Improving" means at least WarmupEpsilon faster than the best batch seen so far.
         if (batchMean < _best * (1.0 - _epsilon))
@@ -112,7 +143,13 @@ internal sealed class WarmupPlateauDetector
         if (batchMean < _best)
             _best = batchMean;
 
-        if (Count >= _minWarmup && _nonImproving >= _patience)
+        // The plateau rule says the body has stopped getting faster; the settle gates then decide
+        // whether it is actually safe to stop (enough wall-clock warmup, JIT quiesced).
+        var plateauReached = Count >= _minWarmup && _nonImproving >= _patience;
+
+        if (plateauReached
+            && WarmupGates.CanSettle(
+                _warmupElapsedNs, _minWarmupTimeNs, jitDelta, _requireJitQuiescence, _jitGateDeactivateNs))
         {
             Resolved = true;
             StopReason = WarmupStopReason.Settled;

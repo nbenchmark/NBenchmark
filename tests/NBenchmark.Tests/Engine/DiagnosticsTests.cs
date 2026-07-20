@@ -451,6 +451,33 @@ public sealed class DiagnosticsTests : IDisposable
     }
 
     [Fact]
+    public void OnPhaseCompleted_Emits_Cap_Hit_Span_Event_For_GraceCapExhausted()
+    {
+        // GraceCapExhausted is a cap hit too - the measurement ran into the grace ceiling and still
+        // stopped under MinSamples, which is the variant most worth observing (the result is
+        // flagged unreliable), so it must emit the same phase.cap_hit span event as WallClockCap.
+        var stoppedActivities = new List<Activity>();
+        using var stopListener = new ActivityListener();
+        stopListener.ShouldListenTo = source => source.Name == "NBenchmark";
+
+        stopListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
+            ActivitySamplingResult.AllData;
+
+        stopListener.ActivityStopped = a => stoppedActivities.Add(a);
+        ActivitySource.AddActivityListener(stopListener);
+
+        NBenchmarkDiagnostics.OnPhaseStarting("b", MeasurementPhase.Measurement);
+
+        NBenchmarkDiagnostics.OnPhaseCompleted(
+            "b", MeasurementPhase.Measurement,
+            SampleStopReason.GraceCapExhausted);
+
+        var phaseSpan = stoppedActivities.FirstOrDefault(a => a.DisplayName == "nbenchmark.phase.measurement");
+        Assert.NotNull(phaseSpan);
+        Assert.Contains(phaseSpan.Events, e => e.Name == "phase.cap_hit");
+    }
+
+    [Fact]
     public void OnPhaseCompleted_Does_Not_Emit_Ci_Target_Event_For_ExplicitCount()
     {
         var stoppedActivities = new List<Activity>();

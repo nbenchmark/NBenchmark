@@ -24,9 +24,15 @@ internal static class AdaptiveLoop
     // very first candidate (K = 1). Running the remaining probes is pure waste (a 2 s body would
     // burn 8 s of the default 20 s budget on four extra probes that all clear the target). Once
     // the first probe clears the short-circuit factor, break out of the probe loop and feed that
-    // single reading. Post-warmup K recalibration (WS3) is the safety net for extreme cold-start
-    // skew where the first probe is a fluke.
+    // single reading. Post-warmup K recalibration is the safety net for extreme cold-start skew
+    // where the first probe is a fluke and the warm body runs much faster.
     private const int SlowBodyShortCircuitFactor = 1000;
+
+    // Post-warmup K recalibration triggers only when the warm sample spans less than this fraction
+    // of the target duration - i.e. cold calibration left K meaningfully too small. A half-target
+    // threshold avoids churn from small warm/cold differences while still catching the common case
+    // where the warm body runs several times faster than the tier-0 code calibration first timed.
+    private const double PostWarmupTriggerFraction = 0.5;
 
     // Cached phase string literals for the per-sample OTLP tags. Using literals (instead of
     // MeasurementPhase.ToString()) keeps the RecordSample hot path allocation-free: the tag
@@ -54,6 +60,7 @@ internal static class AdaptiveLoop
         var graceCapNs = maxTuningNs * autoTune.CapGraceFactor;
         var calibrate = IsEligibleForCalibration(o, spec);
         var k = o.OpsPerSample ?? 1;
+        int? initialOpsPerSample = null;
         double accumulatedNs = 0;
         double calibrationWarmupNs = 0;
         double bestCalibrationElapsed = 0;
@@ -250,7 +257,12 @@ internal static class AdaptiveLoop
                     warmupOrdinal++;
                 }
 
-                if (detector.Feed(elapsed / k))
+                // Read the process JIT compiled-method count just after the sample; the detector
+                // uses its per-batch delta as the JIT-quiescence gate signal. Read outside the
+                // timed window (the sample's elapsed is already captured), so it never taints timing.
+                var jitCompiledCount = System.Runtime.JitInfo.GetCompiledMethodCount();
+
+                if (detector.Feed(elapsed / k, elapsed, jitCompiledCount))
                 {
                     warmupStop = detector.StopReason;
                     break;
@@ -264,6 +276,32 @@ internal static class AdaptiveLoop
             }
 
             resolvedWarmup = detector.Count;
+
+            // Post-warmup K recalibration: cold calibration (Phase A) resolved K against the body's
+            // pre-warmup speed; the warm body may run several times faster, leaving each sample well
+            // under the target duration and re-exposing the fixed timer overhead calibration existed
+            // to amortise. Re-derive K from the warm per-op estimate and run one untimed sample so
+            // the larger batch's cache/branch state is warm before measurement starts.
+            if (calibrate && detector.LastBatchMeanPerOp > 0)
+            {
+                var maxOps = Math.Min(autoTune.MaxOpsPerSample, MeasurementOptions.MaxOpsPerSampleLimit);
+                var recalibratedK = WarmupRecalibration.Resolve(
+                    k, detector.LastBatchMeanPerOp, autoTune.TargetSampleDurationNs, maxOps, PostWarmupTriggerFraction);
+
+                if (recalibratedK != k)
+                {
+                    initialOpsPerSample = k;
+                    k = recalibratedK;
+                    RunUntimedSampleSync(body, spec, k, forceGc);
+                    totalBodyInvocations += k;
+
+                    if (attached)
+                    {
+                        observer.OnDetector(new DetectorStateEvent(
+                            name, MeasurementPhase.Warmup, resolvedWarmup, detector.LastBatchMeanPerOp, 0.0, 0.0, k));
+                    }
+                }
+            }
         }
 
         NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Warmup, resolvedWarmup: resolvedWarmup, warmupStop: warmupStop);
@@ -453,7 +491,8 @@ internal static class AdaptiveLoop
             jitterMetric,
             detectorSwitched,
             autoTune.CapGraceFactor,
-            autoTune.WarmupBudgetFraction);
+            autoTune.WarmupBudgetFraction,
+            initialOpsPerSample);
     }
 
     public static async Task<AdaptiveResult> RunAsync(
@@ -475,6 +514,7 @@ internal static class AdaptiveLoop
         var graceCapNs = maxTuningNs * autoTune.CapGraceFactor;
         var calibrate = IsEligibleForCalibration(o, spec);
         var k = o.OpsPerSample ?? 1;
+        int? initialOpsPerSample = null;
         double accumulatedNs = 0;
         double calibrationWarmupNs = 0;
         double bestCalibrationElapsed = 0;
@@ -673,7 +713,12 @@ internal static class AdaptiveLoop
                     warmupOrdinal++;
                 }
 
-                if (detector.Feed(elapsed / k))
+                // Read the process JIT compiled-method count just after the sample; the detector
+                // uses its per-batch delta as the JIT-quiescence gate signal. Read outside the
+                // timed window (the sample's elapsed is already captured), so it never taints timing.
+                var jitCompiledCount = System.Runtime.JitInfo.GetCompiledMethodCount();
+
+                if (detector.Feed(elapsed / k, elapsed, jitCompiledCount))
                 {
                     warmupStop = detector.StopReason;
                     break;
@@ -687,6 +732,32 @@ internal static class AdaptiveLoop
             }
 
             resolvedWarmup = detector.Count;
+
+            // Post-warmup K recalibration: cold calibration (Phase A) resolved K against the body's
+            // pre-warmup speed; the warm body may run several times faster, leaving each sample well
+            // under the target duration and re-exposing the fixed timer overhead calibration existed
+            // to amortise. Re-derive K from the warm per-op estimate and run one untimed sample so
+            // the larger batch's cache/branch state is warm before measurement starts.
+            if (calibrate && detector.LastBatchMeanPerOp > 0)
+            {
+                var maxOps = Math.Min(autoTune.MaxOpsPerSample, MeasurementOptions.MaxOpsPerSampleLimit);
+                var recalibratedK = WarmupRecalibration.Resolve(
+                    k, detector.LastBatchMeanPerOp, autoTune.TargetSampleDurationNs, maxOps, PostWarmupTriggerFraction);
+
+                if (recalibratedK != k)
+                {
+                    initialOpsPerSample = k;
+                    k = recalibratedK;
+                    await RunUntimedSampleAsync(body, spec, k, forceGc).ConfigureAwait(false);
+                    totalBodyInvocations += k;
+
+                    if (attached)
+                    {
+                        observer.OnDetector(new DetectorStateEvent(
+                            name, MeasurementPhase.Warmup, resolvedWarmup, detector.LastBatchMeanPerOp, 0.0, 0.0, k));
+                    }
+                }
+            }
         }
 
         NBenchmarkDiagnostics.OnPhaseCompleted(name, MeasurementPhase.Warmup, resolvedWarmup: resolvedWarmup, warmupStop: warmupStop);
@@ -879,7 +950,8 @@ internal static class AdaptiveLoop
             jitterMetric,
             detectorSwitched,
             autoTune.CapGraceFactor,
-            autoTune.WarmupBudgetFraction);
+            autoTune.WarmupBudgetFraction,
+            initialOpsPerSample);
     }
 
     private static bool IsEligibleForCalibration(MeasurementOptions o, RunSpec spec)
@@ -911,7 +983,8 @@ internal static class AdaptiveLoop
         double? jitterMetric,
         bool detectorSwitched,
         double capGraceFactor,
-        double warmupBudgetFraction)
+        double warmupBudgetFraction,
+        int? initialOpsPerSample)
     {
         var timingsArray = timings.ToArray();
 
@@ -925,6 +998,7 @@ internal static class AdaptiveLoop
             ResolvedWarmup = resolvedWarmup,
             ResolvedSamples = sampleCount,
             OpsPerSample = opsPerSample,
+            InitialOpsPerSample = initialOpsPerSample,
             TotalBodyInvocations = totalBodyInvocations,
             WarmupStop = warmupStop,
             SampleStop = sampleStop,

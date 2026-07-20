@@ -22,19 +22,37 @@ The probe is on by default (`AutoTune.EnableJitterCalibration`). Pinning `Outlie
 
 ### Phase 1 - Ops-per-sample calibration (K)
 
-If `OpsPerSample` is `null` (the default) and the body is eligible, NBenchmark times a single invocation, then doubles K - timing 1, 2, 4, 8, … invocations as one batch - until a batch spans at least `AutoTune.TargetSampleDurationNs` (1 µs by default). The resolved K is reused for warmup and measurement, and every reported timing divides the batch time by K to give a per-operation number.
+If `OpsPerSample` is `null` (the default) and the body is eligible, NBenchmark times a single invocation, then doubles K - timing 1, 2, 4, 8, … invocations as one batch - until a batch spans at least `AutoTune.TargetSampleDurationNs` (**10 µs** by default). The resolved K is reused for warmup and measurement, and every reported timing divides the batch time by K to give a per-operation number.
 
-Calibration is skipped (K = 1) when `IterationSetup`/`IterationTeardown` is set or `ForceGcBeforeEachIteration` is on, because a batch would no longer represent one isolated call. A pinned `OpsPerSample` is always honoured.
+The 10 µs target keeps two per-sample error sources negligible: timer **quantization** (Windows QPC ticks at 100 ns, so a 10 µs sample resolves to ~0.1% rather than the ~±10% a 1 µs sample would suffer) and the fixed **timestamp-read overhead** (~10-30 ns, ~0.2% of 10 µs rather than ~1-3% of 1 µs). Both would otherwise leak into the ±2.5% CI target. Bodies already spanning ≥ 10 µs keep K = 1, so their per-op tail visibility is unchanged.
+
+> [!NOTE] K > 1 batches change what percentiles mean
+> When K > 1, each recorded sample is the mean of K back-to-back operations, so P95/P99/Max and the histogram describe **batch means**, not individual-operation tails - a slow individual op is averaged with its K-1 neighbours. For a sub-10 µs body the trade is deliberate (per-op timing at that scale is dominated by timer noise anyway); when you need per-op tail latency, pin `OpsPerSample = 1` and read the caveats in [Descriptive Statistics](./descriptive.md).
+
+Calibration is skipped (K = 1) when `IterationSetup`/`IterationTeardown` is set or `ForceGcBeforeEachIteration` is on, because a batch would no longer represent one isolated call. A pinned `OpsPerSample` is always honoured. Calibration runs against the body's **cold** (pre-warmup) speed; see [Post-warmup recalibration](#post-warmup-recalibration) below for how K is re-derived once the body is warm.
 
 ### Phase 2 - Warmup (plateau detection)
 
 If `WarmupIterations` is `null`, NBenchmark collects warmup samples in batches of `AutoTune.BatchSize` and tracks the best (fastest) batch mean seen so far. Once `AutoTune.PlateauPatience` consecutive batches fail to improve on the best by at least `AutoTune.WarmupEpsilon`, the code is considered warm and warmup stops - never before `AutoTune.MinWarmup` samples, never after `AutoTune.MaxWarmup`. A pinned `WarmupIterations` runs exactly that many warmup samples.
+
+The plateau rule alone measures warmup in *iterations*, but a fast body plateaus in microseconds of wall-clock - long before the background JIT delivers tier-1 (and dynamic-PGO) code. Warmup would then settle on the stable-but-slow tier-0 plateau and the tier-1 switch would land mid-measurement as a step change, the dominant source of run-to-run variance on very fast benchmarks. Two extra gates prevent that:
+
+- **Warmup time floor** (`AutoTune.MinWarmupTime`, default 100 ms; 25 ms under `Quick`): auto-warmup will not settle until it has run at least this much wall-clock, giving tiered compilation time to land. Set to `0` to disable.
+- **JIT-quiescence gate** (`AutoTune.RequireJitQuiescence`, default on): at each batch boundary NBenchmark reads `System.Runtime.JitInfo`'s compiled-method count; while it is still rising over a batch (tier-1 promotion in flight), warmup continues. To avoid blocking forever on a busy in-process host that JITs unrelated code, the gate deactivates once warmup has run 4 × `MinWarmupTime`. Disabling the time floor (`MinWarmupTime = 0`) also disables this gate.
+
+Both gates only *delay* settling past the plateau; `MaxWarmup` and the calibration+warmup budget share (below) still bound warmup from above, so a genuinely slow body is not held open by them.
 
 For slow bodies the configured `BatchSize` is shrunk based on the per-sample estimate from calibration: a body that takes seconds per sample warms in batches of 1 so the plateau rule can settle after `PlateauPatience + 1` samples instead of `(PlateauPatience + 1) × BatchSize` (subject to the `MinWarmup` floor, which with the default `MinWarmup = 8` is then the binding constraint). Without this shrink a 2 s body with the default `BatchSize = 8` would need `(PlateauPatience + 1) × BatchSize = 32` samples — 64 s of warmup — just to clear the plateau requirement.
 
 Calibration and warmup share a budget: together they may consume at most `AutoTune.WarmupBudgetFraction` of `AutoTune.MaxTuningTime` (default 0.4 = 40%), reserving the remainder for measurement. This keeps slow bodies from spending the whole cap on warmup and leaving measurement with a single sample. When the share is exhausted, warmup stops at the wall-clock cap and a warning names the share.
 
 If `ForceGcBetweenBenchmarks` is true (the `Independent` profile), a full gen-2 GC runs after warmup to establish a clean heap baseline. Under `Realistic` (the default) this is skipped and the benchmark inherits the warmup's heap state.
+
+### Post-warmup recalibration
+
+Ops-per-sample calibration (Phase 1) resolves K against the body's **cold** code. Once warmup has driven the body to its steady-state (tiered / PGO-optimized) speed - often several times faster - the same K may span well under the target duration, re-exposing the fixed timer overhead calibration existed to amortise. So after auto-warmup settles, NBenchmark re-derives K from the warm per-op estimate the plateau detector measured (the last warmup batch mean): if the warm sample spans less than half the target, K is bumped to the next power of two that reaches the target, and one untimed sample runs to warm the larger batch's cache/branch state before measurement.
+
+Recalibration only applies when calibration ran (not a pinned K, no setup/teardown, no forced GC) and only ever increases K. When it fires, `BenchmarkResult.AutoTune.InitialOpsPerSample` records the pre-recalibration (cold) K while `OpsPerSample` holds the final value; the gap shows how much faster the warm body ran than the cold code first timed. When no recalibration occurs, `InitialOpsPerSample` is `null`.
 
 ### Phase 3 - Measurement (CI-width target)
 

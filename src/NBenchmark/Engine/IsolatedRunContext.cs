@@ -62,6 +62,10 @@ internal sealed record MeasurementOverrides
 
     public double? CapGraceFactor { get; init; }
 
+    public TimeSpan? MinWarmupTime { get; init; }
+
+    public bool? NoJitQuiescence { get; init; }
+
     public int? LaunchCount { get; init; }
 
     public IReadOnlyList<double>? ReportedPercentiles { get; init; }
@@ -99,6 +103,8 @@ internal sealed record MeasurementOverrides
         CapBehavior = cliArgs.AutoTuneCapBehavior,
         WarmupBudgetFraction = cliArgs.WarmupBudgetFraction,
         CapGraceFactor = cliArgs.CapGraceFactor,
+        MinWarmupTime = cliArgs.MinWarmupTime,
+        NoJitQuiescence = cliArgs.NoJitQuiescence,
         LaunchCount = cliArgs.LaunchCount,
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
@@ -189,6 +195,18 @@ internal sealed record MeasurementOverrides
         if (CapGraceFactor.HasValue)
         {
             autoTune = autoTune with { CapGraceFactor = CapGraceFactor.Value };
+            autoTuneChanged = true;
+        }
+
+        if (MinWarmupTime.HasValue)
+        {
+            autoTune = autoTune with { MinWarmupTime = MinWarmupTime.Value };
+            autoTuneChanged = true;
+        }
+
+        if (NoJitQuiescence is true)
+        {
+            autoTune = autoTune with { RequireJitQuiescence = false };
             autoTuneChanged = true;
         }
 

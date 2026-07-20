@@ -22,6 +22,9 @@ The [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_met
 
 Configurable percentile values computed via the [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method) method: `i = ceil(p × n)`. Controlled by `MeasurementOptions.ReportedPercentiles` (default: P50, P95, P99, P99.9, Max). Each entry is a `PercentileEntry` with a `Percentile` (0-1) and `Value` (nanoseconds). Access a specific percentile with `result.GetPercentile(0.95)`.
 
+> [!IMPORTANT] Percentiles describe samples, and a sample may be a batch
+> When [ops-per-sample calibration](./measurement.md#phase-1---ops-per-sample-calibration-k) resolves `K > 1` (the norm for sub-10 µs bodies), each **sample** is the mean of `K` back-to-back operations. Percentiles, Min, Max, and the histogram are therefore over **batch means**, not individual operations - a single slow op is averaged with its `K-1` neighbours, so the tail percentiles understate true per-operation tail latency. This is the deliberate cost of amortising timer overhead on fast bodies. When you need genuine per-op tail latency, pin `OpsPerSample = 1` (accepting that at that scale the reported values are dominated by timer resolution and read overhead - compare against a baseline measured the same way). Bodies that already span ≥ `AutoTune.TargetSampleDurationNs` (10 µs) keep `K = 1`, so their percentiles are already per-operation.
+
 ### Min and Max
 
 `samples[0]` and `samples[n-1]` of the sorted, trimmed array.

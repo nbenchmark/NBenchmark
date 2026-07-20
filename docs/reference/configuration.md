@@ -368,9 +368,11 @@ Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `
 | `MinWarmup` / `MaxWarmup` | `8` / `10 000` | Floor and ceiling for auto-detected warmup length. |
 | `WarmupEpsilon` | `0.02` | Minimum relative improvement a warmup batch must show to count as "still warming up". |
 | `PlateauPatience` | `3` | Consecutive non-improving batches that end warmup. |
+| `MinWarmupTime` | `100 ms` | Minimum wall-clock time auto-warmup must run before it may settle, so background tiered JIT (tier-0 → tier-1 → dynamic PGO) can land before measurement rather than mid-run. Bounded above by the calibration+warmup budget share and `MaxWarmup`. `0` disables the floor (and the JIT-quiescence gate). `Quick` preset uses 25 ms. |
+| `RequireJitQuiescence` | `true` | Whether auto-warmup also refuses to settle while the JIT is still compiling methods (a proxy for in-flight tier-1 promotion), read from `System.Runtime.JitInfo` at each batch boundary. Deactivates once warmup has run 4 × `MinWarmupTime` so a busy in-process host cannot block warmup forever; inactive when `MinWarmupTime = 0`. |
 | `MinSamples` / `MaxSamples` | `30` / `100 000` | Floor and ceiling for the auto-resolved measured-sample count. |
 | `CiTarget` | `0.025` | Target relative half-width of the confidence interval; sampling stops once it is met. |
-| `TargetSampleDurationNs` | `1 000` | Per-sample duration that ops-per-sample calibration aims for. |
+| `TargetSampleDurationNs` | `10 000` | Per-sample duration that ops-per-sample calibration aims for. 10 µs keeps timer quantization (~0.1% vs ~±10% at 1 µs on a 100 ns timer) and timestamp-read overhead (~0.2% vs ~1-3%) negligible against the CI target. Bodies ≥ 10 µs keep K = 1; sub-10 µs bodies are batched, so their percentiles describe batch means. `Thorough` preset uses 50 µs. |
 | `MaxOpsPerSample` | `1 048 576` | Ceiling on auto-calibrated K. |
 | `BatchSize` | `8` | Warmup batch size and the cadence on which the CI-width rule is evaluated. |
 | `MaxTuningTime` | `20 s` | Per-benchmark safety cap on cumulative in-body sample time (calibration + warmup + measurement). Setup, teardown, and GC are excluded, so real wall-clock can exceed it. |
@@ -385,7 +387,7 @@ Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `
 The interval's confidence level is `ConfidenceLevel` (below) - the CI-width rule targets that same level, so it is not duplicated on `AutoTune`.
 
 BenchmarkSuite/BenchmarkHarness fluent method: `.WithAutoTune(AutoTunePreset.Quick)` or `.WithAutoTune(customOptions)`  
-CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--autotune-cap-behavior`, `--warmup-budget-fraction`, `--cap-grace-factor`.
+CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--autotune-cap-behavior`, `--warmup-budget-fraction`, `--cap-grace-factor`, `--min-warmup-time`, `--no-jit-quiescence`.
 
 ### Profile
 

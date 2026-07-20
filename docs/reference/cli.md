@@ -98,6 +98,8 @@ In auto mode NBenchmark resolves warmup length, measured-sample count, and ops-p
 | `--autotune-cap-behavior <mode>` | `warn` | What happens when the wall-clock cap is hit before the CI target or warmup plateau is reached: `warn` emits a warning; `error` marks the benchmark as errored. |
 | `--warmup-budget-fraction <0-1>` | `0.4` | Max share of `--max-tuning-time` that calibration and warmup may consume together; the remainder is reserved for measurement. Must be in `(0, 1]`. |
 | `--cap-grace-factor <n>` | `1.5` | Multiplier on `--max-tuning-time` that the measurement phase may reach while chasing `--min-samples` after the cap fires. Must be at least 1; set to 1 to disable the grace path. |
+| `--min-warmup-time <ms>` | `100` | Minimum wall-clock time (milliseconds) auto-warmup must run before it may settle, so background tiered JIT can land before measurement. Must be ≥ 0; `0` disables the floor (and the JIT-quiescence gate). |
+| `--no-jit-quiescence` | off | Disable the JIT-quiescence warmup gate (warmup no longer waits for the JIT to stop compiling); the `--min-warmup-time` floor still applies. |
 
 ```bash
 # Quick feedback: fewer samples, looser CI
@@ -540,7 +542,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 | Code | Meaning |
 |---|---|
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
-| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--warmup-budget-fraction`, `--cap-grace-factor`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown diagnostics mode (`--diagnostics`), unknown reporter name (`--reporter`), unknown observer name (`--observer`), unknown priority level (`--priority`), invalid detail level (`--detail`), invalid OTLP endpoint URL (`--otlp-endpoint`), or a benchmark exceeded the `--threshold-pct` regression limit. |
+| `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--warmup-budget-fraction`, `--cap-grace-factor`, `--min-warmup-time`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown diagnostics mode (`--diagnostics`), unknown reporter name (`--reporter`), unknown observer name (`--observer`), unknown priority level (`--priority`), invalid detail level (`--detail`), invalid OTLP endpoint URL (`--otlp-endpoint`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 
 When exit code `1` is set during argument parsing, the run still completes (discovery, measurement, and reporting proceed). This lets you see output even after a misconfigured invocation - but the non-zero exit code ensures CI pipelines catch the problem. When exit code `1` is caused by a `--threshold-pct` regression, reporters still flush their output so you retain the evidence.
 

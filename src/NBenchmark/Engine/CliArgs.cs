@@ -76,6 +76,19 @@ internal sealed record CliArgs
     /// </summary>
     public double? CapGraceFactor { get; init; }
 
+    /// <summary>
+    ///     The minimum wall-clock time auto-warmup must run before it may settle. <c>null</c> uses
+    ///     the <see cref="AutoTuneOptions" /> default (100 ms). Parsed from a millisecond value.
+    /// </summary>
+    public TimeSpan? MinWarmupTime { get; init; }
+
+    /// <summary>
+    ///     When true, disables the JIT-quiescence warmup gate (maps to
+    ///     <see cref="AutoTuneOptions.RequireJitQuiescence" /> = <c>false</c>). The warmup time floor
+    ///     still applies.
+    /// </summary>
+    public bool NoJitQuiescence { get; init; }
+
     /// <summary>Number of separate launches for each benchmark (1 = default, single-run behavior).</summary>
     public int? LaunchCount { get; init; }
 
@@ -176,6 +189,8 @@ internal sealed record CliArgs
         AutoTuneCapBehavior? autoTuneCapBehavior = null;
         double? warmupBudgetFraction = null;
         double? capGraceFactor = null;
+        TimeSpan? minWarmupTime = null;
+        var noJitQuiescence = false;
         int? launchCount = null;
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
@@ -428,6 +443,16 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --cap-grace-factor value '{args[i]}'. Must be at least 1 (e.g. 1.5).");
 
                     break;
+                case "--min-warmup-time" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var mwt) && mwt >= 0)
+                        minWarmupTime = TimeSpan.FromMilliseconds(mwt);
+                    else
+                        errors.Add($"Invalid --min-warmup-time value '{args[i]}'. Must be a non-negative number of milliseconds (0 disables).");
+
+                    break;
+                case "--no-jit-quiescence":
+                    noJitQuiescence = true;
+                    break;
                 case "--launch-count" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var lc) && lc >= 1 && lc <= MeasurementOptions.MaxLaunchCount)
                         launchCount = lc;
@@ -521,7 +546,7 @@ internal sealed record CliArgs
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
-                    or "--warmup-budget-fraction" or "--cap-grace-factor"
+                    or "--warmup-budget-fraction" or "--cap-grace-factor" or "--min-warmup-time"
                     or "--launch-count" or "--percentiles" or "--runtimes"
                     or "--cpu-affinity" or "--priority" or "--otlp-endpoint":
                     errors.Add($"Missing value for '{args[i]}'.");
@@ -569,6 +594,8 @@ internal sealed record CliArgs
             AutoTuneCapBehavior = autoTuneCapBehavior,
             WarmupBudgetFraction = warmupBudgetFraction,
             CapGraceFactor = capGraceFactor,
+            MinWarmupTime = minWarmupTime,
+            NoJitQuiescence = noJitQuiescence,
             LaunchCount = launchCount,
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
@@ -735,6 +762,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --autotune-cap-behavior <mode>  Cap handling: warn (default) or error");
         Console.WriteLine("  --warmup-budget-fraction <0-1>  Max share of --max-tuning-time for calibration + warmup (default: 0.4)");
         Console.WriteLine("  --cap-grace-factor <n>  Multiplier on --max-tuning-time the measurement phase may reach while chasing --min-samples (default: 1.5)");
+        Console.WriteLine("  --min-warmup-time <ms>  Minimum wall-clock warmup time before auto-warmup may settle, in ms (default: 100; 0 disables)");
+        Console.WriteLine("  --no-jit-quiescence     Disable the JIT-quiescence warmup gate (keep only the time floor)");
         Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (harness default: 3)");
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");

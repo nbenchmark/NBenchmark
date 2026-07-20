@@ -267,7 +267,7 @@ public class MeasurementOptionsTests
         Assert.Equal(value, opts.ConfidenceLevel);
     }
 
-    // ---------- WS2: AutoTuneOptions validation ----------
+    // ---------- AutoTuneOptions grace-ceiling and budget-share validation ----------
 
     [Fact]
     public void AutoTune_Default_WarmupBudgetFraction_Is_0_4()
@@ -321,5 +321,62 @@ public class MeasurementOptionsTests
     {
         var opts = new AutoTuneOptions { CapGraceFactor = value };
         Assert.Equal(value, opts.CapGraceFactor);
+    }
+
+    // ---------- Target sample duration, warmup time floor, JIT-quiescence gate, and presets ----------
+
+    [Fact]
+    public void AutoTune_Default_TargetSampleDurationNs_Is_10us()
+    {
+        Assert.Equal(10_000, AutoTuneOptions.Default.TargetSampleDurationNs);
+    }
+
+    [Fact]
+    public void AutoTune_Default_MinWarmupTime_Is_100ms()
+    {
+        Assert.Equal(TimeSpan.FromMilliseconds(100), AutoTuneOptions.Default.MinWarmupTime);
+    }
+
+    [Fact]
+    public void AutoTune_Default_RequireJitQuiescence_Is_True()
+    {
+        Assert.True(AutoTuneOptions.Default.RequireJitQuiescence);
+    }
+
+    [Fact]
+    public void Quick_Preset_Tunes_Warmup_For_Fast_Feedback()
+    {
+        var quick = AutoTuneOptions.Quick;
+
+        Assert.Equal(4, quick.BatchSize);
+        Assert.Equal(2, quick.PlateauPatience);
+        Assert.Equal(TimeSpan.FromMilliseconds(25), quick.MinWarmupTime);
+    }
+
+    [Fact]
+    public void Thorough_Preset_Uses_50us_Target()
+    {
+        Assert.Equal(50_000, AutoTuneOptions.Thorough.TargetSampleDurationNs);
+    }
+
+    [Fact]
+    public void MinWarmupTime_Accepts_Zero()
+    {
+        var opts = new AutoTuneOptions { MinWarmupTime = TimeSpan.Zero };
+        Assert.Equal(TimeSpan.Zero, opts.MinWarmupTime);
+    }
+
+    [Fact]
+    public void MinWarmupTime_Rejects_Negative()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new AutoTuneOptions { MinWarmupTime = TimeSpan.FromMilliseconds(-1) });
+    }
+
+    [Fact]
+    public void RequireJitQuiescence_Can_Be_Disabled()
+    {
+        var opts = new AutoTuneOptions { RequireJitQuiescence = false };
+        Assert.False(opts.RequireJitQuiescence);
     }
 }

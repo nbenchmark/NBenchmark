@@ -48,6 +48,10 @@ public class AdaptiveLoopTests
             Iterations = 10, // explicit measured count
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
+            // Isolate the plateau rule from the warmup time floor and JIT gate (both covered by
+            // dedicated tests): with a scripted 1000 ns/sample body the 100 ms floor would otherwise
+            // hold warmup open to MaxWarmup instead of settling on the plateau.
+            AutoTune = AutoTuneOptions.Default with { MinWarmupTime = TimeSpan.Zero, RequireJitQuiescence = false },
         };
 
         // A flat signal settles the plateau rule at its floor.
@@ -107,7 +111,9 @@ public class AdaptiveLoopTests
             Iterations = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
-            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false }, // isolate Phase A calibration
+            // Isolate Phase A calibration, and pin the 1 µs target this test's scripted timings assume
+            // (the default is now 10 µs).
+            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false, TargetSampleDurationNs = 1_000 },
         };
 
         // Calibration probes each candidate K = 1, 2, 4 five times and feeds the *fastest* reading
@@ -160,10 +166,11 @@ public class AdaptiveLoopTests
             Iterations = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
-            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false }, // isolate Phase A
+            // Isolate Phase A; pin the 1 µs target so the short-circuit ratio below is unambiguous.
+            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false, TargetSampleDurationNs = 1_000 },
         };
 
-        // Each sample spans 10 ms (10,000,000 ns) - 10,000x the default TargetSampleDurationNs
+        // Each sample spans 10 ms (10,000,000 ns) - 10,000x the pinned TargetSampleDurationNs
         // (1,000 ns), well above the SlowBodyShortCircuitFactor of 1,000. The doubling search
         // would settle on K = 1 after a single probe, so running the remaining 4 probes is pure
         // waste (today this step alone burns 40 ms of in-body time for a 10 ms body).
@@ -183,6 +190,83 @@ public class AdaptiveLoopTests
         // The 3 measured samples each read 10,000,000 ns / K = 10,000,000 ns per op.
         Assert.Equal(3, result.PerOpTimings.Length);
         Assert.All(result.PerOpTimings, t => Assert.Equal(10_000_000.0, t));
+    }
+
+    [Fact]
+    public void PostWarmupRecalibration_Bumps_K_When_Warm_Body_Faster_Than_Cold()
+    {
+        var bodyCalls = 0;
+
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = null, // auto-calibrate against cold speed
+            WarmupIterations = null, // auto warmup (recalibration only runs in this path)
+            Iterations = 3,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            // 10 µs target; isolate from the warmup time floor / JIT gate so warmup settles on the
+            // plateau at 32 samples.
+            AutoTune = AutoTuneOptions.Default with
+            {
+                EnableJitterCalibration = false,
+                TargetSampleDurationNs = 10_000,
+                MinWarmupTime = TimeSpan.Zero,
+                RequireJitQuiescence = false,
+            },
+        };
+
+        // Cold calibration: 5 probes at 10 µs each -> a K = 1 sample already spans the target, so K
+        // resolves to 1. Then the warm body runs 100x faster (100 ns/op), so the warm sample spans
+        // only 100 ns « half the 10 µs target and K is recalibrated to next-pow2(10000/100) = 128.
+        var clock = new ScriptedClock(call => call < 5 ? 10_000.0 : 100.0);
+
+        var result = RunSync(() => bodyCalls++, options, clock);
+
+        Assert.Equal(1, result.Diagnostic.InitialOpsPerSample); // cold K
+        Assert.Equal(128, result.Diagnostic.OpsPerSample); // recalibrated warm K
+        Assert.Equal(3, result.PerOpTimings.Length);
+
+        // 5 calibration (K=1) + 32 warmup (K=1) + 1 untimed recalibration sample (K=128) + 3 measured
+        // (K=128) = 5 + 32 + 128 + 384 = 549. The 128-invocation jump proves the untimed sample ran
+        // at the new K to warm the larger batch's cache/branch state.
+        Assert.Equal(549, bodyCalls);
+        Assert.Equal(549, result.Diagnostic.TotalBodyInvocations);
+    }
+
+    [Fact]
+    public void PostWarmupRecalibration_Skipped_When_Warm_Sample_Near_Target()
+    {
+        var bodyCalls = 0;
+
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = null,
+            WarmupIterations = null,
+            Iterations = 3,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                EnableJitterCalibration = false,
+                TargetSampleDurationNs = 10_000,
+                MinWarmupTime = TimeSpan.Zero,
+                RequireJitQuiescence = false,
+            },
+        };
+
+        // The warm body is no faster than the cold code (constant 10 µs/op): the warm sample already
+        // spans the full target, above the half-target trigger, so K stays 1 and no recalibration
+        // occurs. InitialOpsPerSample is null when the loop did not recalibrate.
+        var clock = new ScriptedClock(10_000.0);
+
+        var result = RunSync(() => bodyCalls++, options, clock);
+
+        Assert.Equal(1, result.Diagnostic.OpsPerSample);
+        Assert.Null(result.Diagnostic.InitialOpsPerSample);
+        Assert.Equal(3, result.PerOpTimings.Length);
+
+        // 5 calibration + 32 warmup + 3 measured, all at K = 1, with no untimed recalibration sample.
+        Assert.Equal(5 + 32 + 3, bodyCalls);
     }
 
     [Fact]
@@ -281,10 +365,10 @@ public class AdaptiveLoopTests
     [Fact]
     public void WallClock_Cap_Grace_Continues_Past_Base_Cap_And_Reports_GraceCapExhausted()
     {
-        // The core WS2 behavior: when the base cap fires below MinSamples, the grace path keeps
-        // sampling up to MaxTuningTime * CapGraceFactor instead of stopping on a dangerously
-        // under-sampled result. Without grace this body would stop at 10 samples (the pre-WS2
-        // behavior, which at the extreme is a single sample with StdDev = 0 and a zero error margin).
+        // The grace-ceiling feature: when the wall-clock cap fires below MinSamples, the grace path
+        // keeps sampling up to MaxTuningTime * CapGraceFactor instead of stopping on a dangerously
+        // under-sampled result. This trades extra runtime for enough samples to compute meaningful
+        // statistics; without grace this body would stop at 10 samples with unreliable margins.
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,

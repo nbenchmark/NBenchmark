@@ -101,7 +101,14 @@ public class MeasurementObserverTests
             Iterations = 10, // explicit measured count
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
-            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
+            // Isolate the plateau rule from the warmup time floor and JIT gate so the scripted 1000 ns body
+            // settles on the plateau (32) rather than running to MaxWarmup.
+            AutoTune = AutoTuneOptions.Default with
+            {
+                EnableJitterCalibration = false,
+                MinWarmupTime = TimeSpan.Zero,
+                RequireJitQuiescence = false,
+            },
         };
 
         // A flat signal settles the plateau rule at its floor.
@@ -185,7 +192,8 @@ public class MeasurementObserverTests
             Iterations = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
-            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
+            // Pin the 1 µs target this test's scripted 250/2000 ns timings assume (the default is now 10 µs).
+            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false, TargetSampleDurationNs = 1_000 },
         };
 
         // K = 1 step (5 probes at 250 ns each -> fastest 250 < 1000 target, so K doubles).

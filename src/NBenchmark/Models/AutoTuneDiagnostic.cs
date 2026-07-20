@@ -18,6 +18,16 @@ public sealed record AutoTuneDiagnostic
     public required int OpsPerSample { get; init; }
 
     /// <summary>
+    ///     The ops-per-sample count that cold calibration (Phase A) originally resolved, when the loop
+    ///     later <em>recalibrated</em> <c>K</c> upward from the warm per-op estimate measured during
+    ///     warmup; <c>null</c> when no post-warmup recalibration occurred. When set,
+    ///     <see cref="OpsPerSample" /> is the final (post-recalibration) <c>K</c> and this is the
+    ///     pre-recalibration value - the gap reflects how much faster the warm body ran than the cold
+    ///     code calibration first saw.
+    /// </summary>
+    public int? InitialOpsPerSample { get; init; }
+
+    /// <summary>
     ///     The total number of body invocations across every phase of the loop &#8212; ops-per-sample
     ///     calibration, warmup, and measurement &#8212; counting each timed and untimed sample at the
     ///     ops-per-sample count in effect when it ran.

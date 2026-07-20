@@ -330,7 +330,11 @@ internal static class NBenchmarkDiagnostics
             }));
         }
 
-        if (sampleStop == SampleStopReason.WallClockCap || warmupStop == WarmupStopReason.WallClockCap)
+        // GraceCapExhausted is also a cap hit - the measurement ran past the base cap into the
+        // grace ceiling and still stopped under MinSamples, which is the most important variant
+        // to surface (the result is flagged unreliable).
+        if (sampleStop is SampleStopReason.WallClockCap or SampleStopReason.GraceCapExhausted
+            || warmupStop == WarmupStopReason.WallClockCap)
             activity.AddEvent(new ActivityEvent("phase.cap_hit"));
 
         activity.Dispose();

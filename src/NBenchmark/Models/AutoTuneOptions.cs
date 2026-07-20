@@ -22,6 +22,9 @@ public sealed record AutoTuneOptions
         MinSamples = 15,
         CiTarget = 0.05,
         MaxTuningTime = TimeSpan.FromSeconds(5),
+        BatchSize = 4,
+        PlateauPatience = 2,
+        MinWarmupTime = TimeSpan.FromMilliseconds(25),
     };
 
     /// <summary>More samples and a tighter CI target for publication-grade numbers.</summary>
@@ -30,7 +33,7 @@ public sealed record AutoTuneOptions
         MinWarmup = 16,
         MinSamples = 100,
         CiTarget = 0.01,
-        TargetSampleDurationNs = 4_000,
+        TargetSampleDurationNs = 50_000,
         MaxTuningTime = TimeSpan.FromSeconds(60),
     };
 
@@ -39,10 +42,21 @@ public sealed record AutoTuneOptions
     private readonly int _plateauPatience = 3;
     private readonly double _warmupBudgetFraction = 0.4;
     private readonly double _capGraceFactor = 1.5;
+    private readonly TimeSpan _minWarmupTime = TimeSpan.FromMilliseconds(100);
 
     // ----- Warmup plateau -----
 
-    /// <summary>The earliest sample at which auto-warmup may settle. Default 8.</summary>
+    /// <summary>
+    ///     The earliest sample at which auto-warmup may settle. Default 8.
+    ///     <para>
+    ///         This is a floor on the sample <em>count</em>. Note the plateau rule cannot settle
+    ///         before it has seen <c>(PlateauPatience + 1) × BatchSize</c> samples (one improving
+    ///         batch plus <see cref="PlateauPatience" /> non-improving ones), so with the defaults
+    ///         (patience 3, batch 8) the effective minimum is 32 samples and <c>MinWarmup</c> only
+    ///         binds when raised above that. <see cref="MinWarmupTime" /> is the independent floor
+    ///         on warmup <em>wall-clock</em>, which for fast bodies is usually the binding one.
+    ///     </para>
+    /// </summary>
     public int MinWarmup { get; init; } = 8;
 
     /// <summary>The warmup ceiling. Default 10,000 (== <see cref="MeasurementOptions.MaxWarmupIterations" />).</summary>
@@ -66,6 +80,44 @@ public sealed record AutoTuneOptions
             : throw new ArgumentOutOfRangeException(nameof(value), value, "PlateauPatience must be at least 1.");
     }
 
+    /// <summary>
+    ///     The minimum wall-clock time auto-warmup must run before it may settle, regardless of how
+    ///     quickly the plateau rule is satisfied. Default 100 ms (25 ms under the <c>Quick</c> preset).
+    ///     <para>
+    ///         The plateau rule measures warmup in <em>iterations</em>, but a fast body plateaus in
+    ///         microseconds of wall-clock - long before the background JIT delivers tier-1 (and
+    ///         dynamic-PGO) code. Warmup then settles on the stable but slow tier-0 plateau and the
+    ///         tier-1 switch lands mid-measurement as a step change, the dominant source of
+    ///         run-to-run variance on very fast benchmarks. This floor holds warmup open long enough
+    ///         for tiered compilation to land. It is bounded above by the calibration+warmup budget
+    ///         share (<see cref="WarmupBudgetFraction" /> of <see cref="MaxTuningTime" />) and by
+    ///         <see cref="MaxWarmup" />, either of which stops warmup first for a genuinely slow body.
+    ///         Set to <see cref="TimeSpan.Zero" /> to disable the floor (which also disables the
+    ///         <see cref="RequireJitQuiescence" /> gate).
+    ///     </para>
+    /// </summary>
+    public TimeSpan MinWarmupTime
+    {
+        get => _minWarmupTime;
+        init => _minWarmupTime = value >= TimeSpan.Zero
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value, "MinWarmupTime must be zero or positive.");
+    }
+
+    /// <summary>
+    ///     Whether auto-warmup additionally refuses to settle while the JIT is still compiling
+    ///     methods (a proxy for in-flight tier-1 promotion of the body under test). Default <c>true</c>.
+    ///     <para>
+    ///         At each warmup batch boundary the loop reads <see cref="System.Runtime.JitInfo" />'s
+    ///         compiled-method count; while the count is still rising over a batch, warmup continues.
+    ///         To avoid blocking forever on a busy in-process host that JITs unrelated code, the gate
+    ///         deactivates once warmup has run for 4 × <see cref="MinWarmupTime" />. The gate is
+    ///         inactive when <see cref="MinWarmupTime" /> is <see cref="TimeSpan.Zero" />. Set to
+    ///         <c>false</c> to keep only the time floor.
+    ///     </para>
+    /// </summary>
+    public bool RequireJitQuiescence { get; init; } = true;
+
     // ----- CI-width sample count -----
 
     /// <summary>The earliest sample at which auto-measurement may stop on the CI target. Default 30.</summary>
@@ -86,9 +138,18 @@ public sealed record AutoTuneOptions
     /// <summary>
     ///     The target duration of a single timed sample, in nanoseconds. Auto-calibration doubles
     ///     the ops-per-sample count until a sample spans at least this long, amortising fixed
-    ///     timer overhead. Default 1,000 (1 µs).
+    ///     timer overhead. Default 10,000 (10 µs).
+    ///     <para>
+    ///         10 µs keeps two per-sample error sources negligible: timer <em>quantization</em>
+    ///         (Windows QPC ticks at 100 ns, so a 10 µs sample resolves to ~0.1% rather than the
+    ///         ~±10% a 1 µs sample suffers) and the fixed <em>timestamp-read overhead</em> (~10-30 ns
+    ///         per sample, ~0.2% of 10 µs rather than ~1-3% of 1 µs). Both would otherwise leak into
+    ///         the ±2.5% CI target the calibration feeds. Bodies already spanning ≥ 10 µs keep
+    ///         <c>K = 1</c>, so their per-op tail visibility is unchanged; only sub-10 µs bodies are
+    ///         batched (and for those, percentiles describe batch means - see the docs).
+    ///     </para>
     /// </summary>
-    public double TargetSampleDurationNs { get; init; } = 1_000;
+    public double TargetSampleDurationNs { get; init; } = 10_000;
 
     /// <summary>The ceiling on auto-calibrated ops per sample. Must be at least 1. Default 2^20.</summary>
     public int MaxOpsPerSample
