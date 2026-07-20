@@ -22,12 +22,14 @@ The [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_met
 
 Configurable percentile values computed via the [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method) method: `i = ceil(p × n)`. Controlled by `MeasurementOptions.ReportedPercentiles` (default: P50, P95, P99, P99.9, Max). Each entry is a `PercentileEntry` with a `Percentile` (0-1) and `Value` (nanoseconds). Access a specific percentile with `result.GetPercentile(0.95)`.
 
+**Tail metrics are computed from the full pre-trim distribution by default.** Percentiles, `Min`, `Max`, and the histogram describe the shape of the distribution, so they are computed from the raw (pre-trim) sample set - `MeasurementOptions.TailMetricsBasis = Raw`, the default. This keeps them honest: the IQR/MAD fence removes exactly the slow tail that P99/P99.9/Max exist to describe, so a GC pause the `Realistic` profile deliberately timed appears in `Max` rather than being trimmed out of it. Central-tendency and dispersion statistics (mean, standard deviation, CI, CV, skewness, kurtosis, MAD, median, median CI) always stay on the **trimmed** set, so a fenced-out spike never moves the mean or inflates the interval. Set `TailMetricsBasis = Trimmed` (or `--tail-basis trimmed`) to compute tail metrics from the inlier set instead.
+
 > [!IMPORTANT] Percentiles describe samples, and a sample may be a batch
 > When [ops-per-sample calibration](./measurement.md#phase-1---ops-per-sample-calibration-k) resolves `K > 1` (the norm for sub-10 µs bodies), each **sample** is the mean of `K` back-to-back operations. Percentiles, Min, Max, and the histogram are therefore over **batch means**, not individual operations - a single slow op is averaged with its `K-1` neighbours, so the tail percentiles understate true per-operation tail latency. This is the deliberate cost of amortising timer overhead on fast bodies. When you need genuine per-op tail latency, pin `OpsPerSample = 1` (accepting that at that scale the reported values are dominated by timer resolution and read overhead - compare against a baseline measured the same way). Bodies that already span ≥ `AutoTune.TargetSampleDurationNs` (10 µs) keep `K = 1`, so their percentiles are already per-operation.
 
 ### Min and Max
 
-`samples[0]` and `samples[n-1]` of the sorted, trimmed array.
+`samples[0]` and `samples[n-1]` of the sorted tail source (the full pre-trim set by default; see the tail-metrics note above).
 
 ### Sample standard deviation ([Bessel's correction](https://en.wikipedia.org/wiki/Bessel%27s_correction))
 
@@ -79,6 +81,14 @@ These approximations are cross-checked against SciPy on every build: the t
 critical value matches `scipy.stats.t.ppf` to machine precision for df = 1, 2 and
 to **better than 1%** for df ≥ 3 (worst case ≈ 0.79% at df = 3, 99%). See
 [Validation & Accuracy](./validation.md) for the full tolerance table.
+
+## Confidence interval on the median
+
+The t-interval above is on the **mean**, but the median is NBenchmark's headline comparison metric (ratios and the Mann-Whitney semantics both key off it). `MedianCiLower`/`MedianCiUpper` report a **distribution-free** confidence interval on the median built from order statistics - no normality assumption.
+
+For `n < 50` the rank bounds are exact, from the binomial(`n`, ½) distribution: the interval `[X(l), X(u)]` (1-based order statistics) covers the median with probability `1 − 2·CDF(l−1)`, and `l` is the largest rank whose lower-tail mass does not exceed `α/2`. This can only be conservative (coverage ≥ the requested level). For `n ≥ 50` the normal approximation to the binomial gives `l = ⌊(n − z√n)/2⌋`, `u = ⌈1 + (n + z√n)/2⌉` with `z = Φ⁻¹((1+CL)/2)`. Ranks are clamped into `[1, n]`; when even the widest interval cannot reach the requested level (tiny `n`, high `CL`) the full range is returned.
+
+The interval is computed on the same (trimmed) set as `Median`. It appears in the advanced-detail stats block and is always present in JSON.
 
 ## [Coefficient of variation](https://en.wikipedia.org/wiki/Coefficient_of_variation)
 
@@ -144,6 +154,8 @@ Reported as `0` when `n < 1$.
 | `MarginOfError` | $t^{*} \times \text{SEM}$ | Half-width of CI on the mean. |
 | `ConfidenceIntervalLower` | $\bar{x} - \text{MoE}$ | Lower CI bound. |
 | `ConfidenceIntervalUpper` | $\bar{x} + \text{MoE}$ | Upper CI bound. |
+| `MedianCiLower` / `MedianCiUpper` | Order-statistic interval | Distribution-free confidence interval on the median (exact binomial for $n < 50$, normal approximation above). `null` when undefined ($n < 2$, dry-run, errored). |
+| `MedianShift` | Hodges-Lehmann + Lehmann CI | Location shift vs. baseline (median of pairwise candidate − baseline differences) with a rank-based interval, in ns/op. Positive = candidate slower. `null` for the baseline or when significance did not run. |
 | `CoefficientOfVariation` | $s / \bar{x}$ | Relative variability. |
 | `Skewness` | $g_1 = \frac{n \sum (x_i - \bar{x})^3}{(n-1)(n-2) s^3}$ | [Sample skewness](https://en.wikipedia.org/wiki/Skewness). Zero for $n < 3$. |
 | `Kurtosis` | $g_2 = \frac{n(n+1)\sum (x_i-\bar{x})^4}{(n-1)(n-2)(n-3)s^4} - \frac{3(n-1)^2}{(n-2)(n-3)}$ | [Excess kurtosis](https://en.wikipedia.org/wiki/Kurtosis). Zero for $n < 4$. |

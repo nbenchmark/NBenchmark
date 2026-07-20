@@ -136,8 +136,15 @@ public static class EffectSizeFactory
 }
 
 /// <summary>A single candidate-versus-baseline significance verdict.</summary>
+/// <param name="Shift">
+///     The Hodges-Lehmann location shift versus the baseline (candidate − baseline, in the
+///     samples' units) with a rank-based confidence interval; <c>null</c> when the strategy did not
+///     produce one. Complements the effect size: <see cref="Effect" /> says how consistently the
+///     candidate differs, <see cref="Shift" /> says by how much.
+/// </param>
 public readonly record struct PairwiseComparison(
     string Name,
     double? PValue,
     SignificanceVerdict Verdict,
-    EffectSize? Effect = null);
+    EffectSize? Effect = null,
+    ShiftEstimate? Shift = null);

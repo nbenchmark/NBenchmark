@@ -23,17 +23,38 @@ public sealed class StatsSummary
     public double Mad { get; init; }
 
     /// <summary>
+    ///     Lower bound of the distribution-free confidence interval on the median (order-statistic
+    ///     interval at <see cref="ConfidenceLevel" />). <c>null</c> when it is undefined (fewer than
+    ///     two samples). Computed on the same set as <see cref="Median" /> (the central,
+    ///     trimmed set).
+    /// </summary>
+    public double? MedianCiLower { get; init; }
+
+    /// <summary>Upper bound of the median confidence interval. <c>null</c> when undefined. See <see cref="MedianCiLower" />.</summary>
+    public double? MedianCiUpper { get; init; }
+
+    /// <summary>
     ///     Computes the full descriptive-statistics summary for <paramref name="samples" />.
     ///     The input does not need to be pre-sorted: order-dependent statistics
     ///     (median, percentiles, min/max, MAD) are computed on a sorted copy when the
     ///     input is unsorted. The input array is never mutated.
+    ///     <para>
+    ///         When <paramref name="tailSource" /> is supplied, the order statistics that describe
+    ///         the shape of the distribution - percentiles, min, max, and the histogram - are
+    ///         computed from it instead of from <paramref name="samples" />, while every
+    ///         central-tendency and dispersion statistic (mean, standard deviation, CI, CV,
+    ///         skewness, kurtosis, MAD, median, and the median CI) stays on
+    ///         <paramref name="samples" />. The engine passes the pre-trim set here so tail metrics
+    ///         describe the full distribution while the central statistics stay robust to outliers.
+    ///     </para>
     /// </summary>
     public static StatsSummary Compute(
         double[] samples,
         double confidenceLevel = 0.95,
         IReadOnlyList<double>? reportedPercentiles = null,
         bool enableHistogram = true,
-        int histogramBucketCount = 20)
+        int histogramBucketCount = 20,
+        double[]? tailSource = null)
     {
         if (samples.Length == 0)
             return new StatsSummary { ConfidenceLevel = confidenceLevel };
@@ -52,6 +73,18 @@ public sealed class StatsSummary
         {
             samples = (double[])samples.Clone();
             Array.Sort(samples);
+        }
+
+        // The tail source (when supplied) must be sorted too. Default it to the trimmed samples
+        // so a null argument reproduces the pre-P2-1 all-from-trimmed behavior exactly.
+        var tail = tailSource ?? samples;
+
+        if (tail.Length == 0)
+            tail = samples;
+        else if (!ReferenceEquals(tail, samples) && !IsSorted(tail))
+        {
+            tail = (double[])tail.Clone();
+            Array.Sort(tail);
         }
 
         var n = samples.Length;
@@ -102,8 +135,12 @@ public sealed class StatsSummary
 
         var mad = ComputeMad(samples);
 
-        var percentiles = ComputePercentiles(samples, reportedPercentiles);
-        var histogram = enableHistogram && n >= 2 ? ComputeHistogram(samples, histogramBucketCount) : null;
+        // Order statistics describe the distribution's shape, so they read from the tail source
+        // (the full pre-trim set by default). The central statistics above stay on the trimmed
+        // samples so a fenced-out spike does not move the mean or inflate the CI.
+        var percentiles = ComputePercentiles(tail, reportedPercentiles);
+        var histogram = enableHistogram && tail.Length >= 2 ? ComputeHistogram(tail, histogramBucketCount) : null;
+        var medianCi = MedianCi.Compute(samples, confidenceLevel);
 
         return new StatsSummary
         {
@@ -111,8 +148,8 @@ public sealed class StatsSummary
             Median = Percentile.Compute(samples, 0.50),
             Percentiles = percentiles,
             Histogram = histogram,
-            Min = samples[0],
-            Max = samples[^1],
+            Min = tail[0],
+            Max = tail[^1],
             StandardDeviation = sampleStdDev,
             StandardError = standardError,
             MarginOfError = marginOfError,
@@ -121,6 +158,8 @@ public sealed class StatsSummary
             Skewness = skewness,
             Kurtosis = kurtosis,
             Mad = mad,
+            MedianCiLower = medianCi?.Lower,
+            MedianCiUpper = medianCi?.Upper,
         };
     }
 

@@ -45,6 +45,47 @@ public class SignificanceTests
     }
 
     [Fact]
+    public void ComputeSignificance_Populates_Median_Shift_On_Candidate()
+    {
+        var rng = new Random(42);
+        var baselineSamples = Enumerable.Range(0, 50).Select(_ => (double)rng.Next(90, 110)).ToArray();
+        var fasterSamples = Enumerable.Range(0, 50).Select(_ => (double)rng.Next(40, 60)).ToArray();
+
+        var results = new List<BenchmarkResult>
+        {
+            new()
+            {
+                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
+                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+            },
+            new()
+            {
+                Name = "faster", Mean = 50, Median = 50, Percentiles = [],
+                Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+            },
+        };
+
+        var rawSamples = new Dictionary<string, double[]>
+        {
+            ["baseline"] = baselineSamples,
+            ["faster"] = fasterSamples,
+        };
+
+        Significance.ComputeSignificance(results, rawSamples);
+
+        // Baseline carries no shift; the candidate is clearly faster, so the shift is negative and
+        // its interval excludes zero.
+        Assert.Null(results[0].MedianShift);
+        Assert.NotNull(results[1].MedianShift);
+        Assert.True(results[1].MedianShift!.Value.Value < 0);
+        Assert.True(results[1].MedianShift.Value.Upper < 0);
+    }
+
+    [Fact]
     public void ComputeSignificance_Does_Not_Set_Baseline_PValue()
     {
         var results = new List<BenchmarkResult>

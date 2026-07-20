@@ -73,6 +73,25 @@ public record BenchmarkResult
     public required double Kurtosis { get; init; }
     public required double Mad { get; init; }
 
+    /// <summary>
+    ///     Lower bound of the distribution-free confidence interval on the median (order-statistic
+    ///     interval at <see cref="ConfidenceLevel" />). <c>null</c> for dry-run, errored, or
+    ///     calibration-derived results, or when there are fewer than two samples. Assumption-free,
+    ///     unlike the t-interval on the mean - the median is the headline comparison metric.
+    /// </summary>
+    public double? MedianCiLower { get; init; }
+
+    /// <summary>Upper bound of the median confidence interval. See <see cref="MedianCiLower" />.</summary>
+    public double? MedianCiUpper { get; init; }
+
+    /// <summary>
+    ///     The Hodges-Lehmann shift versus the baseline (median of pairwise candidate − baseline
+    ///     differences) with a rank-based confidence interval, in nanoseconds per op. Positive means
+    ///     the candidate is slower. Populated during significance testing for non-baseline results;
+    ///     <c>null</c> for the baseline, single-benchmark runs, or when significance did not run.
+    /// </summary>
+    public ShiftEstimate? MedianShift { get; init; }
+
     public required long? AllocMedian { get; init; }
     public required long? AllocP95 { get; init; }
     public required long? AllocMax { get; init; }

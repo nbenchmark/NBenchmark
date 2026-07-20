@@ -186,6 +186,29 @@ The **Magnitude** column classifies `|delta|` using the [Romano et al. (2006)](h
 
 These are the same thresholds used in the educational-assessment literature. They are guidelines, not laws - your domain may call for stricter or looser cutoffs (see [Practical-significance gate](#practical-significance-gate) above).
 
+## Technical detail: Hodges-Lehmann shift
+
+Cliff's delta says how *consistently* the candidate differs from the baseline; it does not say *by how much*. The **Hodges-Lehmann** estimate, `BenchmarkResult.MedianShift`, closes that gap in time units: it is the median of all pairwise candidate − baseline differences, with a rank-based (Lehmann) confidence interval.
+
+- **Point estimate:** `median({ bⱼ − aᵢ })`. Positive = candidate slower.
+- **Interval:** the k-th smallest to k-th largest pairwise difference, with `k = ⌊mn/2 − z·σ_U⌋` and the tie-corrected Mann-Whitney `σ_U` - the same construction R's `wilcox.test(conf.int = TRUE)` uses in its normal-approximation branch. The interval excludes zero exactly when the U test rejects at `α = 1 − confidenceLevel`.
+- **Cost:** the pairwise set is O(n₁·n₂), so each group is deterministically stride-subsampled to at most 512 values before pairing. The estimate stays representative and the result is reproducible run to run.
+
+It appears in the advanced-detail stats block (e.g. `Median shift (Hodges-Lehmann): +12.3 ns [8.1 ns, 16.9 ns] (95%)`) and is always present in JSON.
+
+## Technical detail: i.i.d. sanity checks
+
+Both the CI-width stop rule and the Mann-Whitney test assume independent, identically distributed samples. Drift (a JIT tier-up or DPGO step landing mid-measurement, a thermal ramp, periodic GC) and autocorrelation both shrink the computed interval faster than the truth warrants. When at least 50 measured samples are available, NBenchmark runs two cheap post-hoc checks over the arrival-order stream and adds a warning when either trips:
+
+- **Drift:** a split-half Mann-Whitney U between the first and second halves of the stream. A warning fires when `p < 0.001` - the distribution moved during measurement.
+- **Dependence:** the lag-1 autocorrelation `r`. A warning fires when `r > 0.5`, noting the deflated effective sample size `≈ n·(1 − r)/(1 + r)`.
+
+These are advisory: the result is still reported. They tell you the reported interval may understate the true uncertainty and point at longer warmup (`--min-warmup-time`) or host thermal/load state.
+
+## Numerical accuracy of the asymptotic tail
+
+The Mann-Whitney asymptotic branch reads the standard-normal CDF from an erfc accurate to ~1e-15 relative (W. J. Cody's rational Chebyshev approximation). This matters only for deep-tail exported p-values: at `α = 0.05` any reasonable approximation suffices, but p-values below ~1e-7 are meaningful rather than noise.
+
 ## Custom significance tests
 
 The whole strategy is pluggable through `ISignificanceTest`. Implement it to swap in a bootstrap comparison, a Bayesian test, a post-hoc procedure, or a domain-specific rule:
@@ -247,8 +270,9 @@ new MeasurementOptions { SignificanceTest = new MedianRatioSignificanceTest(25) 
 
 `Analyze` receives a `SignificanceContext` (the comparable `Groups`, the `BaselineIndex`, the `Baseline` group, the non-baseline `Candidates`, and the `SignificanceLevel`) and returns a `SignificanceReport` containing:
 
-- **`Pairwise`** - one `PairwiseComparison(name, pValue, verdict, effect)` per candidate. Use `PValue: null` for rules that do not produce a p-value.
+- **`Pairwise`** - one `PairwiseComparison(name, pValue, verdict, effect, shift)` per candidate. Use `PValue: null` for rules that do not produce a p-value.
 - **`Effect`** (`EffectSize`) - optional strategy-defined effect metadata (`Metric`, numeric `Value`, string `Magnitude`, `Direction`, and optional normalized `PracticalValue` used by `MinimumPracticalEffect`).
+- **`Shift`** (`ShiftEstimate`) - optional location-shift estimate in time units with a confidence interval (the built-in strategies populate the Hodges-Lehmann shift). Copied to `BenchmarkResult.MedianShift`.
 - **`Omnibus`** - an optional single verdict across all groups. Set it for omnibus tests like Kruskal-Wallis; leave it `null` for purely pairwise tests.
 
 The built-in strategies - `MannWhitneyUSignificanceTest`, `KruskalWallisSignificanceTest`, and the group-count-aware `DefaultSignificanceTest` - all implement this same interface, so you can also wrap or compose them.

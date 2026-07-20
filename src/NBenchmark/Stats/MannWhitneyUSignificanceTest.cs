@@ -40,7 +40,10 @@ public sealed class MannWhitneyUSignificanceTest : ISignificanceTest
             if (!double.IsNaN(result.CliffsDelta))
                 effect = EffectSizeFactory.ForCliffsDelta(result.CliffsDelta);
 
-            pairwise.Add(new PairwiseComparison(candidate.Name, result.PValue, verdict, effect));
+            var shift = HodgesLehmann.Estimate(
+                baseline.Samples, candidate.Samples, 1.0 - context.SignificanceLevel);
+
+            pairwise.Add(new PairwiseComparison(candidate.Name, result.PValue, verdict, effect, shift));
         }
 
         return new SignificanceReport { Pairwise = pairwise };

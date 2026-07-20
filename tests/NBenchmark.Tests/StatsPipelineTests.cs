@@ -1,4 +1,5 @@
 using NBenchmark.Engine;
+using NBenchmark.Stats;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -128,5 +129,99 @@ public class StatsPipelineTests
         _ = StatsPipeline.Run(rawTimings, null, new MeasurementOptions { OutlierMode = mode });
 
         Assert.Equal(snapshot, rawTimings);
+    }
+
+    // ---- Raw-basis tail statistics (P2-1) ---------------------------------
+
+    // A bimodal stream: 90 fast samples plus a trimmed slow cluster. Under the default Raw
+    // basis, Max/P99/histogram must include the slow cluster (the tail the fence exists to
+    // describe), while Mean/StdDev exclude it (robust central statistics).
+    private static double[] BimodalTimings()
+    {
+        var timings = new double[100];
+        Array.Fill(timings, 100.0, 0, 90);
+        Array.Fill(timings, 1000.0, 90, 10);
+        return timings;
+    }
+
+    private static double PercentileValue(StatsSummary stats, double p) =>
+        stats.Percentiles.First(e => Math.Abs(e.Percentile - p) < 1e-9).Value;
+
+    [Fact]
+    public void Run_RawTailBasis_Is_Default_And_Includes_Trimmed_Tail()
+    {
+        var result = StatsPipeline.Run(BimodalTimings(), null, new MeasurementOptions { Iterations = 100 });
+
+        Assert.Equal(10, result.OutliersRemoved);
+
+        // Central statistics stay on the trimmed set.
+        Assert.Equal(100.0, result.Stats.Mean);
+        Assert.Equal(0.0, result.Stats.StandardDeviation);
+
+        // Order statistics describe the whole distribution.
+        Assert.Equal(1000.0, result.Stats.Max);
+        Assert.Equal(1000.0, PercentileValue(result.Stats, 0.99));
+        Assert.Equal(1000.0, result.Stats.Histogram!.Max);
+    }
+
+    [Fact]
+    public void Run_TrimmedTailBasis_Excludes_The_Trimmed_Tail()
+    {
+        var result = StatsPipeline.Run(BimodalTimings(), null,
+            new MeasurementOptions { Iterations = 100, TailMetricsBasis = TailMetricsBasis.Trimmed });
+
+        Assert.Equal(10, result.OutliersRemoved);
+        Assert.Equal(100.0, result.Stats.Mean);
+        Assert.Equal(100.0, result.Stats.Max);
+        Assert.Equal(100.0, PercentileValue(result.Stats, 0.99));
+        Assert.Equal(100.0, result.Stats.Histogram!.Max);
+    }
+
+    [Fact]
+    public void Run_Populates_Median_Ci()
+    {
+        var timings = Enumerable.Range(1, 100).Select(i => (double)i).ToArray();
+
+        var result = StatsPipeline.Run(timings, null,
+            new MeasurementOptions { Iterations = 100, OutlierMode = OutlierMode.None });
+
+        Assert.NotNull(result.Stats.MedianCiLower);
+        Assert.NotNull(result.Stats.MedianCiUpper);
+        Assert.True(result.Stats.MedianCiLower <= result.Stats.Median);
+        Assert.True(result.Stats.MedianCiUpper >= result.Stats.Median);
+    }
+
+    // ---- GC <-> outlier annotation (P2-2) ---------------------------------
+
+    [Fact]
+    public void Run_Annotates_Gc_Correlated_Outliers()
+    {
+        // 35 fast + 5 slow (trimmed). n < 50 so the sample-quality checks stay out of the way.
+        var timings = new double[40];
+        Array.Fill(timings, 100.0, 0, 35);
+        Array.Fill(timings, 1000.0, 35, 5);
+
+        // Three of the five slow samples coincided with a collection.
+        var gcCounts = new int[40];
+        gcCounts[35] = 1;
+        gcCounts[36] = 1;
+        gcCounts[37] = 2;
+
+        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { Iterations = 40 }, gcCounts);
+
+        Assert.Contains(result.Warnings, w => w.Contains("garbage collection"));
+        Assert.Contains(result.Warnings, w => w.Contains("garbage collection") && w.Contains("3"));
+    }
+
+    [Fact]
+    public void Run_Without_Gc_Counts_Omits_Gc_Annotation()
+    {
+        var timings = new double[40];
+        Array.Fill(timings, 100.0, 0, 35);
+        Array.Fill(timings, 1000.0, 35, 5);
+
+        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { Iterations = 40 });
+
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("garbage collection"));
     }
 }

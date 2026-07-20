@@ -213,6 +213,33 @@ public class CliArgsTests
     }
 
     [Theory]
+    [InlineData("raw", TailMetricsBasis.Raw)]
+    [InlineData("trimmed", TailMetricsBasis.Trimmed)]
+    public void ParseCore_TailBasis_Valid_SetsBasis(string value, TailMetricsBasis expected)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--tail-basis", value]);
+        Assert.Empty(errors);
+        Assert.Equal(expected, result.TailMetricsBasis);
+    }
+
+    [Fact]
+    public void ParseCore_TailBasis_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.TailMetricsBasis);
+    }
+
+    [Fact]
+    public void ParseCore_TailBasis_Invalid_ReturnsError()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--tail-basis", "bogus"]);
+
+        Assert.Null(result.TailMetricsBasis);
+        var error = Assert.Single(errors);
+        Assert.Contains("Invalid --tail-basis", error);
+    }
+
+    [Theory]
     [InlineData("none", DiagnosticsMode.None)]
     [InlineData("gc", DiagnosticsMode.Gc)]
     [InlineData("gcandcpu", DiagnosticsMode.GcAndCpu)]

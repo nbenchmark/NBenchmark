@@ -134,6 +134,14 @@ public record MeasurementOptions
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
     /// <summary>
+    ///     Which sample set the order statistics (percentiles, min, max, histogram) are computed
+    ///     from. Default <see cref="TailMetricsBasis.Raw" /> - the full pre-trim distribution, so the
+    ///     tail metrics describe the tail the outlier fence removed rather than the inliers.
+    ///     Central-tendency and dispersion statistics always stay on the trimmed set.
+    /// </summary>
+    public TailMetricsBasis TailMetricsBasis { get; init; } = TailMetricsBasis.Raw;
+
+    /// <summary>
     ///     A custom outlier-detection strategy. When set, it takes precedence over
     ///     <see cref="OutlierMode" />, letting you plug in your own trimming algorithm.
     ///     Leave <c>null</c> to use the built-in detector selected by <see cref="OutlierMode" />.

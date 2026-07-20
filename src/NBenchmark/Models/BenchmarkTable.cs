@@ -300,6 +300,9 @@ public sealed record BenchmarkTable
             Skewness = result.Skewness,
             Kurtosis = result.Kurtosis,
             Mad = result.Mad,
+            MedianCiLower = result.MedianCiLower,
+            MedianCiUpper = result.MedianCiUpper,
+            MedianShift = result.MedianShift,
             AllocMedian = result.AllocMedian,
             AllocP95 = result.AllocP95,
             AllocMax = result.AllocMax,
@@ -375,6 +378,13 @@ public sealed record BenchmarkTable
         lines.Add(
             $"CI: [{BenchmarkFormatter.FormatNs(row.ConfidenceIntervalLower)}; {BenchmarkFormatter.FormatNs(row.ConfidenceIntervalUpper)}] (CI {row.ConfidenceLevel * 100:F1}%)");
 
+        if (row.MedianCiLower is { } medianLower && row.MedianCiUpper is { } medianUpper)
+        {
+            lines.Add(
+                $"Median CI: [{BenchmarkFormatter.FormatNs(medianLower)}; {BenchmarkFormatter.FormatNs(medianUpper)}] "
+                + $"(distribution-free, CI {row.ConfidenceLevel * 100:F1}%)");
+        }
+
         lines.Add($"Margin: ±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}% of Mean)");
 
         lines.Add($"CV: {row.CoefficientOfVariation:F4} ({row.CoefficientOfVariationPercent:F2}%)");
@@ -424,6 +434,9 @@ public sealed record BenchmarkTable
             var magnitudeText = string.IsNullOrWhiteSpace(genericEffect.Magnitude) ? "?" : genericEffect.Magnitude;
             lines.Add($"Effect ({genericEffect.Metric}): {valueText} ({magnitudeText})");
         }
+
+        if (row.MedianShift is { } shift)
+            lines.Add($"Median shift (Hodges-Lehmann): {FormatShift(shift)}");
 
         if (row.AllocMedian is not null)
         {
@@ -475,6 +488,20 @@ public sealed record BenchmarkTable
             summary += ", detector→MAD";
 
         return summary;
+    }
+
+    /// <summary>
+    ///     Formats a Hodges-Lehmann shift and its interval as a signed, human-readable string,
+    ///     e.g. <c>+12.3 ns [8.1 ns, 16.9 ns] (95%)</c>. The sign makes the direction explicit
+    ///     (positive = candidate slower than baseline).
+    /// </summary>
+    public static string FormatShift(ShiftEstimate shift)
+    {
+        var sign = shift.Value >= 0 ? "+" : "-";
+        var value = $"{sign}{BenchmarkFormatter.FormatNs(Math.Abs(shift.Value))}";
+
+        return $"{value} [{BenchmarkFormatter.FormatNs(shift.Lower)}, {BenchmarkFormatter.FormatNs(shift.Upper)}] "
+               + $"({shift.ConfidenceLevel * 100:0.#}%)";
     }
 
     /// <summary>
@@ -550,6 +577,15 @@ public record BenchmarkRow
     public required double Skewness { get; init; }
     public required double Kurtosis { get; init; }
     public required double Mad { get; init; }
+
+    /// <summary>Lower/upper bounds of the distribution-free median confidence interval; <c>null</c> when undefined.</summary>
+    public double? MedianCiLower { get; init; }
+
+    public double? MedianCiUpper { get; init; }
+
+    /// <summary>The Hodges-Lehmann shift versus the baseline with its CI; <c>null</c> for the baseline or when not tested.</summary>
+    public ShiftEstimate? MedianShift { get; init; }
+
     public long? AllocMedian { get; init; }
     public long? AllocP95 { get; init; }
     public long? AllocMax { get; init; }

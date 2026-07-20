@@ -65,7 +65,7 @@ The warning is **non-fatal**: the benchmark still completes and reports statisti
 ### What to do
 
 1. **Do not silence it.** The warning is telling you something real about your code's performance distribution. The reported median describes the fast path; the cluster centre describes a latency a real user will also hit.
-2. **Re-run with `OutlierMode.None`** to see the full distribution (the warning only fires when trimming is active, because it inspects the discarded tail). The [histogram](./descriptive.md) and the reported percentiles (P99, Max) will show the second peak.
+2. **Read the tail metrics as-is - they already show the second peak.** By default the [histogram](./descriptive.md) and the reported percentiles (P99, P99.9, Max) are computed from the full pre-trim distribution (`TailMetricsBasis = Raw`), so the trimmed cluster is still visible in them; you do not need to re-run with `OutlierMode.None`. Trimming affects only the central statistics (mean, standard deviation, CI). If you have explicitly set `TailMetricsBasis = Trimmed`, re-run with `OutlierMode.None` to see the cluster in the tail metrics.
 3. **Investigate the cause.** Use a profiler or add instrumentation around the suspected bottleneck (lock, cache-hot path, GC notification). The cluster centre in the warning message is a hint about how much extra time the slow path costs.
 4. **Consider `--profile independent`** if you suspect GC: it forces per-iteration Gen0 collection, which makes GC pauses deterministic rather than bimodal.
 5. **Reduce noise at the source** with [environment control](../features/environment-control.md) if you suspect OS scheduling contributed to the spread.
@@ -75,6 +75,16 @@ The warning is **non-fatal**: the benchmark still completes and reports statisti
 The bimodal detector runs **after** whichever `OutlierMode` is active and inspects that mode's discarded tail. It is most useful with the default `IqrFence`, which discards a data-adaptive tail. With `None` (no trimming) there is no discarded tail to inspect, so the warning never fires. With `RemoveTop5Percent` or `RemoveTopAndBottom5Percent` the discarded set is a fixed quota, so a tight cluster in it is still meaningful. With `MedianAbsoluteDeviation` the symmetric fence can discard fast and slow samples; only the slow ones above the kept median are considered for the cluster.
 
 The detector never changes which samples are kept - it only adds a warning. The trimmed statistics are computed exactly as the `OutlierMode` dictates.
+
+### GC-correlated outliers
+
+When GC collection counts are collected (`DiagnosticsOptions.GcCollectionCounts`, on by default), NBenchmark records a per-sample GC delta alongside each timing. After trimming, it counts how many of the discarded samples coincided with a collection and annotates the result - answering the first question an outlier tail raises, *"was that a GC?"*, without a re-run:
+
+```
+⚠ 5 of 7 removed outlier(s) coincided with a garbage collection.
+```
+
+When a bimodal warning also fired, the same fact is folded into that warning ("… (3 of the discarded outliers coincided with a garbage collection.)") so the two signals are not reported twice. A high GC-correlation share points at allocation pressure; consider `--profile independent` (forces per-iteration Gen0 collection, making GC deterministic) or reducing allocations in the body.
 
 ## Median Absolute Deviation (MAD)
 

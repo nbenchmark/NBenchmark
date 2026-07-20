@@ -209,7 +209,13 @@ public sealed class BenchmarkRunner
             ? spec.Options with { OutlierDetector = switchedDetector }
             : spec.Options;
 
-        var pipeline = StatsPipeline.Run(adaptive.PerOpTimings, adaptive.PerOpAllocations, effectiveOptions);
+        // Per-sample GC deltas (Gen0+Gen1+Gen2), aligned 1:1 with the measured timings, let the
+        // pipeline annotate which trimmed outliers coincided with a collection. Only built when GC
+        // counts were actually collected.
+        var perSampleGcCounts = BuildPerSampleGcCounts(adaptive, spec.Options.Diagnostics);
+
+        var pipeline = StatsPipeline.Run(
+            adaptive.PerOpTimings, adaptive.PerOpAllocations, effectiveOptions, perSampleGcCounts);
         var mergedWarnings = MergeWarnings(pipeline.Warnings, adaptive.Warnings);
         var diagnosticsResult = BuildDiagnosticsResult(adaptive, spec.Options.Diagnostics);
         var mergedPipeline = pipeline with { Warnings = mergedWarnings, DiagnosticsResult = diagnosticsResult };
@@ -226,6 +232,21 @@ public sealed class BenchmarkRunner
             adaptive.ResolvedWarmup,
             adaptive.Diagnostic,
             spec.Categories);
+    }
+
+    private static int[]? BuildPerSampleGcCounts(AdaptiveResult adaptive, DiagnosticsOptions opts)
+    {
+        if (!opts.GcCollectionCounts || adaptive.PerOpDiagnostics is not { } diags || diags.Length == 0)
+            return null;
+
+        var counts = new int[diags.Length];
+
+        for (var i = 0; i < diags.Length; i++)
+        {
+            counts[i] = diags[i].Gen0 + diags[i].Gen1 + diags[i].Gen2;
+        }
+
+        return counts;
     }
 
     private static DiagnosticsResult? BuildDiagnosticsResult(AdaptiveResult adaptive, DiagnosticsOptions opts)

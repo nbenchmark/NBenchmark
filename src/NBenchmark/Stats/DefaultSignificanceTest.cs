@@ -50,6 +50,7 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
         // and apply Holm-Bonferroni over the tested candidates.
         var baseline = context.Baseline;
         var order = new List<string>(candidateCount);
+        var candidateSamples = new List<double[]>(candidateCount);
 
         var rawResults = new List<MannWhitneyUResult>(candidateCount);
 
@@ -57,6 +58,7 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
         {
             rawResults.Add(MannWhitneyU.Test(baseline.Samples, candidate.Samples));
             order.Add(candidate.Name);
+            candidateSamples.Add(candidate.Samples);
         }
 
         var rawPValues = rawResults.Select(r => r.PValue).ToList();
@@ -83,7 +85,10 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
             if (!double.IsNaN(mwResult.CliffsDelta))
                 effect = EffectSizeFactory.ForCliffsDelta(mwResult.CliffsDelta);
 
-            pairwise.Add(new PairwiseComparison(order[i], p, verdict, effect));
+            var shift = HodgesLehmann.Estimate(
+                baseline.Samples, candidateSamples[i], 1.0 - context.SignificanceLevel);
+
+            pairwise.Add(new PairwiseComparison(order[i], p, verdict, effect, shift));
         }
 
         return new SignificanceReport { Pairwise = pairwise, Omnibus = omnibus };

@@ -15,7 +15,8 @@ public static class StatsPipeline
     public static ProcessedMeasurements Run(
         double[] rawTimings,
         long[]? rawAllocations,
-        MeasurementOptions options)
+        MeasurementOptions options,
+        int[]? perSampleGcCounts = null)
     {
         // OutlierTrim.TrimDetailed clones internally and does not mutate the input, so
         // rawTimings stays in arrival order and TrimmedOrdinals map back correctly.
@@ -24,15 +25,24 @@ public static class StatsPipeline
         Debug.Assert(IsSorted(trimResult.Kept),
             "OutlierTrim must produce sorted output; Percentile.Compute requires sorted input.");
 
+        // Tail metrics (percentiles/min/max/histogram) read from the full pre-trim set by default
+        // so the fence does not trim out the very tail those metrics exist to describe. Passing
+        // null keeps them on the trimmed (Kept) set - the Trimmed escape hatch.
+        var tailSource = options.TailMetricsBasis == TailMetricsBasis.Raw
+            ? trimResult.SortedAll
+            : null;
+
         var stats = StatsSummary.Compute(
             trimResult.Kept,
             options.ConfidenceLevel,
             options.ReportedPercentiles,
             options.EnableHistogram,
-            options.HistogramBucketCount);
+            options.HistogramBucketCount,
+            tailSource);
 
         long? meanAllocs = rawAllocations is not null ? ComputeMean(rawAllocations) : null;
-        var warnings = BuildWarnings(trimResult.Kept, trimResult.Discarded, rawTimings.Length);
+        var warnings = BuildWarnings(
+            trimResult.Kept, trimResult.Discarded, rawTimings, trimResult.TrimmedOrdinals, perSampleGcCounts);
         var outliersRemoved = rawTimings.Length - trimResult.Kept.Length;
 
         return new ProcessedMeasurements(
@@ -50,21 +60,65 @@ public static class StatsPipeline
             { Warnings = warnings };
     }
 
-    private static IReadOnlyList<string> BuildWarnings(double[] trimmed, double[] discarded, int totalSamples)
+    private static IReadOnlyList<string> BuildWarnings(
+        double[] trimmed,
+        double[] discarded,
+        double[] rawTimings,
+        int[] trimmedOrdinals,
+        int[]? perSampleGcCounts)
     {
-        var cluster = BimodalDetector.DetectSlowCluster(trimmed, discarded, totalSamples);
+        var warnings = new List<string>();
 
-        if (cluster is null)
-            return [];
+        var cluster = BimodalDetector.DetectSlowCluster(trimmed, discarded, rawTimings.Length);
+        var gcCorrelatedOutliers = CountGcCorrelatedOutliers(trimmedOrdinals, perSampleGcCounts);
 
-        var (count, center) = cluster.Value;
+        if (cluster is { } clusterValue)
+        {
+            var (count, center) = clusterValue;
 
-        return
-        [
-            $"{count} discarded outlier(s) form a distinct cluster near {BenchmarkFormatter.FormatNs(center)} "
-            + "rather than scattered noise - possible bimodal distribution; investigate this tail latency "
-            + "(e.g. GC pauses, lock contention, or cache misses).",
-        ];
+            var message =
+                $"{count} discarded outlier(s) form a distinct cluster near {BenchmarkFormatter.FormatNs(center)} "
+                + "rather than scattered noise - possible bimodal distribution; investigate this tail latency "
+                + "(e.g. GC pauses, lock contention, or cache misses).";
+
+            // If the discarded cluster is GC-correlated, say so - it answers the first question a
+            // bimodal warning raises ("was that a GC?") instead of leaving the user to re-run.
+            if (gcCorrelatedOutliers > 0)
+                message += $" ({gcCorrelatedOutliers} of the discarded outliers coincided with a garbage collection.)";
+
+            warnings.Add(message);
+        }
+        else if (gcCorrelatedOutliers > 0)
+        {
+            var removed = trimmedOrdinals.Length;
+            warnings.Add(
+                $"{gcCorrelatedOutliers} of {removed} removed outlier(s) coincided with a garbage collection.");
+        }
+
+        // i.i.d. sanity checks on the arrival-order stream (drift, autocorrelation).
+        warnings.AddRange(SampleQuality.BuildWarnings(rawTimings));
+
+        return warnings.Count == 0 ? [] : warnings;
+    }
+
+    /// <summary>
+    ///     Counts trimmed samples whose per-sample GC delta was positive - i.e. a collection
+    ///     happened during that sample. Returns 0 when GC counts were not collected.
+    /// </summary>
+    private static int CountGcCorrelatedOutliers(int[] trimmedOrdinals, int[]? perSampleGcCounts)
+    {
+        if (perSampleGcCounts is null || trimmedOrdinals.Length == 0)
+            return 0;
+
+        var count = 0;
+
+        foreach (var ordinal in trimmedOrdinals)
+        {
+            if (ordinal >= 0 && ordinal < perSampleGcCounts.Length && perSampleGcCounts[ordinal] > 0)
+                count++;
+        }
+
+        return count;
     }
 
     private static long ComputeMean(long[] values)

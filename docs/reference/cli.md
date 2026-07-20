@@ -154,6 +154,23 @@ The `--outlier` flag always takes priority over a programmatic `OutlierDetector`
 
 ---
 
+### `--tail-basis <basis>`
+
+Which sample set the order statistics - percentiles, `Min`, `Max`, and the histogram - are computed from. Default: `raw`.
+
+| Token     | Basis                                                       |
+|-----------|-------------------------------------------------------------|
+| `raw`     | Full pre-trim distribution; includes the trimmed tail.      |
+| `trimmed` | Inlier (post-trim) set; describes only the central process. |
+
+```bash
+dotnet run -- --tail-basis trimmed
+```
+
+Central-tendency and dispersion statistics (mean, standard deviation, CI, CV, skewness, kurtosis, MAD, median, median CI) always stay on the trimmed set regardless of this flag. See [Descriptive Statistics](../statistics/descriptive.md) for details.
+
+---
+
 ### `--reporter <type>`
 
 Add a reporter by name. Can be specified multiple times to stack reporters. Built-in reporters:

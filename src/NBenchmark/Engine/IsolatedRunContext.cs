@@ -42,6 +42,7 @@ internal sealed record MeasurementOverrides
     public double? ConfidenceLevel { get; init; }
     public double? SignificanceLevel { get; init; }
     public OutlierMode? OutlierMode { get; init; }
+    public TailMetricsBasis? TailMetricsBasis { get; init; }
     public MeasurementProfile? Profile { get; init; }
     public bool? ForceGc { get; init; }
     public bool? NoAllocations { get; init; }
@@ -90,6 +91,7 @@ internal sealed record MeasurementOverrides
         ConfidenceLevel = cliArgs.ConfidenceLevel,
         SignificanceLevel = cliArgs.Alpha,
         OutlierMode = cliArgs.OutlierMode,
+        TailMetricsBasis = cliArgs.TailMetricsBasis,
         Profile = cliArgs.Profile,
         ForceGc = cliArgs.ForceGc,
         NoAllocations = cliArgs.NoAllocations,
@@ -130,6 +132,9 @@ internal sealed record MeasurementOverrides
 
         if (OutlierMode.HasValue)
             result = result with { OutlierMode = OutlierMode.Value, OutlierDetector = null };
+
+        if (TailMetricsBasis.HasValue)
+            result = result with { TailMetricsBasis = TailMetricsBasis.Value };
 
         if (Profile.HasValue)
             result = result with { Profile = Profile.Value };

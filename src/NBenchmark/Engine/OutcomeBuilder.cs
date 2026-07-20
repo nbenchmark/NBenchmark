@@ -156,6 +156,8 @@ internal static class OutcomeBuilder
                 Skewness = stats?.Skewness ?? 0,
                 Kurtosis = stats?.Kurtosis ?? 0,
                 Mad = stats?.Mad ?? 0,
+                MedianCiLower = stats?.MedianCiLower,
+                MedianCiUpper = stats?.MedianCiUpper,
                 MeanAllocatedBytes = meanAllocatedBytes,
                 AllocMedian = allocStats?.P50,
                 AllocP95 = allocStats?.P95,

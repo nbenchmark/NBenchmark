@@ -87,7 +87,8 @@ public static class OutlierTrim
             iqr,
             classification.LowerFence,
             classification.UpperFence,
-            trimmedOrdinals);
+            trimmedOrdinals,
+            sorted);
     }
 
     private static int[] RecoverDiscardedOrdinals(double[] sortedValues, int[] sortedIndices, double[] discarded)
@@ -150,6 +151,11 @@ public static class OutlierTrim
 ///     when nothing was trimmed. Use this to flag raw samples as outliers without re-running
 ///     the detector.
 /// </param>
+/// <param name="SortedAll">
+///     The full pre-trim sample set, sorted ascending (the array the detector was handed). Order
+///     statistics that must describe the whole distribution - percentiles, min, max, histogram -
+///     are computed from this so the tail the fence trimmed out is still reported.
+/// </param>
 public readonly record struct TrimResult(
     double[] Kept,
     double[] Discarded,
@@ -158,4 +164,5 @@ public readonly record struct TrimResult(
     double InterquartileRange,
     double? LowerFence,
     double? UpperFence,
-    int[] TrimmedOrdinals);
+    int[] TrimmedOrdinals,
+    double[] SortedAll);

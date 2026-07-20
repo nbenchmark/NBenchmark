@@ -520,6 +520,25 @@ CLI flag: `--outlier <none|top5|both5|iqr|mad>`
 
 See [Outlier Trimming](../statistics/outliers.md) for the full algorithms.
 
+### TailMetricsBasis
+
+```csharp
+TailMetricsBasis = TailMetricsBasis.Raw   // default
+```
+
+Which sample set the order statistics - percentiles, `Min`, `Max`, and the histogram - are computed from.
+
+| Value | Behaviour |
+|---|---|
+| `TailMetricsBasis.Raw` | Full pre-trim distribution. Tail metrics describe the tail the outlier fence removed - so a GC pause the `Realistic` profile deliberately timed shows up in `Max`. **(default)** |
+| `TailMetricsBasis.Trimmed` | Inlier (post-trim) set. Tail metrics describe only the central process. |
+
+Central-tendency and dispersion statistics (mean, standard deviation, CI, CV, skewness, kurtosis, MAD, median, median CI) always stay on the trimmed set regardless of this setting.
+
+CLI flag: `--tail-basis <raw|trimmed>`
+
+See [Descriptive Statistics](../statistics/descriptive.md) for details.
+
 ### OutlierDetector
 
 ```csharp

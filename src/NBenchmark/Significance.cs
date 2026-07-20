@@ -145,6 +145,7 @@ public static class Significance
                         PValue = comparison.PValue,
                         SignificanceVerdict = verdict,
                         Effect = effect,
+                        MedianShift = comparison.Shift,
                     };
                 }
             }

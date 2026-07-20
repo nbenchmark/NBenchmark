@@ -20,6 +20,7 @@ internal sealed record CliArgs
     public double? ConfidenceLevel { get; init; }
     public double? Alpha { get; init; }
     public OutlierMode? OutlierMode { get; init; }
+    public TailMetricsBasis? TailMetricsBasis { get; init; }
     public IReadOnlyList<string> ReporterNames { get; init; } = [];
     public IReadOnlyList<string> ObserverNames { get; init; } = [];
     public IReadOnlyList<string> CategoryFilterInclude { get; init; } = [];
@@ -174,6 +175,7 @@ internal sealed record CliArgs
         double? alpha = null;
         var inProcess = false;
         OutlierMode? outlierMode = null;
+        TailMetricsBasis? tailMetricsBasis = null;
         MeasurementProfile? profile = null;
         bool? forceGc = null;
         bool? noAllocations = null;
@@ -269,6 +271,17 @@ internal sealed record CliArgs
                         outlierMode = parsedOutlier;
                     else
                         errors.Add($"Invalid --outlier value '{outlierStr}'. Must be one of: none, top5, both5, iqr, mad.");
+
+                    break;
+                case "--tail-basis" when i + 1 < args.Length:
+                    var tailStr = args[++i];
+
+                    if (string.Equals(tailStr, "raw", StringComparison.OrdinalIgnoreCase))
+                        tailMetricsBasis = NBenchmark.TailMetricsBasis.Raw;
+                    else if (string.Equals(tailStr, "trimmed", StringComparison.OrdinalIgnoreCase))
+                        tailMetricsBasis = NBenchmark.TailMetricsBasis.Trimmed;
+                    else
+                        errors.Add($"Invalid --tail-basis value '{tailStr}'. Must be one of: raw, trimmed.");
 
                     break;
                 case "--order" when i + 1 < args.Length:
@@ -543,7 +556,7 @@ internal sealed record CliArgs
                     break;
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--observer" or "--category" or "--exclude-category" or "--confidence" or "--order"
-                    or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
+                    or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--tail-basis" or "--detail" or "--profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
                     or "--warmup-budget-fraction" or "--cap-grace-factor" or "--min-warmup-time"
@@ -572,6 +585,7 @@ internal sealed record CliArgs
             ConfidenceLevel = confidenceLevel,
             Alpha = alpha,
             OutlierMode = outlierMode,
+            TailMetricsBasis = tailMetricsBasis,
             ReporterNames = reporterNames,
             ObserverNames = observerNames,
             CategoryFilterInclude = categoryInclude,
@@ -751,6 +765,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
         Console.WriteLine("  --alpha <0-1>          Significance level for the significance test (default: 0.05)");
         Console.WriteLine("  --outlier <mode>       Outlier trimming: none, top5, both5, iqr (default), mad");
+        Console.WriteLine("  --tail-basis <basis>   Percentile/Min/Max/histogram source: raw (default), trimmed");
         Console.WriteLine("  --auto-tune <preset>   Adaptive tuning preset: default, quick, or thorough");
         Console.WriteLine("  --ops-per-sample <n>   Pin ops-per-sample K (default: auto-calibrated)");
         Console.WriteLine("  --ci-target <0-1>      Target relative CI half-width for auto sampling (default: 0.025)");
