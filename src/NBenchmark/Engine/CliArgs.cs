@@ -62,6 +62,20 @@ internal sealed record CliArgs
 
     public AutoTuneCapBehavior? AutoTuneCapBehavior { get; init; }
 
+    /// <summary>
+    ///     The maximum share of <c>--max-tuning-time</c> that ops-per-sample calibration and
+    ///     warmup may consume together. <c>null</c> uses the <see cref="AutoTuneOptions" />
+    ///     default (0.4). Must be a fraction strictly greater than 0 and at most 1.
+    /// </summary>
+    public double? WarmupBudgetFraction { get; init; }
+
+    /// <summary>
+    ///     The hard ceiling multiplier the measurement phase may reach while chasing
+    ///     <c>--min-samples</c> after the wall-clock cap fires. <c>null</c> uses the
+    ///     <see cref="AutoTuneOptions" /> default (1.5). Must be at least 1.
+    /// </summary>
+    public double? CapGraceFactor { get; init; }
+
     /// <summary>Number of separate launches for each benchmark (1 = default, single-run behavior).</summary>
     public int? LaunchCount { get; init; }
 
@@ -160,6 +174,8 @@ internal sealed record CliArgs
         int? maxWarmup = null;
         TimeSpan? maxTuningTime = null;
         AutoTuneCapBehavior? autoTuneCapBehavior = null;
+        double? warmupBudgetFraction = null;
+        double? capGraceFactor = null;
         int? launchCount = null;
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
@@ -398,6 +414,20 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --autotune-cap-behavior value '{capBehaviorStr}'. Must be 'warn' or 'error'.");
 
                     break;
+                case "--warmup-budget-fraction" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var wbf) && wbf is > 0 and <= 1)
+                        warmupBudgetFraction = wbf;
+                    else
+                        errors.Add($"Invalid --warmup-budget-fraction value '{args[i]}'. Must be a fraction in (0, 1] (e.g. 0.4).");
+
+                    break;
+                case "--cap-grace-factor" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var cgf) && cgf >= 1)
+                        capGraceFactor = cgf;
+                    else
+                        errors.Add($"Invalid --cap-grace-factor value '{args[i]}'. Must be at least 1 (e.g. 1.5).");
+
+                    break;
                 case "--launch-count" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var lc) && lc >= 1 && lc <= MeasurementOptions.MaxLaunchCount)
                         launchCount = lc;
@@ -491,6 +521,7 @@ internal sealed record CliArgs
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--detail" or "--profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
+                    or "--warmup-budget-fraction" or "--cap-grace-factor"
                     or "--launch-count" or "--percentiles" or "--runtimes"
                     or "--cpu-affinity" or "--priority" or "--otlp-endpoint":
                     errors.Add($"Missing value for '{args[i]}'.");
@@ -536,6 +567,8 @@ internal sealed record CliArgs
             MaxWarmup = maxWarmup,
             MaxTuningTime = maxTuningTime,
             AutoTuneCapBehavior = autoTuneCapBehavior,
+            WarmupBudgetFraction = warmupBudgetFraction,
+            CapGraceFactor = capGraceFactor,
             LaunchCount = launchCount,
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
@@ -700,6 +733,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --max-warmup <n>       Maximum warmup samples in auto mode (default: 10000)");
         Console.WriteLine("  --max-tuning-time <s>  Wall-clock cap per benchmark, in seconds (default: 20)");
         Console.WriteLine("  --autotune-cap-behavior <mode>  Cap handling: warn (default) or error");
+        Console.WriteLine("  --warmup-budget-fraction <0-1>  Max share of --max-tuning-time for calibration + warmup (default: 0.4)");
+        Console.WriteLine("  --cap-grace-factor <n>  Multiplier on --max-tuning-time the measurement phase may reach while chasing --min-samples (default: 1.5)");
         Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (harness default: 3)");
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");

@@ -14,4 +14,11 @@ public enum SampleStopReason
 
     /// <summary>The per-benchmark wall-clock cap (<see cref="AutoTuneOptions.MaxTuningTime" />) ended measurement early.</summary>
     WallClockCap = 3,
+
+    /// <summary>
+    ///     The grace ceiling (<see cref="AutoTuneOptions.MaxTuningTime" /> *
+    ///     <see cref="AutoTuneOptions.CapGraceFactor" />) was reached while still below
+    ///     <see cref="AutoTuneOptions.MinSamples" />. The error margin is unreliable.
+    /// </summary>
+    GraceCapExhausted = 4,
 }

@@ -436,7 +436,7 @@ public class BenchmarkRunnerTests
                 Iterations = null,
                 OutlierMode = OutlierMode.None,
                 MeasureAllocationsOverride = false,
-                AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50) },
+                AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 },
             },
         };
 

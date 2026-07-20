@@ -58,6 +58,10 @@ internal sealed record MeasurementOverrides
 
     public AutoTuneCapBehavior? CapBehavior { get; init; }
 
+    public double? WarmupBudgetFraction { get; init; }
+
+    public double? CapGraceFactor { get; init; }
+
     public int? LaunchCount { get; init; }
 
     public IReadOnlyList<double>? ReportedPercentiles { get; init; }
@@ -93,6 +97,8 @@ internal sealed record MeasurementOverrides
         MaxWarmup = cliArgs.MaxWarmup,
         MaxTuningTime = cliArgs.MaxTuningTime,
         CapBehavior = cliArgs.AutoTuneCapBehavior,
+        WarmupBudgetFraction = cliArgs.WarmupBudgetFraction,
+        CapGraceFactor = cliArgs.CapGraceFactor,
         LaunchCount = cliArgs.LaunchCount,
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
@@ -171,6 +177,18 @@ internal sealed record MeasurementOverrides
         if (CapBehavior.HasValue)
         {
             autoTune = autoTune with { CapBehavior = CapBehavior.Value };
+            autoTuneChanged = true;
+        }
+
+        if (WarmupBudgetFraction.HasValue)
+        {
+            autoTune = autoTune with { WarmupBudgetFraction = WarmupBudgetFraction.Value };
+            autoTuneChanged = true;
+        }
+
+        if (CapGraceFactor.HasValue)
+        {
+            autoTune = autoTune with { CapGraceFactor = CapGraceFactor.Value };
             autoTuneChanged = true;
         }
 

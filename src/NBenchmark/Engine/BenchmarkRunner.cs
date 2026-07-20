@@ -191,6 +191,7 @@ public sealed class BenchmarkRunner
     {
         if (spec.Options.AutoTune.CapBehavior == AutoTuneCapBehavior.Error
             && (adaptive.Diagnostic.SampleStop == SampleStopReason.WallClockCap
+                || adaptive.Diagnostic.SampleStop == SampleStopReason.GraceCapExhausted
                 || adaptive.Diagnostic.WarmupStop == WarmupStopReason.WallClockCap))
         {
             var ex = new InvalidOperationException(
@@ -276,10 +277,15 @@ public sealed class BenchmarkRunner
 
     private static string FormatCapError(AutoTuneDiagnostic diagnostic, TimeSpan maxTuningTime)
     {
-        var phase = diagnostic.WarmupStop == WarmupStopReason.WallClockCap
-                    && diagnostic.SampleStop == SampleStopReason.WallClockCap
+        // Measurement can hit either the base cap or the grace ceiling; both mean it ran out of
+        // time. Warmup only ever hits its budget share (reported as WallClockCap).
+        var warmupCapped = diagnostic.WarmupStop == WarmupStopReason.WallClockCap;
+        var measurementCapped = diagnostic.SampleStop
+            is SampleStopReason.WallClockCap or SampleStopReason.GraceCapExhausted;
+
+        var phase = warmupCapped && measurementCapped
             ? "Warmup and measurement"
-            : diagnostic.SampleStop == SampleStopReason.WallClockCap
+            : measurementCapped
                 ? "Measurement"
                 : "Warmup";
 

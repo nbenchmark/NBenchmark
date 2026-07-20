@@ -262,7 +262,7 @@ public class AdaptiveLoopTests
             Iterations = null, // auto -> would otherwise collect at least MinSamples (30)
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
-            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50) }, // 5000 ns
+            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 }, // 5000 ns
         };
 
         var clock = new ScriptedClock(1000.0);
@@ -270,11 +270,108 @@ public class AdaptiveLoopTests
         var result = RunSync(() => { }, options, clock);
 
         // Accumulated sample time crosses the 5000 ns cap on the 5th 1000 ns sample, far below MinSamples.
+        // CapGraceFactor = 1.0 disables the grace path, so the loop stops at the base cap.
         Assert.Equal(SampleStopReason.WallClockCap, result.Diagnostic.SampleStop);
         Assert.Equal(5, result.PerOpTimings.Length);
         Assert.Single(result.Warnings);
         Assert.Contains("wall-clock tuning cap", result.Warnings[0]);
         Assert.Contains("--max-tuning-time", result.Warnings[0]);
+    }
+
+    [Fact]
+    public void WallClock_Cap_Grace_Continues_Past_Base_Cap_And_Reports_GraceCapExhausted()
+    {
+        // The core WS2 behavior: when the base cap fires below MinSamples, the grace path keeps
+        // sampling up to MaxTuningTime * CapGraceFactor instead of stopping on a dangerously
+        // under-sampled result. Without grace this body would stop at 10 samples (the pre-WS2
+        // behavior, which at the extreme is a single sample with StdDev = 0 and a zero error margin).
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = null, // auto -> CI detector; MinSamples (30) never reached under the cap
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            // Base cap 10000 ns (10 samples), grace ceiling 20000 ns (20 samples). Both below the
+            // MinSamples floor of 30, so the grace ceiling is what stops the loop.
+            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(100), CapGraceFactor = 2.0 },
+        };
+
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        // The base cap fires at sample 10 but grace carries sampling to the 20000 ns ceiling (20
+        // samples) - double what the base cap alone would have collected.
+        Assert.Equal(SampleStopReason.GraceCapExhausted, result.Diagnostic.SampleStop);
+        Assert.Equal(20, result.PerOpTimings.Length);
+        Assert.Single(result.Warnings);
+        Assert.Contains("grace ceiling", result.Warnings[0]);
+        Assert.Contains("only 20 samples", result.Warnings[0]);
+        Assert.Contains("unreliable", result.Warnings[0]);
+    }
+
+    [Fact]
+    public void WallClock_Cap_Grace_Reaches_MinSamples_Then_Stops_WallClockCap()
+    {
+        // When the grace ceiling is high enough to let the loop reach MinSamples, the result is a
+        // normal WallClockCap stop with the standard cap warning - not GraceCapExhausted, and no
+        // "unreliable" flag. This proves grace extends sampling only as far as it needs to.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = null,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            // Base cap 25000 ns (25 samples), grace ceiling 50000 ns. MinSamples (30) sits between
+            // them, so grace carries the loop to exactly 30 samples and then stops at the base cap.
+            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(250), CapGraceFactor = 2.0 },
+        };
+
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.Equal(SampleStopReason.WallClockCap, result.Diagnostic.SampleStop);
+        Assert.Equal(30, result.PerOpTimings.Length); // grace extended past the base-cap's 25 samples to MinSamples
+        Assert.Single(result.Warnings);
+        Assert.DoesNotContain("grace ceiling", result.Warnings[0]);
+        Assert.DoesNotContain("unreliable", result.Warnings[0]);
+    }
+
+    [Fact]
+    public async Task RunAsync_WallClock_Cap_Grace_Reports_GraceCapExhausted()
+    {
+        // Mirror of the sync grace test: the async overload carries the identical grace logic, so
+        // it must produce the same GraceCapExhausted stop and sample count.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = null,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(100), CapGraceFactor = 2.0 },
+        };
+
+        var clock = new ScriptedClock(1000.0);
+        var spec = new RunSpec { Options = options };
+
+        var result = await AdaptiveLoop.RunAsync(
+            "bench",
+            () => Task.CompletedTask,
+            spec,
+            clock,
+            NullBenchmarkProgress.Instance,
+            NullMeasurementObserver.Instance,
+            CancellationToken.None);
+
+        Assert.Equal(SampleStopReason.GraceCapExhausted, result.Diagnostic.SampleStop);
+        Assert.Equal(20, result.PerOpTimings.Length);
+        Assert.Single(result.Warnings);
+        Assert.Contains("grace ceiling", result.Warnings[0]);
+        Assert.Contains("unreliable", result.Warnings[0]);
     }
 
     [Fact]
@@ -291,7 +388,7 @@ public class AdaptiveLoopTests
             Iterations = 1_000, // pinned count, far above what the cap allows
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
-            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50) }, // 5000 ns
+            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 }, // 5000 ns
         };
 
         var clock = new ScriptedClock(1000.0);
@@ -325,7 +422,7 @@ public class AdaptiveLoopTests
             Iterations = 0, // measurement phase exits immediately on explicit count
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
-            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50) }, // 5000 ns
+            AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 }, // 5000 ns
         };
 
         // Constant 1000 ns/op signal will never settle to the plateau rule's satisfaction.
@@ -336,7 +433,11 @@ public class AdaptiveLoopTests
         Assert.Equal(WarmupStopReason.WallClockCap, result.Diagnostic.WarmupStop);
         Assert.True(result.ResolvedWarmup >= 0);
         Assert.Single(result.Warnings);
-        Assert.Contains("Warmup stopped at the wall-clock tuning cap", result.Warnings[0]);
+        // The warning names the calibration+warmup budget share (default 40%), not the full cap -
+        // warmup stops at its share (2 µs of the 5 µs cap here), so saying "stopped at the 5 µs cap"
+        // would misstate when it actually stopped.
+        Assert.Contains("Warmup exhausted its calibration+warmup budget", result.Warnings[0]);
+        Assert.Contains("40%", result.Warnings[0]);
         Assert.Contains("--max-tuning-time", result.Warnings[0]);
     }
 
@@ -395,6 +496,7 @@ public class AdaptiveLoopTests
             AutoTune = AutoTuneOptions.Default with
             {
                 MaxTuningTime = TimeSpan.FromTicks(50), // 5000 ns cap
+                CapGraceFactor = 1.0,
                 TargetSampleDurationNs = 100_000_000, // unreachable target so calibration probes several Ks
             },
         };
@@ -410,9 +512,9 @@ public class AdaptiveLoopTests
         Assert.Equal(WarmupStopReason.WallClockCap, result.Diagnostic.WarmupStop);
         Assert.Equal(SampleStopReason.WallClockCap, result.Diagnostic.SampleStop);
         Assert.Single(result.Warnings);
-        Assert.Contains("Calibration stopped at the wall-clock tuning cap", result.Warnings[0]);
+        Assert.Contains("Calibration exhausted its calibration+warmup budget", result.Warnings[0]);
         Assert.Contains("--max-tuning-time", result.Warnings[0]);
-        Assert.DoesNotContain("Warmup stopped", result.Warnings[0]);
+        Assert.DoesNotContain("Warmup exhausted", result.Warnings[0]);
         Assert.True(result.ResolvedWarmup > 0);
     }
 
@@ -447,7 +549,7 @@ public class AdaptiveLoopTests
         // The cap label (5.00 µs for a 5000 ns cap) appears in the warning; the elapsed text
         // is not shown.
         Assert.Contains("5.00 µs", result.Warnings[0]);
-        Assert.Contains("Warmup stopped at the wall-clock tuning cap", result.Warnings[0]);
+        Assert.Contains("Warmup exhausted its calibration+warmup budget", result.Warnings[0]);
     }
 
     [Fact]

@@ -504,6 +504,91 @@ public class CliArgsTests
         Assert.Contains("Missing value", error);
     }
 
+    // ---------- WS2: --warmup-budget-fraction and --cap-grace-factor ----------
+
+    [Theory]
+    [InlineData("0.4", 0.4)]
+    [InlineData("0.5", 0.5)]
+    [InlineData("1", 1.0)]
+    [InlineData("1.0", 1.0)]
+    public void ParseCore_WarmupBudgetFraction_Valid_SetsFraction(string value, double expected)
+    {
+        var (result, _) = CliArgs.ParseCore(["--warmup-budget-fraction", value]);
+        Assert.Equal(expected, result.WarmupBudgetFraction);
+    }
+
+    [Fact]
+    public void ParseCore_WarmupBudgetFraction_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.WarmupBudgetFraction);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-0.1")]
+    [InlineData("1.5")]
+    [InlineData("bogus")]
+    public void ParseCore_WarmupBudgetFraction_Invalid_ReturnsError(string value)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--warmup-budget-fraction", value]);
+
+        Assert.Null(result.WarmupBudgetFraction);
+        var error = Assert.Single(errors);
+        Assert.Contains("Invalid --warmup-budget-fraction", error);
+    }
+
+    [Fact]
+    public void ParseCore_WarmupBudgetFraction_MissingValue_ReturnsError()
+    {
+        var (_, errors) = CliArgs.ParseCore(["--warmup-budget-fraction"]);
+
+        var error = Assert.Single(errors);
+        Assert.Contains("Missing value", error);
+    }
+
+    [Theory]
+    [InlineData("1.5", 1.5)]
+    [InlineData("1", 1.0)]
+    [InlineData("1.0", 1.0)]
+    [InlineData("2", 2.0)]
+    [InlineData("3.0", 3.0)]
+    public void ParseCore_CapGraceFactor_Valid_SetsFactor(string value, double expected)
+    {
+        var (result, _) = CliArgs.ParseCore(["--cap-grace-factor", value]);
+        Assert.Equal(expected, result.CapGraceFactor);
+    }
+
+    [Fact]
+    public void ParseCore_CapGraceFactor_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.CapGraceFactor);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("0.5")]
+    [InlineData("-1")]
+    [InlineData("bogus")]
+    public void ParseCore_CapGraceFactor_Invalid_ReturnsError(string value)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--cap-grace-factor", value]);
+
+        Assert.Null(result.CapGraceFactor);
+        var error = Assert.Single(errors);
+        Assert.Contains("Invalid --cap-grace-factor", error);
+    }
+
+    [Fact]
+    public void ParseCore_CapGraceFactor_MissingValue_ReturnsError()
+    {
+        var (_, errors) = CliArgs.ParseCore(["--cap-grace-factor"]);
+
+        var error = Assert.Single(errors);
+        Assert.Contains("Missing value", error);
+    }
+
     [Fact]
     public void ParseCore_Profile_Invalid_ReturnsError()
     {

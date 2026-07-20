@@ -37,6 +37,8 @@ public sealed record AutoTuneOptions
     private readonly int _batchSize = 8;
     private readonly int _maxOpsPerSample = 1 << 20;
     private readonly int _plateauPatience = 3;
+    private readonly double _warmupBudgetFraction = 0.4;
+    private readonly double _capGraceFactor = 1.5;
 
     // ----- Warmup plateau -----
 
@@ -173,6 +175,34 @@ public sealed record AutoTuneOptions
     ///     <see cref="AutoTuneCapBehavior.Warn" />.
     /// </summary>
     public AutoTuneCapBehavior CapBehavior { get; init; } = AutoTuneCapBehavior.Warn;
+
+    /// <summary>
+    ///     The maximum share of <see cref="MaxTuningTime" /> that ops-per-sample calibration and
+    ///     warmup may consume together. The remaining share is reserved for measurement. Must be
+    ///     strictly greater than 0 and at most 1. Default 0.4 (40%).
+    /// </summary>
+    public double WarmupBudgetFraction
+    {
+        get => _warmupBudgetFraction;
+        init => _warmupBudgetFraction = value is > 0 and <= 1
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value, "WarmupBudgetFraction must be in (0, 1].");
+    }
+
+    /// <summary>
+    ///     The hard ceiling multiplier the measurement phase may reach while chasing
+    ///     <see cref="MinSamples" /> after the wall-clock cap fires. When the cap fires before
+    ///     <see cref="MinSamples" /> is reached, the loop keeps sampling up to
+    ///     <c>MaxTuningTime * CapGraceFactor</c> rather than stop on a dangerously
+    ///     under-sampled result. Must be at least 1. Default 1.5.
+    /// </summary>
+    public double CapGraceFactor
+    {
+        get => _capGraceFactor;
+        init => _capGraceFactor = value >= 1
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value, "CapGraceFactor must be at least 1.");
+    }
 
     /// <summary>Resolves a <see cref="AutoTunePreset" /> to its concrete options.</summary>
     public static AutoTuneOptions FromPreset(AutoTunePreset preset) => preset switch

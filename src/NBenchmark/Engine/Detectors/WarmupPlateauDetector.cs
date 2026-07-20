@@ -20,12 +20,51 @@ internal sealed class WarmupPlateauDetector
     private int _nonImproving;
 
     public WarmupPlateauDetector(AutoTuneOptions options)
+        : this(options, perSampleEstimateNs: 0.0)
+    {
+    }
+
+    /// <summary>
+    ///     Constructs the detector with an optional per-sample elapsed estimate (in nanoseconds)
+    ///     from ops-per-sample calibration. When the estimate is positive and the body is slow
+    ///     enough that the configured <see cref="AutoTuneOptions.BatchSize" /> would span well over
+    ///     the warmup batch target (250 ms), the effective batch is shrunk so the plateau rule can
+    ///     settle in a reasonable number of samples instead of spending the whole warmup budget on
+    ///     a handful of full-length batches. A 2 s body with default BatchSize = 8 would otherwise
+    ///     have to feed (Patience + 1) * BatchSize = 32 samples (64 s) before the plateau rule can
+    ///     settle; shrinking the batch to 1 drops the plateau requirement to (Patience + 1) = 4
+    ///     samples, after which <see cref="AutoTuneOptions.MinWarmup" /> (default 8) becomes the
+    ///     binding floor. The estimate is 0 when calibration did not run (K pinned, setup/teardown,
+    ///     forced GC), in which case the configured BatchSize is used unchanged.
+    ///     <para>
+    ///         Batch shrinking only lowers the sample <em>count</em> needed to settle; the
+    ///         calibration+warmup wall-clock share (<see cref="AutoTuneOptions.WarmupBudgetFraction" />
+    ///         of <see cref="AutoTuneOptions.MaxTuningTime" />) is the independent time bound and
+    ///         typically stops a genuinely slow body's warmup before either floor is reached.
+    ///     </para>
+    /// </summary>
+    public WarmupPlateauDetector(AutoTuneOptions options, double perSampleEstimateNs)
     {
         _minWarmup = Math.Max(0, options.MinWarmup);
         _maxWarmup = Math.Max(_minWarmup, options.MaxWarmup);
         _epsilon = options.WarmupEpsilon;
         _patience = Math.Max(1, options.PlateauPatience);
-        _batchSize = Math.Max(1, options.BatchSize);
+        _batchSize = ResolveBatchSize(options.BatchSize, perSampleEstimateNs);
+    }
+
+    private static int ResolveBatchSize(int configured, double perSampleEstimateNs)
+    {
+        if (perSampleEstimateNs <= 0)
+            return Math.Max(1, configured);
+
+        // Scale the batch so one batch spans roughly the 250 ms target. A slow body (2 s/sample)
+        // resolves to a batch of 1; a fast body (1 µs/sample) resolves to 250_000, clamped to the
+        // configured BatchSize. The floor is 1 (one sample per batch) and the ceiling is the
+        // configured BatchSize - slow bodies shrink the batch, fast bodies are unaffected.
+        const double targetBatchNs = 250_000_000.0;
+        var scaled = (int)Math.Ceiling(targetBatchNs / perSampleEstimateNs);
+
+        return Math.Clamp(scaled, 1, Math.Max(1, configured));
     }
 
     /// <summary>Whether warmup has settled or hit its ceiling.</summary>

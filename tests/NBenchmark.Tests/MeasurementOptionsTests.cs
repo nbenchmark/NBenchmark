@@ -266,4 +266,60 @@ public class MeasurementOptionsTests
         var opts = new MeasurementOptions { ConfidenceLevel = value };
         Assert.Equal(value, opts.ConfidenceLevel);
     }
+
+    // ---------- WS2: AutoTuneOptions validation ----------
+
+    [Fact]
+    public void AutoTune_Default_WarmupBudgetFraction_Is_0_4()
+    {
+        Assert.Equal(0.4, AutoTuneOptions.Default.WarmupBudgetFraction);
+    }
+
+    [Fact]
+    public void AutoTune_Default_CapGraceFactor_Is_1_5()
+    {
+        Assert.Equal(1.5, AutoTuneOptions.Default.CapGraceFactor);
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(-0.1)]
+    [InlineData(1.5)]
+    public void WarmupBudgetFraction_Rejects_Invalid_Values(double value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new AutoTuneOptions { WarmupBudgetFraction = value });
+    }
+
+    [Theory]
+    [InlineData(0.1)]
+    [InlineData(0.4)]
+    [InlineData(0.5)]
+    [InlineData(1.0)]
+    public void WarmupBudgetFraction_Accepts_Valid_Values(double value)
+    {
+        var opts = new AutoTuneOptions { WarmupBudgetFraction = value };
+        Assert.Equal(value, opts.WarmupBudgetFraction);
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(0.5)]
+    [InlineData(0.99)]
+    public void CapGraceFactor_Rejects_Invalid_Values(double value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new AutoTuneOptions { CapGraceFactor = value });
+    }
+
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(1.5)]
+    [InlineData(2.0)]
+    [InlineData(10.0)]
+    public void CapGraceFactor_Accepts_Valid_Values(double value)
+    {
+        var opts = new AutoTuneOptions { CapGraceFactor = value };
+        Assert.Equal(value, opts.CapGraceFactor);
+    }
 }

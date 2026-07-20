@@ -374,6 +374,8 @@ Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `
 | `MaxOpsPerSample` | `1 048 576` | Ceiling on auto-calibrated K. |
 | `BatchSize` | `8` | Warmup batch size and the cadence on which the CI-width rule is evaluated. |
 | `MaxTuningTime` | `20 s` | Per-benchmark safety cap on cumulative in-body sample time (calibration + warmup + measurement). Setup, teardown, and GC are excluded, so real wall-clock can exceed it. |
+| `WarmupBudgetFraction` | `0.4` | Max share of `MaxTuningTime` that calibration (Phase A) and warmup (Phase B) may consume together. Once the share is exhausted, each phase stops at the wall-clock cap and the loop moves on, reserving the remainder for measurement. Must be in `(0, 1]`. |
+| `CapGraceFactor` | `1.5` | Hard ceiling multiplier the measurement phase may reach while chasing `MinSamples` after the `MaxTuningTime` cap fires. When the cap fires before `MinSamples` is reached, the loop keeps sampling up to `MaxTuningTime × CapGraceFactor` so the reported statistics have enough samples to be meaningful (a one-sample result reports StdDev = 0 and MarginOfError = 0 - dangerously clean-looking). Must be at least 1; set to 1 to disable the grace path. `CapBehavior = Error` users are unaffected - the error fires at the base cap either way. |
 | `CapBehavior` | `Warn` | What happens when `MaxTuningTime` is reached before the CI target or warmup plateau is reached. `Warn` emits a warning; `Error` marks the benchmark as errored. |
 | `EnableJitterCalibration` | `true` | Whether the pre-flight jitter probe runs. When `false`, the jitter metric is `null` and the outlier detector is never auto-switched. |
 | `JitterCalibrationSamples` | `32` | Number of timed samples the jitter probe collects. |
@@ -383,7 +385,7 @@ Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `
 The interval's confidence level is `ConfidenceLevel` (below) - the CI-width rule targets that same level, so it is not duplicated on `AutoTune`.
 
 BenchmarkSuite/BenchmarkHarness fluent method: `.WithAutoTune(AutoTunePreset.Quick)` or `.WithAutoTune(customOptions)`  
-CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--autotune-cap-behavior`.
+CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--autotune-cap-behavior`, `--warmup-budget-fraction`, `--cap-grace-factor`.
 
 ### Profile
 

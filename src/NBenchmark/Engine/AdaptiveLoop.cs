@@ -50,9 +50,13 @@ internal static class AdaptiveLoop
         var diagnostics = o.Diagnostics;
         var forceGc = o.ForceGcBeforeEachIteration;
         var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
+        var calibrationWarmupCapNs = maxTuningNs * autoTune.WarmupBudgetFraction;
+        var graceCapNs = maxTuningNs * autoTune.CapGraceFactor;
         var calibrate = IsEligibleForCalibration(o, spec);
         var k = o.OpsPerSample ?? 1;
         double accumulatedNs = 0;
+        double calibrationWarmupNs = 0;
+        double bestCalibrationElapsed = 0;
         long totalBodyInvocations = 0;
         var attached = observer != NullMeasurementObserver.Instance;
 
@@ -142,6 +146,7 @@ internal static class AdaptiveLoop
                     var (elapsed, _, _) = AcquireSampleSync(body, spec, clock, probeK, false, forceGc, DiagnosticsOptions.None);
                     totalBodyInvocations += probeK;
                     accumulatedNs += elapsed;
+                    calibrationWarmupNs += elapsed;
                     calibrationSamples++;
 
                     NBenchmarkDiagnostics.RecordSample(name, true, CalibrationPhaseTag, elapsed / probeK, -1);
@@ -162,6 +167,7 @@ internal static class AdaptiveLoop
 
                 var resolved = calibrator.Feed(best);
                 k = calibrator.OpsPerSample;
+                bestCalibrationElapsed = best;
 
                 if (attached)
                     observer.OnDetector(new DetectorStateEvent(name, MeasurementPhase.Calibration, calibrationSamples, best, 0.0, 0.0, k));
@@ -169,7 +175,7 @@ internal static class AdaptiveLoop
                 if (resolved)
                     break;
 
-                if (accumulatedNs >= maxTuningNs)
+                if (calibrationWarmupNs >= calibrationWarmupCapNs)
                 {
                     calibrationCapped = true;
                     break;
@@ -218,7 +224,8 @@ internal static class AdaptiveLoop
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
 
-            var detector = new WarmupPlateauDetector(autoTune);
+            var perSampleEstimate = calibrate ? bestCalibrationElapsed : 0.0;
+            var detector = new WarmupPlateauDetector(autoTune, perSampleEstimate);
             warmupStop = WarmupStopReason.Settled;
             var warmupOrdinal = 0;
             var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
@@ -229,6 +236,7 @@ internal static class AdaptiveLoop
                 var (elapsed, _, _) = AcquireSampleSync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
+                calibrationWarmupNs += elapsed;
 
                 NBenchmarkDiagnostics.RecordSample(name, true, WarmupPhaseTag, elapsed / k, -1);
 
@@ -248,7 +256,7 @@ internal static class AdaptiveLoop
                     break;
                 }
 
-                if (accumulatedNs >= maxTuningNs)
+                if (calibrationWarmupNs >= calibrationWarmupCapNs)
                 {
                     warmupStop = WarmupStopReason.WallClockCap;
                     break;
@@ -372,7 +380,20 @@ internal static class AdaptiveLoop
 
                 if (accumulatedNs >= maxTuningNs)
                 {
-                    sampleStop = SampleStopReason.WallClockCap;
+                    var underMinSamples = sampleCount < autoTune.MinSamples;
+                    var graceEnabled = graceCapNs > maxTuningNs;
+
+                    // Base cap fired below MinSamples with grace budget left: keep sampling rather
+                    // than stop on a dangerously under-sampled result (a one-sample stop reports
+                    // StdDev = 0 and a zero error margin - clean-looking but meaningless).
+                    if (underMinSamples && graceEnabled && accumulatedNs < graceCapNs)
+                        continue;
+
+                    // Grace exhausted while still under MinSamples flags the result unreliable;
+                    // otherwise this is an ordinary cap stop (enough samples, or grace disabled).
+                    sampleStop = underMinSamples && graceEnabled
+                        ? SampleStopReason.GraceCapExhausted
+                        : SampleStopReason.WallClockCap;
                     break;
                 }
             }
@@ -430,7 +451,9 @@ internal static class AdaptiveLoop
             autoTune.MaxSamples,
             explicitSamples,
             jitterMetric,
-            detectorSwitched);
+            detectorSwitched,
+            autoTune.CapGraceFactor,
+            autoTune.WarmupBudgetFraction);
     }
 
     public static async Task<AdaptiveResult> RunAsync(
@@ -448,9 +471,13 @@ internal static class AdaptiveLoop
         var diagnostics = o.Diagnostics;
         var forceGc = o.ForceGcBeforeEachIteration;
         var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
+        var calibrationWarmupCapNs = maxTuningNs * autoTune.WarmupBudgetFraction;
+        var graceCapNs = maxTuningNs * autoTune.CapGraceFactor;
         var calibrate = IsEligibleForCalibration(o, spec);
         var k = o.OpsPerSample ?? 1;
         double accumulatedNs = 0;
+        double calibrationWarmupNs = 0;
+        double bestCalibrationElapsed = 0;
         long totalBodyInvocations = 0;
         var attached = observer != NullMeasurementObserver.Instance;
 
@@ -542,6 +569,7 @@ internal static class AdaptiveLoop
 
                     totalBodyInvocations += probeK;
                     accumulatedNs += elapsed;
+                    calibrationWarmupNs += elapsed;
                     calibrationSamples++;
 
                     NBenchmarkDiagnostics.RecordSample(name, true, CalibrationPhaseTag, elapsed / probeK, -1);
@@ -562,6 +590,7 @@ internal static class AdaptiveLoop
 
                 var resolved = calibrator.Feed(best);
                 k = calibrator.OpsPerSample;
+                bestCalibrationElapsed = best;
 
                 if (attached)
                     observer.OnDetector(new DetectorStateEvent(name, MeasurementPhase.Calibration, calibrationSamples, best, 0.0, 0.0, k));
@@ -569,7 +598,7 @@ internal static class AdaptiveLoop
                 if (resolved)
                     break;
 
-                if (accumulatedNs >= maxTuningNs)
+                if (calibrationWarmupNs >= calibrationWarmupCapNs)
                 {
                     calibrationCapped = true;
                     break;
@@ -618,7 +647,8 @@ internal static class AdaptiveLoop
             if (attached)
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Warmup, PhaseTransition.Starting));
 
-            var detector = new WarmupPlateauDetector(autoTune);
+            var perSampleEstimate = calibrate ? bestCalibrationElapsed : 0.0;
+            var detector = new WarmupPlateauDetector(autoTune, perSampleEstimate);
             warmupStop = WarmupStopReason.Settled;
             var warmupOrdinal = 0;
             var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
@@ -629,6 +659,7 @@ internal static class AdaptiveLoop
                 var (elapsed, _, _) = await AcquireSampleAsync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None).ConfigureAwait(false);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
+                calibrationWarmupNs += elapsed;
 
                 NBenchmarkDiagnostics.RecordSample(name, true, WarmupPhaseTag, elapsed / k, -1);
 
@@ -648,7 +679,7 @@ internal static class AdaptiveLoop
                     break;
                 }
 
-                if (accumulatedNs >= maxTuningNs)
+                if (calibrationWarmupNs >= calibrationWarmupCapNs)
                 {
                     warmupStop = WarmupStopReason.WallClockCap;
                     break;
@@ -775,7 +806,20 @@ internal static class AdaptiveLoop
 
                 if (accumulatedNs >= maxTuningNs)
                 {
-                    sampleStop = SampleStopReason.WallClockCap;
+                    var underMinSamples = sampleCount < autoTune.MinSamples;
+                    var graceEnabled = graceCapNs > maxTuningNs;
+
+                    // Base cap fired below MinSamples with grace budget left: keep sampling rather
+                    // than stop on a dangerously under-sampled result (a one-sample stop reports
+                    // StdDev = 0 and a zero error margin - clean-looking but meaningless).
+                    if (underMinSamples && graceEnabled && accumulatedNs < graceCapNs)
+                        continue;
+
+                    // Grace exhausted while still under MinSamples flags the result unreliable;
+                    // otherwise this is an ordinary cap stop (enough samples, or grace disabled).
+                    sampleStop = underMinSamples && graceEnabled
+                        ? SampleStopReason.GraceCapExhausted
+                        : SampleStopReason.WallClockCap;
                     break;
                 }
             }
@@ -833,7 +877,9 @@ internal static class AdaptiveLoop
             autoTune.MaxSamples,
             explicitSamples,
             jitterMetric,
-            detectorSwitched);
+            detectorSwitched,
+            autoTune.CapGraceFactor,
+            autoTune.WarmupBudgetFraction);
     }
 
     private static bool IsEligibleForCalibration(MeasurementOptions o, RunSpec spec)
@@ -863,7 +909,9 @@ internal static class AdaptiveLoop
         int maxSamples,
         int? explicitSamples,
         double? jitterMetric,
-        bool detectorSwitched)
+        bool detectorSwitched,
+        double capGraceFactor,
+        double warmupBudgetFraction)
     {
         var timingsArray = timings.ToArray();
 
@@ -888,7 +936,8 @@ internal static class AdaptiveLoop
 
         var warnings = BuildStopWarnings(
             warmupStop, sampleStop, calibrationCapped, maxTuningTime,
-            achievedCi, ciTarget, maxSamples, sampleCount, explicitSamples);
+            achievedCi, ciTarget, maxSamples, sampleCount, explicitSamples, capGraceFactor,
+            warmupBudgetFraction);
 
         if (detectorSwitched)
         {
@@ -980,17 +1029,24 @@ internal static class AdaptiveLoop
         double ciTarget,
         int maxSamples,
         int sampleCount,
-        int? explicitSamples)
+        int? explicitSamples,
+        double capGraceFactor,
+        double warmupBudgetFraction)
     {
         var capLabel = BenchmarkFormatter.FormatDuration(maxTuningTime);
+
+        // Calibration and warmup stop at their shared share of the cap, not the full cap, so the
+        // message names the share (e.g. "40% of the 20 s tuning cap") rather than the full value -
+        // otherwise a warmup that stopped after 8 s reads as "stopped at the 20 s cap".
+        var sharePct = $"{warmupBudgetFraction * 100:0.#}%";
 
         if (calibrationCapped)
         {
             return
             [
-                $"Calibration stopped at the wall-clock tuning cap ({capLabel}) "
+                $"Calibration exhausted its calibration+warmup budget ({sharePct} of the {capLabel} tuning cap) "
                 + "before ops-per-sample could be resolved. The chosen K may be suboptimal. "
-                + "Consider increasing --max-tuning-time.",
+                + "Consider increasing --max-tuning-time or --warmup-budget-fraction.",
             ];
         }
 
@@ -1019,6 +1075,17 @@ internal static class AdaptiveLoop
             ];
         }
 
+        if (sampleStop == SampleStopReason.GraceCapExhausted)
+        {
+            return
+            [
+                $"Measurement stopped at the grace ceiling ({capLabel} * {capGraceFactor:F1}) "
+                + $"after collecting only {sampleCount} samples, below the minimum required for a "
+                + "reliable confidence interval. The reported error margin is unreliable. "
+                + "Consider increasing --max-tuning-time, reducing --min-samples, or pinning --iterations.",
+            ];
+        }
+
         if (sampleStop == SampleStopReason.MaxCeiling && achievedCi > ciTarget)
         {
             return
@@ -1037,9 +1104,9 @@ internal static class AdaptiveLoop
         {
             return
             [
-                $"Warmup stopped at the wall-clock tuning cap ({capLabel}) "
+                $"Warmup exhausted its calibration+warmup budget ({sharePct} of the {capLabel} tuning cap) "
                 + "before the body reached a steady state. The remaining samples may be affected by JIT or cache warm-up. "
-                + "Consider increasing --max-tuning-time or pinning --warmup.",
+                + "Consider increasing --max-tuning-time, raising --warmup-budget-fraction, or pinning --warmup.",
             ];
         }
 
