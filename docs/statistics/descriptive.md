@@ -16,11 +16,11 @@ $$\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i$$
 
 ### Median
 
-The [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method) method. For sorted sample index `i = ceil(0.5 × n)` (1-based). Equivalent to the middle value for odd `n`, and the lower-middle for even `n`.
+The **mid-average** convention: the middle value for odd `n`, and the mean of the two middle order statistics for even `n`. This matches `numpy.median` and the median NBenchmark uses elsewhere (per-launch aggregation, jitter calibration), so the reported `Median` and the `P50` percentile agree. Every other percentile uses the nearest-rank method (see below); the median is the sole exception, because the mid-average removes the small systematic downward bias nearest-rank has on even `n`.
 
 ### Percentiles
 
-Configurable percentile values computed via the [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method) method: `i = ceil(p × n)`. Controlled by `MeasurementOptions.ReportedPercentiles` (default: P50, P95, P99, P99.9, Max). Each entry is a `PercentileEntry` with a `Percentile` (0-1) and `Value` (nanoseconds). Access a specific percentile with `result.GetPercentile(0.95)`.
+Configurable percentile values computed via the [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method) method: `i = ceil(p × n)`. The median (`p = 0.50`) is the one exception - it mid-averages the two middles on even `n` (see [Median](#median) above); `Q1`/`Q3` and every other percentile stay nearest-rank. Controlled by `MeasurementOptions.ReportedPercentiles` (default: P50, P95, P99, P99.9, Max). Each entry is a `PercentileEntry` with a `Percentile` (0-1) and `Value` (nanoseconds). Access a specific percentile with `result.GetPercentile(0.95)`.
 
 **Tail metrics are computed from the full pre-trim distribution by default.** Percentiles, `Min`, `Max`, and the histogram describe the shape of the distribution, so they are computed from the raw (pre-trim) sample set - `MeasurementOptions.TailMetricsBasis = Raw`, the default. This keeps them honest: the IQR/MAD fence removes exactly the slow tail that P99/P99.9/Max exist to describe, so a GC pause the `Realistic` profile deliberately timed appears in `Max` rather than being trimmed out of it. Central-tendency and dispersion statistics (mean, standard deviation, CI, CV, skewness, kurtosis, MAD, median, median CI) always stay on the **trimmed** set, so a fenced-out spike never moves the mean or inflates the interval. Set `TailMetricsBasis = Trimmed` (or `--tail-basis trimmed`) to compute tail metrics from the inlier set instead.
 
@@ -136,7 +136,7 @@ Reported as `0` when `n < 1$.
 
 | Field | Formula / method | Description |
 |---|---|---|
-| `Median` | Nearest-rank P50 | [Robust central tendency](https://en.wikipedia.org/wiki/Median). |
+| `Median` | Mid-average P50 (mean of the two middles on even `n`) | [Robust central tendency](https://en.wikipedia.org/wiki/Median). |
 | `Mean` | $\bar{x} = \frac{1}{n}\sum x_i$ | [Arithmetic average](https://en.wikipedia.org/wiki/Arithmetic_mean). |
 | `Percentiles` | `IReadOnlyList<PercentileEntry>` | Configurable percentile values. Default set includes P50 (0.50), P95 (0.95), P99 (0.99), P99.9 (0.999), Max (1.0). Controlled by `MeasurementOptions.ReportedPercentiles`. Access via `GetPercentile(p)`. |
 | `Histogram` | `LatencyHistogram?` | Latency histogram with bucket boundaries and sample counts. `null` when `EnableHistogram` is `false` or fewer than 2 samples. |
@@ -166,7 +166,7 @@ Reported as `0` when `n < 1$.
 | `SignificanceTestName` | - | Display name of the pairwise significance test used (e.g. `"Mann-Whitney U"`). |
 | `OutlierDetector` | - | Display name of the outlier detector applied (e.g. `"IQR fence (1.5×)"` or `"MAD (3×)"`). |
 | `MeanAllocatedBytes` | Mean of iteration deltas | Mean heap allocation per iteration. |
-| `AllocMedian` | Nearest-rank P50 of iteration deltas | Median allocation per iteration (only when `MeasureAllocations = true`). |
+| `AllocMedian` | Mid-average P50 of iteration deltas | Median allocation per iteration (only when `MeasureAllocations = true`). |
 | `AllocP95` | Nearest-rank P95 of iteration deltas | P95 allocation per iteration (only when `MeasureAllocations = true`). |
 | `AllocMax` | Max of iteration deltas | Max allocation per iteration (only when `MeasureAllocations = true`). |
 

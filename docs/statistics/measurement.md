@@ -29,7 +29,7 @@ The 10 µs target keeps two per-sample error sources negligible: timer **quantiz
 > [!NOTE] K > 1 batches change what percentiles mean
 > When K > 1, each recorded sample is the mean of K back-to-back operations, so P95/P99/Max and the histogram describe **batch means**, not individual-operation tails - a slow individual op is averaged with its K-1 neighbours. For a sub-10 µs body the trade is deliberate (per-op timing at that scale is dominated by timer noise anyway); when you need per-op tail latency, pin `OpsPerSample = 1` and read the caveats in [Descriptive Statistics](./descriptive.md).
 
-Calibration is skipped (K = 1) when `IterationSetup`/`IterationTeardown` is set or `ForceGcBeforeEachIteration` is on, because a batch would no longer represent one isolated call. A pinned `OpsPerSample` is always honoured. Calibration runs against the body's **cold** (pre-warmup) speed; see [Post-warmup recalibration](#post-warmup-recalibration) below for how K is re-derived once the body is warm.
+Calibration is skipped (K = 1) when `IterationSetup`/`IterationTeardown` is set, because a batch would no longer represent one isolated call. It is **not** skipped under the `Independent` profile: the forced Gen0 GC runs once per sample (the K-batch), before the timestamp and outside the timed window — the same semantics a pinned `OpsPerSample` gets — so nano-scale CPU bodies still amortise timer overhead. A pinned `OpsPerSample` is always honoured. Calibration runs against the body's **cold** (pre-warmup) speed; see [Post-warmup recalibration](#post-warmup-recalibration) below for how K is re-derived once the body is warm.
 
 ### Phase 2 - Warmup (plateau detection)
 
@@ -46,13 +46,13 @@ For slow bodies the configured `BatchSize` is shrunk based on the per-sample est
 
 Calibration and warmup share a budget: together they may consume at most `AutoTune.WarmupBudgetFraction` of `AutoTune.MaxTuningTime` (default 0.4 = 40%), reserving the remainder for measurement. This keeps slow bodies from spending the whole cap on warmup and leaving measurement with a single sample. When the share is exhausted, warmup stops at the wall-clock cap and a warning names the share.
 
-If `ForceGcBetweenBenchmarks` is true (the `Independent` profile), a full gen-2 GC runs after warmup to establish a clean heap baseline. Under `Realistic` (the default) this is skipped and the benchmark inherits the warmup's heap state.
+If `ForceGcBeforeMeasurement` is true (the `Independent` profile), a full gen-2 GC runs after warmup to establish a clean heap baseline. Under `Realistic` (the default) this is skipped and the benchmark inherits the warmup's heap state. (This is a distinct knob from `ForceGcBetweenBenchmarks`, which runs a full GC *between* benchmarks and is on for both profiles.)
 
 ### Post-warmup recalibration
 
 Ops-per-sample calibration (Phase 1) resolves K against the body's **cold** code. Once warmup has driven the body to its steady-state (tiered / PGO-optimized) speed - often several times faster - the same K may span well under the target duration, re-exposing the fixed timer overhead calibration existed to amortise. So after auto-warmup settles, NBenchmark re-derives K from the warm per-op estimate the plateau detector measured (the last warmup batch mean): if the warm sample spans less than half the target, K is bumped to the next power of two that reaches the target, and one untimed sample runs to warm the larger batch's cache/branch state before measurement.
 
-Recalibration only applies when calibration ran (not a pinned K, no setup/teardown, no forced GC) and only ever increases K. When it fires, `BenchmarkResult.AutoTune.InitialOpsPerSample` records the pre-recalibration (cold) K while `OpsPerSample` holds the final value; the gap shows how much faster the warm body ran than the cold code first timed. When no recalibration occurs, `InitialOpsPerSample` is `null`.
+Recalibration only applies when calibration ran (not a pinned K, no setup/teardown) and only ever increases K. When it fires, `BenchmarkResult.AutoTune.InitialOpsPerSample` records the pre-recalibration (cold) K while `OpsPerSample` holds the final value; the gap shows how much faster the warm body ran than the cold code first timed. When no recalibration occurs, `InitialOpsPerSample` is `null`.
 
 ### Phase 3 - Measurement (CI-width target)
 
@@ -62,12 +62,12 @@ When the cap fires before `AutoTune.MinSamples` is reached, the loop keeps sampl
 
 Each measured sample does the following:
 
-- If `ForceGcBeforeEachIteration` is true (the `Independent` profile), force a gen-0 collection.
+- If `ForceGcBeforeEachIteration` is true (the `Independent` profile), force a gen-0 collection (once per sample, before the timestamp).
 - Call `IterationSetup` if provided.
 - Record `Stopwatch.GetTimestamp()`.
 - Invoke the benchmark action K times.
 - Read the timestamp again and convert the raw tick delta to nanoseconds at the timer's **native resolution** (`delta × 10⁹ / Stopwatch.Frequency`), then divide by K.
-- Record the allocation delta (divided by K) if `MeasureAllocations` is true (the `Realistic` profile).
+- Record the allocation delta (divided by K) if `MeasureAllocations` is true (on by default under both profiles; the snapshot is taken outside the timed window).
 - Call `IterationTeardown` if provided.
 
 **Important:** the timer is read immediately after the K-batch returns, before teardown runs. Teardown time is not included in the measurement.
@@ -84,8 +84,10 @@ Every measured result carries an `AutoTune` diagnostic (`BenchmarkResult.AutoTun
 
 NBenchmark provides two measurement profiles that control how GC interacts with the measurement loop:
 
-- **`Realistic`** (the default) - no per-iteration Gen0 GC, no between-benchmark full GC, allocation tracking on. Numbers reflect what the same code does in production, including natural GC pauses and CPU cache effects.
-- **`Independent`** (opt-in) - force Gen0 GC before every iteration, force full GC between benchmarks, no allocation tracking. Useful for pure-CPU measurements, cryptographic algorithms, numeric kernels, and other cases where iteration-to-iteration independence is more important than ecological validity.
+- **`Realistic`** (the default) - no per-iteration Gen0 GC, no pre-measurement full GC (the warmup heap is inherited). Numbers reflect what the same code does in production, including natural GC pauses and CPU cache effects.
+- **`Independent`** (opt-in) - force Gen0 GC before every sample, run a full GC after warmup before measurement. Useful for pure-CPU measurements, cryptographic algorithms, numeric kernels, and other cases where iteration-to-iteration independence is more important than ecological validity.
+
+Two behaviours are on for **both** profiles: the between-benchmark full GC (so one benchmark's leftover heap cannot bias the next) and allocation tracking (sampled outside the timed window, so it costs nothing and surfaces the "this pure-CPU body actually allocates" signal even under `Independent`). Disable them with `--no-gc-between-benchmarks` / `--no-allocations` if needed.
 
 ### Worked example
 
@@ -99,7 +101,7 @@ BenchmarkSuite.Create("AllocPressure")
 
 Under the **Realistic** profile (the default), the variance (CV%) is high and some iterations show Gen0-GC stalls. The `Alloc/op` column is populated and shows the allocation pressure. The numbers reflect what this code would do in production.
 
-Under the **Independent** profile (`--profile independent`), the variance is low and the per-iteration numbers are tightly clustered. The `Alloc/op` column is empty by default. The numbers answer a narrower question: "how much CPU time does this take, ignoring GC and cache?"
+Under the **Independent** profile (`--profile independent`), the variance is low and the per-iteration numbers are tightly clustered. The `Alloc/op` column is still populated (allocation tracking is on for both profiles), so the 100 KB/op shows up even here. The numbers answer a narrower question: "how much CPU time does this take, ignoring GC and cache?"
 
 ### Setting the profile
 
@@ -127,15 +129,22 @@ Each behaviour can be overridden individually:
 // Enable per-iteration GC under Realistic
 options with { ForceGcBeforeEachIterationOverride = true }
 
-// Disable allocation tracking under Realistic
+// Inherit the warmup heap under Independent (skip the pre-measurement GC)
+options with { ForceGcBeforeMeasurementOverride = false }
+
+// Disable allocation tracking (both profiles)
 options with { MeasureAllocationsOverride = false }
+
+// Disable the between-benchmark GC (both profiles)
+options with { ForceGcBetweenBenchmarksOverride = false }
 ```
 
 CLI equivalents:
 
 ```bash
 dotnet run -- --profile realistic --force-gc
-dotnet run -- --profile realistic --no-allocations
+dotnet run -- --no-allocations
+dotnet run -- --no-gc-between-benchmarks
 ```
 
 ### Timer resolution

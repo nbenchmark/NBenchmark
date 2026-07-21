@@ -128,6 +128,7 @@ public static class Significance
                     // sub-threshold result is not reported as practically large.
                     var verdict = comparison.Verdict;
                     var effect = comparison.Effect;
+                    var downgraded = false;
 
                     if (minimumPracticalEffect.HasValue
                         && comparison.Effect is { PracticalValue: { } practicalValue }
@@ -135,9 +136,32 @@ public static class Significance
                         && practicalValue < minimumPracticalEffect.Value)
                     {
                         if (verdict == SignificanceVerdict.Significant)
+                        {
                             verdict = SignificanceVerdict.NotSignificant;
+                            downgraded = true;
+                        }
 
                         effect = comparison.Effect.Value with { Magnitude = "neg" };
+                    }
+
+                    // When the practical-effect gate flips a ✓ to ✗, record it so the change is
+                    // discoverable rather than silently swallowing a statistically significant
+                    // result. The warning surfaces in every reporter's warnings footer.
+                    var warnings = results[i].Warnings;
+
+                    if (downgraded)
+                    {
+                        var metric = comparison.Effect!.Value.Metric;
+                        var practical = comparison.Effect.Value.PracticalValue!.Value;
+                        warnings =
+                        [
+                            .. warnings,
+                            $"statistically significant but practically negligible: {metric} practical "
+                            + $"magnitude {practical:0.###} is below the minimum practical effect "
+                            + $"{minimumPracticalEffect!.Value:0.###}, so the significance verdict was "
+                            + "downgraded to not-significant. Set MinimumPracticalEffect = 0 "
+                            + "(CLI: --min-practical-effect 0) to restore p-value-only verdicts.",
+                        ];
                     }
 
                     results[i] = results[i] with
@@ -146,6 +170,7 @@ public static class Significance
                         SignificanceVerdict = verdict,
                         Effect = effect,
                         MedianShift = comparison.Shift,
+                        Warnings = warnings,
                     };
                 }
             }

@@ -45,6 +45,20 @@ internal sealed record CliArgs
 
     public bool? NoAllocations { get; init; }
 
+    /// <summary>
+    ///     When true, disables the full GC that otherwise runs between benchmarks under both
+    ///     profiles (maps to <see cref="MeasurementOptions.ForceGcBetweenBenchmarksOverride" /> =
+    ///     <c>false</c>). Use when the inter-benchmark heap carry-over is intended.
+    /// </summary>
+    public bool NoGcBetweenBenchmarks { get; init; }
+
+    /// <summary>
+    ///     The minimum practical effect [0, 1] a change must reach to keep a significant verdict.
+    ///     <c>null</c> uses the <see cref="MeasurementOptions" /> default (0.147); <c>0</c> restores
+    ///     p-value-only verdicts.
+    /// </summary>
+    public double? MinPracticalEffect { get; init; }
+
     public int? OpsPerSample { get; init; }
 
     public AutoTunePreset? AutoTunePreset { get; init; }
@@ -179,6 +193,8 @@ internal sealed record CliArgs
         MeasurementProfile? profile = null;
         bool? forceGc = null;
         bool? noAllocations = null;
+        var noGcBetweenBenchmarks = false;
+        double? minPracticalEffect = null;
         DiagnosticsMode? diagnostics = null;
         int? opsPerSample = null;
         AutoTunePreset? autoTunePreset = null;
@@ -351,6 +367,16 @@ internal sealed record CliArgs
                     break;
                 case "--no-allocations":
                     noAllocations = true;
+                    break;
+                case "--no-gc-between-benchmarks":
+                    noGcBetweenBenchmarks = true;
+                    break;
+                case "--min-practical-effect" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var mpe) && mpe is >= 0 and <= 1)
+                        minPracticalEffect = mpe;
+                    else
+                        errors.Add($"Invalid --min-practical-effect value '{args[i]}'. Must be a fraction in [0, 1] (0 restores p-value-only verdicts).");
+
                     break;
                 case "--diagnostics" when i + 1 < args.Length:
                     var diagStr = args[++i];
@@ -560,7 +586,7 @@ internal sealed record CliArgs
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
                     or "--warmup-budget-fraction" or "--cap-grace-factor" or "--min-warmup-time"
-                    or "--launch-count" or "--percentiles" or "--runtimes"
+                    or "--launch-count" or "--percentiles" or "--runtimes" or "--min-practical-effect"
                     or "--cpu-affinity" or "--priority" or "--otlp-endpoint":
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
@@ -596,6 +622,8 @@ internal sealed record CliArgs
             Profile = profile,
             ForceGc = forceGc,
             NoAllocations = noAllocations,
+            NoGcBetweenBenchmarks = noGcBetweenBenchmarks,
+            MinPracticalEffect = minPracticalEffect,
             Diagnostics = diagnostics,
             OpsPerSample = opsPerSample,
             AutoTunePreset = autoTunePreset,
@@ -795,6 +823,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --profile <mode>       Measurement profile: realistic (default) or independent");
         Console.WriteLine("  --force-gc             Force Gen0 GC before every iteration (overrides profile)");
         Console.WriteLine("  --no-allocations       Disable allocation tracking (overrides profile)");
+        Console.WriteLine("  --no-gc-between-benchmarks  Disable the full GC between benchmarks (on by default for both profiles)");
+        Console.WriteLine("  --min-practical-effect <0-1>  Min practical effect for a significant verdict (default: 0.147; 0 = p-value only)");
         Console.WriteLine("  --diagnostics <mode>   Runtime diagnostics: none, gc, gcandcpu, all (default: gc)");
         Console.WriteLine("  --cpu-affinity <list>  Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)");
         Console.WriteLine("  --priority <level>     Process priority: normal, idle, belownormal, abovenormal, high, realtime");

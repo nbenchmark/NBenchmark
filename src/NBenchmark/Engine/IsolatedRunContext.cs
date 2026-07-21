@@ -46,6 +46,8 @@ internal sealed record MeasurementOverrides
     public MeasurementProfile? Profile { get; init; }
     public bool? ForceGc { get; init; }
     public bool? NoAllocations { get; init; }
+    public bool? NoGcBetweenBenchmarks { get; init; }
+    public double? MinPracticalEffect { get; init; }
 
     // Auto-tune scalar overrides. AutoTuneOptions is rebuilt by the child re-running its entry
     // point, so only these CLI-derived deltas travel; the object itself is never serialized.
@@ -95,6 +97,8 @@ internal sealed record MeasurementOverrides
         Profile = cliArgs.Profile,
         ForceGc = cliArgs.ForceGc,
         NoAllocations = cliArgs.NoAllocations,
+        NoGcBetweenBenchmarks = cliArgs.NoGcBetweenBenchmarks ? true : null,
+        MinPracticalEffect = cliArgs.MinPracticalEffect,
         Preset = cliArgs.AutoTunePreset,
         CiTarget = cliArgs.CiTarget,
         MinSamples = cliArgs.MinSamples,
@@ -144,6 +148,12 @@ internal sealed record MeasurementOverrides
 
         if (NoAllocations.HasValue)
             result = result with { MeasureAllocationsOverride = !NoAllocations.Value };
+
+        if (NoGcBetweenBenchmarks is true)
+            result = result with { ForceGcBetweenBenchmarksOverride = false };
+
+        if (MinPracticalEffect.HasValue)
+            result = result with { MinimumPracticalEffect = MinPracticalEffect.Value };
 
         // Layer auto-tune scalars: start from the preset when given, else the current knobs.
         var autoTune = Preset.HasValue ? AutoTuneOptions.FromPreset(Preset.Value) : result.AutoTune;

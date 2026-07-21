@@ -1,6 +1,6 @@
 ---
 title: Significance Testing
-description: How NBenchmark decides whether benchmark differences are statistically real - the Mann-Whitney U test for two groups and the Kruskal-Wallis omnibus test (with post-hoc pairwise Mann-Whitney U and Holm-Bonferroni correction) for three or more. Plus Cliff's delta effect size and the opt-in MinimumPracticalEffect practical-significance gate.
+description: How NBenchmark decides whether benchmark differences are statistically real - the Mann-Whitney U test for two groups and the Kruskal-Wallis omnibus test (with post-hoc pairwise Mann-Whitney U and Holm-Bonferroni correction) for three or more. Plus Cliff's delta effect size and the MinimumPracticalEffect practical-significance gate (on by default at 0.147).
 order: 5
 ---
 
@@ -52,18 +52,23 @@ The sign convention is: **positive delta = candidate tends to be slower than bas
 
 ### Practical-significance gate
 
-Set `MeasurementOptions.MinimumPracticalEffect` (or use `BenchmarkSuite.WithMinimumPracticalEffect(...)` / `BenchmarkHarness.WithMinimumPracticalEffect(...)`) to require a minimum practical-effect score in `[0, 1]` for a comparison to count as meaningful. Built-in Mann-Whitney tests map this score to `|delta|`; custom tests can map any effect metric by returning `EffectSize.PracticalValue` in `PairwiseComparison`.
+`MeasurementOptions.MinimumPracticalEffect` requires a minimum practical-effect score in `[0, 1]` for a comparison to count as meaningful. **It defaults to `0.147`** — the Romano negligible/small boundary (the same cutoff the Magnitude column uses) — so out of the box a ✓ verdict means "statistically real **and** at least a small effect", not merely "p < alpha". Built-in Mann-Whitney tests map this score to `|delta|`; custom tests can map any effect metric by returning `EffectSize.PracticalValue` in `PairwiseComparison`.
 
 - Comparisons with practical effect below the threshold are reported with `Magnitude = neg` (so a sub-threshold result is never labelled `large`).
-- The Sig verdict is downgraded from `Significant` to `NotSignificant` even when the p-value is below alpha.
-- The configured value must be in the range `[0, 1]`.
+- The Sig verdict is downgraded from `Significant` to `NotSignificant` even when the p-value is below alpha, and a **warning records the downgrade** (visible in the reporters' warnings section) so the change is discoverable rather than silent.
+- The configured value must be in the range `[0, 1]`. Set it to **`0`** (`--min-practical-effect 0`) to restore p-value-only verdicts, or to `null` in code to disable the gate entirely.
 
 The engine enforces the gate in `Significance.ApplyReport` after the test runs, so it works for any `ISignificanceTest` implementation - not just the built-in ones. Custom tests that return an `EffectSize` with `PracticalValue` are gated automatically; tests that do not return a practical value are unaffected.
 
 ```csharp
-// Reject statistical significance below |delta| = 0.33 (the "small" threshold)
+// Restore p-value-only verdicts (disable the default gate)
+.WithMinimumPracticalEffect(0)
+
+// Or demand a stronger effect: reject significance below |delta| = 0.33 (the "medium" threshold)
 .WithMinimumPracticalEffect(0.33)
 ```
+
+Set it via `MeasurementOptions.MinimumPracticalEffect`, `BenchmarkSuite.WithMinimumPracticalEffect(...)` / `BenchmarkHarness.WithMinimumPracticalEffect(...)`, or `--min-practical-effect <0-1>` on the CLI.
 
 Leave it `null` (the default) to keep p-value-only Sig semantics, in which case the Magnitude column is purely informational.
 

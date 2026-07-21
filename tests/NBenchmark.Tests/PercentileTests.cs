@@ -16,9 +16,21 @@ public class PercentileTests
     [Fact]
     public void Compute_Median_Of_Sorted_Even_Array()
     {
+        // The median (p == 0.50) uses the mid-average convention: the mean of the two middle
+        // order statistics on even n. For {1, 2, 3, 4} that is (2 + 3) / 2 = 2.5, not the
+        // nearest-rank lower-middle (2). Other percentiles keep the nearest-rank convention.
         var sorted = new double[] { 1, 2, 3, 4 };
         var result = Percentile.Compute(sorted, 0.50);
-        Assert.Equal(2, result);
+        Assert.Equal(2.5, result);
+    }
+
+    [Fact]
+    public void Compute_Median_MidAverage_Matches_Other_Median_Conventions()
+    {
+        // Regression guard for the unified median: p == 0.50 must average the two middles so the
+        // reported Median agrees with JitterCalibrator.Median / LaunchAggregator.MedianOf.
+        var sorted = new double[] { 10, 20, 30, 40, 50, 60 };
+        Assert.Equal(35, Percentile.Compute(sorted, 0.50));
     }
 
     [Fact]

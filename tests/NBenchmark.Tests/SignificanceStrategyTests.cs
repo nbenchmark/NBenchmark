@@ -360,6 +360,11 @@ public class SignificanceStrategyTests
         var candidateResult = results.Single(r => r.Name == "candidate");
         Assert.Equal(SignificanceVerdict.NotSignificant, candidateResult.SignificanceVerdict);
         Assert.Equal("neg", candidateResult.Effect?.Magnitude);
+
+        // The downgrade is recorded as a discoverable warning (not silently swallowed).
+        Assert.Contains(
+            candidateResult.Warnings,
+            w => w.Contains("practically negligible") && w.Contains("--min-practical-effect 0"));
     }
 
     [Fact]

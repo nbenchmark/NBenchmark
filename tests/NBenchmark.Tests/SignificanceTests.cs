@@ -82,7 +82,7 @@ public class SignificanceTests
         Assert.Null(results[0].MedianShift);
         Assert.NotNull(results[1].MedianShift);
         Assert.True(results[1].MedianShift!.Value.Value < 0);
-        Assert.True(results[1].MedianShift.Value.Upper < 0);
+        Assert.True(results[1].MedianShift!.Value.Upper < 0);
     }
 
     [Fact]

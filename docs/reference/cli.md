@@ -275,18 +275,18 @@ Equivalent to calling `WithCrossClassSignificance()` in code.
 
 ### `--profile <mode>`
 
-Set the measurement profile. Controls per-iteration GC, between-benchmark GC, and allocation tracking as a bundle.
+Set the measurement profile. Controls the per-iteration Gen0 GC and the pre-measurement full GC as a bundle. Between-benchmark GC and allocation tracking are on for **both** profiles.
 
 | Value | Behaviour |
 |---|---|
-| `realistic` | No per-iteration GC, no between-benchmark GC, allocation tracking on. **(default)** |
-| `independent` | Per-iteration Gen0 GC, between-benchmark full GC, allocation tracking off. |
+| `realistic` | No per-iteration GC, no pre-measurement GC (inherits the warmup heap). **(default)** |
+| `independent` | Per-iteration Gen0 GC, full GC after warmup before measurement. |
 
 ```bash
 dotnet run -- --profile independent
 ```
 
-Individual behaviours can be overridden with `--force-gc` and `--no-allocations`. See [Measurement Profiles](../statistics/measurement.md#measurement-profiles) for a worked example.
+Individual behaviours can be overridden with `--force-gc`, `--no-gc-between-benchmarks`, and `--no-allocations`. See [Measurement Profiles](../statistics/measurement.md#measurement-profiles) for a worked example.
 
 ---
 
@@ -304,13 +304,35 @@ There is no `--no-force-gc` flag because `Realistic` already disables per-iterat
 
 ### `--no-allocations`
 
-Override the profile to disable allocation tracking. Under the default `Realistic` profile, this suppresses the `Alloc/op` column without switching to the `Independent` profile.
+Disable allocation tracking, suppressing the `Alloc/op` column. Allocation tracking is on by default under both profiles (it is sampled outside the timed window, so it costs no timing purity), so this flag is the only opt-out.
 
 ```bash
-dotnet run -- --profile realistic --no-allocations
+dotnet run -- --no-allocations
 ```
 
-There is no `--allocations` flag because `Realistic` already enables allocation tracking; users who want to disable it use `--no-allocations`.
+There is no `--allocations` flag because both profiles already enable allocation tracking; users who want to disable it use `--no-allocations`.
+
+---
+
+### `--no-gc-between-benchmarks`
+
+Disable the full GC that otherwise runs between benchmarks. That GC is on by default for both profiles so one benchmark's leftover heap cannot bias the next (which would make results order-dependent). Use this flag when the inter-benchmark heap carry-over is intended.
+
+```bash
+dotnet run -- --no-gc-between-benchmarks
+```
+
+This is distinct from the pre-measurement GC (`Independent` only), which clears the warmup heap before the measurement loop and is not affected by this flag.
+
+---
+
+### `--min-practical-effect <0-1>`
+
+Set the minimum practical effect a change must reach to keep a significant (✓) verdict. Defaults to `0.147` (the Romano negligible/small boundary), so ✓ means "statistically real **and** at least a small effect". When a comparison's practical effect falls below the threshold, its verdict is downgraded to not-significant and a warning records the downgrade. Set to `0` to restore p-value-only verdicts.
+
+```bash
+dotnet run -- --min-practical-effect 0
+```
 
 ---
 

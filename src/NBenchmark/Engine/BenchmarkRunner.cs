@@ -217,6 +217,9 @@ public sealed class BenchmarkRunner
         var pipeline = StatsPipeline.Run(
             adaptive.PerOpTimings, adaptive.PerOpAllocations, effectiveOptions, perSampleGcCounts);
         var mergedWarnings = MergeWarnings(pipeline.Warnings, adaptive.Warnings);
+        mergedWarnings = MergeWarnings(
+            mergedWarnings,
+            BuildMidBatchGcWarnings(effectiveOptions, adaptive.Diagnostic.OpsPerSample, pipeline.MeanAllocatedBytes));
         var diagnosticsResult = BuildDiagnosticsResult(adaptive, spec.Options.Diagnostics);
         var mergedPipeline = pipeline with { Warnings = mergedWarnings, DiagnosticsResult = diagnosticsResult };
 
@@ -314,6 +317,27 @@ public sealed class BenchmarkRunner
                + "before reaching the requested precision. "
                + "Use --autotune-cap-behavior warn to accept under-sampled results, "
                + "or increase --max-tuning-time / pin --iterations / pin --warmup.";
+    }
+
+    // Under a per-iteration forced GC (the Independent profile), the collection runs once per
+    // sample - before the K-batch and outside the timed window. When K > 1 and the body allocates,
+    // allocations accumulate across the batch and a GC can land mid-batch, inside the timed window,
+    // reintroducing exactly the pause the forced GC was meant to exclude. Auto-K is now allowed
+    // under Independent, so surface this so the user can pin K = 1 when it matters.
+    private static IReadOnlyList<string> BuildMidBatchGcWarnings(
+        MeasurementOptions options, int opsPerSample, long? meanAllocatedBytes)
+    {
+        if (options.ForceGcBeforeEachIteration && opsPerSample > 1 && meanAllocatedBytes is > 0)
+        {
+            return
+            [
+                $"ops-per-sample K = {opsPerSample} and the body allocates "
+                + $"~{BenchmarkFormatter.FormatAlloc(meanAllocatedBytes.Value)}/op under a per-iteration forced GC; "
+                + "a collection can occur inside a timed K-batch. Pin --ops-per-sample 1 to keep each timed sample GC-free.",
+            ];
+        }
+
+        return [];
     }
 
     private static IReadOnlyList<string> MergeWarnings(IReadOnlyList<string> pipelineWarnings, IReadOnlyList<string> adaptiveWarnings)

@@ -315,11 +315,12 @@ internal static class AdaptiveLoop
 
         progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
 
-        // Pre-measurement full GC is intentionally profile-gated (and has been since the
-        // MeasurementProfile feature, not a change introduced by the adaptive loop): the Independent
-        // profile clears warmup garbage so it cannot trigger a collection mid-measurement, while the
-        // default Realistic profile deliberately inherits the warmup heap to match production.
-        if (o.ForceGcBetweenBenchmarks)
+        // Pre-measurement full GC is intentionally profile-gated: the Independent profile clears
+        // warmup garbage so it cannot trigger a collection mid-measurement, while the default
+        // Realistic profile deliberately inherits the warmup heap to match production. This is a
+        // distinct decision from the between-benchmark GC (ForceGcBetweenBenchmarks, run by
+        // SuiteRunner), which is on for both profiles.
+        if (o.ForceGcBeforeMeasurement)
             GcControl.ForceFullGc();
 
         // ----- Phase C: measurement -----
@@ -771,11 +772,12 @@ internal static class AdaptiveLoop
 
         await progress.OnWarmupCompleted(name).ConfigureAwait(false);
 
-        // Pre-measurement full GC is intentionally profile-gated (and has been since the
-        // MeasurementProfile feature, not a change introduced by the adaptive loop): the Independent
-        // profile clears warmup garbage so it cannot trigger a collection mid-measurement, while the
-        // default Realistic profile deliberately inherits the warmup heap to match production.
-        if (o.ForceGcBetweenBenchmarks)
+        // Pre-measurement full GC is intentionally profile-gated: the Independent profile clears
+        // warmup garbage so it cannot trigger a collection mid-measurement, while the default
+        // Realistic profile deliberately inherits the warmup heap to match production. This is a
+        // distinct decision from the between-benchmark GC (ForceGcBetweenBenchmarks, run by
+        // SuiteRunner), which is on for both profiles.
+        if (o.ForceGcBeforeMeasurement)
             GcControl.ForceFullGc();
 
         // ----- Phase C: measurement -----
@@ -954,11 +956,15 @@ internal static class AdaptiveLoop
             initialOpsPerSample);
     }
 
+    // Per-iteration setup/teardown make a K-batch semantically wrong (each op must be paired with
+    // its own setup), so those still block calibration. ForceGcBeforeEachIteration does NOT: the
+    // forced Gen0 collection runs once per sample (K-batch), before the timestamp and outside the
+    // timed window, which is exactly the pinned-K semantics - so auto-K under the Independent
+    // profile behaves identically to a user who pinned K there.
     private static bool IsEligibleForCalibration(MeasurementOptions o, RunSpec spec)
         => o.OpsPerSample is null
            && spec.IterationSetup is null
-           && spec.IterationTeardown is null
-           && !o.ForceGcBeforeEachIteration;
+           && spec.IterationTeardown is null;
 
     private static AdaptiveResult BuildResult(
         List<double> timings,

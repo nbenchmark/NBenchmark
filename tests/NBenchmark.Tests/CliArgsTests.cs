@@ -712,6 +712,75 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_NoGcBetweenBenchmarks_SetsFlag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--no-gc-between-benchmarks"]);
+        Assert.Empty(errors);
+        Assert.True(result.NoGcBetweenBenchmarks);
+    }
+
+    [Fact]
+    public void ParseCore_NoGcBetweenBenchmarks_Default_IsFalse()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.False(result.NoGcBetweenBenchmarks);
+    }
+
+    [Fact]
+    public void NoGcBetweenBenchmarks_Override_DisablesForBothProfiles()
+    {
+        var (args, _) = CliArgs.ParseCore(["--no-gc-between-benchmarks"]);
+        var overrides = MeasurementOverrides.FromCliArgs(args);
+
+        var realistic = overrides.Apply(MeasurementOptions.For(MeasurementProfile.Realistic));
+        var independent = overrides.Apply(MeasurementOptions.For(MeasurementProfile.Independent));
+
+        Assert.False(realistic.ForceGcBetweenBenchmarks);
+        Assert.False(independent.ForceGcBetweenBenchmarks);
+        // The pre-measurement GC is a distinct knob and is untouched by this flag.
+        Assert.True(independent.ForceGcBeforeMeasurement);
+    }
+
+    [Theory]
+    [InlineData("0", 0.0)]
+    [InlineData("0.147", 0.147)]
+    [InlineData("0.5", 0.5)]
+    [InlineData("1", 1.0)]
+    public void ParseCore_MinPracticalEffect_Parses_Valid(string value, double expected)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--min-practical-effect", value]);
+        Assert.Empty(errors);
+        Assert.Equal(expected, result.MinPracticalEffect);
+    }
+
+    [Theory]
+    [InlineData("-0.1")]
+    [InlineData("1.1")]
+    [InlineData("abc")]
+    public void ParseCore_MinPracticalEffect_Rejects_Invalid(string value)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--min-practical-effect", value]);
+        Assert.Null(result.MinPracticalEffect);
+        Assert.NotEmpty(errors);
+    }
+
+    [Fact]
+    public void ParseCore_MinPracticalEffect_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.MinPracticalEffect);
+    }
+
+    [Fact]
+    public void MinPracticalEffect_Override_Zero_RestoresPValueOnlyVerdicts()
+    {
+        var (args, _) = CliArgs.ParseCore(["--min-practical-effect", "0"]);
+        var applied = MeasurementOverrides.FromCliArgs(args).Apply(MeasurementOptions.Default);
+
+        Assert.Equal(0.0, applied.MinimumPracticalEffect);
+    }
+
+    [Fact]
     public void Parse_WritesErrorsToStderr()
     {
         var prev = Environment.ExitCode;

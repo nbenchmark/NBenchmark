@@ -77,7 +77,9 @@ public class StatsCrossCheckTests
         Numerics.AssertRelativeClose(1.3375973484822197, stats.StandardError, 1e-9);
         Numerics.AssertRelativeClose(3.02585542280894, stats.MarginOfError, 1e-2);
 
-        Assert.Equal(100.0, stats.Median, 12);
+        // n = 10 (even): numpy.median mid-averages the two middles (100.0, 101.2) → 100.6,
+        // rather than the nearest-rank P50 of 100.0.
+        Assert.Equal(100.6, stats.Median, 12);
         Assert.Equal(110.1, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 12);
         Assert.Equal(110.1, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 12);
     }
@@ -92,7 +94,9 @@ public class StatsCrossCheckTests
         Numerics.AssertRelativeClose(4.911139528997893, stats.StandardError, 1e-9);
         Numerics.AssertRelativeClose(9.814129230772705, stats.MarginOfError, 1e-3);
 
-        Assert.Equal(502.83658401138837, stats.Median, 9);
+        // n = 64 (even): numpy.median = mean of the two middles → 503.3726220059931, versus the
+        // nearest-rank P50 of 502.83658401138837.
+        Assert.Equal(503.3726220059931, stats.Median, 9);
         Assert.Equal(555.9591597889488, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 9);
         Assert.Equal(604.7263770547136, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 9);
     }
@@ -105,9 +109,10 @@ public class StatsCrossCheckTests
         var sorted = (double[])Normal64.Clone();
         Array.Sort(sorted);
 
-        // numpy.percentile(Normal64, q, method='inverted_cdf')
+        // numpy.percentile(Normal64, q, method='inverted_cdf'). P50 is intentionally omitted:
+        // the median uses the mid-average convention (numpy.median), asserted in the *_Matches_Reference
+        // tests, so it no longer matches nearest-rank on even n.
         Assert.Equal(469.6245127830197, Percentile.Compute(sorted, 0.25), 9);
-        Assert.Equal(502.83658401138837, Percentile.Compute(sorted, 0.50), 9);
         Assert.Equal(524.7340005920331, Percentile.Compute(sorted, 0.75), 9);
         Assert.Equal(555.9591597889488, Percentile.Compute(sorted, 0.95), 9);
         Assert.Equal(604.7263770547136, Percentile.Compute(sorted, 0.99), 9);

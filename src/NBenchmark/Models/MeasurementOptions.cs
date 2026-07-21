@@ -21,7 +21,15 @@ public record MeasurementOptions
     private readonly int _histogramBucketCount = 20;
     private readonly int? _iterations;
     private readonly int _launchCount = 1;
-    private readonly double? _minimumPracticalEffect;
+    private readonly double? _minimumPracticalEffect = DefaultMinimumPracticalEffect;
+
+    /// <summary>
+    ///     The default <see cref="MinimumPracticalEffect" />: 0.147, the Romano boundary between a
+    ///     negligible and a small effect (the same threshold the Magnitude column uses). A ✓ verdict
+    ///     therefore means "statistically real <em>and</em> at least a small effect". Set the option
+    ///     to <c>0</c> to restore p-value-only verdicts.
+    /// </summary>
+    public const double DefaultMinimumPracticalEffect = 0.147;
     private readonly int? _opsPerSample;
     private readonly IReadOnlyList<double> _reportedPercentiles = DefaultReportedPercentiles;
     private readonly double _significanceLevel = 0.05;
@@ -105,31 +113,50 @@ public record MeasurementOptions
 
     /// <summary>
     ///     The authoritative measurement profile. The resolved booleans
-    ///     (<see cref="ForceGcBeforeEachIteration" />, <see cref="ForceGcBetweenBenchmarks" />,
-    ///     <see cref="MeasureAllocations" />) derive from this unless an explicit override is set.
+    ///     (<see cref="ForceGcBeforeEachIteration" />, <see cref="ForceGcBeforeMeasurement" />,
+    ///     <see cref="ForceGcBetweenBenchmarks" />, <see cref="MeasureAllocations" />) derive from
+    ///     this unless an explicit override is set.
     /// </summary>
     public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
 
     /// <summary>Overrides <see cref="ForceGcBeforeEachIteration" />. When <c>null</c>, the value derives from <see cref="Profile" />.</summary>
     public bool? ForceGcBeforeEachIterationOverride { get; init; }
 
-    /// <summary>Overrides <see cref="ForceGcBetweenBenchmarks" />. When <c>null</c>, the value derives from <see cref="Profile" />.</summary>
+    /// <summary>Overrides <see cref="ForceGcBeforeMeasurement" />. When <c>null</c>, the value derives from <see cref="Profile" />.</summary>
+    public bool? ForceGcBeforeMeasurementOverride { get; init; }
+
+    /// <summary>Overrides <see cref="ForceGcBetweenBenchmarks" />. When <c>null</c>, the value defaults to <c>true</c>.</summary>
     public bool? ForceGcBetweenBenchmarksOverride { get; init; }
 
-    /// <summary>Overrides <see cref="MeasureAllocations" />. When <c>null</c>, the value derives from <see cref="Profile" />.</summary>
+    /// <summary>Overrides <see cref="MeasureAllocations" />. When <c>null</c>, allocation tracking defaults to <c>true</c>.</summary>
     public bool? MeasureAllocationsOverride { get; init; }
 
     /// <summary>Whether a Gen0 GC is forced before each measured iteration. Forced under <see cref="MeasurementProfile.Independent" />, unless overridden.</summary>
     public bool ForceGcBeforeEachIteration =>
         ForceGcBeforeEachIterationOverride ?? Profile == MeasurementProfile.Independent;
 
-    /// <summary>Whether a full GC runs between benchmarks. Forced under <see cref="MeasurementProfile.Independent" />, unless overridden.</summary>
-    public bool ForceGcBetweenBenchmarks =>
-        ForceGcBetweenBenchmarksOverride ?? Profile == MeasurementProfile.Independent;
+    /// <summary>
+    ///     Whether a full GC runs once between warmup and measurement, clearing the warmup heap so
+    ///     it cannot trigger a collection mid-measurement. Forced under
+    ///     <see cref="MeasurementProfile.Independent" />, unless overridden;
+    ///     <see cref="MeasurementProfile.Realistic" /> deliberately inherits the warmup heap to match
+    ///     production. Distinct from <see cref="ForceGcBetweenBenchmarks" />, which runs a full GC
+    ///     <em>between</em> benchmarks to keep them independent of one another.
+    /// </summary>
+    public bool ForceGcBeforeMeasurement =>
+        ForceGcBeforeMeasurementOverride ?? Profile == MeasurementProfile.Independent;
 
-    /// <summary>Whether per-iteration allocations are sampled and reported. On under <see cref="MeasurementProfile.Realistic" />, unless overridden.</summary>
+    /// <summary>
+    ///     Whether a full GC runs between benchmarks so one benchmark's leftover heap cannot bias
+    ///     the next (which would make results order-dependent and undermine the significance test's
+    ///     independence assumption). On by default under both profiles, unless overridden.
+    /// </summary>
+    public bool ForceGcBetweenBenchmarks =>
+        ForceGcBetweenBenchmarksOverride ?? true;
+
+    /// <summary>Whether per-iteration allocations are sampled and reported. On by default under both profiles, unless overridden.</summary>
     public bool MeasureAllocations =>
-        MeasureAllocationsOverride ?? Profile == MeasurementProfile.Realistic;
+        MeasureAllocationsOverride ?? true;
 
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
@@ -224,9 +251,12 @@ public record MeasurementOptions
     ///     The minimum practical effect in [0, 1] required for a benchmark to be considered
     ///     meaningfully different. The active significance strategy can map its own effect
     ///     metric to this normalized value via <see cref="EffectSize.PracticalValue" />.
-    ///     When set and the reported practical value is below this threshold, the Sig verdict
-    ///     is downgraded to NotSignificant and the magnitude label is forced to <c>neg</c>.
-    ///     Leave null to keep p-value-only Sig semantics.
+    ///     When the reported practical value is below this threshold, the Sig verdict is
+    ///     downgraded to NotSignificant and the magnitude label is forced to <c>neg</c>, and a
+    ///     warning records the downgrade.
+    ///     Defaults to <see cref="DefaultMinimumPracticalEffect" /> (0.147), so a ✓ means "real
+    ///     and at least a small effect". Set to <c>0</c> to restore p-value-only Sig semantics;
+    ///     set to <c>null</c> to disable the gate entirely.
     /// </summary>
     public double? MinimumPracticalEffect
     {

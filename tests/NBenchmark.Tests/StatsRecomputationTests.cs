@@ -85,8 +85,9 @@ public class StatsRecomputationTests
         Assert.Equal(samples[0], stats.Min, 12);
         Assert.Equal(samples[^1], stats.Max, 12);
 
-        // Nearest-rank percentiles recomputed independently.
-        Assert.Equal(NearestRank(samples, 0.50), stats.Median, 12);
+        // The median uses the mid-average convention (mean of the two middles on even n); every
+        // other percentile keeps nearest-rank. Recomputed independently.
+        Assert.Equal(MidAverageMedian(samples), stats.Median, 12);
         Assert.Equal(NearestRank(samples, 0.95), stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 12);
         Assert.Equal(NearestRank(samples, 0.99), stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 12);
     }
@@ -108,7 +109,9 @@ public class StatsRecomputationTests
         for (var pct = 1; pct <= 99; pct++)
         {
             var p = pct / 100.0;
-            Assert.Equal(NearestRank(samples, p), Percentile.Compute(samples, p), 12);
+            // p == 0.50 is the median: mid-average convention. Every other percentile is nearest-rank.
+            var expected = pct == 50 ? MidAverageMedian(samples) : NearestRank(samples, p);
+            Assert.Equal(expected, Percentile.Compute(samples, p), 12);
         }
     }
 
@@ -125,5 +128,21 @@ public class StatsRecomputationTests
         var index = (int)Math.Ceiling(p * sorted.Length) - 1;
         index = Math.Clamp(index, 0, sorted.Length - 1);
         return sorted[index];
+    }
+
+    // Independent reference for the median: the mean of the two middle order statistics on
+    // even n, the single middle element on odd n.
+    private static double MidAverageMedian(double[] sorted)
+    {
+        if (sorted.Length == 0)
+            return 0;
+
+        if (sorted.Length == 1)
+            return sorted[0];
+
+        var mid = sorted.Length / 2;
+        return sorted.Length % 2 == 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2.0
+            : sorted[mid];
     }
 }

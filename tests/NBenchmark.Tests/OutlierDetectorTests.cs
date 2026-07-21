@@ -17,7 +17,9 @@ public class OutlierDetectorTests
     [Fact]
     public void Mad_DiscardsExtremeHighOutlier()
     {
-        // median = 18, scaled MAD = 4 × 1.4826 = 5.9304, fence = 18 ± 17.79 → only 200 is outside.
+        // n = 10 (even), so the median mid-averages the two middles: (18 + 20) / 2 = 19. The
+        // absolute deviations from 19 are {1,1,3,3,5,5,7,7,9,181}, whose median is (5 + 5) / 2 = 5,
+        // so scaled MAD = 5 × 1.4826 = 7.413 and the fence is 19 ± 22.239 → only 200 is outside.
         var values = new double[] { 10, 12, 14, 16, 18, 20, 22, 24, 26, 200 };
 
         var classification = new MadOutlierDetector().Classify(values);
@@ -27,7 +29,7 @@ public class OutlierDetectorTests
         Assert.Equal(26d, classification.Kept[^1]);
         Assert.NotNull(classification.LowerFence);
         Assert.NotNull(classification.UpperFence);
-        Numerics.AssertRelativeClose(35.7912, classification.UpperFence!.Value, 1e-4);
+        Numerics.AssertRelativeClose(41.239, classification.UpperFence!.Value, 1e-4);
     }
 
     [Fact]
