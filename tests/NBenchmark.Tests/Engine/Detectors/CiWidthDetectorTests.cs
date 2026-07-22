@@ -98,6 +98,84 @@ public class CiWidthDetectorTests
         Assert.True(counts.ContainsKey(confidenceLevel));
     }
 
+    [Fact]
+    public void HalfWidthSeries_RecordsAtCadenceAndMatchesAchievedHalfWidth()
+    {
+        // Cadence 2 with MinSamples 2 evaluates the stop rule every other sample once past the
+        // floor. With an unreachable CiTarget the loop runs to the MaxSamples ceiling, so an
+        // entry is appended at every cadence check plus the final MaxCeiling evaluation.
+        var options = AutoTuneOptions.Default with
+        {
+            MinSamples = 2,
+            BatchSize = 2,
+            MaxSamples = 20,
+            CiTarget = 0.001, // unreachable for a varied stream, so the loop hits MaxCeiling
+        };
+        var detector = new CiWidthDetector(0.95, options);
+
+        // Deterministic stream with non-zero variance. ComputeHalfWidth succeeds once n >= 2
+        // and the mean is positive, so every cadence check appends an entry.
+        for (var i = 1; i <= 20; i++)
+        {
+            detector.Feed(100.0 + 10.0 * Math.Sin(i));
+        }
+
+        Assert.True(detector.Resolved);
+        Assert.Equal(SampleStopReason.MaxCeiling, detector.StopReason);
+
+        // Evaluations at Count = 2, 4, 6, ..., 18 (nine cadence checks) plus the MaxCeiling
+        // evaluation at Count = 20. The MaxCeiling branch fires before the cadence branch when
+        // Count == _maxSamples, so Count = 20 produces one entry, not two.
+        Assert.Equal(10, detector.HalfWidthSeries.Count);
+
+        // The final series entry must match the last AchievedRelativeHalfWidth the detector
+        // reported: the series records the same value at each append.
+        Assert.Equal(detector.AchievedRelativeHalfWidth, detector.HalfWidthSeries[^1], 12);
+
+        // Every entry is finite and non-negative (it is |t * SE / mean|).
+        foreach (var value in detector.HalfWidthSeries)
+        {
+            Assert.True(double.IsFinite(value));
+            Assert.True(value >= 0.0);
+        }
+    }
+
+    [Fact]
+    public void HalfWidthSeries_EmptyWhenComputeHalfWidthNeverSucceeds()
+    {
+        // ComputeHalfWidth returns false (and does not append) when Count < 2 or Mean <= 0.
+        // Feeding only zeros keeps Mean = 0, so no evaluation ever appends. The detector still
+        // resolves at the MaxCeiling because the MaxCeiling branch calls ComputeHalfWidth but
+        // ignores its return value.
+        var options = AutoTuneOptions.Default with
+        {
+            MinSamples = 2,
+            MaxSamples = 4,
+            BatchSize = 1,
+            CiTarget = 0.0,
+        };
+        var detector = new CiWidthDetector(0.95, options);
+
+        for (var i = 0; i < 4; i++)
+        {
+            detector.Feed(0.0);
+        }
+
+        Assert.True(detector.Resolved);
+        Assert.Equal(SampleStopReason.MaxCeiling, detector.StopReason);
+        Assert.Empty(detector.HalfWidthSeries);
+    }
+
+    [Fact]
+    public void HalfWidthSeries_EmptyBeforeFirstEvaluation()
+    {
+        // Construct but never feed: the series is empty by construction.
+        var options = AutoTuneOptions.Default with { MinSamples = 5, MaxSamples = 100, BatchSize = 1 };
+        var detector = new CiWidthDetector(0.95, options);
+
+        Assert.Empty(detector.HalfWidthSeries);
+    }
+
     private static int FeedConstantUntilResolved(CiWidthDetector detector, double value, int cap)
     {
         for (var i = 1; i <= cap; i++)

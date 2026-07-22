@@ -493,7 +493,8 @@ internal static class AdaptiveLoop
             detectorSwitched,
             autoTune.CapGraceFactor,
             autoTune.WarmupBudgetFraction,
-            initialOpsPerSample);
+            initialOpsPerSample,
+            ciWidthSeries: ci?.HalfWidthSeries ?? []);
     }
 
     public static async Task<AdaptiveResult> RunAsync(
@@ -953,7 +954,8 @@ internal static class AdaptiveLoop
             detectorSwitched,
             autoTune.CapGraceFactor,
             autoTune.WarmupBudgetFraction,
-            initialOpsPerSample);
+            initialOpsPerSample,
+            ciWidthSeries: ci?.HalfWidthSeries ?? []);
     }
 
     // Per-iteration setup/teardown make a K-batch semantically wrong (each op must be paired with
@@ -990,7 +992,8 @@ internal static class AdaptiveLoop
         bool detectorSwitched,
         double capGraceFactor,
         double warmupBudgetFraction,
-        int? initialOpsPerSample)
+        int? initialOpsPerSample,
+        IReadOnlyList<double> ciWidthSeries)
     {
         var timingsArray = timings.ToArray();
 
@@ -1012,6 +1015,7 @@ internal static class AdaptiveLoop
             TuningWallClock = tuningWallClock,
             JitterMetric = jitterMetric,
             OutlierDetectorSwitched = detectorSwitched,
+            CiWidthSeries = ciWidthSeries,
         };
 
         var warnings = BuildStopWarnings(

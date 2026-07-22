@@ -100,6 +100,62 @@ public class AdaptiveLoopTests
     }
 
     [Fact]
+    public void AutoSamples_Populates_CiWidthSeries_At_Each_Cadence_Evaluation()
+    {
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0, // no warmup
+            Iterations = null, // auto sample count -> CI detector
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+        };
+
+        // Zero-variance signal: the CI half-width is 0, so the target is met at the first
+        // cadence multiple (BatchSize 8) at or past MinSamples (30), i.e. at Count = 32. The
+        // detector resolves on that single evaluation, so the series carries exactly one entry.
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.Equal(SampleStopReason.CiTargetMet, result.Diagnostic.SampleStop);
+
+        // One evaluation at Count = 32 produced one series entry. The value is 0 (zero-variance
+        // signal: half-width is t * 0 / mean = 0).
+        var series = result.Diagnostic.CiWidthSeries;
+        Assert.Single(series);
+        Assert.Equal(0.0, series[0], 12);
+
+        // The series entry matches the final AchievedRelativeHalfWidth the detector reported,
+        // and the post-loop scalar recomputed by BuildResult agrees (zero variance -> both 0).
+        Assert.Equal(result.Diagnostic.AchievedRelativeCiWidth, series[^1], 12);
+    }
+
+    [Fact]
+    public void PinnedSamples_Leaves_CiWidthSeries_Empty()
+    {
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 2,
+            WarmupIterations = 1,
+            Iterations = 4, // pinned measured count -> no CI detector is constructed
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+        };
+
+        var clock = new ScriptedClock(1000.0);
+
+        var result = RunSync(() => { }, options, clock);
+
+        Assert.Equal(SampleStopReason.ExplicitCount, result.Diagnostic.SampleStop);
+        Assert.Equal(4, result.Diagnostic.ResolvedSamples);
+
+        // The CI detector is built only in auto mode (Iterations == null). A pinned run has no
+        // detector, so no series is recorded.
+        Assert.Empty(result.Diagnostic.CiWidthSeries);
+    }
+
+    [Fact]
     public void EligibleFastBody_Calibrates_OpsPerSample_Above_One()
     {
         var bodyCalls = 0;

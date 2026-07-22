@@ -79,4 +79,20 @@ public sealed record AutoTuneDiagnostic
     ///     use is on <see cref="BenchmarkResult.OutlierDetector" />.
     /// </summary>
     public bool OutlierDetectorSwitched { get; init; }
+
+    /// <summary>
+    ///     The relative CI half-width at each evaluation point during the measurement phase, in
+    ///     evaluation order. One entry per cadence check once past
+    ///     <see cref="AutoTuneOptions.MinSamples" />, plus a final entry when
+    ///     <see cref="AutoTuneOptions.MaxSamples" /> is reached. Empty for pinned runs (no adaptive
+    ///     convergence) and for autotuned runs that never reached the evaluation floor.
+    ///     <para>
+    ///         The final entry may differ slightly from <see cref="AchievedRelativeCiWidth" />,
+    ///         which is recomputed on the full raw sample set after the loop stops: the series uses
+    ///         the Welford accumulator's running stats at the moment of each evaluation, while the
+    ///         scalar is computed from the complete sample array. The series shows the convergence
+    ///         trajectory, the scalar shows the final achieved value.
+    ///     </para>
+    /// </summary>
+    public IReadOnlyList<double> CiWidthSeries { get; init; } = [];
 }

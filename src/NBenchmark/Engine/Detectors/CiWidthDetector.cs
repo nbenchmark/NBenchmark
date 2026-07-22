@@ -15,6 +15,11 @@ namespace NBenchmark.Engine.Detectors;
 /// </remarks>
 internal sealed class CiWidthDetector
 {
+    // Pre-sized to avoid the first few backing-array reallocations during short runs. The
+    // series grows at evaluation cadence (every BatchSize samples past MinSamples), not per
+    // sample, so even a pessimistic upper bound (MaxSamples / BatchSize = 12,500) is ~100 KB.
+    private readonly List<double> _halfWidthSeries = new(capacity: 128);
+
     private readonly int _cadence;
     private readonly double _ciTarget;
     private readonly double _confidenceLevel;
@@ -39,6 +44,16 @@ internal sealed class CiWidthDetector
 
     /// <summary>The relative CI half-width (half-width / mean) at the most recent evaluation.</summary>
     public double AchievedRelativeHalfWidth { get; private set; } = double.PositiveInfinity;
+
+    /// <summary>
+    ///     The relative CI half-width at each evaluation point during measurement, in evaluation
+    ///     order. Empty when no evaluation has run yet (e.g. the loop never reached
+    ///     <see cref="AutoTuneOptions.MinSamples" />). The final entry may differ slightly from
+    ///     <see cref="AchievedRelativeHalfWidth" /> recomputed on the full raw sample set after the
+    ///     loop stops - the series uses the Welford accumulator's running stats, while the
+    ///     post-loop scalar is computed from the complete trimmed-or-untrimmed array.
+    /// </summary>
+    public IReadOnlyList<double> HalfWidthSeries => _halfWidthSeries;
 
     /// <summary>The number of measured samples fed so far.</summary>
     public long Count { get; private set; }
@@ -102,6 +117,7 @@ internal sealed class CiWidthDetector
         }
 
         AchievedRelativeHalfWidth = t * standardError / Mean;
+        _halfWidthSeries.Add(AchievedRelativeHalfWidth);
         return true;
     }
 }
