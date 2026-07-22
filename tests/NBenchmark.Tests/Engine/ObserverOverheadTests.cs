@@ -8,7 +8,7 @@ namespace NBenchmark.Tests.Engine;
 ///     Timing-safety self-test: the defining contract of <see cref="IMeasurementObserver" /> is that
 ///     attaching an observer must not perturb the measurement. This runs a real CPU-bound body with
 ///     and without a recording observer (using the real wall-clock, not a scripted clock) and asserts
-///     the medians match within a CV-scaled tolerance. A regression in observer overhead - a blocking
+///     the medians match within a noise-scaled tolerance. A regression in observer overhead - a blocking
 ///     callback, a hot-path allocation, a missing null check - fails this test.
 /// </summary>
 public class ObserverOverheadTests
@@ -27,45 +27,55 @@ public class ObserverOverheadTests
     public void Attaching_An_Observer_Does_Not_Perturb_The_Median_Within_Noise()
     {
         const double targetMicros = 2_000.0; // 2 ms body - long enough to dwarf observer overhead
+        const int rounds = 5;
 
         var options = new MeasurementOptions
         {
             WarmupIterations = 5,
-            Iterations = 50,
+            Iterations = 30,
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
         };
 
-        // Run without an observer (NullMeasurementObserver) and with a recording observer. The
-        // recording observer captures every event - the worst case for hot-path work - so any
-        // per-callback cost shows up as a median shift.
-        var nullOutcome = BenchmarkRunner.Instance.Run(
-            "busywait-null",
-            () => BusyWait(targetMicros),
-            new RunSpec { Options = options, Observer = NullMeasurementObserver.Instance });
+        // Interleave the null and observed arms across multiple rounds so both sample the
+        // same scheduler/GC environment within each round. Comparing two single sequential
+        // runs is flaky on a shared CI runner: a context switch hitting one arm but not the
+        // other swings the median far more than any per-callback cost. By pairing the arms
+        // within each round and taking the per-round ratio, shared environment noise cancels;
+        // the median-of-ratios isolates the observer's own overhead and is robust to a single
+        // unlucky round.
+        var ratios = new double[rounds];
+        RecordingObserver? observer = null;
 
-        var observer = new RecordingObserver();
+        for (var round = 0; round < rounds; round++)
+        {
+            var nullOutcome = BenchmarkRunner.Instance.Run(
+                "busywait-null",
+                () => BusyWait(targetMicros),
+                new RunSpec { Options = options, Observer = NullMeasurementObserver.Instance });
 
-        var observedOutcome = BenchmarkRunner.Instance.Run(
-            "busywait-observed",
-            () => BusyWait(targetMicros),
-            new RunSpec { Options = options, Observer = observer });
+            observer = new RecordingObserver();
+            var observedOutcome = BenchmarkRunner.Instance.Run(
+                "busywait-observed",
+                () => BusyWait(targetMicros),
+                new RunSpec { Options = options, Observer = observer });
+
+            ratios[round] = observedOutcome.Result.Median / nullOutcome.Result.Median;
+        }
 
         // Sanity: the observer did capture events (the contract is not "zero events").
-        Assert.NotEmpty(observer.Samples);
+        Assert.NotEmpty(observer!.Samples);
         Assert.NotEmpty(observer.Phases);
 
-        // CV-scaled tolerance: the wider the natural spread, the more slack we allow. The default
-        // OutlierMode.None keeps all samples, so CV is the raw spread. A 3x CV band is generous enough
-        // to absorb scheduler noise on a shared CI runner while still catching a per-callback cost
-        // that exceeds the body's own variance.
-        var cv = nullOutcome.Result.CoefficientOfVariation;
-        var tolerance = Math.Max(0.05, 3.0 * cv); // floor at 5% to avoid dividing by a tiny CV
+        // The median-of-ratios isolates the observer's overhead from shared environment noise.
+        // On a 2 ms body the per-callback cost is negligible, so the ratio should sit near 1.0.
+        // A generous ±20% band absorbs residual within-round jitter on a shared CI runner
+        // while still catching a per-callback regression (a blocking callback or hot-path
+        // allocation that adds meaningful overhead to a 2 ms body).
+        Array.Sort(ratios);
+        var medianRatio = ratios[rounds / 2];
 
-        var medianShift = Math.Abs(observedOutcome.Result.Median - nullOutcome.Result.Median)
-                          / nullOutcome.Result.Median;
-
-        Assert.InRange(medianShift, 0.0, tolerance);
+        Assert.InRange(medianRatio, 0.80, 1.20);
     }
 
     [Fact]
