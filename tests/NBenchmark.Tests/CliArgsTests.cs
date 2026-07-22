@@ -939,6 +939,23 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_NoSamples_Sets_NoSamples_Flag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--no-samples"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.NoSamples);
+    }
+
+    [Fact]
+    public void ParseCore_NoSamples_Default_Is_False()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+
+        Assert.False(result.NoSamples);
+    }
+
+    [Fact]
     public void ParseCore_CpuAffinity_Single_Core_Parses()
     {
         var (result, errors) = CliArgs.ParseCore(["--cpu-affinity", "0"]);
@@ -1132,6 +1149,7 @@ public class CliArgsTests
         Assert.Contains("--autotune-cap-behavior", stdout);
         Assert.Contains("--percentiles", stdout);
         Assert.Contains("--no-histogram", stdout);
+        Assert.Contains("--no-samples", stdout);
         Assert.Contains("--cpu-affinity", stdout);
         Assert.Contains("--priority", stdout);
         Assert.Contains("--dedicated-host-guidance", stdout);

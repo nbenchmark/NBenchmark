@@ -280,6 +280,8 @@ public sealed record BenchmarkTable
             CoefficientOfVariation = result.CoefficientOfVariation,
             Percentiles = result.Percentiles,
             Histogram = result.Histogram,
+            RawSamples = result.RawSamples,
+            TrimmedOrdinals = result.TrimmedOrdinals,
             Ratio = comparable ? ComputeRatio(result, baseline) : double.NaN,
             IsBaseline = comparable && (isBaselineOverride ?? result.IsBaseline),
             Errored = result.Errored,
@@ -548,6 +550,20 @@ public record BenchmarkRow
     public required double CoefficientOfVariation { get; init; }
     public required IReadOnlyList<PercentileEntry> Percentiles { get; init; }
     public LatencyHistogram? Histogram { get; init; }
+
+    /// <summary>
+    ///     The raw per-op nanoseconds of every measured sample, in sample order, before outlier
+    ///     trimming. Empty for dry-run, errored, or calibration-derived results. Used by the
+    ///     Console reporter's density sparkline.
+    /// </summary>
+    public IReadOnlyList<double> RawSamples { get; init; } = [];
+
+    /// <summary>
+    ///     Ordinals (zero-based positions in <see cref="RawSamples" />) of every sample the
+    ///     outlier detector discarded. Used by the Console reporter to mark trimmed samples.
+    /// </summary>
+    public IReadOnlyList<int> TrimmedOrdinals { get; init; } = [];
+
     public required double Ratio { get; init; }
     public required bool IsBaseline { get; init; }
     public required bool Errored { get; init; }

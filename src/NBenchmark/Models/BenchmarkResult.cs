@@ -63,11 +63,19 @@ public record BenchmarkResult
     ///     <para>
     ///         Use this to flag individual raw samples as trimmed without re-running the
     ///         outlier detector. The ordinals refer to positions in
-    ///         <see cref="MeasurementOutcome.RawSamples" /> when the result came from a
-    ///         measured run.
+    ///         <see cref="RawSamples" /> when the result came from a measured run.
     ///     </para>
     /// </summary>
     public IReadOnlyList<int> TrimmedOrdinals { get; init; } = [];
+
+    /// <summary>
+    ///     The raw per-op nanoseconds of every measured sample, in sample order, before
+    ///     outlier trimming. Empty for dry-run, errored, or calibration-derived results.
+    ///     <see cref="TrimmedOrdinals" /> indexes into this collection. Shares storage with
+    ///     <see cref="MeasurementOutcome.RawSamples" /> when the result came from
+    ///     <c>Benchmark.RunRaw</c> / <c>RunRawAsync</c>; treat as read-only.
+    /// </summary>
+    public IReadOnlyList<double> RawSamples { get; init; } = [];
 
     public required double Skewness { get; init; }
     public required double Kurtosis { get; init; }

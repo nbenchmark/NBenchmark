@@ -119,6 +119,13 @@ internal sealed record CliArgs
     public bool NoHistogram { get; init; }
 
     /// <summary>
+    ///     When true, omits raw per-sample arrays from reporter output (JSON).
+    ///     Samples are still collected for significance and the Console histogram;
+    ///     this only controls whether they are serialized to file.
+    /// </summary>
+    public bool NoSamples { get; init; }
+
+    /// <summary>
     ///     Diagnostics mode controlling which runtime counters are collected.
     ///     <c>null</c> uses the MeasurementOptions default (GC counts on).
     /// </summary>
@@ -212,6 +219,7 @@ internal sealed record CliArgs
         int? launchCount = null;
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
+        var noSamples = false;
         var runtimes = new List<RuntimeMoniker>();
         IReadOnlyList<int>? cpuAffinity = null;
         ProcessPriorityClass? processPriority = null;
@@ -525,6 +533,9 @@ internal sealed record CliArgs
                 case "--no-histogram":
                     noHistogram = true;
                     break;
+                case "--no-samples":
+                    noSamples = true;
+                    break;
                 case "--cpu-affinity" when i + 1 < args.Length:
                     var affinityRaw = args[++i];
 
@@ -641,6 +652,7 @@ internal sealed record CliArgs
             LaunchCount = launchCount,
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
+            NoSamples = noSamples,
             Runtimes = runtimes,
             CpuAffinity = cpuAffinity,
             ProcessPriority = processPriority,
@@ -810,6 +822,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (harness default: 3)");
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");
+        Console.WriteLine("  --no-samples            Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");

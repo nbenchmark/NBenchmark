@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using NBenchmark.Stats;
 using Spectre.Console;
 using Spectre.Console.Rendering;
@@ -8,6 +9,9 @@ namespace NBenchmark.Reporters.Console;
 public sealed class ConsoleReporter : IReporter
 {
     private const int BarWidth = 12;
+    private const int HistogramRangeWidth = 28;
+    private const int HistogramMinBarWidth = 8;
+    private const int HistogramMaxBarWidth = 34;
 
     public ConsoleReporter(ReportDetail detail = ReportDetail.Simple)
     {
@@ -83,6 +87,8 @@ public sealed class ConsoleReporter : IReporter
             {
                 AnsiConsole.WriteLine();
                 RenderAdvancedDetails(table);
+                AnsiConsole.WriteLine();
+                RenderDistribution(table);
             }
 
             AnsiConsole.WriteLine();
@@ -737,6 +743,224 @@ public sealed class ConsoleReporter : IReporter
         }
 
         return $"[cyan]{Esc(magnitude)}[/]";
+    }
+
+    private const int SparklineBins = 50;
+
+    private static readonly char[] SparkBlocks =
+        ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+    private static void RenderDistribution(BenchmarkTable benchTable)
+    {
+        var rows = benchTable.Rows
+            .Where(r => !r.Errored && (r.RawSamples.Count > 0 || r.Histogram is not null))
+            .ToList();
+
+        if (rows.Count == 0)
+            return;
+
+        var rule = new Rule("[dim]Distribution[/]")
+            .LeftJustified()
+            .RuleStyle(Style.Parse("grey"));
+
+        AnsiConsole.Write(rule);
+        AnsiConsole.WriteLine();
+
+        foreach (var row in rows)
+        {
+            var content = new StringBuilder();
+
+            if (row.RawSamples.Count > 0)
+            {
+                var sparkline = RenderSparkline(row.RawSamples, row.TrimmedOrdinals);
+                content.AppendLine(sparkline);
+
+                var rawMin = row.RawSamples[0];
+                var rawMax = row.RawSamples[0];
+
+                for (var i = 1; i < row.RawSamples.Count; i++)
+                {
+                    if (row.RawSamples[i] < rawMin)
+                        rawMin = row.RawSamples[i];
+
+                    if (row.RawSamples[i] > rawMax)
+                        rawMax = row.RawSamples[i];
+                }
+
+                // The sparkline renders every raw sample (including trimmed ones, in red), so
+                // the footer count reflects the raw distribution size, not the kept (row.N)
+                // count. The "N trimmed" line below carries the kept/removed breakdown.
+                content.AppendLine($"[dim]min {BenchmarkFormatter.FormatNs(rawMin)} · max {BenchmarkFormatter.FormatNs(rawMax)} · {row.RawSamples.Count} samples[/]");
+
+                if (row.OutliersRemoved > 0)
+                    content.AppendLine($"[red]● {row.OutliersRemoved} trimmed ({Esc(benchTable.OutlierDetector)})[/]");
+            }
+
+            if (row.Histogram is { } histogram && histogram.Buckets.Count > 0)
+            {
+                if (content.Length > 0)
+                    content.AppendLine();
+
+                content.AppendLine("[dim]Histogram: count, share, cumulative[/]");
+
+                if (row.LowerFence is not null && row.UpperFence is not null)
+                    content.AppendLine("[dim]median bucket marked ◉; outlier-region buckets shown in red[/]");
+
+                var maxCount = histogram.Buckets.Max(b => b.Count);
+                var totalCount = histogram.Buckets.Sum(b => b.Count);
+                var histogramBarWidth = ResolveHistogramBarWidth();
+
+                if (maxCount > 0 && totalCount > 0)
+                {
+                    var cumulativeCount = 0;
+
+                    foreach (var bucket in histogram.Buckets)
+                    {
+                        cumulativeCount += bucket.Count;
+
+                        var filled = (int)Math.Round((double)bucket.Count / maxCount * histogramBarWidth);
+
+                        if (bucket.Count > 0)
+                            filled = Math.Max(1, filled);
+
+                        filled = Math.Clamp(filled, 0, histogramBarWidth);
+                        var empty = histogramBarWidth - filled;
+                        var bar = $"{new string('█', filled)}{new string('░', empty)}";
+                        var barColor = GetHistogramBucketColor(row, bucket, histogram.Max);
+                        var range = $"{BenchmarkFormatter.FormatNs(bucket.Lower)}-{BenchmarkFormatter.FormatNs(bucket.Upper)}";
+                        var bucketPercent = bucket.Count * 100.0 / totalCount;
+                        var cumulativePercent = cumulativeCount * 100.0 / totalCount;
+                        var marker = IsValueInBucket(row.Median, bucket, histogram.Max)
+                            ? " [bold yellow]◉[/]"
+                            : string.Empty;
+
+                        content.AppendLine(
+                            $"  [dim]{range.PadRight(HistogramRangeWidth)}[/] "
+                            + $"[{barColor}]{bar}[/] "
+                            + $"[dim]{bucket.Count,4} ({bucketPercent,5:0.0}%) · cum {cumulativePercent,5:0.0}%[/]"
+                            + marker);
+                    }
+                }
+            }
+
+            if (content.Length == 0)
+                continue;
+
+            var panel = new Panel(content.ToString().TrimEnd())
+                .Header($"[bold]{Esc(row.Name)}[/]")
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey42)
+                .Padding(1, 0)
+                .Expand();
+
+            AnsiConsole.Write(panel);
+            AnsiConsole.WriteLine();
+        }
+    }
+
+    private static string RenderSparkline(IReadOnlyList<double> samples, IReadOnlyList<int> trimmedOrdinals)
+    {
+        if (samples.Count == 0)
+            return string.Empty;
+
+        var min = samples[0];
+        var max = samples[0];
+
+        for (var i = 1; i < samples.Count; i++)
+        {
+            if (samples[i] < min)
+                min = samples[i];
+
+            if (samples[i] > max)
+                max = samples[i];
+        }
+
+        var range = max - min;
+
+        if (range <= 0)
+        {
+            var block = SparkBlocks[^1];
+            return $"[steelblue1]{new string(block, SparklineBins)}[/]";
+        }
+
+        var counts = new int[SparklineBins];
+        var trimmedSet = new HashSet<int>(trimmedOrdinals);
+        var hasTrimmed = trimmedSet.Count > 0;
+
+        var trimmedBins = hasTrimmed ? new bool[SparklineBins] : null;
+
+        for (var i = 0; i < samples.Count; i++)
+        {
+            var bin = (int)((samples[i] - min) / range * SparklineBins);
+
+            if (bin >= SparklineBins)
+                bin = SparklineBins - 1;
+
+            counts[bin]++;
+
+            if (trimmedBins != null && trimmedSet.Contains(i))
+                trimmedBins[bin] = true;
+        }
+
+        var maxCount = counts.Max();
+
+        if (maxCount == 0)
+            return string.Empty;
+
+        var sb = new StringBuilder(SparklineBins * 16);
+
+        for (var bin = 0; bin < SparklineBins; bin++)
+        {
+            var level = (int)((double)counts[bin] / maxCount * (SparkBlocks.Length - 1));
+            level = Math.Clamp(level, 0, SparkBlocks.Length - 1);
+            var block = SparkBlocks[level];
+
+            if (hasTrimmed && counts[bin] > 0)
+            {
+                sb.Append(trimmedBins![bin] ? $"[red]{block}[/]" : $"[steelblue1]{block}[/]");
+            }
+            else
+            {
+                sb.Append($"[steelblue1]{block}[/]");
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static int ResolveHistogramBarWidth()
+    {
+        var availableWidth = Math.Max(0, AnsiConsole.Profile.Width - (HistogramRangeWidth + 40));
+        return Math.Clamp(availableWidth, HistogramMinBarWidth, HistogramMaxBarWidth);
+    }
+
+    private static string GetHistogramBucketColor(BenchmarkRow row, HistogramBucket bucket, double histogramMax)
+    {
+        if (IsBucketOutsideFences(row, bucket))
+            return "indianred1";
+
+        return IsValueInBucket(row.Median, bucket, histogramMax)
+            ? "deepskyblue1"
+            : "steelblue1";
+    }
+
+    private static bool IsBucketOutsideFences(BenchmarkRow row, HistogramBucket bucket)
+    {
+        if (row.LowerFence is not { } lowerFence || row.UpperFence is not { } upperFence)
+            return false;
+
+        return bucket.Upper < lowerFence || bucket.Lower > upperFence;
+    }
+
+    private static bool IsValueInBucket(double value, HistogramBucket bucket, double histogramMax)
+    {
+        if (value < bucket.Lower)
+            return false;
+
+        if (value < bucket.Upper)
+            return true;
+
+        return Math.Abs(bucket.Upper - histogramMax) <= 1e-9 && value <= bucket.Upper;
     }
 
     private static string RenderBar(double value, double max, string color)

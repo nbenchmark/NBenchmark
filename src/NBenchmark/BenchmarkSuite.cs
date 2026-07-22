@@ -1193,7 +1193,15 @@ public sealed class BenchmarkSuite(string name)
 
                 if (byName.TryGetValue(envelope.Name, out var item))
                 {
-                    result = item.Result with { IsBaseline = isBaseline, Description = envelope.Description };
+                    // Re-attach display samples the child stripped from its serialized result.
+                    // For launch-aggregated items, prefer the representative launch samples kept
+                    // on Result so TrimmedOrdinals stay aligned with the shown distribution.
+                    result = item.Result with
+                    {
+                        IsBaseline = isBaseline,
+                        Description = envelope.Description,
+                        RawSamples = ResolveResultRawSamples(item),
+                    };
                     raw = item.RawSamples;
                 }
                 else
@@ -1368,6 +1376,7 @@ public sealed class BenchmarkSuite(string name)
                                     IsBaseline = isBaseline,
                                     Description = envelope.Description,
                                     RuntimeMoniker = tfm,
+                                    RawSamples = ResolveResultRawSamples(item),
                                 };
 
                                 if (item.RawSamples.Length > 0)
@@ -1382,9 +1391,9 @@ public sealed class BenchmarkSuite(string name)
                                         envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
                                         _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
                                         envelope.Categories).Result with
-                                    {
-                                        RuntimeMoniker = tfm,
-                                    };
+                                {
+                                    RuntimeMoniker = tfm,
+                                };
                             }
 
                             result = result with { ParameterSet = envelope.ParameterSet };
@@ -1456,7 +1465,7 @@ public sealed class BenchmarkSuite(string name)
                 var match = launchItems.FirstOrDefault(item => item.Result.Name == name);
 
                 if (match is not null)
-                    perLaunchResults.Add(match.Result);
+                    perLaunchResults.Add(match.Result with { RawSamples = match.RawSamples });
             }
 
             if (perLaunchResults.Count == 0)
@@ -1483,12 +1492,15 @@ public sealed class BenchmarkSuite(string name)
 
             var stats = LaunchAggregator.Aggregate(perLaunchResults);
             var best = LaunchAggregator.BestLaunch(perLaunchResults);
-            var aggregatedResult = best with { LaunchStatistics = stats };
-
             var rawSamples = allLaunchItems
                 .SelectMany(launchItems => launchItems.Where(item => item.Result.Name == name))
                 .SelectMany(item => item.RawSamples)
                 .ToArray();
+
+            // Keep representative-launch samples on the displayed result so statistical fields
+            // and TrimmedOrdinals remain aligned; pooled samples still travel alongside for
+            // significance calculations.
+            var aggregatedResult = best with { LaunchStatistics = stats };
 
             aggregated.Add(new IsolatedResultItem
             {
@@ -1498,6 +1510,11 @@ public sealed class BenchmarkSuite(string name)
         }
 
         return aggregated;
+    }
+
+    private static IReadOnlyList<double> ResolveResultRawSamples(IsolatedResultItem item)
+    {
+        return item.Result.RawSamples.Count > 0 ? item.Result.RawSamples : item.RawSamples;
     }
 
     // --- Parameter expansion ---

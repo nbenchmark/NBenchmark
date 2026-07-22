@@ -202,6 +202,86 @@ public class ConsoleReporterTests
         await reporter.ReportAsync([result]);
     }
 
+    [Fact]
+    public async Task ConsoleReporter_Advanced_Renders_Distribution_With_RawSamples()
+    {
+        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var result = MakeResult("with-samples", 100) with
+        {
+            RawSamples = [90.0, 95.0, 100.0, 105.0, 110.0, 200.0],
+            TrimmedOrdinals = [5],
+            OutliersRemoved = 1,
+            N = 5,
+        };
+
+        AnsiConsole.Record();
+
+        await reporter.ReportAsync([result]);
+
+        var output = AnsiConsole.ExportText();
+
+        Assert.Contains("Distribution", output);
+        Assert.Contains("with-samples", output);
+        Assert.Contains("max 200.0 ns", output);
+        Assert.Contains("6 samples", output);
+        Assert.Contains("1 trimmed", output);
+    }
+
+    [Fact]
+    public async Task ConsoleReporter_Advanced_Renders_Distribution_With_Empty_RawSamples()
+    {
+        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var result = MakeResult("no-samples", 100) with
+        {
+            RawSamples = [],
+            LowerFence = 95,
+            UpperFence = 105,
+            Histogram = new LatencyHistogram(
+                [new HistogramBucket(90, 95, 2), new HistogramBucket(95, 100, 3)],
+                90, 100, 5),
+        };
+
+        AnsiConsole.Record();
+
+        await reporter.ReportAsync([result]);
+
+        var output = AnsiConsole.ExportText();
+
+        Assert.Contains("Histogram: count, share, cumulative", output);
+        Assert.Contains("median bucket marked", output);
+        Assert.Contains("40.0%", output);
+        Assert.Contains("100.0%", output);
+        Assert.Contains("cum", output);
+    }
+
+    [Fact]
+    public async Task ConsoleReporter_Advanced_Renders_Distribution_With_Null_Histogram()
+    {
+        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var result = MakeResult("no-histogram", 100) with
+        {
+            RawSamples = [90.0, 95.0, 100.0, 105.0, 110.0],
+            Histogram = null,
+        };
+
+        // Does not throw; renders sparkline only when Histogram is null.
+        await reporter.ReportAsync([result]);
+    }
+
+    [Fact]
+    public async Task ConsoleReporter_Advanced_Renders_Distribution_With_All_Zero_Range_Samples()
+    {
+        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var result = MakeResult("flat", 100) with
+        {
+            RawSamples = [100.0, 100.0, 100.0, 100.0],
+            Histogram = null,
+        };
+
+        // Does not throw; all-equal samples produce a flat sparkline.
+        await reporter.ReportAsync([result]);
+    }
+
     private static BenchmarkResult MakeResult(string name, double median)
     {
         return new BenchmarkResult

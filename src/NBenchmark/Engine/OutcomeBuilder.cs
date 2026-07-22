@@ -126,9 +126,13 @@ internal static class OutcomeBuilder
         var totalOperations = autoTune?.TotalBodyInvocations
                               ?? (long)measuredIterations + resolvedWarmup;
 
+        // Share one sample array between MeasurementOutcome.RawSamples and Result.RawSamples
+        // to avoid an extra O(n) copy on every measured benchmark.
+        var samples = rawSamples.Length == 0 ? Array.Empty<double>() : rawSamples;
+
         return new MeasurementOutcome
         {
-            RawSamples = rawSamples,
+            RawSamples = samples,
             Result = new BenchmarkResult
             {
                 Name = name,
@@ -153,6 +157,7 @@ internal static class OutcomeBuilder
                 OutliersRemoved = outliersRemoved,
                 N = measuredIterations,
                 TrimmedOrdinals = trimmedOrdinals,
+                RawSamples = samples,
                 Skewness = stats?.Skewness ?? 0,
                 Kurtosis = stats?.Kurtosis ?? 0,
                 Mad = stats?.Mad ?? 0,

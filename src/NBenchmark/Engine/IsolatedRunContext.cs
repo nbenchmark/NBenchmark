@@ -432,7 +432,7 @@ internal static class IsolatedRunContext
         var items = results
             .Select(r => new IsolatedResultItem
             {
-                Result = r,
+                Result = r with { RawSamples = [] },
                 RawSamples = rawSamples.TryGetValue($"{r.Name}\0{r.RuntimeMoniker}", out var samples) ? samples : [],
             })
             .ToList();

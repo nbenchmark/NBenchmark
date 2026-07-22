@@ -79,6 +79,60 @@ public class ReporterTests
     }
 
     [Fact]
+    public async Task JsonReporter_Includes_RawSamples_By_Default()
+    {
+        var tempDir = MakeSubDir("nb-json-samples");
+
+        try
+        {
+            var reporter = new JsonReporter(tempDir);
+            var result = MakeResult("alpha", 100) with { RawSamples = [777.0, 888.0, 999.0] };
+
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
+            Assert.Single(files);
+
+            var content = await File.ReadAllTextAsync(files[0]);
+            Assert.Contains("\"rawSamples\"", content);
+            Assert.Contains("777", content);
+            Assert.Contains("888", content);
+            Assert.Contains("999", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task JsonReporter_IncludeSamples_False_Omits_RawSamples()
+    {
+        var tempDir = MakeSubDir("nb-json-no-samples");
+
+        try
+        {
+            var reporter = new JsonReporter(tempDir) { IncludeSamples = false };
+            var result = MakeResult("alpha", 100) with { RawSamples = [777.0, 888.0, 999.0] };
+
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
+            Assert.Single(files);
+
+            var content = await File.ReadAllTextAsync(files[0]);
+            Assert.Contains("\"rawSamples\"", content);
+            Assert.DoesNotContain("777", content);
+            Assert.DoesNotContain("888", content);
+            Assert.DoesNotContain("999", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
     public async Task MarkdownReporter_Writes_Table_Containing_Results()
     {
         var tempDir = MakeSubDir("nb-md");

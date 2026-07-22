@@ -39,6 +39,7 @@ public sealed class BenchmarkHarness
     private bool _launchCountExplicit;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private bool _optionsExplicitlySet;
+    private bool _noSamples;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
@@ -71,12 +72,15 @@ public sealed class BenchmarkHarness
         var harness = new BenchmarkHarness();
         harness._cliArgs = cliArgs;
         harness._detail = cliArgs.Detail;
+        harness._noSamples = cliArgs.NoSamples;
 
         foreach (var name in cliArgs.ReporterNames)
         {
             if (ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out var reporter))
                 harness._reporters.Add(reporter);
         }
+
+        harness.ApplyNoSamples();
 
         foreach (var name in cliArgs.ObserverNames)
         {
@@ -102,7 +106,9 @@ public sealed class BenchmarkHarness
     public BenchmarkHarness WithReporter(IReporter reporter)
     {
         reporter.Detail = _detail;
+
         _reporters.Add(reporter);
+        ApplyNoSamples();
         return this;
     }
 
@@ -823,8 +829,13 @@ public sealed class BenchmarkHarness
 
                     foreach (var item in runtimeResults)
                     {
-                        allResults.Add(item.Result);
-                        rawSamples[$"{item.Result.Name}\0{tfm}"] = item.RawSamples;
+                        // Re-attach display samples the child stripped from its serialized result
+                        // (see IsolatedRunContext.WriteChildPayloadIfRequestedAsync). For
+                        // launch-aggregated items, prefer the representative launch samples kept
+                        // on Result so TrimmedOrdinals stay aligned with the shown distribution.
+                        var withSamples = item.Result with { RawSamples = ResolveResultRawSamples(item) };
+                        allResults.Add(withSamples);
+                        rawSamples[$"{withSamples.Name}\0{tfm}"] = item.RawSamples;
                     }
                 }
                 finally
@@ -1565,7 +1576,10 @@ public sealed class BenchmarkHarness
 
             if (byName.TryGetValue(name, out var item))
             {
-                result = item.Result;
+                // Re-attach display samples the child stripped from its serialized result. For
+                // launch-aggregated items, prefer the representative launch samples kept on
+                // Result so TrimmedOrdinals stay aligned with the shown distribution.
+                result = item.Result with { RawSamples = ResolveResultRawSamples(item) };
                 raw = item.RawSamples;
             }
             else
@@ -1609,7 +1623,7 @@ public sealed class BenchmarkHarness
                 var match = launchItems.FirstOrDefault(item => item.Result.Name == name);
 
                 if (match is not null)
-                    perLaunchResults.Add(match.Result);
+                    perLaunchResults.Add(match.Result with { RawSamples = match.RawSamples });
             }
 
             if (perLaunchResults.Count == 0)
@@ -1631,12 +1645,15 @@ public sealed class BenchmarkHarness
 
             var stats = LaunchAggregator.Aggregate(perLaunchResults);
             var best = LaunchAggregator.BestLaunch(perLaunchResults);
-            var aggregatedResult = best with { LaunchStatistics = stats };
-
             var rawSamples = allLaunchItems
                 .SelectMany(launchItems => launchItems.Where(item => item.Result.Name == name))
                 .SelectMany(item => item.RawSamples)
                 .ToArray();
+
+            // Keep representative-launch samples on the displayed result so statistical fields
+            // and TrimmedOrdinals remain aligned; pooled samples still travel alongside for
+            // significance calculations.
+            var aggregatedResult = best with { LaunchStatistics = stats };
 
             aggregated.Add(new IsolatedResultItem
             {
@@ -1929,6 +1946,25 @@ public sealed class BenchmarkHarness
         {
             if (ReporterRegistry.TryCreate(_reporters[i].Name, outputDir, _detail, out var rebuilt))
                 _reporters[i] = rebuilt;
+        }
+
+        ApplyNoSamples();
+    }
+
+    private static IReadOnlyList<double> ResolveResultRawSamples(IsolatedResultItem item)
+    {
+        return item.Result.RawSamples.Count > 0 ? item.Result.RawSamples : item.RawSamples;
+    }
+
+    private void ApplyNoSamples()
+    {
+        if (!_noSamples)
+            return;
+
+        foreach (var reporter in _reporters)
+        {
+            if (reporter is JsonReporter json)
+                json.IncludeSamples = false;
         }
     }
 

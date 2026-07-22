@@ -19,6 +19,13 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
 
     public ReportDetail Detail { get; set; } = detail;
 
+    /// <summary>
+    ///     When <c>false</c>, raw per-sample arrays are omitted from the JSON output (serialized as
+    ///     empty arrays). Samples are still collected for significance and the Console histogram;
+    ///     this only controls whether they are written to the file. Default <c>true</c>.
+    /// </summary>
+    public bool IncludeSamples { get; set; } = true;
+
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)
@@ -30,12 +37,16 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
 
         var filePath = Path.Combine(_outputDirectory, fileName);
 
+        var serializedResults = IncludeSamples
+            ? results
+            : results.Select(r => r with { RawSamples = [] }).ToList();
+
         var envelope = new ResultEnvelope
         {
             GeneratedAt = DateTimeOffset.UtcNow,
             Detail = Detail,
             Profile = results.FirstOrDefault()?.Profile ?? MeasurementProfile.Realistic,
-            Results = results,
+            Results = serializedResults,
         };
 
         await using var stream = File.Create(filePath);
