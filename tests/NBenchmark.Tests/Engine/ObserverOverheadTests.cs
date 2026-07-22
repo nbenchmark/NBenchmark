@@ -27,13 +27,13 @@ public class ObserverOverheadTests
     public void Attaching_An_Observer_Does_Not_Perturb_The_Median_Within_Noise()
     {
         const double targetMicros = 2_000.0; // 2 ms body - long enough to dwarf observer overhead
-        const int rounds = 5;
+        const int rounds = 9;
 
         var options = new MeasurementOptions
         {
             WarmupIterations = 5,
             Iterations = 30,
-            OutlierMode = OutlierMode.None,
+            OutlierMode = OutlierMode.IqrFence,
             MeasureAllocationsOverride = false,
         };
 
@@ -42,8 +42,8 @@ public class ObserverOverheadTests
         // runs is flaky on a shared CI runner: a context switch hitting one arm but not the
         // other swings the median far more than any per-callback cost. By pairing the arms
         // within each round and taking the per-round ratio, shared environment noise cancels;
-        // the median-of-ratios isolates the observer's own overhead and is robust to a single
-        // unlucky round.
+        // the median-of-ratios isolates the observer's own overhead and is robust to a few
+        // unlucky rounds.
         var ratios = new double[rounds];
         RecordingObserver? observer = null;
 
