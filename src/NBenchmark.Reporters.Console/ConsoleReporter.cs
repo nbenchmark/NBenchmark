@@ -9,9 +9,15 @@ namespace NBenchmark.Reporters.Console;
 public sealed class ConsoleReporter : IReporter
 {
     private const int BarWidth = 12;
-    private const int HistogramRangeWidth = 28;
-    private const int HistogramMinBarWidth = 8;
-    private const int HistogramMaxBarWidth = 34;
+    private const int AxisMinWidth = 30;
+    private const int AxisMaxWidth = 70;
+    private const int StripIndent = 2;
+
+    private const string GapStyle = "grey35";
+    private const string WhiskerStyle = "grey62";
+    private const string BoxStyle = "steelblue1";
+    private const string MedianStyle = "bold yellow";
+    private const string OutlierStyle = "indianred1";
 
     public ConsoleReporter(ReportDetail detail = ReportDetail.Simple)
     {
@@ -745,15 +751,13 @@ public sealed class ConsoleReporter : IReporter
         return $"[cyan]{Esc(magnitude)}[/]";
     }
 
-    private const int SparklineBins = 50;
-
     private static readonly char[] SparkBlocks =
         ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
     private static void RenderDistribution(BenchmarkTable benchTable)
     {
         var rows = benchTable.Rows
-            .Where(r => !r.Errored && (r.RawSamples.Count > 0 || r.Histogram is not null))
+            .Where(r => !r.Errored && (r.RawSamples.Count > 0 || r.Max > r.Min))
             .ToList();
 
         if (rows.Count == 0)
@@ -766,91 +770,37 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.Write(rule);
         AnsiConsole.WriteLine();
 
+        var axisWidth = ResolveAxisWidth();
+
         foreach (var row in rows)
         {
             var content = new StringBuilder();
 
+            // The sparkline shows distribution shape (multimodality, skew); the box-whisker
+            // strip below shows the quartiles, the kept range, and every trimmed sample as a
+            // red dot at its true position. The strip is drawn purely from Q1/Q3/median and
+            // the kept/discarded split, so it is correct for any outlier detector (IQR, MAD,
+            // percentile, none, custom) - only which points are dots changes.
             if (row.RawSamples.Count > 0)
             {
-                var sparkline = RenderSparkline(row.RawSamples, row.TrimmedOrdinals);
-                content.AppendLine(sparkline);
-
-                var rawMin = row.RawSamples[0];
-                var rawMax = row.RawSamples[0];
-
-                for (var i = 1; i < row.RawSamples.Count; i++)
-                {
-                    if (row.RawSamples[i] < rawMin)
-                        rawMin = row.RawSamples[i];
-
-                    if (row.RawSamples[i] > rawMax)
-                        rawMax = row.RawSamples[i];
-                }
-
-                // The sparkline renders every raw sample (including trimmed ones, in red), so
-                // the footer count reflects the raw distribution size, not the kept (row.N)
-                // count. The "N trimmed" line below carries the kept/removed breakdown.
-                content.AppendLine($"[dim]min {BenchmarkFormatter.FormatNs(rawMin)} · max {BenchmarkFormatter.FormatNs(rawMax)} · {row.RawSamples.Count} samples[/]");
-
-                if (row.OutliersRemoved > 0)
-                    content.AppendLine($"[red]● {row.OutliersRemoved} trimmed ({Esc(benchTable.OutlierDetector)})[/]");
+                // Give the sparkline the same width as the axis and indent it so its bins sit
+                // directly above the axis cells - the two rows then read as a single chart.
+                var (lo, _) = SampleRange(row);
+                var indent = new string(' ', StripIndent + BenchmarkFormatter.FormatNs(lo).Length + 1);
+                content.AppendLine(indent + RenderSparkline(row.RawSamples, row.TrimmedOrdinals, axisWidth));
             }
 
-            if (row.Histogram is { } histogram && histogram.Buckets.Count > 0)
-            {
-                if (content.Length > 0)
-                    content.AppendLine();
+            content.AppendLine(RenderBoxWhisker(row, axisWidth));
+            content.AppendLine(string.Empty);
 
-                content.AppendLine("[dim]Histogram: count, share, cumulative[/]");
-
-                if (row.LowerFence is not null && row.UpperFence is not null)
-                    content.AppendLine("[dim]median bucket marked ◉; outlier-region buckets shown in red[/]");
-
-                var maxCount = histogram.Buckets.Max(b => b.Count);
-                var totalCount = histogram.Buckets.Sum(b => b.Count);
-                var histogramBarWidth = ResolveHistogramBarWidth();
-
-                if (maxCount > 0 && totalCount > 0)
-                {
-                    var cumulativeCount = 0;
-
-                    foreach (var bucket in histogram.Buckets)
-                    {
-                        cumulativeCount += bucket.Count;
-
-                        var filled = (int)Math.Round((double)bucket.Count / maxCount * histogramBarWidth);
-
-                        if (bucket.Count > 0)
-                            filled = Math.Max(1, filled);
-
-                        filled = Math.Clamp(filled, 0, histogramBarWidth);
-                        var empty = histogramBarWidth - filled;
-                        var bar = $"{new string('█', filled)}{new string('░', empty)}";
-                        var barColor = GetHistogramBucketColor(row, bucket, histogram.Max);
-                        var range = $"{BenchmarkFormatter.FormatNs(bucket.Lower)}-{BenchmarkFormatter.FormatNs(bucket.Upper)}";
-                        var bucketPercent = bucket.Count * 100.0 / totalCount;
-                        var cumulativePercent = cumulativeCount * 100.0 / totalCount;
-                        var marker = IsValueInBucket(row.Median, bucket, histogram.Max)
-                            ? " [bold yellow]◉[/]"
-                            : string.Empty;
-
-                        content.AppendLine(
-                            $"  [dim]{range.PadRight(HistogramRangeWidth)}[/] "
-                            + $"[{barColor}]{bar}[/] "
-                            + $"[dim]{bucket.Count,4} ({bucketPercent,5:0.0}%) · cum {cumulativePercent,5:0.0}%[/]"
-                            + marker);
-                    }
-                }
-            }
-
-            if (content.Length == 0)
-                continue;
+            foreach (var line in RenderDistributionSummary(row, benchTable.OutlierDetector))
+                content.AppendLine(line);
 
             var panel = new Panel(content.ToString().TrimEnd())
                 .Header($"[bold]{Esc(row.Name)}[/]")
                 .Border(BoxBorder.Rounded)
                 .BorderColor(Color.Grey42)
-                .Padding(1, 0)
+                .Padding(2, 1)
                 .Expand();
 
             AnsiConsole.Write(panel);
@@ -858,7 +808,7 @@ public sealed class ConsoleReporter : IReporter
         }
     }
 
-    private static string RenderSparkline(IReadOnlyList<double> samples, IReadOnlyList<int> trimmedOrdinals)
+    private static string RenderSparkline(IReadOnlyList<double> samples, IReadOnlyList<int> trimmedOrdinals, int bins)
     {
         if (samples.Count == 0)
             return string.Empty;
@@ -880,21 +830,21 @@ public sealed class ConsoleReporter : IReporter
         if (range <= 0)
         {
             var block = SparkBlocks[^1];
-            return $"[steelblue1]{new string(block, SparklineBins)}[/]";
+            return $"[steelblue1]{new string(block, bins)}[/]";
         }
 
-        var counts = new int[SparklineBins];
+        var counts = new int[bins];
         var trimmedSet = new HashSet<int>(trimmedOrdinals);
         var hasTrimmed = trimmedSet.Count > 0;
 
-        var trimmedBins = hasTrimmed ? new bool[SparklineBins] : null;
+        var trimmedBins = hasTrimmed ? new bool[bins] : null;
 
         for (var i = 0; i < samples.Count; i++)
         {
-            var bin = (int)((samples[i] - min) / range * SparklineBins);
+            var bin = (int)((samples[i] - min) / range * bins);
 
-            if (bin >= SparklineBins)
-                bin = SparklineBins - 1;
+            if (bin >= bins)
+                bin = bins - 1;
 
             counts[bin]++;
 
@@ -907,9 +857,9 @@ public sealed class ConsoleReporter : IReporter
         if (maxCount == 0)
             return string.Empty;
 
-        var sb = new StringBuilder(SparklineBins * 16);
+        var sb = new StringBuilder(bins * 16);
 
-        for (var bin = 0; bin < SparklineBins; bin++)
+        for (var bin = 0; bin < bins; bin++)
         {
             var level = (int)((double)counts[bin] / maxCount * (SparkBlocks.Length - 1));
             level = Math.Clamp(level, 0, SparkBlocks.Length - 1);
@@ -928,39 +878,163 @@ public sealed class ConsoleReporter : IReporter
         return sb.ToString();
     }
 
-    private static int ResolveHistogramBarWidth()
+    private static int ResolveAxisWidth()
     {
-        var availableWidth = Math.Max(0, AnsiConsole.Profile.Width - (HistogramRangeWidth + 40));
-        return Math.Clamp(availableWidth, HistogramMinBarWidth, HistogramMaxBarWidth);
+        // Reserve room for the two numeric axis labels, the spaces around the axis, and the
+        // rounded panel border/padding (2 cols each side); give the rest to the axis itself.
+        var available = Math.Max(0, AnsiConsole.Profile.Width - 32);
+        return Math.Clamp(available, AxisMinWidth, AxisMaxWidth);
     }
 
-    private static string GetHistogramBucketColor(BenchmarkRow row, HistogramBucket bucket, double histogramMax)
+    /// <summary>
+    ///     Renders a to-scale box-and-whisker strip on a single min-&gt;max axis: the box spans
+    ///     Q1-Q3 with the median marked, the whisker spans the kept (inlier) range, and every
+    ///     trimmed sample is a red dot at its true position. Independent of the outlier
+    ///     detector - the quartiles are always computed and the kept/discarded split is always
+    ///     populated - so it reads the same way whether the fence was IQR, MAD, or otherwise.
+    /// </summary>
+    private static string RenderBoxWhisker(BenchmarkRow row, int width)
     {
-        if (IsBucketOutsideFences(row, bucket))
-            return "indianred1";
+        var (lo, hi) = SampleRange(row);
 
-        return IsValueInBucket(row.Median, bucket, histogramMax)
-            ? "deepskyblue1"
-            : "steelblue1";
+        if (hi <= lo || width < 4)
+            return $"  [dim]▉ all samples ≈ {BenchmarkFormatter.FormatNs(row.Median)}[/]";
+
+        var cells = new char[width];
+        var styles = new string[width];
+
+        for (var i = 0; i < width; i++)
+        {
+            cells[i] = '·';
+            styles[i] = GapStyle;
+        }
+
+        int Col(double v) => Math.Clamp((int)Math.Round((v - lo) / (hi - lo) * (width - 1)), 0, width - 1);
+
+        // Whisker: the span of the kept (inlier) samples.
+        var (keptLo, keptHi) = KeptExtent(row, lo, hi);
+        var wLo = Col(keptLo);
+        var wHi = Col(keptHi);
+
+        for (var i = wLo; i <= wHi; i++)
+        {
+            cells[i] = '─';
+            styles[i] = WhiskerStyle;
+        }
+
+        // Box: Q1-Q3 (clamped into the axis in case the pre-trim quartiles sit at an edge).
+        var bLo = Col(Math.Clamp(row.Q1, lo, hi));
+        var bHi = Col(Math.Clamp(row.Q3, lo, hi));
+
+        for (var i = bLo; i <= bHi; i++)
+        {
+            cells[i] = '█';
+            styles[i] = BoxStyle;
+        }
+
+        // Whisker end caps, only where the box did not already claim the cell.
+        if (cells[wLo] == '─')
+            cells[wLo] = '├';
+
+        if (cells[wHi] == '─')
+            cells[wHi] = '┤';
+
+        // Median line.
+        var mCol = Col(Math.Clamp(row.Median, lo, hi));
+        cells[mCol] = '◉';
+        styles[mCol] = MedianStyle;
+
+        // Trimmed samples as dots at their true positions.
+        foreach (var ordinal in row.TrimmedOrdinals)
+        {
+            if (ordinal < 0 || ordinal >= row.RawSamples.Count)
+                continue;
+
+            var oCol = Col(row.RawSamples[ordinal]);
+            cells[oCol] = '●';
+            styles[oCol] = OutlierStyle;
+        }
+
+        return $"  [dim]{BenchmarkFormatter.FormatNs(lo)}[/] {RunLengthMarkup(cells, styles)} [dim]{BenchmarkFormatter.FormatNs(hi)}[/]";
     }
 
-    private static bool IsBucketOutsideFences(BenchmarkRow row, HistogramBucket bucket)
+    private static string[] RenderDistributionSummary(BenchmarkRow row, string outlierDetector)
     {
-        if (row.LowerFence is not { } lowerFence || row.UpperFence is not { } upperFence)
-            return false;
+        var sampleCount = row.RawSamples.Count > 0 ? row.RawSamples.Count : row.N + row.OutliersRemoved;
 
-        return bucket.Upper < lowerFence || bucket.Lower > upperFence;
+        var stats =
+            $"  [dim]median {BenchmarkFormatter.FormatNs(row.Median)} · "
+            + $"IQR {BenchmarkFormatter.FormatNs(row.Q1)}–{BenchmarkFormatter.FormatNs(row.Q3)}[/]";
+
+        var counts = $"  [dim]{sampleCount} samples[/]";
+
+        if (row.OutliersRemoved > 0)
+            counts += $"[red] · {row.OutliersRemoved} trimmed ({Esc(outlierDetector)})[/]";
+
+        return [stats, counts];
     }
 
-    private static bool IsValueInBucket(double value, HistogramBucket bucket, double histogramMax)
+    private static (double Lo, double Hi) SampleRange(BenchmarkRow row)
     {
-        if (value < bucket.Lower)
-            return false;
+        if (row.RawSamples.Count == 0)
+            return (row.Min, row.Max);
 
-        if (value < bucket.Upper)
-            return true;
+        var lo = row.RawSamples[0];
+        var hi = row.RawSamples[0];
 
-        return Math.Abs(bucket.Upper - histogramMax) <= 1e-9 && value <= bucket.Upper;
+        for (var i = 1; i < row.RawSamples.Count; i++)
+        {
+            if (row.RawSamples[i] < lo)
+                lo = row.RawSamples[i];
+
+            if (row.RawSamples[i] > hi)
+                hi = row.RawSamples[i];
+        }
+
+        return (lo, hi);
+    }
+
+    private static (double Lo, double Hi) KeptExtent(BenchmarkRow row, double fallbackLo, double fallbackHi)
+    {
+        if (row.RawSamples.Count == 0 || row.TrimmedOrdinals.Count == 0)
+            return (fallbackLo, fallbackHi);
+
+        var trimmed = new HashSet<int>(row.TrimmedOrdinals);
+        var lo = double.PositiveInfinity;
+        var hi = double.NegativeInfinity;
+
+        for (var i = 0; i < row.RawSamples.Count; i++)
+        {
+            if (trimmed.Contains(i))
+                continue;
+
+            if (row.RawSamples[i] < lo)
+                lo = row.RawSamples[i];
+
+            if (row.RawSamples[i] > hi)
+                hi = row.RawSamples[i];
+        }
+
+        return double.IsInfinity(lo) || double.IsInfinity(hi) ? (fallbackLo, fallbackHi) : (lo, hi);
+    }
+
+    private static string RunLengthMarkup(char[] cells, string[] styles)
+    {
+        var sb = new StringBuilder(cells.Length * 4);
+        var i = 0;
+
+        while (i < cells.Length)
+        {
+            var style = styles[i];
+            var start = i;
+
+            while (i < cells.Length && styles[i] == style)
+                i++;
+
+            sb.Append('[').Append(style).Append(']').Append(cells, start, i - start).Append("[/]");
+        }
+
+        return sb.ToString();
     }
 
     private static string RenderBar(double value, double max, string color)

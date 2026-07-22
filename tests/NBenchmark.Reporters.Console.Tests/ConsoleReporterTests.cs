@@ -222,7 +222,9 @@ public class ConsoleReporterTests
 
         Assert.Contains("Distribution", output);
         Assert.Contains("with-samples", output);
-        Assert.Contains("max 200.0 ns", output);
+        Assert.Contains("median", output);
+        // The axis is labelled with the raw min and max; 200 ns is the far outlier.
+        Assert.Contains("200.0 ns", output);
         Assert.Contains("6 samples", output);
         Assert.Contains("1 trimmed", output);
     }
@@ -231,14 +233,15 @@ public class ConsoleReporterTests
     public async Task ConsoleReporter_Advanced_Renders_Distribution_With_Empty_RawSamples()
     {
         var reporter = new ConsoleReporter(ReportDetail.Advanced);
+
+        // No raw samples: the box-whisker strip falls back to drawing from the summary
+        // statistics (Q1/Q3/median/min/max) alone, with no per-sample dots.
         var result = MakeResult("no-samples", 100) with
         {
             RawSamples = [],
-            LowerFence = 95,
-            UpperFence = 105,
-            Histogram = new LatencyHistogram(
-                [new HistogramBucket(90, 95, 2), new HistogramBucket(95, 100, 3)],
-                90, 100, 5),
+            Q1 = 95,
+            Q3 = 105,
+            N = 5,
         };
 
         AnsiConsole.Record();
@@ -247,11 +250,11 @@ public class ConsoleReporterTests
 
         var output = AnsiConsole.ExportText();
 
-        Assert.Contains("Histogram: count, share, cumulative", output);
-        Assert.Contains("median bucket marked", output);
-        Assert.Contains("40.0%", output);
-        Assert.Contains("100.0%", output);
-        Assert.Contains("cum", output);
+        Assert.Contains("Distribution", output);
+        Assert.Contains("no-samples", output);
+        Assert.Contains("median", output);
+        Assert.Contains("IQR", output);
+        Assert.Contains("samples", output);
     }
 
     [Fact]
@@ -264,7 +267,7 @@ public class ConsoleReporterTests
             Histogram = null,
         };
 
-        // Does not throw; renders sparkline only when Histogram is null.
+        // Does not throw; the box-whisker strip no longer depends on Histogram.
         await reporter.ReportAsync([result]);
     }
 
@@ -278,7 +281,7 @@ public class ConsoleReporterTests
             Histogram = null,
         };
 
-        // Does not throw; all-equal samples produce a flat sparkline.
+        // Does not throw; all-equal samples collapse the strip to a single "all samples ≈" marker.
         await reporter.ReportAsync([result]);
     }
 
