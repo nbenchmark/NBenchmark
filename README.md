@@ -6,9 +6,11 @@
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-blue.svg)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Zero-ceremony benchmarking for .NET.**
+**Straightforward benchmarking for .NET.**
 
-NBenchmark provides a low-overhead measurement engine with built-in statistical analysis. It moves beyond raw averages by providing confidence intervals, outlier trimming, and significance testing out of the box - allowing you to differentiate between a real performance gain and background noise.
+Benchmarking code sounds simple - run it, time it, compare. In practice the numbers are easy to get wrong: the JIT compiler is still optimizing your method during the first runs, the timer can cost more than a fast method, a single GC pause or OS context switch skews an average, and a 2% improvement you were sure you measured can be statistical noise.
+
+NBenchmark takes care of the statistical analysis. One line of code gives you a calibrated, warmed-up, outlier-trimmed result with a confidence interval.
 
 ```csharp
 var result = Benchmark.Run(() => MandelbrotCalculation(name: "Mandelbrot calculation"));
@@ -19,24 +21,19 @@ result.Print();
 
 ## Why NBenchmark?
 
-- **Zero-ceremony measurements.** `Benchmark.Run(() => ...)` requires no attributes, no class structures, and no dedicated project. Run a reliable benchmark directly in your existing code or scratchpad.
+- **No setup required.** `Benchmark.Run(() => ...)` - no attributes, no class structure, no dedicated project. Drop it into a console app, a test, or a scratchpad.
 
-- **Adaptive, self-tuning measurements.** No iteration counts to guess. NBenchmark calibrates ops-per-sample for fast bodies, detects when warmup has plateaued, and streams samples until the confidence interval hits its target - then stops. Pin any dimension when you want a fixed, reproducible run.
+- **Adaptive measurement.** No iteration counts to guess. The engine calibrates ops-per-sample for fast methods so timer overhead doesn't dominate, and detects when warmup has plateaued so the JIT has settled. Pin any dimension when you want a fixed, reproducible run.
 
-- **Statistical rigor by default.** The adaptive loop auto-sizes warmup, sample count, and ops-per-batch for each benchmark, stopping once the 95% confidence interval is tight enough. Combined with IQR-fence outlier trimming, it validates A/B comparisons with a Mann-Whitney U test, reports Cliff's delta effect size as a Magnitude column (Negligible / Small / Medium / Large), and automatically switches to the Kruskal-Wallis omnibus test when comparing three or more implementations.
+- **Statistical rigor built in.** Samples stream until the 95% confidence interval is tight enough, then stop. IQR-fence outlier trimming filters OS noise, with a bimodal-distribution warning when discarded samples look like real latency spikes rather than random jitter. A/B comparisons use a Mann-Whitney U test with Cliff's delta effect size (Negligible / Small / Medium / Large), automatically switching to Kruskal-Wallis for three or more implementations.
 
 - **Pluggable statistics.** Swap in your own outlier detector (`IOutlierDetector`) or significance test (`ISignificanceTest`) when the built-in IQR/MAD trimming and rank-based tests don't fit your domain.
 
-- **Low-overhead execution.** The measurement loop is reflection-free. The engine uses typed delegates to avoid virtual dispatch and boxing during timing, ensuring the JIT optimizes your benchmark body just as it would in production.
+- **Low-overhead execution.** The measurement loop is reflection-free and uses typed delegates to avoid virtual dispatch and boxing during timing, so the JIT optimizes your benchmark body as it would in production.
 
-- **Async-native.** Measures the true duration of `Task` and `Task<T>` async work without sync-over-async wrappers.
+- **Async-native.** Measures the true duration of `Task` and `Task<T>` work without sync-over-async wrappers.
 
-- **Automated A/B comparisons.** `BenchmarkSuite` runs implementations side-by-side, calculates ratios, and flags whether differences are statistically significant.
-
-- **Pragmatic package structure.** The core `NBenchmark` package is zero-dependency. Opt-in to additional features like Spectre.Console tables, Dependency Injection, or test framework integration as needed.
-- **Compile-time analysis.** The optional `NBenchmark.Analyzers` package catches common benchmark authoring mistakes (dead code elimination, implicit order dependence, missing return values) as Roslyn diagnostics during build, before you ever run a measurement.
-
----
+- **Compile-time analysis.** The optional `NBenchmark.Analyzers` package catches common benchmark authoring mistakes - dead code elimination, implicit order dependence, missing return values - as Roslyn diagnostics during build, before you ever run a measurement.
 
 ## Installation
 
@@ -44,35 +41,31 @@ result.Print();
 dotnet add package NBenchmark
 ```
 
-### Optional Packages
+### Optional packages
 
 | Package | Purpose |
 |---|---|
-| `NBenchmark.Reporters.Console` | Rich terminal tables via Spectre.Console |
-| `NBenchmark.Analyzers` | Roslyn analyzers to catch common authoring mistakes |
+| `NBenchmark.Analyzers` | Roslyn analyzers that catch authoring mistakes at build time |
 | `NBenchmark.DependencyInjection` | Constructor injection for benchmark classes |
+| `NBenchmark.Reporters.Console` | Rich terminal tables via Spectre.Console |
 | `NBenchmark.Integration.xUnit` | Enforce performance thresholds as xUnit tests |
 | `NBenchmark.Integration.NUnit` | Enforce performance thresholds as NUnit tests |
 | `NBenchmark.Integration.MSTest` | Enforce performance thresholds as MSTest tests |
 
-## Usage Modes
+## Four modes, one engine
 
-### 1. Single Mode (Ad-hoc checks)
+### 1. Single mode
 
 The fastest way to get a reliable number.
 
 ```csharp
-// Sync or Async
-var result = await Benchmark.RunAsync(async () => await FetchDataAsync());
-
-// Returns the value - the runner consumes it to keep the body alive for the JIT
 var result = Benchmark.Run(() => int.Parse("12345"));
+Console.WriteLine($"P95: {result.GetPercentile(0.95)} ns, Alloc: {result.MeanAllocatedBytes} B");
 
-// Programmatic access to results
-Console.WriteLine($"P95: {result.P95} ns, Alloc: {result.MeanAllocatedBytes} B");
+var result = await Benchmark.RunAsync(async () => await FetchDataAsync());
 ```
 
-### 2. Suite Mode (Side-by-side comparison)
+### 2. Suite mode
 
 Compare multiple implementations with a fluent API.
 
@@ -85,11 +78,11 @@ var results = await new BenchmarkSuite("string concat")
     .RunAsync();
 ```
 
-The output includes a **Ratio** column and a **✓** signifier if the speed difference is statistically significant.
+The output includes a **Ratio** column and a **✓** in the **Sig** column when the speed difference is statistically significant.
 
-### 3. Harness Mode (Dedicated projects)
+### 3. Harness mode
 
-Attribute-based discovery with a full CLI, designed for dedicated benchmark projects.
+Attribute-based discovery with a CLI, for dedicated benchmark projects.
 
 ```csharp
 public class StringBenchmarks
@@ -101,7 +94,6 @@ public class StringBenchmarks
     public string Interpolate() => $"{"a"}{"b"}{"c"}";
 }
 
-// Program.cs
 await BenchmarkHarness.Create(args)
     .AddFromAssembly<StringBenchmarks>()
     .WithReporter(new ConsoleReporter())
@@ -114,16 +106,30 @@ dotnet run -- --dry-run                         # Validate wiring without runnin
 dotnet run -- --reporter json                   # Output results for CI/CD
 ```
 
-## Performance Gates (CI/CD)
+### 4. Global tool
 
-Enforce performance SLAs directly in your test suite. If a benchmark exceeds the threshold, the test fails.
+Install once, benchmark any assembly with `[Benchmark]` methods - no project needed.
 
-```csharp
-[PerformanceFact(MaxMeanNs = 500_000, MaxAllocatedBytes = 1024)]
-public void CriticalPath_ShouldBeFast() => ProcessOrder(testOrder);
+```bash
+dotnet tool install -g NBenchmark.Tool
+dotnet benchmark --project ./MyApp.Benchmarks
+dotnet benchmark --assembly ./bin/Release/net10.0/MyLib.dll
 ```
 
-Supports P95 latency, allocation limits, and **baseline regression checks** (comparing against a previously saved JSON result).
+All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--threshold-pct`, etc.).
+
+## Features
+
+- **Parameterized benchmarks.** Run the same body across multiple input values to see how an algorithm scales - `WithParameter` in Suite mode, `[BenchmarkCase]` in Harness mode. ([Suite](./docs/features/parameterized-suite.md) / [Harness](./docs/features/parameterized-harness.md))
+- **Categories.** Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from a run via CLI flags or the programmatic filter API. ([Categories](./docs/features/categories.md))
+- **Isolated runs.** Run benchmarks in freshly spawned child processes so JIT, GC, and thread-pool state from earlier work can't bias later measurements; isolated by default in Harness mode. ([Isolated runs](./docs/features/isolated-runs.md))
+- **Multi-runtime comparison.** Build and run the same benchmarks across net8, net9, and net10 in separate child processes and compare side-by-side. ([Multi-runtime](./docs/features/multi-runtime.md))
+- **Multiple launches.** Repeat each benchmark as independent launches to surface run-to-run variance and produce cross-launch aggregation stats. ([Multiple launches](./docs/features/multiple-launches.md))
+- **Environment control.** Pin CPU affinity, raise process priority, and detect noisy hosts to reduce measurement noise at its source. ([Environment control](./docs/features/environment-control.md))
+- **Performance gates in CI.** Enforce absolute or relative performance thresholds as xUnit, NUnit, or MSTest tests that fail on regression. ([Test integration](./docs/test-integration/index.md))
+- **CI regression gate.** Fail the harness run with a non-zero exit code when any benchmark regresses beyond a percentage against the baseline (`--threshold-pct`). ([CLI reference](./docs/reference/cli.md))
+- **Runtime diagnostics.** Record GC collection counts, heap state, exceptions, and CPU time per operation alongside timings. ([Diagnostics](./docs/statistics/diagnostics.md))
+- **Live telemetry.** Stream per-sample, per-phase, and per-detector events to an `IMeasurementObserver`, or export spans and metrics to OpenTelemetry via the built-in `System.Diagnostics` instrumentation. ([Observers](./docs/reference/observers.md) / [OTel](./docs/reference/bcl-instrumentation.md))
 
 ---
 
