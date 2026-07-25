@@ -552,6 +552,8 @@ Which sample set the order statistics - percentiles, `Min`, `Max`, and the histo
 | `TailMetricsBasis.Raw` | Full pre-trim distribution. Tail metrics describe the tail the outlier fence removed - so a GC pause the `Realistic` profile deliberately timed shows up in `Max`. **(default)** |
 | `TailMetricsBasis.Trimmed` | Inlier (post-trim) set. Tail metrics describe only the central process. |
 
+The resolved basis is recorded on the result (`BenchmarkResult.TailMetricsBasis`) so a consumer can label which sample set each statistic describes instead of inferring it. See [Descriptive statistics](../statistics/descriptive.md).
+
 Central-tendency and dispersion statistics (mean, standard deviation, CI, CV, skewness, kurtosis, MAD, median, median CI) always stay on the trimmed set regardless of this setting.
 
 CLI flag: `--tail-basis <raw|trimmed>`

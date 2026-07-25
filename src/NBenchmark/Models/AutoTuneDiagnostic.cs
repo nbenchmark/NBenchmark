@@ -119,8 +119,77 @@ public sealed record AutoTuneDiagnostic
     ///     boundaries. <c>0</c> for pinned warmup, and for auto-warmup that ended before its first
     ///     batch boundary. A large value next to a short warmup is the signature of a body measured
     ///     mid-tier-up.
+    ///     <para>
+    ///         Process-wide, not per-benchmark: in an in-process run the first benchmark to execute
+    ///         absorbs the bulk of startup compilation and later ones see almost none. Since benchmark
+    ///         order is randomised, this is also a large part of why the same benchmark's warmup cost
+    ///         differs from run to run.
+    ///     </para>
     /// </summary>
     public long WarmupJitCompiledMethods { get; init; }
+
+    /// <summary>
+    ///     Wall-clock time the JIT spent compiling during auto-warmup. Unlike
+    ///     <see cref="WarmupJitCompiledMethods" /> this is denominated in the same units as the
+    ///     benchmark itself, which makes it the honest answer to "what did tiered compilation cost
+    ///     here?". <see cref="TimeSpan.Zero" /> for pinned warmup.
+    /// </summary>
+    public TimeSpan WarmupJitCompilationTime { get; init; }
+
+    /// <summary>
+    ///     IL bytes the JIT compiled during auto-warmup. Distinguishes "a few large methods" from
+    ///     "many small ones" when reading <see cref="WarmupJitCompiledMethods" />.
+    /// </summary>
+    public long WarmupJitCompiledIlBytes { get; init; }
+
+    /// <summary>
+    ///     How far into warmup, in nanoseconds, the JIT compiled-method count last changed - or
+    ///     <c>0</c> when it never did. With the body under continuous load the last compilation is
+    ///     typically the promotion of its own hot path, which makes this the engine's closest
+    ///     approximation of a tier-up landing marker. Compare against
+    ///     <see cref="WarmupElapsedNs" /> to see how much quiet time followed.
+    /// </summary>
+    public double JitLastChangeAtNs { get; init; }
+
+    /// <summary>
+    ///     Total elapsed nanoseconds across every auto-warmup sample. The x-axis extent for
+    ///     <see cref="WarmupCurve" /> and the denominator for
+    ///     <see cref="AutoTuneOptions.MinWarmupTime" />.
+    /// </summary>
+    public double WarmupElapsedNs { get; init; }
+
+    /// <summary>
+    ///     Whether warmup ended with the JIT genuinely quiet - the configured
+    ///     <see cref="AutoTuneOptions.JitQuietPeriod" /> elapsed with no compilation - rather than the
+    ///     gate having been bypassed by its deactivation threshold. <c>false</c> means measurement may
+    ///     have started while compilation was still in flight.
+    /// </summary>
+    public bool JitQuiescenceAchieved { get; init; } = true;
+
+    /// <summary>
+    ///     The warmup curve: the mean per-op nanoseconds of each auto-warmup batch, oldest first.
+    ///     Empty for pinned warmup and for warmup that ended before its first batch boundary.
+    ///     <para>
+    ///         This is where tiered compilation is visible. The body starts in tier-0 or quick-jitted
+    ///         code, the runtime promotes it after the call-counting delay, dynamic PGO may instrument
+    ///         and re-optimise it, and each transition shows up as a step down in per-op time. Plotted
+    ///         against <see cref="WarmupSampleInterval" /> and marked with
+    ///         <see cref="JitLastChangeAtNs" />, it is the tier-up story for this benchmark.
+    ///     </para>
+    ///     <para>
+    ///         Batch means rather than raw samples: they are what the plateau rule already computes,
+    ///         and the averaging keeps a two-or-three-step decay from being buried in jitter. Bounded
+    ///         in length - long warmups are decimated by a doubling stride, so the shape survives at
+    ///         coarser resolution.
+    ///     </para>
+    /// </summary>
+    public IReadOnlyList<double> WarmupCurve { get; init; } = [];
+
+    /// <summary>
+    ///     Warmup samples between consecutive <see cref="WarmupCurve" /> points, so a caller can label
+    ///     a real iteration axis. <c>0</c> when the curve is empty.
+    /// </summary>
+    public int WarmupSampleInterval { get; init; }
 
     /// <summary>
     ///     How many times the drift gate discarded the collected samples and restarted measurement

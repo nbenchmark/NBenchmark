@@ -95,11 +95,30 @@ Each measured sample does the following:
 
 ### Raw vs. trimmed statistics
 
-The CI-width stop rule evaluates the **raw** (untrimmed) sample stream as it arrives. After the loop ends, the collected per-op samples pass through [outlier trimming](./outliers.md) and the reported statistics - including the Error column - are computed on the **trimmed** set. The two confidence intervals are close but need not be identical: the diagnostic's `AchievedRelativeCiWidth` reflects the raw stop value, while the reported interval reflects the trimmed result.
+The CI-width stop rule evaluates the **raw** (untrimmed) sample stream as it arrives. After the loop ends, the collected per-op samples pass through [outlier trimming](./outliers.md) and the reported statistics - including the Error column - are computed on the **trimmed** set. So the diagnostic's `AchievedRelativeCiWidth` reflects the raw stop value while the reported interval reflects the trimmed result.
+
+The two are usually close, but they can diverge by two orders of magnitude, and the direction is always the same: **the reported interval is the narrower one.** When a benchmark's variance lives almost entirely in the outliers, trimming removes it and the reported margin tightens around what remains — one sample body reported `MarginOfError` at ±1.3% of its mean next to an `AchievedRelativeCiWidth` of `1.05` (±105%) and a `MaxCeiling` stop. Neither number is wrong; they describe different sample sets. But a tight Error column is only trustworthy evidence that the *measurement converged* when `SampleStop` is `CiTargetMet`. Read the stop reason before the margin.
 
 ### What the loop decided
 
-Every measured result carries an `AutoTune` diagnostic (`BenchmarkResult.AutoTune`) recording the resolved K, warmup length, sample count, why each phase stopped, the achieved CI half-width, the wall-clock time spent tuning, the pre-flight jitter metric, and whether the outlier detector was auto-switched. Reporters surface it as an `auto-tuned: …` line (console, Markdown), dedicated columns (CSV advanced), or an `autoTune` object (JSON). It is `null` on dry-run and errored results.
+Every measured result carries an `AutoTune` diagnostic (`BenchmarkResult.AutoTune`) recording the resolved K, warmup length, sample count, why each phase stopped, the achieved CI half-width and its convergence trace, the wall-clock time spent tuning, the pre-flight jitter metric, whether the outlier detector was auto-switched, and the drift and restart counters. Reporters surface it as an `auto-tuned: …` line (console, Markdown), dedicated columns (CSV advanced), or an `autoTune` object (JSON). It is `null` on dry-run and errored results.
+
+It also records what warmup observed about tiered compilation - see [the warmup curve](#the-warmup-curve).
+
+### The warmup curve
+
+The [warmup gates](#phase-2---warmup-plateau-detection) decide *when* warmup may end. The diagnostic additionally retains what warmup *saw*, which is the only surviving record of the body tiering up: raw warmup timings are never persisted, and `RawSamples` covers the measurement phase only.
+
+- **`WarmupCurve`** - the mean per-op time of each warmup batch, oldest first. The plateau rule already computes a batch mean, so retaining them costs nothing, and the averaging keeps a two-or-three-step decay from being buried in per-sample jitter. Tier-0 → tier-1 promotion, and instrumented → optimized under dynamic PGO, each appear as a step down. **`WarmupSampleInterval`** gives the warmup iterations between consecutive points, so the array plots against a real iteration axis. Bounded at 512 points - a longer warmup is decimated by a doubling stride, keeping points evenly spaced and the shape intact at coarser resolution. Empty for a pinned `WarmupIterations`, which runs no plateau detection.
+- **`JitLastChangeAtNs`** - how far into warmup the compiled-method count last moved, with **`WarmupElapsedNs`** as the total extent. Under continuous load the final compilation is usually the promotion of the body's own hot path, which makes this the closest thing to a tier-up marker to draw on the curve. **`JitQuiescenceAchieved`** reports whether the quiet period genuinely elapsed rather than the gate being bypassed by its deactivation threshold.
+- **`WarmupJitCompiledMethods`**, **`WarmupJitCompilationTime`**, **`WarmupJitCompiledIlBytes`** - `System.Runtime.JitInfo` deltas across warmup, sampled at batch boundaries. Compilation *time* is the most directly useful: it is denominated in the same units as the benchmark, so it answers "what did tiering cost here?" rather than "how many methods were involved?".
+
+All three counters are **process-wide**, not per-benchmark. In an in-process run the first benchmark to execute absorbs the bulk of startup compilation and later ones see almost none - which is real, and since [benchmarks run in random order by default](../faq.md#can-i-run-benchmarks-in-source-order-instead-of-random-order) it is a significant part of why the same benchmark's warmup differs between runs. Use `--order declaration` (or `--seed` for a reproducible shuffle) if you need the JIT cost to fall in the same place every time.
+
+Two limits worth knowing:
+
+- **This is aggregate decay, not per-method tier attribution.** Naming individual methods and their tiers (`QuickJitted`, `OptimizedTier1`, OSR, instrumented) requires the runtime's `MethodLoadVerbose` events via EventPipe or an in-process `EventListener`, which NBenchmark does not collect.
+- **Ops-per-sample calibration runs before warmup** and already exercises the body, so some tier-up has typically happened before the first warmup batch is recorded. The curve shows what remains of tiering plus cache and branch-predictor warming, not the full cold-start cliff - expect a few percent for an already-fast body and several times for an allocation-heavy one.
 
 ## Measurement profiles
 

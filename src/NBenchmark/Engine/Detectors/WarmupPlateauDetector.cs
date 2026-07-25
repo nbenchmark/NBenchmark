@@ -17,6 +17,7 @@ internal sealed class WarmupPlateauDetector
     private readonly double _minWarmupTimeNs;
     private readonly int _patience;
     private readonly bool _requireJitQuiescence;
+    private readonly WarmupCurveRecorder _curve;
     private int _batchCount;
 
     private double _batchSum;
@@ -72,6 +73,8 @@ internal sealed class WarmupPlateauDetector
         // host that JITs unrelated code cannot hold warmup open forever. A zero floor leaves this at
         // zero, which disables the gate (WarmupGates treats a zero floor as off).
         _jitGateDeactivateNs = _minWarmupTimeNs * 4.0;
+
+        _curve = new WarmupCurveRecorder(_batchSize);
     }
 
     private static int ResolveBatchSize(int configured, double perSampleEstimateNs)
@@ -131,6 +134,37 @@ internal sealed class WarmupPlateauDetector
     public double LastBatchMeanPerOp { get; private set; }
 
     /// <summary>
+    ///     How far into warmup, in nanoseconds, the JIT compiled-method count last moved - or <c>0</c>
+    ///     when it never did. This is the closest thing the engine has to a tier-up landing marker:
+    ///     with the body under continuous load, the last compilation is typically the promotion of the
+    ///     hot path itself. Compare against <see cref="WarmupElapsedNs" /> to see how much quiet time
+    ///     followed it.
+    /// </summary>
+    public double JitLastChangeAtNs => _lastJitChangeAtNs;
+
+    /// <summary>Total warmup elapsed nanoseconds, summed across every warmup sample.</summary>
+    public double WarmupElapsedNs => _warmupElapsedNs;
+
+    /// <summary>
+    ///     Whether warmup ended with the JIT genuinely quiet - the configured quiet period elapsed with
+    ///     no compilation - as opposed to the gate having been bypassed by its deactivation threshold or
+    ///     never having been required. When this is <c>false</c> and the gate was required, measurement
+    ///     may have started while compilation was still in flight.
+    /// </summary>
+    public bool JitQuiescenceAchieved => !_requireJitQuiescence
+        || _minWarmupTimeNs <= 0
+        || _warmupElapsedNs - _lastJitChangeAtNs >= _jitQuietPeriodNs;
+
+    /// <summary>
+    ///     The warmup curve: one mean per-op reading per warmup batch, oldest first, decimated to a
+    ///     bounded length. Empty when no batch completed. See <see cref="WarmupCurveRecorder" />.
+    /// </summary>
+    public double[] Curve => _curve.ToArray();
+
+    /// <summary>Warmup samples between consecutive <see cref="Curve" /> points.</summary>
+    public int CurveSampleInterval => _curve.SampleInterval;
+
+    /// <summary>
     ///     Reports one warmup sample: its per-op nanoseconds (for the plateau rule), its raw elapsed
     ///     nanoseconds (for the <see cref="AutoTuneOptions.MinWarmupTime" /> floor), and the process
     ///     JIT compiled-method count read just after the sample (for the JIT-quiescence gate).
@@ -169,6 +203,10 @@ internal sealed class WarmupPlateauDetector
         _batchSum = 0;
         _batchCount = 0;
         LastBatchMeanPerOp = batchMean;
+
+        // Retain the batch mean as one point on the warmup curve. This is the only record of the
+        // tier-0 → tier-1 decay that survives the run: raw warmup timings are never persisted.
+        _curve.Add(batchMean);
 
         // Track *where in warmup* the compiled-method count last moved, rather than whether it moved
         // during this one batch - the gate needs a sustained quiet interval, see WarmupGates.CanSettle.

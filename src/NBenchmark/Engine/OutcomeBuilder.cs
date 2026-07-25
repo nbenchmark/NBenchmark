@@ -182,6 +182,7 @@ internal static class OutcomeBuilder
                 IsBaseline = isBaseline,
                 OutlierMode = options.OutlierMode,
                 OutlierDetector = options.ResolveOutlierDetector().Name,
+                TailMetricsBasis = options.TailMetricsBasis,
                 SignificanceTestName = options.ResolveSignificanceTest().Name,
                 SignificanceLevel = options.SignificanceLevel,
                 Profile = options.Profile,

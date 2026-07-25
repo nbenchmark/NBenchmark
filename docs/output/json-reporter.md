@@ -108,15 +108,32 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
       "measuredDuration": "00:00:00.040",
       "isBaseline": false,
       "outlierMode": "iqrFence",
+      "outlierDetector": "IQR fence (1.5×)",
+      "tailMetricsBasis": "raw",
       "autoTune": {
         "resolvedWarmup": 40,
         "resolvedSamples": 190,
         "opsPerSample": 1,
+        "initialOpsPerSample": null,
         "totalBodyInvocations": 230,
         "warmupStop": "settled",
         "sampleStop": "ciTargetMet",
         "achievedRelativeCiWidth": 0.0184,
-        "tuningWallClock": "00:00:00.050"
+        "tuningWallClock": "00:00:00.050",
+        "jitterMetric": 0.0271,
+        "outlierDetectorSwitched": false,
+        "ciWidthSeries": [0.212, 0.098, 0.041, 0.0184],
+        "warmupTimeFloorMet": true,
+        "warmupElapsedNs": 500049799.0,
+        "warmupCurve": [412.0, 350.1, 288.4, 276.9, 275.4],
+        "warmupSampleInterval": 8,
+        "warmupJitCompiledMethods": 133,
+        "warmupJitCompilationTime": "00:00:00.0205982",
+        "warmupJitCompiledIlBytes": 7404,
+        "jitLastChangeAtNs": 481309320.0,
+        "jitQuiescenceAchieved": true,
+        "measurementRestarts": 0,
+        "splitHalfDrift": 0.0042
       }
     }
   ]
@@ -127,7 +144,27 @@ All timing values are in **nanoseconds**. Property names use camelCase.
 
 Percentile values are now emitted in a `percentiles` array of `{ percentile, value }` objects (replacing the old `p95`/`p99` scalar properties). The set of reported percentiles is controlled by `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. When `EnableHistogram` is `true` (default), a `histogram` object with `min`, `max`, `sampleCount`, and `buckets` (array of `{ lower, upper, count }`) is also included.
 
-The `autoTune` object records what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) decided for this benchmark: the resolved warmup length (`resolvedWarmup`), measured-sample count (`resolvedSamples`), ops-per-sample K (`opsPerSample`), total body invocations, why each phase stopped (`warmupStop`, `sampleStop` - one of `settled` / `ciTargetMet` / `maxCeiling` / `explicitCount` / `wallClockCap`), the raw relative CI half-width achieved (`achievedRelativeCiWidth`), and the wall-clock tuning time. It is `null` on dry-run and errored results.
+### Which sample set each statistic describes
+
+The result carries **two populations**, and `tailMetricsBasis` says which basis the tail metrics used. Under the default `raw`, the order statistics — `min`, `max`, `percentiles` and `histogram` — describe the **full pre-trim** sample set, while `mean`, `median`, `standardDeviation`, `standardError`, `marginOfError`, `coefficientOfVariation`, the confidence intervals and `measuredIterations` always describe the **trimmed (inlier)** set. That is deliberate: the outlier fence removes exactly the slow tail P99/Max exist to describe (see [Descriptive statistics](../statistics/descriptive.md)). But it means the two groups are not directly comparable — a consumer that displays both should label which is which, and `outlierDetector` names the detector that drew the line.
+
+### The `autoTune` object
+
+`autoTune` records what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) decided for this benchmark. It is `null` on dry-run and errored results.
+
+| Group | Fields |
+|---|---|
+| **What it resolved** | `resolvedWarmup`, `resolvedSamples`, `opsPerSample`, `initialOpsPerSample` (the pre-recalibration cold K, or `null`), `totalBodyInvocations` |
+| **Why it stopped** | `warmupStop` (`settled` / `maxCeiling` / `explicitCount` / `wallClockCap`), `sampleStop` (adds `ciTargetMet` and `driftUnresolved`) |
+| **How well it converged** | `achievedRelativeCiWidth` (on the **raw** stream — see the caveat below), `ciWidthSeries` (the convergence trace, one entry per cadence check), `tuningWallClock` |
+| **Host and stability** | `jitterMetric`, `outlierDetectorSwitched`, `measurementRestarts`, `splitHalfDrift` |
+| **Warmup and tiered compilation** | `warmupTimeFloorMet`, `warmupElapsedNs`, `warmupCurve`, `warmupSampleInterval`, `warmupJitCompiledMethods`, `warmupJitCompilationTime`, `warmupJitCompiledIlBytes`, `jitLastChangeAtNs`, `jitQuiescenceAchieved` |
+
+> **`achievedRelativeCiWidth` and `marginOfError` measure different things.** The former is the CI half-width the loop achieved on the **raw** stream at its stop decision; the latter is recomputed on the **trimmed** set. When the outliers carry most of the variance the two diverge sharply — a benchmark can report `marginOfError` at ±1% of the mean next to an `achievedRelativeCiWidth` of `1.05`. That is not a contradiction, but treat the trimmed margin as optimistic whenever `sampleStop` is not `ciTargetMet`.
+
+`warmupCurve` is the mean per-op time of each warmup batch, oldest first — the shape of tiered compilation landing, since a body promoted from tier-0 to tier-1 (and re-optimized again under dynamic PGO) gets faster in steps. `warmupSampleInterval` gives the warmup iterations between consecutive points, so the array can be plotted against a real iteration axis. The array is bounded at 512 points: longer warmups are decimated by a doubling stride, keeping the points evenly spaced and the shape intact at coarser resolution. It is empty for pinned `warmupIterations` (which runs no plateau detection) and when `IncludeSamples` is off.
+
+`jitLastChangeAtNs` is how far into warmup the JIT last compiled anything. With the body under continuous load that is typically the promotion of its own hot path, which makes it the closest thing to a tier-up marker to draw on the curve; compare it against `warmupElapsedNs` to see how much quiet time followed. The three `warmupJit*` counters are process-wide `System.Runtime.JitInfo` deltas, so in an in-process run the first benchmark to execute absorbs most of the startup compilation and later ones see almost none — that is real, and since benchmark order is randomised it is a large part of why the same benchmark's warmup differs between runs.
 
 `totalDuration` is end-to-end wall-clock (warmup + pre-measure GC + measured loop); `measuredDuration` is the measured loop only. `measuredDuration <= totalDuration` always; the gap is dominated by warmup iterations and the pre-measure `GC.Collect`.
 

@@ -193,6 +193,21 @@ public record BenchmarkResult
     /// </summary>
     public string OutlierDetector { get; init; } = OutlierDetectors.IqrFence.Name;
 
+    /// <summary>
+    ///     Which sample set the order statistics on this result were computed from -
+    ///     <see cref="NBenchmark.TailMetricsBasis.Raw" /> (the full pre-trim distribution, the default) or
+    ///     <see cref="NBenchmark.TailMetricsBasis.Trimmed" />.
+    ///     <para>
+    ///         This matters for anything that displays these numbers. <see cref="Min" />,
+    ///         <see cref="Max" />, <see cref="Percentiles" /> and <see cref="Histogram" /> follow this
+    ///         basis, while <see cref="Mean" />, <see cref="Median" />,
+    ///         <see cref="StandardDeviation" />, the confidence intervals and <see cref="N" /> are
+    ///         always computed on the trimmed set. Under the default basis the two describe different
+    ///         populations and are not comparable - a consumer that shows both must say which is which.
+    ///     </para>
+    /// </summary>
+    public TailMetricsBasis TailMetricsBasis { get; init; } = TailMetricsBasis.Raw;
+
     /// <summary>The measurement profile under which this result was produced.</summary>
     public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
 

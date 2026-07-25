@@ -202,18 +202,18 @@ internal static class AdaptiveLoop
         int resolvedWarmup;
         WarmupStopReason warmupStop;
 
-        // Whether auto-warmup reached MinWarmupTime, and how much the JIT compiled while it ran. Both
-        // are captured on every exit path so the diagnostic and the stop warnings stay honest even when
-        // warmup was cut short. Pinned and calibration-capped warmup have no floor to meet, so they
-        // report the floor as met and no JIT delta.
-        var warmupTimeFloorMet = true;
-        long warmupJitCompiled = 0;
+        // What the warmup phase observed: whether it reached MinWarmupTime, what the JIT did while it
+        // ran, and the batch-mean curve that shows tiered compilation landing. Captured on every exit
+        // path so the diagnostic and the stop warnings stay honest even when warmup was cut short.
+        // Pinned and calibration-capped warmup run no plateau detection, so they report no JIT signal
+        // and no curve.
+        var warmup = WarmupOutcome.None(timeFloorMet: true);
 
         if (calibrationCapped)
         {
             resolvedWarmup = calibrationSamples;
             warmupStop = WarmupStopReason.WallClockCap;
-            warmupTimeFloorMet = false;
+            warmup = WarmupOutcome.None(timeFloorMet: false);
         }
         else if (o.WarmupIterations is { } explicitWarmup)
         {
@@ -246,6 +246,8 @@ internal static class AdaptiveLoop
             var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
 
             var warmupSamplesFed = 0;
+            JitCounters? jitBaseline = null;
+            JitCounters jitLatest = default;
 
             while (true)
             {
@@ -275,9 +277,17 @@ internal static class AdaptiveLoop
                 // JIT activity, perturbing the very signal it reports.
                 warmupSamplesFed++;
 
-                var jitCompiledCount = warmupSamplesFed % detector.EffectiveBatchSize == 0
-                    ? System.Runtime.JitInfo.GetCompiledMethodCount()
-                    : -1L;
+                // At a batch boundary, snapshot all three JIT counters together: the method count
+                // feeds the quiescence gate, while compilation time and IL bytes are reported as
+                // warmup deltas (the first snapshot is the baseline).
+                var jitCompiledCount = -1L;
+                if (warmupSamplesFed % detector.EffectiveBatchSize == 0)
+                {
+                    var counters = JitCounters.Read();
+                    jitBaseline ??= counters;
+                    jitLatest = counters;
+                    jitCompiledCount = counters.CompiledMethods;
+                }
 
                 if (detector.Feed(elapsed / k, elapsed, jitCompiledCount))
                 {
@@ -293,8 +303,18 @@ internal static class AdaptiveLoop
             }
 
             resolvedWarmup = detector.Count;
-            warmupTimeFloorMet = detector.TimeFloorMet;
-            warmupJitCompiled = detector.JitCompiledDelta;
+
+            var jitDelta = jitBaseline is { } baseline ? jitLatest.Since(baseline) : default;
+            warmup = new WarmupOutcome(
+                TimeFloorMet: detector.TimeFloorMet,
+                JitCompiledMethods: detector.JitCompiledDelta,
+                JitCompilationTime: jitDelta.CompilationTime,
+                JitCompiledIlBytes: jitDelta.CompiledIlBytes,
+                JitLastChangeAtNs: detector.JitLastChangeAtNs,
+                ElapsedNs: detector.WarmupElapsedNs,
+                JitQuiescenceAchieved: detector.JitQuiescenceAchieved,
+                Curve: detector.Curve,
+                CurveSampleInterval: detector.CurveSampleInterval);
 
             // Post-warmup K recalibration: cold calibration (Phase A) resolved K against the body's
             // pre-warmup speed; the warm body may run several times faster, leaving each sample well
@@ -568,8 +588,7 @@ internal static class AdaptiveLoop
             autoTune.WarmupBudgetFraction,
             initialOpsPerSample,
             ciWidthSeries: ci?.HalfWidthSeries ?? [],
-            warmupTimeFloorMet: warmupTimeFloorMet,
-            warmupJitCompiled: warmupJitCompiled,
+            warmup: warmup,
             measurementRestarts: restarts,
             // Computed unconditionally, not only on the drift-gate path, so drift stays visible on
             // pinned-count, wall-clock-cap, and ceiling stops - none of which consult the gate.
@@ -741,18 +760,18 @@ internal static class AdaptiveLoop
         int resolvedWarmup;
         WarmupStopReason warmupStop;
 
-        // Whether auto-warmup reached MinWarmupTime, and how much the JIT compiled while it ran. Both
-        // are captured on every exit path so the diagnostic and the stop warnings stay honest even when
-        // warmup was cut short. Pinned and calibration-capped warmup have no floor to meet, so they
-        // report the floor as met and no JIT delta.
-        var warmupTimeFloorMet = true;
-        long warmupJitCompiled = 0;
+        // What the warmup phase observed: whether it reached MinWarmupTime, what the JIT did while it
+        // ran, and the batch-mean curve that shows tiered compilation landing. Captured on every exit
+        // path so the diagnostic and the stop warnings stay honest even when warmup was cut short.
+        // Pinned and calibration-capped warmup run no plateau detection, so they report no JIT signal
+        // and no curve.
+        var warmup = WarmupOutcome.None(timeFloorMet: true);
 
         if (calibrationCapped)
         {
             resolvedWarmup = calibrationSamples;
             warmupStop = WarmupStopReason.WallClockCap;
-            warmupTimeFloorMet = false;
+            warmup = WarmupOutcome.None(timeFloorMet: false);
         }
         else if (o.WarmupIterations is { } explicitWarmup)
         {
@@ -785,6 +804,8 @@ internal static class AdaptiveLoop
             var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
 
             var warmupSamplesFed = 0;
+            JitCounters? jitBaseline = null;
+            JitCounters jitLatest = default;
 
             while (true)
             {
@@ -814,9 +835,17 @@ internal static class AdaptiveLoop
                 // JIT activity, perturbing the very signal it reports.
                 warmupSamplesFed++;
 
-                var jitCompiledCount = warmupSamplesFed % detector.EffectiveBatchSize == 0
-                    ? System.Runtime.JitInfo.GetCompiledMethodCount()
-                    : -1L;
+                // At a batch boundary, snapshot all three JIT counters together: the method count
+                // feeds the quiescence gate, while compilation time and IL bytes are reported as
+                // warmup deltas (the first snapshot is the baseline).
+                var jitCompiledCount = -1L;
+                if (warmupSamplesFed % detector.EffectiveBatchSize == 0)
+                {
+                    var counters = JitCounters.Read();
+                    jitBaseline ??= counters;
+                    jitLatest = counters;
+                    jitCompiledCount = counters.CompiledMethods;
+                }
 
                 if (detector.Feed(elapsed / k, elapsed, jitCompiledCount))
                 {
@@ -832,8 +861,18 @@ internal static class AdaptiveLoop
             }
 
             resolvedWarmup = detector.Count;
-            warmupTimeFloorMet = detector.TimeFloorMet;
-            warmupJitCompiled = detector.JitCompiledDelta;
+
+            var jitDelta = jitBaseline is { } baseline ? jitLatest.Since(baseline) : default;
+            warmup = new WarmupOutcome(
+                TimeFloorMet: detector.TimeFloorMet,
+                JitCompiledMethods: detector.JitCompiledDelta,
+                JitCompilationTime: jitDelta.CompilationTime,
+                JitCompiledIlBytes: jitDelta.CompiledIlBytes,
+                JitLastChangeAtNs: detector.JitLastChangeAtNs,
+                ElapsedNs: detector.WarmupElapsedNs,
+                JitQuiescenceAchieved: detector.JitQuiescenceAchieved,
+                Curve: detector.Curve,
+                CurveSampleInterval: detector.CurveSampleInterval);
 
             // Post-warmup K recalibration: cold calibration (Phase A) resolved K against the body's
             // pre-warmup speed; the warm body may run several times faster, leaving each sample well
@@ -1110,8 +1149,7 @@ internal static class AdaptiveLoop
             autoTune.WarmupBudgetFraction,
             initialOpsPerSample,
             ciWidthSeries: ci?.HalfWidthSeries ?? [],
-            warmupTimeFloorMet: warmupTimeFloorMet,
-            warmupJitCompiled: warmupJitCompiled,
+            warmup: warmup,
             measurementRestarts: restarts,
             // Computed unconditionally, not only on the drift-gate path, so drift stays visible on
             // pinned-count, wall-clock-cap, and ceiling stops - none of which consult the gate.
@@ -1156,8 +1194,7 @@ internal static class AdaptiveLoop
         double warmupBudgetFraction,
         int? initialOpsPerSample,
         IReadOnlyList<double> ciWidthSeries,
-        bool warmupTimeFloorMet,
-        long warmupJitCompiled,
+        WarmupOutcome warmup,
         int measurementRestarts,
         double splitHalfDrift,
         double coefficientOfVariation,
@@ -1184,8 +1221,15 @@ internal static class AdaptiveLoop
             JitterMetric = jitterMetric,
             OutlierDetectorSwitched = detectorSwitched,
             CiWidthSeries = ciWidthSeries,
-            WarmupTimeFloorMet = warmupTimeFloorMet,
-            WarmupJitCompiledMethods = warmupJitCompiled,
+            WarmupTimeFloorMet = warmup.TimeFloorMet,
+            WarmupJitCompiledMethods = warmup.JitCompiledMethods,
+            WarmupJitCompilationTime = warmup.JitCompilationTime,
+            WarmupJitCompiledIlBytes = warmup.JitCompiledIlBytes,
+            JitLastChangeAtNs = warmup.JitLastChangeAtNs,
+            WarmupElapsedNs = warmup.ElapsedNs,
+            JitQuiescenceAchieved = warmup.JitQuiescenceAchieved,
+            WarmupCurve = warmup.Curve,
+            WarmupSampleInterval = warmup.CurveSampleInterval,
             MeasurementRestarts = measurementRestarts,
             SplitHalfDrift = splitHalfDrift,
         };
@@ -1193,7 +1237,7 @@ internal static class AdaptiveLoop
         var warnings = BuildStopWarnings(
             warmupStop, sampleStop, calibrationCapped, maxTuningTime,
             achievedCi, ciTarget, maxSamples, sampleCount, explicitSamples, capGraceFactor,
-            warmupBudgetFraction, warmupTimeFloorMet, measurementRestarts, splitHalfDrift,
+            warmupBudgetFraction, warmup.TimeFloorMet, measurementRestarts, splitHalfDrift,
             coefficientOfVariation, hasIterationHooks, resolvedWarmup);
 
         if (detectorSwitched)

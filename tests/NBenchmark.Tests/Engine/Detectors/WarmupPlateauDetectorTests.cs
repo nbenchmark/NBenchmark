@@ -376,6 +376,101 @@ public class WarmupPlateauDetectorTests
         Assert.Equal(250.0, detector.LastBatchMeanPerOp);
     }
 
+    // ── Warmup curve and JIT-tier signals ──
+
+    [Fact]
+    public void Curve_Records_One_Point_Per_Completed_Batch()
+    {
+        var options = PlateauOnly with { BatchSize = 4, PlateauPatience = 2, MinWarmup = 1 };
+        var detector = new WarmupPlateauDetector(options);
+
+        // No batch has completed yet, so there is nothing to plot.
+        Assert.Empty(detector.Curve);
+
+        var resolvedAt = FeedUntilResolved(detector, perOp: 250.0, elapsedNs: 250.0, jit: _ => 0, cap: 1_000);
+
+        Assert.Equal(resolvedAt / 4, detector.Curve.Length);
+        Assert.All(detector.Curve, v => Assert.Equal(250.0, v));
+        Assert.Equal(4, detector.CurveSampleInterval);
+    }
+
+    [Fact]
+    public void Curve_Captures_The_Tier_Up_Decay()
+    {
+        // The point of retaining the curve: a body that starts slow in tier-0 code and speeds up as
+        // the JIT promotes it must show that drop, otherwise there is nothing to visualise.
+        var options = PlateauOnly with { BatchSize = 4, PlateauPatience = 3, MinWarmup = 1 };
+        var detector = new WarmupPlateauDetector(options);
+
+        for (var i = 1; i <= 1_000; i++)
+        {
+            // 1000 ns in tier-0 for the first batch, then 100 ns once promoted. The promotion has to
+            // land within the first batch or two for the curve to record it: the plateau rule would
+            // otherwise settle during the flat tier-0 stretch and warmup would end before the
+            // speed-up was ever observed — precisely the "measured mid-tier-up" case the JIT
+            // quiescence gate and MinWarmupTime floor exist to prevent.
+            var perOp = i <= 4 ? 1000.0 : 100.0;
+            if (detector.Feed(perOp, perOp, 0))
+                break;
+        }
+
+        var curve = detector.Curve;
+        Assert.True(curve.Length >= 2);
+        Assert.Equal(1000.0, curve[0]);
+        Assert.Equal(100.0, curve[^1]);
+    }
+
+    [Fact]
+    public void JitLastChangeAtNs_Marks_Where_Compilation_Stopped()
+    {
+        // This is the closest thing to a tier-up landing marker: the point in warmup after which the
+        // JIT compiled nothing more.
+        var options = PlateauOnly with { BatchSize = 1, PlateauPatience = 100, MinWarmup = 1 };
+        var detector = new WarmupPlateauDetector(options);
+
+        // Count climbs for the first 5 batches, then holds. Batch 1 sets the baseline, so the last
+        // observed change is at batch 5 — 5 x 100 ns of accumulated warmup.
+        for (var i = 1; i <= 10; i++)
+            detector.Feed(100.0, 100.0, i <= 5 ? i : 5);
+
+        Assert.Equal(500.0, detector.JitLastChangeAtNs);
+        Assert.Equal(1000.0, detector.WarmupElapsedNs);
+        // Baseline captured at batch 1 (count 1), last count 5.
+        Assert.Equal(4, detector.JitCompiledDelta);
+    }
+
+    [Fact]
+    public void JitQuiescenceAchieved_Is_False_When_Compilation_Ran_To_The_End()
+    {
+        // MinWarmupTime non-zero and quiescence required, so the gate is live. The compiled-method
+        // count changes on the final batch, meaning measurement would start with compilation still
+        // in flight.
+        var options = AutoTuneOptions.Default with
+        {
+            MinWarmupTime = TimeSpan.FromTicks(10_000), // 1 ms
+            RequireJitQuiescence = true,
+            BatchSize = 1,
+            PlateauPatience = 100,
+            MinWarmup = 1,
+        };
+        var detector = new WarmupPlateauDetector(options);
+
+        for (var i = 1; i <= 10; i++)
+            detector.Feed(100.0, 100.0, i);
+
+        Assert.False(detector.JitQuiescenceAchieved);
+    }
+
+    [Fact]
+    public void JitQuiescenceAchieved_Is_True_When_The_Gate_Is_Not_Required()
+    {
+        var detector = new WarmupPlateauDetector(PlateauOnly);
+
+        FeedUntilResolved(detector, perOp: 100.0, elapsedNs: 100.0, jit: i => i, cap: 1_000);
+
+        Assert.True(detector.JitQuiescenceAchieved);
+    }
+
     private static int FeedConstantUntilResolved(WarmupPlateauDetector detector, double value, int cap)
         => FeedUntilResolved(detector, value, value, _ => 0, cap);
 
