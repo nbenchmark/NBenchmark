@@ -477,6 +477,13 @@ public sealed record BenchmarkTable
     ///     (e.g. <c>auto-tuned: 240 samples × 64 ops, warmup 40, CI ±1.8%</c>). When the pre-flight
     ///     jitter probe ran, appends a jitter clause (e.g. <c>, jitter 0.04</c>); when the outlier
     ///     detector was auto-switched, appends a switch clause (e.g. <c>, detector→MAD</c>).
+    ///     <para>
+    ///         Also surfaces the steady-state signals when they are notable: <c>, drift 2.2%</c> once
+    ///         the split-half gap is at all appreciable, <c>, restarts 1</c> when the drift gate
+    ///         resampled, and <c>, warmup cut short</c> when auto-warmup never reached its time floor.
+    ///         A tight CI sitting next to any of those is the visible signal that the number is precise
+    ///         but not reproducible - which is exactly what a bare CI figure hides.
+    ///     </para>
     /// </summary>
     public static string FormatAutoTuneSummary(AutoTuneDiagnostic diagnostic)
     {
@@ -488,6 +495,17 @@ public sealed record BenchmarkTable
 
         if (diagnostic.OutlierDetectorSwitched)
             summary += ", detector→MAD";
+
+        // Half the default drift tolerance: below that the gap is ordinary noise and reporting it would
+        // be clutter on every row.
+        if (diagnostic.SplitHalfDrift > 0.05)
+            summary += $", drift {diagnostic.SplitHalfDrift * 100:F1}%";
+
+        if (diagnostic.MeasurementRestarts > 0)
+            summary += $", restarts {diagnostic.MeasurementRestarts}";
+
+        if (!diagnostic.WarmupTimeFloorMet)
+            summary += ", warmup cut short";
 
         return summary;
     }

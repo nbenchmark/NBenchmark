@@ -92,8 +92,8 @@ internal sealed record CliArgs
     public double? CapGraceFactor { get; init; }
 
     /// <summary>
-    ///     The minimum wall-clock time auto-warmup must run before it may settle. <c>null</c> uses
-    ///     the <see cref="AutoTuneOptions" /> default (100 ms). Parsed from a millisecond value.
+    ///     The minimum in-body time auto-warmup must run before it may settle. <c>null</c> uses
+    ///     the <see cref="AutoTuneOptions" /> default (250 ms). Parsed from a millisecond value.
     /// </summary>
     public TimeSpan? MinWarmupTime { get; init; }
 
@@ -103,6 +103,34 @@ internal sealed record CliArgs
     ///     still applies.
     /// </summary>
     public bool NoJitQuiescence { get; init; }
+
+    /// <summary>
+    ///     How long the JIT compiled-method count must stay unchanged before the quiescence gate lets
+    ///     warmup settle. <c>null</c> uses the <see cref="AutoTuneOptions" /> default (50 ms). Parsed
+    ///     from a millisecond value; <c>0</c> disables the gate.
+    /// </summary>
+    public TimeSpan? JitQuietPeriod { get; init; }
+
+    /// <summary>
+    ///     The minimum in-body time the measurement phase must span before it may stop on the CI
+    ///     target. <c>null</c> uses the <see cref="AutoTuneOptions" /> default (100 ms). Parsed from a
+    ///     millisecond value; <c>0</c> disables the floor.
+    /// </summary>
+    public TimeSpan? MinMeasurementTime { get; init; }
+
+    /// <summary>
+    ///     How far the first and second halves of the measured samples may disagree before the loop
+    ///     refuses to stop on the CI target. <c>null</c> uses the <see cref="AutoTuneOptions" /> default
+    ///     (0.1); <c>0</c> disables the gate.
+    /// </summary>
+    public double? DriftTolerance { get; init; }
+
+    /// <summary>
+    ///     How many times the drift gate may discard the collected samples and restart measurement.
+    ///     <c>null</c> uses the <see cref="AutoTuneOptions" /> default (2); <c>0</c> reports
+    ///     <see cref="SampleStopReason.DriftUnresolved" /> on the first detected drift instead.
+    /// </summary>
+    public int? MaxDriftRestarts { get; init; }
 
     /// <summary>Number of separate launches for each benchmark (1 = default, single-run behavior).</summary>
     public int? LaunchCount { get; init; }
@@ -216,6 +244,10 @@ internal sealed record CliArgs
         double? capGraceFactor = null;
         TimeSpan? minWarmupTime = null;
         var noJitQuiescence = false;
+        TimeSpan? jitQuietPeriod = null;
+        TimeSpan? minMeasurementTime = null;
+        double? driftTolerance = null;
+        int? maxDriftRestarts = null;
         int? launchCount = null;
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
@@ -444,18 +476,20 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --max-samples value '{args[i]}'. Must be 1–{MeasurementOptions.MaxIterations}.");
 
                     break;
+                // The auto-warmup bounds use MaxAutoWarmupIterations, not the tighter pinned-warmup
+                // limit: a fast body needs tens of thousands of samples to reach MinWarmupTime.
                 case "--min-warmup" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var minw) && minw >= 0 && minw <= MeasurementOptions.MaxWarmupIterations)
+                    if (int.TryParse(args[++i], out var minw) && minw >= 0 && minw <= MeasurementOptions.MaxAutoWarmupIterations)
                         minWarmup = minw;
                     else
-                        errors.Add($"Invalid --min-warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupIterations}.");
+                        errors.Add($"Invalid --min-warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxAutoWarmupIterations}.");
 
                     break;
                 case "--max-warmup" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var maxw) && maxw >= 1 && maxw <= MeasurementOptions.MaxWarmupIterations)
+                    if (int.TryParse(args[++i], out var maxw) && maxw >= 1 && maxw <= MeasurementOptions.MaxAutoWarmupIterations)
                         maxWarmup = maxw;
                     else
-                        errors.Add($"Invalid --max-warmup value '{args[i]}'. Must be 1–{MeasurementOptions.MaxWarmupIterations}.");
+                        errors.Add($"Invalid --max-warmup value '{args[i]}'. Must be 1–{MeasurementOptions.MaxAutoWarmupIterations}.");
 
                     break;
                 case "--max-tuning-time" when i + 1 < args.Length:
@@ -499,6 +533,34 @@ internal sealed record CliArgs
                     break;
                 case "--no-jit-quiescence":
                     noJitQuiescence = true;
+                    break;
+                case "--jit-quiet-period" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var jqp) && jqp >= 0)
+                        jitQuietPeriod = TimeSpan.FromMilliseconds(jqp);
+                    else
+                        errors.Add($"Invalid --jit-quiet-period value '{args[i]}'. Must be a non-negative number of milliseconds (0 disables the gate).");
+
+                    break;
+                case "--min-measurement-time" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var mmt) && mmt >= 0)
+                        minMeasurementTime = TimeSpan.FromMilliseconds(mmt);
+                    else
+                        errors.Add($"Invalid --min-measurement-time value '{args[i]}'. Must be a non-negative number of milliseconds (0 disables the floor).");
+
+                    break;
+                case "--drift-tolerance" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var dt) && dt is >= 0 and <= 1)
+                        driftTolerance = dt;
+                    else
+                        errors.Add($"Invalid --drift-tolerance value '{args[i]}'. Must be a fraction in [0, 1] (e.g. 0.1; 0 disables the gate).");
+
+                    break;
+                case "--max-drift-restarts" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var mdr) && mdr >= 0)
+                        maxDriftRestarts = mdr;
+                    else
+                        errors.Add($"Invalid --max-drift-restarts value '{args[i]}'. Must be zero or a positive integer.");
+
                     break;
                 case "--launch-count" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var lc) && lc >= 1 && lc <= MeasurementOptions.MaxLaunchCount)
@@ -597,6 +659,8 @@ internal sealed record CliArgs
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
                     or "--warmup-budget-fraction" or "--cap-grace-factor" or "--min-warmup-time"
+                    or "--jit-quiet-period" or "--min-measurement-time" or "--drift-tolerance"
+                    or "--max-drift-restarts"
                     or "--launch-count" or "--percentiles" or "--runtimes" or "--min-practical-effect"
                     or "--cpu-affinity" or "--priority" or "--otlp-endpoint":
                     errors.Add($"Missing value for '{args[i]}'.");
@@ -649,6 +713,10 @@ internal sealed record CliArgs
             CapGraceFactor = capGraceFactor,
             MinWarmupTime = minWarmupTime,
             NoJitQuiescence = noJitQuiescence,
+            JitQuietPeriod = jitQuietPeriod,
+            MinMeasurementTime = minMeasurementTime,
+            DriftTolerance = driftTolerance,
+            MaxDriftRestarts = maxDriftRestarts,
             LaunchCount = launchCount,
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
@@ -810,15 +878,19 @@ internal sealed record CliArgs
         Console.WriteLine("  --ops-per-sample <n>   Pin ops-per-sample K (default: auto-calibrated)");
         Console.WriteLine("  --ci-target <0-1>      Target relative CI half-width for auto sampling (default: 0.025)");
         Console.WriteLine("  --min-samples <n>      Minimum measured samples in auto mode (default: 30)");
-        Console.WriteLine("  --max-samples <n>      Maximum measured samples in auto mode (default: 100000)");
+        Console.WriteLine("  --max-samples <n>      Maximum measured samples in auto mode (default: 5000)");
         Console.WriteLine("  --min-warmup <n>       Minimum warmup samples in auto mode (default: 8)");
-        Console.WriteLine("  --max-warmup <n>       Maximum warmup samples in auto mode (default: 10000)");
+        Console.WriteLine("  --max-warmup <n>       Maximum warmup samples in auto mode (default: 100000)");
         Console.WriteLine("  --max-tuning-time <s>  Wall-clock cap per benchmark, in seconds (default: 20)");
         Console.WriteLine("  --autotune-cap-behavior <mode>  Cap handling: warn (default) or error");
         Console.WriteLine("  --warmup-budget-fraction <0-1>  Max share of --max-tuning-time for calibration + warmup (default: 0.4)");
         Console.WriteLine("  --cap-grace-factor <n>  Multiplier on --max-tuning-time the measurement phase may reach while chasing --min-samples (default: 1.5)");
-        Console.WriteLine("  --min-warmup-time <ms>  Minimum wall-clock warmup time before auto-warmup may settle, in ms (default: 100; 0 disables)");
+        Console.WriteLine("  --min-warmup-time <ms>  Minimum warmup time before auto-warmup may settle, in ms (default: 250; 0 disables)");
         Console.WriteLine("  --no-jit-quiescence     Disable the JIT-quiescence warmup gate (keep only the time floor)");
+        Console.WriteLine("  --jit-quiet-period <ms>  How long the JIT must stay quiet before auto-warmup may settle, in ms (default: 50; 0 disables the gate)");
+        Console.WriteLine("  --min-measurement-time <ms>  Minimum measurement time before the CI target may stop sampling, in ms (default: 100; 0 disables)");
+        Console.WriteLine("  --drift-tolerance <0-1>  Max first-half/second-half disagreement before the CI stop is refused (default: 0.1; 0 disables)");
+        Console.WriteLine("  --max-drift-restarts <n>  How many times drift may discard samples and restart measurement (default: 2)");
         Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (harness default: 3)");
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");

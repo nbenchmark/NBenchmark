@@ -355,23 +355,29 @@ AutoTune = AutoTuneOptions.Default   // default
 
 Bounds and steers the adaptive measurement loop - the warmup plateau rule, the CI-width sample-count rule, and ops-per-sample calibration. Three named presets trade measurement time for precision:
 
-| Preset | MinWarmup | MinSamples | CiTarget | Use it for |
-|---|---|---|---|---|
-| `AutoTuneOptions.Quick` | 4 | 15 | 0.05 (±5%) | Fast inner-loop feedback. |
-| `AutoTuneOptions.Default` | 8 | 30 | 0.025 (±2.5%) | The balanced default. |
-| `AutoTuneOptions.Thorough` | 16 | 100 | 0.01 (±1%) | Publication-grade numbers. |
+| Preset | MinWarmup | MinSamples | MaxSamples | CiTarget | MinWarmupTime | MinMeasurementTime | Use it for |
+|---|---|---|---|---|---|---|---|
+| `AutoTuneOptions.Quick` | 4 | 15 | 2 000 | 0.05 (±5%) | **500 ms** | 50 ms | Fast inner-loop feedback. |
+| `AutoTuneOptions.Default` | 8 | 30 | 5 000 | 0.025 (±2.5%) | 500 ms | 100 ms | The balanced default. |
+| `AutoTuneOptions.Thorough` | 16 | 100 | 20 000 | 0.01 (±1%) | 1 s | 500 ms | Publication-grade numbers. |
+
+> `Quick` deliberately does **not** shorten `MinWarmupTime`. That floor is a measurement-correctness requirement, not a speed/accuracy trade-off: too short a warmup does not give you a rougher number, it gives you a confidently wrong one — a body measured on tier-0 code can report a median several times off with a ±1% error bar, and it will not reproduce between runs. `Quick` gets its speed from `CiTarget`, `MinSamples`, and `MaxTuningTime`.
 
 Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `--auto-tune thorough` on the CLI, or build your own `AutoTuneOptions` record. The individual knobs:
 
 | Knob | Default | Meaning |
 |---|---|---|
-| `MinWarmup` / `MaxWarmup` | `8` / `10 000` | Floor and ceiling for auto-detected warmup length. |
+| `MinWarmup` / `MaxWarmup` | `8` / `100 000` | Floor and ceiling for auto-detected warmup length, as sample counts. `MaxWarmup` is deliberately far above what any body needs so that the *time* bounds bind instead: a fast body needs ~25 000 samples to accumulate `MinWarmupTime` at the 10 µs sample target, and a count ceiling binding first would silently defeat that floor. (The tighter `10 000` limit still applies to a *pinned* `WarmupIterations`.) |
 | `WarmupEpsilon` | `0.02` | Minimum relative improvement a warmup batch must show to count as "still warming up". |
 | `PlateauPatience` | `3` | Consecutive non-improving batches that end warmup. |
-| `MinWarmupTime` | `100 ms` | Minimum wall-clock time auto-warmup must run before it may settle, so background tiered JIT (tier-0 → tier-1 → dynamic PGO) can land before measurement rather than mid-run. Bounded above by the calibration+warmup budget share and `MaxWarmup`. `0` disables the floor (and the JIT-quiescence gate). `Quick` preset uses 25 ms. |
-| `RequireJitQuiescence` | `true` | Whether auto-warmup also refuses to settle while the JIT is still compiling methods (a proxy for in-flight tier-1 promotion), read from `System.Runtime.JitInfo` at each batch boundary. Deactivates once warmup has run 4 × `MinWarmupTime` so a busy in-process host cannot block warmup forever; inactive when `MinWarmupTime = 0`. |
-| `MinSamples` / `MaxSamples` | `30` / `100 000` | Floor and ceiling for the auto-resolved measured-sample count. |
+| `MinWarmupTime` | `500 ms` | Minimum in-body time auto-warmup must accumulate before it may settle, so background tiered JIT (tier-0 → tier-1 → dynamic PGO) lands before measurement rather than mid-run. 5× the runtime's `TieredCompilation.CallCountingDelayMs` (100 ms) — that delay restarts while tier-0 methods are still being first-called and tier-1 is only *queued* when it expires, so a floor at or below 100 ms reliably lands the tier-up inside measurement. In practice this is the binding constraint on warmup length for almost every body. Bounded above by the calibration+warmup budget share and `MaxWarmup`. `0` disables the floor (and the JIT-quiescence gate). `Thorough` uses 1 s; `Quick` inherits 500 ms. Chosen empirically: at 250 ms a `StringBuilder`-append loop still landed in either its tier-0 or its ~4.5× faster steady state depending on the run (4.8× run-to-run spread); 500 ms cost 55% more wall-clock and made it consistent, while 1 s cost a further 76% for one more benchmark. |
+| `RequireJitQuiescence` | `true` | Whether auto-warmup also refuses to settle until the JIT has been quiet for `JitQuietPeriod`, read from `System.Runtime.JitInfo` at each batch boundary. Deactivates once warmup has run 4 × `MinWarmupTime` so a busy in-process host cannot block warmup forever; inactive when `MinWarmupTime = 0`. |
+| `JitQuietPeriod` | `50 ms` | How long the JIT compiled-method count must stay unchanged before the quiescence gate opens. A *sustained* interval is required because a per-batch check cannot work: one batch of a fast body spans tens of microseconds, so a background compilation almost never lands inside it and a per-batch delta reads zero essentially always. Clamped down to `MinWarmupTime` so it never becomes the binding floor. `0` disables the gate. `Thorough` uses 100 ms. |
+| `MinSamples` / `MaxSamples` | `30` / `5 000` | Floor and ceiling for the auto-resolved measured-sample count. `MinSamples` is the *validity* floor (below it the interval is untrustworthy however narrow) and is also what the `CapGraceFactor` grace budget chases. `MaxSamples` was formerly 100 000: at 5 000 the CI rule still reaches ±2.5% for a coefficient of variation up to ~90%, and past that the required count grows as `(t × CV / target)²` and runs away — a CV of 580% needs ~50 000 samples for ±5% — where the variance *is* the finding rather than something more samples fix. |
 | `CiTarget` | `0.025` | Target relative half-width of the confidence interval; sampling stops once it is met. |
+| `MinMeasurementTime` | `100 ms` | Minimum in-body time the measurement phase must span before it may stop on the CI target — the measurement analogue of `MinWarmupTime`, and what makes the sample count scale with body speed instead of being a flat number. A cheap body collects hundreds or thousands of samples for milliseconds of extra work, which is what makes its percentiles and significance test meaningful (at n ≈ 16 the reported P95/P99/P99.9 all collapse onto the maximum). The rule is: measurement spans at least this long, or reaches `MaxSamples` samples, whichever comes first — so worst-case added cost is `MinMeasurementTime` per benchmark and **zero** for any body already slower than `MinMeasurementTime / MinSamples` (≈3.3 ms by default). `0` disables the floor. `Quick` uses 50 ms, `Thorough` 500 ms. |
+| `MeasurementDriftTolerance` | `0.10` | How far the first-half and second-half means of the measured samples may disagree (as a fraction of the smaller half-mean) before the CI stop is refused. Guards the failure mode that is hardest to spot: a JIT tier-up landing inside the measurement window is a step change, and the CI-on-the-mean rule will report a tight interval straight across it — a 10× wrong number with a ±0.9% error bar. The gap must also exceed 4 standard errors, so a heavy-tailed body whose half-means differ by pure noise is not flagged. `0` disables the gate; either way `AutoTune.SplitHalfDrift` records the gap. |
+| `MeasurementRestartLimit` | `2` | How many times the drift gate may discard the collected samples and restart measurement — one for tier-0 → tier-1, one for instrumented → optimized under dynamic PGO. Restarts draw on the same `MaxTuningTime` budget as ordinary sampling, so they can never make a benchmark run longer. A body still drifting after the limit reports `SampleStopReason.DriftUnresolved` with a warning, which is a finding rather than something more restarts fix. `Thorough` uses 3. |
 | `TargetSampleDurationNs` | `10 000` | Per-sample duration that ops-per-sample calibration aims for. 10 µs keeps timer quantization (~0.1% vs ~±10% at 1 µs on a 100 ns timer) and timestamp-read overhead (~0.2% vs ~1-3%) negligible against the CI target. Bodies ≥ 10 µs keep K = 1; sub-10 µs bodies are batched, so their percentiles describe batch means. `Thorough` preset uses 50 µs. |
 | `MaxOpsPerSample` | `1 048 576` | Ceiling on auto-calibrated K. |
 | `BatchSize` | `8` | Warmup batch size and the cadence on which the CI-width rule is evaluated. |
@@ -387,7 +393,7 @@ Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `
 The interval's confidence level is `ConfidenceLevel` (below) - the CI-width rule targets that same level, so it is not duplicated on `AutoTune`.
 
 BenchmarkSuite/BenchmarkHarness fluent method: `.WithAutoTune(AutoTunePreset.Quick)` or `.WithAutoTune(customOptions)`  
-CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--autotune-cap-behavior`, `--warmup-budget-fraction`, `--cap-grace-factor`, `--min-warmup-time`, `--no-jit-quiescence`.
+CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--autotune-cap-behavior`, `--warmup-budget-fraction`, `--cap-grace-factor`, `--min-warmup-time`, `--no-jit-quiescence`, `--jit-quiet-period`, `--min-measurement-time`, `--drift-tolerance`, `--max-drift-restarts`.
 
 ### Profile
 

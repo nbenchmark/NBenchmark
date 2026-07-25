@@ -150,7 +150,14 @@ public class MeasurementObserverTests
             Iterations = null, // auto sample count -> CI detector
             OutlierMode = OutlierMode.None,
             MeasureAllocationsOverride = false,
-            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
+            // MinMeasurementTime = 0 isolates the CI stop rule from the measurement time floor, which
+            // would otherwise hold this scripted 1 us body to its derived sample floor. This test is
+            // about the detector events, not the floor.
+            AutoTune = AutoTuneOptions.Default with
+            {
+                EnableJitterCalibration = false,
+                MinMeasurementTime = TimeSpan.Zero,
+            },
         };
 
         // Zero-variance signal -> CI half-width is 0, so the target is met at the first cadence point.

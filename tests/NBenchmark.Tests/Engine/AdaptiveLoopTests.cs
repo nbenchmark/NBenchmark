@@ -86,7 +86,10 @@ public class AdaptiveLoopTests
         // Zero-variance signal -> CI half-width is 0, so the target is met at the first cadence point.
         var clock = new ScriptedClock(1000.0);
 
-        var result = RunSync(() => { }, options, clock);
+        // MinMeasurementTime = 0 isolates the CI stop rule from the measurement time floor, which would
+        // otherwise hold this 1 us body to its derived sample floor. The floor has its own tests below;
+        // this one is about the cadence arithmetic. Same idiom as MinWarmupTime = 0 above.
+        var result = RunSync(() => { }, WithNoMeasurementFloor(options), clock);
 
         Assert.Equal(0, result.ResolvedWarmup);
         Assert.Equal(WarmupStopReason.ExplicitCount, result.Diagnostic.WarmupStop);
@@ -116,7 +119,8 @@ public class AdaptiveLoopTests
         // detector resolves on that single evaluation, so the series carries exactly one entry.
         var clock = new ScriptedClock(1000.0);
 
-        var result = RunSync(() => { }, options, clock);
+        // MinMeasurementTime = 0 isolates the cadence arithmetic from the measurement time floor.
+        var result = RunSync(() => { }, WithNoMeasurementFloor(options), clock);
 
         Assert.Equal(SampleStopReason.CiTargetMet, result.Diagnostic.SampleStop);
 
@@ -1022,4 +1026,272 @@ public class AdaptiveLoopTests
         return AdaptiveLoop.Run(
             "bench", body, spec, clock, NullBenchmarkProgress.Instance, NullMeasurementObserver.Instance, CancellationToken.None);
     }
+
+    // ---------- Measurement drift gate ----------
+    //
+    // These reproduce the defect that motivated the gate. In the field, SortLargeArray's tier-1
+    // promotion landed inside its measurement window: the first decile of samples averaged 4.80 ms and
+    // the last 2.22 ms, and the CI-on-the-mean rule reported a single tight interval straight across the
+    // step. The scripted step below is the same shape at a magnitude that still lets the CI converge,
+    // which is precisely the regime where the old loop would report a precise but irreproducible number.
+
+    /// <summary>
+    ///     A body that runs at <c>1150 ns</c> for its first 16 measured samples and <c>1000 ns</c>
+    ///     thereafter - a 15% downward step, as if a tier-up landed 16 samples in.
+    /// </summary>
+    private static ScriptedClock SteppingClock() => new(i => i < 16 ? 1150.0 : 1000.0);
+
+    private static MeasurementOptions DriftOptions(int restartLimit) => MeasurementOptions.Default with
+    {
+        OpsPerSample = 1, // pin K so calibration consumes no scripted samples
+        WarmupIterations = 0, // no warmup, so scripted sample 0 is the first measured sample
+        Iterations = null, // auto -> CI detector, so the drift gate is consulted
+        OutlierMode = OutlierMode.None,
+        MeasureAllocationsOverride = false,
+        AutoTune = AutoTuneOptions.Default with
+        {
+            EnableJitterCalibration = false, // the probe would consume scripted samples
+            MinMeasurementTime = TimeSpan.Zero, // isolate from the time floor; the step position is what matters
+            CiTarget = 0.03, // the mid-step interval is 2.56%, so the CI stop fires *across* the step
+            MeasurementRestartLimit = restartLimit,
+        },
+    };
+
+    [Fact]
+    public void Drift_Gate_Discards_The_Stale_Prefix_And_Resamples()
+    {
+        var result = RunSync(() => { }, DriftOptions(restartLimit: 2), SteppingClock());
+
+        // At sample 32 the CI target is met (2.56% < 3%) but the halves are 1150 vs 1000 - 15% apart,
+        // and well beyond 4 standard errors. So the loop discards those 32 samples and starts over.
+        Assert.Equal(1, result.Diagnostic.MeasurementRestarts);
+
+        // The retained samples are all from the post-step regime: 32 more samples, now zero-variance, so
+        // the CI target is met again immediately and the halves agree.
+        Assert.Equal(32, result.Diagnostic.ResolvedSamples);
+        Assert.Equal(SampleStopReason.CiTargetMet, result.Diagnostic.SampleStop);
+        Assert.All(result.PerOpTimings, t => Assert.Equal(1000.0, t));
+        Assert.Equal(0.0, result.Diagnostic.SplitHalfDrift, 10);
+
+        // A clean restart is not a failure, so it carries no warning.
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void Drift_Gate_Reports_DriftUnresolved_When_Restarts_Are_Exhausted()
+    {
+        var result = RunSync(() => { }, DriftOptions(restartLimit: 0), SteppingClock());
+
+        // With no restarts allowed the loop must not silently report the drifted number as converged.
+        Assert.Equal(0, result.Diagnostic.MeasurementRestarts);
+        Assert.Equal(SampleStopReason.DriftUnresolved, result.Diagnostic.SampleStop);
+        Assert.Equal(32, result.Diagnostic.ResolvedSamples);
+
+        // The drift is recorded so the discrepancy is visible next to the interval.
+        Assert.Equal(0.15, result.Diagnostic.SplitHalfDrift, 6);
+
+        var warning = Assert.Single(result.Warnings);
+        Assert.Contains("still drifting", warning);
+        Assert.Contains("--min-warmup-time", warning);
+    }
+
+    [Fact]
+    public void Drift_Gate_Is_Disabled_By_A_Zero_Tolerance()
+    {
+        var options = DriftOptions(restartLimit: 2);
+        options = options with { AutoTune = options.AutoTune with { MeasurementDriftTolerance = 0.0 } };
+
+        var result = RunSync(() => { }, options, SteppingClock());
+
+        // Opting out restores the old behaviour exactly: stop across the step, report the blended mean.
+        Assert.Equal(0, result.Diagnostic.MeasurementRestarts);
+        Assert.Equal(SampleStopReason.CiTargetMet, result.Diagnostic.SampleStop);
+        Assert.Equal(32, result.Diagnostic.ResolvedSamples);
+
+        // The drift is still reported, so the number is at least not silently trusted.
+        Assert.Equal(0.15, result.Diagnostic.SplitHalfDrift, 6);
+    }
+
+    [Fact]
+    public async Task RunAsync_Mirrors_Sync_For_The_Drift_Restart()
+    {
+        // The sync and async loops are near-duplicates, which makes the restart path - the most
+        // intricate edit in the loop - the likeliest place for them to diverge. Pin both.
+        var spec = new RunSpec { Options = DriftOptions(restartLimit: 2) };
+
+        var result = await AdaptiveLoop.RunAsync(
+            "bench",
+            () => Task.CompletedTask,
+            spec,
+            SteppingClock(),
+            NullBenchmarkProgress.Instance,
+            NullMeasurementObserver.Instance,
+            CancellationToken.None);
+
+        Assert.Equal(1, result.Diagnostic.MeasurementRestarts);
+        Assert.Equal(32, result.Diagnostic.ResolvedSamples);
+        Assert.Equal(SampleStopReason.CiTargetMet, result.Diagnostic.SampleStop);
+        Assert.All(result.PerOpTimings, t => Assert.Equal(1000.0, t));
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task RunAsync_Mirrors_Sync_For_DriftUnresolved()
+    {
+        var spec = new RunSpec { Options = DriftOptions(restartLimit: 0) };
+
+        var result = await AdaptiveLoop.RunAsync(
+            "bench",
+            () => Task.CompletedTask,
+            spec,
+            SteppingClock(),
+            NullBenchmarkProgress.Instance,
+            NullMeasurementObserver.Instance,
+            CancellationToken.None);
+
+        Assert.Equal(SampleStopReason.DriftUnresolved, result.Diagnostic.SampleStop);
+        Assert.Equal(32, result.Diagnostic.ResolvedSamples);
+        Assert.Equal(0.15, result.Diagnostic.SplitHalfDrift, 6);
+        Assert.Contains("still drifting", Assert.Single(result.Warnings));
+    }
+
+    [Fact]
+    public void Drift_Restart_Keeps_The_Per_Sample_Lists_Index_Aligned()
+    {
+        // timings, allocations, and diagnostics are read by shared ordinal downstream (the
+        // "outlier coincided with a GC" annotation walks trimmed ordinals into the diagnostics array),
+        // so a restart that cleared one list but not the others would silently corrupt that mapping.
+        var options = DriftOptions(restartLimit: 2) with { MeasureAllocationsOverride = true };
+        options = options with { Diagnostics = new DiagnosticsOptions { GcCollectionCounts = true } };
+
+        var result = RunSync(() => { }, options, SteppingClock());
+
+        Assert.Equal(1, result.Diagnostic.MeasurementRestarts);
+        Assert.Equal(32, result.PerOpTimings.Length);
+        Assert.NotNull(result.PerOpAllocations);
+        Assert.Equal(result.PerOpTimings.Length, result.PerOpAllocations!.Length);
+        Assert.NotNull(result.PerOpDiagnostics);
+        Assert.Equal(result.PerOpTimings.Length, result.PerOpDiagnostics!.Length);
+    }
+
+    [Fact]
+    public void Warmup_MaxCeiling_Below_The_Time_Floor_Warns_About_Cold_Code()
+    {
+        // The silent failure the loop used to have: a count ceiling that binds before MinWarmupTime
+        // means measurement begins on possibly-cold code and nothing was said about it.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = null, // auto warmup
+            Iterations = 4,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                EnableJitterCalibration = false,
+                MaxWarmup = 20, // 20 samples x 1000 ns = 20 us, nowhere near the 250 ms floor
+                RequireJitQuiescence = false,
+            },
+        };
+
+        var result = RunSync(() => { }, options, new ScriptedClock(1000.0));
+
+        Assert.Equal(WarmupStopReason.MaxCeiling, result.Diagnostic.WarmupStop);
+        Assert.False(result.Diagnostic.WarmupTimeFloorMet);
+
+        var warning = Assert.Single(result.Warnings);
+        Assert.Contains("sample ceiling", warning);
+        Assert.Contains("pre-tier-1", warning);
+    }
+
+    [Fact]
+    public void Warmup_MaxCeiling_Cold_Code_Warning_Is_Suppressed_With_Iteration_Hooks()
+    {
+        // Setup/teardown run outside the timed window, so accumulated in-body time materially
+        // under-counts real elapsed time and the floor check would fire spuriously.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = null,
+            Iterations = 4,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with
+            {
+                EnableJitterCalibration = false,
+                MaxWarmup = 20,
+                RequireJitQuiescence = false,
+            },
+        };
+
+        var result = RunSync(() => { }, options, new ScriptedClock(1000.0), setup: () => { });
+
+        Assert.Equal(WarmupStopReason.MaxCeiling, result.Diagnostic.WarmupStop);
+
+        // Still a warning (warmup never plateaued), but not the cold-code one.
+        var warning = Assert.Single(result.Warnings);
+        Assert.DoesNotContain("pre-tier-1", warning);
+        Assert.Contains("without ever reaching a plateau", warning);
+    }
+
+    [Fact]
+    public void Measurement_Time_Floor_Holds_A_Cheap_Body_To_The_Derived_Sample_Floor()
+    {
+        // The user-facing point of the floor: a 1 us body that used to stop at 32 samples now collects
+        // hundreds, for a few hundred microseconds of extra work, so its percentiles and significance
+        // test have real power.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = null,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
+        };
+
+        var result = RunSync(() => { }, options, new ScriptedClock(1000.0));
+
+        // 100 ms of body time at 1 us per sample would need 100,000 samples, so MaxSamples (5,000) is
+        // what releases the floor here. The zero-variance stream meets the CI target on that same
+        // sample, and CiTargetMet wins over MaxCeiling on the boundary.
+        Assert.Equal(5_000, result.Diagnostic.ResolvedSamples);
+        Assert.Equal(SampleStopReason.CiTargetMet, result.Diagnostic.SampleStop);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void Measurement_Time_Floor_Does_Not_Delay_A_Slow_Body()
+    {
+        // The floor must cost nothing for a body already slower than MinMeasurementTime / MinSamples
+        // (100 ms / 30 here, so ~3.3 ms). A 10 ms body clears the duration well before MinSamples.
+        var options = MeasurementOptions.Default with
+        {
+            OpsPerSample = 1,
+            WarmupIterations = 0,
+            Iterations = null,
+            OutlierMode = OutlierMode.None,
+            MeasureAllocationsOverride = false,
+            AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
+        };
+
+        var result = RunSync(() => { }, options, new ScriptedClock(10_000_000.0));
+
+        // MinSamples 30 binds, so the stop is at the first cadence multiple past it - exactly as before
+        // this change. The floor added nothing.
+        Assert.Equal(32, result.Diagnostic.ResolvedSamples);
+        Assert.Equal(SampleStopReason.CiTargetMet, result.Diagnostic.SampleStop);
+    }
+
+    /// <summary>
+    ///     Disables the measurement time floor so a test can exercise the CI-width cadence arithmetic in
+    ///     isolation. Without it, a scripted fast body is held to the measurement time floor (and so to
+    ///     <c>MaxSamples</c>) rather than stopping at the first cadence multiple past <c>MinSamples</c>. The
+    ///     counterpart of the <c>MinWarmupTime = TimeSpan.Zero</c> idiom used for the plateau tests.
+    /// </summary>
+    private static MeasurementOptions WithNoMeasurementFloor(MeasurementOptions options)
+        => options with
+        {
+            AutoTune = options.AutoTune with { MinMeasurementTime = TimeSpan.Zero },
+        };
 }

@@ -93,6 +93,53 @@ public sealed record AutoTuneDiagnostic
     ///         scalar is computed from the complete sample array. The series shows the convergence
     ///         trajectory, the scalar shows the final achieved value.
     ///     </para>
+    ///     <para>
+    ///         When <see cref="MeasurementRestarts" /> is non-zero the series covers only the final
+    ///         attempt - the convergence trajectory of the samples actually reported.
+    ///     </para>
     /// </summary>
     public IReadOnlyList<double> CiWidthSeries { get; init; } = [];
+
+    /// <summary>
+    ///     Whether auto-warmup reached <see cref="AutoTuneOptions.MinWarmupTime" /> before it stopped.
+    ///     <c>false</c> means warmup was cut short - by <see cref="AutoTuneOptions.MaxWarmup" />, by the
+    ///     calibration+warmup budget share, or because the body is calibration-ineligible and too fast
+    ///     to reach the floor within the sample ceiling - so the body may still have been running
+    ///     pre-tier-1 code when measurement began.
+    ///     <para>
+    ///         This is the single most useful field for diagnosing a benchmark whose median differs
+    ///         wildly between runs while each run reports a tight error margin. Always <c>true</c> for a
+    ///         pinned <see cref="MeasurementOptions.WarmupIterations" /> (the floor does not apply).
+    ///     </para>
+    /// </summary>
+    public bool WarmupTimeFloorMet { get; init; } = true;
+
+    /// <summary>
+    ///     How many methods the JIT compiled over the course of auto-warmup, sampled at batch
+    ///     boundaries. <c>0</c> for pinned warmup, and for auto-warmup that ended before its first
+    ///     batch boundary. A large value next to a short warmup is the signature of a body measured
+    ///     mid-tier-up.
+    /// </summary>
+    public long WarmupJitCompiledMethods { get; init; }
+
+    /// <summary>
+    ///     How many times the drift gate discarded the collected samples and restarted measurement
+    ///     because the stream had not settled (see
+    ///     <see cref="AutoTuneOptions.MeasurementDriftTolerance" />). <c>0</c> for the overwhelming
+    ///     majority of runs; a non-zero value means a step change - usually a JIT tier-up or a dynamic
+    ///     PGO re-optimization - landed inside the measurement window and the loop resampled past it.
+    /// </summary>
+    public int MeasurementRestarts { get; init; }
+
+    /// <summary>
+    ///     The relative gap between the means of the first and second halves of the reported samples,
+    ///     as a fraction of the smaller half-mean. Near <c>0</c> for a stationary body.
+    ///     <para>
+    ///         Computed on every stop, not only when the drift gate fires, so drift stays visible on
+    ///         pinned-count, wall-clock-cap, and ceiling stops - none of which consult the gate. A large
+    ///         value alongside a narrow <see cref="AchievedRelativeCiWidth" /> means the interval is
+    ///         tight around a centre that moved: the reported number is precise but not reproducible.
+    ///     </para>
+    /// </summary>
+    public double SplitHalfDrift { get; init; }
 }

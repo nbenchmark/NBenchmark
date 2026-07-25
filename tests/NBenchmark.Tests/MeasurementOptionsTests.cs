@@ -387,9 +387,12 @@ public class MeasurementOptionsTests
     }
 
     [Fact]
-    public void AutoTune_Default_MinWarmupTime_Is_100ms()
+    public void AutoTune_Default_MinWarmupTime_Is_500ms()
     {
-        Assert.Equal(TimeSpan.FromMilliseconds(100), AutoTuneOptions.Default.MinWarmupTime);
+        // 5x the runtime's 100 ms tiered-compilation call-counting delay, and chosen empirically: at
+        // 250 ms a StringBuilder-append loop landed in either its tier-0 or its ~4.5x-faster steady
+        // state depending on the run (a 4.8x run-to-run median spread); 500 ms made it consistent.
+        Assert.Equal(TimeSpan.FromMilliseconds(500), AutoTuneOptions.Default.MinWarmupTime);
     }
 
     [Fact]
@@ -399,19 +402,75 @@ public class MeasurementOptionsTests
     }
 
     [Fact]
+    public void AutoTune_Default_MaxWarmup_Far_Exceeds_The_Pinned_Limit()
+    {
+        // A count ceiling that binds before MinWarmupTime silently defeats the floor: a fast body needs
+        // ~25,000 samples at the 10 us sample target to accumulate 250 ms.
+        Assert.Equal(MeasurementOptions.MaxAutoWarmupIterations, AutoTuneOptions.Default.MaxWarmup);
+        Assert.Equal(100_000, AutoTuneOptions.Default.MaxWarmup);
+        Assert.True(AutoTuneOptions.Default.MaxWarmup > MeasurementOptions.MaxWarmupIterations);
+    }
+
+    [Fact]
+    public void AutoTune_Default_Steady_State_Knobs()
+    {
+        var d = AutoTuneOptions.Default;
+
+        Assert.Equal(TimeSpan.FromMilliseconds(50), d.JitQuietPeriod);
+        Assert.Equal(TimeSpan.FromMilliseconds(100), d.MinMeasurementTime);
+        Assert.Equal(0.10, d.MeasurementDriftTolerance);
+        Assert.Equal(2, d.MeasurementRestartLimit);
+    }
+
+    [Fact]
+    public void AutoTune_Default_MaxSamples_Is_5000()
+    {
+        // 100,000 was inherited from MeasurementOptions.MaxIterations, not chosen on measurement
+        // grounds; at that ceiling a body with a CV in the hundreds of percent burns tens of thousands
+        // of samples chasing a target more samples cannot reach.
+        Assert.Equal(5_000, AutoTuneOptions.Default.MaxSamples);
+    }
+
+    [Fact]
     public void Quick_Preset_Tunes_Warmup_For_Fast_Feedback()
     {
         var quick = AutoTuneOptions.Quick;
 
         Assert.Equal(4, quick.BatchSize);
         Assert.Equal(2, quick.PlateauPatience);
-        Assert.Equal(TimeSpan.FromMilliseconds(25), quick.MinWarmupTime);
+        Assert.Equal(15, quick.MinSamples);
+        Assert.Equal(2_000, quick.MaxSamples);
+        Assert.Equal(0.05, quick.CiTarget);
+        Assert.Equal(TimeSpan.FromMilliseconds(50), quick.MinMeasurementTime);
+    }
+
+    [Fact]
+    public void Quick_Preset_Does_Not_Shorten_The_Warmup_Time_Floor()
+    {
+        // The floor is a correctness requirement, not a speed/accuracy trade-off: a 25 ms floor
+        // guarantees measuring pre-tier-1 code, which produced a 9.8x wrong number reported at
+        // +/-0.86%. Quick's speed comes from CiTarget, MinSamples, and MaxTuningTime instead.
+        Assert.Equal(TimeSpan.FromMilliseconds(500), AutoTuneOptions.Quick.MinWarmupTime);
+        Assert.Equal(AutoTuneOptions.Default.MinWarmupTime, AutoTuneOptions.Quick.MinWarmupTime);
+        Assert.Equal(AutoTuneOptions.Default.JitQuietPeriod, AutoTuneOptions.Quick.JitQuietPeriod);
     }
 
     [Fact]
     public void Thorough_Preset_Uses_50us_Target()
     {
         Assert.Equal(50_000, AutoTuneOptions.Thorough.TargetSampleDurationNs);
+    }
+
+    [Fact]
+    public void Thorough_Preset_Raises_Every_Steady_State_Floor()
+    {
+        var t = AutoTuneOptions.Thorough;
+
+        Assert.Equal(TimeSpan.FromMilliseconds(1_000), t.MinWarmupTime);
+        Assert.Equal(TimeSpan.FromMilliseconds(100), t.JitQuietPeriod);
+        Assert.Equal(TimeSpan.FromMilliseconds(500), t.MinMeasurementTime);
+        Assert.Equal(20_000, t.MaxSamples);
+        Assert.Equal(3, t.MeasurementRestartLimit);
     }
 
     [Fact]
@@ -433,5 +492,48 @@ public class MeasurementOptionsTests
     {
         var opts = new AutoTuneOptions { RequireJitQuiescence = false };
         Assert.False(opts.RequireJitQuiescence);
+    }
+
+    [Fact]
+    public void JitQuietPeriod_Accepts_Zero_And_Rejects_Negative()
+    {
+        Assert.Equal(TimeSpan.Zero, new AutoTuneOptions { JitQuietPeriod = TimeSpan.Zero }.JitQuietPeriod);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new AutoTuneOptions { JitQuietPeriod = TimeSpan.FromMilliseconds(-1) });
+    }
+
+    [Fact]
+    public void MinMeasurementTime_Accepts_Zero_And_Rejects_Negative()
+    {
+        Assert.Equal(TimeSpan.Zero, new AutoTuneOptions { MinMeasurementTime = TimeSpan.Zero }.MinMeasurementTime);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new AutoTuneOptions { MinMeasurementTime = TimeSpan.FromMilliseconds(-1) });
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(0.5)]
+    [InlineData(1.0)]
+    public void MeasurementDriftTolerance_Accepts_Zero_To_One(double value)
+    {
+        Assert.Equal(value, new AutoTuneOptions { MeasurementDriftTolerance = value }.MeasurementDriftTolerance);
+    }
+
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(1.1)]
+    public void MeasurementDriftTolerance_Rejects_Out_Of_Range(double value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new AutoTuneOptions { MeasurementDriftTolerance = value });
+    }
+
+    [Fact]
+    public void MeasurementRestartLimit_Accepts_Zero_And_Rejects_Negative()
+    {
+        Assert.Equal(0, new AutoTuneOptions { MeasurementRestartLimit = 0 }.MeasurementRestartLimit);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new AutoTuneOptions { MeasurementRestartLimit = -1 });
     }
 }

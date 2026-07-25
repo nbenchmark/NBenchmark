@@ -65,10 +65,26 @@ internal sealed class CiWidthDetector
     public double StandardDeviation => Count >= 2 ? Math.Sqrt(_m2 / (Count - 1)) : 0.0;
 
     /// <summary>
+    ///     The running coefficient of variation (standard deviation / mean), or <see cref="double.NaN" />
+    ///     before a positive mean exists. Free from the Welford state, and the number that explains a
+    ///     ceiling stop: the CI-on-the-mean rule needs samples proportional to the <em>square</em> of
+    ///     this, so a body with a CV in the hundreds of percent can never converge.
+    /// </summary>
+    public double CoefficientOfVariation => Mean > 0 ? StandardDeviation / Mean : double.NaN;
+
+    /// <summary>
     ///     Reports the per-op nanoseconds of one measured sample. Returns <c>true</c> when the
     ///     measurement phase is resolved (the caller should stop collecting samples).
     /// </summary>
-    public bool Feed(double perOpNs)
+    /// <param name="perOpNs">The sample's per-op nanoseconds.</param>
+    /// <param name="stopAllowed">
+    ///     Whether an outside floor (see <see cref="MeasurementGates.TimeFloorMet" />) currently permits
+    ///     stopping on the CI target. When <c>false</c> the detector keeps accumulating and still
+    ///     records the achieved half-width, but does not resolve - so the composed floor stays a caller
+    ///     policy while the accumulator stays here. The sample ceiling is unaffected: blocking there
+    ///     would spin forever.
+    /// </param>
+    public bool Feed(double perOpNs, bool stopAllowed)
     {
         if (Resolved)
             return true;
@@ -80,20 +96,30 @@ internal sealed class CiWidthDetector
         var delta2 = perOpNs - Mean;
         _m2 += delta * delta2;
 
-        if (Count >= _maxSamples)
-        {
-            ComputeHalfWidth();
-            Resolved = true;
-            StopReason = SampleStopReason.MaxCeiling;
-            return true;
-        }
+        // The CI target is evaluated before the ceiling so that a run whose final sample both reaches
+        // MaxSamples and meets the target reports CiTargetMet rather than a ceiling stop - the target
+        // was met, and the warning attached to a ceiling stop would be wrong. Also keeps the half-width
+        // computed exactly once per sample.
+        var atCadence = Count >= _minSamples && Count % _cadence == 0;
+        var atCeiling = Count >= _maxSamples;
 
-        if (Count >= _minSamples && Count % _cadence == 0
-                                 && ComputeHalfWidth() && AchievedRelativeHalfWidth < _ciTarget)
+        if (atCadence || atCeiling)
         {
-            Resolved = true;
-            StopReason = SampleStopReason.CiTargetMet;
-            return true;
+            var computed = ComputeHalfWidth();
+
+            if (stopAllowed && computed && AchievedRelativeHalfWidth < _ciTarget)
+            {
+                Resolved = true;
+                StopReason = SampleStopReason.CiTargetMet;
+                return true;
+            }
+
+            if (atCeiling)
+            {
+                Resolved = true;
+                StopReason = SampleStopReason.MaxCeiling;
+                return true;
+            }
         }
 
         return false;

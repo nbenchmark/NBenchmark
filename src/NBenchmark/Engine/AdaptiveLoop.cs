@@ -202,10 +202,18 @@ internal static class AdaptiveLoop
         int resolvedWarmup;
         WarmupStopReason warmupStop;
 
+        // Whether auto-warmup reached MinWarmupTime, and how much the JIT compiled while it ran. Both
+        // are captured on every exit path so the diagnostic and the stop warnings stay honest even when
+        // warmup was cut short. Pinned and calibration-capped warmup have no floor to meet, so they
+        // report the floor as met and no JIT delta.
+        var warmupTimeFloorMet = true;
+        long warmupJitCompiled = 0;
+
         if (calibrationCapped)
         {
             resolvedWarmup = calibrationSamples;
             warmupStop = WarmupStopReason.WallClockCap;
+            warmupTimeFloorMet = false;
         }
         else if (o.WarmupIterations is { } explicitWarmup)
         {
@@ -237,6 +245,8 @@ internal static class AdaptiveLoop
             var warmupOrdinal = 0;
             var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
 
+            var warmupSamplesFed = 0;
+
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
@@ -257,10 +267,17 @@ internal static class AdaptiveLoop
                     warmupOrdinal++;
                 }
 
-                // Read the process JIT compiled-method count just after the sample; the detector
-                // uses its per-batch delta as the JIT-quiescence gate signal. Read outside the
-                // timed window (the sample's elapsed is already captured), so it never taints timing.
-                var jitCompiledCount = System.Runtime.JitInfo.GetCompiledMethodCount();
+                // Read the process JIT compiled-method count just after the sample; the detector tracks
+                // where it last changed as the JIT-quiescence gate signal. Read outside the timed window
+                // (the sample's elapsed is already captured), so it never taints timing - but only at
+                // batch boundaries, which is the only point the gate consults it. Warmup now spans tens
+                // of thousands of samples on a fast body, and this QCall can itself allocate and trigger
+                // JIT activity, perturbing the very signal it reports.
+                warmupSamplesFed++;
+
+                var jitCompiledCount = warmupSamplesFed % detector.EffectiveBatchSize == 0
+                    ? System.Runtime.JitInfo.GetCompiledMethodCount()
+                    : -1L;
 
                 if (detector.Feed(elapsed / k, elapsed, jitCompiledCount))
                 {
@@ -276,6 +293,8 @@ internal static class AdaptiveLoop
             }
 
             resolvedWarmup = detector.Count;
+            warmupTimeFloorMet = detector.TimeFloorMet;
+            warmupJitCompiled = detector.JitCompiledDelta;
 
             // Post-warmup K recalibration: cold calibration (Phase A) resolved K against the body's
             // pre-warmup speed; the warm body may run several times faster, leaving each sample well
@@ -325,10 +344,19 @@ internal static class AdaptiveLoop
 
         // ----- Phase C: measurement -----
         var explicitSamples = o.Iterations;
-        var timings = new List<double>(explicitSamples ?? autoTune.MinSamples);
+
+        // The time-derived sample floor (see MeasurementGates) resolves the count a cheap body is held
+        // to, so size the list for that rather than for MinSamples - otherwise every auto run regrows
+        // the backing array several times on the hot path.
+        var sampleCeiling = MeasurementGates.ResolveTimeFloorCeiling(autoTune.MinSamples, autoTune.MaxSamples);
+        var minMeasurementNs = autoTune.MinMeasurementTime.Ticks * 100.0;
+        var timings = new List<double>(explicitSamples ?? sampleCeiling);
         var allocations = measureAllocations ? new List<long>(timings.Capacity) : null;
         var diagnosticsList = diagnostics.Any ? new List<DiagnosticDelta>(timings.Capacity) : null;
         var ci = explicitSamples is null ? new CiWidthDetector(o.ConfidenceLevel, autoTune) : null;
+        var tracker = new SplitHalfTracker(timings);
+        double measurementNs = 0;
+        var restarts = 0;
 
         // Subscribe to FirstChanceException for the measurement phase only.
         if (diagnostics.Exceptions)
@@ -370,10 +398,12 @@ internal static class AdaptiveLoop
                 var (elapsed, allocDelta, diagDelta) = AcquireSampleSync(body, spec, clock, k, measureAllocations, forceGc, diagnostics);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
+                measurementNs += elapsed;
                 var perOp = elapsed / k;
                 timings.Add(perOp);
                 allocations?.Add(allocDelta / k);
                 diagnosticsList?.Add(diagDelta);
+                tracker.Add(perOp);
                 sampleCount++;
 
                 NBenchmarkDiagnostics.RecordSample(name, false, MeasurementPhaseTag, perOp, measureAllocations ? allocDelta / k : -1L);
@@ -399,8 +429,51 @@ internal static class AdaptiveLoop
                         break;
                     }
                 }
-                else if (ci.Feed(perOp))
+                else if (ci.Feed(perOp, MeasurementGates.TimeFloorMet(sampleCount, measurementNs, minMeasurementNs, sampleCeiling)))
                 {
+                    // Steady-state gate on the CI stop, the measurement-phase counterpart to the warmup
+                    // settle gates. A step change inside the measurement window (a JIT tier-up, a PGO
+                    // re-optimization) leaves the CI rule perfectly willing to report a tight interval
+                    // straight across it, which is how a 10x-wrong number gets a +/-0.9% error bar.
+                    if (ci.StopReason == SampleStopReason.CiTargetMet
+                        && !MeasurementGates.IsSteady(
+                            tracker.FirstHalfMean, tracker.SecondHalfMean, sampleCount, ci.StandardDeviation,
+                            autoTune.MeasurementDriftTolerance, MeasurementGates.DefaultSigmaTolerance))
+                    {
+                        if (restarts < autoTune.MeasurementRestartLimit)
+                        {
+                            restarts++;
+
+                            // Discard the whole prefix, not just the stale half: after a detected step
+                            // there is no way to know where the new regime began, so the later samples
+                            // may themselves be mid-transition. All three per-sample lists are
+                            // index-aligned (the GC-correlation annotation reads diagnostics by
+                            // ordinal against timings), so they must be cleared together.
+                            timings.Clear();
+                            allocations?.Clear();
+                            diagnosticsList?.Clear();
+                            tracker.Reset();
+                            sampleCount = 0;
+                            measurementNs = 0;
+                            ci = new CiWidthDetector(o.ConfidenceLevel, autoTune);
+
+                            // Re-announce the phase so observers and the progress UI see an explicit
+                            // ordinal reset rather than a silent rewind.
+                            if (attached)
+                            {
+                                observer.OnPhase(new MeasurementPhaseEvent(
+                                    name, MeasurementPhase.Measurement, PhaseTransition.Starting));
+                            }
+
+                            // accumulatedNs is deliberately NOT reset: restarts draw on the same tuning
+                            // budget as ordinary sampling, so they can never extend total runtime.
+                            continue;
+                        }
+
+                        sampleStop = SampleStopReason.DriftUnresolved;
+                        break;
+                    }
+
                     sampleStop = ci.StopReason;
 
                     NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
@@ -494,7 +567,15 @@ internal static class AdaptiveLoop
             autoTune.CapGraceFactor,
             autoTune.WarmupBudgetFraction,
             initialOpsPerSample,
-            ciWidthSeries: ci?.HalfWidthSeries ?? []);
+            ciWidthSeries: ci?.HalfWidthSeries ?? [],
+            warmupTimeFloorMet: warmupTimeFloorMet,
+            warmupJitCompiled: warmupJitCompiled,
+            measurementRestarts: restarts,
+            // Computed unconditionally, not only on the drift-gate path, so drift stays visible on
+            // pinned-count, wall-clock-cap, and ceiling stops - none of which consult the gate.
+            splitHalfDrift: MeasurementGates.SplitHalfDrift(tracker.FirstHalfMean, tracker.SecondHalfMean),
+            coefficientOfVariation: ci?.CoefficientOfVariation ?? double.NaN,
+            hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null);
     }
 
     public static async Task<AdaptiveResult> RunAsync(
@@ -660,10 +741,18 @@ internal static class AdaptiveLoop
         int resolvedWarmup;
         WarmupStopReason warmupStop;
 
+        // Whether auto-warmup reached MinWarmupTime, and how much the JIT compiled while it ran. Both
+        // are captured on every exit path so the diagnostic and the stop warnings stay honest even when
+        // warmup was cut short. Pinned and calibration-capped warmup have no floor to meet, so they
+        // report the floor as met and no JIT delta.
+        var warmupTimeFloorMet = true;
+        long warmupJitCompiled = 0;
+
         if (calibrationCapped)
         {
             resolvedWarmup = calibrationSamples;
             warmupStop = WarmupStopReason.WallClockCap;
+            warmupTimeFloorMet = false;
         }
         else if (o.WarmupIterations is { } explicitWarmup)
         {
@@ -695,6 +784,8 @@ internal static class AdaptiveLoop
             var warmupOrdinal = 0;
             var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
 
+            var warmupSamplesFed = 0;
+
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
@@ -715,10 +806,17 @@ internal static class AdaptiveLoop
                     warmupOrdinal++;
                 }
 
-                // Read the process JIT compiled-method count just after the sample; the detector
-                // uses its per-batch delta as the JIT-quiescence gate signal. Read outside the
-                // timed window (the sample's elapsed is already captured), so it never taints timing.
-                var jitCompiledCount = System.Runtime.JitInfo.GetCompiledMethodCount();
+                // Read the process JIT compiled-method count just after the sample; the detector tracks
+                // where it last changed as the JIT-quiescence gate signal. Read outside the timed window
+                // (the sample's elapsed is already captured), so it never taints timing - but only at
+                // batch boundaries, which is the only point the gate consults it. Warmup now spans tens
+                // of thousands of samples on a fast body, and this QCall can itself allocate and trigger
+                // JIT activity, perturbing the very signal it reports.
+                warmupSamplesFed++;
+
+                var jitCompiledCount = warmupSamplesFed % detector.EffectiveBatchSize == 0
+                    ? System.Runtime.JitInfo.GetCompiledMethodCount()
+                    : -1L;
 
                 if (detector.Feed(elapsed / k, elapsed, jitCompiledCount))
                 {
@@ -734,6 +832,8 @@ internal static class AdaptiveLoop
             }
 
             resolvedWarmup = detector.Count;
+            warmupTimeFloorMet = detector.TimeFloorMet;
+            warmupJitCompiled = detector.JitCompiledDelta;
 
             // Post-warmup K recalibration: cold calibration (Phase A) resolved K against the body's
             // pre-warmup speed; the warm body may run several times faster, leaving each sample well
@@ -783,10 +883,19 @@ internal static class AdaptiveLoop
 
         // ----- Phase C: measurement -----
         var explicitSamples = o.Iterations;
-        var timings = new List<double>(explicitSamples ?? autoTune.MinSamples);
+
+        // The time-derived sample floor (see MeasurementGates) resolves the count a cheap body is held
+        // to, so size the list for that rather than for MinSamples - otherwise every auto run regrows
+        // the backing array several times on the hot path.
+        var sampleCeiling = MeasurementGates.ResolveTimeFloorCeiling(autoTune.MinSamples, autoTune.MaxSamples);
+        var minMeasurementNs = autoTune.MinMeasurementTime.Ticks * 100.0;
+        var timings = new List<double>(explicitSamples ?? sampleCeiling);
         var allocations = measureAllocations ? new List<long>(timings.Capacity) : null;
         var diagnosticsList = diagnostics.Any ? new List<DiagnosticDelta>(timings.Capacity) : null;
         var ci = explicitSamples is null ? new CiWidthDetector(o.ConfidenceLevel, autoTune) : null;
+        var tracker = new SplitHalfTracker(timings);
+        double measurementNs = 0;
+        var restarts = 0;
 
         // Subscribe to FirstChanceException for the measurement phase only.
         if (diagnostics.Exceptions)
@@ -831,10 +940,12 @@ internal static class AdaptiveLoop
 
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
+                measurementNs += elapsed;
                 var perOp = elapsed / k;
                 timings.Add(perOp);
                 allocations?.Add(allocDelta / k);
                 diagnosticsList?.Add(diagDelta);
+                tracker.Add(perOp);
                 sampleCount++;
 
                 NBenchmarkDiagnostics.RecordSample(name, false, MeasurementPhaseTag, perOp, measureAllocations ? allocDelta / k : -1L);
@@ -860,8 +971,51 @@ internal static class AdaptiveLoop
                         break;
                     }
                 }
-                else if (ci.Feed(perOp))
+                else if (ci.Feed(perOp, MeasurementGates.TimeFloorMet(sampleCount, measurementNs, minMeasurementNs, sampleCeiling)))
                 {
+                    // Steady-state gate on the CI stop, the measurement-phase counterpart to the warmup
+                    // settle gates. A step change inside the measurement window (a JIT tier-up, a PGO
+                    // re-optimization) leaves the CI rule perfectly willing to report a tight interval
+                    // straight across it, which is how a 10x-wrong number gets a +/-0.9% error bar.
+                    if (ci.StopReason == SampleStopReason.CiTargetMet
+                        && !MeasurementGates.IsSteady(
+                            tracker.FirstHalfMean, tracker.SecondHalfMean, sampleCount, ci.StandardDeviation,
+                            autoTune.MeasurementDriftTolerance, MeasurementGates.DefaultSigmaTolerance))
+                    {
+                        if (restarts < autoTune.MeasurementRestartLimit)
+                        {
+                            restarts++;
+
+                            // Discard the whole prefix, not just the stale half: after a detected step
+                            // there is no way to know where the new regime began, so the later samples
+                            // may themselves be mid-transition. All three per-sample lists are
+                            // index-aligned (the GC-correlation annotation reads diagnostics by
+                            // ordinal against timings), so they must be cleared together.
+                            timings.Clear();
+                            allocations?.Clear();
+                            diagnosticsList?.Clear();
+                            tracker.Reset();
+                            sampleCount = 0;
+                            measurementNs = 0;
+                            ci = new CiWidthDetector(o.ConfidenceLevel, autoTune);
+
+                            // Re-announce the phase so observers and the progress UI see an explicit
+                            // ordinal reset rather than a silent rewind.
+                            if (attached)
+                            {
+                                observer.OnPhase(new MeasurementPhaseEvent(
+                                    name, MeasurementPhase.Measurement, PhaseTransition.Starting));
+                            }
+
+                            // accumulatedNs is deliberately NOT reset: restarts draw on the same tuning
+                            // budget as ordinary sampling, so they can never extend total runtime.
+                            continue;
+                        }
+
+                        sampleStop = SampleStopReason.DriftUnresolved;
+                        break;
+                    }
+
                     sampleStop = ci.StopReason;
 
                     NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
@@ -955,7 +1109,15 @@ internal static class AdaptiveLoop
             autoTune.CapGraceFactor,
             autoTune.WarmupBudgetFraction,
             initialOpsPerSample,
-            ciWidthSeries: ci?.HalfWidthSeries ?? []);
+            ciWidthSeries: ci?.HalfWidthSeries ?? [],
+            warmupTimeFloorMet: warmupTimeFloorMet,
+            warmupJitCompiled: warmupJitCompiled,
+            measurementRestarts: restarts,
+            // Computed unconditionally, not only on the drift-gate path, so drift stays visible on
+            // pinned-count, wall-clock-cap, and ceiling stops - none of which consult the gate.
+            splitHalfDrift: MeasurementGates.SplitHalfDrift(tracker.FirstHalfMean, tracker.SecondHalfMean),
+            coefficientOfVariation: ci?.CoefficientOfVariation ?? double.NaN,
+            hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null);
     }
 
     // Per-iteration setup/teardown make a K-batch semantically wrong (each op must be paired with
@@ -993,7 +1155,13 @@ internal static class AdaptiveLoop
         double capGraceFactor,
         double warmupBudgetFraction,
         int? initialOpsPerSample,
-        IReadOnlyList<double> ciWidthSeries)
+        IReadOnlyList<double> ciWidthSeries,
+        bool warmupTimeFloorMet,
+        long warmupJitCompiled,
+        int measurementRestarts,
+        double splitHalfDrift,
+        double coefficientOfVariation,
+        bool hasIterationHooks)
     {
         var timingsArray = timings.ToArray();
 
@@ -1016,12 +1184,17 @@ internal static class AdaptiveLoop
             JitterMetric = jitterMetric,
             OutlierDetectorSwitched = detectorSwitched,
             CiWidthSeries = ciWidthSeries,
+            WarmupTimeFloorMet = warmupTimeFloorMet,
+            WarmupJitCompiledMethods = warmupJitCompiled,
+            MeasurementRestarts = measurementRestarts,
+            SplitHalfDrift = splitHalfDrift,
         };
 
         var warnings = BuildStopWarnings(
             warmupStop, sampleStop, calibrationCapped, maxTuningTime,
             achievedCi, ciTarget, maxSamples, sampleCount, explicitSamples, capGraceFactor,
-            warmupBudgetFraction);
+            warmupBudgetFraction, warmupTimeFloorMet, measurementRestarts, splitHalfDrift,
+            coefficientOfVariation, hasIterationHooks, resolvedWarmup);
 
         if (detectorSwitched)
         {
@@ -1115,7 +1288,13 @@ internal static class AdaptiveLoop
         int sampleCount,
         int? explicitSamples,
         double capGraceFactor,
-        double warmupBudgetFraction)
+        double warmupBudgetFraction,
+        bool warmupTimeFloorMet,
+        int measurementRestarts,
+        double splitHalfDrift,
+        double coefficientOfVariation,
+        bool hasIterationHooks,
+        int resolvedWarmup)
     {
         var capLabel = BenchmarkFormatter.FormatDuration(maxTuningTime);
 
@@ -1159,6 +1338,21 @@ internal static class AdaptiveLoop
             ];
         }
 
+        if (sampleStop == SampleStopReason.DriftUnresolved)
+        {
+            return
+            [
+                $"The measured samples were still drifting after {measurementRestarts} restart(s): the first and "
+                + $"second halves of the stream differ by {splitHalfDrift * 100:F1}%, well beyond the "
+                + "drift tolerance. The reported confidence interval describes a moving target rather than a "
+                + "stable measurement, so the centre is not reproducible however narrow the interval looks. "
+                + "The usual cause is a JIT tier-up or dynamic-PGO re-optimization landing inside measurement - "
+                + "raise --min-warmup-time so it lands during warmup instead. Otherwise the body itself is "
+                + "non-stationary (thermal ramp, a filling cache, a growing data structure); check host "
+                + "thermal/load state, or use --launch-count to measure across-launch spread.",
+            ];
+        }
+
         if (sampleStop == SampleStopReason.GraceCapExhausted)
         {
             return
@@ -1172,12 +1366,22 @@ internal static class AdaptiveLoop
 
         if (sampleStop == SampleStopReason.MaxCeiling && achievedCi > ciTarget)
         {
+            // Name the CV: the required sample count grows as (t * CV / target)^2, so for a genuinely
+            // noisy body the ceiling is not the problem and raising it will not help. Spelling out the
+            // count it would actually take is what makes that concrete.
+            var cvClause = double.IsFinite(coefficientOfVariation) && coefficientOfVariation > 0
+                ? $" The raw coefficient of variation is {coefficientOfVariation * 100:F0}%, so this rule would need "
+                  + $"roughly {EstimateSamplesForTarget(coefficientOfVariation, ciTarget):N0} samples to converge - "
+                  + "at that spread the body's variance is the finding, not the sample count."
+                : string.Empty;
+
             return
             [
                 $"Measurement stopped at the sample ceiling ({maxSamples:N0}) "
                 + $"before reaching the confidence-interval target (achieved ±{achievedCi * 100:F1}% vs target ±{ciTarget * 100:F1}%). "
-                + "The reported error margin is wider than requested. "
-                + "Consider increasing --max-samples, loosening --ci-target if the body is genuinely noisy, "
+                + "The reported error margin is wider than requested."
+                + cvClause
+                + " Consider loosening --ci-target if the body is genuinely noisy, raising --max-samples, "
                 + "or pinning --iterations for a deterministic count. For short bodies (<100 ns), the variance is often "
                 + "dominated by timer overhead and scheduler jitter rather than the code under test - use --launch-count "
                 + "to measure across-launch spread, which is usually the more honest signal.",
@@ -1186,15 +1390,65 @@ internal static class AdaptiveLoop
 
         if (warmupStop == WarmupStopReason.WallClockCap)
         {
+            var floorClause = warmupTimeFloorMet
+                ? "The warmup time floor was reached, so tiered compilation has most likely landed, but the body "
+                  + "was still getting faster when warmup stopped."
+                : "The warmup time floor was NOT reached, so the body may still be running pre-tier-1 "
+                  + "(unoptimized) code and the measured number can be several times slower than steady state "
+                  + "while still showing a tight error margin.";
+
             return
             [
                 $"Warmup exhausted its calibration+warmup budget ({sharePct} of the {capLabel} tuning cap) "
-                + "before the body reached a steady state. The remaining samples may be affected by JIT or cache warm-up. "
+                + $"before the body reached a steady state. {floorClause} "
                 + "Consider increasing --max-tuning-time, raising --warmup-budget-fraction, or pinning --warmup.",
             ];
         }
 
+        // Warmup hitting its sample ceiling used to exit silently. That is the most dangerous quiet
+        // failure in the loop: a fast body needs tens of thousands of samples to reach the time floor,
+        // so a ceiling that binds first means measurement begins on cold code with nothing said about it.
+        if (warmupStop == WarmupStopReason.MaxCeiling)
+        {
+            // Iteration setup/teardown runs outside the timed window, so accumulated in-body time
+            // materially under-counts real elapsed time and the floor check is not meaningful there.
+            if (!warmupTimeFloorMet && !hasIterationHooks)
+            {
+                return
+                [
+                    $"Warmup stopped at the sample ceiling ({resolvedWarmup:N0} iterations) without reaching the "
+                    + "warmup time floor, so the body may still be running pre-tier-1 (unoptimized) code. "
+                    + "A measurement taken there can be several times slower than steady state while still "
+                    + "reporting a tight error margin, and it will not reproduce across runs. "
+                    + "Consider raising --max-warmup, lowering --min-warmup-time, or pinning --warmup. "
+                    + "A body too fast to accumulate the floor within the ceiling (typically with "
+                    + "--ops-per-sample pinned to 1) needs a larger --ops-per-sample so each sample spans more work.",
+                ];
+            }
+
+            return
+            [
+                $"Warmup stopped at the sample ceiling ({resolvedWarmup:N0} iterations) without ever reaching a "
+                + "plateau - the body was still getting faster. The measured samples may be affected by "
+                + "ongoing JIT or cache warm-up. Consider raising --max-warmup or pinning --warmup.",
+            ];
+        }
+
         return [];
+    }
+
+    /// <summary>
+    ///     The sample count the CI-width rule would need for a given coefficient of variation and
+    ///     target half-width, from <c>n ~= (t * CV / target)^2</c> with <c>t ~= 1.96</c>. Used only to
+    ///     make a ceiling-stop warning concrete, so the normal approximation is ample.
+    /// </summary>
+    private static double EstimateSamplesForTarget(double coefficientOfVariation, double ciTarget)
+    {
+        if (ciTarget <= 0)
+            return double.PositiveInfinity;
+
+        var n = Math.Pow(1.96 * coefficientOfVariation / ciTarget, 2);
+        return double.IsFinite(n) ? Math.Ceiling(n) : double.PositiveInfinity;
     }
 
     private static (double elapsedNs, long allocDelta, DiagnosticDelta diagDelta) AcquireSampleSync(

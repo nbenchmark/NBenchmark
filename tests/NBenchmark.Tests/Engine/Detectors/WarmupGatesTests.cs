@@ -5,8 +5,9 @@ namespace NBenchmark.Tests;
 
 public class WarmupGatesTests
 {
-    // deactivate = 4 x floor, mirroring the detector's wiring.
+    // deactivate = 4 x floor and quiet <= floor, mirroring the detector's wiring.
     private const double Floor = 1_000.0;
+    private const double Quiet = 200.0;
     private const double Deactivate = 4_000.0;
 
     [Fact]
@@ -14,53 +15,84 @@ public class WarmupGatesTests
     {
         // Below the floor: cannot settle regardless of JIT state.
         Assert.False(WarmupGates.CanSettle(
-            warmupElapsedNs: 999.0, minWarmupTimeNs: Floor, jitCompiledDeltaLastBatch: 0,
-            requireJitQuiescence: true, jitGateDeactivateNs: Deactivate));
+            warmupElapsedNs: 999.0, minWarmupTimeNs: Floor, lastJitChangeAtNs: 0.0,
+            requireJitQuiescence: true, jitQuietPeriodNs: Quiet, jitGateDeactivateNs: Deactivate));
     }
 
     [Fact]
-    public void Allows_At_Time_Floor_When_Jit_Quiet()
+    public void Allows_At_Time_Floor_When_Jit_Never_Compiled()
     {
-        // Floor met (>=) and JIT quiet (delta 0): settle.
+        // A body that triggers no compilation at all is "quiet since ns 0", so the gate collapses to
+        // the time floor - the common case, and it must not cost anything.
         Assert.True(WarmupGates.CanSettle(
-            warmupElapsedNs: 1_000.0, minWarmupTimeNs: Floor, jitCompiledDeltaLastBatch: 0,
-            requireJitQuiescence: true, jitGateDeactivateNs: Deactivate));
+            warmupElapsedNs: 1_000.0, minWarmupTimeNs: Floor, lastJitChangeAtNs: 0.0,
+            requireJitQuiescence: true, jitQuietPeriodNs: Quiet, jitGateDeactivateNs: Deactivate));
     }
 
     [Fact]
-    public void Blocks_While_Jit_Active_Within_Deactivation_Window()
+    public void Allows_At_Time_Floor_When_Quiet_Period_Has_Elapsed()
     {
-        // Floor met but the JIT is still compiling and we are before the deactivation threshold.
+        // Last change at 700 ns, now at 1000 ns: 300 ns of quiet against a 200 ns requirement.
+        Assert.True(WarmupGates.CanSettle(
+            warmupElapsedNs: 1_000.0, minWarmupTimeNs: Floor, lastJitChangeAtNs: 700.0,
+            requireJitQuiescence: true, jitQuietPeriodNs: Quiet, jitGateDeactivateNs: Deactivate));
+    }
+
+    [Fact]
+    public void Blocks_When_Jit_Changed_Too_Recently()
+    {
+        // This is the case the old per-batch delta rule could not see. The JIT last compiled 100 ns
+        // ago, short of the 200 ns quiet requirement, so warmup must continue even though the time
+        // floor is met and this particular batch saw no compilation.
         Assert.False(WarmupGates.CanSettle(
-            warmupElapsedNs: 2_000.0, minWarmupTimeNs: Floor, jitCompiledDeltaLastBatch: 3,
-            requireJitQuiescence: true, jitGateDeactivateNs: Deactivate));
+            warmupElapsedNs: 1_100.0, minWarmupTimeNs: Floor, lastJitChangeAtNs: 1_000.0,
+            requireJitQuiescence: true, jitQuietPeriodNs: Quiet, jitGateDeactivateNs: Deactivate));
     }
 
     [Fact]
-    public void Allows_While_Jit_Active_Past_Deactivation_Window()
+    public void Allows_Exactly_At_Quiet_Period_Boundary()
     {
-        // Past the deactivation threshold the JIT gate is ignored even though the JIT is still busy.
+        // The comparison is >=, so exactly one quiet period is enough.
         Assert.True(WarmupGates.CanSettle(
-            warmupElapsedNs: 4_000.0, minWarmupTimeNs: Floor, jitCompiledDeltaLastBatch: 3,
-            requireJitQuiescence: true, jitGateDeactivateNs: Deactivate));
+            warmupElapsedNs: 1_200.0, minWarmupTimeNs: Floor, lastJitChangeAtNs: 1_000.0,
+            requireJitQuiescence: true, jitQuietPeriodNs: Quiet, jitGateDeactivateNs: Deactivate));
     }
 
     [Fact]
-    public void Jit_Gate_Off_Ignores_Jit_Delta()
+    public void Allows_With_Recent_Jit_Change_Past_Deactivation_Window()
     {
-        // With the gate disabled, only the time floor matters - a positive delta does not block.
+        // Past the deactivation threshold the gate is ignored even though the JIT just compiled, so a
+        // busy host that JITs unrelated code cannot hold warmup open forever.
         Assert.True(WarmupGates.CanSettle(
-            warmupElapsedNs: 1_000.0, minWarmupTimeNs: Floor, jitCompiledDeltaLastBatch: 99,
-            requireJitQuiescence: false, jitGateDeactivateNs: Deactivate));
+            warmupElapsedNs: 4_000.0, minWarmupTimeNs: Floor, lastJitChangeAtNs: 3_990.0,
+            requireJitQuiescence: true, jitQuietPeriodNs: Quiet, jitGateDeactivateNs: Deactivate));
+    }
+
+    [Fact]
+    public void Jit_Gate_Off_Ignores_Recent_Jit_Change()
+    {
+        // With the gate disabled, only the time floor matters.
+        Assert.True(WarmupGates.CanSettle(
+            warmupElapsedNs: 1_000.0, minWarmupTimeNs: Floor, lastJitChangeAtNs: 999.0,
+            requireJitQuiescence: false, jitQuietPeriodNs: Quiet, jitGateDeactivateNs: Deactivate));
+    }
+
+    [Fact]
+    public void Zero_Quiet_Period_Disables_The_Gate()
+    {
+        // A zero quiet period means the user asked for the time floor alone.
+        Assert.True(WarmupGates.CanSettle(
+            warmupElapsedNs: 1_000.0, minWarmupTimeNs: Floor, lastJitChangeAtNs: 1_000.0,
+            requireJitQuiescence: true, jitQuietPeriodNs: 0.0, jitGateDeactivateNs: Deactivate));
     }
 
     [Fact]
     public void Zero_Floor_Disables_Both_Gates()
     {
-        // A zero floor makes the deactivation threshold zero too, so the JIT gate never applies and
-        // settling is always allowed (the plateau rule alone governs) - even with the JIT busy.
+        // A zero floor leaves no timescale to measure a quiet period against, so the JIT gate never
+        // applies and the plateau rule alone governs - even with the JIT having just compiled.
         Assert.True(WarmupGates.CanSettle(
-            warmupElapsedNs: 0.0, minWarmupTimeNs: 0.0, jitCompiledDeltaLastBatch: 99,
-            requireJitQuiescence: true, jitGateDeactivateNs: 0.0));
+            warmupElapsedNs: 0.0, minWarmupTimeNs: 0.0, lastJitChangeAtNs: 0.0,
+            requireJitQuiescence: true, jitQuietPeriodNs: Quiet, jitGateDeactivateNs: 0.0));
     }
 }

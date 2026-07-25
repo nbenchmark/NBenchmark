@@ -21,4 +21,13 @@ public enum SampleStopReason
     ///     <see cref="AutoTuneOptions.MinSamples" />. The error margin is unreliable.
     /// </summary>
     GraceCapExhausted = 4,
+
+    /// <summary>
+    ///     The measured stream was still drifting - its first and second halves disagreed by more than
+    ///     <see cref="AutoTuneOptions.MeasurementDriftTolerance" /> - after
+    ///     <see cref="AutoTuneOptions.MeasurementRestartLimit" /> restarts. The confidence interval
+    ///     describes a moving target rather than a stable measurement, so the reported centre is not
+    ///     reproducible even though the interval may look narrow.
+    /// </summary>
+    DriftUnresolved = 5,
 }

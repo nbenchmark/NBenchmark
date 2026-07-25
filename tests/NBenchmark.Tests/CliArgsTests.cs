@@ -616,6 +616,111 @@ public class CliArgsTests
         Assert.Contains("Missing value", error);
     }
 
+    // ---------- Steady-state CLI flags ----------
+
+    [Theory]
+    [InlineData("--jit-quiet-period", "50", 50)]
+    [InlineData("--jit-quiet-period", "0", 0)]
+    [InlineData("--min-measurement-time", "100", 100)]
+    [InlineData("--min-measurement-time", "0", 0)]
+    [InlineData("--min-measurement-time", "250.5", 250.5)]
+    public void ParseCore_Timespan_Steady_State_Flags_Valid(string flag, string value, double expectedMs)
+    {
+        var (result, errors) = CliArgs.ParseCore([flag, value]);
+
+        Assert.Empty(errors);
+
+        var actual = flag == "--jit-quiet-period" ? result.JitQuietPeriod : result.MinMeasurementTime;
+        Assert.Equal(TimeSpan.FromMilliseconds(expectedMs), actual);
+    }
+
+    [Theory]
+    [InlineData("--jit-quiet-period", "-1")]
+    [InlineData("--jit-quiet-period", "bogus")]
+    [InlineData("--min-measurement-time", "-1")]
+    [InlineData("--min-measurement-time", "bogus")]
+    [InlineData("--drift-tolerance", "-0.1")]
+    [InlineData("--drift-tolerance", "1.1")]
+    [InlineData("--drift-tolerance", "bogus")]
+    [InlineData("--max-drift-restarts", "-1")]
+    [InlineData("--max-drift-restarts", "bogus")]
+    public void ParseCore_Steady_State_Flags_Invalid_ReturnsError(string flag, string value)
+    {
+        var (_, errors) = CliArgs.ParseCore([flag, value]);
+
+        var error = Assert.Single(errors);
+        Assert.Contains($"Invalid {flag}", error);
+    }
+
+    [Theory]
+    [InlineData("--jit-quiet-period")]
+    [InlineData("--min-measurement-time")]
+    [InlineData("--drift-tolerance")]
+    [InlineData("--max-drift-restarts")]
+    public void ParseCore_Steady_State_Flags_MissingValue_ReturnsError(string flag)
+    {
+        // Easy to miss: a new flag absent from the missing-value case arm falls through to "Unknown
+        // flag" instead, which is a confusing error for a real flag used without its argument.
+        var (_, errors) = CliArgs.ParseCore([flag]);
+
+        var error = Assert.Single(errors);
+        Assert.Contains("Missing value", error);
+    }
+
+    [Theory]
+    [InlineData("0", 0.0)]
+    [InlineData("0.1", 0.1)]
+    [InlineData("1", 1.0)]
+    public void ParseCore_DriftTolerance_Valid(string value, double expected)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--drift-tolerance", value]);
+
+        Assert.Empty(errors);
+        Assert.Equal(expected, result.DriftTolerance);
+    }
+
+    [Theory]
+    [InlineData("0", 0)]
+    [InlineData("3", 3)]
+    public void ParseCore_MaxDriftRestarts_Valid(string value, int expected)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--max-drift-restarts", value]);
+
+        Assert.Empty(errors);
+        Assert.Equal(expected, result.MaxDriftRestarts);
+    }
+
+    [Fact]
+    public void ParseCore_Steady_State_Flags_Default_To_Null()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+
+        Assert.Null(result.JitQuietPeriod);
+        Assert.Null(result.MinMeasurementTime);
+        Assert.Null(result.DriftTolerance);
+        Assert.Null(result.MaxDriftRestarts);
+    }
+
+    [Theory]
+    [InlineData("--min-warmup", "100000")]
+    [InlineData("--max-warmup", "100000")]
+    public void ParseCore_Auto_Warmup_Bounds_Accept_The_Auto_Ceiling(string flag, string value)
+    {
+        // The auto-warmup bounds are validated against MaxAutoWarmupIterations (100,000), not the
+        // tighter pinned-warmup limit (10,000): a fast body needs tens of thousands of samples to
+        // accumulate MinWarmupTime, so 10,000 would silently defeat the floor.
+        var (_, errors) = CliArgs.ParseCore([flag, value]);
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void ParseCore_Pinned_Warmup_Still_Uses_The_Tighter_Limit()
+    {
+        // --warmup pins an exact count and is unaffected by the auto ceiling.
+        var (_, errors) = CliArgs.ParseCore(["--warmup", "100000"]);
+        Assert.Single(errors);
+    }
+
     // ---------- Warmup time floor and JIT-quiescence gate CLI flags ----------
 
     [Theory]

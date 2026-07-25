@@ -11,6 +11,7 @@ internal sealed class WarmupPlateauDetector
     private readonly int _batchSize;
     private readonly double _epsilon;
     private readonly double _jitGateDeactivateNs;
+    private readonly double _jitQuietPeriodNs;
     private readonly int _maxWarmup;
     private readonly int _minWarmup;
     private readonly double _minWarmupTimeNs;
@@ -20,7 +21,9 @@ internal sealed class WarmupPlateauDetector
 
     private double _batchSum;
     private double _best = double.PositiveInfinity;
-    private long _lastBatchJitCount;
+    private long _jitBaseline = -1;
+    private long _lastJitCount = -1;
+    private double _lastJitChangeAtNs;
     private int _nonImproving;
     private double _warmupElapsedNs;
 
@@ -58,9 +61,16 @@ internal sealed class WarmupPlateauDetector
         _minWarmupTimeNs = Math.Max(0, options.MinWarmupTime.Ticks * 100.0);
         _requireJitQuiescence = options.RequireJitQuiescence;
 
+        // Clamp the quiet period down to the time floor so the gate can never become the binding
+        // floor itself. This keeps the composition predictable and documentable: when nothing is
+        // compiling, warmup ends at MinWarmupTime; when something is, warmup extends until the quiet
+        // period elapses, bounded by the deactivation threshold below. Without the clamp, setting
+        // MinWarmupTime = 10 ms would silently yield a 50 ms floor from the default quiet period.
+        _jitQuietPeriodNs = Math.Min(Math.Max(0, options.JitQuietPeriod.Ticks * 100.0), _minWarmupTimeNs);
+
         // The JIT-quiescence gate stops blocking once warmup has run 4 x the time floor, so a busy
         // host that JITs unrelated code cannot hold warmup open forever. A zero floor leaves this at
-        // zero, which disables the gate (WarmupGates treats a zero deactivation threshold as off).
+        // zero, which disables the gate (WarmupGates treats a zero floor as off).
         _jitGateDeactivateNs = _minWarmupTimeNs * 4.0;
     }
 
@@ -89,6 +99,31 @@ internal sealed class WarmupPlateauDetector
     public int Count { get; private set; }
 
     /// <summary>
+    ///     The number of samples grouped into one warmup batch, after the slow-body shrink. The caller
+    ///     uses this to read the JIT compiled-method count only at batch boundaries, since that is the
+    ///     only point the gate consults it.
+    /// </summary>
+    public int EffectiveBatchSize => _batchSize;
+
+    /// <summary>
+    ///     Whether accumulated warmup reached <see cref="AutoTuneOptions.MinWarmupTime" />. Readable
+    ///     after every exit path - settled, <see cref="WarmupStopReason.MaxCeiling" />, or the caller's
+    ///     budget cap - so the caller can warn when warmup was cut short of the floor and the body may
+    ///     still be running pre-tier-1 code.
+    /// </summary>
+    public bool TimeFloorMet => _warmupElapsedNs >= _minWarmupTimeNs;
+
+    /// <summary>
+    ///     How many methods the JIT compiled over the course of warmup (the count at the most recent
+    ///     batch boundary minus the baseline captured at the first), or <c>0</c> when no boundary has
+    ///     been reached. Reported as a diagnostic: a large value alongside a short warmup is the
+    ///     signature of a body measured mid-tier-up.
+    /// </summary>
+    public long JitCompiledDelta => _jitBaseline >= 0 && _lastJitCount >= 0
+        ? _lastJitCount - _jitBaseline
+        : 0;
+
+    /// <summary>
     ///     The mean per-op nanoseconds of the most recently completed batch, or <c>0</c> before the
     ///     first batch completes. This is the warm steady-state estimate the caller feeds into
     ///     post-warmup ops-per-sample recalibration (<see cref="WarmupRecalibration" />).
@@ -101,6 +136,15 @@ internal sealed class WarmupPlateauDetector
     ///     JIT compiled-method count read just after the sample (for the JIT-quiescence gate).
     ///     Returns <c>true</c> when warmup is resolved (the caller should move to measurement).
     /// </summary>
+    /// <param name="perOpNs">The sample's per-op nanoseconds.</param>
+    /// <param name="elapsedNs">The sample's raw elapsed nanoseconds (per-op times ops-per-sample).</param>
+    /// <param name="jitCompiledMethodCount">
+    ///     The process JIT compiled-method count read just after the sample, or <c>-1</c> for "not
+    ///     sampled". The gate only consults this at batch boundaries, so the caller may skip the read
+    ///     on non-boundary samples and pass <c>-1</c> - which matters once warmup spans tens of
+    ///     thousands of samples, and because the read itself can allocate and trigger JIT activity,
+    ///     perturbing the very signal it reports.
+    /// </param>
     public bool Feed(double perOpNs, double elapsedNs, long jitCompiledMethodCount)
     {
         if (Resolved)
@@ -110,10 +154,6 @@ internal sealed class WarmupPlateauDetector
         _batchSum += perOpNs;
         _batchCount++;
         _warmupElapsedNs += elapsedNs;
-
-        // Capture the JIT baseline on the first sample so the first batch's delta is well-defined.
-        if (Count == 1)
-            _lastBatchJitCount = jitCompiledMethodCount;
 
         if (Count >= _maxWarmup)
         {
@@ -130,9 +170,19 @@ internal sealed class WarmupPlateauDetector
         _batchCount = 0;
         LastBatchMeanPerOp = batchMean;
 
-        // Methods the JIT compiled during this batch (a proxy for in-flight tier-1 promotion).
-        var jitDelta = jitCompiledMethodCount - _lastBatchJitCount;
-        _lastBatchJitCount = jitCompiledMethodCount;
+        // Track *where in warmup* the compiled-method count last moved, rather than whether it moved
+        // during this one batch - the gate needs a sustained quiet interval, see WarmupGates.CanSettle.
+        // A negative count means the caller did not sample it here, so leave the state alone.
+        if (jitCompiledMethodCount >= 0)
+        {
+            // Capture the baseline at the first sampled boundary so JitCompiledDelta is well-defined.
+            if (_jitBaseline < 0)
+                _jitBaseline = jitCompiledMethodCount;
+            else if (jitCompiledMethodCount != _lastJitCount)
+                _lastJitChangeAtNs = _warmupElapsedNs;
+
+            _lastJitCount = jitCompiledMethodCount;
+        }
 
         // "Improving" means at least WarmupEpsilon faster than the best batch seen so far.
         if (batchMean < _best * (1.0 - _epsilon))
@@ -144,12 +194,13 @@ internal sealed class WarmupPlateauDetector
             _best = batchMean;
 
         // The plateau rule says the body has stopped getting faster; the settle gates then decide
-        // whether it is actually safe to stop (enough wall-clock warmup, JIT quiesced).
+        // whether it is actually safe to stop (enough warmup time accumulated, JIT quiesced).
         var plateauReached = Count >= _minWarmup && _nonImproving >= _patience;
 
         if (plateauReached
             && WarmupGates.CanSettle(
-                _warmupElapsedNs, _minWarmupTimeNs, jitDelta, _requireJitQuiescence, _jitGateDeactivateNs))
+                _warmupElapsedNs, _minWarmupTimeNs, _lastJitChangeAtNs,
+                _requireJitQuiescence, _jitQuietPeriodNs, _jitGateDeactivateNs))
         {
             Resolved = true;
             StopReason = WarmupStopReason.Settled;

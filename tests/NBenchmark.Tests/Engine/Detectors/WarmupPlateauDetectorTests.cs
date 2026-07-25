@@ -190,8 +190,7 @@ public class WarmupPlateauDetectorTests
     public void JitGate_Blocks_While_Jit_Compiling_Then_Settles_When_Quiet()
     {
         // The plateau is ready and the (tiny) time floor is met immediately, but the JIT gate holds
-        // warmup open while the compiled-method count keeps rising, and releases it on the first
-        // batch with a zero delta.
+        // warmup open until a full quiet period has elapsed since the count last moved.
         var options = AutoTuneOptions.Default with
         {
             BatchSize = 1,
@@ -202,15 +201,140 @@ public class WarmupPlateauDetectorTests
         };
         var detector = new WarmupPlateauDetector(options);
 
-        // JIT count: 0 (baseline at sample 1), 5 at sample 2 (delta 5 -> blocks), 5 thereafter
-        // (delta 0 -> quiescent).
+        // JIT count: 0 (baseline at sample 1), then 5 from sample 2 onward - so the count changes once,
+        // at 200 ns, and never again. The quiet period is clamped to the 100 ns floor.
         var resolvedAt = FeedUntilResolved(
             detector, perOp: 100.0, elapsedNs: 100.0, jit: i => i <= 1 ? 0 : 5, cap: 1_000);
 
         Assert.True(detector.Resolved);
         Assert.Equal(WarmupStopReason.Settled, detector.StopReason);
-        // Sample 2 is plateau-ready but the JIT delta of 5 blocks; sample 3 has delta 0 -> settle.
+        // Sample 2 is plateau-ready but the count just moved (0 ns of quiet); by sample 3 the change is
+        // 100 ns in the past, satisfying the quiet period -> settle.
         Assert.Equal(3, resolvedAt);
+
+        // The delta is reported for the diagnostic: baseline 0 at the first boundary, 5 at the last.
+        Assert.Equal(5, detector.JitCompiledDelta);
+        Assert.True(detector.TimeFloorMet);
+    }
+
+    [Fact]
+    public void JitGate_Requires_The_Quiet_Period_To_Elapse_After_The_Last_Change()
+    {
+        // The failure the old per-batch rule could not catch: the count moves at a batch boundary, then
+        // the *next* boundary sees no change. A per-batch delta reads zero there and settles
+        // immediately; the quiet-interval rule keeps warming until enough time has actually passed.
+        // Quiet period 500 ns against a 500 ns floor (the clamp keeps them equal here).
+        var options = AutoTuneOptions.Default with
+        {
+            BatchSize = 1,
+            PlateauPatience = 1,
+            MinWarmup = 1,
+            MinWarmupTime = TimeSpan.FromTicks(5), // 500 ns floor -> quiet period clamped to 500 ns
+            JitQuietPeriod = TimeSpan.FromMilliseconds(50),
+            RequireJitQuiescence = true,
+        };
+        var detector = new WarmupPlateauDetector(options);
+
+        // The count moves once, at sample 3 (300 ns) - before the floor is reached - then stays put.
+        var resolvedAt = FeedUntilResolved(
+            detector, perOp: 100.0, elapsedNs: 100.0, jit: i => i < 3 ? 1 : 2, cap: 1_000);
+
+        Assert.True(detector.Resolved);
+        Assert.Equal(WarmupStopReason.Settled, detector.StopReason);
+
+        // Change at 300 ns + 500 ns of required quiet = 800 ns, reached at sample 8 (and well inside the
+        // 2,000 ns deactivation threshold). A per-batch delta rule would have settled at sample 5: the
+        // batch at the floor saw no compilation, so its delta was zero.
+        Assert.Equal(8, resolvedAt);
+    }
+
+    [Fact]
+    public void JitQuietPeriod_Is_Clamped_To_The_Time_Floor()
+    {
+        // A quiet period longer than the floor must not become the binding floor: with the count never
+        // moving, warmup still ends at the floor rather than at the (much larger) quiet period.
+        var options = AutoTuneOptions.Default with
+        {
+            BatchSize = 1,
+            PlateauPatience = 1,
+            MinWarmup = 1,
+            MinWarmupTime = TimeSpan.FromTicks(3), // 300 ns floor
+            JitQuietPeriod = TimeSpan.FromSeconds(10), // absurdly long; clamped to 300 ns
+            RequireJitQuiescence = true,
+        };
+        var detector = new WarmupPlateauDetector(options);
+
+        var resolvedAt = FeedUntilResolved(
+            detector, perOp: 100.0, elapsedNs: 100.0, jit: _ => 7, cap: 1_000);
+
+        Assert.True(detector.Resolved);
+        Assert.Equal(WarmupStopReason.Settled, detector.StopReason);
+        // 300 ns floor / 100 ns per sample = 3 samples; the plateau is ready at sample 2.
+        Assert.Equal(3, resolvedAt);
+    }
+
+    [Fact]
+    public void MaxCeiling_Reports_TimeFloorMet_False_When_Warmup_Was_Cut_Short()
+    {
+        // A body far too fast to accumulate the floor within the sample ceiling. This is the silent
+        // failure the caller now warns about: warmup exits on the ceiling with the body potentially
+        // still on pre-tier-1 code, and TimeFloorMet is how the caller detects it.
+        var options = AutoTuneOptions.Default with
+        {
+            BatchSize = 1,
+            PlateauPatience = 1,
+            MinWarmup = 1,
+            MaxWarmup = 20,
+            MinWarmupTime = TimeSpan.FromMilliseconds(100), // unreachable: 20 samples x 1 ns = 20 ns
+            RequireJitQuiescence = false,
+        };
+        var detector = new WarmupPlateauDetector(options);
+
+        var resolvedAt = FeedUntilResolved(detector, perOp: 1.0, elapsedNs: 1.0, jit: _ => 0, cap: 1_000);
+
+        Assert.Equal(20, resolvedAt);
+        Assert.Equal(WarmupStopReason.MaxCeiling, detector.StopReason);
+        Assert.False(detector.TimeFloorMet);
+    }
+
+    [Fact]
+    public void EffectiveBatchSize_Reports_The_Shrunk_Batch_For_A_Slow_Body()
+    {
+        // The caller reads EffectiveBatchSize to sample the JIT counter only at boundaries, so it has
+        // to reflect the slow-body shrink rather than the configured value.
+        var options = AutoTuneOptions.Default with { BatchSize = 8 };
+
+        // 250 ms target batch / 100 ms per sample -> ceil(2.5) = 3, under the configured 8.
+        var slow = new WarmupPlateauDetector(options, perSampleEstimateNs: 100_000_000.0);
+        Assert.Equal(3, slow.EffectiveBatchSize);
+
+        // A fast body is unaffected: the scaled value is clamped to the configured BatchSize.
+        var fast = new WarmupPlateauDetector(options, perSampleEstimateNs: 1_000.0);
+        Assert.Equal(8, fast.EffectiveBatchSize);
+    }
+
+    [Fact]
+    public void Unsampled_Jit_Count_Does_Not_Disturb_The_Gate()
+    {
+        // The caller passes -1 on non-boundary samples. With BatchSize 1 every sample is a boundary, so
+        // force the issue directly: a stream of -1 must behave exactly like "never changed", i.e. the
+        // gate collapses to the time floor rather than blocking forever.
+        var options = AutoTuneOptions.Default with
+        {
+            BatchSize = 1,
+            PlateauPatience = 1,
+            MinWarmup = 1,
+            MinWarmupTime = TimeSpan.FromTicks(3), // 300 ns floor
+            RequireJitQuiescence = true,
+        };
+        var detector = new WarmupPlateauDetector(options);
+
+        var resolvedAt = FeedUntilResolved(detector, perOp: 100.0, elapsedNs: 100.0, jit: _ => -1L, cap: 1_000);
+
+        Assert.True(detector.Resolved);
+        Assert.Equal(WarmupStopReason.Settled, detector.StopReason);
+        Assert.Equal(3, resolvedAt);
+        Assert.Equal(0, detector.JitCompiledDelta);
     }
 
     [Fact]

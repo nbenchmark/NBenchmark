@@ -15,6 +15,21 @@ public static class SampleQuality
     /// <summary>Split-half Mann-Whitney p-value below which a drift warning fires.</summary>
     public const double DriftPValueThreshold = 0.001;
 
+    /// <summary>
+    ///     The relative gap between the two half-medians a drift must also exceed before the warning
+    ///     fires, as a fraction of the smaller half-median. Mirrors the engine's in-loop drift gate so
+    ///     the two cannot contradict each other.
+    ///     <para>
+    ///         Significance alone is not enough at the sample counts the measurement time floor now
+    ///         produces. A rank test on 2,000 samples resolves a sub-percent shift to p far below the
+    ///         threshold, so a bare p-value rule would warn "the halves differ significantly" on
+    ///         precisely the runs the engine's gate just certified as steady - contradictory advice on
+    ///         a difference too small to act on. Requiring practical magnitude as well keeps the
+    ///         warning about drift that matters.
+    ///     </para>
+    /// </summary>
+    public const double DriftRelativeThreshold = 0.10;
+
     /// <summary>Lag-1 autocorrelation above which a dependence warning fires.</summary>
     public const double AutocorrelationThreshold = 0.5;
 
@@ -35,8 +50,10 @@ public static class SampleQuality
 
         var warnings = new List<string>(2);
 
-        // Drift: compare the first and second halves of the arrival-order stream. A significant
-        // difference means the distribution moved during measurement.
+        // Drift: compare the first and second halves of the arrival-order stream. A shift that is both
+        // statistically significant and practically large means the distribution moved during
+        // measurement. Both conditions are required - see DriftRelativeThreshold for why significance
+        // alone would contradict the engine's own in-loop drift gate.
         var half = n / 2;
         var first = rawArrivalOrder[..half];
         var second = rawArrivalOrder[half..];
@@ -44,12 +61,17 @@ public static class SampleQuality
 
         if (!double.IsNaN(drift.PValue) && drift.PValue < DriftPValueThreshold)
         {
-            warnings.Add(
-                $"the first and second halves of the measured stream differ significantly "
-                + $"(split-half Mann-Whitney p = {FormatP(drift.PValue)}) - the timings drifted during "
-                + "measurement (JIT tier-up/DPGO, thermal ramp, or periodic GC), so the reported "
-                + "confidence interval may understate the true uncertainty; consider a longer warmup "
-                + "(--min-warmup-time) or checking host thermal/load state.");
+            var relativeShift = RelativeMedianShift(first, second);
+
+            if (relativeShift > DriftRelativeThreshold)
+            {
+                warnings.Add(
+                    $"the first and second halves of the measured stream differ significantly "
+                    + $"(split-half Mann-Whitney p = {FormatP(drift.PValue)}, medians {relativeShift * 100:F1}% apart) - "
+                    + "the timings drifted during measurement (JIT tier-up/DPGO, thermal ramp, or periodic GC), "
+                    + "so the reported confidence interval describes a moving target and may understate the true "
+                    + "uncertainty; consider a longer warmup (--min-warmup-time) or checking host thermal/load state.");
+            }
         }
 
         // Dependence: lag-1 autocorrelation. Positive correlation between consecutive samples
@@ -105,4 +127,35 @@ public static class SampleQuality
     }
 
     private static string FormatP(double p) => p < 1e-6 ? p.ToString("0.0e+0") : p.ToString("0.######");
+
+    /// <summary>
+    ///     The gap between the two halves' medians as a fraction of the smaller one, or <c>0</c> when
+    ///     either half is empty or degenerate. Medians rather than means, because the heavy-tailed
+    ///     bodies this check runs on have means dominated by their tails - a single GC pause in one half
+    ///     would otherwise read as drift.
+    /// </summary>
+    private static double RelativeMedianShift(double[] first, double[] second)
+    {
+        if (first.Length == 0 || second.Length == 0)
+            return 0.0;
+
+        var a = Median(first);
+        var b = Median(second);
+
+        if (!double.IsFinite(a) || !double.IsFinite(b) || a <= 0 || b <= 0)
+            return 0.0;
+
+        return Math.Abs(b - a) / Math.Min(a, b);
+    }
+
+    private static double Median(double[] values)
+    {
+        var sorted = values.ToArray();
+        Array.Sort(sorted);
+        var mid = sorted.Length / 2;
+
+        return sorted.Length % 2 == 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2.0
+            : sorted[mid];
+    }
 }

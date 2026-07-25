@@ -34,7 +34,7 @@ public class CiWidthDetectorTests
         for (var i = 1; i <= 1_000; i++)
         {
             // A wildly bimodal stream cannot reach a 0.1% half-width within the ceiling.
-            if (detector.Feed(i % 2 == 0 ? 10.0 : 200.0))
+            if (detector.Feed(i % 2 == 0 ? 10.0 : 200.0, stopAllowed: true))
             {
                 resolvedAt = i;
                 break;
@@ -58,7 +58,7 @@ public class CiWidthDetectorTests
 
         foreach (var s in samples)
         {
-            detector.Feed(s);
+            detector.Feed(s, stopAllowed: true);
         }
 
         var expected = StatsSummary.Compute(samples);
@@ -84,7 +84,7 @@ public class CiWidthDetectorTests
             for (var i = 1; i <= 100_000; i++)
             {
                 // Deterministic moderate-spread stream (CV ~ 3.5%).
-                if (detector.Feed(100.0 + 5.0 * Math.Sin(i)))
+                if (detector.Feed(100.0 + 5.0 * Math.Sin(i), stopAllowed: true))
                     break;
             }
 
@@ -117,15 +117,15 @@ public class CiWidthDetectorTests
         // and the mean is positive, so every cadence check appends an entry.
         for (var i = 1; i <= 20; i++)
         {
-            detector.Feed(100.0 + 10.0 * Math.Sin(i));
+            detector.Feed(100.0 + 10.0 * Math.Sin(i), stopAllowed: true);
         }
 
         Assert.True(detector.Resolved);
         Assert.Equal(SampleStopReason.MaxCeiling, detector.StopReason);
 
-        // Evaluations at Count = 2, 4, 6, ..., 18 (nine cadence checks) plus the MaxCeiling
-        // evaluation at Count = 20. The MaxCeiling branch fires before the cadence branch when
-        // Count == _maxSamples, so Count = 20 produces one entry, not two.
+        // Evaluations at Count = 2, 4, 6, ..., 18 (nine cadence checks) plus the ceiling evaluation
+        // at Count = 20. Count = 20 satisfies both the cadence and the ceiling, but the half-width is
+        // computed once per sample, so it produces one entry, not two.
         Assert.Equal(10, detector.HalfWidthSeries.Count);
 
         // The final series entry must match the last AchievedRelativeHalfWidth the detector
@@ -158,7 +158,7 @@ public class CiWidthDetectorTests
 
         for (var i = 0; i < 4; i++)
         {
-            detector.Feed(0.0);
+            detector.Feed(0.0, stopAllowed: true);
         }
 
         Assert.True(detector.Resolved);
@@ -180,10 +180,102 @@ public class CiWidthDetectorTests
     {
         for (var i = 1; i <= cap; i++)
         {
-            if (detector.Feed(value))
+            if (detector.Feed(value, stopAllowed: true))
                 return i;
         }
 
         throw new InvalidOperationException("Detector did not resolve.");
+    }
+
+    [Fact]
+    public void StopAllowed_False_Blocks_CiTargetMet_But_Keeps_Accumulating()
+    {
+        // A tight, easily-converging stream that would stop on the CI target immediately. With the
+        // outside floor withholding permission, the detector must keep going - this is how the
+        // measurement time floor composes on top without the detector knowing about it.
+        var options = AutoTuneOptions.Default with { MinSamples = 2, BatchSize = 2, MaxSamples = 500, CiTarget = 0.5 };
+        var detector = new CiWidthDetector(0.95, options);
+
+        for (var i = 0; i < 100; i++)
+        {
+            Assert.False(detector.Feed(100.0, stopAllowed: false));
+        }
+
+        Assert.False(detector.Resolved);
+        Assert.Equal(100, detector.Count);
+
+        // The half-width was still tracked while stopping was blocked, so the convergence trace does
+        // not go dark during the floor.
+        Assert.NotEmpty(detector.HalfWidthSeries);
+
+        // Once permission arrives, the next *cadence* check resolves. Sample 101 is off-cadence, so the
+        // stop rule is not evaluated there; sample 102 is.
+        Assert.False(detector.Feed(100.0, stopAllowed: true));
+        Assert.True(detector.Feed(100.0, stopAllowed: true));
+        Assert.Equal(SampleStopReason.CiTargetMet, detector.StopReason);
+    }
+
+    [Fact]
+    public void StopAllowed_False_Does_Not_Block_MaxCeiling()
+    {
+        // The ceiling must latch regardless of the floor, or a nano-scale body that can never
+        // accumulate the required duration would spin forever.
+        var options = AutoTuneOptions.Default with { MinSamples = 2, BatchSize = 2, MaxSamples = 10, CiTarget = 0.5 };
+        var detector = new CiWidthDetector(0.95, options);
+
+        var resolvedAt = 0;
+
+        for (var i = 1; i <= 10; i++)
+        {
+            if (detector.Feed(100.0 + 10.0 * Math.Sin(i), stopAllowed: false))
+            {
+                resolvedAt = i;
+                break;
+            }
+        }
+
+        Assert.Equal(10, resolvedAt);
+        Assert.Equal(SampleStopReason.MaxCeiling, detector.StopReason);
+    }
+
+    [Fact]
+    public void CiTargetMet_Wins_Over_MaxCeiling_On_The_Boundary_Sample()
+    {
+        // When the final permitted sample both reaches MaxSamples and meets the target, the target was
+        // genuinely met - reporting MaxCeiling would attach a "wider than requested" warning to a run
+        // that satisfied the request.
+        var options = AutoTuneOptions.Default with { MinSamples = 2, BatchSize = 10, MaxSamples = 10, CiTarget = 0.5 };
+        var detector = new CiWidthDetector(0.95, options);
+
+        for (var i = 1; i <= 10; i++)
+        {
+            detector.Feed(100.0, stopAllowed: true);
+        }
+
+        Assert.True(detector.Resolved);
+        Assert.Equal(SampleStopReason.CiTargetMet, detector.StopReason);
+    }
+
+    [Fact]
+    public void CoefficientOfVariation_Tracks_The_Welford_State()
+    {
+        var options = AutoTuneOptions.Default with { MinSamples = 2, BatchSize = 2, MaxSamples = 1_000, CiTarget = 0.0 };
+        var detector = new CiWidthDetector(0.95, options);
+
+        // Alternating 90/110 around a mean of 100 gives a sample StdDev of ~10.26 at n = 100.
+        for (var i = 0; i < 100; i++)
+        {
+            detector.Feed(i % 2 == 0 ? 90.0 : 110.0, stopAllowed: true);
+        }
+
+        Assert.Equal(detector.StandardDeviation / detector.Mean, detector.CoefficientOfVariation, 12);
+        Assert.InRange(detector.CoefficientOfVariation, 0.09, 0.11);
+    }
+
+    [Fact]
+    public void CoefficientOfVariation_Is_NaN_Before_A_Positive_Mean()
+    {
+        var detector = new CiWidthDetector(0.95, AutoTuneOptions.Default);
+        Assert.True(double.IsNaN(detector.CoefficientOfVariation));
     }
 }

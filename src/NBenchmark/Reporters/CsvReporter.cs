@@ -62,7 +62,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
             baseHeaders += ",Mean,OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,AutoTuneSplitHalfDrift,AutoTuneRestarts,AutoTuneWarmupTimeFloorMet,AutoTuneWarmupJitMethods,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories");
         }
 
         foreach (var table in tables)
@@ -153,6 +153,10 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                         : "";
 
                     var atDetectorSwitched = autoTune?.OutlierDetectorSwitched == true ? "true" : "";
+                    var atSplitHalfDrift = autoTune is null ? "" : autoTune.SplitHalfDrift.ToString("F4");
+                    var atRestarts = autoTune?.MeasurementRestarts.ToString() ?? "";
+                    var atWarmupFloorMet = autoTune is null ? "" : autoTune.WarmupTimeFloorMet ? "true" : "false";
+                    var atWarmupJitMethods = autoTune?.WarmupJitCompiledMethods.ToString() ?? "";
 
                     var safeCategories = string.Join("; ", row.Categories).Replace("\"", "\"\"");
                     var advancedDiag = row.Diagnostics;
@@ -189,6 +193,10 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                         $"{atTuningMs}," +
                         $"{atJitterMetric}," +
                         $"{atDetectorSwitched}," +
+                        $"{atSplitHalfDrift}," +
+                        $"{atRestarts}," +
+                        $"{atWarmupFloorMet}," +
+                        $"{atWarmupJitMethods}," +
                         $"{heapCommitted}," +
                         $"{heapFragmented}," +
                         $"{excPerOp}," +

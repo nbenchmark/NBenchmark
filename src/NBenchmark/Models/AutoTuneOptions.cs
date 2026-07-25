@@ -15,16 +15,26 @@ public sealed record AutoTuneOptions
     /// <summary>The balanced default profile.</summary>
     public static readonly AutoTuneOptions Default = new();
 
-    /// <summary>Fewer samples and a looser CI target for fast feedback.</summary>
+    /// <summary>
+    ///     Fewer samples and a looser CI target for fast feedback.
+    ///     <para>
+    ///         Note this preset does <em>not</em> shorten <see cref="MinWarmupTime" />. That floor is a
+    ///         measurement-<em>correctness</em> requirement (it is what gives tiered compilation time to
+    ///         land before measurement starts), not a speed/accuracy trade-off, so it is the same across
+    ///         every preset. Quick's speed comes from its looser <see cref="CiTarget" />, lower
+    ///         <see cref="MinSamples" />, and shorter <see cref="MaxTuningTime" />.
+    ///     </para>
+    /// </summary>
     public static readonly AutoTuneOptions Quick = new()
     {
         MinWarmup = 4,
         MinSamples = 15,
+        MaxSamples = 2_000,
         CiTarget = 0.05,
         MaxTuningTime = TimeSpan.FromSeconds(5),
         BatchSize = 4,
         PlateauPatience = 2,
-        MinWarmupTime = TimeSpan.FromMilliseconds(25),
+        MinMeasurementTime = TimeSpan.FromMilliseconds(50),
     };
 
     /// <summary>More samples and a tighter CI target for publication-grade numbers.</summary>
@@ -32,9 +42,14 @@ public sealed record AutoTuneOptions
     {
         MinWarmup = 16,
         MinSamples = 100,
+        MaxSamples = 20_000,
         CiTarget = 0.01,
         TargetSampleDurationNs = 50_000,
         MaxTuningTime = TimeSpan.FromSeconds(60),
+        MinWarmupTime = TimeSpan.FromMilliseconds(1_000),
+        JitQuietPeriod = TimeSpan.FromMilliseconds(100),
+        MinMeasurementTime = TimeSpan.FromMilliseconds(500),
+        MeasurementRestartLimit = 3,
     };
 
     private readonly int _batchSize = 8;
@@ -42,7 +57,11 @@ public sealed record AutoTuneOptions
     private readonly int _plateauPatience = 3;
     private readonly double _warmupBudgetFraction = 0.4;
     private readonly double _capGraceFactor = 1.5;
-    private readonly TimeSpan _minWarmupTime = TimeSpan.FromMilliseconds(100);
+    private readonly TimeSpan _minWarmupTime = TimeSpan.FromMilliseconds(500);
+    private readonly TimeSpan _jitQuietPeriod = TimeSpan.FromMilliseconds(50);
+    private readonly TimeSpan _minMeasurementTime = TimeSpan.FromMilliseconds(100);
+    private readonly double _measurementDriftTolerance = 0.10;
+    private readonly int _measurementRestartLimit = 2;
 
     // ----- Warmup plateau -----
 
@@ -54,13 +73,25 @@ public sealed record AutoTuneOptions
     ///         batch plus <see cref="PlateauPatience" /> non-improving ones), so with the defaults
     ///         (patience 3, batch 8) the effective minimum is 32 samples and <c>MinWarmup</c> only
     ///         binds when raised above that. <see cref="MinWarmupTime" /> is the independent floor
-    ///         on warmup <em>wall-clock</em>, which for fast bodies is usually the binding one.
+    ///         on warmup <em>duration</em>, which in practice is the binding one for almost every body.
     ///     </para>
     /// </summary>
     public int MinWarmup { get; init; } = 8;
 
-    /// <summary>The warmup ceiling. Default 10,000 (== <see cref="MeasurementOptions.MaxWarmupIterations" />).</summary>
-    public int MaxWarmup { get; init; } = 10_000;
+    /// <summary>
+    ///     The warmup ceiling, as a sample count. Default 100,000
+    ///     (== <see cref="MeasurementOptions.MaxAutoWarmupIterations" />).
+    ///     <para>
+    ///         This is deliberately far above the count any body needs, so that the <em>time</em> bounds -
+    ///         <see cref="MinWarmupTime" /> from below and the calibration+warmup share
+    ///         (<see cref="WarmupBudgetFraction" /> of <see cref="MaxTuningTime" />) from above - are the
+    ///         binding constraints. A count ceiling low enough to bind before
+    ///         <see cref="MinWarmupTime" /> silently defeats the floor: warmup exits on the ceiling with
+    ///         the body still running pre-tier-1 code. Hitting this ceiling before the time floor is
+    ///         reached raises a warning.
+    ///     </para>
+    /// </summary>
+    public int MaxWarmup { get; init; } = MeasurementOptions.MaxAutoWarmupIterations;
 
     /// <summary>
     ///     The minimum relative improvement a warmup batch must show over the best batch so far
@@ -81,16 +112,40 @@ public sealed record AutoTuneOptions
     }
 
     /// <summary>
-    ///     The minimum wall-clock time auto-warmup must run before it may settle, regardless of how
-    ///     quickly the plateau rule is satisfied. Default 100 ms (25 ms under the <c>Quick</c> preset).
+    ///     The minimum in-body time auto-warmup must run before it may settle, regardless of how
+    ///     quickly the plateau rule is satisfied. Default 500 ms (1 s under the <c>Thorough</c>
+    ///     preset); the same on every preset, since this is a correctness floor rather than a
+    ///     speed/accuracy trade-off.
     ///     <para>
     ///         The plateau rule measures warmup in <em>iterations</em>, but a fast body plateaus in
     ///         microseconds of wall-clock - long before the background JIT delivers tier-1 (and
     ///         dynamic-PGO) code. Warmup then settles on the stable but slow tier-0 plateau and the
     ///         tier-1 switch lands mid-measurement as a step change, the dominant source of
     ///         run-to-run variance on very fast benchmarks. This floor holds warmup open long enough
-    ///         for tiered compilation to land. It is bounded above by the calibration+warmup budget
-    ///         share (<see cref="WarmupBudgetFraction" /> of <see cref="MaxTuningTime" />) and by
+    ///         for tiered compilation to land.
+    ///     </para>
+    ///     <para>
+    ///         The default is 5× the runtime's <c>TieredCompilation.CallCountingDelayMs</c> (100 ms).
+    ///         That delay <em>restarts</em> while tier-0 methods are still being called for the first
+    ///         time, and tier-1 is only <em>queued</em> once it finally expires - then compiled on a
+    ///         background thread, with a further instrumented-to-optimized transition under dynamic PGO
+    ///         and, for a method with a hot loop, on-stack replacement before any of that. A floor at or
+    ///         below 100 ms therefore reliably lands those transitions inside the measurement window
+    ///         instead of before it.
+    ///     </para>
+    ///     <para>
+    ///         500 ms was chosen empirically, not from the delay alone. On a 10-benchmark suite, raising
+    ///         the floor from 250 ms to 500 ms cost 55% more wall-clock and took the worst observed
+    ///         run-to-run median spread from 4.8× to 1.08× (a <c>StringBuilder</c>-append loop whose
+    ///         steady state is ~4.5× faster than its tier-0 code, and which at 250 ms landed in either
+    ///         regime depending on the run). Going on to 1 s cost a further 76% and improved only one
+    ///         remaining benchmark, so that is where <c>Thorough</c> sits rather than the default. A body
+    ///         that needs longer still - typically a hot loop that depends heavily on dynamic PGO - shows
+    ///         up as a stable but irreproducible median; raise this knob for it.
+    ///     </para>
+    ///     <para>
+    ///         It is bounded above by the calibration+warmup budget share
+    ///         (<see cref="WarmupBudgetFraction" /> of <see cref="MaxTuningTime" />) and by
     ///         <see cref="MaxWarmup" />, either of which stops warmup first for a genuinely slow body.
     ///         Set to <see cref="TimeSpan.Zero" /> to disable the floor (which also disables the
     ///         <see cref="RequireJitQuiescence" /> gate).
@@ -105,26 +160,82 @@ public sealed record AutoTuneOptions
     }
 
     /// <summary>
-    ///     Whether auto-warmup additionally refuses to settle while the JIT is still compiling
-    ///     methods (a proxy for in-flight tier-1 promotion of the body under test). Default <c>true</c>.
+    ///     Whether auto-warmup additionally refuses to settle until the JIT has been quiet for
+    ///     <see cref="JitQuietPeriod" /> (a proxy for in-flight tier-1 promotion of the body under
+    ///     test having completed). Default <c>true</c>.
     ///     <para>
     ///         At each warmup batch boundary the loop reads <see cref="System.Runtime.JitInfo" />'s
-    ///         compiled-method count; while the count is still rising over a batch, warmup continues.
-    ///         To avoid blocking forever on a busy in-process host that JITs unrelated code, the gate
-    ///         deactivates once warmup has run for 4 × <see cref="MinWarmupTime" />. The gate is
-    ///         inactive when <see cref="MinWarmupTime" /> is <see cref="TimeSpan.Zero" />. Set to
-    ///         <c>false</c> to keep only the time floor.
+    ///         compiled-method count and remembers where in warmup it last changed; warmup continues
+    ///         until that change is <see cref="JitQuietPeriod" /> in the past. To avoid blocking
+    ///         forever on a busy in-process host that JITs unrelated code, the gate deactivates once
+    ///         warmup has run for 4 × <see cref="MinWarmupTime" />. The gate is inactive when
+    ///         <see cref="MinWarmupTime" /> or <see cref="JitQuietPeriod" /> is
+    ///         <see cref="TimeSpan.Zero" />. Set to <c>false</c> to keep only the time floor.
     ///     </para>
     /// </summary>
     public bool RequireJitQuiescence { get; init; } = true;
 
+    /// <summary>
+    ///     How long the JIT compiled-method count must stay unchanged before the
+    ///     <see cref="RequireJitQuiescence" /> gate lets warmup settle, measured in accumulated in-body
+    ///     warmup time. Default 50 ms (100 ms under the <c>Thorough</c> preset).
+    ///     <para>
+    ///         A <em>sustained quiet interval</em> is the point of this knob. Asking only whether the
+    ///         JIT compiled anything during the most recent batch cannot work: for a fast body one
+    ///         batch spans tens of microseconds, so a background tier-1 compilation almost never lands
+    ///         inside that specific window and the per-batch delta reads zero essentially always. The
+    ///         quiet interval has to be matched to the timescale of the phenomenon, not to the batch.
+    ///     </para>
+    ///     <para>
+    ///         Clamped down to <see cref="MinWarmupTime" /> by the detector so it can never become the
+    ///         binding floor - when nothing is compiling, warmup ends at <see cref="MinWarmupTime" />;
+    ///         when something is, warmup extends until the quiet interval elapses, bounded by
+    ///         4 × <see cref="MinWarmupTime" />. Set to <see cref="TimeSpan.Zero" /> to disable the
+    ///         gate while keeping the time floor.
+    ///     </para>
+    /// </summary>
+    public TimeSpan JitQuietPeriod
+    {
+        get => _jitQuietPeriod;
+        init => _jitQuietPeriod = value >= TimeSpan.Zero
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value, "JitQuietPeriod must be zero or positive.");
+    }
+
     // ----- CI-width sample count -----
 
-    /// <summary>The earliest sample at which auto-measurement may stop on the CI target. Default 30.</summary>
+    /// <summary>
+    ///     The earliest sample <em>count</em> at which auto-measurement may stop on the CI target.
+    ///     Default 30 (15 under <c>Quick</c>, 100 under <c>Thorough</c>).
+    ///     <para>
+    ///         This is the <em>validity</em> floor - below it the computed interval is not trustworthy
+    ///         regardless of how narrow it looks. <see cref="MinMeasurementTime" /> is the independent
+    ///         floor on measurement <em>duration</em>, which for fast bodies is the binding one and is
+    ///         what makes the sample count scale with how cheap the body is. This count floor is also
+    ///         the one the <see cref="CapGraceFactor" /> grace budget chases, so it stays a count.
+    ///     </para>
+    /// </summary>
     public int MinSamples { get; init; } = 30;
 
-    /// <summary>The measured-sample ceiling. Default 100,000 (== <see cref="MeasurementOptions.MaxIterations" />).</summary>
-    public int MaxSamples { get; init; } = 100_000;
+    /// <summary>
+    ///     The measured-sample ceiling. Default 5,000 (2,000 under <c>Quick</c>, 20,000 under
+    ///     <c>Thorough</c>).
+    ///     <para>
+    ///         At 5,000 samples the CI-width rule still delivers ±2.5% for any body with a coefficient
+    ///         of variation up to roughly 90%. Past that, the required count grows as
+    ///         <c>(t × CV / target)²</c> and runs away - a CV of 580% needs ~50,000 samples to reach
+    ///         ±5% - but a body that noisy has variance that <em>is</em> the finding, and more samples
+    ///         only buy a tighter interval around an unstable centre. Hitting this ceiling with the CI
+    ///         target unmet raises a warning that reports the CV and suggests
+    ///         <c>--launch-count</c> instead.
+    ///     </para>
+    ///     <para>
+    ///         Also the point at which <see cref="MinMeasurementTime" /> stops waiting for its duration,
+    ///         so a body too fast to accumulate that duration is bounded here rather than chasing a
+    ///         target it can never reach.
+    ///     </para>
+    /// </summary>
+    public int MaxSamples { get; init; } = 5_000;
 
     /// <summary>
     ///     The target relative half-width of the confidence interval on the mean. Measurement
@@ -132,6 +243,84 @@ public sealed record AutoTuneOptions
     ///     (±2.5%).
     /// </summary>
     public double CiTarget { get; init; } = 0.025;
+
+    /// <summary>
+    ///     The minimum in-body time the measurement phase must span before it may stop on the CI
+    ///     target. Default 100 ms (50 ms under <c>Quick</c>, 500 ms under <c>Thorough</c>).
+    ///     <para>
+    ///         The measurement analogue of <see cref="MinWarmupTime" />, and the reason the resolved
+    ///         sample count scales with body speed instead of being a flat number. A flat
+    ///         <see cref="MinSamples" /> is blind to how cheap the body is: the same 30 samples that
+    ///         cost 9 s on a 300 ms body cost 0.5 ms on a 1 µs body, where thousands of samples are
+    ///         essentially free and buy meaningful percentiles, a usable histogram, and a significance
+    ///         test with real power. At n ≈ 16 the reported p95/p99/p99.9 all collapse onto the maximum.
+    ///     </para>
+    ///     <para>
+    ///         The rule is simply: measurement spans at least this long, or reaches
+    ///         <see cref="MaxSamples" /> samples, whichever comes first. So the worst-case added cost is
+    ///         <see cref="MinMeasurementTime" /> per benchmark, and it is <b>zero</b> for any body
+    ///         already slower than <c>MinMeasurementTime / MinSamples</c> (about 3.3 ms at the defaults),
+    ///         where <see cref="MinSamples" /> binds and nothing changes. Set to
+    ///         <see cref="TimeSpan.Zero" /> to disable the floor and stop on <see cref="MinSamples" />
+    ///         alone.
+    ///     </para>
+    /// </summary>
+    public TimeSpan MinMeasurementTime
+    {
+        get => _minMeasurementTime;
+        init => _minMeasurementTime = value >= TimeSpan.Zero
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value, "MinMeasurementTime must be zero or positive.");
+    }
+
+    /// <summary>
+    ///     How far the first and second halves of the measured samples may disagree before the loop
+    ///     refuses to stop on the CI target, as a fraction of the smaller half-mean. Default 0.10 (10%).
+    ///     <para>
+    ///         Guards the failure mode that makes a run-to-run discrepancy hardest to notice: a JIT
+    ///         tier-up (or thermal ramp, or cache fill) landing inside the measurement window produces
+    ///         a step change, and the CI-on-the-mean rule is perfectly happy to report a tight interval
+    ///         across it. Without this gate the loop can report ±0.9% on a number that is 10× wrong.
+    ///     </para>
+    ///     <para>
+    ///         The check also requires the gap to be statistically real, not just large, so a
+    ///         heavy-tailed body whose half-means differ by pure sampling noise is not flagged. When it
+    ///         does fire, the stale samples are discarded and measurement restarts (up to
+    ///         <see cref="MeasurementRestartLimit" /> times). Set to <c>0</c> to disable the gate.
+    ///     </para>
+    /// </summary>
+    public double MeasurementDriftTolerance
+    {
+        get => _measurementDriftTolerance;
+        init => _measurementDriftTolerance = value is >= 0 and <= 1
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value, "MeasurementDriftTolerance must be in [0, 1].");
+    }
+
+    /// <summary>
+    ///     How many times the drift gate (<see cref="MeasurementDriftTolerance" />) may discard the
+    ///     collected samples and restart measurement. Default 2 (3 under <c>Thorough</c>).
+    ///     <para>
+    ///         Two restarts covers the two transitions a .NET body normally goes through: tier-0 to
+    ///         tier-1, and instrumented to optimized under dynamic PGO. A body still drifting after
+    ///         that is genuinely non-stationary (thermal ramp, filling cache, growing data structure),
+    ///         which is a finding rather than something more restarts fix - so the loop stops and
+    ///         reports <see cref="SampleStopReason.DriftUnresolved" /> with a warning.
+    ///     </para>
+    ///     <para>
+    ///         Restarts draw on the same <see cref="MaxTuningTime" /> budget as ordinary sampling, so
+    ///         they can never extend a benchmark's total runtime. Set to <c>0</c> to report
+    ///         <see cref="SampleStopReason.DriftUnresolved" /> on the first detected drift instead of
+    ///         resampling.
+    ///     </para>
+    /// </summary>
+    public int MeasurementRestartLimit
+    {
+        get => _measurementRestartLimit;
+        init => _measurementRestartLimit = value >= 0
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value, "MeasurementRestartLimit must be zero or positive.");
+    }
 
     // ----- Ops-per-sample calibration -----
 

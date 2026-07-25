@@ -69,6 +69,14 @@ internal sealed record MeasurementOverrides
 
     public bool? NoJitQuiescence { get; init; }
 
+    public TimeSpan? JitQuietPeriod { get; init; }
+
+    public TimeSpan? MinMeasurementTime { get; init; }
+
+    public double? DriftTolerance { get; init; }
+
+    public int? MaxDriftRestarts { get; init; }
+
     public int? LaunchCount { get; init; }
 
     public IReadOnlyList<double>? ReportedPercentiles { get; init; }
@@ -111,6 +119,10 @@ internal sealed record MeasurementOverrides
         CapGraceFactor = cliArgs.CapGraceFactor,
         MinWarmupTime = cliArgs.MinWarmupTime,
         NoJitQuiescence = cliArgs.NoJitQuiescence,
+        JitQuietPeriod = cliArgs.JitQuietPeriod,
+        MinMeasurementTime = cliArgs.MinMeasurementTime,
+        DriftTolerance = cliArgs.DriftTolerance,
+        MaxDriftRestarts = cliArgs.MaxDriftRestarts,
         LaunchCount = cliArgs.LaunchCount,
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
@@ -222,6 +234,30 @@ internal sealed record MeasurementOverrides
         if (NoJitQuiescence is true)
         {
             autoTune = autoTune with { RequireJitQuiescence = false };
+            autoTuneChanged = true;
+        }
+
+        if (JitQuietPeriod.HasValue)
+        {
+            autoTune = autoTune with { JitQuietPeriod = JitQuietPeriod.Value };
+            autoTuneChanged = true;
+        }
+
+        if (MinMeasurementTime.HasValue)
+        {
+            autoTune = autoTune with { MinMeasurementTime = MinMeasurementTime.Value };
+            autoTuneChanged = true;
+        }
+
+        if (DriftTolerance.HasValue)
+        {
+            autoTune = autoTune with { MeasurementDriftTolerance = DriftTolerance.Value };
+            autoTuneChanged = true;
+        }
+
+        if (MaxDriftRestarts.HasValue)
+        {
+            autoTune = autoTune with { MeasurementRestartLimit = MaxDriftRestarts.Value };
             autoTuneChanged = true;
         }
 

@@ -7,7 +7,19 @@ public record MeasurementOptions
     internal const double PercentileEqualityTolerance = 1e-9;
     public const int MinIterations = 0;
     public const int MaxIterations = 100_000;
+
+    /// <summary>The ceiling on a <em>pinned</em> <see cref="WarmupIterations" /> (and <c>--warmup</c>).</summary>
     public const int MaxWarmupIterations = 10_000;
+
+    /// <summary>
+    ///     The ceiling on <em>auto</em>-resolved warmup (<see cref="AutoTuneOptions.MaxWarmup" /> and
+    ///     <c>--max-warmup</c> / <c>--min-warmup</c>). Deliberately far above
+    ///     <see cref="MaxWarmupIterations" />: a fast body needs tens of thousands of samples to reach
+    ///     <see cref="AutoTuneOptions.MinWarmupTime" />, and a count ceiling that binds first would
+    ///     silently defeat that floor.
+    /// </summary>
+    public const int MaxAutoWarmupIterations = 100_000;
+
     public const int MaxOpsPerSampleLimit = 1 << 24;
     public const int MaxLaunchCount = 100;
     public const int MinHistogramBucketCount = 5;
