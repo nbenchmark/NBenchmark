@@ -378,6 +378,24 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
+    ///     Suppresses the always-on Debug-build / debugger-attached guidance warning for
+    ///     this harness run. Use when measuring Debug behavior is intentional. Also
+    ///     propagated to isolated child processes.
+    /// </summary>
+    public BenchmarkHarness WithSuppressBuildConfigurationWarning(bool suppress = true)
+    {
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with
+            {
+                SuppressBuildConfigurationWarning = suppress,
+            },
+        };
+
+        return this;
+    }
+
+    /// <summary>
     ///     Sets the measurement profile, which bundles per-iteration GC, between-benchmark GC, and
     ///     allocation tracking. <see cref="MeasurementProfile.Realistic" /> (the default) keeps natural
     ///     GC pressure in the timing; <see cref="MeasurementProfile.Independent" /> isolates iterations

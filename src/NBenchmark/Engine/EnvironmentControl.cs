@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.Versioning;
 
 namespace NBenchmark.Engine;
@@ -19,6 +20,39 @@ namespace NBenchmark.Engine;
 public static class EnvironmentControl
 {
     /// <summary>
+    ///     The env var opt-out for the always-on Debug-build / debugger-attached warning.
+    ///     Set to <c>"1"</c> to suppress; the
+    ///     <see cref="EnvironmentOptions.SuppressBuildConfigurationWarning" /> flag is the
+    ///     programmatic equivalent. Mirrors the <c>CI=true</c> opt-out convention used by
+    ///     auto-attached reporters, so CLI-only callers can silence the warning without
+    ///     changing code.
+    /// </summary>
+    internal const string SuppressDebugWarningEnvVar = "NBENCHMARK_SUPPRESS_DEBUG_WARNING";
+
+    /// <summary>
+    ///     Once-per-process guard for <see cref="EmitBuildConfigurationGuidance" />. Both
+    ///     the Single-mode facade (<c>Benchmark.Run</c>) and the Suite/Harness paths
+    ///     (through <see cref="Apply" />) call it, and isolated children re-enter
+    ///     <c>RunAsync</c> - without this guard the same parent process would warn twice
+    ///     (once from the facade call, once from the suite/harness <c>Apply</c> call), and
+    ///     a child re-running the entry assembly would re-emit the parent's warning.
+    /// </summary>
+    private static int _buildConfigWarningEmitted;
+
+    /// <summary>
+    ///     Cached entry-assembly configuration value. This avoids repeated reflection when
+    ///     guidance checks run multiple times in a process before any warning is emitted.
+    /// </summary>
+    private static readonly Lazy<string?> CachedEntryAssemblyConfiguration = new(ReadEntryAssemblyConfigurationCore);
+
+    /// <summary>
+    ///     Test-only hook: resets the once-per-process guard so a test fixture can invoke
+    ///     <see cref="EmitBuildConfigurationGuidance" /> repeatedly. Not intended for
+    ///     production use; production callers rely on the guard to avoid double emission.
+    /// </summary>
+    internal static void ResetBuildConfigurationWarningGuard() => Interlocked.Exchange(ref _buildConfigWarningEmitted, 0);
+
+    /// <summary>
     ///     Applies <paramref name="options" /> to the current process and returns a scope
     ///     that restores the prior state on dispose. <c>null</c> options (the default) is
     ///     a no-op and returns a no-op scope, so callers do not need to branch.
@@ -29,9 +63,24 @@ public static class EnvironmentControl
     ///     because the host refused a priority bump (common on locked-down CI runners).
     ///     The dedicated-host guidance probe is always run when requested, independent of
     ///     whether the other settings were successfully applied.
+    ///     <para>
+    ///         Independent of <paramref name="options" />, this entry point also runs the
+    ///         always-on Debug-build / debugger-attached guidance check (see
+    ///         <see cref="EmitBuildConfigurationGuidance" />) once per process. The check
+    ///         is suppressed when the current process is an isolated child (the parent
+    ///         already warned), when <see cref="EnvironmentOptions.SuppressBuildConfigurationWarning" />
+    ///         is set, or when the <see cref="SuppressDebugWarningEnvVar" /> env var is
+    ///         <c>"1"</c>.
+    ///     </para>
     /// </remarks>
     public static IDisposable Apply(EnvironmentOptions? options)
     {
+        // The build-config warning is always-on and independent of the hardware/OS options
+        // below; fire it before the no-op fast path so a caller with no EnvironmentOptions
+        // set still gets warned once per process. Gated on not-in-child so an isolated
+        // child re-entering Apply does not re-emit the parent's warning.
+        EmitBuildConfigurationGuidance(options);
+
         if (options is null || (options.CpuAffinity is null
                                 && options.ProcessPriority is null
                                 && !options.DedicatedHostGuidance))
@@ -153,6 +202,120 @@ public static class EnvironmentControl
         {
             Console.Error.WriteLine($"  - {w}");
         }
+    }
+
+    /// <summary>
+    ///     Emits a non-fatal warning when the entry assembly was built in <c>Debug</c>
+    ///     configuration or when a debugger is attached. Both conditions defeat JIT
+    ///     inlining and tier-1 optimization, so the resulting numbers are not
+    ///     production-representative. The warning is always-on (the common
+    ///     <c>dotnet run</c> without <c>-c Release</c> footgun is silent otherwise) and
+    ///     fires at most once per process. Suppressed when the current process is an
+    ///     isolated child (the parent already warned), when
+    ///     <see cref="EnvironmentOptions.SuppressBuildConfigurationWarning" /> is set, or
+    ///     when the <see cref="SuppressDebugWarningEnvVar" /> env var is <c>"1"</c>.
+    /// </summary>
+    /// <remarks>
+    ///     This is the build counterpart to <see cref="EmitDedicatedHostGuidance" />: that
+    ///     method warns about unsuitable *hardware*, this warns about an unsuitable *build*.
+    ///     Both follow the same "warn and proceed, never refuse" philosophy - a benchmark
+    ///     run should never fail because the host or build is imperfect, but the user
+    ///     should know the numbers are not trustworthy.
+    /// </remarks>
+    internal static void EmitBuildConfigurationGuidance(EnvironmentOptions? options)
+    {
+        // Suppression and child-scope checks come *before* the once-per-process guard so a
+        // suppressed call does not consume it - a later non-suppressed call in the same
+        // process would otherwise stay silent. An isolated child is a fresh process (the
+        // guard starts at 0 regardless), so this ordering does not change child behaviour;
+        // the real child gate is the IsActive check below.
+        if (IsolatedRunContext.IsActive)
+            return;
+
+        if (options is { SuppressBuildConfigurationWarning: true })
+            return;
+
+        if (IsSuppressEnvVarSet())
+            return;
+
+        var warnings = new List<string>(2);
+        var configuration = CachedEntryAssemblyConfiguration.Value;
+
+        if (!string.IsNullOrEmpty(configuration)
+            && configuration.Contains("Debug", StringComparison.OrdinalIgnoreCase))
+        {
+            warnings.Add(
+                $"The entry assembly was built in '{configuration}' configuration. The JIT "
+                + "disables inlining and dead-code elimination under Debug, so the measured "
+                + "numbers are not production-representative. Rebuild with `dotnet run -c Release` "
+                + "(or set the configuration to Release in your IDE) before trusting the results. "
+                + "If measuring Debug is intentional, suppress this warning with "
+                + $"{SuppressDebugWarningEnvVar}=1 or EnvironmentOptions.SuppressBuildConfigurationWarning.");
+        }
+
+        if (Debugger.IsAttached)
+        {
+            warnings.Add(
+                "A debugger is attached. The runtime suppresses inlining for methods the "
+                + "debugger might step into, so timings are not production-representative even "
+                + "under a Release build. Detach the debugger before measuring, or suppress this "
+                + $"warning with {SuppressDebugWarningEnvVar}=1 if attaching during development "
+                + "is intentional.");
+        }
+
+        if (warnings.Count == 0)
+            return;
+
+        // Once-per-process: only consume the guard when we are actually about to emit.
+        // This preserves a later warning opportunity if an earlier call had no warning
+        // conditions (for example, debugger attached after an initial non-debug run).
+        if (Interlocked.CompareExchange(ref _buildConfigWarningEmitted, 1, 0) != 0)
+            return;
+
+        Console.Error.WriteLine("Build configuration guidance:");
+
+        foreach (var w in warnings)
+        {
+            Console.Error.WriteLine($"  - {w}");
+        }
+    }
+
+    /// <summary>
+    ///     Reads the <c>AssemblyConfigurationAttribute</c> of the entry assembly. Returns
+    ///     <c>null</c> when the attribute is absent (common for some publish layouts) so
+    ///     the caller can treat absence as "no warning" rather than fail.
+    /// </summary>
+    private static string? ReadEntryAssemblyConfigurationCore()
+    {
+        try
+        {
+            return Assembly.GetEntryAssembly()
+                ?.GetCustomAttribute<AssemblyConfigurationAttribute>()
+                ?.Configuration;
+        }
+        catch
+        {
+            // Best-effort: if the attribute cannot be read (e.g. a published single-file
+            // bundle with no assembly metadata), treat it as unknown rather than fail.
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     Returns <c>true</c> when the <see cref="SuppressDebugWarningEnvVar" /> env var
+    ///     is set to a truthy value (<c>"1"</c> or any case-insensitive form of
+    ///     <c>"true"</c>). Any other value (or unset) returns <c>false</c>, so the caller
+    ///     falls through to normal warning-condition evaluation.
+    /// </summary>
+    private static bool IsSuppressEnvVarSet()
+    {
+        var value = Environment.GetEnvironmentVariable(SuppressDebugWarningEnvVar);
+
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        return value == "1"
+               || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

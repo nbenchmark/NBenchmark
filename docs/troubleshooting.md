@@ -12,6 +12,7 @@ This page maps symptoms you may see in benchmark output to their likely causes a
 
 | Symptom | Likely cause | Configuration fix |
 |---|---|---|
+| **Numbers are uniformly slow and not production-representative** | The entry assembly was built in `Debug` configuration (common with `dotnet run` without `-c Release`), or a debugger is attached. Both defeat JIT inlining and tier-1 optimization | Rebuild with `dotnet run -c Release` (or set the configuration to Release in your IDE) and detach the debugger. If measuring Debug is intentional, suppress the warning with `NBENCHMARK_SUPPRESS_DEBUG_WARNING=1` or `new MeasurementOptions { Environment = new EnvironmentOptions { SuppressBuildConfigurationWarning = true } }` |
 | Large Error (wide CI) | Genuinely variable timings (auto-sampling already hit its sample ceiling or time cap) | Demand a tighter target: `.WithAutoTune(AutoTunePreset.Thorough)` or `--ci-target 0.01`. Raise `--max-samples` / `--max-tuning-time` if the loop is stopping on a cap - see [Configuration: AutoTune](./reference/configuration.md#autotune) |
 | Large Error (wide CI) | OS scheduling / context-switch noise | Switch outlier mode to `.WithOutlierMode(OutlierMode.IqrFence)` - see [Configuration](./reference/configuration.md#outliermode) |
 | Large Error (wide CI) | Thermal throttling on laptops | Pin a longer warmup with `.WithWarmup(50)` to let the CPU stabilise. Run plugged in. - see [Configuration](./reference/configuration.md#warmupiterations) |

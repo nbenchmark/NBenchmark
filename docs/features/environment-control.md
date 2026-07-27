@@ -8,7 +8,7 @@ order: 8
 
 NBenchmark's [outlier trimming](../statistics/outliers.md) and [bimodal warning](../statistics/outliers.md#bimodal-distribution-warning) react to measurement noise after the fact - they discard or flag samples that look like OS interference. **Environment control** is the proactive counterpart: it reduces noise at the source before the timer starts.
 
-Three opt-in controls are available. All default to off, all are restored when the run completes, and none are required for the zero-ceremony "just run my benchmark" path.
+Three opt-in host controls are available. All default to off, all are restored when the run completes, and none are required for the zero-ceremony "just run my benchmark" path.
 
 ## CPU affinity
 
@@ -77,6 +77,32 @@ new BenchmarkSuite("MySuite")
     .WithDedicatedHostGuidance()
     .Add(...)
     .RunAsync();
+```
+
+## Build-configuration guidance (always on)
+
+Separate from the three host controls above, NBenchmark emits a one-time warning when:
+
+- The entry assembly is built in `Debug` configuration.
+- A debugger is attached.
+
+Those conditions can make timings non-production-representative (for example, reduced inlining/tiering behavior), so the warning is enabled by default in single, suite, and harness modes.
+
+When measuring Debug behavior is intentional, suppress it with either of these knobs:
+
+```csharp
+new BenchmarkSuite("MySuite")
+    .WithSuppressBuildConfigurationWarning()
+    .Add(...)
+    .RunAsync();
+
+await BenchmarkHarness.Create(args)
+    .WithSuppressBuildConfigurationWarning()
+    .RunAsync();
+```
+
+```bash
+NBENCHMARK_SUPPRESS_DEBUG_WARNING=1 dotnet run -- --filter MyBenchmarks.*
 ```
 
 ## Combining the controls

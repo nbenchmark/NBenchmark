@@ -551,6 +551,8 @@ Use it on CI runners and dev laptops to surface hidden noise sources before you 
 
 Programmatic equivalent: `WithDedicatedHostGuidance()` (suite/harness).
 
+Related warning: NBenchmark also emits a one-time build-configuration warning when the entry assembly is Debug-built or a debugger is attached. There is no CLI flag for this warning; suppress it with `NBENCHMARK_SUPPRESS_DEBUG_WARNING=1` or `.WithSuppressBuildConfigurationWarning()` / `new MeasurementOptions { Environment = new EnvironmentOptions { SuppressBuildConfigurationWarning = true } }` when measuring Debug behavior intentionally.
+
 ---
 
 ### `--otlp-endpoint <url>`

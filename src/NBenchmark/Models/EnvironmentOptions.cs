@@ -54,6 +54,18 @@ public record EnvironmentOptions
     public bool DedicatedHostGuidance { get; init; }
 
     /// <summary>
+    ///     When <c>true</c>, suppresses the always-on warning that fires when the entry
+    ///     assembly was built in <c>Debug</c> configuration or when a debugger is attached.
+    ///     Both conditions defeat JIT inlining and tier-1 optimization, so the numbers are
+    ///     not production-representative; the warning is on by default to catch the common
+    ///     <c>dotnet run</c> (without <c>-c Release</c>) footgun. Set this to <c>true</c> when
+    ///     measuring Debug behaviour is intentional. The <c>NBENCHMARK_SUPPRESS_DEBUG_WARNING=1</c>
+    ///     environment variable also suppresses it, for CLI-only callers that cannot easily
+    ///     change the options record. Defaults to <c>false</c>.
+    /// </summary>
+    public bool SuppressBuildConfigurationWarning { get; init; }
+
+    /// <summary>
     ///     Parses a comma-separated list of non-negative integers (e.g. <c>"0"</c> or
     ///     <c>"2,3"</c>) into an affinity list. Whitespace is tolerated. Returns
     ///     <c>null</c> for a null or blank input. Throws <see cref="FormatException" />

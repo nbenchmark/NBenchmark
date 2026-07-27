@@ -627,6 +627,23 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>
+    ///     Suppresses the always-on Debug-build / debugger-attached guidance warning for
+    ///     this suite. Use when measuring Debug behavior is intentional.
+    /// </summary>
+    public BenchmarkSuite WithSuppressBuildConfigurationWarning(bool suppress = true)
+    {
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with
+            {
+                SuppressBuildConfigurationWarning = suppress,
+            },
+        };
+
+        return this;
+    }
+
     public BenchmarkSuite WithRunOrder(RunOrder order)
     {
         _runOrder = order;

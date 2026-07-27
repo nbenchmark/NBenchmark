@@ -15,6 +15,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
     {
         var spec = new RunSpec { Options = options ?? MeasurementOptions.Default, Progress = progress ?? NullBenchmarkProgress.Instance };
+        EmitBuildConfigurationGuidanceOnce(options);
         return BenchmarkRunner.Instance.Run(name, action, spec, cancellationToken).Result;
     }
 
@@ -25,6 +26,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
     {
         var spec = new RunSpec { Options = options ?? MeasurementOptions.Default, Progress = progress ?? NullBenchmarkProgress.Instance };
+        EmitBuildConfigurationGuidanceOnce(options);
         return BenchmarkRunner.Instance.Run(name, action, spec, cancellationToken).Result;
     }
 
@@ -35,6 +37,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
     {
         var spec = new RunSpec { Options = options ?? MeasurementOptions.Default, Progress = progress ?? NullBenchmarkProgress.Instance };
+        EmitBuildConfigurationGuidanceOnce(options);
         var outcome = await BenchmarkRunner.Instance.RunAsync(name, action, spec, cancellationToken).ConfigureAwait(false);
         return outcome.Result;
     }
@@ -46,6 +49,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
     {
         var spec = new RunSpec { Options = options ?? MeasurementOptions.Default, Progress = progress ?? NullBenchmarkProgress.Instance };
+        EmitBuildConfigurationGuidanceOnce(options);
         var outcome = await BenchmarkRunner.Instance.RunAsync(name, action, spec, cancellationToken).ConfigureAwait(false);
         return outcome.Result;
     }
@@ -57,6 +61,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
     {
         var spec = new RunSpec { Options = options ?? MeasurementOptions.Default, Progress = progress ?? NullBenchmarkProgress.Instance };
+        EmitBuildConfigurationGuidanceOnce(options);
         return BenchmarkRunner.Instance.Run(name, action, spec, cancellationToken);
     }
 
@@ -67,6 +72,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
     {
         var spec = new RunSpec { Options = options ?? MeasurementOptions.Default, Progress = progress ?? NullBenchmarkProgress.Instance };
+        EmitBuildConfigurationGuidanceOnce(options);
         return BenchmarkRunner.Instance.Run(name, action, spec, cancellationToken);
     }
 
@@ -77,6 +83,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
     {
         var spec = new RunSpec { Options = options ?? MeasurementOptions.Default, Progress = progress ?? NullBenchmarkProgress.Instance };
+        EmitBuildConfigurationGuidanceOnce(options);
         return BenchmarkRunner.Instance.RunAsync(name, action, spec, cancellationToken);
     }
 
@@ -87,6 +94,18 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
     {
         var spec = new RunSpec { Options = options ?? MeasurementOptions.Default, Progress = progress ?? NullBenchmarkProgress.Instance };
+        EmitBuildConfigurationGuidanceOnce(options);
         return BenchmarkRunner.Instance.RunAsync(name, action, spec, cancellationToken);
     }
+
+    /// <summary>
+    ///     Emits the always-on Debug-build / debugger-attached warning once per process.
+    ///     Single-method mode does not go through <see cref="EnvironmentControl.Apply" />
+    ///     (which emits it for Suite and Harness mode), so the facade calls it directly.
+    ///     The once-per-process guard inside <see cref="EnvironmentControl" /> prevents
+    ///     double emission when <see cref="Benchmark.Run" /> is called from inside a
+    ///     Suite or Harness process that already warned via <c>Apply</c>.
+    /// </summary>
+    private static void EmitBuildConfigurationGuidanceOnce(MeasurementOptions? options)
+        => EnvironmentControl.EmitBuildConfigurationGuidance(options?.Environment);
 }

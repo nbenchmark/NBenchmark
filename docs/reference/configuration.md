@@ -691,6 +691,7 @@ Opt-in hardware/OS controls applied for the duration of a run, typed as `Environ
 | `CpuAffinity` | `IReadOnlyList<int>?` | `null` | Logical CPU core indices to pin the process to (e.g. `[2, 3]`). Restored on run exit. Linux/Windows only; ignored with a warning on macOS. |
 | `ProcessPriority` | `ProcessPriorityClass?` | `null` | Process priority to request. `High` is recommended for dedicated hosts. Restored on run exit. A refused elevation is a warning, not an error. |
 | `DedicatedHostGuidance` | `bool` | `false` | Emit a non-fatal pre-run warning when the host looks noisy (low core count, unraisable priority, or on macOS unobservable frequency scaling/thermal throttling). On a suitable host, actively suggests `--priority high`. |
+| `SuppressBuildConfigurationWarning` | `bool` | `false` | Suppress the always-on warning that appears when the entry assembly is Debug-built or a debugger is attached. Use this only when measuring Debug behavior intentionally. |
 
 ```csharp
 var options = new MeasurementOptions
@@ -705,7 +706,8 @@ var options = new MeasurementOptions
 ```
 
 BenchmarkSuite/BenchmarkHarness fluent methods: `.WithHardwareAffinity(2, 3)`, `.WithProcessPriority(ProcessPriorityClass.High)`, `.WithDedicatedHostGuidance()`  
-CLI flags: `--cpu-affinity <list>`, `--priority <level>`, `--dedicated-host-guidance`
+CLI flags: `--cpu-affinity <list>`, `--priority <level>`, `--dedicated-host-guidance`  
+Additional suppression knobs: `.WithSuppressBuildConfigurationWarning()` (suite/harness) or `NBENCHMARK_SUPPRESS_DEBUG_WARNING=1` (environment variable)
 
 This is the proactive counterpart to the statistical noise handling in [Outlier Trimming](../statistics/outliers.md): trimming reacts to noise after the fact; environment control reduces it at the source. See [Environment control](../features/environment-control.md) for the full model, platform notes, and isolated-process propagation.
 
