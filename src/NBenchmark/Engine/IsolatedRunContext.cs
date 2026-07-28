@@ -378,6 +378,20 @@ internal sealed record IsolatedRunRequest
     ///     <c>dotnet exec</c> with this path instead of re-running the current process.
     /// </summary>
     public string? EntryAssemblyPath { get; init; }
+
+    /// <summary>
+    ///     Wall-clock ceiling for this child. On expiry the launcher kills the child's whole
+    ///     process tree and reports an errored result naming the timeout, rather than waiting
+    ///     forever - the previous behaviour was a bare <c>WaitForExitAsync</c> with no bound,
+    ///     so a deadlocked or wedged child hung the entire run with no diagnostic.
+    ///     <para>
+    ///         Parents set this from <see cref="ChildProcessLauncher.ComputeTimeout" />, which
+    ///         derives it from the engine's own tuning budget so a legitimately slow benchmark
+    ///         is never killed. The default here is a generous backstop for a request built
+    ///         without an options context.
+    ///     </para>
+    /// </summary>
+    public TimeSpan Timeout { get; init; } = ChildProcessLauncher.DefaultChildTimeout;
 }
 
 /// <summary>A single benchmark result plus its raw per-iteration samples, as shipped from a child.</summary>
@@ -452,13 +466,25 @@ internal static class IsolatedRunContext
     ///     the current process is not an isolated child (or has no output path), so the
     ///     same in-process run helper can be reused by the parent.
     /// </summary>
+    /// <param name="results">The results the child produced, in the order it produced them.</param>
+    /// <param name="resolveRawSamples">
+    ///     Maps a result to its raw pre-trim samples. This is a delegate rather than a
+    ///     dictionary because callers hold their samples in different key spaces:
+    ///     <see cref="SuiteRunner.RunAsync" /> returns them keyed by plain benchmark name,
+    ///     while the suite orchestrator has already re-keyed to
+    ///     <see cref="RawSampleKey.For(BenchmarkResult)" />. Passing a dictionary let a caller
+    ///     supply the wrong key space and lose every sample silently - which is exactly what
+    ///     happened on the Harness child paths. Each caller now states its own lookup, so the
+    ///     convention is visible where the knowledge lives.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the payload write.</param>
     public static async Task WriteChildPayloadIfRequestedAsync(
         IReadOnlyList<BenchmarkResult> results,
-        IReadOnlyDictionary<string, double[]> rawSamples,
+        Func<BenchmarkResult, double[]> resolveRawSamples,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(results);
-        ArgumentNullException.ThrowIfNull(rawSamples);
+        ArgumentNullException.ThrowIfNull(resolveRawSamples);
 
         var outputPath = Scope.Value?.OutputPath;
 
@@ -469,7 +495,7 @@ internal static class IsolatedRunContext
             .Select(r => new IsolatedResultItem
             {
                 Result = r with { RawSamples = [] },
-                RawSamples = rawSamples.TryGetValue($"{r.Name}\0{r.RuntimeMoniker}", out var samples) ? samples : [],
+                RawSamples = resolveRawSamples(r) ?? [],
             })
             .ToList();
 

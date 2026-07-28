@@ -750,7 +750,7 @@ public sealed class BenchmarkHarness
         // SuiteRunner and the isolated-launch aggregators key raw samples by benchmark name;
         // ApplyPerClassSignificance needs the composite name+runtime key so multi-runtime
         // results don't collide.
-        rawSamples = ToCompositeKeys(allResults, rawSamples);
+        rawSamples = RawSampleKey.ToComposite(allResults, rawSamples);
 
         ApplyPerClassSignificance(allResults, rawSamples, suiteOptions, _cliArgs.CrossClass || _crossClass);
 
@@ -853,7 +853,7 @@ public sealed class BenchmarkHarness
                         // on Result so TrimmedOrdinals stay aligned with the shown distribution.
                         var withSamples = item.Result with { RawSamples = ResolveResultRawSamples(item) };
                         allResults.Add(withSamples);
-                        rawSamples[$"{withSamples.Name}\0{tfm}"] = item.RawSamples;
+                        rawSamples[RawSampleKey.For(withSamples.Name, tfm)] = item.RawSamples;
                     }
                 }
                 finally
@@ -947,6 +947,8 @@ public sealed class BenchmarkHarness
                 RuntimeMoniker = moniker,
                 EntryAssemblyPath = entryAssemblyPath,
                 ObserverNames = ResolveObserverNames(),
+                Timeout = ChildProcessLauncher.ComputeTimeout(
+                    MergeCliOptions(EffectiveBaseOptions, _cliArgs), suite.Benchmarks.Count),
             };
 
             var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
@@ -967,21 +969,6 @@ public sealed class BenchmarkHarness
         return allItems;
     }
 
-    private static Dictionary<string, double[]> ToCompositeKeys(
-        IReadOnlyList<BenchmarkResult> results,
-        Dictionary<string, double[]> nameKeyedSamples)
-    {
-        var composite = new Dictionary<string, double[]>(nameKeyedSamples.Count);
-
-        foreach (var r in results)
-        {
-            if (nameKeyedSamples.TryGetValue(r.Name, out var samples))
-                composite[$"{r.Name}\0{r.RuntimeMoniker}"] = samples;
-        }
-
-        return composite;
-    }
-
     private static void ApplyPerClassSignificance(
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
@@ -990,7 +977,7 @@ public sealed class BenchmarkHarness
     {
         static string RawKey(BenchmarkResult r)
         {
-            return $"{r.Name}\0{r.RuntimeMoniker}";
+            return RawSampleKey.For(r);
         }
 
         if (crossClass)
@@ -1562,6 +1549,8 @@ public sealed class BenchmarkHarness
             // them through ObserverRegistry, which is populated identically by [ModuleInitializer]
             // self-registration in the child's fresh process.
             ObserverNames = ResolveObserverNames(),
+            Timeout = ChildProcessLauncher.ComputeTimeout(
+                MergeCliOptions(EffectiveBaseOptions, _cliArgs), benchmarks.Count),
         };
 
         IReadOnlyList<IsolatedResultItem> items;
@@ -1821,7 +1810,12 @@ public sealed class BenchmarkHarness
             await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, PostSuiteCleanup);
         }
 
-        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, samples, cancellationToken)
+        // SuiteRunner keys samples by plain benchmark name, and a child runs a single runtime,
+        // so the plain name is unambiguous here. Looking these up by the composite
+        // name+runtime key returned nothing for every benchmark, which silently emptied
+        // RawSamples on every isolated Harness result and disabled significance testing.
+        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(
+                results, r => samples.GetValueOrDefault(r.Name, []), cancellationToken)
             .ConfigureAwait(false);
 
         return results;
@@ -1882,7 +1876,9 @@ public sealed class BenchmarkHarness
             }
         }
 
-        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, samples, cancellationToken)
+        // Keyed by plain benchmark name - see the note in RunPerClassHostChildAsync.
+        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(
+                results, r => samples.GetValueOrDefault(r.Name, []), cancellationToken)
             .ConfigureAwait(false);
 
         return results;

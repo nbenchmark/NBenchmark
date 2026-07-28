@@ -94,10 +94,12 @@ See [Harness mode](../usage-modes/harness-mode.md#isolatedprocess) for the full 
 
 ## Important behavior notes
 
-- Isolation adds overhead: one process launch per child. For ordinary microbenchmarks the in-process path is faster and accurate enough.
+- Isolation adds overhead: one process launch per child, measured at roughly 200 ms. Against the per-benchmark wall-clock floor of about 600 ms (`MinWarmupTime` plus `MinMeasurementTime`), that is a small tax for a comparison group of any size.
+- **Do not rely on `--in-process` for anything comparative.** On four benchmarks with provably identical cost, repeated in-process runs spanned 3.27x and fabricated a 2.80x difference between two of them, while reporting a tight confidence interval on each. Isolated runs of the same benchmarks spanned 1.08x. See `plans/out-of-process-pivot.md` for the measurements and the reason.
 - Isolated children always run in **declaration** order; run-order randomization applies only to in-process runs.
 - `--dry-run` (equivalent to `--iterations 0 --warmup 0`) always runs in-process - no child is spawned.
 - Children rebuild their measurement configuration by re-running your `Main`, so custom detectors and significance tests are preserved. Harness mode additionally forwards scalar CLI overrides (iterations, warmup, confidence, and so on) to each child.
+- A child that never returns is killed, along with its whole process tree, once it exceeds a wall-clock ceiling derived from the tuning budget (`MaxTuningTime` and `CapGraceFactor`, plus warmup and process-start allowances). The affected benchmarks are reported as errored, naming the timeout, rather than hanging the run. Raise `--max-tuning-time` if the work is genuinely that slow. Cancelling a run also takes its children down, so neither a timeout nor a Ctrl-C leaves a benchmark process behind.
 
 ## Related
 

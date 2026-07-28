@@ -1046,16 +1046,19 @@ public sealed class BenchmarkSuite(string name)
 
             sentinelEmitted = true;
 
-            // SuiteRunner keys raw samples by benchmark name; the significance and payload paths
-            // need the composite name+runtime key so multi-runtime results don't collide.
-            rawSamples = ToCompositeKeys(results, rawSamples);
+            // SuiteRunner keys raw samples by benchmark name; the significance path needs the
+            // composite name+runtime key so multi-runtime results don't collide.
+            rawSamples = RawSampleKey.ToComposite(results, rawSamples);
 
             if (applySignificance)
                 ApplyPerParameterSignificance(results, rawSamples);
 
             if (writeChildPayload)
             {
-                await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, rawSamples, cancellationToken)
+                await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(
+                        results,
+                        r => rawSamples.GetValueOrDefault(RawSampleKey.For(r), []),
+                        cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -1111,7 +1114,7 @@ public sealed class BenchmarkSuite(string name)
             aggregated.Add(best with { LaunchStatistics = stats });
 
             if (pooledSamples.TryGetValue(name, out var samples))
-                rawSamples[$"{name}\0{best.RuntimeMoniker}"] = samples;
+                rawSamples[RawSampleKey.For(name, best.RuntimeMoniker)] = samples;
         }
 
         return (aggregated, rawSamples);
@@ -1173,6 +1176,7 @@ public sealed class BenchmarkSuite(string name)
                 CallerMemberName = callerMemberName,
                 SuiteName = Name,
                 BenchmarkDisplayNames = displayNames,
+                Timeout = ChildProcessLauncher.ComputeTimeout(_options, displayNames.Count),
             };
 
             IReadOnlyList<IsolatedResultItem> items;
@@ -1236,7 +1240,7 @@ public sealed class BenchmarkSuite(string name)
 
                 result = result with { ParameterSet = envelope.ParameterSet };
                 results.Add(result);
-                rawSamples[$"{envelope.Name}\0{result.RuntimeMoniker}"] = raw;
+                rawSamples[RawSampleKey.For(envelope.Name, result.RuntimeMoniker)] = raw;
 
                 await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
                 observer.OnResult(result);
@@ -1350,6 +1354,7 @@ public sealed class BenchmarkSuite(string name)
                             BenchmarkDisplayNames = envelopeNames,
                             RuntimeMoniker = build.Moniker,
                             EntryAssemblyPath = build.DllPath,
+                            Timeout = ChildProcessLauncher.ComputeTimeout(_options, envelopeNames.Count),
                         };
 
                         IReadOnlyList<IsolatedResultItem> items;
@@ -1397,7 +1402,7 @@ public sealed class BenchmarkSuite(string name)
                                 };
 
                                 if (item.RawSamples.Length > 0)
-                                    rawSamples[$"{envelope.Name}\0{tfm}"] = item.RawSamples;
+                                    rawSamples[RawSampleKey.For(envelope.Name, tfm)] = item.RawSamples;
                             }
                             else
                             {
@@ -1649,21 +1654,6 @@ public sealed class BenchmarkSuite(string name)
     private static string FormatParamDisplayName(string benchmarkName, BenchmarkParameter[] paramSet)
         => BenchmarkParameter.FormatDisplayName(benchmarkName, paramSet);
 
-    private static Dictionary<string, double[]> ToCompositeKeys(
-        IReadOnlyList<BenchmarkResult> results,
-        Dictionary<string, double[]> nameKeyedSamples)
-    {
-        var composite = new Dictionary<string, double[]>(nameKeyedSamples.Count);
-
-        foreach (var r in results)
-        {
-            if (nameKeyedSamples.TryGetValue(r.Name, out var samples))
-                composite[$"{r.Name}\0{r.RuntimeMoniker}"] = samples;
-        }
-
-        return composite;
-    }
-
     private async Task InvokeReportersAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
     {
         await ReporterRegistry.InvokeReportersAsync(_reporters, _detail, results, cancellationToken)
@@ -1674,7 +1664,7 @@ public sealed class BenchmarkSuite(string name)
     {
         static string RawKey(BenchmarkResult r)
         {
-            return $"{r.Name}\0{r.RuntimeMoniker}";
+            return RawSampleKey.For(r);
         }
 
         if (!results.Any(r => r.ParameterSet.Count > 0))

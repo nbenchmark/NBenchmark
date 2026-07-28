@@ -37,6 +37,33 @@ internal static class ChildProcessLauncher
     private const int StdoutTailLines = 20;
 
     /// <summary>
+    ///     Backstop ceiling for a child built without an options context. Generous, because
+    ///     killing a legitimately slow benchmark is worse than waiting: the point of the
+    ///     timeout is to bound a wedged child, not to enforce a budget.
+    /// </summary>
+    internal static readonly TimeSpan DefaultChildTimeout = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    ///     Floor for a <see cref="ComputeTimeout" />-derived budget, so a very small tuning
+    ///     budget still leaves room for process start. Deliberately not applied to an explicitly
+    ///     supplied timeout - see <see cref="Clamp" />.
+    /// </summary>
+    internal static readonly TimeSpan MinChildTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>Absolute ceiling, applied to derived and explicit timeouts alike.</summary>
+    internal static readonly TimeSpan MaxChildTimeout = TimeSpan.FromMinutes(60);
+
+    /// <summary>
+    ///     Fixed allowance for process start, JIT, discovery, and the user's entry-point
+    ///     prologue - a child re-runs the whole of <c>Main</c>, which can do real work before
+    ///     it reaches the benchmark.
+    /// </summary>
+    private static readonly TimeSpan ChildStartupAllowance = TimeSpan.FromSeconds(60);
+
+    /// <summary>Per-benchmark slack for setup, teardown, and the between-benchmark full GC.</summary>
+    private static readonly TimeSpan PerBenchmarkSlack = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     ///     The OTel-standard env vars forwarded verbatim to children so the OpenTelemetry SDK
     ///     (when the user has wired one in their entry point) picks up the same exporter and
     ///     resource attributes in the child as in the parent. A child that re-runs the entry
@@ -72,6 +99,34 @@ internal static class ChildProcessLauncher
         IsolatedRunRequest request,
         CancellationToken cancellationToken)
         => Current.LaunchAsync(request, cancellationToken);
+
+    /// <summary>
+    ///     Derives a child's wall-clock ceiling from the engine's own tuning budget, so the
+    ///     timeout scales with what the child was actually asked to do and can never fire on a
+    ///     benchmark that is merely slow.
+    ///     <para>
+    ///         <see cref="AutoTuneOptions.MaxTuningTime" /> times
+    ///         <see cref="AutoTuneOptions.CapGraceFactor" /> is the engine's own hard ceiling on
+    ///         in-body time per benchmark, so anything past that plus warmup and slack is a
+    ///         wedged child rather than a busy one. <c>LaunchCount</c> is deliberately not a
+    ///         factor: each launch is its own child process.
+    ///     </para>
+    /// </summary>
+    internal static TimeSpan ComputeTimeout(MeasurementOptions options, int benchmarkCount)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var autoTune = options.AutoTune;
+        var perBenchmark = autoTune.MaxTuningTime * autoTune.CapGraceFactor
+                           + autoTune.MinWarmupTime
+                           + PerBenchmarkSlack;
+
+        var budget = ChildStartupAllowance + perBenchmark * Math.Max(benchmarkCount, 1);
+
+        return budget < MinChildTimeout ? MinChildTimeout
+            : budget > MaxChildTimeout ? MaxChildTimeout
+            : budget;
+    }
 
     internal static ProcessStartInfo BuildStartInfo(
         params (string Name, string Value)[] environmentVariables)
@@ -269,6 +324,45 @@ internal static class ChildProcessLauncher
         return sb.ToString();
     }
 
+    private static string BuildTimeoutMessage(
+        IsolatedRunRequest request,
+        TimeSpan timeout,
+        StringBuilder stderr,
+        Queue<string> stdoutTail)
+    {
+        var sb = new StringBuilder();
+
+        sb.Append(
+            $"Isolated child process for {Describe(request)} exceeded its {timeout.TotalSeconds:0.#}s timeout "
+            + "and was killed. This usually means the benchmark body deadlocked, waited on I/O that never "
+            + "completed, or the entry point blocked before reaching the benchmark. Raise the budget with "
+            + "--max-tuning-time if the work is genuinely this slow.");
+
+        if (stderr.Length > 0)
+            sb.Append($" stderr: {stderr.ToString().Trim()}");
+
+        if (stdoutTail.Count > 0)
+            sb.Append($" stdout (last {stdoutTail.Count} lines): {string.Join(" | ", stdoutTail).Trim()}");
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    ///     Guards against a timeout that would disable the bound rather than set it. A
+    ///     non-positive value - which includes <see cref="Timeout.InfiniteTimeSpan" /> (-1 ms) -
+    ///     falls back to <see cref="DefaultChildTimeout" /> rather than firing instantly or
+    ///     restoring the original unbounded wait; anything above the ceiling is capped.
+    ///     <para>
+    ///         A small positive value is honoured, so a caller can deliberately ask for a tight
+    ///         bound. The 60-second floor belongs to <see cref="ComputeTimeout" />, which is
+    ///         where a budget is being derived rather than chosen.
+    ///     </para>
+    /// </summary>
+    private static TimeSpan Clamp(TimeSpan timeout)
+        => timeout <= TimeSpan.Zero ? DefaultChildTimeout
+            : timeout > MaxChildTimeout ? MaxChildTimeout
+            : timeout;
+
     private static string Describe(IsolatedRunRequest request)
         => request.Kind == IsolatedRunKind.Suite
             ? $"suite '{request.SuiteName}'"
@@ -363,19 +457,59 @@ internal static class ChildProcessLauncher
                 };
 
                 process.Start();
-                process.BeginErrorReadLine();
-                process.BeginOutputReadLine();
 
-                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                // Capture the id now: Process.Id can throw once the object is disposed, and the
+                // reaper needs a stable handle for the whole lifetime of the child.
+                var processId = process.Id;
+                ChildProcessReaper.Track(processId, process);
 
-                if (process.ExitCode != 0 || !File.Exists(outputPath))
+                try
                 {
-                    return ErroredItems(
-                        request,
-                        BuildFailureMessage(request, process.ExitCode, outputPath, stderr, stdoutTail));
-                }
+                    process.BeginErrorReadLine();
+                    process.BeginOutputReadLine();
 
-                return await ReadPayloadAsync(outputPath, cancellationToken).ConfigureAwait(false);
+                    var timeout = Clamp(request.Timeout);
+
+                    using var timeoutCts = new CancellationTokenSource(timeout);
+
+                    using var linkedCts = CancellationTokenSource
+                        .CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+                    try
+                    {
+                        await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested
+                                                            && !cancellationToken.IsCancellationRequested)
+                    {
+                        // The child is wedged. Take its whole tree down, then report which
+                        // timeout fired - previously this waited forever with no diagnostic.
+                        ChildProcessReaper.KillTree(process);
+
+                        return ErroredItems(request, BuildTimeoutMessage(request, timeout, stderr, stdoutTail));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // The caller cancelled. Kill the tree before the exception escapes,
+                        // otherwise the child outlives us and keeps measuring against temp
+                        // files the finally block is about to delete.
+                        ChildProcessReaper.KillTree(process);
+                        throw;
+                    }
+
+                    if (process.ExitCode != 0 || !File.Exists(outputPath))
+                    {
+                        return ErroredItems(
+                            request,
+                            BuildFailureMessage(request, process.ExitCode, outputPath, stderr, stdoutTail));
+                    }
+
+                    return await ReadPayloadAsync(outputPath, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    ChildProcessReaper.Untrack(processId);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
