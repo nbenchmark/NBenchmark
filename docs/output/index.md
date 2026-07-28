@@ -1,7 +1,7 @@
 ---
 title: Output
-description: Reporters and output control - console, JSON, Markdown, CSV, custom reporters, and report detail levels.
-order: 4
+description: Reporters and output control - console, JSON, Markdown, CSV, custom reporters, and reading your results.
+order: 5
 ---
 
 # Output

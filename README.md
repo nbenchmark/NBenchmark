@@ -25,7 +25,7 @@ result.Print();
 
 - **Adaptive measurement.** No iteration counts to guess. The engine calibrates ops-per-sample for fast methods so timer overhead doesn't dominate, and detects when warmup has plateaued so the JIT has settled. Pin any dimension when you want a fixed, reproducible run.
 
-- **Statistical rigor built in.** Samples stream until the 95% confidence interval is tight enough, then stop. IQR-fence outlier trimming filters OS noise, with a bimodal-distribution warning when discarded samples look like real latency spikes rather than random jitter. A/B comparisons use a Mann-Whitney U test with Cliff's delta effect size (Negligible / Small / Medium / Large), automatically switching to Kruskal-Wallis for three or more implementations.
+- **Statistical rigor built in.** Samples stream until the confidence interval is tight enough, then stop. Outlier trimming filters OS noise (IQR fence by default, with a bimodal-distribution warning when discarded samples look like real latency spikes rather than random jitter). A/B comparisons automatically determine whether a difference is statistically real or just noise, with an effect-size magnitude (Negligible / Small / Medium / Large) so a ✓ always means "real and at least a small effect". The built-in tests are non-parametric rank-based methods, cross-validated against SciPy and NumPy - see [Significance Testing](./docs/statistics/significance.md) for the methodology.
 
 - **Pluggable statistics.** Swap in your own outlier detector (`IOutlierDetector`) or significance test (`ISignificanceTest`) when the built-in IQR/MAD trimming and rank-based tests don't fit your domain.
 

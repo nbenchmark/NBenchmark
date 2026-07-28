@@ -1,7 +1,7 @@
 ---
 title: Samples
 description: Runnable sample projects included with NBenchmark.
-order: 8
+order: 9
 ---
 
 # Samples

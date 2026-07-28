@@ -46,6 +46,7 @@ Keep `InstanceLifetime.PerClass` statistically valid with `IStateReset` or autom
 
 ## See also
 
+- [Guides](../guides/) - workflow-first recipes that combine these features to solve real benchmarking tasks (ASP.NET services, CI/CD tuning, refactors, parameter sweeps, cross-runtime, test-suite gates, custom statistics)
 - [Usage modes](../usage-modes/) - the four ways to run benchmarks
 - [Output](../output/index.md) - reporters and output control
 - [Configuration](../reference/configuration.md) - configuration and CLI flags

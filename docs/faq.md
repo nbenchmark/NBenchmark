@@ -1,7 +1,7 @@
 ---
 title: FAQ
 description: Frequently asked questions about NBenchmark.
-order: 9
+order: 10
 ---
 
 # FAQ
@@ -37,7 +37,7 @@ A large Error (margin of error) means the measurements are highly variable. Comm
 - **Thermal throttling.** On laptops, the CPU may reduce clock speed mid-run. Increase warmup with `.WithWarmup(50)` to let the CPU stabilise before measurement, or reduce iterations to shorten the run.
 - **The code path varies.** If your benchmark hits different code paths each iteration (e.g. a cache that fills up), that variability is real and expected.
 
-See the [Troubleshooting guide](./troubleshooting.md) for the full symptom matrix and configuration remedies.
+See the [Troubleshooting guide](./troubleshooting.md) for the full symptom-to-fix index and configuration remedies.
 
 ### Why should I care about the median vs. the mean?
 

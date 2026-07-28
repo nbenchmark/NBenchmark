@@ -1,7 +1,7 @@
 ---
 title: Test integration
 description: Enforce performance thresholds inside an existing xUnit, NUnit, or MSTest test suite.
-order: 6
+order: 7
 ---
 
 # Test integration

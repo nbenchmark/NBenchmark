@@ -64,6 +64,10 @@ The warning is **non-fatal**: the benchmark still completes and reports statisti
 
 ### What to do
 
+> [!CAUTION] Quick fix
+> 1. **Check the body** for **lock contention** or **cache misses** - the cluster centre in the warning names the extra cost the slow path pays.
+> 2. **If you suspect GC:** `dotnet run -- --profile independent` (forces per-iteration Gen0 collection, making GC pauses deterministic rather than bimodal).
+
 1. **Do not silence it.** The warning is telling you something real about your code's performance distribution. The reported median describes the fast path; the cluster centre describes a latency a real user will also hit.
 2. **Read the tail metrics as-is - they already show the second peak.** By default the [histogram](./descriptive.md) and the reported percentiles (P99, P99.9, Max) are computed from the full pre-trim distribution (`TailMetricsBasis = Raw`), so the trimmed cluster is still visible in them; you do not need to re-run with `OutlierMode.None`. Trimming affects only the central statistics (mean, standard deviation, CI). If you have explicitly set `TailMetricsBasis = Trimmed`, re-run with `OutlierMode.None` to see the cluster in the tail metrics.
 3. **Investigate the cause.** Use a profiler or add instrumentation around the suspected bottleneck (lock, cache-hot path, GC notification). The cluster centre in the warning message is a hint about how much extra time the slow path costs.

@@ -1,7 +1,7 @@
 ---
 title: Reference
 description: Configuration, CLI flags, and compile-time diagnostics.
-order: 7
+order: 8
 ---
 
 # Reference

@@ -113,20 +113,20 @@ The set of reported percentiles is configurable via `MeasurementOptions.Reported
 
 When comparing two or more benchmarks, it's not enough to see that one has a lower median. The difference might be random noise.
 
-NBenchmark uses the **[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)** to answer: "Is this difference statistically significant?" The test implementation (along with every other statistical primitive in the library) is dependency-free and cross-validated against SciPy and NumPy - see [Validation & Accuracy](../statistics/validation.md).
+NBenchmark answers that question and reports the answer in two columns:
 
-- A **✓** in the Sig column means the difference would occur by chance less than 5% of the time (p < 0.05). It is very unlikely to be noise.
-- A **✗** means the difference is not statistically significant - you cannot confidently conclude one is faster than the other.
-- The test requires at least **2 samples** in each group; with fewer it returns no result.
+- **Sig** - whether the difference is statistically real.
+  - **✓** means the difference would occur by chance less than 5% of the time (p < 0.05). It is very unlikely to be noise.
+  - **✗** means the difference is not statistically significant - you cannot confidently conclude one is faster than the other.
+  - (blank) means the benchmark is the baseline, or significance was not tested (fewer than 2 samples in a group).
+- **Magnitude** - how large the difference is, classified as Negligible / Small / Medium / Large. A statistically significant result (✓) with a Negligible magnitude means the difference is real but too small to care about. Focus on results with Small, Medium, or Large magnitudes.
 
-The Mann-Whitney U test is **[non-parametric](https://en.wikipedia.org/wiki/Nonparametric_statistics)** - it makes no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not.
-
-When you compare **three or more** benchmarks, NBenchmark first runs the **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus test**. If the omnibus is significant (at least one group differs), it follows up with pairwise Mann-Whitney U tests (candidate versus baseline) with Holm-Bonferroni correction, and the per-row Sig column shows the corrected verdicts. If the omnibus is not significant, no post-hoc comparisons run and the per-row Sig column stays blank. The default strategy is `DefaultSignificanceTest`; you can swap in your own via `ISignificanceTest` (see [Significance Testing](../statistics/significance.md#custom-significance-tests)).
-
-Statistical significance is reported with a standardized magnitude: the **Magnitude** column shows Cliff's delta classified as Negligible / Small / Medium / Large. See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta) for the thresholds, the sign convention, and the opt-in `MinimumPracticalEffect` gate.
+By default a ✓ means "statistically real **and** at least a small effect", not merely "p < alpha": a `MinimumPracticalEffect` gate (on by default) downgrades sub-small differences so a ✓ is always worth acting on. Set it to `0` (`--min-practical-effect 0`) to restore p-value-only verdicts.
 
 > [!NOTE]
 > Statistical significance does not mean the difference is *large* or *important*. A tiny 0.1 ns difference can be statistically significant with many iterations. Read the Magnitude column alongside Sig and the Ratio column.
+
+The built-in tests are **non-parametric rank-based methods** - they make no assumption that your timings follow a normal (bell-curve) distribution, which benchmark timings generally do not. NBenchmark picks the right test for the number of groups being compared (a pairwise test for two, an omnibus test with post-hoc correction for three or more), and every statistical primitive is dependency-free and cross-validated against SciPy and NumPy. See [Significance Testing](../statistics/significance.md) for the full methodology, the algorithms, p-value interpretation, the effect-size thresholds, and how to swap in your own test.
 
 ## Allocation tracking
 
