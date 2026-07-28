@@ -57,7 +57,14 @@ internal sealed class WorkerSession(FrameChannel channel)
             // End of stream. The coordinator closed its write end - deliberately, or because it
             // died. Either way this worker has nothing left to serve and no reason to linger.
             if (frame is null)
+            {
+                // Said out loud because from the coordinator's side this is indistinguishable from
+                // a crash: its next read returns end-of-stream either way. Without this line a
+                // worker that exited for a perfectly ordinary reason looks like a lost process.
+                Console.Error.WriteLine("nbworker: inbound stream closed while idle; exiting.");
+
                 return WorkerExitCode.Success;
+            }
 
             switch (frame.Kind)
             {
@@ -249,7 +256,7 @@ internal sealed class WorkerSession(FrameChannel channel)
                 continue;
             }
 
-            var outcome = await BodyResolver
+            var outcome = await DelegateDispatch
                 .MeasureAsync(body.DisplayName, resolved, spec, cancellationToken)
                 .ConfigureAwait(false);
 

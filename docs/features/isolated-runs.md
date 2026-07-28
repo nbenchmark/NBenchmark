@@ -12,7 +12,7 @@ How you reach for isolation depends on the mode:
 
 | Mode | Isolation | Granularity |
 | --- | --- | --- |
-| **Single** (`Benchmark.Run` / `RunAsync`) | Not available - always in-process | - |
+| **Single** (`Benchmark.Run` / `RunAsync`) | **On by default** | One worker per call |
 | **Suite** (`BenchmarkSuite`) | Opt in with `WithIsolation()` | The whole suite runs in one child process |
 | **Harness** (`BenchmarkHarness`) | **On by default** | Per class, with per-benchmark and opt-out controls |
 
@@ -24,14 +24,48 @@ Isolation is useful when you want to reduce contamination from:
 
 ## Single mode
 
-Single mode is intentionally simple and always runs **in-process** - there is no isolated variant. When you need a clean process, use Suite or Harness mode.
+Single mode isolates by default. The call signature is unchanged - including the synchronous return - and the body is measured in a worker started under the configured runtime profile:
 
 ```csharp
 using NBenchmark;
 
-// Always in-process - fast and simple.
-var result = Benchmark.Run(() => ColdStartSensitivePath(), name: "cold path");
+// Measured in a worker, under the steady-state runtime profile.
+var result = Benchmark.Run(() => Fibonacci(20), name: "fib");
 ```
+
+This matters more here than anywhere else, because a lambda measured in whatever process happens to be running inherits that process's JIT tiering. The same body, measured both ways in the same program:
+
+| round | isolated | in-process | ratio |
+| --- | --- | --- | --- |
+| 0 | 329 ns | 7,009 ns | 21.3x |
+| 1 | 320 ns | 6,733 ns | 21.0x |
+| 2 | 322 ns | 329 ns | 1.0x |
+
+The in-process column is not noisy - it is *wrong*, by a factor of 21, until the JIT happens to promote the body to tier 1 on the third attempt. Nothing in the reported confidence interval hints at that. The isolated column is the same number every time.
+
+### When the body cannot be isolated
+
+A body that **captures state from its enclosing scope** cannot be measured in a worker, because the captured values live only in this process:
+
+```csharp
+var iterations = 1000;
+
+// Captures `iterations`, so this is measured in-process and labelled.
+var result = Benchmark.Run(() => Work(iterations));
+```
+
+NBenchmark measures it here, prints the reason once, and stamps `IsolationStatus.InProcessCapturedState` on the result. It never reconstructs the captured state: doing so was tried, and it did not fail loudly - it returned a plausible number for the wrong value. To isolate a body like this, remove the capture (use a constant, or move the state into a benchmark class field).
+
+### Measuring this process on purpose
+
+`RunInProcess` is not a fallback - it is the correct choice when the current process *is* the subject: cold-start and first-call cost, or a body that must observe host state such as a warm cache or an open connection. It measures here silently, with no warning, and stamps `IsolationStatus.InProcessRequested`:
+
+```csharp
+// Deliberate: measuring first-call cost, where disabling tiering would measure the wrong thing.
+var cold = Benchmark.RunInProcess(() => ColdStartSensitivePath(), name: "cold path");
+```
+
+`Benchmark.Warmup()` optionally starts a worker in the background so the first measured call does not pay the roughly 70 ms launch.
 
 ## Suite mode
 

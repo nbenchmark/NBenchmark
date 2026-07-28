@@ -318,6 +318,44 @@ public sealed class FrameChannelTests
     }
 
     /// <summary>
+    ///     Non-finite statistics must survive the wire.
+    ///     <para>
+    ///         This is a regression guard for a defect that killed workers intermittently. A benchmark
+    ///         whose samples are all identical has zero variance, so its skewness and kurtosis are
+    ///         0/0 - and <c>Utf8JsonWriter</c> refuses to write <c>NaN</c> by default. The worker
+    ///         therefore threw <i>after</i> measuring successfully, while serializing its own result,
+    ///         and the coordinator saw nothing but a process that had gone away. Trivially fast bodies
+    ///         hit it roughly a third of the time.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task BenchmarkCompleted_SurvivesNonFiniteStatistics()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        var result = ResultNamed("zero-variance") with
+        {
+            Skewness = double.NaN,
+            Kurtosis = double.NaN,
+            CoefficientOfVariation = double.NaN,
+            OperationsPerSecond = double.PositiveInfinity,
+            StandardDeviation = 0,
+        };
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new BenchmarkCompletedPayload { Result = result, RawSamples = [1.0, 1.0] }),
+            CancellationToken.None);
+
+        var received = (await right.ReadAsync(CancellationToken.None))!.BenchmarkCompleted!.Result;
+
+        Assert.True(double.IsNaN(received.Skewness));
+        Assert.True(double.IsNaN(received.Kurtosis));
+        Assert.True(double.IsNaN(received.CoefficientOfVariation));
+        Assert.True(double.IsPositiveInfinity(received.OperationsPerSecond));
+    }
+
+    /// <summary>
     ///     End of stream reads as <c>null</c>, not an exception. This is what lets a worker exit
     ///     on its own when the coordinator dies, with no supervisor in the loop.
     /// </summary>

@@ -140,13 +140,26 @@ public sealed class ConsoleReporter : IReporter
 
     private static void RenderMixedRuntimeProfileWarning(BenchmarkTable benchTable)
     {
-        if (!benchTable.MixedRuntimeProfiles)
-            return;
+        if (benchTable.MixedRuntimeProfiles)
+        {
+            AnsiConsole.MarkupLine(
+                "[yellow]Warning:[/] [dim]rows in this table were measured under different runtime "
+                + "configurations, so their numbers are not comparable with each other. This usually "
+                + "means in-process benchmarks were mixed with isolated ones.[/]");
+        }
 
-        AnsiConsole.MarkupLine(
-            "[yellow]Warning:[/] [dim]rows in this table were measured under different runtime "
-            + "configurations, so their numbers are not comparable with each other. This usually "
-            + "means in-process benchmarks were mixed with isolated ones.[/]");
+        // Naming the reason matters as much as naming the fact. "You asked for in-process" and "the
+        // measurement worker is not installed" produce identical numbers and identical labels, but
+        // only one of them is a problem the user can fix.
+        foreach (var reason in benchTable.InProcessReasons)
+        {
+            if (reason.ToRemedy() is not { } remedy)
+                continue;
+
+            AnsiConsole.MarkupLine(
+                $"[yellow]Warning:[/] [dim]{Esc(reason.ToLabel())} rows were not isolated: "
+                + $"{Esc(remedy)}.[/]");
+        }
     }
 
     private static void RenderHeader(BenchmarkTable benchTable)

@@ -231,6 +231,17 @@ public record BenchmarkResult
     /// </summary>
     public string RuntimeKnobs { get; init; } = "";
 
+    /// <summary>
+    ///     Where this measurement ran, and - when it did not run in a worker - why not.
+    ///     <para>
+    ///         The default is <see cref="IsolationStatus.InProcessRequested" /> rather than
+    ///         <see cref="IsolationStatus.Isolated" /> on purpose: a result that nobody explicitly
+    ///         marked as isolated did not come from a worker, and defaulting the other way would let
+    ///         any code path that forgot to set it claim a fidelity it never had.
+    ///     </para>
+    /// </summary>
+    public IsolationStatus IsolationStatus { get; init; } = IsolationStatus.InProcessRequested;
+
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     /// <summary>

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace NBenchmark.Engine;
 
@@ -79,9 +80,17 @@ internal static class ChildProcessLauncher
         "OTEL_SERVICE_NAME",
     ];
 
+    /// <remarks>
+    ///     Named floating-point literals are allowed because statistics legitimately produce
+    ///     non-finite values - a benchmark whose samples are all identical has zero variance, so its
+    ///     skewness and kurtosis are 0/0 - and <c>Utf8JsonWriter</c> otherwise throws rather than
+    ///     writing <c>NaN</c>. Without this, a child that had measured perfectly well died while
+    ///     serializing its own results.
+    /// </remarks>
     internal static readonly JsonSerializerOptions SerializerOptions = new()
     {
         WriteIndented = false,
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 
     /// <summary>

@@ -45,6 +45,19 @@ internal static class WorkerRunPlan
         public bool CanIsolate => Refusal == Refusal.None;
 
         public static Decision Allow() => new(Refusal.None, null);
+
+        /// <summary>
+        ///     The status to stamp on results this decision sends to the host process, so the reason
+        ///     travels with the numbers rather than living only in a console message that scrolls by.
+        /// </summary>
+        public IsolationStatus Status => Refusal switch
+        {
+            Refusal.None => IsolationStatus.Isolated,
+            Refusal.WorkerNotDeployed => IsolationStatus.InProcessNoWorker,
+            Refusal.LiveInstanceFactory => IsolationStatus.InProcessLiveFixture,
+            Refusal.NoAssemblyOnDisk => IsolationStatus.InProcessUnaddressablePlan,
+            _ => IsolationStatus.InProcessRequested,
+        };
     }
 
     /// <summary>

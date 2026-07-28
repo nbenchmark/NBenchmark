@@ -82,8 +82,8 @@ internal static class WorkerLauncher
 
             try
             {
-                worker = await WorkerHost
-                    .StartAsync(workerPath, request.Options.RuntimeProfile, cancellationToken)
+                worker = await WorkerPrewarm
+                    .TakeOrStartAsync(workerPath, request.Options.RuntimeProfile, cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (WorkerStartException ex)

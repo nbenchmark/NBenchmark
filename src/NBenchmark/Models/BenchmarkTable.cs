@@ -51,6 +51,18 @@ public sealed record BenchmarkTable
     public bool MixedRuntimeProfiles { get; init; }
 
     /// <summary>
+    ///     The distinct reasons any row in this table was measured in the host process rather than a
+    ///     worker. Empty when every row was isolated.
+    ///     <para>
+    ///         Reported because <see cref="MixedRuntimeProfiles" /> only says the rows are not
+    ///         comparable; this says <i>why</i>, and each reason has a different remedy. A user who
+    ///         cannot see the difference between "you asked for in-process" and "the worker is not
+    ///         installed" has no way to act on either.
+    ///     </para>
+    /// </summary>
+    public IReadOnlyList<IsolationStatus> InProcessReasons { get; init; } = [];
+
+    /// <summary>
     ///     The omnibus significance verdict (e.g. Kruskal-Wallis) across all benchmarks, when
     ///     an omnibus test was run (three or more groups); otherwise <c>null</c>.
     /// </summary>
@@ -282,6 +294,12 @@ public sealed record BenchmarkTable
                 .Select(r => r.RuntimeProfileName)
                 .Distinct(StringComparer.Ordinal)
                 .Count() > 1,
+            InProcessReasons = results
+                .Where(r => !r.IsolationStatus.IsIsolated())
+                .Select(r => r.IsolationStatus)
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList(),
             Omnibus = results.FirstOrDefault(r => r.Omnibus is not null)?.Omnibus,
         };
     }

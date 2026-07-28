@@ -23,15 +23,27 @@ internal sealed class FrameChannel : IDisposable
     ///     floor of roughly 600 ms, so source generation would buy nothing measurable here.
     /// </summary>
     /// <remarks>
-    ///     Nulls are written rather than omitted. <see cref="BenchmarkResult" /> declares its
-    ///     allocation columns as <c>required</c> <i>and</i> nullable - "the measurement must state
-    ///     whether it tracked allocations, and null means it did not" - so a global omit-nulls
-    ///     policy produces JSON that will not deserialize. The envelope's unused payload slots are
-    ///     suppressed individually instead, which keeps frames compact without that trap.
+    ///     <para>
+    ///         Nulls are written rather than omitted. <see cref="BenchmarkResult" /> declares its
+    ///         allocation columns as <c>required</c> <i>and</i> nullable - "the measurement must state
+    ///         whether it tracked allocations, and null means it did not" - so a global omit-nulls
+    ///         policy produces JSON that will not deserialize. The envelope's unused payload slots are
+    ///         suppressed individually instead, which keeps frames compact without that trap.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="JsonNumberHandling.AllowNamedFloatingPointLiterals" /> is not optional here.
+    ///         Statistics legitimately produce non-finite values - a benchmark whose samples are all
+    ///         identical has zero variance, so its skewness and kurtosis are 0/0 - and by default
+    ///         <c>Utf8JsonWriter</c> throws rather than writing <c>NaN</c>. That threw <i>inside the
+    ///         worker</i>, killing it after the measurement had already succeeded, and the coordinator
+    ///         saw only a vanished process. Trivially fast bodies hit it intermittently, which is the
+    ///         worst kind of bug to leave in a benchmarking tool.
+    ///     </para>
     /// </remarks>
     internal static readonly JsonSerializerOptions SerializerOptions = new()
     {
         WriteIndented = false,
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 
     private readonly Stream _inbound;

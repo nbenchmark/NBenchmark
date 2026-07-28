@@ -1129,7 +1129,7 @@ public sealed class BenchmarkSuite(string name)
 
             var stats = LaunchAggregator.Aggregate(perLaunch);
             var best = LaunchAggregator.BestLaunch(perLaunch);
-            aggregated.Add(best with { LaunchStatistics = stats });
+            aggregated.Add(LaunchAggregator.Apply(best, stats));
 
             if (pooledSamples.TryGetValue(name, out var samples))
                 rawSamples[RawSampleKey.For(name, best.RuntimeMoniker)] = samples;
@@ -1542,7 +1542,7 @@ public sealed class BenchmarkSuite(string name)
             // Keep representative-launch samples on the displayed result so statistical fields
             // and TrimmedOrdinals remain aligned; pooled samples still travel alongside for
             // significance calculations.
-            var aggregatedResult = best with { LaunchStatistics = stats };
+            var aggregatedResult = LaunchAggregator.Apply(best, stats);
 
             aggregated.Add(new IsolatedResultItem
             {

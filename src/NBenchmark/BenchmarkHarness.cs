@@ -727,9 +727,16 @@ public sealed class BenchmarkHarness
 
                 if (inProcess.Count > 0)
                 {
+                    var inProcessStart = allResults.Count;
+
                     await RunInProcessSuiteAsync(
                         suite with { Benchmarks = inProcess }, suiteOptions, runningIndex, totalBenchmarks,
                         allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+
+                    // A benchmark that carries [InProcess] chose the host itself, whatever the class
+                    // as a whole could or could not do; anything else landed here because of the
+                    // class-level refusal, and should say which one.
+                    StampIsolationStatus(allResults, inProcessStart, inProcess, workerDecision.Status);
 
                     runningIndex += inProcess.Count;
                 }
@@ -1366,7 +1373,7 @@ public sealed class BenchmarkHarness
 
                     var stats = LaunchAggregator.Aggregate(perLaunchResults);
                     var best = LaunchAggregator.BestLaunch(perLaunchResults);
-                    allResults.Add(best with { LaunchStatistics = stats });
+                    allResults.Add(LaunchAggregator.Apply(best, stats));
 
                     foreach (var kvp in PoolRawSamplesByName(perLaunchSamples))
                     {
@@ -1421,7 +1428,7 @@ public sealed class BenchmarkHarness
 
             var stats = LaunchAggregator.Aggregate(perLaunch);
             var best = LaunchAggregator.BestLaunch(perLaunch);
-            aggregated.Add(best with { LaunchStatistics = stats });
+            aggregated.Add(LaunchAggregator.Apply(best, stats));
 
             if (pooledSamples.TryGetValue(name, out var launchSamples))
                 samples[name] = launchSamples;
@@ -1645,6 +1652,51 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
+    ///     Records why each in-process result ran in the host, on the result itself.
+    ///     <para>
+    ///         A benchmark carrying <c>[InProcess]</c> asked for the host and is stamped as such even
+    ///         when the class was also refused for another reason - the explicit choice is the true
+    ///         explanation, and reporting a refusal the user never hit would send them chasing a
+    ///         problem they do not have.
+    ///     </para>
+    /// </summary>
+    private static void StampIsolationStatus(
+        List<BenchmarkResult> results,
+        int startIndex,
+        IReadOnlyList<BenchmarkMethodDefinition> benchmarks,
+        IsolationStatus classStatus)
+    {
+        var explicitlyInProcess = benchmarks
+            .Where(b => b.Isolation == IsolationMode.InProcess)
+            .Select(b => b.DisplayName)
+            .ToHashSet(StringComparer.Ordinal);
+
+        for (var i = startIndex; i < results.Count; i++)
+        {
+            var result = results[i];
+
+            var status = explicitlyInProcess.Contains(MethodNameOf(result.Name))
+                ? IsolationStatus.InProcessRequested
+                : classStatus;
+
+            results[i] = result with
+            {
+                IsolationStatus = status == IsolationStatus.Isolated
+                    ? IsolationStatus.InProcessRequested
+                    : status,
+            };
+        }
+    }
+
+    /// <summary>Strips the class prefix from a <c>Class.Method</c> result name.</summary>
+    private static string MethodNameOf(string resultName)
+    {
+        var separator = resultName.LastIndexOf('.');
+
+        return separator < 0 ? resultName : resultName[(separator + 1)..];
+    }
+
+    /// <summary>
     ///     Reports, once per class, that isolation was declined and why.
     ///     <para>
     ///         This is the visible half of "refuse rather than guess". A silent fallback to
@@ -1771,7 +1823,10 @@ public sealed class BenchmarkHarness
             // Keep representative-launch samples on the displayed result so statistical fields
             // and TrimmedOrdinals remain aligned; pooled samples still travel alongside for
             // significance calculations.
-            var aggregatedResult = best with { LaunchStatistics = stats };
+            // Pooling samples across replicate workers multiplies statistical power without
+            // improving reproducibility, so a difference far below the run-to-run noise can still
+            // read as overwhelmingly significant. Apply attaches a warning where that is happening.
+            var aggregatedResult = LaunchAggregator.Apply(best, stats);
 
             aggregated.Add(new IsolatedResultItem
             {

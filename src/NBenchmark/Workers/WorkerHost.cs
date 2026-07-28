@@ -25,16 +25,22 @@ internal sealed class WorkerHost : IAsyncDisposable
 
     // The channel owns both pipe streams and disposes them, so they are not held separately here.
     private readonly FrameChannel _channel;
-    private readonly Queue<string> _stderrTail = new(StderrTailLines + 1);
+    private readonly Queue<string> _stderrTail;
     private readonly int _processId;
     private bool _disposed;
 
-    private WorkerHost(Process process, FrameChannel channel, ReadyPayload ready)
+    private WorkerHost(Process process, FrameChannel channel, ReadyPayload ready, Queue<string> stderrTail)
     {
         _process = process;
         _channel = channel;
         _processId = process.Id;
         Ready = ready;
+
+        // The live queue the stderr handler writes into, not a copy of it. Copying at construction
+        // time - which is what this did first - captured only what the worker said before its
+        // handshake, so anything it reported while dying was silently discarded. That is the exact
+        // moment the output matters most.
+        _stderrTail = stderrTail;
     }
 
     /// <summary>What the worker reported about the process it is - not what it was asked to be.</summary>
@@ -45,7 +51,61 @@ internal sealed class WorkerHost : IAsyncDisposable
     public int ProcessId => _processId;
 
     /// <summary>The tail of the worker's stderr, for diagnosing a worker that died.</summary>
-    public string StderrTail => string.Join(Environment.NewLine, _stderrTail);
+    public string StderrTail
+    {
+        get
+        {
+            lock (_stderrTail)
+            {
+                return string.Join(Environment.NewLine, _stderrTail);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     How the worker process ended, for a fault message. A worker that vanishes with no stderr
+    ///     is otherwise undiagnosable - the exit code distinguishes a crash from a clean exit from
+    ///     something having killed it, and those have completely different causes.
+    /// </summary>
+    public string ExitDescription
+    {
+        get
+        {
+            try
+            {
+                if (!_process.HasExited)
+                    return "the process is still running";
+
+                var code = _process.ExitCode;
+
+                // A negative code on Unix is a signal: the process did not choose to exit.
+                return code < 0
+                    ? $"killed by signal {-code}"
+                    : $"exit code {code}";
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or SystemException)
+            {
+                return "exit status unavailable";
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Waits briefly for the worker to finish exiting, so a diagnostic composed afterwards sees a
+    ///     settled exit code and a drained stderr rather than racing both.
+    /// </summary>
+    public async Task WaitForExitAsync(TimeSpan timeout)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(timeout);
+            await _process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or InvalidOperationException)
+        {
+            // Still running, or already reaped. Either way the caller reports what it can see.
+        }
+    }
 
     /// <summary>
     ///     Spawns a worker under <paramref name="profile" /> and completes the handshake.
@@ -123,17 +183,7 @@ internal sealed class WorkerHost : IAsyncDisposable
             var channel = new FrameChannel(fromWorker, toWorker);
             var ready = await HandshakeAsync(channel, process, stderrTail, cancellationToken).ConfigureAwait(false);
 
-            var host = new WorkerHost(process, channel, ready);
-
-            lock (stderrTail)
-            {
-                foreach (var line in stderrTail)
-                {
-                    host._stderrTail.Enqueue(line);
-                }
-            }
-
-            return host;
+            return new WorkerHost(process, channel, ready, stderrTail);
         }
         catch
         {

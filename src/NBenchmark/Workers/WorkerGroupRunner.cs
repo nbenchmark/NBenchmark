@@ -58,9 +58,14 @@ internal static class WorkerGroupRunner
 
                 if (frame is null)
                 {
+                    // Give the worker a moment to finish exiting and its stderr to drain. Composing
+                    // the diagnostic immediately would race both, and produce exactly the useless
+                    // "it vanished, no idea why" message this is meant to avoid.
+                    await host.WaitForExitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+
                     faults.Add(new FaultPayload
                     {
-                        Message = "The measurement worker exited before the group finished."
+                        Message = $"The measurement worker exited before the group finished ({host.ExitDescription})."
                                   + (host.StderrTail.Length == 0 ? "" : $" Worker stderr: {host.StderrTail}"),
                     });
 
@@ -85,7 +90,11 @@ internal static class WorkerGroupRunner
 
                     case WorkerFrameKind.BenchmarkCompleted when frame.BenchmarkCompleted is not null:
                         var payload = frame.BenchmarkCompleted;
-                        results.Add(payload.Result);
+
+                        // Stamped here rather than in the worker, because only this side knows the
+                        // result arrived over a process boundary at all. A worker that stamped
+                        // itself would be taking its own word for it.
+                        results.Add(payload.Result with { IsolationStatus = IsolationStatus.Isolated });
                         samples[payload.Result.Name] = payload.RawSamples;
 
                         // Deliberately no OnBenchmarkCompleted / OnResult here. A group may be
