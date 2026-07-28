@@ -292,6 +292,47 @@ dotnet run -- --profile independent
 
 Individual behaviours can be overridden with `--force-gc`, `--no-gc-between-benchmarks`, and `--no-allocations`. See [Measurement Profiles](../statistics/measurement.md#measurement-profiles) for a worked example.
 
+> [!NOTE]
+> `--profile` controls *GC behaviour during* a run. `--runtime-profile` (below) controls the *runtime configuration a process starts with*. They are independent.
+
+---
+
+### `--runtime-profile <profile>`
+
+Set the runtime-startup configuration benchmarks are measured under: JIT tiering, dynamic PGO, ReadyToRun, and GC flavour.
+
+| Value | Configuration | What it is for |
+| --- | --- | --- |
+| `steady-state` | `TieredCompilation=0`, `TieredPGO=0`, `ReadyToRun=0` | **(default)** Fully-optimized steady-state throughput. |
+| `production` | `TieredCompilation=1`, `TieredPGO=1`, `ReadyToRun=1` | What your users actually run. Reproducible, but imprecise. |
+| `server-gc` | `steady-state` plus `gcServer=1`, `gcConcurrent=0` | Code destined for a server-GC host. |
+| `host` | Nothing set | Inherit the host's configuration. Reproduces pre-profile numbers. |
+
+**Why this exists.** None of these settings can be changed in a process that is already running - the runtime reads them once at startup. That, rather than cross-benchmark state contamination, is the real reason a measurement needs its own process: **the process boundary is how the configuration gets delivered.**
+
+The effect is not subtle. On four benchmarks with provably identical cost:
+
+| Configuration | Spread across runs | Largest fabricated difference |
+| --- | --- | --- |
+| `--runtime-profile host` | 3.10x | 3.06x |
+| `--runtime-profile production` | 2.59x | 2.54x |
+| `--runtime-profile steady-state` | **1.02x** | **1.01x** |
+
+Under `host` and `production`, benchmarks of identical cost differed by up to 3x - each reported with a tight confidence interval. Tiered compilation means a short body may be measured as tier-0 or tier-1 code depending on unrelated process history.
+
+```bash
+dotnet run -- --runtime-profile production --launch-count 5   # imprecise: raise the replicate count
+dotnet run -- --runtime-profile host                          # reproduce a pre-profile baseline
+```
+
+**Limits, stated plainly:**
+
+- `steady-state` forbids on-stack replacement and changes startup behaviour, so it is **the wrong choice for measuring cold-start or first-call cost**. Use `production` for that.
+- It also costs wall clock, because every method is compiled eagerly at full optimization.
+- **It cannot apply to in-process benchmarks.** Anything measured in the host process - all of Simple mode, and `--in-process` or `[InProcess]` benchmarks - reports `host` and inherits the host's configuration. NBenchmark says so rather than claiming otherwise: every result carries the profile it was *actually* measured under, and results measured under different profiles are never compared against each other.
+
+Set `RuntimeProfile.Host` (or `--runtime-profile host`) to accept the host's configuration everywhere and silence the guidance message; `NBENCHMARK_SUPPRESS_RUNTIME_PROFILE_WARNING=1` suppresses it without changing the profile.
+
 ---
 
 ### `--force-gc`

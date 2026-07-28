@@ -50,6 +50,11 @@ public sealed class BenchmarkRunner
         var progress = spec.Progress;
         var observer = spec.Observer;
 
+        // The single funnel every measurement in every mode passes through, so this is the one
+        // place that can tell whether a requested runtime profile actually took effect. In a
+        // child it always has; in the host it never can.
+        RuntimeProfileEnvironment.EmitNotAppliedGuidanceOnce(options);
+
         NBenchmarkDiagnostics.ResetBenchmarkState();
 
         try
@@ -91,6 +96,11 @@ public sealed class BenchmarkRunner
         var options = spec.Options;
         var progress = spec.Progress;
         var observer = spec.Observer;
+
+        // The single funnel every measurement in every mode passes through, so this is the one
+        // place that can tell whether a requested runtime profile actually took effect. In a
+        // child it always has; in the host it never can.
+        RuntimeProfileEnvironment.EmitNotAppliedGuidanceOnce(options);
 
         NBenchmarkDiagnostics.ResetBenchmarkState();
 

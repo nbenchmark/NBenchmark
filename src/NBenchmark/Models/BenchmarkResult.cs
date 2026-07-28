@@ -211,6 +211,26 @@ public record BenchmarkResult
     /// <summary>The measurement profile under which this result was produced.</summary>
     public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
 
+    /// <summary>
+    ///     The name of the runtime-startup configuration this result was <b>actually</b> measured
+    ///     under - not the one that was requested. <c>"host"</c> means the measurement ran in a
+    ///     process NBenchmark did not launch, so it inherited whatever runtime configuration that
+    ///     process was started with; every in-process result reports this.
+    ///     <para>
+    ///         Two results measured under different runtime profiles are not comparable, so the
+    ///         significance engine never places them in the same comparison group.
+    ///     </para>
+    /// </summary>
+    public string RuntimeProfileName { get; init; } = RuntimeProfile.Host.Name;
+
+    /// <summary>
+    ///     The runtime-startup knobs in effect for this measurement, e.g.
+    ///     <c>"tiered=off pgo=off r2r=off"</c>. Read from the measuring process's own environment
+    ///     rather than derived from the requested profile, so a knob the user set by hand is
+    ///     reported as faithfully as one NBenchmark applied. Empty when none are set.
+    /// </summary>
+    public string RuntimeKnobs { get; init; } = "";
+
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     /// <summary>

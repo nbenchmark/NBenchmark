@@ -29,6 +29,28 @@ public sealed record BenchmarkTable
     public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
 
     /// <summary>
+    ///     The runtime-startup configuration these results were actually measured under, by name.
+    ///     <c>"host"</c> means the measuring process inherited whatever configuration it was
+    ///     started with, which is always the case for in-process benchmarks.
+    /// </summary>
+    public string RuntimeProfileName { get; init; } = RuntimeProfile.Host.Name;
+
+    /// <summary>
+    ///     The startup knobs in effect, e.g. <c>"tiered=off pgo=off r2r=off"</c>. Empty when none
+    ///     are set.
+    /// </summary>
+    public string RuntimeKnobs { get; init; } = "";
+
+    /// <summary>
+    ///     <c>true</c> when the rows in this table were not all measured under the same runtime
+    ///     profile - for example a class combining <c>[InProcess]</c> benchmarks with isolated
+    ///     ones. Their numbers are not comparable with each other, and reporters must say so:
+    ///     the profile difference alone was measured to move a value by roughly 3.3x, which is far
+    ///     larger than most effects anyone is looking for.
+    /// </summary>
+    public bool MixedRuntimeProfiles { get; init; }
+
+    /// <summary>
     ///     The omnibus significance verdict (e.g. Kruskal-Wallis) across all benchmarks, when
     ///     an omnibus test was run (three or more groups); otherwise <c>null</c>.
     /// </summary>
@@ -254,6 +276,12 @@ public sealed record BenchmarkTable
             SignificanceLevel = headerSource?.SignificanceLevel ?? 0.05,
             SignificanceTestName = headerSource?.SignificanceTestName ?? DefaultSignificanceTest.Instance.Name,
             Profile = results.FirstOrDefault()?.Profile ?? MeasurementProfile.Realistic,
+            RuntimeProfileName = results.FirstOrDefault()?.RuntimeProfileName ?? RuntimeProfile.Host.Name,
+            RuntimeKnobs = results.FirstOrDefault()?.RuntimeKnobs ?? "",
+            MixedRuntimeProfiles = results
+                .Select(r => r.RuntimeProfileName)
+                .Distinct(StringComparer.Ordinal)
+                .Count() > 1,
             Omnibus = results.FirstOrDefault(r => r.Omnibus is not null)?.Omnibus,
         };
     }

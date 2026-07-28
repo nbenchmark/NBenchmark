@@ -66,6 +66,15 @@ public sealed class BenchmarkHarness
             ? _options
             : _options with { LaunchCount = DefaultHarnessLaunchCount };
 
+    /// <summary>
+    ///     The options an isolated child should be launched under, with CLI overrides merged in.
+    ///     Used by the child-request builders for the values the parent must resolve on the child's
+    ///     behalf - the wall-clock timeout and the runtime profile, neither of which a child can
+    ///     work out for itself (no user arguments are forwarded, and runtime knobs are fixed before
+    ///     any managed code runs).
+    /// </summary>
+    private MeasurementOptions ChildLaunchOptions => MergeCliOptions(EffectiveBaseOptions, _cliArgs);
+
     public static BenchmarkHarness Create(string[] args)
     {
         var cliArgs = CliArgs.Parse(args);
@@ -406,6 +415,25 @@ public sealed class BenchmarkHarness
         _options = _options with { Profile = profile };
         return this;
     }
+
+    /// <summary>
+    ///     Sets the runtime-startup configuration to measure under - JIT tiering, dynamic PGO,
+    ///     ReadyToRun and GC flavour. Defaults to <see cref="RuntimeProfile.SteadyState" />.
+    ///     <para>
+    ///         This is the setting that requires a child process to exist: the runtime reads these
+    ///         knobs once at startup, so they can only be applied to a process being launched.
+    ///         Benchmarks that run in the host process report <c>"host"</c> and inherit its
+    ///         configuration.
+    ///     </para>
+    /// </summary>
+    public BenchmarkHarness WithRuntimeProfile(RuntimeProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        _options = _options with { RuntimeProfile = profile };
+        _optionsExplicitlySet = true;
+        return this;
+    }
+
 
     /// <summary>
     ///     Tunes the adaptive measurement loop (warmup plateau, CI-width sample count, and
@@ -871,7 +899,7 @@ public sealed class BenchmarkHarness
 
                 // Threshold comparisons only make sense within the same runtime - net8 will
                 // always look "slower" than net10, which would false-positive every net8 row.
-                foreach (var runtimeGroup in allResults.GroupBy(r => r.RuntimeMoniker))
+                foreach (var runtimeGroup in allResults.GroupBy(ComparisonGroup.KeyFor))
                 {
                     if (ThresholdCheck.HasRegression(runtimeGroup.ToList(), threshold) is (true, var names))
                         regressedNames.AddRange(names);
@@ -947,8 +975,8 @@ public sealed class BenchmarkHarness
                 RuntimeMoniker = moniker,
                 EntryAssemblyPath = entryAssemblyPath,
                 ObserverNames = ResolveObserverNames(),
-                Timeout = ChildProcessLauncher.ComputeTimeout(
-                    MergeCliOptions(EffectiveBaseOptions, _cliArgs), suite.Benchmarks.Count),
+                Timeout = ChildProcessLauncher.ComputeTimeout(ChildLaunchOptions, suite.Benchmarks.Count),
+                RuntimeProfile = ChildLaunchOptions.RuntimeProfile,
             };
 
             var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
@@ -1001,7 +1029,7 @@ public sealed class BenchmarkHarness
             // the net8 baseline, not the net10 one.
             var runtimeGroups = classResults
                 .Select((r, idx) => (Result: r, Index: idx))
-                .GroupBy(ri => ri.Result.RuntimeMoniker)
+                .GroupBy(ri => ComparisonGroup.KeyFor(ri.Result))
                 .ToList();
 
             if (!classResults.Any(r => r.ParameterSet.Count > 0))
@@ -1040,7 +1068,7 @@ public sealed class BenchmarkHarness
             foreach (var paramGroup in paramGroups)
             {
                 var paramRuntimeGroups = paramGroup
-                    .GroupBy(ri => ri.Result.RuntimeMoniker)
+                    .GroupBy(ri => ComparisonGroup.KeyFor(ri.Result))
                     .ToList();
 
                 foreach (var runtimeGroup in paramRuntimeGroups)
@@ -1082,7 +1110,7 @@ public sealed class BenchmarkHarness
         {
             foreach (var runtimeGroup in allResults
                          .Select((r, idx) => (Result: r, Index: idx))
-                         .GroupBy(ri => ri.Result.RuntimeMoniker))
+                         .GroupBy(ri => ComparisonGroup.KeyFor(ri.Result)))
             {
                 var runtimeList = runtimeGroup.ToList();
                 var runtimeResults = runtimeList.Select(ri => ri.Result).ToList();
@@ -1114,7 +1142,7 @@ public sealed class BenchmarkHarness
         foreach (var paramGroup in paramGroups)
         {
             foreach (var runtimeGroup in paramGroup
-                         .GroupBy(ri => ri.Result.RuntimeMoniker))
+                         .GroupBy(ri => ComparisonGroup.KeyFor(ri.Result)))
             {
                 var runtimeList = runtimeGroup.ToList();
                 var runtimeResults = runtimeList.Select(ri => ri.Result).ToList();
@@ -1549,8 +1577,8 @@ public sealed class BenchmarkHarness
             // them through ObserverRegistry, which is populated identically by [ModuleInitializer]
             // self-registration in the child's fresh process.
             ObserverNames = ResolveObserverNames(),
-            Timeout = ChildProcessLauncher.ComputeTimeout(
-                MergeCliOptions(EffectiveBaseOptions, _cliArgs), benchmarks.Count),
+            Timeout = ChildProcessLauncher.ComputeTimeout(ChildLaunchOptions, benchmarks.Count),
+            RuntimeProfile = ChildLaunchOptions.RuntimeProfile,
         };
 
         IReadOnlyList<IsolatedResultItem> items;

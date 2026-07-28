@@ -334,6 +334,30 @@ public record MeasurementOptions
     /// </summary>
     public EnvironmentOptions? Environment { get; init; }
 
+    /// <summary>
+    ///     The runtime-startup configuration to measure under - JIT tiering, dynamic PGO,
+    ///     ReadyToRun and GC flavour. Defaults to <see cref="RuntimeProfile.SteadyState" />,
+    ///     which is the only configuration measured to be both precise and accurate.
+    ///     <para>
+    ///         This can only be honoured for benchmarks that run in a child process, because the
+    ///         runtime reads these settings once at startup. An in-process run reports
+    ///         <see cref="RuntimeProfile.Host" /> on its results and carries a warning, rather
+    ///         than claiming a fidelity it does not have. Set
+    ///         <see cref="RuntimeProfile.Host" /> to opt out and inherit the host's configuration
+    ///         everywhere.
+    ///     </para>
+    /// </summary>
+    public RuntimeProfile RuntimeProfile { get; init; } = RuntimeProfile.SteadyState;
+
+    /// <summary>
+    ///     Suppresses the once-per-process guidance that fires when
+    ///     <see cref="RuntimeProfile" /> was requested but could not be applied because the
+    ///     measurement is running in the host process. Set this when in-process measurement is a
+    ///     deliberate choice. The result's <see cref="BenchmarkResult.RuntimeProfileName" /> stamp
+    ///     is unaffected - suppressing the message never suppresses the provenance.
+    /// </summary>
+    public bool SuppressRuntimeProfileWarning { get; init; }
+
     /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
     public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };
 

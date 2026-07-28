@@ -205,6 +205,31 @@ internal static class ChildProcessLauncher
     ///     cross-process channel. Caller-supplied variables win over the inherited OTel ones
     ///     so a caller can override the endpoint for a specific child if needed.
     /// </summary>
+    /// <summary>
+    ///     Applies a runtime profile to a child that has not started yet. This is the whole point
+    ///     of spawning a process: tiering, PGO, ReadyToRun and GC flavour are read by the runtime
+    ///     once at startup and cannot be changed afterwards, so the parent can only deliver them
+    ///     here. A profile that inherits everything is a no-op and leaves the child's environment
+    ///     untouched.
+    ///     <para>
+    ///         The profile name is also passed as a marker so the child can report by name what it
+    ///         was launched under - the runtime offers no managed read-back for tiering, so the
+    ///         child cannot work it out for itself.
+    ///     </para>
+    /// </summary>
+    internal static void ApplyRuntimeProfile(ProcessStartInfo psi, RuntimeProfile? profile)
+    {
+        if (profile is null || profile.InheritsEverything)
+            return;
+
+        foreach (var (variable, value) in profile.ToEnvironment())
+        {
+            psi.Environment[variable] = value;
+        }
+
+        psi.Environment[RuntimeProfile.ProfileNameEnvVar] = profile.Name;
+    }
+
     private static void ApplyTelemetryEnvironment(
         ProcessStartInfo psi,
         params (string Name, string Value)[] environmentVariables)
@@ -421,17 +446,20 @@ internal static class ChildProcessLauncher
             {
                 await WriteRequestAsync(requestPath, request, cancellationToken).ConfigureAwait(false);
 
-                using var process = new Process
-                {
-                    StartInfo = !string.IsNullOrEmpty(request.EntryAssemblyPath)
-                        ? BuildStartInfo(
-                            request.EntryAssemblyPath,
-                            (RequestPathEnvVar, requestPath),
-                            (OutputPathEnvVar, outputPath))
-                        : BuildStartInfo(
-                            (RequestPathEnvVar, requestPath),
-                            (OutputPathEnvVar, outputPath)),
-                };
+                var startInfo = !string.IsNullOrEmpty(request.EntryAssemblyPath)
+                    ? BuildStartInfo(
+                        request.EntryAssemblyPath,
+                        (RequestPathEnvVar, requestPath),
+                        (OutputPathEnvVar, outputPath))
+                    : BuildStartInfo(
+                        (RequestPathEnvVar, requestPath),
+                        (OutputPathEnvVar, outputPath));
+
+                // The only place the runtime profile can be applied: these variables are read by
+                // the runtime at startup, so they must be on the environment before Start().
+                ApplyRuntimeProfile(startInfo, request.RuntimeProfile);
+
+                using var process = new Process { StartInfo = startInfo };
 
                 var stderr = new StringBuilder();
                 var stdoutTail = new Queue<string>(StdoutTailLines + 1);

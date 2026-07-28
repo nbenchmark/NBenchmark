@@ -516,6 +516,24 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>
+    ///     Sets the runtime-startup configuration to measure under - JIT tiering, dynamic PGO,
+    ///     ReadyToRun and GC flavour. Defaults to <see cref="RuntimeProfile.SteadyState" />.
+    ///     <para>
+    ///         This is the setting that requires a child process to exist: the runtime reads these
+    ///         knobs once at startup, so they can only be applied to a process being launched.
+    ///         Benchmarks that run in the host process report <c>"host"</c> and inherit its
+    ///         configuration.
+    ///     </para>
+    /// </summary>
+    public BenchmarkSuite WithRuntimeProfile(RuntimeProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        _options = _options with { RuntimeProfile = profile };
+        return this;
+    }
+
+
     public BenchmarkSuite WithOutlierMode(OutlierMode mode)
     {
         _options = _options with { OutlierMode = mode };
@@ -1177,6 +1195,7 @@ public sealed class BenchmarkSuite(string name)
                 SuiteName = Name,
                 BenchmarkDisplayNames = displayNames,
                 Timeout = ChildProcessLauncher.ComputeTimeout(_options, displayNames.Count),
+                RuntimeProfile = _options.RuntimeProfile,
             };
 
             IReadOnlyList<IsolatedResultItem> items;
@@ -1355,6 +1374,7 @@ public sealed class BenchmarkSuite(string name)
                             RuntimeMoniker = build.Moniker,
                             EntryAssemblyPath = build.DllPath,
                             Timeout = ChildProcessLauncher.ComputeTimeout(_options, envelopeNames.Count),
+                            RuntimeProfile = _options.RuntimeProfile,
                         };
 
                         IReadOnlyList<IsolatedResultItem> items;
@@ -1671,7 +1691,7 @@ public sealed class BenchmarkSuite(string name)
         {
             // Significance only makes sense within the same runtime; net8 vs net10 is not
             // a meaningful comparison for p-value purposes.
-            foreach (var runtimeGroup in results.GroupBy(r => r.RuntimeMoniker))
+            foreach (var runtimeGroup in results.GroupBy(ComparisonGroup.KeyFor))
             {
                 var runtimeList = runtimeGroup.ToList();
                 var runtimeRaw = new Dictionary<string, double[]>();
@@ -1684,7 +1704,7 @@ public sealed class BenchmarkSuite(string name)
 
                 var indices = results
                     .Select((res, idx) => (res, idx))
-                    .Where(x => x.res.RuntimeMoniker == runtimeGroup.Key)
+                    .Where(x => ComparisonGroup.KeyFor(x.res) == runtimeGroup.Key)
                     .Select(x => x.idx)
                     .ToList();
 
@@ -1709,7 +1729,7 @@ public sealed class BenchmarkSuite(string name)
 
         foreach (var group in groups)
         {
-            foreach (var runtimeGroup in group.GroupBy(ri => ri.Result.RuntimeMoniker))
+            foreach (var runtimeGroup in group.GroupBy(ri => ComparisonGroup.KeyFor(ri.Result)))
             {
                 var groupList = runtimeGroup.ToList();
                 var groupResults = groupList.Select(ri => ri.Result).ToList();

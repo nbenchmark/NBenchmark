@@ -110,8 +110,43 @@ public sealed class ConsoleReporter : IReporter
     {
         var count = benchTable.Rows.Count(r => !r.Errored);
 
+        // Runtime provenance is included even at Simple detail. The configuration a benchmark was
+        // measured under moves the number by more than most of the effects people are looking for,
+        // so it is not a detail-level nicety - a reader cannot interpret the table without it.
         AnsiConsole.MarkupLine(
-            $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · CI {benchTable.ConfidenceLevel * 100:0.#}%[/]");
+            $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · "
+            + $"CI {benchTable.ConfidenceLevel * 100:0.#}% · runtime {Esc(RuntimeSummary(benchTable))}[/]");
+
+        RenderMixedRuntimeProfileWarning(benchTable);
+    }
+
+    /// <summary>
+    ///     A short description of the runtime configuration the rows were measured under. Reports
+    ///     <c>mixed</c> rather than picking one arbitrarily when the rows disagree, which happens
+    ///     whenever a class combines <c>[InProcess]</c> benchmarks with isolated ones.
+    /// </summary>
+    private static string RuntimeSummary(BenchmarkTable benchTable)
+    {
+        if (benchTable.MixedRuntimeProfiles)
+            return "mixed";
+
+        if (benchTable.RuntimeProfileName != RuntimeProfile.Host.Name)
+            return $"{benchTable.RuntimeProfileName} ({benchTable.RuntimeKnobs})";
+
+        return string.IsNullOrEmpty(benchTable.RuntimeKnobs)
+            ? "host (inherited - not applied by NBenchmark)"
+            : $"host (inherited: {benchTable.RuntimeKnobs})";
+    }
+
+    private static void RenderMixedRuntimeProfileWarning(BenchmarkTable benchTable)
+    {
+        if (!benchTable.MixedRuntimeProfiles)
+            return;
+
+        AnsiConsole.MarkupLine(
+            "[yellow]Warning:[/] [dim]rows in this table were measured under different runtime "
+            + "configurations, so their numbers are not comparable with each other. This usually "
+            + "means in-process benchmarks were mixed with isolated ones.[/]");
     }
 
     private static void RenderHeader(BenchmarkTable benchTable)
@@ -688,6 +723,10 @@ public sealed class ConsoleReporter : IReporter
         };
 
         AnsiConsole.MarkupLine($"[grey]Profile:[/] [dim]{profileLabel}[/]");
+
+        AnsiConsole.MarkupLine($"[grey]Runtime:[/] [dim]{Esc(RuntimeSummary(benchTable))}[/]");
+
+        RenderMixedRuntimeProfileWarning(benchTable);
 
         AnsiConsole.MarkupLine(
             $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · CI {benchTable.ConfidenceLevel * 100:0.#}%[/]");

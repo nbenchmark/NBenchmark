@@ -431,6 +431,46 @@ BenchmarkHarness fluent method: `.WithMeasurementProfile(MeasurementProfile.Inde
 BenchmarkSuite fluent method: `.WithMeasurementProfile(MeasurementProfile.Independent)`
 CLI flag: `--profile independent`
 
+### RuntimeProfile
+
+```csharp
+RuntimeProfile = RuntimeProfile.SteadyState   // default
+```
+
+The runtime-startup configuration a benchmark is measured under: JIT tiering, dynamic PGO, ReadyToRun, and GC flavour. Distinct from `Profile` above, which controls GC behaviour *during* a run.
+
+| Profile | Configuration | Use for |
+| --- | --- | --- |
+| `RuntimeProfile.SteadyState` | tiering off, PGO off, R2R off | **(default)** fully-optimized steady-state throughput |
+| `RuntimeProfile.Production` | tiering on, PGO on, R2R on | what ships; reproducible but imprecise |
+| `RuntimeProfile.ServerGc` | `SteadyState` + non-concurrent server GC | code destined for a server-GC host |
+| `RuntimeProfile.Host` | nothing set | inherit the host's configuration |
+
+**These settings can only be applied to a process as it starts** - the runtime reads them once and never re-reads them. So they can be honoured for benchmarks that run in a child process, and cannot be honoured for anything measured in the host process.
+
+NBenchmark therefore reports what was *actually* applied rather than what was requested. Every result carries:
+
+- `RuntimeProfileName` - the profile actually in effect, or `"host"` when the measuring process inherited its configuration.
+- `RuntimeKnobs` - the knobs in effect, e.g. `"tiered=off pgo=off r2r=off"`, read from the measuring process's own environment. A knob you set by hand is reported just as faithfully as one NBenchmark applied.
+
+Results measured under different runtime profiles are **never placed in the same comparison group**, so no significance test, effect size, ratio or threshold gate ever spans them. A table that mixes them (a class combining `[InProcess]` benchmarks with isolated ones) is flagged.
+
+Custom profiles are supported; `ExtraEnvironment` forwards any additional variables verbatim:
+
+```csharp
+var profile = RuntimeProfile.SteadyState with
+{
+    Name = "steady-state-big-gen0",
+    ExtraEnvironment = new Dictionary<string, string> { ["DOTNET_GCgen0size"] = "1E00000" },
+};
+```
+
+BenchmarkHarness fluent method: `.WithRuntimeProfile(RuntimeProfile.Production)`
+BenchmarkSuite fluent method: `.WithRuntimeProfile(RuntimeProfile.Production)`
+CLI flag: `--runtime-profile production`
+
+See [`--runtime-profile`](cli.md#--runtime-profile-profile) for the measured impact and the full list of limitations.
+
 ### ForceGcBeforeEachIteration
 
 ```csharp

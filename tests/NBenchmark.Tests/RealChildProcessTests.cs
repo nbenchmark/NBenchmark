@@ -25,9 +25,8 @@ public class RealChildProcessTests
 
     private const int PinnedWarmup = 2;
 
-    private const string FixtureAssemblyName = "NBenchmark.Tests.IsolationFixture";
-
-    private const string HangingClassFullName = $"{FixtureAssemblyName}.HangingBenchmarks";
+    private static readonly string HangingClassFullName =
+        IsolationFixtureLocator.ClassFullName("HangingBenchmarks");
 
     /// <summary>
     ///     The regression test for the composite-key defect. Before the fix the child looked its
@@ -48,7 +47,7 @@ public class RealChildProcessTests
         var request = new IsolatedRunRequest
         {
             Kind = IsolatedRunKind.Host,
-            DeclaringTypeFullName = $"{FixtureAssemblyName}.{className}",
+            DeclaringTypeFullName = IsolationFixtureLocator.ClassFullName(className),
             DisplayPrefix = className,
             BenchmarkDisplayNames = ["Fast", "Slow"],
             Overrides = new MeasurementOverrides
@@ -56,7 +55,7 @@ public class RealChildProcessTests
                 Iterations = PinnedIterations,
                 WarmupIterations = PinnedWarmup,
             },
-            EntryAssemblyPath = FixtureAssemblyPath(),
+            EntryAssemblyPath = IsolationFixtureLocator.AssemblyPath(),
         };
 
         var items = await ChildProcessLauncher.LaunchAsync(request, CancellationToken.None);
@@ -143,7 +142,7 @@ public class RealChildProcessTests
                 Iterations = PinnedIterations,
                 WarmupIterations = 0,
             },
-            EntryAssemblyPath = FixtureAssemblyPath(),
+            EntryAssemblyPath = IsolationFixtureLocator.AssemblyPath(),
             Timeout = TimeSpan.FromSeconds(3),
         };
 
@@ -183,7 +182,7 @@ public class RealChildProcessTests
             DisplayPrefix = "HangingBenchmarks",
             BenchmarkDisplayNames = ["Hang"],
             Overrides = new MeasurementOverrides { Iterations = PinnedIterations, WarmupIterations = 0 },
-            EntryAssemblyPath = FixtureAssemblyPath(),
+            EntryAssemblyPath = IsolationFixtureLocator.AssemblyPath(),
         };
 
         var launch = ChildProcessLauncher.LaunchAsync(request, cts.Token);
@@ -215,36 +214,6 @@ public class RealChildProcessTests
     }
 
     /// <summary>
-    ///     Resolves the fixture executable from the path baked into this assembly at build time
-    ///     by <c>NBenchmark.Tests.csproj</c>, so the tests never guess at relative bin layouts.
-    /// </summary>
-    private static string FixtureAssemblyPath()
-    {
-        var directory = Assembly.GetExecutingAssembly()
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .FirstOrDefault(a => a.Key == "IsolationFixtureDirectory")
-            ?.Value;
-
-        if (string.IsNullOrWhiteSpace(directory))
-        {
-            throw new InvalidOperationException(
-                "The IsolationFixtureDirectory assembly metadata is missing. It is set by an "
-                + "AssemblyMetadata item in NBenchmark.Tests.csproj.");
-        }
-
-        var path = Path.GetFullPath(Path.Combine(directory, $"{FixtureAssemblyName}.dll"));
-
-        if (!File.Exists(path))
-        {
-            throw new InvalidOperationException(
-                $"The isolation fixture was not found at '{path}'. It should have been built by the "
-                + "ProjectReference in NBenchmark.Tests.csproj.");
-        }
-
-        return path;
-    }
-
-    /// <summary>
     ///     Runs the fixture as a full parent process. <c>--output</c> is validated against the
     ///     current working directory, so the report directory is set through
     ///     <see cref="ProcessStartInfo.WorkingDirectory" /> and passed as a relative path.
@@ -265,7 +234,7 @@ public class RealChildProcessTests
         };
 
         psi.ArgumentList.Add("exec");
-        psi.ArgumentList.Add(FixtureAssemblyPath());
+        psi.ArgumentList.Add(IsolationFixtureLocator.AssemblyPath());
 
         foreach (var arg in args)
         {

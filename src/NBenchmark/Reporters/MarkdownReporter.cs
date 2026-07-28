@@ -50,6 +50,21 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine(
             $"> **{tables[0].RunAtUtc} UTC** · {tables[0].WarmupIterations} warmup · {tables[0].MeasuredIterations} measured · {tables[0].Profile.ToString().ToLowerInvariant()} profile");
 
+        // The runtime configuration is provenance a reader needs to interpret the numbers at all,
+        // so it goes in the header rather than a footnote.
+        var runtimeKnobs = string.IsNullOrEmpty(tables[0].RuntimeKnobs)
+            ? "inherited, not applied by NBenchmark"
+            : tables[0].RuntimeKnobs;
+
+        sb.AppendLine($"> Runtime: **{tables[0].RuntimeProfileName}** ({runtimeKnobs})");
+
+        if (tables.Any(t => t.MixedRuntimeProfiles))
+        {
+            sb.AppendLine(
+                "> ⚠️ Rows were measured under different runtime configurations and are not "
+                + "comparable with each other.");
+        }
+
         sb.AppendLine();
 
         foreach (var table in tables)

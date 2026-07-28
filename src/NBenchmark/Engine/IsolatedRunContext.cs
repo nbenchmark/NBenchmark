@@ -44,6 +44,14 @@ internal sealed record MeasurementOverrides
     public OutlierMode? OutlierMode { get; init; }
     public TailMetricsBasis? TailMetricsBasis { get; init; }
     public MeasurementProfile? Profile { get; init; }
+
+    /// <summary>
+    ///     The runtime-startup configuration requested on the command line. Unlike the other
+    ///     overrides this is not applied by the child to itself - the parent already applied it to
+    ///     the child's environment block before startup, because that is the only point at which
+    ///     the runtime reads it. It travels so the child's effective options agree with reality.
+    /// </summary>
+    public RuntimeProfile? RuntimeProfile { get; init; }
     public bool? ForceGc { get; init; }
     public bool? NoAllocations { get; init; }
     public bool? NoGcBetweenBenchmarks { get; init; }
@@ -103,6 +111,7 @@ internal sealed record MeasurementOverrides
         OutlierMode = cliArgs.OutlierMode,
         TailMetricsBasis = cliArgs.TailMetricsBasis,
         Profile = cliArgs.Profile,
+        RuntimeProfile = cliArgs.RuntimeProfile,
         ForceGc = cliArgs.ForceGc,
         NoAllocations = cliArgs.NoAllocations,
         NoGcBetweenBenchmarks = cliArgs.NoGcBetweenBenchmarks ? true : null,
@@ -154,6 +163,9 @@ internal sealed record MeasurementOverrides
 
         if (Profile.HasValue)
             result = result with { Profile = Profile.Value };
+
+        if (RuntimeProfile is not null)
+            result = result with { RuntimeProfile = RuntimeProfile };
 
         if (ForceGc.HasValue)
             result = result with { ForceGcBeforeEachIterationOverride = ForceGc.Value };
@@ -378,6 +390,15 @@ internal sealed record IsolatedRunRequest
     ///     <c>dotnet exec</c> with this path instead of re-running the current process.
     /// </summary>
     public string? EntryAssemblyPath { get; init; }
+
+    /// <summary>
+    ///     The runtime-startup configuration to launch this child under. Unlike every other
+    ///     setting on this request it is <b>not</b> something the child could rebuild by re-running
+    ///     the entry point: tiering, PGO, ReadyToRun and GC flavour are fixed before any managed
+    ///     code runs, so only the parent can apply them, via the child's environment block.
+    ///     <c>null</c> inherits the parent's environment.
+    /// </summary>
+    public RuntimeProfile? RuntimeProfile { get; init; }
 
     /// <summary>
     ///     Wall-clock ceiling for this child. On expiry the launcher kills the child's whole

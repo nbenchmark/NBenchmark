@@ -92,6 +92,24 @@ When isolation resolves to a mix, NBenchmark runs the in-process benchmarks in t
 
 See [Harness mode](../usage-modes/harness-mode.md#isolatedprocess) for the full attribute reference.
 
+## Why isolation actually matters
+
+The intuitive case for isolation is that a benchmark should not inherit JIT, GC or thread-pool state left behind by its siblings. That is true, but it is not the main reason, and measuring it shows why.
+
+Four benchmarks with provably identical cost, measured repeatedly:
+
+| Configuration | Spread across runs | Largest fabricated difference |
+| --- | --- | --- |
+| in-process | 3.27x | 2.80x |
+| isolated, host runtime configuration | 3.10x | 3.06x |
+| **isolated, `steady-state` runtime configuration** | **1.02x** | **1.01x** |
+
+Isolation on its own barely helped. What fixed it was disabling tiered compilation - and **that can only be done to a process that has not started yet**, because the runtime reads the setting once at startup and never again.
+
+So the process boundary is not the remedy. It is the *delivery mechanism* for the [runtime profile](../reference/cli.md#--runtime-profile-profile), which is the remedy. Isolation without it produces numbers that are reproducible and wrong, reported with a tight confidence interval - which is worse than being obviously noisy, because it invites trust.
+
+This is also why an in-process benchmark can never be as trustworthy as an isolated one, no matter how many samples it collects: it is stuck with whatever configuration its host process was started with. NBenchmark reports that rather than hiding it - in-process results are stamped `host`, and results measured under different runtime configurations are never compared against each other.
+
 ## Important behavior notes
 
 - Isolation adds overhead: one process launch per child, measured at roughly 200 ms. Against the per-benchmark wall-clock floor of about 600 ms (`MinWarmupTime` plus `MinMeasurementTime`), that is a small tax for a comparison group of any size.

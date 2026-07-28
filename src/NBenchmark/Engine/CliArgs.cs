@@ -41,6 +41,13 @@ internal sealed record CliArgs
 
     public MeasurementProfile? Profile { get; init; }
 
+    /// <summary>
+    ///     The runtime-startup configuration requested via <c>--runtime-profile</c>. Applied to
+    ///     isolated children through their environment block; in-process benchmarks inherit the
+    ///     host's configuration and report <c>"host"</c>.
+    /// </summary>
+    public RuntimeProfile? RuntimeProfile { get; init; }
+
     public bool? ForceGc { get; init; }
 
     public bool? NoAllocations { get; init; }
@@ -226,6 +233,7 @@ internal sealed record CliArgs
         OutlierMode? outlierMode = null;
         TailMetricsBasis? tailMetricsBasis = null;
         MeasurementProfile? profile = null;
+        RuntimeProfile? runtimeProfile = null;
         bool? forceGc = null;
         bool? noAllocations = null;
         var noGcBetweenBenchmarks = false;
@@ -400,6 +408,19 @@ internal sealed record CliArgs
                         profile = MeasurementProfile.Independent;
                     else
                         errors.Add($"Invalid --profile value '{profileStr}'. Must be 'realistic' or 'independent'.");
+
+                    break;
+                case "--runtime-profile" when i + 1 < args.Length:
+                    var runtimeProfileStr = args[++i];
+
+                    if (RuntimeProfile.TryParse(runtimeProfileStr, out var parsedRuntimeProfile))
+                        runtimeProfile = parsedRuntimeProfile;
+                    else
+                    {
+                        errors.Add(
+                            $"Invalid --runtime-profile value '{runtimeProfileStr}'. Must be one of: "
+                            + $"{string.Join(", ", RuntimeProfile.KnownNames)}.");
+                    }
 
                     break;
                 case "--force-gc":
@@ -656,6 +677,7 @@ internal sealed record CliArgs
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--observer" or "--category" or "--exclude-category" or "--confidence" or "--order"
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--tail-basis" or "--detail" or "--profile"
+                    or "--runtime-profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
                     or "--warmup-budget-fraction" or "--cap-grace-factor" or "--min-warmup-time"
@@ -695,6 +717,7 @@ internal sealed record CliArgs
             InProcess = inProcess,
             CrossClass = crossClass,
             Profile = profile,
+            RuntimeProfile = runtimeProfile,
             ForceGc = forceGc,
             NoAllocations = noAllocations,
             NoGcBetweenBenchmarks = noGcBetweenBenchmarks,
@@ -906,6 +929,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --threshold-pct <n>    Fail with exit code 1 if any benchmark regresses");
         Console.WriteLine("                        >N% vs baseline (median-based comparison; n >= 1).");
         Console.WriteLine("  --profile <mode>       Measurement profile: realistic (default) or independent");
+        Console.WriteLine("  --runtime-profile <p>   Runtime config for isolated children: steady-state");
+        Console.WriteLine("                          (default), production, server-gc, or host");
         Console.WriteLine("  --force-gc             Force Gen0 GC before every iteration (overrides profile)");
         Console.WriteLine("  --no-allocations       Disable allocation tracking (overrides profile)");
         Console.WriteLine("  --no-gc-between-benchmarks  Disable the full GC between benchmarks (on by default for both profiles)");
