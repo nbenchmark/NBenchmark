@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>NBenchmark.Worker</RootNamespace>
+
+    <!--
+      The on-disk name the coordinator looks for. Short and distinctive because it shows up in
+      process lists, `ps` output and task managers while a run is in flight - a developer who
+      sees an unexpected process should be able to tell what it is.
+    -->
+    <AssemblyName>nbworker</AssemblyName>
+
+    <!--
+      Not packed as its own package: the worker is an implementation detail of NBenchmark and is
+      shipped inside NBenchmark's own package, so its version can never skew from the engine's.
+    -->
+    <IsPackable>false</IsPackable>
+
+    <!--
+      A worker built for net8.0 must still start on a machine that only has a newer runtime
+      installed, because the coordinator picks the worker whose TFM matches the *target
+      assembly*, not whatever runtimes happen to be present.
+    -->
+    <RollForward>LatestMinor</RollForward>
+
+    <!--
+      No apphost. The coordinator launches the worker with `dotnet exec nbworker.dll`, which
+      avoids shipping a native launcher per operating system and architecture - three TFMs times
+      every RID would be a large payload for no benefit, since a .NET SDK or runtime is
+      necessarily present anyway.
+    -->
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
+  </ItemGroup>
+
+</Project>

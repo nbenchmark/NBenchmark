@@ -4,6 +4,12 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
+
+    <!--
+      Deploys the measurement worker, the way the package's own build targets do for a real
+      consumer. Without it a sample falls back to measuring in its own process and says so.
+    -->
+    <NBenchmarkUseWorker>true</NBenchmarkUseWorker>
   </PropertyGroup>
 
   <ItemGroup>

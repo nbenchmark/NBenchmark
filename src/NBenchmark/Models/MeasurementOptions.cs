@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using NBenchmark.Stats;
 
 namespace NBenchmark;
@@ -185,6 +186,13 @@ public record MeasurementOptions
     ///     <see cref="OutlierMode" />, letting you plug in your own trimming algorithm.
     ///     Leave <c>null</c> to use the built-in detector selected by <see cref="OutlierMode" />.
     /// </summary>
+    /// <remarks>
+    ///     Excluded from serialization: a strategy object is live code, not data, so it cannot
+    ///     travel to a measurement worker as a value. It travels instead as an assembly-qualified
+    ///     type name that the worker instantiates through its own load context, which works for
+    ///     any detector with a parameterless constructor. See <c>NBenchmark.Workers</c>.
+    /// </remarks>
+    [JsonIgnore]
     public IOutlierDetector? OutlierDetector { get; init; }
 
     /// <summary>
@@ -242,6 +250,8 @@ public record MeasurementOptions
     ///     more), letting you plug in your own comparison. Leave <c>null</c> to use the
     ///     default strategy.
     /// </summary>
+    /// <remarks>Excluded from serialization for the reason given on <see cref="OutlierDetector" />.</remarks>
+    [JsonIgnore]
     public ISignificanceTest? SignificanceTest { get; init; }
 
     /// <summary>

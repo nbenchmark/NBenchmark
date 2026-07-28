@@ -1,0 +1,59 @@
+﻿<Project>
+
+  <!--
+    Deploys the measurement worker into the consuming project's output.
+
+    NBenchmark measures in a separate process, because JIT tiering, dynamic PGO, ReadyToRun and GC
+    flavour are read by the runtime once at startup and can never be changed afterwards - so they
+    can only be delivered to a process that has not started yet. `nbworker` is that process. It has
+    to sit next to the application that references NBenchmark, because that is where the engine
+    looks for it at run time.
+
+    The worker is a framework-dependent managed assembly launched with `dotnet exec`, not a native
+    executable, so exactly one copy per target framework is needed rather than one per operating
+    system and architecture.
+  -->
+
+  <PropertyGroup>
+    <!--
+      Set to false to skip deploying the worker. Benchmarks then fall back to measuring in the host
+      process, which is materially less accurate: on bodies of provably identical cost, in-process
+      runs spanned 3.27x and fabricated a 2.80x difference between two of them, each reported with a
+      tight confidence interval. Affected results are stamped 'host' rather than claiming otherwise.
+    -->
+    <NBenchmarkDeployWorker Condition="'$(NBenchmarkDeployWorker)' == ''">true</NBenchmarkDeployWorker>
+
+    <!--
+      Overridable so this same file can serve a source build, where the worker comes from its own
+      output directory rather than from the package's tools folder.
+    -->
+    <NBenchmarkWorkerSourceDirectory Condition="'$(NBenchmarkWorkerSourceDirectory)' == ''">$(MSBuildThisFileDirectory)../tools/$(TargetFramework)/</NBenchmarkWorkerSourceDirectory>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(NBenchmarkDeployWorker)' == 'true' AND Exists('$(NBenchmarkWorkerSourceDirectory)')">
+    <!--
+      Into a subdirectory rather than straight into the output root, so nbworker's own
+      runtimeconfig.json and deps.json cannot be confused with the application's - they describe a
+      different program. The engine looks here.
+    -->
+    <None Include="$(NBenchmarkWorkerSourceDirectory)**\*.*">
+      <Link>nbworker\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+      <Pack>false</Pack>
+    </None>
+  </ItemGroup>
+
+  <!--
+    A missing worker is not a build error - the run still works, less accurately, and says so. But
+    it is worth a warning, because the usual cause is a stale or partial package restore and the
+    symptom otherwise looks like NBenchmark quietly choosing not to isolate.
+  -->
+  <Target Name="_NBenchmarkWarnOnMissingWorker"
+          BeforeTargets="Build"
+          Condition="'$(NBenchmarkDeployWorker)' == 'true' AND !Exists('$(NBenchmarkWorkerSourceDirectory)')">
+    <Warning Code="NB1001"
+             Text="NBenchmark could not find its measurement worker for $(TargetFramework) at '$(NBenchmarkWorkerSourceDirectory)'. Benchmarks will be measured in the host process, which cannot control JIT tiering or GC flavour; results will be stamped 'host'. Try a clean restore. Set NBenchmarkDeployWorker=false to silence this."/>
+  </Target>
+
+</Project>

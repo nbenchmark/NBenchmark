@@ -12,11 +12,60 @@
   <ItemGroup>
     <InternalsVisibleTo Include="NBenchmark.Tests"/>
     <InternalsVisibleTo Include="NBenchmark.DependencyInjection"/>
+
+    <!--
+      The measurement worker. It is a separate process but not a separate design: it runs the
+      engine's own measurement loop and the shared DiscoveredGroupExecutor, so an isolated number
+      and an in-process number differ only by the runtime configuration the process was started
+      with. That requires reaching the engine internals rather than reimplementing them.
+      Named for the assembly name, not the project name.
+    -->
+    <InternalsVisibleTo Include="nbworker"/>
   </ItemGroup>
 
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath=""/>
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Imported automatically by any project that references the package. -->
+    <None Include="build/NBenchmark.targets" Pack="true" PackagePath="build/"/>
+  </ItemGroup>
+
+  <!--
+    Packs the measurement worker under tools/<tfm>/, so its version can never skew from the engine's
+    - which matters, because the worker unifies NBenchmark from its own load context rather than
+    loading the consumer's copy, and a skew would measure against different engine code than the
+    user compiled against with no other symptom.
+
+    The worker is built here with the MSBuild task rather than declared as a ProjectReference,
+    because the worker references this project: a reference back would close a cycle. This target
+    runs once per target framework, so each pass builds and collects the matching worker.
+  -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>
+      $(TargetsForTfmSpecificContentInPackage);_NBenchmarkPackWorker
+    </TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <Target Name="_NBenchmarkPackWorker">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)../NBenchmark.Worker/NBenchmark.Worker.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)"/>
+
+    <PropertyGroup>
+      <_NBenchmarkWorkerOutput>$(MSBuildThisFileDirectory)../NBenchmark.Worker/bin/$(Configuration)/$(TargetFramework)/</_NBenchmarkWorkerOutput>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(_NBenchmarkWorkerOutput)nbworker.dll')"
+           Text="The measurement worker was not built for $(TargetFramework). Packing without it would ship a package whose benchmarks silently fall back to in-process measurement."/>
+
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(_NBenchmarkWorkerOutput)nbworker.dll;$(_NBenchmarkWorkerOutput)nbworker.deps.json;$(_NBenchmarkWorkerOutput)nbworker.runtimeconfig.json">
+        <PackagePath>tools/$(TargetFramework)/</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
 
 </Project>

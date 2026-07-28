@@ -1,0 +1,26 @@
+﻿<Project>
+
+  <!--
+    In-repo equivalent of the `build/NBenchmark.targets` that ships in the package.
+
+    A package consumer gets the measurement worker copied into its output automatically. A project
+    inside this repository references NBenchmark by ProjectReference instead, which does not import
+    the package's build targets, so worker deployment has to be wired here.
+
+    Rather than copying files - which would race the worker's own build on a clean clone, because
+    item globs are evaluated before referenced projects are built - the worker's output directory is
+    baked into the assembly as metadata that WorkerLocator reads at run time. Same mechanism the
+    isolation-fixture tests already use, and immune to build ordering.
+
+    Opt in with <NBenchmarkUseWorker>true</NBenchmarkUseWorker>.
+  -->
+
+  <ItemGroup Condition="'$(NBenchmarkUseWorker)' == 'true'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src/NBenchmark.Worker/NBenchmark.Worker.csproj"
+                     ReferenceOutputAssembly="false"/>
+
+    <AssemblyMetadata Include="NBenchmarkWorkerDirectory"
+                      Value="$(MSBuildThisFileDirectory)src/NBenchmark.Worker/bin/$(Configuration)/$(TargetFramework)/"/>
+  </ItemGroup>
+
+</Project>

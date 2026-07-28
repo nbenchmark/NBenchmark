@@ -7,6 +7,7 @@ using NBenchmark.Lifecycle;
 using NBenchmark.Observers;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
+using NBenchmark.Workers;
 
 namespace NBenchmark;
 
@@ -691,9 +692,21 @@ public sealed class BenchmarkHarness
                 var perBenchmark = new List<BenchmarkMethodDefinition>();
                 var autoUpgradedResultNames = new HashSet<string>();
 
+                // Whether a worker can measure this class at all. When it cannot, the benchmarks run
+                // in the host process and say so, rather than being quietly measured under whatever
+                // configuration the host happened to start with.
+                var workerDecision = inProcessGlobal
+                    ? new WorkerRunPlan.Decision(WorkerRunPlan.Refusal.RequestedInProcess, null)
+                    : WorkerRunPlan.ForDiscoveredClass(suite.Type.Assembly.Location, _instanceFactory is not null);
+
+                if (workerDecision is { CanIsolate: false, Explanation: { } explanation })
+                    EmitIsolationRefusal(suite.Type.Name, explanation);
+
+                var forceInProcess = inProcessGlobal || !workerDecision.CanIsolate;
+
                 foreach (var benchmark in suite.Benchmarks)
                 {
-                    var decision = ResolveIsolation(benchmark, suite, inProcessGlobal, _instanceFactory is not null, out var autoUpgraded);
+                    var decision = ResolveIsolation(benchmark, suite, forceInProcess, _instanceFactory is not null, out var autoUpgraded);
 
                     if (autoUpgraded)
                         autoUpgradedResultNames.Add($"{suite.Type.Name}.{benchmark.DisplayName}");
@@ -1558,47 +1571,40 @@ public sealed class BenchmarkHarness
                 effectiveLaunchCount = b.Attribute.LaunchCount;
         }
 
-        for (var i = 0; i < benchmarks.Count; i++)
+        var options = ChildLaunchOptions;
+        var names = benchmarks.Select(b => b.DisplayName).ToList();
+        var timeout = ChildProcessLauncher.ComputeTimeout(options, benchmarks.Count);
+
+        // Each replicate is its own worker, so LaunchCount buys a between-process variance estimate
+        // rather than repeated measurements inside one process. That is the reproducibility number a
+        // regression gate needs; the within-process interval only describes precision, and the data
+        // shows how misleading it is alone - a standard deviation of 0.16 ns on an 11 ns reading
+        // while the true run-to-run spread was 3.27x.
+        var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>(effectiveLaunchCount);
+
+        for (var replicate = 0; replicate < effectiveLaunchCount; replicate++)
         {
-            var name = $"{suite.Type.Name}.{benchmarks[i].DisplayName}";
-            await _progress.OnBenchmarkStarting(name, startIndex + i + 1, totalBenchmarks).ConfigureAwait(false);
+            var request = WorkerRunPlan.DiscoveredClassRequest(
+                suite.Type,
+                names,
+                options,
+                _defaultInstanceLifetime,
+                _cliArgs.RunOrder ?? _runOrder,
+                _cliArgs.Seed,
+                replicate,
+                startIndex,
+                totalBenchmarks,
+                WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
+                WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _));
+
+            allLaunchItems.Add(
+                await RunGroupInWorkerAsync(request, names, suite, timeout, observer, cancellationToken)
+                    .ConfigureAwait(false));
         }
 
-        var request = new IsolatedRunRequest
-        {
-            Kind = IsolatedRunKind.Host,
-            DeclaringTypeFullName = suite.Type.FullName,
-            DisplayPrefix = suite.Type.Name,
-            BenchmarkDisplayNames = benchmarks.Select(b => b.DisplayName).ToList(),
-            Overrides = MeasurementOverrides.FromCliArgs(_cliArgs),
-
-            // Forward the resolved observer names so isolated children activate the same
-            // observers (e.g. the dashboard, an OTLP exporter) as the parent. The child resolves
-            // them through ObserverRegistry, which is populated identically by [ModuleInitializer]
-            // self-registration in the child's fresh process.
-            ObserverNames = ResolveObserverNames(),
-            Timeout = ChildProcessLauncher.ComputeTimeout(ChildLaunchOptions, benchmarks.Count),
-            RuntimeProfile = ChildLaunchOptions.RuntimeProfile,
-        };
-
-        IReadOnlyList<IsolatedResultItem> items;
-
-        if (effectiveLaunchCount > 1)
-        {
-            var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
-
-            for (var launchIdx = 0; launchIdx < effectiveLaunchCount; launchIdx++)
-            {
-                var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                    .ConfigureAwait(false);
-
-                allLaunchItems.Add(launchItems);
-            }
-
-            items = HostAggregateIsolatedLaunches(allLaunchItems, benchmarks, suite);
-        }
-        else
-            items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
+        var items = effectiveLaunchCount > 1
+            ? HostAggregateIsolatedLaunches(allLaunchItems, benchmarks, suite)
+            : allLaunchItems[0];
 
         var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
 
@@ -1636,6 +1642,83 @@ public sealed class BenchmarkHarness
             await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
             observer.OnResult(result);
         }
+    }
+
+    /// <summary>
+    ///     Reports, once per class, that isolation was declined and why.
+    ///     <para>
+    ///         This is the visible half of "refuse rather than guess". A silent fallback to
+    ///         in-process would be the worst outcome available: on bodies of provably identical cost,
+    ///         in-process runs spanned 3.27x and fabricated a 2.80x difference between two of them,
+    ///         each reported with a tight confidence interval. The results themselves are also
+    ///         stamped <c>host</c>, so the provenance survives even if this message is scrolled past.
+    ///     </para>
+    /// </summary>
+    private void EmitIsolationRefusal(string className, string explanation)
+    {
+        if (!_isolationRefusalsReported.Add(className))
+            return;
+
+        Console.Error.WriteLine(
+            $"Isolation: '{className}' is being measured in this process because {explanation}");
+
+        Console.Error.WriteLine(
+            "  In-process measurements cannot control JIT tiering, PGO, ReadyToRun or GC flavour, "
+            + "because the runtime fixes those at startup. They are stamped 'host' and are never "
+            + "compared against isolated results.");
+    }
+
+    private readonly HashSet<string> _isolationRefusalsReported = new(StringComparer.Ordinal);
+
+    /// <summary>
+    ///     Spawns one worker, measures one replicate of a group in it, and shuts it down.
+    ///     <para>
+    ///         A worker is single-use. Recycling one across groups is the obvious optimisation and is
+    ///         disqualified: the only way to unload a target assembly is a collectible load context,
+    ///         and a collectible context reaches static fields through a <c>LoaderAllocator</c>
+    ///         indirection that inflates any benchmark touching a static - an overhead the report
+    ///         would attribute to the user's code.
+    ///     </para>
+    ///     <para>
+    ///         Progress is replayed into the real progress instance for the first replicate only.
+    ///         Later replicates measure the same benchmarks again, so forwarding their lifecycle
+    ///         events would make a progress bar appear to run backwards.
+    ///     </para>
+    /// </summary>
+    private async Task<IReadOnlyList<IsolatedResultItem>> RunGroupInWorkerAsync(
+        RunGroupPayload request,
+        IReadOnlyList<string> benchmarkNames,
+        BenchmarkSuiteDefinition suite,
+        TimeSpan timeout,
+        IMeasurementObserver observer,
+        CancellationToken cancellationToken)
+    {
+        var isFirstReplicate = request.GroupId.EndsWith("#0", StringComparison.Ordinal);
+
+        var group = await WorkerLauncher.Current.RunGroupAsync(
+                request,
+                isFirstReplicate ? _progress : NullBenchmarkProgress.Instance,
+                isFirstReplicate ? observer : NullMeasurementObserver.Instance,
+                timeout,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var items = group.Results
+            .Select(result => new IsolatedResultItem
+            {
+                Result = result,
+                RawSamples = group.RawSamples.GetValueOrDefault(result.Name, []),
+            })
+            .ToList();
+
+        // Benchmarks the worker never reported become errored rows naming the reason, so a failure
+        // is visible in the table rather than a silently missing line.
+        foreach (var errored in WorkerGroupRunner.ToErroredResults(group, benchmarkNames, suite.Type.Name))
+        {
+            items.Add(new IsolatedResultItem { Result = errored, RawSamples = [] });
+        }
+
+        return items;
     }
 
     private static IReadOnlyList<IsolatedResultItem> HostAggregateIsolatedLaunches(
