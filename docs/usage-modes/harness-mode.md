@@ -152,7 +152,7 @@ See [Parameterized benchmarks: Harness mode](../features/parameterized-harness.m
 These attributes control setup and teardown at the class and iteration level. All decorated methods must have no parameters. By default, the lifetime is `PerMethod` - both the instance and the lifecycle methods fire once per `[Benchmark]` method. Add `[InstanceLifetime(InstanceLifetime.PerClass)]` on the class to run setup/teardown once for the class.
 
 | Attribute | Runs | Timing |
-|---|---|---|
+| --- | --- | --- |
 | `[BenchmarkSetup]` | Once before each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
 | `[BenchmarkTeardown]` | Once after each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
 | `[BenchmarkIterationSetup]` | Before each individual iteration | Not measured |

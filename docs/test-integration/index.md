@@ -11,7 +11,7 @@ NBenchmark's integration packages connect it to the rest of your toolchain. The 
 ## Test framework packages
 
 | Package | Framework |
-|---|---|
+| --- | --- |
 | `NBenchmark.Integration.xUnit` | xUnit v2 |
 | `NBenchmark.Integration.NUnit` | NUnit 3 / 4 |
 | `NBenchmark.Integration.MSTest` | MSTest v2 / v3 |
@@ -117,7 +117,7 @@ See [Statistics: Significance Testing](../statistics/significance.md) for how th
 All three packages share the same set of threshold properties. A threshold of `-1` (double) or `-1` (long) means the check is disabled. Omitting a property is equivalent to `-1`.
 
 | Property | Type | Default | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `MaxMeanNs` | `double` | -1 (disabled) | Maximum allowed mean execution time in nanoseconds. |
 | `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles` (the default set includes `0.95`). If P95 was not computed, a clear error message guides you to check the configuration. |
 | `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |

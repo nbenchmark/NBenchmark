@@ -47,6 +47,7 @@ The margin of error on the mean at the configured confidence level (default 95%)
 A small Error (e.g. under 1%) means the mean is precisely estimated. A large Error means your measurements are highly variable. In auto-sampling mode, NBenchmark keeps collecting samples until the Error meets the precision target, so a wide interval usually points to genuine run-to-run variability rather than too few samples.
 
 **What to do about a large Error:**
+
 - Check whether something external is interfering (background processes, thermal throttling)
 - Use the `Thorough` preset to demand a tighter target
 - If you pinned `Iterations`, raise the count or return to auto mode
@@ -77,12 +78,13 @@ Speed relative to the baseline. `0.75x` = 25% faster; `2.0x` = twice as slow. Th
 ### Sig (suite mode)
 
 | Symbol | Meaning |
-|---|---|
+| --- | --- |
 | **✓** | The difference from the baseline is statistically significant (p < 0.05). It is very unlikely to be noise. |
 | **✗** | The difference is not statistically significant. You cannot confidently conclude one is faster than the other. |
 | (blank) | The benchmark is the baseline, or significance was not tested (fewer than 2 samples in a group). |
 
 **What to do:**
+
 - A ✓ with a small Ratio (e.g. `1.01x`) means the difference is statistically real but may be too small to matter in practice. Check the Magnitude column.
 - A ✗ with a large Ratio (e.g. `1.5x`) means the measurements are too noisy to tell. Try reducing noise (see [Tuning for noisy CI](../reference/configuration.md#tuning-for-noisy-ci-environments)) or collecting more samples.
 
@@ -93,7 +95,7 @@ See [Significance Testing](../statistics/significance.md) for the full detail.
 Classifies the effect size using Cliff's delta:
 
 | Label | What it means |
-|---|---|
+| --- | --- |
 | Negligible | The two distributions overlap almost completely. The difference is tiny. |
 | Small | A modest but detectable shift. |
 | Medium | A clear, practically meaningful difference. |
@@ -120,7 +122,7 @@ auto-tuned: K=64, warmup=12, samples=47, CI half-width=1.8%, jitter=0.03
 ```
 
 | Field | Meaning |
-|---|---|
+| --- | --- |
 | K | Ops per sample - how many back-to-back invocations were timed together |
 | warmup | How many warmup samples were collected before measurement started |
 | samples | How many measured samples were collected |
@@ -143,6 +145,7 @@ If you see a warning like:
 This means the slow samples were **not** random noise - they were a repeatable second execution profile (e.g. a cache miss, lock contention, or GC pause). The reported median describes the common case; the cluster centre describes a latency a real user will also hit.
 
 **What to do:**
+
 - Do not ignore it. The warning is telling you something real about your code's performance distribution.
 - Re-run with `OutlierMode.None` to see the full distribution.
 - Investigate the cause with a profiler.

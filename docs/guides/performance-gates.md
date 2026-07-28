@@ -125,7 +125,7 @@ The `p` and Cliff's delta values tell you whether the slowdown is real and how l
 ## How this differs from `--threshold-pct`
 
 | | Test-integration packages | Harness `--threshold-pct` |
-|---|---|---|
+| --- | --- | --- |
 | Lives in | Your existing test suite | A dedicated benchmark project |
 | Trigger | `dotnet test` | `dotnet run -- --threshold-pct 10` |
 | Comparison | Your method vs. a calibration / `ReferenceMethod` (same session) | Each benchmark vs. the suite baseline (same session) |

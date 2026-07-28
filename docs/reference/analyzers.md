@@ -19,7 +19,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 ## Diagnostic reference
 
 | ID | Title | Severity | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | NB0001 | Benchmark class must have a public parameterless constructor | Warning | A class or record with `[Benchmark]` methods has no public parameterless constructor. Add one, or use `NBenchmark.DependencyInjection`. |
 | NB0002 | `[Benchmark]` method must not be static | Error | A method is marked `[Benchmark]` but is `static`. Only instance methods are discovered. Remove the `static` keyword. |
 | NB0003 | `[BenchmarkCase]` / `[BenchmarkCases]` must match method parameters | Error | The number of `[BenchmarkCase]` values does not match the method's parameter count, or the `[BenchmarkCases]` source yields a tuple arity that does not match. Also covers missing or non-existent source methods. |

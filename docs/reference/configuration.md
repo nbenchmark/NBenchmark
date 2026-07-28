@@ -19,7 +19,7 @@ Task-based configuration guides for common benchmarking situations. Each guide s
 **What to combine:**
 
 | Setting | Why |
-|---|---|
+| --- | --- |
 | `Environment.ProcessPriority = High` | Reduces preemption by unrelated OS work. The benchmark thread is less likely to be paused mid-sample. |
 | `OutlierMode.MedianAbsoluteDeviation` | More robust than the default IQR fence when a heavy tail of preempted samples distorts the quartile-based fence. MAD has a 50% breakdown point. |
 | `LaunchCount = 3` | Runs the benchmark 3 times as independent launches. The best (lowest-median) launch is reported, giving you a second layer of noise rejection. |
@@ -44,6 +44,7 @@ dotnet run -- --priority high --outlier mad --launch-count 3 --autotune-cap-beha
 ```
 
 **See also:**
+
 - [Environment](#environment)
 - [OutlierMode](#outliermode)
 - [LaunchCount](#launchcount)
@@ -59,7 +60,7 @@ dotnet run -- --priority high --outlier mad --launch-count 3 --autotune-cap-beha
 **What to combine:**
 
 | Setting | Why |
-|---|---|
+| --- | --- |
 | `AutoTune = AutoTuneOptions.Quick` | Lowers the CI target to ±5%, reduces minimum samples to 15, and minimum warmup to 4. |
 | `WarmupIterations = 4` | Pins a short warmup instead of auto-detecting. |
 | `Iterations = 20` | Pins a small measured sample count. |
@@ -84,6 +85,7 @@ dotnet run -- --auto-tune quick --warmup 4 --iterations 20 --confidence 0.90
 ```
 
 **See also:**
+
 - [AutoTune](#autotune)
 - [WarmupIterations](#warmupiterations)
 - [Iterations](#iterations)
@@ -98,7 +100,7 @@ dotnet run -- --auto-tune quick --warmup 4 --iterations 20 --confidence 0.90
 **What to combine:**
 
 | Setting | Why |
-|---|---|
+| --- | --- |
 | `AutoTune = AutoTuneOptions.Thorough` | Raises the CI target to ±1%, minimum samples to 100, and minimum warmup to 16. |
 | `ConfidenceLevel = 0.99` | A 99% CI is wider and more conservative. |
 | `LaunchCount = 5` | Multiple independent launches let you report cross-launch statistics and the best representative run. |
@@ -122,6 +124,7 @@ dotnet run -- --auto-tune thorough --confidence 0.99 --launch-count 5
 ```
 
 **See also:**
+
 - [AutoTune](#autotune)
 - [ConfidenceLevel](#confidencelevel)
 - [LaunchCount](#launchcount)
@@ -136,7 +139,7 @@ dotnet run -- --auto-tune thorough --confidence 0.99 --launch-count 5
 **What to combine:**
 
 | Setting | Why |
-|---|---|
+| --- | --- |
 | `Profile = Independent` | Forces Gen0 GC before every iteration, full GC between benchmarks, and disables allocation tracking. |
 | `OpsPerSample = 1` | Each sample is a single invocation. Calibration is skipped when per-iteration GC is on, so K stays 1 by default - pin it explicitly if you want a different value. |
 
@@ -156,6 +159,7 @@ dotnet run -- --profile independent
 ```
 
 **See also:**
+
 - [Profile](#profile)
 - [ForceGcBeforeEachIteration](#forcegcbeforeeachiteration)
 - [MeasureAllocations](#measureallocations)
@@ -170,7 +174,7 @@ dotnet run -- --profile independent
 **What to combine:**
 
 | Setting | Why |
-|---|---|
+| --- | --- |
 | `Diagnostics = DiagnosticsOptions.All` | Enables GC collection counts, heap info, exception tracking, and CPU time. Lets you correlate timing spikes with GC pauses or CPU throttling. |
 | `OutlierMode = MedianAbsoluteDeviation` | More robust to heavy-tailed distributions. If the default IQR fence is being distorted by a long tail, MAD gives a clearer picture. |
 | `Detail = Advanced` | Shows the auto-tune diagnostic line (K, warmup, samples, CI half-width, jitter metric) and the outlier fence values. |
@@ -192,11 +196,13 @@ dotnet run -- --diagnostics all --outlier mad --detail advanced
 ```
 
 **What to look for:**
+
 - High jitter metric (> 0.10) in the auto-tune diagnostic: the host is noisy. Consider [environment controls](../features/environment-control.md).
 - GC collection counts that correlate with slow samples: GC pressure is affecting your timings. Try `--profile independent`.
 - A bimodal-distribution warning: investigate the cause (lock contention, cache misses, GC pauses) rather than silencing it.
 
 **See also:**
+
 - [Diagnostics](#diagnostics)
 - [OutlierMode](#outliermode)
 - [Reading Your Results](../output/reading-your-results.md)
@@ -261,7 +267,7 @@ Iterations = null   // default - auto-resolved from a CI-width target
 The number of measured samples per benchmark, typed as `int?`:
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `null` **(default)** | Auto-resolved. NBenchmark streams samples until the confidence interval on the mean is tight enough (the `AutoTune.CiTarget` half-width), bounded by `AutoTune.MinSamples` and `AutoTune.MaxSamples`. |
 | `0` | Dry-run. The body is not invoked and no measurements are taken. See [CLI Reference: `--dry-run`](./cli.md#--dry-run). |
 | `> 0` | Pins an exact measured-sample count, disabling auto-sampling. Valid range: `1` to `100 000`. |
@@ -282,7 +288,7 @@ WarmupIterations = null   // default - auto-detected with a plateau rule
 The number of warmup samples discarded before measurement begins, typed as `int?`:
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `null` **(default)** | Auto-detected. NBenchmark watches the per-sample timings and stops warmup once they plateau (stop improving), bounded by `AutoTune.MinWarmup` and `AutoTune.MaxWarmup`. |
 | `0` | Skips warmup entirely - the first measured sample includes any cold-start cost. |
 | `> 0` | Pins an exact warmup count. Valid range: `1` to `10 000`. |
@@ -356,7 +362,7 @@ AutoTune = AutoTuneOptions.Default   // default
 Bounds and steers the adaptive measurement loop - the warmup plateau rule, the CI-width sample-count rule, and ops-per-sample calibration. Three named presets trade measurement time for precision:
 
 | Preset | MinWarmup | MinSamples | MaxSamples | CiTarget | MinWarmupTime | MinMeasurementTime | Use it for |
-|---|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | `AutoTuneOptions.Quick` | 4 | 15 | 2 000 | 0.05 (±5%) | **500 ms** | 50 ms | Fast inner-loop feedback. |
 | `AutoTuneOptions.Default` | 8 | 30 | 5 000 | 0.025 (±2.5%) | 500 ms | 100 ms | The balanced default. |
 | `AutoTuneOptions.Thorough` | 16 | 100 | 20 000 | 0.01 (±1%) | 1 s | 500 ms | Publication-grade numbers. |
@@ -366,7 +372,7 @@ Bounds and steers the adaptive measurement loop - the warmup plateau rule, the C
 Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `--auto-tune thorough` on the CLI, or build your own `AutoTuneOptions` record. The individual knobs:
 
 | Knob | Default | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | `MinWarmup` / `MaxWarmup` | `8` / `100 000` | Floor and ceiling for auto-detected warmup length, as sample counts. `MaxWarmup` is deliberately far above what any body needs so that the *time* bounds bind instead: a fast body needs ~25 000 samples to accumulate `MinWarmupTime` at the 10 µs sample target, and a count ceiling binding first would silently defeat that floor. (The tighter `10 000` limit still applies to a *pinned* `WarmupIterations`.) |
 | `WarmupEpsilon` | `0.02` | Minimum relative improvement a warmup batch must show to count as "still warming up". |
 | `PlateauPatience` | `3` | Consecutive non-improving batches that end warmup. |
@@ -404,7 +410,7 @@ Profile = MeasurementProfile.Realistic   // default
 The measurement profile is the authoritative setting behind two GC behaviours: the per-iteration Gen0 GC and the pre-measurement full GC. The resolved booleans (`ForceGcBeforeEachIteration`, `ForceGcBeforeMeasurement`) are computed from `Profile` unless explicitly overridden via the corresponding `*Override` field. Two related behaviours are on for **both** profiles: `ForceGcBetweenBenchmarks` (so one benchmark cannot bias the next) and `MeasureAllocations` (measured outside the timed window, so it is free).
 
 | Profile | ForceGcBeforeEachIteration | ForceGcBeforeMeasurement | ForceGcBetweenBenchmarks | MeasureAllocations |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `Realistic` (default) | `false` | `false` | `true` | `true` |
 | `Independent` | `true` | `true` | `true` | `true` |
 
@@ -479,7 +485,7 @@ Diagnostics = DiagnosticsOptions.Default   // default - GC collection counts on
 Runtime diagnostics collected alongside timing and allocations. Typed as a `DiagnosticsOptions` record with four boolean toggles:
 
 | Toggle | Default | What it collects |
-|---|---|---|
+| --- | --- | --- |
 | `GcCollectionCounts` | `true` | Gen0, Gen1, Gen2 collection counts during the measurement phase (totals, not per-op). Cheap - two `GC.CollectionCount` reads per sample. |
 | `GcHeapInfo` | `false` | Heap committed bytes and fragmented bytes delta across the measurement phase, via `GC.GetGCMemoryInfo`. |
 | `Exceptions` | `false` | Total first-chance exceptions during the measurement phase, via an `AppDomain.FirstChanceException` subscription. Divided by total measurement ops to give exceptions per operation. |
@@ -488,7 +494,7 @@ Runtime diagnostics collected alongside timing and allocations. Typed as a `Diag
 Three named presets are available via `DiagnosticsOptions.FromMode(DiagnosticsMode)`:
 
 | Mode | Toggles enabled |
-|---|---|
+| --- | --- |
 | `DiagnosticsMode.None` | None |
 | `DiagnosticsMode.Gc` | `GcCollectionCounts` |
 | `DiagnosticsMode.GcAndCpu` | `GcCollectionCounts`, `CpuTime` |
@@ -525,7 +531,7 @@ OutlierMode = OutlierMode.IqrFence   // default
 Controls which samples are discarded before statistics are computed.
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `OutlierMode.None` | No samples are removed. |
 | `OutlierMode.RemoveTop5Percent` | The slowest 5% of samples are removed. |
 | `OutlierMode.RemoveTopAndBottom5Percent` | The slowest and fastest 5% are removed. |
@@ -548,7 +554,7 @@ TailMetricsBasis = TailMetricsBasis.Raw   // default
 Which sample set the order statistics - percentiles, `Min`, `Max`, and the histogram - are computed from.
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `TailMetricsBasis.Raw` | Full pre-trim distribution. Tail metrics describe the tail the outlier fence removed - so a GC pause the `Realistic` profile deliberately timed shows up in `Max`. **(default)** |
 | `TailMetricsBasis.Trimmed` | Inlier (post-trim) set. Tail metrics describe only the central process. |
 
@@ -588,7 +594,7 @@ ConfidenceLevel = 0.95   // default
 The confidence level for the margin of error reported in the Error column. Must be strictly between `0` and `1`.
 
 | Value | Meaning |
-|---|---|
+| --- | --- |
 | `0.90` | 90% confidence - narrower interval, less conservative |
 | `0.95` | 95% confidence - the standard choice **(default)** |
 | `0.99` | 99% confidence - wider interval, more conservative |
@@ -607,7 +613,7 @@ ReportedPercentiles = [0.50, 0.95, 0.99, 0.999, 1.0]   // default
 The set of percentile values to compute from the trimmed samples, typed as `IReadOnlyList<double>`. Each value must be between `0` and `1` inclusive. Values `> 0.50` and `< 1.0` appear as columns in reporter tail-latency tables (e.g. P95, P99, P99.9).
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `[0.50, 0.95, 0.99, 0.999, 1.0]` **(default)** | Reports P50 (Median), P95, P99, P99.9, and Max. |
 | Custom list | Only the specified percentile values are computed. P50 (`0.50`) does not produce a separate percentile column because it is already shown as Median. Max (`1.0`) is reported via the existing Max stat field. |
 | `[0.90]` | Single custom percentile - P90 is computed and displayed. |
@@ -687,7 +693,7 @@ Environment = null   // default - no hardware/OS controls applied
 Opt-in hardware/OS controls applied for the duration of a run, typed as `EnvironmentOptions?`. When `null` (the default), the benchmark runs with whatever CPU affinity and process priority the host started it with - the zero-ceremony path. Set it to reduce measurement noise at its source (CPU migration, preemption, shared-host jitter) before the timer starts.
 
 | Field | Type | Default | Effect |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `CpuAffinity` | `IReadOnlyList<int>?` | `null` | Logical CPU core indices to pin the process to (e.g. `[2, 3]`). Restored on run exit. Linux/Windows only; ignored with a warning on macOS. |
 | `ProcessPriority` | `ProcessPriorityClass?` | `null` | Process priority to request. `High` is recommended for dedicated hosts. Restored on run exit. A refused elevation is a warning, not an error. |
 | `DedicatedHostGuidance` | `bool` | `false` | Emit a non-fatal pre-run warning when the host looks noisy (low core count, unraisable priority, or on macOS unobservable frequency scaling/thermal throttling). On a suitable host, actively suggests `--priority high`. |
@@ -731,7 +737,7 @@ Categories are not part of `MeasurementOptions`; they are metadata declared with
 ## Valid ranges summary
 
 | Option | Type | Default | Valid range |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `Iterations` | `int?` | `null` (auto) | `0` – `100 000` when set (`0` = dry-run) |
 | `WarmupIterations` | `int?` | `null` (auto) | `0` – `10 000` when set |
 | `OpsPerSample` | `int?` | `null` (auto) | `1` – `16 777 216` when set |

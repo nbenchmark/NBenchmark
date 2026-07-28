@@ -71,7 +71,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 ### Simple mode (9 columns)
 
 | Column | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `ClassName` | string | Benchmark class name (double-quote escaped). |
 | `Name` | string | Benchmark name (double-quote escaped). |
 | `Median` | float | Median timing in nanoseconds. |
@@ -85,7 +85,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 ### Standard mode (dynamic columns - adds the following after the simple columns)
 
 | Column | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `Mean` | float | Arithmetic mean in nanoseconds. |
 | `StdDev` | float | Sample standard deviation in nanoseconds. |
 | `StdErr` | float | Standard error of the mean (`StdDev / √n`) in nanoseconds. |
@@ -104,7 +104,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 ### Advanced mode (dynamic columns - all standard columns plus the following)
 
 | Column | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `Q1` | float | First quartile (P25) in nanoseconds. |
 | `Q3` | float | Third quartile (P75) in nanoseconds. |
 | `Iqr` | float | Q3 - Q1 in nanoseconds. |

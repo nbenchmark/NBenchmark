@@ -60,7 +60,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 Pick the granularity that matches your needs:
 
 | Method | When to use it |
-|---|---|
+| --- | --- |
 | `UseDependencyInjection<T>(sp)` | The common case. Discovers `T`'s assembly and resolves from the root provider. One line. |
 | `UseScopedDependencyInjection<T>(sp)` | Like above but creates a fresh DI scope per suite, disposing it after teardown. Good for `DbContext`, EF Core, and any other scoped service. |
 | `WithServiceProvider(sp)` | You already called `AddFromAssembly` yourself (perhaps with multiple assemblies) and want to plug in the root provider. |
@@ -88,7 +88,7 @@ await BenchmarkHarness.Create(args)
 The DI integration matches how `BenchmarkHarness` manages benchmark instances: **a fresh instance per `[Benchmark]` method**. This is the same lifetime the host uses for plain parameterless classes, so DI users get a one-to-one mapping between methods and instances.
 
 | Method | Instance lifetime | Scope lifetime |
-|---|---|---|
+| --- | --- | --- |
 | `WithServiceProvider` | One fresh instance per `[Benchmark]` method, resolved from the root provider. | None. The root provider lives as long as your application. |
 | `WithScopedServiceProvider` | One fresh instance per `[Benchmark]` method. | One fresh scope per method, disposed in per-method teardown. |
 | `WithServiceProvider` + `[InstanceLifetime(PerClass)]` | Resolved from the root provider. Re-used across all `[Benchmark]` methods. | None. |

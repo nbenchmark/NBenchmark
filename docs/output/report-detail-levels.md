@@ -13,7 +13,7 @@ NBenchmark supports three report detail levels that control how much statistical
 Simple mode shows a compact table with the essential information an average developer needs to know whether their code performs well or how it compares to other implementations:
 
 | Column | Description |
-|---|---|
+| --- | --- |
 | **Benchmark** | Benchmark name. |
 | **Median** | Median timing. |
 | **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). |
@@ -83,7 +83,7 @@ dotnet run -- --detail simple
 ```
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `simple` | Compact table with the essential statistics. **(default)** |
 | `standard` | Full comparison table plus Precision & Tail Latency, auto-tune, and Interpretation sections. |
 | `advanced` | Same as standard plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, configured percentiles, and allocation breakdown. |
@@ -97,7 +97,7 @@ Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail
 ## Reporter behaviour
 
 | Reporter | Simple | Standard | Advanced |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Console** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation + auto-tune | Standard + per-benchmark stats block (incl. diagnostics breakdown) |
 | **Markdown** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation | Standard + dedicated details section (incl. diagnostics breakdown) |
 | **CSV** | 12 core columns (incl. GC counts) | 25 core columns (incl. GC counts) | 51 columns including quartiles, fences, shape stats, and full diagnostics |

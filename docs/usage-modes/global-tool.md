@@ -18,7 +18,7 @@ dotnet benchmark
 The tool replaces Harness mode when you want to benchmark an existing project without adding a `Program.cs`, `Main`, and NuGet references. It is the fastest path from "I have a project with `[Benchmark]` methods" to "I have results."
 
 | You want to... | Use |
-|---|---|
+| --- | --- |
 | Benchmark a project you already built | `dotnet benchmark` in the output directory |
 | Build and benchmark in one step | `dotnet benchmark --project ./MyBenchmarks` |
 | Benchmark a specific assembly | `dotnet benchmark --assembly ./bin/Release/net10.0/MyLib.dll` |

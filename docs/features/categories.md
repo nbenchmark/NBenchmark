@@ -43,7 +43,7 @@ Class-level categories are unioned with method-level categories, so `ManyConcat`
 ## CLI filtering
 
 | Flag | Description |
-|---|---|
+| --- | --- |
 | `--category <name>` | Include benchmarks tagged with this category. Repeatable (OR). |
 | `--exclude-category <name>` | Exclude benchmarks tagged with this category. Repeatable (OR). |
 

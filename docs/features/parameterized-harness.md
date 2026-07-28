@@ -80,7 +80,7 @@ The source method can be `static` or instance, `public` or `non-public`. A stati
 ## Choosing between the two
 
 | Use case | Attribute |
-|---|---|
+| --- | --- |
 | Small literal list (2-5 values) | `[BenchmarkCase]` |
 | Generated values, file/database-backed inputs, parameter sweeps, large lists | `[BenchmarkCases]` |
 | Named display names for readability in reports | `[BenchmarkCases]` with named tuples |
@@ -166,7 +166,7 @@ foreach (var r in results)
 ## Suite vs. Harness mode comparison
 
 | Feature | Suite (`WithParameter`) | Harness (`[BenchmarkCase]` / `[BenchmarkCases]`) |
-|---|---|---|
+| --- | --- | --- |
 | Declaration | Fluent lambda + `WithParameter` call | Attribute on method |
 | Parameter types | Primitives, enums, strings, null | Any type matching method signature |
 | Multi-parameter | `WithParameter<T1, T2>` / `WithParameter<T1, T2, T3>` | Method parameter names or named tuples |

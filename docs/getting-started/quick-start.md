@@ -95,7 +95,7 @@ await result.ToJsonAsync("results/");   // directory
 ## What each number means
 
 | Value | What it tells you |
-|---|---|
+| --- | --- |
 | **Median** | The middle value - the most reliable single number. Ignores extreme outliers. |
 | **Mean** | The average. Close to the median for stable code; further away when timings vary widely. |
 | **Error** | How precisely the mean is estimated (±95% CI). A small Error means the mean is reliable. |

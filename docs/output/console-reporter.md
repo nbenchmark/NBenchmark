@@ -78,7 +78,7 @@ After the comparison and precision tables, ConsoleReporter prints an **Interpret
 ## Columns
 
 | Column | Description |
-|---|---|
+| --- | --- |
 | **Benchmark** | Name of the benchmark. Colour-coded: green (≤ 5% slower than baseline), yellow (≤ 50% slower), red (> 50% slower). Baseline is shown in bold. |
 | **Median** | Median timing. |
 | **Mean** | Arithmetic mean. |

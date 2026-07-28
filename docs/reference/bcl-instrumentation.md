@@ -13,7 +13,7 @@ NBenchmark emits first-class `System.Diagnostics` BCL instrumentation from the s
 All instrument and tag names use the `nbenchmark.*` namespace for OpenTelemetry compatibility:
 
 | Instrument | Type | Unit | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `nbenchmark.sample.duration` | Histogram | ns/op | Per-op sample duration |
 | `nbenchmark.alloc.bytes_per_op` | Histogram | B/op | Per-op allocation delta (recorded per sample) |
 | `nbenchmark.outliers.removed` | Counter | samples | Cumulative outliers removed |
@@ -49,7 +49,7 @@ benchmark.suite
 Each phase transition creates an Activity span named `nbenchmark.phase.<phase>` where `<phase>` is one of `jitter`, `calibration`, `warmup`, or `measurement`. Phase spans nest under their parent `benchmark.run` span. Tags include:
 
 | Tag | Set on | Value |
-|---|---|---|
+| --- | --- | --- |
 | `nbenchmark.benchmark.name` | start + stop | Benchmark name |
 | `nbenchmark.phase` | start + stop | Phase enum name |
 | `nbenchmark.sample_stop_reason` | stop (measurement) | Why measurement ended |
@@ -64,7 +64,7 @@ Each phase transition creates an Activity span named `nbenchmark.phase.<phase>` 
 Span events are discrete annotations on a phase span that explain *why* a phase ended. A trace UI renders these as markers on the flame-graph row, making the autotune decision visible at a glance:
 
 | Event | Parent span | Fired when | Key tags |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `detector.switched` | `nbenchmark.phase.jitter` | The outlier detector auto-switched IQR -> MAD | `nbenchmark.from`, `nbenchmark.to`, `nbenchmark.jitter_metric` |
 | `warmup.plateau_reached` | `nbenchmark.phase.warmup` | Warmup stopped because the body settled (plateau rule) | - |
 | `measurement.ci_target_met` | `nbenchmark.phase.measurement` | Measurement stopped because the CI half-width target was met | `nbenchmark.achieved_ci_width`, `nbenchmark.ci_target` |
@@ -108,7 +108,7 @@ The attributes are read once per process from environment variables and cached f
 ### CI identification
 
 | Attribute | Source env vars |
-|---|---|
+| --- | --- |
 | `nbenchmark.ci_provider` | `GITHUB_ACTIONS`, `GITLAB_CI`, `AZURE_PIPELINES`/`TF_BUILD`, `CIRCLECI`, `APPVEYOR`, `TEAMCITY_VERSION`, `JENKINS_URL`, `TRAVIS`, `BUILDKITE` |
 | `nbenchmark.ci_run_id` | `GITHUB_RUN_ID`, `CI_PIPELINE_ID`, `BUILD_BUILDID`, `CIRCLE_BUILD_NUM`, `APPVEYOR_BUILD_ID`, `TEAMCITY_BUILDID`, `BUILDKITE_BUILD_ID`, `TRAVIS_BUILD_ID` |
 | `nbenchmark.ci_run_url` | `GITHUB_SERVER_URL`, `CI_JOB_URL`, `BUILD_BUILDURI`, `CIRCLE_BUILD_URL` |
@@ -119,7 +119,7 @@ The attributes are read once per process from environment variables and cached f
 ### Git identification
 
 | Attribute | Source env vars | Fallback |
-|---|---|---|
+| --- | --- | --- |
 | `nbenchmark.commit_sha` | `GITHUB_SHA`, `CI_COMMIT_SHA`, `GIT_COMMIT` | `git rev-parse --short HEAD` |
 | `nbenchmark.branch` | `GITHUB_HEAD_REF`, `CI_COMMIT_BRANCH`, `GIT_BRANCH` | `git rev-parse --abbrev-ref HEAD` (detached HEAD produces no branch attribute) |
 
@@ -128,7 +128,7 @@ CI-sourced values take precedence over the git CLI fallback. When no CI or git e
 ### Host identification
 
 | Attribute | Value |
-|---|---|
+| --- | --- |
 | `nbenchmark.host.machine_name` | `Environment.MachineName` |
 | `nbenchmark.host.os` | `windows`, `macos`, or `linux` |
 | `nbenchmark.host.arch` | `arm64`, `x64`, `x86`, etc. |
@@ -147,7 +147,7 @@ Harness mode runs each discovered class in an isolated child process by default.
 `ChildProcessLauncher` forwards the following environment variables from parent to every spawned child:
 
 | Env var | Purpose |
-|---|---|
+| --- | --- |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP exporter endpoint |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | OTLP transport (`grpc` or `http/protobuf`) |
 | `OTEL_EXPORTER_OTLP_HEADERS` | OTLP exporter headers (e.g. auth) |

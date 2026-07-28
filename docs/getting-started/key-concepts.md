@@ -43,7 +43,7 @@ The profile is set via `WithMeasurementProfile(MeasurementProfile.Independent)` 
 The profile controls two GC behaviours; the between-benchmark GC and allocation tracking are on for **both** profiles:
 
 | Behaviour | Realistic (default) | Independent |
-|---|---|---|
+| --- | --- | --- |
 | Per-iteration Gen0 GC | Off | On |
 | Pre-measurement full GC (clears warmup heap) | Off | On |
 | Between-benchmark full GC | On | On |
@@ -62,7 +62,7 @@ The fence values (`LowerFence`, `UpperFence`) are first-class fields on `Benchma
 Available modes:
 
 | Mode | What is removed |
-|---|---|
+| --- | --- |
 | `None` | Nothing. All samples are used. |
 | `RemoveTop5Percent` | The slowest 5% of samples. |
 | `RemoveTopAndBottom5Percent` | The slowest and fastest 5%. |

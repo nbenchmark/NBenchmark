@@ -153,7 +153,7 @@ The result carries **two populations**, and `tailMetricsBasis` says which basis 
 `autoTune` records what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) decided for this benchmark. It is `null` on dry-run and errored results.
 
 | Group | Fields |
-|---|---|
+| --- | --- |
 | **What it resolved** | `resolvedWarmup`, `resolvedSamples`, `opsPerSample`, `initialOpsPerSample` (the pre-recalibration cold K, or `null`), `totalBodyInvocations` |
 | **Why it stopped** | `warmupStop` (`settled` / `maxCeiling` / `explicitCount` / `wallClockCap`), `sampleStop` (adds `ciTargetMet` and `driftUnresolved`) |
 | **How well it converged** | `achievedRelativeCiWidth` (on the **raw** stream — see the caveat below), `ciWidthSeries` (the convergence trace, one entry per cadence check), `tuningWallClock` |

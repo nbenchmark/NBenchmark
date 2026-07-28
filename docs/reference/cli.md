@@ -86,7 +86,7 @@ dotnet run -- --warmup 50
 In auto mode NBenchmark resolves warmup length, measured-sample count, and ops-per-sample (K) at runtime. These flags steer that resolution without pinning an exact count. See [Configuration: AutoTune](./configuration.md#autotune) for the full model.
 
 | Flag | Default | Effect |
-|---|---|---|
+| --- | --- | --- |
 | `--auto-tune <preset>` | `default` | Apply a preset bundle: `default`, `quick` (fewer samples, ±5% CI), or `thorough` (more samples, ±1% CI). |
 | `--ops-per-sample <n>` | auto | Pin K - the number of body invocations timed as one sample. Auto-calibrated otherwise. |
 | `--ci-target <0-1>` | `0.025` | Target relative CI half-width for auto sampling. Sampling stops once it is met. |
@@ -143,7 +143,7 @@ dotnet run -- --alpha 0.01
 Outlier-trimming mode applied before statistics are computed. Default: `iqr`.
 
 | Token | Mode |
-|---|---|
+| --- | --- |
 | `none` | No trimming. |
 | `top5` | Remove the slowest 5%. |
 | `both5` | Remove the slowest and fastest 5%. |
@@ -180,7 +180,7 @@ Central-tendency and dispersion statistics (mean, standard deviation, CI, CV, sk
 Add a reporter by name. Can be specified multiple times to stack reporters. Built-in reporters:
 
 | Name | Reporter | Output |
-|---|---|---|
+| --- | --- | --- |
 | `json` | `JsonReporter` | JSON file in the current directory (or `--output` directory) |
 | `markdown` | `MarkdownReporter` | Markdown file in the current directory (or `--output` directory) |
 | `csv` | `CsvReporter` | CSV file in the current directory (or `--output` directory) |
@@ -229,7 +229,7 @@ dotnet run -- --reporter markdown --output ./results
 Control the order benchmarks run in.
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `random` | Fisher-Yates shuffle, random seed each run. **(default)** |
 | `declaration` | Run in the order methods are declared in the class. |
 
@@ -282,7 +282,7 @@ Equivalent to calling `WithCrossClassSignificance()` in code.
 Set the measurement profile. Controls the per-iteration Gen0 GC and the pre-measurement full GC as a bundle. Between-benchmark GC and allocation tracking are on for **both** profiles.
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `realistic` | No per-iteration GC, no pre-measurement GC (inherits the warmup heap). **(default)** |
 | `independent` | Per-iteration Gen0 GC, full GC after warmup before measurement. |
 
@@ -345,7 +345,7 @@ dotnet run -- --min-practical-effect 0
 Control which runtime diagnostics are collected during measurement. GC collection counts are cheap and always available; heap info, exceptions, and CPU time add more detail at a small overhead cost.
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `none` | No diagnostics collected. |
 | `gc` | GC Gen0/Gen1/Gen2 collection counts. **(default)** |
 | `gcandcpu` | GC collection counts plus process CPU time and CPU/wall-clock ratio. |
@@ -373,7 +373,7 @@ Programmatic equivalent: `WithDiagnostics(DiagnosticsMode.All)` or `WithOptions(
 Set the report detail level. Controls how much information reporters display.
 
 | Value | Behaviour |
-|---|---|
+| --- | --- |
 | `simple` | 6-column table with the essential statistics. **(default)** |
 | `standard` | Full comparison table plus Precision & Tail Latency, Diagnostics, Interpretation, and auto-tune sections. |
 | `advanced` | Same as standard plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, allocation breakdown, diagnostics breakdown, and the full set of configured percentiles. |
@@ -521,7 +521,7 @@ Programmatic equivalent: `WithHardwareAffinity(2, 3)` (suite/harness) or `new Me
 Request a process priority for the benchmark run, reducing preemption by unrelated OS work. The prior priority is restored when the run completes. A refused elevation (common on locked-down CI runners) is surfaced as a warning, not an error - the run still proceeds.
 
 | Value | Priority |
-|---|---|
+| --- | --- |
 | `normal` | `ProcessPriorityClass.Normal` |
 | `idle` | `ProcessPriorityClass.Idle` |
 | `belownormal` | `ProcessPriorityClass.BelowNormal` |
@@ -585,7 +585,7 @@ The baseline is the benchmark marked `[Benchmark(Baseline = true)]`, or the fast
 ## Exit codes
 
 | Code | Meaning |
-|---|---|
+| --- | --- |
 | `0` | The run completed. Errored benchmarks are recorded in the results but are not fatal and do not affect the exit code. |
 | `1` | One or more argument errors were detected during parsing: unknown flag, missing flag value, value out of range (`--iterations`, `--warmup`, `--ops-per-sample`, `--launch-count`, `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--warmup-budget-fraction`, `--cap-grace-factor`, `--min-warmup-time`, `--jit-quiet-period`, `--min-measurement-time`, `--drift-tolerance`, `--max-drift-restarts`), invalid format (`--confidence`, `--seed`, `--percentiles`, `--cpu-affinity`), unknown preset (`--auto-tune`), unknown outlier mode (`--outlier`), unknown diagnostics mode (`--diagnostics`), unknown reporter name (`--reporter`), unknown observer name (`--observer`), unknown priority level (`--priority`), invalid detail level (`--detail`), invalid OTLP endpoint URL (`--otlp-endpoint`), or a benchmark exceeded the `--threshold-pct` regression limit. |
 

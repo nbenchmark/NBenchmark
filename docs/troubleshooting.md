@@ -6,7 +6,7 @@ order: 11
 
 # Troubleshooting
 
-Each entry leads with the literal fix in a callout box, then explains why. If you are mid-CI-failure and need to unblock a PR, read the callout, type the flag, and go. Come back to the explanation once the build is green.
+Each entry leads with the literal fix and then explains the why.
 
 ## Measurement variability
 
@@ -84,6 +84,7 @@ See [Measurement Profiles](./statistics/measurement.md#measurement-profiles) for
 ### Bimodal-distribution warning
 
 > [!CAUTION] Quick fix
+>
 > 1. **Check the body** for **lock contention** or **cache misses** - the cluster centre in the warning names the extra cost the slow path pays.
 > 2. **If you suspect GC:** `dotnet run -- --profile independent` (forces per-iteration Gen0 collection, making GC pauses deterministic rather than bimodal).
 
@@ -161,7 +162,7 @@ See [Configuration: ForceGcBetweenBenchmarks](./reference/configuration.md#force
 ## Quick reference: Outlier modes
 
 | Mode | When to use |
-|---|---|
+| --- | --- |
 | `IqrFence` (default) | General-purpose. The [IQR](https://en.wikipedia.org/wiki/Interquartile_range)-based fence adapts to your data's spread, trimming spikes from OS scheduling interrupts without discarding clean samples. |
 | `RemoveTop5Percent` | When you want a fixed quota - always removes the slowest 5% of iterations. |
 | `RemoveTopAndBottom5Percent` | When very fast outliers (e.g. cache hits after warmup) also skew results. |

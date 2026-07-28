@@ -69,7 +69,7 @@ await result.ToJsonAsync("results/");
 ## Available reporters
 
 | Reporter | Package | Output |
-|---|---|---|
+| --- | --- | --- |
 | [ConsoleReporter](./console-reporter.md) | `NBenchmark.Reporters.Console` | Rich terminal table with colour and a bar chart |
 | [MarkdownReporter](./markdown-reporter.md) | `NBenchmark` | `.md` file with a formatted results table |
 | [CsvReporter](./csv-reporter.md) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |

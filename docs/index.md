@@ -117,7 +117,7 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 ## Packages
 
 | Package | Purpose |
-|---|---|
+| --- | --- |
 | `NBenchmark` | Zero-dependency core engine and statistics |
 | `NBenchmark.Analyzers` | Compile-time checks for benchmark correctness |
 | `NBenchmark.DependencyInjection` | Constructor injection for benchmark classes |

@@ -1,6 +1,6 @@
 ---
 title: Comparing a refactor side-by-side
-description: "I changed a hot path - is it really faster?" Suite mode with a baseline, the Sig and Magnitude columns, the practical-significance gate, and cross-class significance.
+description: I changed a hot path - is it really faster? Suite mode with a baseline, the Sig and Magnitude columns, the practical-significance gate, and cross-class significance.
 order: 3
 ---
 

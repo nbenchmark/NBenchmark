@@ -99,7 +99,7 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 ## Columns
 
 | Column | Description |
-|---|---|
+| --- | --- |
 | **Benchmark** | Benchmark name. |
 | **Median** | Median timing. |
 | **Mean** | Arithmetic mean. |
