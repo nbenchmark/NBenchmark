@@ -253,6 +253,33 @@ internal sealed record RunGroupPayload
     public string? PlanMethodName { get; init; }
 
     /// <summary>
+    ///     <see cref="WorkGroupKind.TestMethod" />: metadata token of the method under test, within
+    ///     <see cref="TargetAssemblyPath" />.
+    /// </summary>
+    public int TestMethodToken { get; init; }
+
+    /// <summary>
+    ///     <see cref="WorkGroupKind.TestMethod" />: the defining module's MVID, checked before the
+    ///     token is trusted.
+    ///     <para>
+    ///         The same gate the lambda path uses, and mandatory for the same reason: deterministic
+    ///         builds keep a token valid across a rebuild that inserted a method above it, so a
+    ///         stale token addresses a <i>different</i> method and reports it under the right name.
+    ///     </para>
+    /// </summary>
+    public Guid TestMethodModuleVersionId { get; init; }
+
+    /// <summary>
+    ///     <see cref="WorkGroupKind.TestMethod" />: the test case's argument values, in order.
+    ///     <para>
+    ///         Only simple values ever reach here - the coordinator refuses to route a test whose
+    ///         arguments are live objects, rather than reconstructing them and measuring something
+    ///         subtly different.
+    ///     </para>
+    /// </summary>
+    public IReadOnlyList<TestArgumentPayload> TestMethodArguments { get; init; } = [];
+
+    /// <summary>
     ///     Which <c>nbworker</c> to launch. <c>null</c> uses the one deployed beside this
     ///     application, which is right for everything measured against the running build.
     ///     <para>
@@ -383,4 +410,23 @@ internal sealed record FaultPayload
     ///     that could not be addressed). <c>null</c> means the whole group failed.
     /// </summary>
     public string? BenchmarkName { get; init; }
+}
+
+/// <summary>
+///     One argument value for a test method, in a form that survives the process boundary.
+/// </summary>
+/// <remarks>
+///     Carried as an invariant-culture string plus its type name rather than as JSON, because the
+///     set of permitted types is deliberately small and closed - primitives, strings, enums and a
+///     few unambiguous value types. A general object serializer here would quietly widen that set to
+///     "whatever happens to round-trip", which is exactly the mechanism that is right most of the
+///     time and silently wrong the rest.
+/// </remarks>
+internal sealed record TestArgumentPayload
+{
+    /// <summary>Assembly-qualified name of the argument's declared parameter type.</summary>
+    public required string TypeName { get; init; }
+
+    /// <summary>Invariant-culture text form, or <c>null</c> for a null argument.</summary>
+    public string? Value { get; init; }
 }

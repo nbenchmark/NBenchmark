@@ -442,6 +442,52 @@ public sealed class BenchmarkDiscoverer
         return BenchmarkParameter.FormatDisplayName(methodName, paramSet);
     }
 
+    /// <summary>
+    ///     Builds a one-benchmark suite around a method chosen by the caller rather than found by
+    ///     attribute discovery.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This is how a test-framework integration measures a test method in a worker. The
+    ///         method carries no <c>[Benchmark]</c> attribute, so discovery would never find it -
+    ///         but everything downstream of discovery (instance lifetime, iteration structure,
+    ///         sample transport, progress streaming) applies unchanged, so a synthesized definition
+    ///         reuses all of it rather than growing a parallel measurement path.
+    ///     </para>
+    ///     <para>
+    ///         <paramref name="arguments" /> are bound into the compiled delegate, so a
+    ///         parameterized test case measures the same call the test framework would have made.
+    ///     </para>
+    /// </remarks>
+    internal static BenchmarkSuiteDefinition DefineExplicit(
+        MethodInfo method,
+        object?[] arguments,
+        string displayName)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        ArgumentNullException.ThrowIfNull(arguments);
+
+        var declaringType = method.DeclaringType
+                            ?? throw new InvalidOperationException(
+                                $"Method '{method.Name}' has no declaring type.");
+
+        var definition = CreateDefinition(
+            method,
+            new BenchmarkAttribute(),
+            displayName,
+
+            // Null would mean "no arguments to bind" and take the direct-delegate path, which
+            // cannot express a static method or an argument conversion. An empty array keeps the
+            // expression-tree path for every shape.
+            arguments,
+            paramNames: method.GetParameters().Select(pa => pa.Name ?? string.Empty).ToArray(),
+            iterSetupDel: null,
+            iterTeardownDel: null,
+            classCategories: []);
+
+        return new BenchmarkSuiteDefinition(declaringType, [definition]);
+    }
+
     private static BenchmarkMethodDefinition CreateDefinition(
         MethodInfo method,
         BenchmarkAttribute attribute,
@@ -453,7 +499,7 @@ public sealed class BenchmarkDiscoverer
         IReadOnlyList<string> classCategories,
         bool isBaseline = false)
     {
-        var isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
+        var isAsync = IsAwaitable(method.ReturnType);
 
         Func<object, object?>? syncDelegate = null;
         Func<object, Task>? asyncDelegate = null;
@@ -461,10 +507,16 @@ public sealed class BenchmarkDiscoverer
 
         if (isAsync)
         {
-            asyncDelegate = arguments is null
+            asyncDelegate = arguments is null && typeof(Task).IsAssignableFrom(method.ReturnType)
                 ? BuildAsyncDelegate(method)
-                : BuildArgumentBoundAsyncDelegate(method, arguments);
 
+                // A ValueTask needs .AsTask() before it can be awaited as a Task, which the
+                // direct Delegate.CreateDelegate path cannot express.
+                : BuildArgumentBoundAsyncDelegate(method, arguments ?? []);
+
+            // Only a Task<T> exposes .Result to consume. A ValueTask<T> has already been
+            // converted to a Task<T> by the delegate above, so its consumer is built from the
+            // converted type rather than the declared one.
             if (method.ReturnType.IsGenericType)
                 resultConsumer = BuildResultConsumer(method.ReturnType);
         }
@@ -619,14 +671,44 @@ public sealed class BenchmarkDiscoverer
     {
         var instanceParam = Expression.Parameter(typeof(object), "instance");
         var call = BuildCall(method, instanceParam, arguments);
-        var body = Expression.Convert(call, typeof(Task));
-        return Expression.Lambda<Func<object, Task>>(body, instanceParam).Compile();
+
+        return Expression.Lambda<Func<object, Task>>(AsTask(call, method.ReturnType), instanceParam).Compile();
+    }
+
+    /// <summary>
+    ///     Whether a benchmark's return type is one the engine awaits.
+    /// </summary>
+    /// <remarks>
+    ///     <c>ValueTask</c> is included, and used not to be. Because <c>ValueTask</c> is a struct and
+    ///     therefore not assignable to <c>Task</c>, the old check classified an
+    ///     <c>async ValueTask</c> benchmark as <i>synchronous</i> and boxed the returned struct
+    ///     instead of awaiting it - so the measurement stopped at the first <c>await</c> inside the
+    ///     body. Measured on a body that delays 50 ms, that reported <b>1 ms</b>: a plausible,
+    ///     confidently-wrong number rather than an error.
+    /// </remarks>
+    private static bool IsAwaitable(Type returnType)
+    {
+        if (typeof(Task).IsAssignableFrom(returnType) || returnType == typeof(ValueTask))
+            return true;
+
+        return returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>);
+    }
+
+    /// <summary>Converts a call expression's awaitable result to a <see cref="Task" />.</summary>
+    private static Expression AsTask(Expression call, Type returnType)
+    {
+        if (returnType == typeof(ValueTask))
+            return Expression.Call(call, nameof(ValueTask.AsTask), Type.EmptyTypes);
+
+        if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
+            return Expression.Call(call, nameof(ValueTask<int>.AsTask), Type.EmptyTypes);
+
+        return Expression.Convert(call, typeof(Task));
     }
 
     private static MethodCallExpression BuildCall(
         MethodInfo method, ParameterExpression instanceParam, object?[] arguments)
     {
-        var typedInstance = Expression.Convert(instanceParam, method.DeclaringType!);
         var parameters = method.GetParameters();
         var argExpressions = new Expression[parameters.Length];
 
@@ -635,7 +717,13 @@ public sealed class BenchmarkDiscoverer
             argExpressions[i] = Expression.Constant(arguments[i], parameters[i].ParameterType);
         }
 
-        return Expression.Call(typedInstance, method, argExpressions);
+        // A static method has no receiver, and passing one to Expression.Call throws. Attribute
+        // discovery never reaches this with a static method, but DefineExplicit does - a test
+        // framework will happily hand over a static test method.
+        if (method.IsStatic)
+            return Expression.Call(method, argExpressions);
+
+        return Expression.Call(Expression.Convert(instanceParam, method.DeclaringType!), method, argExpressions);
     }
 
     private static Action<object>? BuildVoidDelegate(MethodInfo? method)

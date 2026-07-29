@@ -28,6 +28,18 @@ internal enum WorkGroupKind
     ///     the worker rather than anything serialized.
     /// </summary>
     Plan = 2,
+
+    /// <summary>
+    ///     A test-framework integration. The worker resolves a single method that carries no
+    ///     <c>[Benchmark]</c> attribute, constructs its declaring type for itself, and measures it.
+    ///     <para>
+    ///         The test instance the framework built is never sent - only the address of the method
+    ///         and any simple argument values. A test class the worker cannot build from nothing is
+    ///         not routed here at all; the coordinator keeps it in the test host and labels the
+    ///         result, rather than measuring a differently-constructed object under the same name.
+    ///     </para>
+    /// </summary>
+    TestMethod = 3,
 }
 
 /// <summary>

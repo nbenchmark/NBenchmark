@@ -132,6 +132,10 @@ internal sealed class WorkerSession(FrameChannel channel)
                     await RunPlanAsync(request, progress, cancellationToken).ConfigureAwait(false);
                     break;
 
+                case WorkGroupKind.TestMethod:
+                    await RunTestMethodAsync(request, options, progress, cancellationToken).ConfigureAwait(false);
+                    break;
+
                 default:
                     Fault($"Group kind {request.Kind} is not supported by this worker.");
                     break;
@@ -159,6 +163,116 @@ internal sealed class WorkerSession(FrameChannel channel)
 
             _queue = null;
         }
+    }
+
+    /// <summary>
+    ///     Measures one method from a test assembly - a method with no <c>[Benchmark]</c> attribute,
+    ///     handed over by an xUnit, NUnit or MSTest integration.
+    /// </summary>
+    /// <remarks>
+    ///     The test-class instance is built here rather than sent, which is why the coordinator only
+    ///     routes classes it has already confirmed are constructible from nothing. Everything after
+    ///     the method is resolved is the ordinary discovery path, so instance lifetime, iteration
+    ///     structure and sample transport are the same code that measures a <c>[Benchmark]</c>.
+    /// </remarks>
+    private async Task RunTestMethodAsync(
+        RunGroupPayload request,
+        MeasurementOptions options,
+        StreamingProgress progress,
+        CancellationToken cancellationToken)
+    {
+        var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
+        var target = context.LoadFromAssemblyPath(Path.GetFullPath(request.TargetAssemblyPath));
+        var module = target.ManifestModule;
+
+        if (module.ModuleVersionId != request.TestMethodModuleVersionId)
+        {
+            Fault(
+                $"'{Path.GetFileName(request.TargetAssemblyPath)}' in this worker is a different build "
+                + "from the one the test host addressed, so the method token cannot be trusted. "
+                + "Rebuild and re-run.");
+
+            return;
+        }
+
+        MethodInfo method;
+
+        try
+        {
+            if (module.ResolveMethod(request.TestMethodToken) is not MethodInfo resolved)
+            {
+                Fault($"Token 0x{request.TestMethodToken:X8} did not resolve to a method.");
+
+                return;
+            }
+
+            method = resolved;
+        }
+        catch (Exception ex) when (ex is ArgumentException or BadImageFormatException)
+        {
+            Fault($"Token 0x{request.TestMethodToken:X8} could not be resolved: {ex.Message}");
+
+            return;
+        }
+
+        var parameters = method.GetParameters();
+
+        if (parameters.Length != request.TestMethodArguments.Count)
+        {
+            Fault(
+                $"'{method.Name}' takes {parameters.Length} argument(s) but {request.TestMethodArguments.Count} "
+                + "were sent. This usually means the assembly was rebuilt between addressing and running.");
+
+            return;
+        }
+
+        var arguments = new object?[parameters.Length];
+
+        try
+        {
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                arguments[i] = TestArgumentCodec.Decode(request.TestMethodArguments[i], parameters[i].ParameterType);
+            }
+        }
+        catch (Exception ex)
+        {
+            Fault($"An argument for '{method.Name}' could not be rebuilt in this worker: {ex.Message}");
+
+            return;
+        }
+
+        var displayName = request.BenchmarkNames.Count > 0 ? request.BenchmarkNames[0] : method.Name;
+        var suite = BenchmarkDiscoverer.DefineExplicit(method, arguments, displayName);
+
+        var outcome = await DiscoveredGroupExecutor.RunAsync(
+                suite,
+                suite.Benchmarks,
+                options,
+                instanceFactory: null,
+                request.Order,
+                request.Seed,
+                request.StartIndex,
+                request.TotalBenchmarks,
+                progress,
+                progress.AsObserver(),
+                postSuiteCleanup: null,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (outcome.InstantiationFailed)
+        {
+            // The coordinator classified this class as constructible before routing it here, so
+            // reaching this means the two disagreed. Reporting it is the only honest option: a
+            // silent fallback would measure nothing and report a gap.
+            Fault(
+                $"'{method.DeclaringType?.FullName}' could not be instantiated in the worker, even "
+                + "though it appeared to have a usable parameterless constructor.");
+
+            return;
+        }
+
+        SendResults(outcome.Results, r => outcome.RawSamples.GetValueOrDefault(r.Name, []));
     }
 
     private async Task RunDiscoveredClassAsync(

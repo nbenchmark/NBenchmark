@@ -8,6 +8,29 @@ public sealed class PerformanceTestMethodIntegrationTests
 {
     public static readonly ConcurrentDictionary<string, int> InvocationCounts = new();
 
+    /// <summary>
+    ///     Asserts the benchmark body actually executed.
+    /// </summary>
+    /// <remarks>
+    ///     These assertions used to read an in-process invocation counter. The body now runs in a
+    ///     worker process, so that counter stays at zero <i>because</i> isolation is working - it
+    ///     would only be non-zero when the measurement silently fell back to the test host. The
+    ///     measurement itself is the better evidence anyway: the engine cannot report timings for a
+    ///     body it never invoked, and unlike a counter it cannot be incremented by anything else.
+    /// </remarks>
+    private static void AssertBodyRan(TestResult result, string what)
+    {
+        Assert.AreEqual(UnitTestOutcome.Passed, result.Outcome, $"{what} did not pass.");
+
+        Assert.IsFalse(
+            string.IsNullOrWhiteSpace(result.LogOutput),
+            $"{what} produced no metrics, so its body did not run.");
+
+        Assert.IsTrue(
+            result.Duration > TimeSpan.Zero,
+            $"{what} reported no elapsed time, so its body did not run.");
+    }
+
     [TestMethod]
     public void PerformanceTestMethod_Runs_On_Static_Void_Method()
     {
@@ -16,7 +39,7 @@ public sealed class PerformanceTestMethodIntegrationTests
         var result = ExecuteAttribute(typeof(StaticVoidBenchmark), key);
 
         Assert.AreEqual(UnitTestOutcome.Passed, result.Outcome);
-        Assert.IsTrue(InvocationCounts[key] > 0, "Static void benchmark body did not run.");
+        AssertBodyRan(result, "Static void benchmark body");
     }
 
     [TestMethod]
@@ -27,7 +50,7 @@ public sealed class PerformanceTestMethodIntegrationTests
         var result = ExecuteAttribute(typeof(StaticAsyncBenchmark), key);
 
         Assert.AreEqual(UnitTestOutcome.Passed, result.Outcome);
-        Assert.IsTrue(InvocationCounts[key] > 0, "Static async benchmark body did not run.");
+        AssertBodyRan(result, "Static async benchmark body");
     }
 
     [TestMethod]
@@ -38,7 +61,7 @@ public sealed class PerformanceTestMethodIntegrationTests
         var result = ExecuteAttribute(typeof(InstanceBenchmark), key);
 
         Assert.AreEqual(UnitTestOutcome.Passed, result.Outcome);
-        Assert.IsTrue(InvocationCounts[key] > 0, "Instance benchmark body did not run.");
+        AssertBodyRan(result, "Instance benchmark body");
     }
 
     [TestMethod]
@@ -49,18 +72,27 @@ public sealed class PerformanceTestMethodIntegrationTests
         var result = ExecuteAttribute(typeof(InstanceAsyncBenchmark), key);
 
         Assert.AreEqual(UnitTestOutcome.Passed, result.Outcome);
-        Assert.IsTrue(InvocationCounts[key] > 0, "Instance async benchmark body did not run.");
+        AssertBodyRan(result, "Instance async benchmark body");
     }
 
     [TestMethod]
     public void PerformanceTestMethod_Runs_On_Method_With_Arguments()
     {
         var key = nameof(ParameterizedBenchmark.RunWithArgument);
-        InvocationCounts[key] = 0;
-        var result = ExecuteAttribute(typeof(ParameterizedBenchmark), key, [2]);
 
-        Assert.AreEqual(UnitTestOutcome.Passed, result.Outcome);
-        Assert.IsTrue(InvocationCounts[key] > 0, "Parameterized benchmark body did not run with supplied arguments.");
+        // The body's success depends on the argument, so pass/fail proves the value arrived. An
+        // in-process counter cannot show this any more - the body runs in a worker, where anything
+        // it increments is invisible here - and comparing two runs' durations would make the
+        // assertion a timing race rather than a fact.
+        var accepted = ExecuteAttribute(typeof(ParameterizedBenchmark), key, [ParameterizedBenchmark.Accepted]);
+        AssertBodyRan(accepted, "Parameterized benchmark");
+
+        var rejected = ExecuteAttribute(typeof(ParameterizedBenchmark), key, [ParameterizedBenchmark.Rejected]);
+
+        Assert.AreNotEqual(
+            UnitTestOutcome.Passed,
+            rejected.Outcome,
+            "the rejected argument never reached the body: it should have thrown.");
     }
 
     private static TestResult ExecuteAttribute(Type testClass, string methodName, object[]? arguments = null)
@@ -164,11 +196,23 @@ public sealed class InstanceAsyncBenchmark
 
 public sealed class ParameterizedBenchmark
 {
+    /// <summary>The value this body accepts.</summary>
+    public const int Accepted = 1;
+
+    /// <summary>The value this body rejects, so a caller can prove the argument arrived.</summary>
+    public const int Rejected = -1;
+
+    /// <summary>
+    ///     Succeeds or throws depending on its argument, so a caller can tell from the outcome alone
+    ///     whether the value crossed the process boundary intact - with no reliance on timing.
+    /// </summary>
     [PerformanceTestMethod(Iterations = 3, WarmupIterations = 1)]
-    public void RunWithArgument(int increment)
+    public void RunWithArgument(int mode)
     {
-        PerformanceTestMethodIntegrationTests.InvocationCounts.AddOrUpdate(
-            nameof(RunWithArgument), increment, (_, value) => value + increment);
+        if (mode == Rejected)
+            throw new InvalidOperationException($"argument {Rejected} reached the body");
+
+        Thread.SpinWait(mode);
     }
 }
 

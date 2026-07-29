@@ -39,6 +39,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         double[]? refSamples = null;
         BenchmarkResult result = null!;
         double[] rawSamples = null!;
+        string? refusal = null;
 
         try
         {
@@ -56,100 +57,57 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                     return Task.FromResult<TestResult[]>([CreateErrorResult(ex.Message)]);
                 }
 
-                if (!TryBuildBody(refMethodInfo, instance, refArgs, out var refBody, out var refIsAsync))
-                {
-                    return Task.FromResult<TestResult[]>([
-                        CreateErrorResult(
-                            $"Could not build body for reference method {ReferenceMethod}."),
-                    ]);
-                }
-
                 var refName = $"{testMethod.TestClassName}.{ReferenceMethod}";
 
-                if (refIsAsync)
-                {
-                    if (refBody is Func<Task> refTaskBody)
-                    {
-                        var refOutcome = BenchmarkRunner.Instance.RunAsync(
-                                refName, refTaskBody, runSpec, CancellationToken.None)
-                            .GetAwaiter().GetResult();
+                // MSTest's Execute is synchronous, so the async path is blocked on here.
+                var reference = TestMeasurement
+                    .MeasureAsync(refMethodInfo, instance, refArgs, refName, runSpec, CancellationToken.None)
+                    .GetAwaiter().GetResult();
 
-                        refResult = refOutcome.Result;
-                        refSamples = refOutcome.RawSamples;
-                    }
-                    else
-                    {
-                        return Task.FromResult<TestResult[]>([
-                            CreateErrorResult(
-                                $"Unsupported async body type for reference method {ReferenceMethod}."),
-                        ]);
-                    }
-                }
-                else
-                {
-                    if (refBody is Action refActionBody)
-                    {
-                        var refOutcome = BenchmarkRunner.Instance.Run(
-                            refName, refActionBody, runSpec, CancellationToken.None);
-
-                        refResult = refOutcome.Result;
-                        refSamples = refOutcome.RawSamples;
-                    }
-                    else
-                    {
-                        return Task.FromResult<TestResult[]>([
-                            CreateErrorResult(
-                                $"Unsupported sync body type for reference method {ReferenceMethod}."),
-                        ]);
-                    }
-                }
+                refResult = reference.Result;
+                refSamples = reference.RawSamples;
             }
 
-            if (TryBuildBody(methodInfo, instance, args, out var body, out var isAsync))
-            {
-                if (isAsync)
-                {
-                    if (body is Func<Task> taskBody)
-                    {
-                        var outcome = BenchmarkRunner.Instance.RunAsync(
-                                name, taskBody, runSpec, CancellationToken.None)
-                            .GetAwaiter().GetResult();
+            var measured = TestMeasurement
+                .MeasureAsync(methodInfo, instance, args, name, runSpec, CancellationToken.None)
+                .GetAwaiter().GetResult();
 
-                        result = outcome.Result;
-                        rawSamples = outcome.RawSamples;
-                    }
-                    else
-                        return Task.FromResult<TestResult[]>([CreateErrorResult($"Unsupported async body type for method {methodInfo.Name}.")]);
-                }
-                else
-                {
-                    if (body is Action actionBody)
-                    {
-                        var outcome = BenchmarkRunner.Instance.Run(
-                            name, actionBody, runSpec, CancellationToken.None);
-
-                        result = outcome.Result;
-                        rawSamples = outcome.RawSamples;
-                    }
-                    else
-                        return Task.FromResult<TestResult[]>([CreateErrorResult($"Unsupported sync body type for method {methodInfo.Name}.")]);
-                }
-            }
-            else
-                return Task.FromResult<TestResult[]>([CreateErrorResult($"Could not build body for method {methodInfo.Name}.")]);
+            result = measured.Result;
+            rawSamples = measured.RawSamples;
+            refusal = measured.Refusal;
         }
         catch (Exception ex)
         {
             return Task.FromResult<TestResult[]>([CreateErrorResult(ex)]);
         }
 
-        var violations = ValidateResult(result, rawSamples, refResult, refSamples, this);
+        // A ratio between one isolated and one host measurement is mostly the difference between
+        // two processes' runtime state, not between the two bodies. Gating on it would be worse
+        // than not gating.
+        var mixedIsolation = refResult is not null && refResult.IsolationStatus != result.IsolationStatus;
+
+        var violations = ValidateResult(
+            result, rawSamples, mixedIsolation ? null : refResult, mixedIsolation ? null : refSamples, this);
+
+        var notes = new List<string>();
+
+        if (refusal is not null)
+            notes.Add($"NBenchmark: '{name}' measured in the test host - {refusal}");
+
+        if (mixedIsolation)
+        {
+            notes.Add(
+                $"NBenchmark: the ratio gate for '{name}' was skipped - the benchmark and its "
+                + "reference were measured in different processes.");
+        }
 
         var testResult = new TestResult
         {
             DisplayName = testMethod.TestMethodName,
             Duration = result.TotalDuration,
-            LogOutput = MetricsFormatter.Format(result),
+            LogOutput = notes.Count == 0
+                ? MetricsFormatter.Format(result)
+                : MetricsFormatter.Format(result) + Environment.NewLine + string.Join(Environment.NewLine, notes),
         };
 
         if (violations.Count > 0)
@@ -236,54 +194,21 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                    $"Failed to create instance of {declaringType.FullName} for benchmark method {method.Name}.");
     }
 
-    private static Action BuildSyncBody(MethodInfo method, object? instance, object?[] args)
-    {
-        var call = BuildCall(method, instance, args);
-        return Expression.Lambda<Action>(call).Compile();
-    }
-
-    private static Action BuildReturningSyncBody(MethodInfo method, object? instance, object?[] args)
-    {
-        var call = BuildCall(method, instance, args);
-        var consumeField = typeof(ReturnSink).GetField(nameof(ReturnSink.Hole))!;
-        var typedField = Expression.Field(null, consumeField);
-        var assign = Expression.Assign(typedField, Expression.Convert(call, typeof(object)));
-        return Expression.Lambda<Action>(assign).Compile();
-    }
-
+    /// <summary>
+    ///     Compiles the test method into a benchmark body.
+    /// </summary>
+    /// <remarks>
+    ///     Delegates to <see cref="TestBodyBuilder" />, which the three test-framework integrations
+    ///     share. They each carried their own copy of this until the copies were found to differ,
+    ///     and a divergence here changes what gets measured rather than failing loudly.
+    /// </remarks>
     internal static bool TryBuildBody(
         MethodInfo method,
         object? instance,
         object?[] args,
         out Delegate body,
         out bool isAsync)
-    {
-        var returnType = method.ReturnType;
-
-        if (returnType == typeof(void))
-        {
-            body = BuildSyncBody(method, instance, args);
-            isAsync = false;
-            return true;
-        }
-
-        var isSupportedAsyncReturn = returnType == typeof(Task)
-                                     || returnType == typeof(ValueTask)
-                                     || (returnType.IsGenericType
-                                         && (returnType.GetGenericTypeDefinition() == typeof(Task<>)
-                                             || returnType.GetGenericTypeDefinition() == typeof(ValueTask<>)));
-
-        if (isSupportedAsyncReturn)
-        {
-            body = BuildAsyncBody(method, instance, args);
-            isAsync = true;
-            return true;
-        }
-
-        body = BuildReturningSyncBody(method, instance, args);
-        isAsync = false;
-        return true;
-    }
+        => TestBodyBuilder.TryBuild(method, instance, args, out body, out isAsync);
 
     internal static (MethodInfo Method, object?[] Args) ResolveReferenceMethod(
         MethodInfo benchmarkMethod,
@@ -364,73 +289,6 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         return true;
     }
 
-    private static Func<Task> BuildAsyncBody(MethodInfo method, object? instance, object?[] args)
-    {
-        var call = BuildCall(method, instance, args);
-        var taskExpression = BuildAsyncTaskExpression(call, method.ReturnType);
-        var invokeTask = Expression.Lambda<Func<Task>>(taskExpression).Compile();
-
-        return async () =>
-        {
-            var task = invokeTask();
-
-            if (task is not null)
-                await task.ConfigureAwait(false);
-        };
-    }
-
-    private static Expression BuildAsyncTaskExpression(Expression call, Type returnType)
-    {
-        if (returnType == typeof(Task)
-            || (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>)))
-            return Expression.Convert(call, typeof(Task));
-
-        if (returnType == typeof(ValueTask))
-            return Expression.Call(call, nameof(ValueTask.AsTask), Type.EmptyTypes);
-
-        if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
-        {
-            var helper = typeof(PerformanceTestMethodAttribute)
-                .GetMethod(nameof(ConvertGenericValueTaskToTask), BindingFlags.NonPublic | BindingFlags.Static)!
-                .MakeGenericMethod(returnType.GetGenericArguments()[0]);
-
-            return Expression.Call(helper, call);
-        }
-
-        throw new InvalidOperationException($"Unsupported async return type: {returnType.FullName}");
-    }
-
-    private static MethodCallExpression BuildCall(MethodInfo method, object? instance, object?[] args)
-    {
-        var parameters = method.GetParameters();
-
-        if (parameters.Length != args.Length)
-        {
-            throw new InvalidOperationException(
-                $"Method '{method.Name}' expects {parameters.Length} argument(s) but received {args.Length}.");
-        }
-
-        var argExpressions = new Expression[parameters.Length];
-
-        for (var i = 0; i < parameters.Length; i++)
-        {
-            argExpressions[i] = Expression.Constant(args[i], parameters[i].ParameterType);
-        }
-
-        if (method.IsStatic)
-            return Expression.Call(method, argExpressions);
-
-        if (instance is null)
-            throw new InvalidOperationException($"Method '{method.Name}' requires a target instance.");
-
-        var typedInstance = Expression.Constant(instance, method.DeclaringType!);
-        return Expression.Call(typedInstance, method, argExpressions);
-    }
-
     private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask) => valueTask.AsTask();
 
-    private static class ReturnSink
-    {
-        public static object? Hole = new();
-    }
 }

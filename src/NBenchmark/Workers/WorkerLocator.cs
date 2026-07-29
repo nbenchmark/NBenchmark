@@ -128,6 +128,7 @@ internal static class WorkerLocator
         }
     }
 
+
     /// <summary>
     ///     Resolves the <c>dotnet</c> muxer.
     ///     <para>

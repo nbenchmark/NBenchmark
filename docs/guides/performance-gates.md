@@ -79,12 +79,39 @@ public void Repository_Query_Is_Fast_Enough()
 
 - **Absolute thresholds** (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) - hard SLAs. Susceptible to shared-runner noise; prefer `MaxSlowdownRatio` for regression gates. Set `MaxAbsoluteThresholdTolerance` to relax absolute thresholds when a shared runner or high-jitter host is detected (e.g. `1.25` for 25% relaxation).
 
-- **Relative thresholds** (`MaxSlowdownRatio`) - regression gates. Hardware-independent because the comparison runs in the same test session. A fast dev machine and a slow CI runner produce the same ratio. No stored files, no environment mismatch, no CI workflow setup. The test fails only when the slowdown is both statistically significant and exceeds the ratio.
+- **Relative thresholds** (`MaxSlowdownRatio`) - regression gates. Comparing two bodies measured in the same session cancels out how *fast the machine is*, so a quick dev box and a slow CI runner agree on the ratio, with no stored baselines or environment matching. The test fails only when the slowdown is both statistically significant and exceeds the ratio.
+
+  **A ratio cancels the hardware, not the runtime state.** This guide previously said the host "cancels out" outright; that is measurably false. On four benchmarks of *provably identical cost*, repeated in-process runs fabricated a **2.80x** ratio between two of them - each reported with a tight confidence interval. Whatever the JIT happened to have tiered up when a given body ran does not cancel, because it is not shared between the two bodies. Set `MaxSlowdownRatio` loosely enough to survive that (start around `10.0` and tighten from observed CI runs), and lean on the statistical gate rather than the ratio alone.
 
 - **Statistical gating** - the test fails only when the slowdown is **both** statistically significant (Mann-Whitney U p-value below the significance level) **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes; a large-but-noisy slowdown passes. This mirrors the [practical-significance gate](../statistics/significance.md#practical-significance-gate) in the suite / harness flow.
 
+## Where your test is measured
+
+Performance tests are measured in a **worker process**, not in the test host - the same isolation the rest of NBenchmark uses, for the same reason: JIT tiering, dynamic PGO and GC flavour are fixed when a process starts, and a test host's are whatever the preceding tests left behind.
+
+The worker builds your test class itself, so this works when the class can be constructed from nothing. That covers the ordinary case. It cannot cover a class the test framework injects into, and NBenchmark says so rather than guessing:
+
+| Situation | Where it runs | Reported as |
+| --- | --- | --- |
+| Plain test class, simple or no arguments | Worker | `Isolated` |
+| Static test class or method | Worker | `Isolated` |
+| `IClassFixture`, `ITestOutputHelper`, constructor injection | Test host | `InProcessLiveFixture` |
+| An argument that is an object graph or mock | Test host | `InProcessLiveFixture` |
+| No worker deployed | Test host | `InProcessNoWorker` |
+
+The reason is printed with the test's metrics, naming the specific parameter or dependency:
+
+```
+NBenchmark: 'ParserTests.Parse' measured in the test host - parameter 'documents'
+(of type 'List`1') is a live object that exists only in this test process.
+```
+
+Those results are still produced and still gated on absolute thresholds. What changes is a **ratio** gate: when a benchmark and its `ReferenceMethod` end up measured in different processes, the ratio describes the two processes more than the two bodies, so the ratio check is skipped and the reason logged. Making both sides isolatable - usually by moving injected state into the method - restores it.
+
+Simple values reach the worker intact: `int`, `string`, `bool`, `enum`, `decimal`, `DateTime`, `Guid` and the like, so `[InlineData]` and `[DataRow]` cases isolate normally. Object arguments are refused rather than reconstructed, because a reconstruction that is usually right is worse than one that declines.
+
 > [!TIP] Absolute vs. relative - which to use?
-> Use **absolute** thresholds only when you have a hard SLA ("parse must complete in under 500 µs"). Use **relative** thresholds for regression gates ("this PR must not regress the parser"). Relative thresholds are robust to the host running them; absolute thresholds are not. A practical tuning workflow for `MaxSlowdownRatio` is to start loose (e.g. `10.0`) and tighten based on several runs in your CI environment.
+> Use **absolute** thresholds only when you have a hard SLA ("parse must complete in under 500 µs"). Use **relative** thresholds for regression gates ("this PR must not regress the parser"). Relative thresholds tolerate a change of machine, which absolute ones do not - but neither is immune to the host process's runtime state, so start `MaxSlowdownRatio` loose (e.g. `10.0`) and tighten from several runs in your own CI environment.
 
 ## Run it
 
@@ -129,7 +156,7 @@ The `p` and Cliff's delta values tell you whether the slowdown is real and how l
 | Lives in | Your existing test suite | A dedicated benchmark project |
 | Trigger | `dotnet test` | `dotnet run -- --threshold-pct 10` |
 | Comparison | Your method vs. a calibration / `ReferenceMethod` (same session) | Each benchmark vs. the suite baseline (same session) |
-| Hardware-independent | Yes (relative thresholds) | No (absolute medians) |
+| Survives a change of machine | Yes (relative thresholds) | No (absolute medians) |
 | Exit code | Test failure | `Environment.ExitCode = 1` |
 | Best for | "Don't regress this hot path" | "Don't regress any benchmark in the suite" |
 
