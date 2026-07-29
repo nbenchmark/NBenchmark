@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
 using Xunit;
@@ -93,11 +94,8 @@ public class ReporterTests
             var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
             Assert.Single(files);
 
-            var content = await File.ReadAllTextAsync(files[0]);
-            Assert.Contains("\"rawSamples\"", content);
-            Assert.Contains("777", content);
-            Assert.Contains("888", content);
-            Assert.Contains("999", content);
+            var samples = await ReadRawSamplesAsync(files[0]);
+            Assert.Equal([777.0, 888.0, 999.0], samples);
         }
         finally
         {
@@ -120,11 +118,9 @@ public class ReporterTests
             var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
             Assert.Single(files);
 
-            var content = await File.ReadAllTextAsync(files[0]);
-            Assert.Contains("\"rawSamples\"", content);
-            Assert.DoesNotContain("777", content);
-            Assert.DoesNotContain("888", content);
-            Assert.DoesNotContain("999", content);
+            // The property is still emitted, but empty - the schema stays stable so a consumer
+            // does not have to distinguish "no samples" from "older file without the field".
+            Assert.Empty(await ReadRawSamplesAsync(files[0]));
         }
         finally
         {
@@ -650,6 +646,29 @@ public class ReporterTests
         {
             Cleanup(tempDir);
         }
+    }
+
+    /// <summary>
+    ///     Reads the single result's raw samples out of a reporter's JSON file.
+    ///     <para>
+    ///         Parsed rather than substring-matched. These assertions used to search the whole
+    ///         document for "777", which also matches the <c>generatedAt</c> timestamp - a run at
+    ///         <c>…50.967779+00:00</c> fails the negative test, and, far worse, a timestamp
+    ///         collision could make the positive test pass while samples were being dropped.
+    ///     </para>
+    /// </summary>
+    private static async Task<double[]> ReadRawSamplesAsync(string path)
+    {
+        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+
+        var result = document.RootElement.GetProperty("results").EnumerateArray().Single();
+
+        // Asserted rather than assumed: the property must exist even when it is empty.
+        Assert.True(
+            result.TryGetProperty("rawSamples", out var rawSamples),
+            "the result carried no 'rawSamples' property at all");
+
+        return [.. rawSamples.EnumerateArray().Select(e => e.GetDouble())];
     }
 
     private static string MakeSubDir(string name)
