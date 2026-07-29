@@ -13,6 +13,25 @@ internal sealed record BenchmarkEnvelope(
     public string OriginalName { get; init; } = Name;
     public IReadOnlyList<BenchmarkParameter> ParameterSet { get; init; } = [];
 
+    /// <summary>
+    ///     The user's own delegate, kept alongside the wrapper that invokes it, so the body can be
+    ///     <i>addressed</i> for measurement in another process.
+    ///     <para>
+    ///         <see cref="RunAsync" /> is a closure this library built; its metadata token identifies
+    ///         NBenchmark's own wrapper, not the user's code. Only the raw delegate points at the
+    ///         method the developer actually wrote. <c>null</c> when the body is not a simple
+    ///         delegate - a parameterized benchmark closes over its parameter values, which exist
+    ///         only in this process - and a null here means "cannot be isolated", never "guess".
+    ///     </para>
+    /// </summary>
+    public Delegate? Body { get; init; }
+
+    /// <summary>
+    ///     Per-iteration setup and teardown, if the caller supplied any. They are live delegates in
+    ///     this process, so their presence is what stops a body from being isolatable on its own.
+    /// </summary>
+    public bool HasIterationHooks { get; init; }
+
     public static BenchmarkEnvelope FromDiscovered(
         BenchmarkMethodDefinition method,
         string className,

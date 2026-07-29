@@ -151,7 +151,7 @@ internal sealed class WorkerHost : IAsyncDisposable
             startInfo.ArgumentList.Add(WorkerProtocol.ParentProcessIdArgument);
             startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
 
-            ChildProcessLauncher.ApplyRuntimeProfile(startInfo, profile);
+            MeasurementBudget.ApplyRuntimeProfile(startInfo, profile);
 
             process = new Process { StartInfo = startInfo };
 

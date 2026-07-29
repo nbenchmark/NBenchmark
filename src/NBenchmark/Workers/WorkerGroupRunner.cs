@@ -211,7 +211,11 @@ internal static class WorkerGroupRunner
     private static string Qualify(string prefix, string name)
         => string.IsNullOrEmpty(prefix) ? name : $"{prefix}.{name}";
 
-    private static BenchmarkResult ErroredResult(string name, string message) => new()
+    /// <summary>
+    ///     A placeholder row for a benchmark that could not be measured, carrying the reason. Shared
+    ///     so every path reports a failure the same way rather than silently dropping the line.
+    /// </summary>
+    internal static BenchmarkResult ErroredResult(string name, string message) => new()
     {
         Name = name,
         Mean = 0,

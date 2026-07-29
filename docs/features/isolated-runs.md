@@ -13,7 +13,7 @@ How you reach for isolation depends on the mode:
 | Mode | Isolation | Granularity |
 | --- | --- | --- |
 | **Single** (`Benchmark.Run` / `RunAsync`) | **On by default** | One worker per call |
-| **Suite** (`BenchmarkSuite`) | Opt in with `WithIsolation()` | The whole suite runs in one child process |
+| **Suite** (`BenchmarkSuite`) | **On by default** | The whole suite runs in one worker |
 | **Harness** (`BenchmarkHarness`) | **On by default** | Per class, with per-benchmark and opt-out controls |
 
 Isolation is useful when you want to reduce contamination from:
@@ -69,22 +69,69 @@ var cold = Benchmark.RunInProcess(() => ColdStartSensitivePath(), name: "cold pa
 
 ## Suite mode
 
-Call `WithIsolation()` on a `BenchmarkSuite` to run the **entire suite** inside a single clean child process. All benchmarks in the suite are measured there, so they compare against each other in the same fresh CLR:
+An ordinary suite isolates with no ceremony. Nothing about how you write it changes:
 
 ```csharp
-using NBenchmark;
-using NBenchmark.Reporters.Console;
-
-var results = await new BenchmarkSuite("isolated-comparison")
-    .Add("baseline", () => Baseline())
-    .Add("candidate", () => Candidate())
-    .WithBaseline("baseline")
+await new BenchmarkSuite("sorting")
+    .Add("bubble", () => BubbleSort())
+    .Add("array", () => ArraySort())
+    .WithBaseline("bubble")
     .WithReporter(new ConsoleReporter())
-    .WithIsolation()        // run the whole suite in one child process
     .RunAsync();
 ```
 
-`WithIsolation(false)` is the default and keeps the suite in-process. Suite setup and teardown (`WithSuiteSetup` / `WithSuiteTeardown`) run inside the child, and your custom `IOutlierDetector` / `ISignificanceTest` are preserved because the child rebuilds the suite from your own `Main` rather than deserializing options.
+Each body is a non-capturing lambda, so NBenchmark addresses the compiled method behind each one and measures the whole suite in a worker. `WithIsolation(false)` opts back into the host process, deliberately and without a warning.
+
+### Why one worker for the whole suite
+
+All of a suite's benchmarks share a single worker, so every ratio between them is a **paired, within-process** comparison - the worker's CPU frequency, thermal state and address-space layout cancel out of the ratio rather than adding to it.
+
+Measuring each benchmark in its own process sounds safer, but the measurements say otherwise. On four benchmarks of provably identical cost:
+
+| Configuration | Spread across runs | Largest fabricated difference |
+| --- | --- | --- |
+| in-process | 3.27x | 2.80x |
+| **isolated per child, host runtime configuration** | **3.10x** | **3.06x** |
+| isolated, `steady-state` runtime configuration | 1.03x | 1.03x |
+
+Per-benchmark isolation buys the middle row. Sibling contamination was never the dominant error - uncontrolled JIT tiering was, and that is a *per-process* setting which is identical whether one worker runs one benchmark or five. Splitting them would convert every ratio into a between-process contrast, inflating its variance for no accuracy gain.
+
+Residual order effects are handled instead by randomizing run order per replicate (`WithRunOrder(RunOrder.Random)`, reproducible via `WithSeed`), and `WithLaunchCount(n)` measures the suite in *n* separate workers to estimate run-to-run reproducibility.
+
+If a specific benchmark genuinely pollutes its siblings - one that permanently fills a static cache, say - put it in its own suite. Harness mode's `[IsolatedProcess]` gives per-benchmark isolation when you need it named at the benchmark level.
+
+### When a suite cannot be isolated on its own
+
+Some suites hold things a worker cannot be handed and must instead **build for itself**. NBenchmark says which benchmark and why, then measures in the host process and labels the results:
+
+- a body that **captures a local** - the captured value exists only in your process
+- **suite setup/teardown**, or per-iteration setup/teardown - live delegates that would otherwise run on the wrong side of the boundary, preparing state the benchmarks never see
+- **parameterized** benchmarks, which close over their parameter values
+- a custom `IOutlierDetector` / `ISignificanceTest` that cannot be rebuilt from a type name
+
+For those, move the suite into a static factory and hand the method group to `RunPlanAsync`. The worker invokes *your factory* in its own process, so all of that is constructed there rather than described to it - nothing has to be serializable:
+
+```csharp
+using NBenchmark.Attributes;
+
+await BenchmarkSuite.RunPlanAsync(BuildSuite);
+
+[BenchmarkPlan]
+static BenchmarkSuite BuildSuite()
+{
+    var payload = new byte[4096];
+
+    return new BenchmarkSuite("hashing")
+        .Add("hash", () => Hash(payload))
+        .WithSuiteSetup(() => Random.Shared.NextBytes(payload));
+}
+```
+
+The factory must be `static` and capture nothing itself, so a worker can locate it by metadata token. `RunPlansAsync(typeof(Plans))` runs every `[BenchmarkPlan]` on a type, each in its own worker. A method marked `[BenchmarkPlan]` but shaped wrongly throws rather than being skipped - a silently skipped suite gives its author nothing to go on.
+
+### `WithIsolation()`
+
+`WithIsolation()` predates all of this. It still works, but isolates by **re-executing your whole program** to rebuild the suite, so side effects in `Main` repeat once per child and *M* isolated suites do *M²* work. It is no longer needed: a plain `RunAsync()` already isolates.
 
 ## Harness mode
 
@@ -168,12 +215,12 @@ This is also why an in-process benchmark can never be as trustworthy as an isola
 
 ## Important behavior notes
 
-- Isolation adds overhead: one process launch per child. A Harness worker costs roughly 70 ms to start and complete its handshake; a Suite child re-runs your entry point and costs about 200 ms. Against the per-benchmark wall-clock floor of about 600 ms (`MinWarmupTime` plus `MinMeasurementTime`), either is a small tax for a comparison group of any size.
+- Isolation adds overhead: one process launch per child. A worker costs roughly 70 ms to start and complete its handshake; a legacy `WithIsolation()` child re-runs your entry point and costs about 200 ms. Against the per-benchmark wall-clock floor of about 600 ms (`MinWarmupTime` plus `MinMeasurementTime`), either is a small tax for a comparison group of any size.
 - **Do not rely on `--in-process` for anything comparative.** On four benchmarks with provably identical cost, repeated in-process runs spanned 3.27x and fabricated a 2.80x difference between two of them, while reporting a tight confidence interval on each. The same benchmarks measured in workers under the default runtime profile spanned 1.03x. See `plans/out-of-process-pivot.md` for the measurements and the reason.
 - **`LaunchCount` is a replicate count, and each replicate is a fresh process.** In Harness mode, `--launch-count 3` measures the group in three separate workers, each with its own shuffle order derived from the session seed. That is what gives a run-to-run reproducibility estimate rather than three repetitions inside one process - and reproducibility, not within-process precision, is what a regression gate should read.
-- Run-order randomization is honoured in Harness workers. Suite children still run in **declaration** order.
+- Run-order randomization is honoured in Harness workers and in `RunPlanAsync` suites. Legacy `WithIsolation()` children still run in **declaration** order.
 - `--dry-run` (equivalent to `--iterations 0 --warmup 0`) always runs in-process - no child is spawned.
-- Suite children rebuild their measurement configuration by re-running your `Main`, so custom detectors and significance tests are preserved. Harness workers receive the resolved configuration directly and rebuild custom strategies from their type names, so nothing of yours is re-executed.
+- `RunPlanAsync` suites need no configuration transfer at all: the worker runs your factory, so custom detectors, significance tests and lifecycle delegates are constructed there rather than described to it. Harness workers receive the resolved configuration directly and rebuild custom strategies from their type names. Legacy `WithIsolation()` children rebuild everything by re-running your `Main`.
 - A child that never returns is killed, along with its whole process tree, once it exceeds a wall-clock ceiling derived from the tuning budget (`MaxTuningTime` and `CapGraceFactor`, plus warmup and process-start allowances). The affected benchmarks are reported as errored, naming the timeout, rather than hanging the run. Raise `--max-tuning-time` if the work is genuinely that slow.
 - A worker cannot outlive the run that started it. It blocks reading its inbound pipe, so if the coordinator exits for any reason - a clean finish, a Ctrl-C, a crash, an IDE stop button - the read ends and the worker exits on its own, measured at 7 ms. Nothing supervises it, which matters because the supervisor would be the process most likely to have died.
 

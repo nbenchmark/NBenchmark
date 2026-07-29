@@ -128,6 +128,10 @@ internal sealed class WorkerSession(FrameChannel channel)
                     await RunLambdasAsync(request, options, progress, cancellationToken).ConfigureAwait(false);
                     break;
 
+                case WorkGroupKind.Plan:
+                    await RunPlanAsync(request, progress, cancellationToken).ConfigureAwait(false);
+                    break;
+
                 default:
                     Fault($"Group kind {request.Kind} is not supported by this worker.");
                     break;
@@ -218,6 +222,88 @@ internal sealed class WorkerSession(FrameChannel channel)
 
             return;
         }
+
+        SendResults(outcome.Results, r => outcome.RawSamples.GetValueOrDefault(r.Name, []));
+    }
+
+    /// <summary>
+    ///     Builds the suite by invoking the user's own factory here, then measures it.
+    ///     <para>
+    ///         Nothing about the suite travelled over the wire - only the address of the factory
+    ///         did. Everything the previous design listed as unable to cross a process boundary
+    ///         (custom outlier detectors, significance tests, observers, instance factories, setup
+    ///         and teardown delegates) is a live object here, because the user's own code
+    ///         constructed it in this process.
+    ///     </para>
+    ///     <para>
+    ///         The measurement options come from the suite the factory built, not from
+    ///         <see cref="RunGroupPayload.Options" />. The request's copy exists so the coordinator
+    ///         could pick the right runtime profile to launch this process under; deserializing it
+    ///         back over the factory's own configuration would discard exactly the parts that
+    ///         cannot be serialized.
+    ///     </para>
+    /// </summary>
+    private async Task RunPlanAsync(
+        RunGroupPayload request,
+        StreamingProgress progress,
+        CancellationToken cancellationToken)
+    {
+        if (request.Bodies.Count != 1)
+        {
+            Fault($"A plan group must carry exactly one factory address; got {request.Bodies.Count}.");
+            return;
+        }
+
+        var planRef = request.Bodies[0];
+        var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
+
+        if (!BodyResolver.TryResolve(context, planRef, out var resolved, out var error))
+        {
+            Fault($"The benchmark plan '{planRef.DisplayName}' could not be resolved because {error}");
+            return;
+        }
+
+        if (resolved is not Func<BenchmarkSuite> factory)
+        {
+            Fault(
+                $"'{planRef.DisplayName}' resolved to {resolved.GetType().Name} rather than a "
+                + $"{nameof(Func<BenchmarkSuite>)}. A benchmark plan must be a parameterless method "
+                + $"returning {nameof(BenchmarkSuite)}.");
+
+            return;
+        }
+
+        BenchmarkSuite suite;
+
+        try
+        {
+            suite = factory();
+        }
+        catch (Exception ex)
+        {
+            // The factory is user code and can fail for any reason. Reporting it as the group's
+            // fault is far more useful than letting it surface as a dead worker.
+            Fault($"The benchmark plan '{planRef.DisplayName}' threw while building the suite: {ex.Message}",
+                ex.ToString());
+
+            return;
+        }
+
+        if (suite is null)
+        {
+            Fault($"The benchmark plan '{planRef.DisplayName}' returned null.");
+            return;
+        }
+
+        var outcome = await suite
+            .MeasureInWorkerAsync(
+                progress,
+                progress.AsObserver(),
+                request.Seed,
+                request.StartIndex,
+                request.TotalBenchmarks,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         SendResults(outcome.Results, r => outcome.RawSamples.GetValueOrDefault(r.Name, []));
     }

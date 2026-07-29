@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+using NBenchmark.Workers;
+
 namespace NBenchmark.Engine;
 
 /// <summary>
@@ -122,20 +124,7 @@ internal static class ChildProcessLauncher
     ///     </para>
     /// </summary>
     internal static TimeSpan ComputeTimeout(MeasurementOptions options, int benchmarkCount)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-
-        var autoTune = options.AutoTune;
-        var perBenchmark = autoTune.MaxTuningTime * autoTune.CapGraceFactor
-                           + autoTune.MinWarmupTime
-                           + PerBenchmarkSlack;
-
-        var budget = ChildStartupAllowance + perBenchmark * Math.Max(benchmarkCount, 1);
-
-        return budget < MinChildTimeout ? MinChildTimeout
-            : budget > MaxChildTimeout ? MaxChildTimeout
-            : budget;
-    }
+        => MeasurementBudget.For(options, benchmarkCount);
 
     internal static ProcessStartInfo BuildStartInfo(
         params (string Name, string Value)[] environmentVariables)
@@ -227,17 +216,7 @@ internal static class ChildProcessLauncher
     ///     </para>
     /// </summary>
     internal static void ApplyRuntimeProfile(ProcessStartInfo psi, RuntimeProfile? profile)
-    {
-        if (profile is null || profile.InheritsEverything)
-            return;
-
-        foreach (var (variable, value) in profile.ToEnvironment())
-        {
-            psi.Environment[variable] = value;
-        }
-
-        psi.Environment[RuntimeProfile.ProfileNameEnvVar] = profile.Name;
-    }
+        => MeasurementBudget.ApplyRuntimeProfile(psi, profile);
 
     private static void ApplyTelemetryEnvironment(
         ProcessStartInfo psi,

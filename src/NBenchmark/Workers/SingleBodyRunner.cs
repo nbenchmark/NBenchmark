@@ -21,7 +21,7 @@ internal static class SingleBodyRunner
     ///     ceiling is, so a legitimately slow body is never killed for being slow.
     /// </summary>
     private static TimeSpan TimeoutFor(MeasurementOptions options)
-        => ChildProcessLauncher.ComputeTimeout(options, benchmarkCount: 1);
+        => MeasurementBudget.For(options, benchmarkCount: 1);
 
     /// <summary>
     ///     Measures <paramref name="body" />, isolating it when possible.

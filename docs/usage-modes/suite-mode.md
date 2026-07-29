@@ -176,18 +176,21 @@ Use `WithRuntimes` to run the same benchmarks across multiple .NET runtimes and 
 
 ## Process isolation
 
-Call `WithIsolation()` to run the **entire suite** in a single freshly spawned child process, so runtime state (JIT warmup, GC pressure, thread-pool state) from the host can't bias the measurements:
+Suites are measured in a dedicated worker process by default - no configuration, no change to how you write them:
 
 ```csharp
 await new BenchmarkSuite("sorting")
-    .Add("bubble", () => BubbleSort(data))
-    .Add("array", () => Array.Sort(data))
+    .Add("bubble", () => BubbleSort())
+    .Add("array", () => ArraySort())
     .WithBaseline("bubble")
-    .WithIsolation()        // whole suite runs in one clean child process
     .RunAsync();
 ```
 
-`WithIsolation(false)` is the default (in-process). The child rebuilds the suite from your own `Main`, so custom `IOutlierDetector` / `ISignificanceTest` instances and suite setup/teardown are preserved. See [Isolated Runs](../features/isolated-runs.md) for the full model.
+This matters because JIT tiering, dynamic PGO, ReadyToRun and GC flavour are fixed when a process starts and can never be changed afterwards - so they can only be chosen for a process that has not started yet. The whole suite shares one worker, which keeps every ratio between its benchmarks a paired, within-process comparison.
+
+`WithIsolation(false)` opts back into the host process, deliberately and silently.
+
+A suite that holds live state a worker cannot be handed - captured locals, suite setup/teardown, parameters, or a custom detector instance - is measured in the host process instead, with the reason named per benchmark. Move it into a static `[BenchmarkPlan]` factory and use `BenchmarkSuite.RunPlanAsync(BuildSuite)`; the worker runs your factory in its own process, so all of that is constructed there. See [Isolated Runs](../features/isolated-runs.md) for the full model.
 
 ## Multiple launches
 

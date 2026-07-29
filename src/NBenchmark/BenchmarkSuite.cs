@@ -5,6 +5,7 @@ using NBenchmark.Engine;
 using NBenchmark.Observers;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
+using NBenchmark.Workers;
 
 namespace NBenchmark;
 
@@ -22,6 +23,20 @@ public sealed class BenchmarkSuite(string name)
     private string? _baselineName;
     private ReportDetail _detail;
     private bool _isolated;
+
+    /// <summary>
+    ///     Set by <see cref="WithIsolation" /><c>(false)</c>, i.e. an explicit request to measure in
+    ///     this process. Distinct from simply not having asked: the default is now to isolate when
+    ///     the suite's bodies can be addressed, so "not isolated" and "asked for in-process" need to
+    ///     be told apart in order to label results honestly.
+    /// </summary>
+    private bool _inProcessRequested;
+
+    /// <summary>Why this suite ended up measured in the host process, when it did.</summary>
+    private IsolationStatus _inProcessStatus = IsolationStatus.InProcessRequested;
+
+    /// <summary>The session shuffle seed, so each replicate worker gets a distinct run order.</summary>
+    private int? _seed;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private string[]? _pendingCategories;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
@@ -46,29 +61,33 @@ public sealed class BenchmarkSuite(string name)
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
-            Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+            action, setup is not null || teardown is not null);
 
     public BenchmarkSuite Add(string name, Func<Task> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
-            await BenchmarkRunner.Instance.RunAsync(name, action,
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                await BenchmarkRunner.Instance.RunAsync(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+            action, setup is not null || teardown is not null);
 
     public BenchmarkSuite Add<T>(string name, Func<T> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
-            Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+            action, setup is not null || teardown is not null);
 
     public BenchmarkSuite Add<T>(string name, Func<Task<T>> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
-            await BenchmarkRunner.Instance.RunAsync(name, action,
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                await BenchmarkRunner.Instance.RunAsync(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+            action, setup is not null || teardown is not null);
 
     // --- Parameterized Add overloads: arity 1 ---
 
@@ -394,13 +413,30 @@ public sealed class BenchmarkSuite(string name)
 
     // --- Private helpers ---
 
+    /// <summary>
+    ///     Records a benchmark, keeping the caller's own delegate alongside the wrapper that runs it.
+    ///     <para>
+    ///         The wrapper is a closure this library built, so its metadata token addresses
+    ///         NBenchmark's code rather than the user's. Keeping <paramref name="body" /> is what
+    ///         lets an inline suite be measured in a worker without the caller restructuring
+    ///         anything - see <see cref="TryAddressBodies" />.
+    ///     </para>
+    /// </summary>
     private BenchmarkSuite AddEnvelope(
         string name,
         IReadOnlyList<string> categories,
-        Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync)
+        Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync,
+        Delegate? body = null,
+        bool hasIterationHooks = false)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEnvelope(name, "", null, false, categories, runAsync));
+
+        _benchmarks.Add(new BenchmarkEnvelope(name, "", null, false, categories, runAsync)
+        {
+            Body = body,
+            HasIterationHooks = hasIterationHooks,
+        });
+
         return this;
     }
 
@@ -662,6 +698,21 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>
+    ///     Pins the shuffle seed, so a randomized run order is reproducible.
+    ///     <para>
+    ///         Each replicate derives a distinct order from this one seed, so raising
+    ///         <see cref="WithLaunchCount" /> still varies the order between replicates - turning run
+    ///         order into a randomized nuisance factor rather than a fixed confound - while the whole
+    ///         session remains reproducible from a single number.
+    ///     </para>
+    /// </summary>
+    public BenchmarkSuite WithSeed(int seed)
+    {
+        _seed = seed;
+        return this;
+    }
+
     public BenchmarkSuite WithRunOrder(RunOrder order)
     {
         _runOrder = order;
@@ -878,6 +929,13 @@ public sealed class BenchmarkSuite(string name)
     public BenchmarkSuite WithIsolation(bool enabled = true)
     {
         _isolated = enabled;
+
+        // WithIsolation(false) is now a real instruction rather than the default, because a suite
+        // whose bodies can be addressed is measured in a worker without being asked. Recording the
+        // request separately is what lets the report distinguish "you chose the host process" from
+        // "your suite could not be isolated", which have entirely different remedies.
+        _inProcessRequested = !enabled;
+
         return this;
     }
 
@@ -894,9 +952,157 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
+    ///     Builds a suite with <paramref name="plan" /> and measures it in a dedicated worker
+    ///     process, then scores and reports it here.
+    /// </summary>
+    /// <param name="plan">
+    ///     A method group pointing at a <b>static, non-capturing</b> factory that builds and
+    ///     configures the suite - conventionally marked <c>[BenchmarkPlan]</c>. The method group
+    ///     itself is the address: the worker locates that method by metadata token and invokes it,
+    ///     so the suite is constructed in the process that measures it.
+    /// </param>
+    /// <remarks>
+    ///     <para>
+    ///         This is the isolated entry point for Suite mode, and it is strictly better than
+    ///         <see cref="WithIsolation" /> was. That mechanism re-executed the whole program to
+    ///         rebuild the suite, so <i>M</i> isolated suites in one <c>Main</c> did <i>M²</i>
+    ///         measurement work and every side effect in <c>Main</c> re-ran once per child. Here the
+    ///         worker calls one factory and nothing else.
+    ///     </para>
+    ///     <para>
+    ///         Because the worker runs your factory rather than deserializing a description of it,
+    ///         everything the suite holds is live in the measuring process: benchmark bodies, suite
+    ///         setup and teardown, a custom <see cref="Stats.IOutlierDetector" /> or
+    ///         <see cref="Stats.ISignificanceTest" />, an instance factory. None of it has to be
+    ///         serializable.
+    ///     </para>
+    ///     <para>
+    ///         A factory that captures state from its enclosing scope cannot be addressed, and is
+    ///         refused rather than approximated: the suite is then measured in this process, the
+    ///         reason is printed, and every result is stamped accordingly. Make the factory
+    ///         <c>static</c> to isolate it.
+    ///     </para>
+    /// </remarks>
+    /// <example>
+    ///     <code>
+    ///     await BenchmarkSuite.RunPlanAsync(BuildSuite);
+    ///
+    ///     [BenchmarkPlan]
+    ///     static BenchmarkSuite BuildSuite() =>
+    ///         new BenchmarkSuite("comparison")
+    ///             .Add("baseline", () => Baseline())
+    ///             .Add("candidate", () => Candidate())
+    ///             .WithBaseline("baseline")
+    ///             .WithReporter(new ConsoleReporter());
+    ///     </code>
+    /// </example>
+    public static async Task<IReadOnlyList<BenchmarkResult>> RunPlanAsync(
+        Func<BenchmarkSuite> plan,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+
+        // Built here as well as in the worker. The coordinator needs the reporters, the baseline and
+        // the runtime profile to launch under - and building it is cheap, because a factory only
+        // wires delegates up rather than running them.
+        var local = plan() ?? throw new InvalidOperationException(
+            $"The benchmark plan '{plan.Method.Name}' returned null.");
+
+        local.ValidateBaseline();
+
+        if (!local._progressExplicitlySet)
+            local._progress = new DefaultConsoleProgress();
+
+        using var observer = local.ResolveObserver();
+
+        var outcome = await SuitePlanRunner
+            .RunAsync(plan, local, local._progress, observer, sessionSeed: null, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!outcome.WasIsolated)
+        {
+            SimpleModeGuidance.EmitOnce(local.Name, outcome.Status, outcome.Refusal);
+
+            // Measured here instead, and labelled. Returning nothing would be worse; returning
+            // something that claims to be isolated would be worse still.
+            var fallback = await local
+                .RunCoreAsync("", 0, "", cancellationToken)
+                .ConfigureAwait(false);
+
+            return [.. fallback.Select(r => r with { IsolationStatus = outcome.Status })];
+        }
+
+        var results = outcome.Results.ToList();
+        var rawSamples = outcome.RawSamples.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
+
+        await local._progress.OnSuiteCompleted(results).ConfigureAwait(false);
+
+        observer.OnPhase(new MeasurementPhaseEvent(
+            string.Empty, MeasurementPhase.SuiteCompleted, PhaseTransition.Completed, Succeeded: true));
+
+        local.ApplyPerParameterSignificance(results, rawSamples);
+        await local.InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
+
+        return results;
+    }
+
+    /// <summary>
+    ///     Finds every <c>[BenchmarkPlan]</c> factory on <typeparamref name="T" /> and runs each one
+    ///     in its own measurement worker, in declaration order.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Each plan gets a fresh worker, so several suites in one program cost one worker each -
+    ///         linear, not the <i>M²</i> the previous callsite-replay design produced by re-running
+    ///         the whole program per child.
+    ///     </para>
+    ///     <para>
+    ///         Plans are conventionally grouped on a <c>static class</c>, which C# does not allow as
+    ///         a type argument - use <see cref="RunPlansAsync(Type, CancellationToken)" /> for those.
+    ///     </para>
+    /// </remarks>
+    public static Task<IReadOnlyList<BenchmarkResult>> RunPlansAsync<T>(
+        CancellationToken cancellationToken = default)
+        => RunPlansAsync(typeof(T), cancellationToken);
+
+    /// <inheritdoc cref="RunPlansAsync{T}(CancellationToken)" />
+    public static async Task<IReadOnlyList<BenchmarkResult>> RunPlansAsync(
+        Type declaringType,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(declaringType);
+
+        var plans = BenchmarkPlanDiscovery.Find(declaringType);
+
+        if (plans.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"'{declaringType.Name}' declares no benchmark plans. A plan is a static, "
+                + $"parameterless method returning {nameof(BenchmarkSuite)} and marked "
+                + "[BenchmarkPlan].");
+        }
+
+        var all = new List<BenchmarkResult>();
+
+        foreach (var plan in plans)
+        {
+            all.AddRange(await RunPlanAsync(plan, cancellationToken).ConfigureAwait(false));
+        }
+
+        return all;
+    }
+
+    /// <summary>
     ///     Runs every benchmark in the suite and returns their results. When
     ///     <see cref="WithIsolation" /> is enabled the suite runs in a dedicated child
     ///     process; otherwise it runs in the current process.
+    ///     <para>
+    ///         For an isolated run, prefer
+    ///         <see cref="RunPlanAsync(Func{BenchmarkSuite}, CancellationToken)" />. That path sends
+    ///         the address of a factory rather than re-executing your whole program to rebuild the
+    ///         suite, so it does not re-run side effects in <c>Main</c> and does not do <i>M²</i>
+    ///         work when a program declares several suites.
+    ///     </para>
     /// </summary>
     public Task<IReadOnlyList<BenchmarkResult>> RunAsync(
         CancellationToken cancellationToken = default,
@@ -967,6 +1173,18 @@ public sealed class BenchmarkSuite(string name)
 
         using var observer = ResolveObserver();
 
+        // An ordinary inline suite is measured in a worker when its bodies can be addressed - which
+        // needs no factory, no attribute and no change to how the suite was written. Isolation that
+        // costs ergonomics is isolation people turn off, so the accurate path has to be the
+        // effortless one.
+        if (!_inProcessRequested)
+        {
+            var isolated = await TryRunInWorkerAsync(observer, cancellationToken).ConfigureAwait(false);
+
+            if (isolated is not null)
+                return isolated;
+        }
+
         return await RunInProcessCoreAsync(
             _progress,
             observer,
@@ -975,6 +1193,98 @@ public sealed class BenchmarkSuite(string name)
             true,
             false,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Measures this inline suite in a worker, or returns <c>null</c> when it cannot be - having
+    ///     first said why, and what to do about it.
+    /// </summary>
+    private async Task<IReadOnlyList<BenchmarkResult>?> TryRunInWorkerAsync(
+        IMeasurementObserver observer,
+        CancellationToken cancellationToken)
+    {
+        var expanded = ExpandEnvelopes();
+        var benchmarks = ApplyCategoryFilter(ApplyExecutionOrder(expanded, RunOrder.Declaration));
+
+        var decision = InlineSuitePlan.TryAddress(
+            benchmarks,
+            _options,
+            hasSuiteLifecycle: _suiteSetup is not null || _suiteTeardown is not null,
+            hasParameters: _parameterDefs.Count > 0);
+
+        if (!decision.CanIsolate)
+        {
+            SimpleModeGuidance.EmitOnce(Name, decision.Status, decision.Explanation);
+            _inProcessStatus = decision.Status;
+
+            return null;
+        }
+
+        var replicates = Math.Max(1, _options.LaunchCount);
+        var timeout = MeasurementBudget.For(_options, decision.Bodies.Count);
+
+        var perReplicate = new List<IReadOnlyList<BenchmarkResult>>(replicates);
+        var perReplicateSamples = new List<Dictionary<string, double[]>>(replicates);
+        var faults = new List<FaultPayload>();
+
+        for (var replicate = 0; replicate < replicates; replicate++)
+        {
+            var request = InlineSuitePlan.Request(
+                Name, decision.Bodies, _options, WorkerRunPlan.DeriveSeed(_seed, replicate), replicate);
+
+            var group = await WorkerLauncher.Current.RunGroupAsync(
+                    request,
+                    replicate == 0 ? _progress : NullBenchmarkProgress.Instance,
+                    replicate == 0 ? observer : NullMeasurementObserver.Instance,
+                    timeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            faults.AddRange(group.Faults);
+
+            if (group.Results.Count > 0)
+            {
+                perReplicate.Add(group.Results);
+                perReplicateSamples.Add(group.RawSamples);
+            }
+        }
+
+        if (perReplicate.Count == 0)
+        {
+            // Nothing came back. Measuring here is better than returning nothing, and the caller is
+            // told it is not getting what it asked for.
+            SimpleModeGuidance.EmitOnce(
+                Name,
+                IsolationStatus.InProcessNoWorker,
+                faults.FirstOrDefault()?.Message ?? "no measurement worker produced a result.");
+
+            _inProcessStatus = IsolationStatus.InProcessNoWorker;
+
+            return null;
+        }
+
+        var (results, rawSamples) = SuitePlanRunner.Combine(perReplicate, perReplicateSamples);
+
+        // The suite's own baseline choice is applied here, because the worker measured bare bodies
+        // and has no idea which of them the comparison is against.
+        for (var i = 0; i < results.Count; i++)
+        {
+            results[i] = results[i] with
+            {
+                ClassName = "",
+                IsBaseline = _baselineName is not null && results[i].Name == _baselineName,
+            };
+        }
+
+        await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
+
+        observer.OnPhase(new MeasurementPhaseEvent(
+            string.Empty, MeasurementPhase.SuiteCompleted, PhaseTransition.Completed, Succeeded: true));
+
+        ApplyPerParameterSignificance(results, rawSamples);
+        await InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
+
+        return results;
     }
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunInProcessCoreAsync(
@@ -1103,6 +1413,85 @@ public sealed class BenchmarkSuite(string name)
             NBenchmarkDiagnostics.OnSuiteCompleted(results);
         }
     }
+
+    /// <summary>
+    ///     Measures this suite inside a measurement worker and hands the results back over the pipe.
+    ///     <para>
+    ///         This is the whole payoff of the <c>[BenchmarkPlan]</c> approach: the worker built this
+    ///         suite by invoking the user's own factory, so the bodies, the setup and teardown
+    ///         delegates, any custom <see cref="Stats.IOutlierDetector" /> or
+    ///         <see cref="Stats.ISignificanceTest" />, and any instance factory are all <i>live
+    ///         objects in the worker's own process</i>. Nothing was serialized, so nothing can be
+    ///         lost in translation - which is what the previous design's "cannot cross the boundary"
+    ///         list was entirely made of.
+    ///     </para>
+    ///     <para>
+    ///         Reporters and significance stay with the coordinator, which owns presentation and can
+    ///         see all replicates. <see cref="MeasurementOptions.LaunchCount" /> is ignored here for
+    ///         the same reason: the coordinator spends it on replicate workers, and honouring it
+    ///         again inside one worker would multiply the two.
+    ///     </para>
+    /// </summary>
+    internal async Task<(List<BenchmarkResult> Results, Dictionary<string, double[]> RawSamples)>
+        MeasureInWorkerAsync(
+            IBenchmarkProgress progress,
+            IMeasurementObserver observer,
+            int? seed,
+            int startIndex,
+            int totalBenchmarks,
+            CancellationToken cancellationToken)
+    {
+        var expanded = ExpandEnvelopes();
+        var ordered = ApplyExecutionOrder(expanded, _runOrder);
+        var filtered = ApplyCategoryFilter(ordered);
+
+        // The runtime profile was applied to this process's environment block before it started -
+        // the only moment it could have been. Affinity and priority are settable at any time and
+        // belong here.
+        using var _ = EnvironmentControl.Apply(_options.Environment);
+
+        _suiteSetup?.Invoke();
+
+        try
+        {
+            var envelopes = filtered
+                .Select(b => b with { IsBaseline = _baselineName is not null && b.OriginalName == _baselineName })
+                .ToList();
+
+            // Parameterized suites pin declaration order so a parameter sweep reads in the order it
+            // was declared; everything else honours the suite's configured order, shuffled by the
+            // seed this replicate was given.
+            var effectiveOrder = _parameterDefs.Count > 0 ? RunOrder.Declaration : _runOrder;
+
+            var (results, rawSamples) = await SuiteRunner.RunAsync(
+                    envelopes,
+                    effectiveOrder,
+                    seed,
+                    _options with { LaunchCount = 1 },
+                    startIndex,
+                    totalBenchmarks,
+                    progress,
+                    cancellationToken,
+                    null,
+                    observer)
+                .ConfigureAwait(false);
+
+            return (results.ToList(), rawSamples);
+        }
+        finally
+        {
+            _suiteTeardown?.Invoke();
+        }
+    }
+
+    /// <summary>The benchmark names this suite would measure, for the coordinator's progress and error rows.</summary>
+    internal IReadOnlyList<string> BenchmarkNames()
+        => ApplyCategoryFilter(ApplyExecutionOrder(ExpandEnvelopes(), RunOrder.Declaration))
+            .Select(b => b.Name)
+            .ToList();
+
+    /// <summary>The measurement configuration this suite was built with.</summary>
+    internal MeasurementOptions ResolvedOptions => _options;
 
     private static (List<BenchmarkResult> Results, Dictionary<string, double[]> RawSamples) AggregateSuiteLaunches(
         IReadOnlyList<IReadOnlyList<BenchmarkResult>> allLaunchResults,
