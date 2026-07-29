@@ -56,6 +56,20 @@ var result = Benchmark.Run(() => Work(iterations));
 
 NBenchmark measures it here, prints the reason once, and stamps `IsolationStatus.InProcessCapturedState` on the result. It never reconstructs the captured state: doing so was tried, and it did not fail loudly - it returned a plausible number for the wrong value. To isolate a body like this, remove the capture (use a constant, or move the state into a benchmark class field).
 
+The analyzer package reports this at compile time as [NB0014](../reference/analyzers.md#nb0014---capturing-body-cannot-be-isolated), naming the symbols captured - which is more precise than the runtime can be, since by then they are fields on a compiler-generated class. It is informational rather than a warning, because capturing is the idiomatic way to benchmark over prepared data.
+
+A few shapes are worth knowing because they do not read the way they lower:
+
+| Body | Isolated? | Why |
+| --- | --- | --- |
+| `() => 43` | yes | Nothing to carry. Roslyn still emits it as an instance method on a cached singleton, so a `Target is null` test would get this wrong. |
+| `static () => 43` | yes | Same as above - `static` documents the intent, it does not change the lowering. |
+| `() => Work(local)` | no | Captures `local`. |
+| `() => Work(_field)` | no | Captures `this` - naming an instance member without a receiver carries the whole object. |
+| `() => Work(StaticField)` | yes | A static needs no receiver. |
+| `widget.Compute` | no | A method group over a live object; the receiver is state this process owns. |
+| `() => 43` beside `() => local` | yes | A non-capturing lambda keeps its isolation even when a sibling in the same scope captures. |
+
 ### Measuring this process on purpose
 
 `RunInProcess` is not a fallback - it is the correct choice when the current process *is* the subject: cold-start and first-call cost, or a body that must observe host state such as a warm cache or an open connection. It measures here silently, with no warning, and stamps `IsolationStatus.InProcessRequested`:

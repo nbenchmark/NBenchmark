@@ -46,6 +46,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         BenchmarkResult result = null!;
         double[] rawSamples = null!;
         string? refusal = null;
+        CalibrationResult? calibration = null;
 
         try
         {
@@ -75,12 +76,14 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
             }
 
             var measured = TestMeasurement
-                .MeasureAsync(methodInfo, instance, args, name, runSpec, CancellationToken.None)
+                .MeasureAsync(methodInfo, instance, args, name, runSpec, CancellationToken.None,
+                    PerformanceGate.NeedsCalibration(this))
                 .GetAwaiter().GetResult();
 
             result = measured.Result;
             rawSamples = measured.RawSamples;
             refusal = measured.Refusal;
+            calibration = measured.Calibration;
         }
         catch (Exception ex)
         {
@@ -89,7 +92,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
 
         var gate = PerformanceGate.Evaluate(
             result, rawSamples, refResult, refSamples, this,
-            PerformanceGate.AllowsInProcessGate(methodInfo));
+            PerformanceGate.AllowsInProcessGate(methodInfo), calibration);
 
         var violations = gate.Violations;
         var notes = new List<string>();

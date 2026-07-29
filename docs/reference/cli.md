@@ -590,6 +590,40 @@ dotnet run -- --no-histogram
 
 ---
 
+### `--emit-raw`
+
+Return every raw sample from an isolated worker instead of a bounded representative subset.
+
+By default a worker sends back at most 4,096 raw samples per benchmark. A benchmark can measure up to 100,000, and the whole array crossing the process boundary on every result is 800 KB of JSON for data the coordinator barely uses — **every statistic NBenchmark reports is computed inside the worker, over the complete sample array**. Raising or lowering the cap cannot move a median, an interval, or an outlier count.
+
+What the samples that cross are used for is the sample dump in JSON output, the Console density sparkline, and significance testing. All three are distribution properties, and a few thousand samples describe a distribution as faithfully as a hundred thousand.
+
+The subset is not a prefix. It is drawn uniformly at random from the full array and kept in measurement order, seeded from the run's seed so a repeat of the same configuration ships the same samples. A prefix would be the slice of the run nearest to warmup, which is the least representative part of it.
+
+Pass `--emit-raw` when you want the complete series for analysis outside NBenchmark:
+
+```bash
+dotnet run -- --emit-raw --reporter json
+```
+
+Programmatic equivalent: `WithOptions(new MeasurementOptions { MaxRawSamples = MeasurementOptions.UnboundedRawSamples })`. Any positive value sets a different cap.
+
+> **In-process runs are unaffected.** There is no boundary to cross, so they always hold the complete array. A run that mixes isolated and in-process benchmarks has more samples on its in-process rows. This changes none of the reported numbers, but it is worth knowing when comparing sample dumps.
+
+See also [`--no-samples`](#--no-samples), which omits the arrays from JSON output entirely.
+
+---
+
+### `--no-samples`
+
+Omit raw per-sample arrays from JSON reporter output. Samples are still collected, still feed significance testing and the Console histogram, and still cross the process boundary — this only controls whether they are written to the file.
+
+```bash
+dotnet run -- --no-samples --reporter json
+```
+
+---
+
 ### `--cpu-affinity <list>`
 
 Pin the benchmark process to specific logical CPU cores for the duration of the run, reducing inter-core migration noise. The value is a comma-separated list of zero-based logical core indices (as reported by the OS). The prior affinity is restored when the run completes.

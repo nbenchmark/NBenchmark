@@ -310,6 +310,156 @@ public sealed class RealWorkerTests
         }
     }
 
+    /// <summary>
+    ///     The sample cap applied across a real process boundary. A worker measures up to
+    ///     <see cref="MeasurementOptions.MaxIterations" /> samples and the whole array used to cross
+    ///     on every result; it now sends a bounded representative subset.
+    /// </summary>
+    [Fact]
+    public async Task Worker_ReturnsAtMostTheConfiguredNumberOfRawSamples()
+    {
+        await using var worker = await WorkerHost.StartAsync(
+            WorkerLocatorForTests.WorkerAssemblyPath(), RuntimeProfile.SteadyState, CancellationToken.None);
+
+        // More samples measured than the cap allows back, so the reduction has to engage.
+        var request = DiscoveredGroup("IsolationFixtureBenchmarks", RuntimeProfile.SteadyState, "Fast") with
+        {
+            Options = FastOptions with
+            {
+                RuntimeProfile = RuntimeProfile.SteadyState,
+                Iterations = 400,
+                MaxRawSamples = 64,
+            },
+        };
+
+        var group = await WorkerGroupRunner.RunAsync(
+            worker, request, NullBenchmarkProgress.Instance, NullMeasurementObserver.Instance,
+            TimeSpan.FromMinutes(2), CancellationToken.None);
+
+        Assert.Empty(group.Faults);
+
+        var samples = Assert.Single(group.RawSamples).Value;
+
+        Assert.Equal(64, samples.Length);
+    }
+
+    /// <summary>
+    ///     <c>--emit-raw</c>: the cap lifts and the full series crosses, for a consumer that wants to
+    ///     analyse the run itself.
+    /// </summary>
+    [Fact]
+    public async Task Worker_WithAnUnboundedCap_ReturnsEverySample()
+    {
+        await using var worker = await WorkerHost.StartAsync(
+            WorkerLocatorForTests.WorkerAssemblyPath(), RuntimeProfile.SteadyState, CancellationToken.None);
+
+        var request = DiscoveredGroup("IsolationFixtureBenchmarks", RuntimeProfile.SteadyState, "Fast") with
+        {
+            Options = FastOptions with
+            {
+                RuntimeProfile = RuntimeProfile.SteadyState,
+                Iterations = 400,
+                MaxRawSamples = MeasurementOptions.UnboundedRawSamples,
+            },
+        };
+
+        var group = await WorkerGroupRunner.RunAsync(
+            worker, request, NullBenchmarkProgress.Instance, NullMeasurementObserver.Instance,
+            TimeSpan.FromMinutes(2), CancellationToken.None);
+
+        Assert.Empty(group.Faults);
+
+        var samples = Assert.Single(group.RawSamples).Value;
+
+        Assert.Equal(400, samples.Length);
+    }
+
+    /// <summary>
+    ///     The reduced array and its trim marks have to arrive consistent with each other. An ordinal
+    ///     past the end of the array it indexes would be a reporter crash; one merely pointing at the
+    ///     wrong sample would be worse, because it would render.
+    /// </summary>
+    [Fact]
+    public async Task Worker_ReturnsTrimmedOrdinalsThatIndexTheSamplesItSent()
+    {
+        await using var worker = await WorkerHost.StartAsync(
+            WorkerLocatorForTests.WorkerAssemblyPath(), RuntimeProfile.SteadyState, CancellationToken.None);
+
+        var request = DiscoveredGroup("IsolationFixtureBenchmarks", RuntimeProfile.SteadyState, "Fast") with
+        {
+            Options = FastOptions with
+            {
+                RuntimeProfile = RuntimeProfile.SteadyState,
+                Iterations = 400,
+                MaxRawSamples = 64,
+                OutlierMode = OutlierMode.IqrFence,
+            },
+        };
+
+        var group = await WorkerGroupRunner.RunAsync(
+            worker, request, NullBenchmarkProgress.Instance, NullMeasurementObserver.Instance,
+            TimeSpan.FromMinutes(2), CancellationToken.None);
+
+        Assert.Empty(group.Faults);
+
+        var result = Assert.Single(group.Results);
+        var samples = group.RawSamples[result.Name];
+
+        foreach (var ordinal in result.TrimmedOrdinals)
+            Assert.InRange(ordinal, 0, samples.Length - 1);
+    }
+
+    /// <summary>
+    ///     The fix for the last cross-process comparison in the library. A test-integration gate that
+    ///     ratios against the calibration standard needs its divisor measured in the same process, and
+    ///     under the same runtime configuration, as the candidate - so the worker measures it.
+    /// </summary>
+    [Fact]
+    public async Task Worker_MeasuresTheCalibrationStandardInItsOwnProcess()
+    {
+        await using var worker = await WorkerHost.StartAsync(
+            WorkerLocatorForTests.WorkerAssemblyPath(), RuntimeProfile.SteadyState, CancellationToken.None);
+
+        var request = DiscoveredGroup("IsolationFixtureBenchmarks", RuntimeProfile.SteadyState, "Fast") with
+        {
+            MeasureCalibration = true,
+        };
+
+        var group = await WorkerGroupRunner.RunAsync(
+            worker, request, NullBenchmarkProgress.Instance, NullMeasurementObserver.Instance,
+            TimeSpan.FromMinutes(2), CancellationToken.None);
+
+        Assert.Empty(group.Faults);
+
+        var calibration = Assert.IsType<CalibrationResult>(group.Calibration);
+
+        Assert.True(calibration.Mean > 0);
+        Assert.True(calibration.Median > 0);
+        Assert.NotEmpty(calibration.Samples);
+    }
+
+    /// <summary>
+    ///     Not measured unless asked for. It is cheap, but a gate that names a reference method has no
+    ///     use for it, and work nobody consumes is still work in the middle of a measurement.
+    /// </summary>
+    [Fact]
+    public async Task Worker_SkipsTheCalibrationWhenItWasNotRequested()
+    {
+        await using var worker = await WorkerHost.StartAsync(
+            WorkerLocatorForTests.WorkerAssemblyPath(), RuntimeProfile.SteadyState, CancellationToken.None);
+
+        var group = await WorkerGroupRunner.RunAsync(
+            worker,
+            DiscoveredGroup("IsolationFixtureBenchmarks", RuntimeProfile.SteadyState, "Fast"),
+            NullBenchmarkProgress.Instance,
+            NullMeasurementObserver.Instance,
+            TimeSpan.FromMinutes(2),
+            CancellationToken.None);
+
+        Assert.Empty(group.Faults);
+        Assert.Null(group.Calibration);
+    }
+
     private sealed class RecordingObserver : IMeasurementObserver
     {
         public List<MeasurementPhase> Phases { get; } = [];

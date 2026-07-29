@@ -20,10 +20,21 @@ public static class TestMethodRunner
     ///     refusal and a worker failure - the caller falls back either way, and the distinction
     ///     belongs in the message rather than in the control flow.
     /// </param>
+    /// <param name="Calibration">
+    ///     The calibration standard as measured <i>inside the worker</i>, when one was asked for.
+    ///     <c>null</c> when it was not requested, or when the worker could not produce one.
+    ///     <para>
+    ///         A gate that ratios against the calibration rather than a named reference method needs
+    ///         its divisor measured under the same runtime configuration as the candidate. Measured in
+    ///         the test host it would not be: the host runs with tiering and ReadyToRun on, the worker
+    ///         with both off, and that difference alone moves a body of identical cost by ~3.3x.
+    ///     </para>
+    /// </param>
     public readonly record struct Outcome(
         BenchmarkResult? Result,
         IReadOnlyList<double> RawSamples,
-        string? Refusal)
+        string? Refusal,
+        CalibrationResult? Calibration = null)
     {
         public bool Measured => Result is not null;
     }
@@ -67,12 +78,18 @@ public static class TestMethodRunner
     }
 
     /// <summary>Measures <paramref name="method" /> in a worker.</summary>
+    /// <param name="measureCalibration">
+    ///     Whether the worker should also measure <see cref="CalibrationStandard" /> and return it on
+    ///     <see cref="Outcome.Calibration" />. Ask for it only when the gate will use it - it is
+    ///     cheap, but it is not free, and a test that names a reference method has no use for it.
+    /// </param>
     public static async Task<Outcome> RunAsync(
         MethodInfo method,
         object?[] arguments,
         string displayName,
         MeasurementOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool measureCalibration = false)
     {
         ArgumentNullException.ThrowIfNull(method);
         ArgumentNullException.ThrowIfNull(arguments);
@@ -113,6 +130,7 @@ public static class TestMethodRunner
             OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
             SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
             TotalBenchmarks = 1,
+            MeasureCalibration = measureCalibration,
         };
 
         var group = await WorkerLauncher.Current.RunGroupAsync(
@@ -137,6 +155,7 @@ public static class TestMethodRunner
         return new Outcome(
             result with { IsolationStatus = IsolationStatus.Isolated, RawSamples = samples },
             samples,
-            null);
+            null,
+            group.Calibration);
     }
 }

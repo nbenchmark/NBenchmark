@@ -196,12 +196,81 @@ public sealed class PerformanceGateIsolationTests
         AllocMax = null,
     };
 
+    /// <summary>
+    ///     A worker is asked for a calibration only when the gate will divide by one. A gate naming a
+    ///     reference method compares two of the user's own benchmarks and has no use for it.
+    /// </summary>
+    [Theory]
+    [InlineData(2.0, null, true)]
+    [InlineData(2.0, "", true)]
+    [InlineData(2.0, "Reference", false)]
+    [InlineData(0, null, false)]
+    public void A_Calibration_Is_Requested_Only_When_The_Gate_Divides_By_One(
+        double maxSlowdownRatio, string? referenceMethod, bool expected)
+    {
+        var thresholds = new Thresholds
+        {
+            MaxSlowdownRatio = maxSlowdownRatio,
+            ReferenceMethod = referenceMethod,
+        };
+
+        Assert.Equal(expected, PerformanceGate.NeedsCalibration(thresholds));
+    }
+
+    /// <summary>
+    ///     The fix for the last cross-process comparison the library performed. An isolated result
+    ///     ratioed against a host-measured calibration spans two runtime configurations, and that
+    ///     difference alone is worth ~3.3x - so the gate says so. Given a calibration from the
+    ///     candidate's own worker, there is nothing to warn about.
+    /// </summary>
+    [Fact]
+    public void An_Isolated_Result_With_A_Worker_Calibration_Draws_No_Cross_Process_Note()
+    {
+        var thresholds = new Thresholds { MaxSlowdownRatio = 1000 };
+        var candidate = Result("Candidate", 100, IsolationStatus.Isolated);
+
+        var withWorkerCalibration = PerformanceGate.Evaluate(
+            candidate, [100, 100], null, null, thresholds,
+            workerCalibration: CalibrationStandard.Measure());
+
+        Assert.Empty(withWorkerCalibration.Notes);
+    }
+
+    [Fact]
+    public void An_Isolated_Result_Falling_Back_To_The_Host_Calibration_Says_So()
+    {
+        var thresholds = new Thresholds { MaxSlowdownRatio = 1000 };
+        var candidate = Result("Candidate", 100, IsolationStatus.Isolated);
+
+        var outcome = PerformanceGate.Evaluate(candidate, [100, 100], null, null, thresholds);
+
+        var note = Assert.Single(outcome.Notes);
+
+        Assert.Contains("calibration was", note);
+        Assert.Contains("test host", note);
+    }
+
+    /// <summary>
+    ///     A host-measured result against the host calibration is a like-for-like comparison, so it
+    ///     needs no note. Warning on every passing test is how notes get ignored.
+    /// </summary>
+    [Fact]
+    public void A_Host_Result_Against_The_Host_Calibration_Draws_No_Note()
+    {
+        var thresholds = new Thresholds { MaxSlowdownRatio = 1000 };
+        var candidate = Result("Candidate", 100, IsolationStatus.InProcessRequested);
+
+        var outcome = PerformanceGate.Evaluate(candidate, [100, 100], null, null, thresholds);
+
+        Assert.Empty(outcome.Notes);
+    }
+
     private sealed class Thresholds : IPerformanceThresholds
     {
         public double MaxMeanNs => -1;
         public double MaxP95Ns => -1;
         public long MaxAllocatedBytes => -1;
-        public string? ReferenceMethod => null;
+        public string? ReferenceMethod { get; init; }
         public double MaxSlowdownRatio { get; init; }
         public int Iterations => 0;
         public int WarmupIterations => 0;

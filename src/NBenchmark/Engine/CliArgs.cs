@@ -185,6 +185,20 @@ internal sealed record CliArgs
     public bool NoSamples { get; init; }
 
     /// <summary>
+    ///     When true, an isolated worker sends back every raw sample it measured instead of a bounded
+    ///     representative subset.
+    /// </summary>
+    /// <remarks>
+    ///     Off by default because a worker can measure up to
+    ///     <see cref="MeasurementOptions.MaxIterations" /> samples, and the coordinator only uses what
+    ///     crosses for significance testing and the Console sparkline - both distribution properties,
+    ///     which a few thousand samples describe as well as a hundred thousand. Turn it on to export
+    ///     the full series for external analysis; it does not change any statistic NBenchmark itself
+    ///     reports, because the worker computes those over the whole array either way.
+    /// </remarks>
+    public bool EmitRaw { get; init; }
+
+    /// <summary>
     ///     Diagnostics mode controlling which runtime counters are collected.
     ///     <c>null</c> uses the MeasurementOptions default (GC counts on).
     /// </summary>
@@ -286,6 +300,7 @@ internal sealed record CliArgs
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
         var noSamples = false;
+        var emitRaw = false;
         var runtimes = new List<RuntimeMoniker>();
         IReadOnlyList<int>? cpuAffinity = null;
         ProcessPriorityClass? processPriority = null;
@@ -651,6 +666,9 @@ internal sealed record CliArgs
                 case "--no-samples":
                     noSamples = true;
                     break;
+                case "--emit-raw":
+                    emitRaw = true;
+                    break;
                 case "--cpu-affinity" when i + 1 < args.Length:
                     var affinityRaw = args[++i];
 
@@ -778,6 +796,7 @@ internal sealed record CliArgs
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
             NoSamples = noSamples,
+            EmitRaw = emitRaw,
             Runtimes = runtimes,
             CpuAffinity = cpuAffinity,
             ProcessPriority = processPriority,
@@ -952,6 +971,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");
         Console.WriteLine("  --no-samples            Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
+        Console.WriteLine($"  --emit-raw              Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");

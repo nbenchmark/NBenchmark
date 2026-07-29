@@ -18,11 +18,26 @@ internal sealed class FrameChannel : IDisposable
 {
     /// <summary>
     ///     Reflection-based rather than source-generated, matching how the rest of the repo
-    ///     serializes <see cref="BenchmarkResult" />. The frames that carry real volume are sent
-    ///     once per benchmark, and a frame costs tens of microseconds against a per-benchmark
-    ///     floor of roughly 600 ms, so source generation would buy nothing measurable here.
+    ///     serializes <see cref="BenchmarkResult" />.
     /// </summary>
     /// <remarks>
+    ///     <para>
+    ///         Source generation was designed in and then measured out. Its three usual arguments all
+    ///         come up empty here. <b>Speed:</b> the frames that carry real volume are sent once per
+    ///         benchmark and cost tens of microseconds against a per-benchmark floor of roughly
+    ///         600 ms. <b>Trimming and AOT:</b> unreachable by construction - the worker loads
+    ///         arbitrary user assemblies into a custom load context and resolves benchmark bodies by
+    ///         metadata token, which no static analysis can follow, and nothing in this repo declares
+    ///         itself trimmable. <b>Correctness:</b> a generator context over the whole frame graph
+    ///         was built and produced zero diagnostics, so there was no unsupported shape for it to
+    ///         have caught.
+    ///     </para>
+    ///     <para>
+    ///         What actually protects this wire is <c>FrameChannelTests</c>, which round-trips every
+    ///         frame kind including a fully-populated <see cref="MeasurementOptions" />. That catches
+    ///         the failure source generation would not - a member that serializes but does not come
+    ///         back, which is silent in both schemes.
+    ///     </para>
     ///     <para>
     ///         Nulls are written rather than omitted. <see cref="BenchmarkResult" /> declares its
     ///         allocation columns as <c>required</c> <i>and</i> nullable - "the measurement must state

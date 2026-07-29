@@ -33,6 +33,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that may hold per-instance state (any non-primitive, non-ambient reference type), which can leak warmed state across benchmark methods. |
 | NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method has both `[BenchmarkCase]` and `[BenchmarkCases]`. Use one or the other. |
 | NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a mutable instance field that is read or written by at least two `[Benchmark]` methods, which can leak warmed state across methods. |
+| NB0014 | Benchmark body captures state and cannot be isolated | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, or `Benchmark.RunRawAsync()` captures a local, a parameter, or `this`. Captured state cannot cross a process boundary, so the body is measured in the host process instead of an isolated worker. |
 
 ### NB0001 - Missing parameterless constructor
 
@@ -250,6 +251,50 @@ Typical fixes:
 2. Make the field `readonly` if it is only assigned once
 3. Keep `PerClass` and suppress with `#pragma warning disable NB0013` when sharing state is intentional
 
+### NB0014 - Capturing body cannot be isolated
+
+NBenchmark measures a benchmark body in a separate worker process, because the runtime configuration a process starts under is the dominant term in a small measurement - on bodies of provably identical cost it moved the reported number by ~3.3x. It gets the body there by resolving the method the compiler already emitted; it never serializes or regenerates it.
+
+A lambda that captures state cannot be addressed that way. Its captured values live in your process, and there is no honest way to reproduce them elsewhere - reconstructing them was tried and rejected, because a fabricated closure did not throw, it returned plausible wrong numbers. So a capturing body is measured in the test host instead, correctly labelled but less precise.
+
+```csharp
+var data = BuildInput();
+
+// Info NB0014: captures 'data' - measured in this process
+Benchmark.Run(() => Process(data));
+```
+
+The runtime already reports this after the fact, in the `Iso` column and the isolation status. NB0014 moves the news to where you can still act on it, and names the symbols responsible - which the runtime cannot do as precisely, because by then they are fields on a compiler-generated class.
+
+**It is `Info`, not a warning**, because capturing is the idiomatic way to benchmark over prepared data. Warning on it would push you towards contorted code to silence a build. What it costs is fidelity, not correctness.
+
+To isolate the body, move the state inside it:
+
+```csharp
+// No capture: the body builds what it needs
+Benchmark.Run(() => Process(BuildInput()));
+```
+
+That measures the setup too, so it is not always what you want. When it is not, use a `[Benchmark]` class - discovery runs inside the worker, so `[GlobalSetup]` and fields are built there and nothing has to cross:
+
+```csharp
+public class ProcessBenchmarks
+{
+    private Input _data = null!;
+
+    [BenchmarkSetup] public void Setup() => _data = BuildInput();
+
+    [Benchmark] public Output Run() => Process(_data);
+}
+```
+
+**What NB0014 does not catch.** Bodies handed to NBenchmark as method groups over live objects (`Benchmark.Run(widget.Compute)`) are refused at runtime for the same reason, but are not lambdas and so are outside this rule. Raise the severity if you want capture to fail a build:
+
+```ini
+[*.cs]
+dotnet_diagnostic.NB0014.severity = warning
+```
+
 ## Runtime independence warning
 
 In addition to the compile-time analyzers above, NBenchmark emits a runtime warning on every `BenchmarkResult.Warnings` list when a class uses `InstanceLifetime.PerClass` and has more than one `[Benchmark]` method. This covers suite mode (where analyzers do not run) and cases where the analyzer package is not installed.
@@ -289,6 +334,7 @@ Diagnostics use the default severity listed in the table above. The default is c
 
 - **Errors** mean the benchmark cannot run or will produce meaningless results. NB0002, NB0003, NB0004, NB0005, NB0006, NB0007, NB0008, and NB0009 are errors.
 - **Warnings** mean the code can run but the measurements may be invalid. NB0001, NB0010, NB0011, and NB0013 are warnings.
+- **Info** means the code and the measurement are both fine, but something about how the measurement was taken is worth knowing. NB0014 is informational.
 
 You can override the severity of any diagnostic in `.editorconfig`. For example, to make all throwaway-lambda warnings errors in Single mode too:
 

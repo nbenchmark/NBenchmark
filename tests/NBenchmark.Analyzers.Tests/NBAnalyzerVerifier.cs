@@ -217,7 +217,12 @@ public static class NBAnalyzerVerifier<TAnalyzer>
             $"Code fix output does not match expected.\nExpected:\n{fixedSource}\n\nActual:\n{changedText}");
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source)
+    /// <summary>
+    ///     Every diagnostic the analyzer produced. Exposed so a test can assert on a message rather
+    ///     than only on an id - a rule whose job is to name symbols is only half-tested by knowing it
+    ///     fired.
+    /// </summary>
+    public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source)
     {
         var userTree = CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp12));
         var stubTree = CSharpSyntaxTree.ParseText(TestSources.Stubs, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp12));

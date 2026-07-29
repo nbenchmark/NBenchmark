@@ -116,7 +116,8 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                     }
 
                     var measured = await TestMeasurement.MeasureAsync(
-                        methodInfo, instance, methodArgs, name, runSpec, cancellationTokenSource.Token);
+                        methodInfo, instance, methodArgs, name, runSpec, cancellationTokenSource.Token,
+                        PerformanceGate.NeedsCalibration(data));
 
                     var result = measured.Result;
                     var rawSamples = measured.RawSamples;
@@ -127,7 +128,8 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                         refResult,
                         refSamples,
                         data,
-                        PerformanceGate.AllowsInProcessGate(methodInfo));
+                        PerformanceGate.AllowsInProcessGate(methodInfo),
+                        measured.Calibration);
 
                     var violations = gate.Violations;
                     var notes = new List<string>();

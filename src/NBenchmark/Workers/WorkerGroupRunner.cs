@@ -28,6 +28,12 @@ internal static class WorkerGroupRunner
         ///     can be assumed complete.
         /// </summary>
         public bool WorkerDied { get; init; }
+
+        /// <summary>
+        ///     The worker's own measurement of <see cref="CalibrationStandard" />, when the request
+        ///     asked for one. <c>null</c> means the caller must use its own.
+        /// </summary>
+        public CalibrationResult? Calibration { get; init; }
     }
 
     public static async Task<GroupResult> RunAsync(
@@ -45,8 +51,20 @@ internal static class WorkerGroupRunner
         var samples = new Dictionary<string, double[]>(StringComparer.Ordinal);
         var faults = new List<FaultPayload>();
 
+        var idleTimeout = MeasurementBudget.IdleFrame(request.Options);
+
+        // What the worker was last seen doing, so a timeout can name it. A worker that vanishes
+        // silently is the hardest kind to diagnose, and "no frames since BenchmarkStarting for
+        // Foo.Bar" is the difference between a usable report and "it hung".
+        var lastActivity = "the run request was sent";
+
         using var timeoutCts = new CancellationTokenSource(timeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+        // Reset on every frame rather than allocated per read: a group can stream tens of thousands
+        // of progress frames, and a CancellationTokenSource per frame would be pure garbage.
+        using var idleCts = new CancellationTokenSource(idleTimeout);
+        using var readLinked = CancellationTokenSource.CreateLinkedTokenSource(linked.Token, idleCts.Token);
 
         try
         {
@@ -54,7 +72,36 @@ internal static class WorkerGroupRunner
 
             while (true)
             {
-                var frame = await host.Channel.ReadAsync(linked.Token).ConfigureAwait(false);
+                WorkerFrame? frame;
+
+                try
+                {
+                    frame = await host.Channel.ReadAsync(readLinked.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (idleCts.IsCancellationRequested
+                                                        && !linked.IsCancellationRequested)
+                {
+                    faults.Add(new FaultPayload
+                    {
+                        Message = $"The measurement worker sent nothing for {idleTimeout.TotalSeconds:0.#}s and "
+                                  + $"was stopped. The last thing it reported was that {lastActivity}. A worker "
+                                  + "goes quiet this long only when a benchmark body, a [GlobalSetup] or a "
+                                  + "static initializer is blocked - on a lock, on I/O, or on an await that "
+                                  + "never completes."
+                                  + (host.StderrTail.Length == 0 ? "" : $" Worker stderr: {host.StderrTail}"),
+                    });
+
+                    return new GroupResult
+                    {
+                        Results = results,
+                        RawSamples = samples,
+                        Faults = faults,
+                        WorkerDied = true,
+                    };
+                }
+
+                // Any frame at all is proof of life, including a coalesced progress tick.
+                idleCts.CancelAfter(idleTimeout);
 
                 if (frame is null)
                 {
@@ -81,15 +128,20 @@ internal static class WorkerGroupRunner
                 switch (frame.Kind)
                 {
                     case WorkerFrameKind.Progress when frame.Progress is not null:
+                        lastActivity = DescribeProgress(frame.Progress);
                         await ReplayProgressAsync(frame.Progress, progress).ConfigureAwait(false);
                         break;
 
                     case WorkerFrameKind.ObserverPhase when frame.ObserverPhase is not null:
+                        lastActivity = $"'{frame.ObserverPhase.BenchmarkName}' entered "
+                                       + $"{frame.ObserverPhase.Phase}";
+
                         ReplayPhase(frame.ObserverPhase, observer);
                         break;
 
                     case WorkerFrameKind.BenchmarkCompleted when frame.BenchmarkCompleted is not null:
                         var payload = frame.BenchmarkCompleted;
+                        lastActivity = $"'{payload.Result.Name}' finished";
 
                         // Stamped here rather than in the worker, because only this side knows the
                         // result arrived over a process boundary at all. A worker that stamped
@@ -108,7 +160,13 @@ internal static class WorkerGroupRunner
                         break;
 
                     case WorkerFrameKind.GroupCompleted:
-                        return new GroupResult { Results = results, RawSamples = samples, Faults = faults };
+                        return new GroupResult
+                        {
+                            Results = results,
+                            RawSamples = samples,
+                            Faults = faults,
+                            Calibration = frame.GroupCompleted?.Calibration?.ToResult(),
+                        };
 
                     default:
                         faults.Add(new FaultPayload
@@ -141,6 +199,21 @@ internal static class WorkerGroupRunner
             };
         }
     }
+
+    /// <summary>
+    ///     A phrase naming what the worker last reported, for a timeout message. Reads as the tail
+    ///     of "the last thing it reported was that ...".
+    /// </summary>
+    private static string DescribeProgress(ProgressPayload payload)
+        => payload.Callback switch
+        {
+            ProgressCallback.WarmupStarting => $"'{payload.Name}' began warming up",
+            ProgressCallback.WarmupCompleted => $"'{payload.Name}' finished warming up",
+            ProgressCallback.BenchmarkStarting => $"'{payload.Name}' started",
+            ProgressCallback.IterationCompleted =>
+                $"'{payload.Name}' completed iteration {payload.Index}",
+            _ => $"'{payload.Name}' reported {payload.Callback}",
+        };
 
     private static Task ReplayProgressAsync(ProgressPayload payload, IBenchmarkProgress progress)
         => payload.Callback switch

@@ -339,6 +339,19 @@ internal sealed record RunGroupPayload
     public int StartIndex { get; init; }
 
     public int TotalBenchmarks { get; init; }
+
+    /// <summary>
+    ///     Whether the worker should also measure <see cref="CalibrationStandard" /> and return it on
+    ///     the <see cref="GroupCompletedPayload" />.
+    /// </summary>
+    /// <remarks>
+    ///     Requested by <see cref="WorkGroupKind.TestMethod" /> groups whose gate ratios against the
+    ///     calibration rather than a named reference method. The point is that the divisor is measured
+    ///     in the same process as the candidate, under the same runtime configuration - a calibration
+    ///     measured in the test host would be running with tiering and ReadyToRun on while the
+    ///     candidate ran with both off, and that difference alone is worth ~3.3x.
+    /// </remarks>
+    public bool MeasureCalibration { get; init; }
 }
 
 /// <summary>
@@ -398,6 +411,27 @@ internal sealed record BenchmarkCompletedPayload
 internal sealed record GroupCompletedPayload
 {
     public required string GroupId { get; init; }
+
+    /// <summary>
+    ///     The worker's own measurement of <see cref="CalibrationStandard" />, when
+    ///     <see cref="RunGroupPayload.MeasureCalibration" /> asked for one.
+    /// </summary>
+    /// <remarks>
+    ///     On the terminal frame rather than beside a result, because it belongs to the process
+    ///     rather than to any one benchmark - and because it is measured after the group's work, when
+    ///     the process is in the state the group left it.
+    /// </remarks>
+    public CalibrationPayload? Calibration { get; init; }
+}
+
+/// <summary>A worker-measured <see cref="CalibrationResult" />, flattened for the wire.</summary>
+internal sealed record CalibrationPayload
+{
+    public required double Mean { get; init; }
+    public required double Median { get; init; }
+    public required double[] Samples { get; init; }
+
+    public CalibrationResult ToResult() => new(Mean, Median, Samples);
 }
 
 internal sealed record FaultPayload

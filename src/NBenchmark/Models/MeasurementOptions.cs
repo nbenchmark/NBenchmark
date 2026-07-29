@@ -26,12 +26,22 @@ public record MeasurementOptions
     public const int MinHistogramBucketCount = 5;
     public const int MaxHistogramBucketCount = 100;
 
+    /// <summary>
+    ///     Default ceiling on how many raw samples an isolated worker sends back per benchmark.
+    ///     See <see cref="MaxRawSamples" />.
+    /// </summary>
+    public const int DefaultMaxRawSamples = 4096;
+
+    /// <summary><see cref="MaxRawSamples" /> value meaning "return every sample".</summary>
+    public const int UnboundedRawSamples = 0;
+
     internal static readonly IReadOnlyList<double> DefaultReportedPercentiles =
         Array.AsReadOnly(new[] { 0.50, 0.95, 0.99, 0.999, 1.0 });
 
     public static readonly MeasurementOptions Default = new();
     private readonly double _confidenceLevel = 0.95;
     private readonly int _histogramBucketCount = 20;
+    private readonly int _maxRawSamples = DefaultMaxRawSamples;
     private readonly int? _iterations;
     private readonly int _launchCount = 1;
     private readonly double? _minimumPracticalEffect = DefaultMinimumPracticalEffect;
@@ -240,6 +250,42 @@ public record MeasurementOptions
             ? value
             : throw new ArgumentOutOfRangeException(nameof(value), value,
                 $"HistogramBucketCount must be between {MinHistogramBucketCount} and {MaxHistogramBucketCount}.");
+    }
+
+    /// <summary>
+    ///     How many raw samples an isolated worker returns per benchmark.
+    ///     <see cref="UnboundedRawSamples" /> returns all of them. Default
+    ///     <see cref="DefaultMaxRawSamples" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This bounds only what crosses a process boundary. Every statistic NBenchmark reports
+    ///         is computed inside the worker over the complete sample array, so raising or lowering
+    ///         this cannot move a median, an interval, or an outlier count. What it affects is the
+    ///         sample dump in JSON output, the Console density sparkline, and the coordinator-side
+    ///         significance test - all distribution properties, which a few thousand samples describe
+    ///         as faithfully as a hundred thousand.
+    ///     </para>
+    ///     <para>
+    ///         The subset is drawn uniformly at random from the full array and kept in measurement
+    ///         order, seeded from the run's own seed so a repeat of the same configuration ships the
+    ///         same samples. It is not a prefix: the first n samples are the part of the run nearest
+    ///         to warmup, which is the least representative slice available.
+    ///     </para>
+    ///     <para>
+    ///         In-process runs are unaffected - there is no boundary to cross, so they always hold
+    ///         the complete array. A run that mixes the two therefore has more samples on its
+    ///         in-process rows, which changes nothing about the numbers but is worth knowing when
+    ///         comparing sample dumps.
+    ///     </para>
+    /// </remarks>
+    public int MaxRawSamples
+    {
+        get => _maxRawSamples;
+        init => _maxRawSamples = value >= UnboundedRawSamples
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value,
+                $"MaxRawSamples must be {UnboundedRawSamples} (unbounded) or positive.");
     }
 
     public bool EnableSignificance { get; init; } = true;

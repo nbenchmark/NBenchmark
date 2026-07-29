@@ -43,29 +43,72 @@ internal static class MeasurementBudget
     ///     with what the process was actually asked to do and can never fire on a benchmark that is
     ///     merely slow.
     ///     <para>
-    ///         <see cref="AutoTuneOptions.MaxTuningTime" /> times
-    ///         <see cref="AutoTuneOptions.CapGraceFactor" /> is the engine's own hard ceiling on
-    ///         in-body time per benchmark, so anything past that plus warmup and slack is a wedged
-    ///         process rather than a busy one. <c>LaunchCount</c> is deliberately not a factor: each
-    ///         replicate is its own process.
+    ///         This is the outer ceiling on a whole group, and because it scales with the benchmark
+    ///         count it is a poor detector of a wedged worker - see <see cref="IdleFrame" />, which is
+    ///         the one that fires first.
     ///     </para>
     /// </summary>
     public static TimeSpan For(MeasurementOptions options, int benchmarkCount)
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        var budget = StartupAllowance + PerBenchmark(options) * Math.Max(benchmarkCount, 1);
+
+        return Clamp(budget);
+    }
+
+    /// <summary>
+    ///     The engine's own in-body ceiling for a single benchmark, plus warmup and slack.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="AutoTuneOptions.MaxTuningTime" /> times
+    ///     <see cref="AutoTuneOptions.CapGraceFactor" /> is the engine's hard ceiling on in-body time
+    ///     per benchmark, so anything past that plus warmup and slack is a wedged process rather than
+    ///     a busy one. <c>LaunchCount</c> is deliberately not a factor: each replicate is its own
+    ///     process.
+    /// </remarks>
+    public static TimeSpan PerBenchmark(MeasurementOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
         var autoTune = options.AutoTune;
 
-        var perBenchmark = autoTune.MaxTuningTime * autoTune.CapGraceFactor
-                           + autoTune.MinWarmupTime
-                           + PerBenchmarkSlack;
+        return autoTune.MaxTuningTime * autoTune.CapGraceFactor
+               + autoTune.MinWarmupTime
+               + PerBenchmarkSlack;
+    }
 
-        var budget = StartupAllowance + perBenchmark * Math.Max(benchmarkCount, 1);
+    /// <summary>
+    ///     How long the coordinator waits for <i>any</i> frame from a worker before concluding it is
+    ///     wedged rather than working.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This is the timeout that actually catches a hung worker. <see cref="For" /> scales with
+    ///         the benchmark count, so a fifty-benchmark group tolerates a wedge for over half an hour
+    ///         before its ceiling fires - by which point the developer has long since killed the run
+    ///         by hand and learned nothing. The idle timeout does not scale with the count, because a
+    ///         worker's silence means the same thing whether it had one benchmark left or fifty.
+    ///     </para>
+    ///     <para>
+    ///         Derived from <see cref="PerBenchmark" /> rather than fixed at the 30 s the design
+    ///         sketched, because the premise that made a flat value safe - "progress streams per
+    ///         sample" - does not hold at the edges. The engine reports a sample only when one
+    ///         finishes, so a body whose single iteration legitimately runs for the whole tuning
+    ///         budget sends nothing for that entire time, as does a worker in <c>[GlobalSetup]</c>,
+    ///         discovery, or process start. A flat 30 s would kill exactly the slow-but-honest
+    ///         benchmarks the engine explicitly permits. Allowing one full per-benchmark ceiling plus
+    ///         the startup allowance means silence is only ever fatal once it exceeds what any single
+    ///         legitimate quiet stretch could account for.
+    ///     </para>
+    /// </remarks>
+    public static TimeSpan IdleFrame(MeasurementOptions options)
+        => Clamp(StartupAllowance + PerBenchmark(options));
 
-        return budget < MinTimeout ? MinTimeout
+    private static TimeSpan Clamp(TimeSpan budget)
+        => budget < MinTimeout ? MinTimeout
             : budget > MaxTimeout ? MaxTimeout
             : budget;
-    }
 
     /// <summary>
     ///     The OTel-standard variables forwarded verbatim to a measuring process, so an

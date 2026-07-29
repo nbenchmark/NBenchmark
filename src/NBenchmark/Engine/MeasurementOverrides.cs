@@ -81,6 +81,12 @@ internal sealed record MeasurementOverrides
 
     public bool? NoHistogram { get; init; }
 
+    /// <summary>
+    ///     Lifts the cap on how many raw samples an isolated worker returns
+    ///     (<see cref="MeasurementOptions.MaxRawSamples" />), set by <c>--emit-raw</c>.
+    /// </summary>
+    public bool? EmitRaw { get; init; }
+
     public DiagnosticsMode? Diagnostics { get; init; }
 
     /// <summary>
@@ -125,6 +131,7 @@ internal sealed record MeasurementOverrides
         LaunchCount = cliArgs.LaunchCount,
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
+        EmitRaw = cliArgs.EmitRaw,
         Diagnostics = cliArgs.Diagnostics,
         Environment = BuildEnvironmentFromCli(cliArgs),
     };
@@ -277,6 +284,12 @@ internal sealed record MeasurementOverrides
 
         if (NoHistogram.HasValue && NoHistogram.Value)
             result = result with { EnableHistogram = false };
+
+        // One-way: the flag asks for everything, and its absence means "leave whatever was
+        // configured alone" rather than "impose the default". A programmatic MaxRawSamples would
+        // otherwise be silently reset by any run that parsed a command line.
+        if (EmitRaw.HasValue && EmitRaw.Value)
+            result = result with { MaxRawSamples = MeasurementOptions.UnboundedRawSamples };
 
         if (Diagnostics.HasValue)
             result = result with { Diagnostics = DiagnosticsOptions.FromMode(Diagnostics.Value) };

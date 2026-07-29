@@ -28,10 +28,16 @@ public static class TestMeasurement
     /// <param name="Refusal">
     ///     Why the measurement was taken in the test host, when it was. <c>null</c> when isolated.
     /// </param>
+    /// <param name="Calibration">
+    ///     The calibration standard measured in the same worker as <paramref name="Result" />, when
+    ///     one was asked for and produced. <c>null</c> otherwise, which sends a gate to the host's own
+    ///     calibration - correct for a host-measured result, a compromise for an isolated one.
+    /// </param>
     public readonly record struct Measured(
         BenchmarkResult Result,
         double[] RawSamples,
-        string? Refusal);
+        string? Refusal,
+        CalibrationResult? Calibration = null);
 
     /// <summary>
     ///     Measures <paramref name="method" />, preferring a worker.
@@ -40,13 +46,19 @@ public static class TestMeasurement
     ///     The live test-class instance. Used only for the in-host path and for deciding whether an
     ///     equivalent could be rebuilt elsewhere - it is never sent anywhere.
     /// </param>
+    /// <param name="measureCalibration">
+    ///     Whether the worker should also measure <see cref="CalibrationStandard" />. Ask for it when
+    ///     the gate will divide by it - that is, when a <c>MaxSlowdownRatio</c> is set with no
+    ///     reference method - so that both sides of the ratio come from the same process.
+    /// </param>
     public static async Task<Measured> MeasureAsync(
         MethodInfo method,
         object? instance,
         object?[] args,
         string name,
         RunSpec runSpec,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool measureCalibration = false)
     {
         ArgumentNullException.ThrowIfNull(method);
         ArgumentNullException.ThrowIfNull(args);
@@ -63,11 +75,11 @@ public static class TestMeasurement
         if (refusal is null)
         {
             var outcome = await TestMethodRunner
-                .RunAsync(method, args, name, runSpec.Options, cancellationToken)
+                .RunAsync(method, args, name, runSpec.Options, cancellationToken, measureCalibration)
                 .ConfigureAwait(false);
 
             if (outcome.Measured)
-                return new Measured(outcome.Result!, [.. outcome.RawSamples], null);
+                return new Measured(outcome.Result!, [.. outcome.RawSamples], null, outcome.Calibration);
 
             // The worker was available but did not deliver. Measuring in the host is better than
             // failing the test over infrastructure, provided the result says so.

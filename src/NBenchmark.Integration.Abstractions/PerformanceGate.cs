@@ -52,6 +52,22 @@ public static class PerformanceGate
     }
 
     /// <summary>
+    ///     Whether this gate will divide by the calibration standard, and so whether a worker should
+    ///     be asked to measure one.
+    /// </summary>
+    /// <remarks>
+    ///     True only for a ratio gate with no reference method. A gate with a reference method
+    ///     compares two of the user's own benchmarks and has no use for a calibration; a gate with no
+    ///     ratio at all has nothing to divide.
+    /// </remarks>
+    public static bool NeedsCalibration(IPerformanceThresholds thresholds)
+    {
+        ArgumentNullException.ThrowIfNull(thresholds);
+
+        return thresholds.MaxSlowdownRatio > 0 && string.IsNullOrWhiteSpace(thresholds.ReferenceMethod);
+    }
+
+    /// <summary>
     ///     Evaluates <paramref name="result" /> against <paramref name="thresholds" />.
     /// </summary>
     /// <param name="referenceResult">
@@ -61,13 +77,21 @@ public static class PerformanceGate
     ///     calibration comparison instead, which is a <i>worse</i> cross-process ratio than the one
     ///     they were avoiding.
     /// </param>
+    /// <param name="workerCalibration">
+    ///     The calibration standard as measured inside the same worker that produced
+    ///     <paramref name="result" />, when there was one. Used in place of the test host's own
+    ///     calibration so that both sides of a <c>MaxSlowdownRatio</c> ratio share a runtime
+    ///     configuration. <c>null</c> falls back to the host measurement, which is the right
+    ///     comparison when the benchmark also ran in the host.
+    /// </param>
     public static Outcome Evaluate(
         BenchmarkResult result,
         double[]? rawSamples,
         BenchmarkResult? referenceResult,
         double[]? referenceSamples,
         IPerformanceThresholds thresholds,
-        bool allowInProcessGate = false)
+        bool allowInProcessGate = false,
+        CalibrationResult? workerCalibration = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(thresholds);
@@ -112,25 +136,36 @@ public static class PerformanceGate
             return new Outcome(violations, notes);
         }
 
-        // No reference method: the ratio is against the built-in calibration body, which measures
-        // this machine's speed rather than a competing implementation. It runs in the test host by
-        // construction, so when the benchmark did not, say so - the comparison is a hardware
-        // normaliser, and reading it as a code-to-code ratio would be reading it wrong.
-        var calibration = PerformanceCalibration.Run();
+        // No reference method: the ratio is against the calibration standard, which measures this
+        // machine's speed rather than a competing implementation.
+        //
+        // Which calibration matters. The divisor has to have been measured under the same runtime
+        // configuration as the candidate, or the ratio reports the difference between two process
+        // configurations - worth ~3.3x on bodies of identical cost - rather than anything about the
+        // code. So an isolated result is divided by the calibration its own worker measured, and a
+        // host-measured result by the host's.
+        var calibration = workerCalibration ?? PerformanceCalibration.Run();
+
+        var calibrationStatus = workerCalibration is not null
+            ? IsolationStatus.Isolated
+            : IsolationStatus.InProcessRequested;
 
         violations.AddRange(RelativeComparison.Check(
             result,
             samples,
-            PerformanceCalibration.CreateBenchmarkResult(),
+            CalibrationStandard.ToBenchmarkResult(calibration, calibrationStatus),
             calibration.Samples,
             thresholds.MaxSlowdownRatio));
 
-        if (result.IsolationStatus.IsIsolated())
+        // Only the mismatched case needs saying. When both were measured the same way the ratio is
+        // sound, and a note on every passing test is noise that trains people to skip the notes.
+        if (result.IsolationStatus.IsIsolated() && workerCalibration is null)
         {
             notes.Add(
-                $"NBenchmark: '{result.Name}' was measured in a worker process and the calibration it is "
-                + "ratioed against was measured in the test host. The calibration normalises for machine "
-                + "speed; treat the ratio as a rough hardware-scaled bound, not a code comparison.");
+                $"NBenchmark: '{result.Name}' was measured in a worker process but its calibration was "
+                + "measured in the test host, so the ratio spans two runtime configurations. Treat it as a "
+                + "rough hardware-scaled bound rather than a code comparison. This usually means the worker "
+                + "could not measure the calibration; its stderr will say why.");
         }
 
         return new Outcome(violations, notes);

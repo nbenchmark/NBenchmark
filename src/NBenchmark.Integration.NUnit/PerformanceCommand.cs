@@ -53,7 +53,8 @@ public sealed class PerformanceCommand : DelegatingTestCommand
             }
 
             var measured = TestMeasurement
-                .MeasureAsync(methodInfo, instance, args, name, runSpec, context.CancellationToken)
+                .MeasureAsync(methodInfo, instance, args, name, runSpec, context.CancellationToken,
+                    PerformanceGate.NeedsCalibration(_attribute))
                 .GetAwaiter().GetResult();
 
             var result = measured.Result;
@@ -66,7 +67,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
 
             var gate = PerformanceGate.Evaluate(
                 result, rawSamples, refResult, refSamples, _attribute,
-                PerformanceGate.AllowsInProcessGate(methodInfo));
+                PerformanceGate.AllowsInProcessGate(methodInfo), measured.Calibration);
 
             var violations = gate.Violations;
 

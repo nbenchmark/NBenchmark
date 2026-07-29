@@ -22,6 +22,15 @@ internal sealed class WorkerSession(FrameChannel channel)
     private FrameQueue? _queue;
 
     /// <summary>
+    ///     The sample budget and seed for the group in flight, held here because every path that
+    ///     produces results funnels through <see cref="SendResults" /> and none of them carry the
+    ///     request that far.
+    /// </summary>
+    private int _maxRawSamples = MeasurementOptions.DefaultMaxRawSamples;
+
+    private int _sampleSeed;
+
+    /// <summary>
     ///     Runs until end-of-stream or a shutdown frame. Returns the process exit code.
     /// </summary>
     public async Task<int> RunAsync(CancellationToken cancellationToken)
@@ -110,6 +119,13 @@ internal sealed class WorkerSession(FrameChannel channel)
         {
             var options = ResolveStrategies(request);
 
+            _maxRawSamples = options.MaxRawSamples;
+
+            // The run's own seed when it has one, so the same seed ships the same subset. Groups
+            // without a seed still need a fixed value rather than a time-derived one, or two runs of
+            // an identical configuration would disagree about which samples they sent.
+            _sampleSeed = request.Seed ?? 0;
+
             // The worker was launched with the runtime profile already applied to its environment
             // block - that is the only moment it could have been. Affinity and priority, by
             // contrast, are settable at any time and belong here.
@@ -156,9 +172,19 @@ internal sealed class WorkerSession(FrameChannel channel)
             if (_queue is not null)
                 await _queue.DrainAsync().ConfigureAwait(false);
 
+            // Measured here, after the group's work, so it reflects the process the benchmark
+            // actually ran in rather than a freshly-started one. Its whole purpose is to be
+            // divisible into that benchmark's number.
+            var calibration = request.MeasureCalibration ? MeasureCalibration() : null;
+
             await _channel
                 .WriteAsync(
-                    WorkerFrame.Of(new GroupCompletedPayload { GroupId = request.GroupId }), cancellationToken)
+                    WorkerFrame.Of(new GroupCompletedPayload
+                    {
+                        GroupId = request.GroupId,
+                        Calibration = calibration,
+                    }),
+                    cancellationToken)
                 .ConfigureAwait(false);
 
             _queue = null;
@@ -636,15 +662,56 @@ internal sealed class WorkerSession(FrameChannel channel)
         IReadOnlyList<BenchmarkResult> results,
         Func<BenchmarkResult, double[]> resolveSamples)
     {
+        // Varied per result so two benchmarks in one group do not keep the same sample positions.
+        // Identical positions would not bias any single benchmark, but it would make a shared
+        // periodic artifact - a GC cadence, a timer - land identically in both and look like a
+        // property of the code rather than of the selection.
+        var index = 0;
+
         foreach (var result in results)
         {
+            var (samples, trimmed) = SampleReservoir.Reduce(
+                resolveSamples(result) ?? [],
+                result.TrimmedOrdinals,
+                _maxRawSamples,
+                unchecked(_sampleSeed + index++));
+
             Enqueue(WorkerFrame.Of(new BenchmarkCompletedPayload
             {
                 // RawSamples travel in the sibling property, so the copy inside the result is
-                // cleared rather than duplicated on the wire.
-                Result = result with { RawSamples = [] },
-                RawSamples = resolveSamples(result) ?? [],
+                // cleared rather than duplicated on the wire. The ordinals go with the result
+                // because that is where they are declared, and they must be the remapped ones -
+                // the originals index into an array that is no longer what is being sent.
+                Result = result with { RawSamples = [], TrimmedOrdinals = trimmed },
+                RawSamples = samples,
             }));
+        }
+    }
+
+    /// <summary>
+    ///     Runs the calibration standard in this process, so a gate can divide by a number measured
+    ///     under the same runtime configuration as the benchmark it is judging.
+    /// </summary>
+    private static CalibrationPayload? MeasureCalibration()
+    {
+        try
+        {
+            var calibration = CalibrationStandard.Measure();
+
+            return new CalibrationPayload
+            {
+                Mean = calibration.Mean,
+                Median = calibration.Median,
+                Samples = calibration.Samples,
+            };
+        }
+        catch (Exception ex)
+        {
+            // Never fatal. A group that measured its benchmark successfully must not be lost over
+            // the divisor; the coordinator falls back to its own calibration and says so.
+            Console.Error.WriteLine($"nbworker: calibration failed ({ex.Message}); the host will use its own.");
+
+            return null;
         }
     }
 

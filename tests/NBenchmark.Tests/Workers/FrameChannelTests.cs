@@ -117,6 +117,7 @@ public sealed class FrameChannelTests
             },
             Environment = new EnvironmentOptions { CpuAffinity = [1, 3], DedicatedHostGuidance = true },
             RuntimeProfile = RuntimeProfile.ServerGc,
+            MaxRawSamples = 512,
         };
 
         var payload = new RunGroupPayload
@@ -134,6 +135,7 @@ public sealed class FrameChannelTests
             DefaultInstanceLifetime = InstanceLifetime.PerClass,
             StartIndex = 4,
             TotalBenchmarks = 10,
+            MeasureCalibration = true,
         };
 
         var (left, right, cleanup) = CreatePair();
@@ -155,6 +157,7 @@ public sealed class FrameChannelTests
         Assert.Equal(InstanceLifetime.PerClass, received.DefaultInstanceLifetime);
         Assert.Equal(4, received.StartIndex);
         Assert.Equal(10, received.TotalBenchmarks);
+        Assert.True(received.MeasureCalibration);
 
         var actual = received.Options;
 
@@ -170,6 +173,7 @@ public sealed class FrameChannelTests
         Assert.Equal(0.25, actual.MinimumPracticalEffect);
         Assert.False(actual.EnableHistogram);
         Assert.Equal(33, actual.HistogramBucketCount);
+        Assert.Equal(512, actual.MaxRawSamples);
         Assert.Equal([0.5, 0.9, 0.999], actual.ReportedPercentiles);
         Assert.True(actual.ForceGcBeforeEachIteration);
         Assert.False(actual.MeasureAllocations);
@@ -359,6 +363,53 @@ public sealed class FrameChannelTests
     ///     End of stream reads as <c>null</c>, not an exception. This is what lets a worker exit
     ///     on its own when the coordinator dies, with no supervisor in the loop.
     /// </summary>
+    /// <summary>
+    ///     The terminal frame carries the worker's own calibration when one was asked for. It rides
+    ///     here rather than beside a result because it describes the process, not any one benchmark.
+    /// </summary>
+    [Fact]
+    public async Task GroupCompleted_CarriesTheWorkerCalibration()
+    {
+        var payload = new GroupCompletedPayload
+        {
+            GroupId = "g1",
+            Calibration = new CalibrationPayload
+            {
+                Mean = 1234.5,
+                Median = 1200.0,
+                Samples = [1100.0, 1200.0, 1300.0],
+            },
+        };
+
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(WorkerFrame.Of(payload), CancellationToken.None);
+        var frame = await right.ReadAsync(CancellationToken.None);
+
+        var received = frame!.GroupCompleted!;
+        var calibration = received.Calibration!.ToResult();
+
+        Assert.Equal("g1", received.GroupId);
+        Assert.Equal(1234.5, calibration.Mean);
+        Assert.Equal(1200.0, calibration.Median);
+        Assert.Equal([1100.0, 1200.0, 1300.0], calibration.Samples);
+    }
+
+    [Fact]
+    public async Task GroupCompleted_WithoutACalibration_RoundTripsAsNull()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new GroupCompletedPayload { GroupId = "g1" }), CancellationToken.None);
+
+        var frame = await right.ReadAsync(CancellationToken.None);
+
+        Assert.Null(frame!.GroupCompleted!.Calibration);
+    }
+
     [Fact]
     public async Task ClosedPeer_ReadsAsEndOfStream()
     {

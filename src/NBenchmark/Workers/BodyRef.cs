@@ -244,10 +244,12 @@ internal sealed record BodyRef
 
         if (instanceFields.Length > 0)
         {
-            // A display class with fields. Roslyn merges every capture in a lexical scope into
-            // one display class, so the named fields may include captures belonging to sibling
-            // lambdas rather than this one - the refusal can therefore be broader than strictly
-            // necessary. That is the safe direction, and it is stated rather than hidden.
+            // A display class with fields. Roslyn merges the captures of every *capturing* lambda
+            // in a lexical scope into one display class, so the named fields may include captures
+            // belonging to a sibling rather than to this body - the message can therefore be
+            // broader than the lambda it describes. The decision is unaffected: a non-capturing
+            // sibling is hoisted to the field-less `<>c` singleton instead of joining this class,
+            // so it is never refused for a neighbour's capture. Both pinned in BodyRefCaptureTests.
             var captured = string.Join(", ", instanceFields.Take(4).Select(f => f.Name));
 
             refusal = $"it captures state from its enclosing scope ({captured}"
