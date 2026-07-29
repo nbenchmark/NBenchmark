@@ -38,6 +38,12 @@ internal static class WorkerRunPlan
 
         /// <summary>The declaring assembly has no file on disk to load (single-file or in-memory).</summary>
         NoAssemblyOnDisk,
+
+        /// <summary>
+        ///     A custom outlier detector or significance test cannot be rebuilt in a worker, because
+        ///     only its type name crosses the boundary and it needs constructor arguments.
+        /// </summary>
+        UnrebuildableStrategy,
     }
 
     internal readonly record struct Decision(Refusal Refusal, string? Explanation)
@@ -56,6 +62,7 @@ internal static class WorkerRunPlan
             Refusal.WorkerNotDeployed => IsolationStatus.InProcessNoWorker,
             Refusal.LiveInstanceFactory => IsolationStatus.InProcessLiveFixture,
             Refusal.NoAssemblyOnDisk => IsolationStatus.InProcessUnaddressablePlan,
+            Refusal.UnrebuildableStrategy => IsolationStatus.InProcessLiveFixture,
             _ => IsolationStatus.InProcessRequested,
         };
     }
@@ -70,7 +77,14 @@ internal static class WorkerRunPlan
     ///     Whether the harness resolves instances through <c>WithInstanceFactory</c> or
     ///     <c>WithServiceProvider</c>.
     /// </param>
-    public static Decision ForDiscoveredClass(string? declaringAssemblyLocation, bool usesInstanceFactory)
+    /// <param name="options">
+    ///     The measurement configuration, so a strategy object that cannot be rebuilt in a worker is
+    ///     caught here rather than silently downgraded. <c>null</c> skips the check.
+    /// </param>
+    public static Decision ForDiscoveredClass(
+        string? declaringAssemblyLocation,
+        bool usesInstanceFactory,
+        MeasurementOptions? options = null)
     {
         // Asked about the assembly under test, not about this application. Those differ under
         // `dotnet benchmark --assembly`, where the target build has its own worker beside it and the
@@ -104,7 +118,37 @@ internal static class WorkerRunPlan
                 + "though nothing had changed.");
         }
 
+        if (options is not null && UnrebuildableStrategy(options) is { } strategyRefusal)
+            return new Decision(Refusal.UnrebuildableStrategy, strategyRefusal);
+
         return Decision.Allow();
+    }
+
+    /// <summary>
+    ///     The reason a pinned outlier detector or significance test cannot be rebuilt in a worker,
+    ///     or <c>null</c> when both can be.
+    /// </summary>
+    /// <remarks>
+    ///     Only a type name crosses the boundary, so a strategy built with constructor arguments
+    ///     cannot be reconstructed there - and the worker falls back to the built-in one. That is the
+    ///     quietest failure available: the body is measured correctly and then scored under a
+    ///     different statistical method than the caller asked for, with nothing in the output saying
+    ///     so. Declining to isolate keeps the caller's own strategy, which is the thing they were
+    ///     explicit about.
+    /// </remarks>
+    public static string? UnrebuildableStrategy(MeasurementOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        foreach (var strategy in new object?[] { options.OutlierDetector, options.SignificanceTest })
+        {
+            _ = StrategyTypeName(strategy, out var refusal);
+
+            if (refusal is not null)
+                return refusal;
+        }
+
+        return null;
     }
 
     /// <summary>

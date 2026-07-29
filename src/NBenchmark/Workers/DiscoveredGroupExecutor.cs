@@ -127,8 +127,9 @@ internal static class DiscoveredGroupExecutor
 
     /// <summary>
     ///     A fresh instance per benchmark, each with its own setup and teardown. Run order is
-    ///     honoured here rather than inside <see cref="SuiteRunner" />, because each benchmark
-    ///     gets its own single-envelope invocation.
+    ///     applied here rather than inside <see cref="SuiteRunner" />, because each benchmark gets
+    ///     its own single-envelope invocation and <see cref="SuiteRunner" /> would have nothing to
+    ///     reorder.
     /// </summary>
     private static async Task<GroupOutcome> RunPerMethodAsync(
         BenchmarkSuiteDefinition suite,
@@ -145,7 +146,7 @@ internal static class DiscoveredGroupExecutor
     {
         var results = new List<BenchmarkResult>();
         var samples = new Dictionary<string, double[]>();
-        var ordered = Order(selected, order, seed);
+        var ordered = RunOrdering.Apply(selected, order, seed);
 
         for (var index = 0; index < ordered.Count; index++)
         {
@@ -196,30 +197,4 @@ internal static class DiscoveredGroupExecutor
         return new GroupOutcome(results, samples, false);
     }
 
-    /// <summary>
-    ///     Applies run-order randomization. The previous isolated path hardcoded declaration
-    ///     order, so <see cref="RunOrder.Random" /> was silently discarded whenever isolation was
-    ///     on - which, in Harness mode, is always. Order is now honoured inside the measuring
-    ///     process, where it belongs.
-    /// </summary>
-    private static List<BenchmarkMethodDefinition> Order(
-        IReadOnlyList<BenchmarkMethodDefinition> benchmarks,
-        RunOrder order,
-        int? seed)
-    {
-        var items = benchmarks.ToList();
-
-        if (order != RunOrder.Random || items.Count < 2)
-            return items;
-
-        var rng = new Random(seed ?? Random.Shared.Next());
-
-        for (var i = items.Count - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (items[i], items[j]) = (items[j], items[i]);
-        }
-
-        return items;
-    }
 }

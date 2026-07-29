@@ -7,9 +7,10 @@ namespace NBenchmark.Workers;
 ///     under.
 /// </summary>
 /// <remarks>
-///     Lives here rather than on the legacy child launcher because the worker path is the primary
-///     consumer now, and depending on the component it replaces would keep the old one alive by
-///     accident. The launcher delegates to this, so the two can never drift apart while both exist.
+///     One place, because every request path needs the same three answers - the group ceiling, the
+///     per-benchmark ceiling it is built from, and the idle-frame timeout - and a path that derived
+///     its own would silently tolerate a wedged worker for a different length of time than its
+///     neighbours.
 /// </remarks>
 internal static class MeasurementBudget
 {

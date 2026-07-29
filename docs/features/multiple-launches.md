@@ -8,7 +8,22 @@ order: 6
 
 By default each benchmark runs once. Use multiple launches to run each benchmark `N` times as independent launches. Each launch includes its own warmup and GC cycle, so variance across launches reflects real run-to-run differences (process state, ASLR, scheduler placement), not just intra-run noise.
 
-The primary result fields (median, mean, percentiles, etc.) come from the **best** (lowest median) launch. Cross-launch statistics (mean, stddev, median, CI across per-launch medians) are computed and displayed in a "Launch Aggregation" table below the main results when `LaunchCount > 1`.
+The primary result fields (median, mean, percentiles, etc.) are the **average across launches**, and the reported confidence interval comes from the spread **between** launches rather than from within any one of them. Cross-launch statistics are also computed in full and displayed in a "Launch Aggregation" table below the main results when `LaunchCount > 1`.
+
+Averaging matters more than it sounds, because each launch is a separate process. The differences between launches are a real systematic component — a different CPU draw, page layout, and address-space layout each time — not transient noise that a minimum would filter out. Reporting the fastest launch selected for the luckiest of those draws, so raising `LaunchCount` to get a *better* estimate produced a *more optimistic* number.
+
+Taking the interval from between the launches is what makes it mean what a reader assumes. On this repository's own sample, three launches of the same in-process benchmark read 4.32, 3.63 and 1.66 ns:
+
+| | reported median | reported interval |
+| --- | --- | --- |
+| fastest launch | 1.66 ns | ±0.02 ns (that launch's own precision) |
+| average of launches | 3.20 ns | **±3.42 ns** |
+
+The second row is the honest one. The first says a number that does not reproduce is known to within one percent.
+
+Counts and durations are totals — `N`, `MeasuredIterations` and `TotalDuration` cover every launch — while `Min` and `Max` span everything observed across all of them.
+
+`RawSamples` and the trimmed-sample marks come from the single launch nearest the averaged median, because the marks are positions *into* that sample array and marks from one launch against another's samples would point at the wrong ones. The pooled samples from every launch are what significance testing reads.
 
 Use multiple launches when single-run noise is a concern and you want to understand how stable the measurement is at the launch level.
 

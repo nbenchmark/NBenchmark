@@ -67,10 +67,30 @@ public static class ReportFormat
     ///         assume them equivalent to the earliest declared epoch.
     ///     </para>
     ///     <para>
-    ///         History: <b>1</b> - first declared epoch. Monomorphic dispatch (no per-op boxing for
-    ///         value-returning benchmarks), suites isolated in worker processes by default under the
-    ///         <c>steady-state</c> runtime profile.
+    ///         History:
     ///     </para>
+    ///     <list type="number">
+    ///         <item>
+    ///             <description>
+    ///                 First declared epoch. Monomorphic dispatch (no per-op boxing for
+    ///                 value-returning benchmarks), suites isolated in worker processes by default
+    ///                 under the <c>steady-state</c> runtime profile.
+    ///             </description>
+    ///         </item>
+    ///         <item>
+    ///             <description>
+    ///                 A multi-launch benchmark reports the <i>average</i> of its launches rather than
+    ///                 the fastest of them, and its interval comes from the spread between launches
+    ///                 rather than from within one. Both are definitional changes to reported
+    ///                 statistics: medians rise for every benchmark measured with
+    ///                 <c>LaunchCount &gt; 1</c> - which is the Harness default - and intervals widen
+    ///                 wherever between-worker spread is real. On this repository's own sample the
+    ///                 in-process row moved from 1.66 ns with a sub-nanosecond interval to 3.20 ns
+    ///                 ±3.42, which is the honest description of three launches reading 4.32, 3.63 and
+    ///                 1.66.
+    ///             </description>
+    ///         </item>
+    ///     </list>
     /// </remarks>
-    public const int MeasurementEpoch = 1;
+    public const int MeasurementEpoch = 2;
 }

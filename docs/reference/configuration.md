@@ -332,7 +332,7 @@ The number of times to repeat each benchmark as a separate launch, typed as `int
 | Value | Behaviour |
 |---|---|
 | `1` **(default)** | Run the benchmark once. No aggregation. |
-| `> 1` | Repeat the full benchmark (warmup + measurement) N times. Cross-launch statistics (mean, stddev, median, CI across launch medians) are computed and stored in `BenchmarkResult.LaunchStatistics`. The primary result fields reflect the **best** launch (lowest median). Valid range: `2` to `100`. |
+| `> 1` | Repeat the full benchmark (warmup + measurement) N times, each in its own worker process. Cross-launch statistics (mean, stddev, median, CI across launch medians) are computed and stored in `BenchmarkResult.LaunchStatistics`. The primary result fields are the **average across launches**, and the reported interval comes from the spread between them. Valid range: `2` to `100`. |
 
 Use multiple launches when single-run noise is a concern and you want to see how much the median itself varies across independent measurements. Each launch includes its own warmup and GC cycle, so consecutive launches are independent measurements of the same body - not correlated samples.
 

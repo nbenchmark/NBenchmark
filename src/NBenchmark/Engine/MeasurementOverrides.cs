@@ -11,19 +11,25 @@ internal enum IsolationDecision
     /// <summary>Run in the host process.</summary>
     InProcess,
 
-    /// <summary>Run with the rest of its declaring class in one shared child process.</summary>
+    /// <summary>Run with the rest of its declaring class in one shared worker process.</summary>
     PerClass,
 
-    /// <summary>Run alone in its own dedicated child process.</summary>
+    /// <summary>Run alone in its own dedicated worker process.</summary>
     PerBenchmark,
 }
 
 /// <summary>
-///     The scalar measurement overrides forwarded to a Host-mode child. The child rebuilds
-///     its base <see cref="MeasurementOptions" /> by re-running the same entry point (so
-///     custom detectors and significance tests survive), then applies these CLI-derived
-///     scalars on top - mirroring what the parent applies in-process.
+///     The CLI-derived deltas layered on top of a programmatically-built
+///     <see cref="MeasurementOptions" />, so a command-line flag overrides a <c>WithOptions</c> call
+///     on that field alone and leaves every other field as the caller configured it.
 /// </summary>
+/// <remarks>
+///     This record is purely a merge step inside one process; nothing here is serialized. Under the
+///     previous file-based isolation design it was also the wire format for a child process, which
+///     re-ran the user's entry point to rebuild its base options and then applied these scalars on
+///     top. A worker now receives the resolved <see cref="MeasurementOptions" /> whole, so the only
+///     surviving job is <c>CliArgs</c> -&gt; <c>MeasurementOptions</c>.
+/// </remarks>
 internal sealed record MeasurementOverrides
 {
     public int? Iterations { get; init; }
@@ -36,10 +42,10 @@ internal sealed record MeasurementOverrides
     public MeasurementProfile? Profile { get; init; }
 
     /// <summary>
-    ///     The runtime-startup configuration requested on the command line. Unlike the other
-    ///     overrides this is not applied by the child to itself - the parent already applied it to
-    ///     the child's environment block before startup, because that is the only point at which
-    ///     the runtime reads it. It travels so the child's effective options agree with reality.
+    ///     The runtime-startup configuration requested on the command line. It reaches a worker as
+    ///     environment variables written before the process starts - the only point at which the
+    ///     runtime reads them - so what lands on <see cref="MeasurementOptions" /> here is the record
+    ///     of what was asked for, which is what gets stamped on every result.
     /// </summary>
     public RuntimeProfile? RuntimeProfile { get; init; }
     public bool? ForceGc { get; init; }
@@ -47,8 +53,8 @@ internal sealed record MeasurementOverrides
     public bool? NoGcBetweenBenchmarks { get; init; }
     public double? MinPracticalEffect { get; init; }
 
-    // Auto-tune scalar overrides. AutoTuneOptions is rebuilt by the child re-running its entry
-    // point, so only these CLI-derived deltas travel; the object itself is never serialized.
+    // Auto-tune scalar overrides, layered onto whichever AutoTuneOptions the caller configured
+    // (or onto Preset when one was named) rather than replacing it wholesale.
     public AutoTunePreset? Preset { get; init; }
     public double? CiTarget { get; init; }
     public int? MinSamples { get; init; }
@@ -90,10 +96,9 @@ internal sealed record MeasurementOverrides
     public DiagnosticsMode? Diagnostics { get; init; }
 
     /// <summary>
-    ///     Environment controls forwarded to a Host-mode child so it can pin itself to
-    ///     the same cores and priority as the parent. The child re-runs the entry point
-    ///     to rebuild its base options, then applies these deltas on top - mirroring what
-    ///     the parent applies in-process. <c>null</c> means the parent set nothing.
+    ///     CPU affinity, process priority and dedicated-host guidance as requested on the command
+    ///     line. Unlike the runtime profile these are settable at any time, so a worker applies them
+    ///     to itself from the options it was sent. <c>null</c> means no environment flag was passed.
     /// </summary>
     public EnvironmentOptions? Environment { get; init; }
 
@@ -302,8 +307,8 @@ internal sealed record MeasurementOverrides
 
     /// <summary>
     ///     Builds the <see cref="EnvironmentOptions" /> carried by overrides from the CLI
-    ///     flags. Returns <c>null</c> when no environment flag was set, so the child does
-    ///     nothing when the parent set nothing.
+    ///     flags. Returns <c>null</c> when no environment flag was set, so an absent flag leaves any
+    ///     programmatic configuration alone instead of overwriting it with defaults.
     /// </summary>
     private static EnvironmentOptions? BuildEnvironmentFromCli(CliArgs cliArgs)
     {
@@ -321,7 +326,7 @@ internal sealed record MeasurementOverrides
     }
 
     /// <summary>
-    ///     Layers override environment settings on top of any programmatic ones. CLI
+    ///     Layers CLI environment settings on top of any programmatic ones. CLI
     ///     flags win on a per-field basis for nullable fields (the same pattern as the
     ///     other overrides); unset CLI fields preserve the programmatic value. The
     ///     <see cref="EnvironmentOptions.DedicatedHostGuidance" /> flag is a bool and
@@ -341,7 +346,7 @@ internal sealed record MeasurementOverrides
     }
 }
 
-/// <summary>A single benchmark result plus its raw per-iteration samples, as shipped from a child.</summary>
+/// <summary>A single benchmark result paired with the raw samples a worker sent alongside it.</summary>
 internal sealed record IsolatedResultItem
 {
     public required BenchmarkResult Result { get; init; }

@@ -920,12 +920,16 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Runs the whole suite in a dedicated child process for a clean-room reading,
-    ///     rather than in the current process. The suite's setup, every benchmark, and the
-    ///     suite's teardown all execute together in that one child; the parent process
-    ///     reads the per-benchmark samples back and computes significance and reports as
-    ///     usual. Defaults to enabled when called with no argument.
+    ///     Whether to measure this suite in a worker process. Isolation is the default, so the only
+    ///     call that changes anything is <c>WithIsolation(false)</c> - an explicit request to measure
+    ///     in the current process.
     /// </summary>
+    /// <remarks>
+    ///     Reach for <c>false</c> when the current process <i>is</i> the subject: cold-start cost, or a
+    ///     body that must observe host state a fresh process cannot rebuild. The result is stamped
+    ///     <see cref="IsolationStatus.InProcessRequested" /> and reports the host's runtime
+    ///     configuration, so it is never silently compared against an isolated measurement.
+    /// </remarks>
     public BenchmarkSuite WithIsolation(bool enabled = true)
     {
         _isolated = enabled;
@@ -941,9 +945,10 @@ public sealed class BenchmarkSuite(string name)
 
     /// <summary>
     ///     Runs the suite benchmarks under each specified runtime and compares results.
-    ///     Cross-runtime execution always uses child processes (each runtime is built via
-    ///     <c>dotnet build -f &lt;tfm&gt;</c> and run in a separate child process),
-    ///     regardless of the <see cref="WithIsolation" /> setting.
+    ///     Cross-runtime execution is always isolated (each runtime is built via
+    ///     <c>dotnet build -f &lt;tfm&gt;</c> and measured in that build's own worker),
+    ///     regardless of the <see cref="WithIsolation" /> setting - measuring another framework's
+    ///     build in this process is not something the host can do.
     /// </summary>
     public BenchmarkSuite WithRuntimes(params RuntimeMoniker[] runtimes)
     {
@@ -1100,15 +1105,19 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Runs every benchmark in the suite and returns their results. When
-    ///     <see cref="WithIsolation" /> is enabled the suite runs in a dedicated child
-    ///     process; otherwise it runs in the current process.
+    ///     Runs every benchmark in the suite and returns their results.
     ///     <para>
-    ///         For an isolated run, prefer
-    ///         <see cref="RunPlanAsync(Func{BenchmarkSuite}, CancellationToken)" />. That path sends
-    ///         the address of a factory rather than re-executing your whole program to rebuild the
-    ///         suite, so it does not re-run side effects in <c>Main</c> and does not do <i>M²</i>
-    ///         work when a program declares several suites.
+    ///         Measured in a worker process whenever every body in the suite can be addressed there,
+    ///         which needs no attribute and no change to how the suite was written. When something
+    ///         cannot cross the boundary - a captured local, a setup delegate, a parameter sweep - the
+    ///         suite is measured here instead, the reason is printed once, and every result carries
+    ///         the matching <see cref="IsolationStatus" />.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="RunPlanAsync(Func{BenchmarkSuite}, CancellationToken)" /> is the answer for
+    ///         the suites this cannot handle: the worker invokes your factory, so the bodies, the
+    ///         lifecycle delegates and any custom strategy are live objects it built rather than
+    ///         anything that had to be serialized.
     ///     </para>
     /// </summary>
     public Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
@@ -1191,7 +1200,8 @@ public sealed class BenchmarkSuite(string name)
         for (var replicate = 0; replicate < replicates; replicate++)
         {
             var request = InlineSuitePlan.Request(
-                Name, decision.Bodies, _options, WorkerRunPlan.DeriveSeed(_seed, replicate), replicate);
+                Name, decision.Bodies, _options, _runOrder,
+                WorkerRunPlan.DeriveSeed(_seed, replicate), replicate);
 
             var group = await WorkerLauncher.Current.RunGroupAsync(
                     request,
@@ -1271,10 +1281,9 @@ public sealed class BenchmarkSuite(string name)
         {
             await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
-            // Apply opt-in hardware/OS controls for the duration of the in-process run. The
-            // scope restores the prior process state on dispose. Isolated suite children
-            // re-run this same entry point and re-derive _options, so they apply the same
-            // settings themselves; Host-mode children receive settings via MeasurementOverrides.
+            // Apply opt-in hardware/OS controls for the duration of the in-process run. The scope
+            // restores the prior process state on dispose. A worker measuring this suite applies the
+            // same settings to itself - see MeasureInWorkerAsync.
             using var _ = EnvironmentControl.Apply(_options.Environment);
 
             _suiteSetup?.Invoke();
@@ -1469,21 +1478,23 @@ public sealed class BenchmarkSuite(string name)
 
         foreach (var name in names)
         {
-            var perLaunch = allLaunchResults
-                .Select(launch => launch.FirstOrDefault(r => r.Name == name))
-                .Where(r => r is not null)
-                .Cast<BenchmarkResult>()
+            // Zipped before filtering, so a launch that produced no result for this benchmark drops
+            // its samples with it rather than shifting later launches' samples onto the wrong result.
+            var launches = allLaunchResults
+                .Select((launch, i) => (Result: launch.FirstOrDefault(r => r.Name == name), Index: i))
+                .Where(x => x.Result is not null)
+                .Select(x => new LaunchAggregator.Launch(
+                    x.Result!, allLaunchSamples[x.Index].GetValueOrDefault(name, [])))
                 .ToList();
 
-            if (perLaunch.Count == 0)
+            if (launches.Count == 0)
                 continue;
 
-            var stats = LaunchAggregator.Aggregate(perLaunch);
-            var best = LaunchAggregator.BestLaunch(perLaunch);
-            aggregated.Add(LaunchAggregator.Apply(best, stats));
+            var combined = LaunchAggregator.Combine(launches);
+            aggregated.Add(combined);
 
             if (pooledSamples.TryGetValue(name, out var samples))
-                rawSamples[RawSampleKey.For(name, best.RuntimeMoniker)] = samples;
+                rawSamples[RawSampleKey.For(name, combined.RuntimeMoniker)] = samples;
         }
 
         return (aggregated, rawSamples);
@@ -1715,41 +1726,15 @@ public sealed class BenchmarkSuite(string name)
         return true;
     }
 
+    /// <summary>
+    ///     Arranges a parameter sweep: parameter values stay in declaration order and the
+    ///     benchmarks within each value are shuffled. A suite with no parameters is left alone here
+    ///     and shuffled by <see cref="SuiteRunner" /> instead, which is where the run seed reaches.
+    /// </summary>
     private List<BenchmarkEnvelope> ApplyExecutionOrder(IReadOnlyList<BenchmarkEnvelope> expanded, RunOrder order)
-    {
-        if (order == RunOrder.Declaration || _parameterDefs.Count == 0)
-            return [.. expanded];
-
-        // Group by parameter set, then shuffle within each group.
-        var parameterGroups = expanded
-            .GroupBy(e => BenchmarkParameter.GetKey(e.ParameterSet))
-            .ToList();
-
-        var ordered = new List<BenchmarkEnvelope>(expanded.Count);
-        var groupSeedRng = new Random(Random.Shared.Next());
-
-        foreach (var group in parameterGroups)
-        {
-            var shuffled = ShuffleEnvelopes(group.ToList(), groupSeedRng.Next());
-            ordered.AddRange(shuffled);
-        }
-
-        return ordered;
-    }
-
-    private static List<BenchmarkEnvelope> ShuffleEnvelopes(List<BenchmarkEnvelope> items, int seed)
-    {
-        var rng = new Random(seed);
-        var list = items.ToList();
-
-        for (var i = list.Count - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
-        }
-
-        return list;
-    }
+        => _parameterDefs.Count == 0
+            ? [.. expanded]
+            : RunOrdering.ApplyWithinGroups(expanded, order, _seed, e => BenchmarkParameter.GetKey(e.ParameterSet));
 
     // --- Validation ---
 

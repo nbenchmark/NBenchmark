@@ -1,3 +1,4 @@
+using NBenchmark.Stats;
 using NBenchmark.Workers;
 using Xunit;
 
@@ -51,10 +52,83 @@ public sealed class WorkerRunPlanTests
         Assert.Contains(nameof(Rebuildable), name);
     }
 
-    private sealed class NeedsArguments(int value)
+    /// <summary>
+    ///     A strategy the worker cannot rebuild makes the whole group un-isolatable, rather than being
+    ///     downgraded on the far side.
+    /// </summary>
+    /// <remarks>
+    ///     The failure this prevents is the quietest one available: the body is measured perfectly in a
+    ///     worker and then scored with the built-in detector instead of the one the caller pinned, with
+    ///     nothing in the output saying so. Only the inline-suite path used to check; the harness,
+    ///     Simple mode and the test integrations all discarded the refusal.
+    /// </remarks>
+    [Fact]
+    public void ForDiscoveredClass_RefusesWhenAStrategyCannotBeRebuilt()
     {
-        public int Value { get; } = value;
+        // A launcher that reports available, so worker deployment is not the variable under test -
+        // this assertion is about what happens once a worker *is* known to be reachable.
+        using var _ = FakeWorkerLauncher.Install(_ => throw new InvalidOperationException("not run"));
+
+        var options = MeasurementOptions.Default with { OutlierDetector = new NeedsArguments(5) };
+
+        var decision = WorkerRunPlan.ForDiscoveredClass(
+            typeof(WorkerRunPlanTests).Assembly.Location, usesInstanceFactory: false, options);
+
+        Assert.False(decision.CanIsolate);
+        Assert.Equal(WorkerRunPlan.Refusal.UnrebuildableStrategy, decision.Refusal);
+        Assert.Contains("parameterless constructor", decision.Explanation);
+
+        // The reason travels with the numbers, not just with the console message.
+        Assert.Equal(IsolationStatus.InProcessLiveFixture, decision.Status);
     }
 
-    private sealed class Rebuildable;
+    /// <summary>A strategy the worker can construct is no obstacle at all.</summary>
+    [Fact]
+    public void ForDiscoveredClass_AllowsARebuildableStrategy()
+    {
+        using var _ = FakeWorkerLauncher.Install(_ => throw new InvalidOperationException("not run"));
+
+        var options = MeasurementOptions.Default with { OutlierDetector = new Rebuildable() };
+
+        Assert.Null(WorkerRunPlan.UnrebuildableStrategy(options));
+
+        Assert.True(WorkerRunPlan
+            .ForDiscoveredClass(typeof(WorkerRunPlanTests).Assembly.Location, false, options)
+            .CanIsolate);
+    }
+
+    /// <summary>
+    ///     Both strategy slots are checked, not just the first. A significance test that cannot be
+    ///     rebuilt is exactly as invisible as a detector that cannot.
+    /// </summary>
+    [Fact]
+    public void UnrebuildableStrategy_ChecksTheSignificanceTestToo()
+    {
+        var options = MeasurementOptions.Default with { SignificanceTest = new NeedsArgumentsTest(3) };
+
+        Assert.Contains("parameterless constructor", WorkerRunPlan.UnrebuildableStrategy(options));
+    }
+
+    private sealed class NeedsArguments(int value) : IOutlierDetector
+    {
+        public string Name => $"needs-arguments ({value})";
+
+        public OutlierClassification Classify(double[] sortedSamples)
+            => OutlierClassification.KeepAll(sortedSamples);
+    }
+
+    private sealed class Rebuildable : IOutlierDetector
+    {
+        public string Name => "rebuildable";
+
+        public OutlierClassification Classify(double[] sortedSamples)
+            => OutlierClassification.KeepAll(sortedSamples);
+    }
+
+    private sealed class NeedsArgumentsTest(int value) : ISignificanceTest
+    {
+        public string Name => $"needs-arguments ({value})";
+
+        public SignificanceReport Analyze(SignificanceContext context) => new() { Pairwise = [] };
+    }
 }

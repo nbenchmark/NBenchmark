@@ -542,7 +542,10 @@ internal sealed class WorkerSession(FrameChannel channel)
         var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
         var index = 0;
 
-        foreach (var body in request.Bodies)
+        // Shuffled here, in the measuring process, for the same reason the discovered-class path
+        // orders inside the worker: the coordinator sends a set of addresses, and the order they are
+        // measured in is a property of the measurement rather than of the request.
+        foreach (var body in RunOrdering.Apply(request.Bodies, request.Order, request.Seed))
         {
             cancellationToken.ThrowIfCancellationRequested();
 

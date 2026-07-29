@@ -277,17 +277,6 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     The observer names forwarded to isolated children so they can activate the same
-    ///     registry-resolved observers as the parent. Only CLI-supplied names
-    ///     (<c>--observer &lt;name&gt;</c>) cross the process boundary: programmatic observer
-    ///     instances added via <see cref="WithObserver(IMeasurementObserver)" /> are live
-    ///     objects and cannot be serialized. The child resolves each name through
-    ///     <see cref="ObserverRegistry" />, which is populated identically by
-    ///     <c>[ModuleInitializer]</c> self-registration in the child's fresh process.
-    /// </summary>
-    private IReadOnlyList<string> ResolveObserverNames()
-        => _cliArgs.ObserverNames;
-
     public BenchmarkHarness WithInstanceFactory(Func<Type, object> factory)
     {
         _instanceFactory = type => InstanceHandle.NoTeardown(factory(type));
@@ -695,10 +684,9 @@ public sealed class BenchmarkHarness
             : MergeCliOptions(EffectiveBaseOptions, _cliArgs);
 
         // Apply opt-in hardware/OS controls (CPU affinity, process priority, dedicated-host
-        // guidance) for the duration of the run. The scope restores the prior process state
-        // on dispose. Isolated children receive the same settings via MeasurementOverrides
-        // and apply them themselves; the parent applies its own so in-process benchmarks and
-        // the parent-side measurement loop run pinned/elevated too.
+        // guidance) for the duration of the run. The scope restores the prior process state on
+        // dispose. A worker applies the same settings to itself from the options it was sent; this
+        // covers in-process benchmarks and the coordinator's own thread.
         using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
 
         var allNames = filtered
@@ -745,7 +733,8 @@ public sealed class BenchmarkHarness
                 // configuration the host happened to start with.
                 var workerDecision = inProcessGlobal
                     ? new WorkerRunPlan.Decision(WorkerRunPlan.Refusal.RequestedInProcess, null)
-                    : WorkerRunPlan.ForDiscoveredClass(suite.Type.Assembly.Location, _instanceFactory is not null);
+                    : WorkerRunPlan.ForDiscoveredClass(
+                        suite.Type.Assembly.Location, _instanceFactory is not null, suiteOptions);
 
                 if (workerDecision is { CanIsolate: false, Explanation: { } explanation })
                     EmitIsolationRefusal(suite.Type.Name, explanation);
@@ -942,10 +931,9 @@ public sealed class BenchmarkHarness
             ? _options with { Iterations = 0, WarmupIterations = 0 }
             : MergeCliOptions(EffectiveBaseOptions, _cliArgs);
 
-        // Apply opt-in hardware/OS controls to the parent process for the duration of the
-        // multi-runtime run, mirroring the single-runtime path. Each spawned child also
-        // applies its own settings via MeasurementOverrides; this scope covers the parent's
-        // own measurement/aggregation work.
+        // Apply opt-in hardware/OS controls to this process for the duration of the multi-runtime
+        // run, mirroring the single-runtime path. Each worker applies the same settings to itself
+        // from the options it was sent; this scope covers the coordinator's own aggregation work.
         using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
 
         // Resolve the observer once for the whole multi-runtime run so auto-attached
@@ -1083,6 +1071,17 @@ public sealed class BenchmarkHarness
 
         var options = ChildLaunchOptions;
 
+        // Said out loud rather than refused. Every other mode declines to isolate a run whose custom
+        // strategy a worker cannot rebuild, but this one has no in-process fallback available - the
+        // point is to measure another framework's build - so the honest move is to name the downgrade
+        // instead of hiding it behind a skipped runtime.
+        if (WorkerRunPlan.UnrebuildableStrategy(options) is { } strategyRefusal)
+        {
+            Console.Error.WriteLine(
+                $"  {tfm}: {strategyRefusal} These benchmarks will be scored with the built-in "
+                + "strategy instead. Give it a parameterless constructor to carry it across.");
+        }
+
         foreach (var suite in filteredSuites)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1101,7 +1100,11 @@ public sealed class BenchmarkHarness
                 DeclaringTypeFullName = suite.Type.FullName,
                 DisplayPrefix = suite.Type.Name,
                 BenchmarkNames = displayNames,
-                Options = options,
+
+                // One worker per (runtime x class), so this worker measures once - the same invariant
+                // every other request path pins, and leaving it unpinned here made this the one place
+                // a worker could be asked to spend replicates it has no way to report separately.
+                Options = options with { LaunchCount = 1 },
                 OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
                 SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
                 Order = _cliArgs.RunOrder ?? _runOrder,
@@ -1497,9 +1500,15 @@ public sealed class BenchmarkHarness
                         perLaunchSamples.Add(samples);
                     }
 
-                    var stats = LaunchAggregator.Aggregate(perLaunchResults);
-                    var best = LaunchAggregator.BestLaunch(perLaunchResults);
-                    allResults.Add(LaunchAggregator.Apply(best, stats));
+                    // Combine reads the representative launch's samples off the pairing, so the
+                    // displayed trim marks still index the array they were computed against. The
+                    // pooled samples below are what significance reads across every launch.
+                    var launches = perLaunchResults
+                        .Select((r, i) => new LaunchAggregator.Launch(
+                            r, perLaunchSamples[i].GetValueOrDefault(r.Name, [])))
+                        .ToList();
+
+                    allResults.Add(LaunchAggregator.Combine(launches));
 
                     foreach (var kvp in PoolRawSamplesByName(perLaunchSamples))
                     {
@@ -1543,18 +1552,19 @@ public sealed class BenchmarkHarness
 
         foreach (var name in names)
         {
-            var perLaunch = allLaunchResults
-                .Select(launch => launch.FirstOrDefault(r => r.Name == name))
-                .Where(r => r is not null)
-                .Cast<BenchmarkResult>()
+            // Zipped before filtering, so a launch missing this benchmark drops its samples with it
+            // rather than shifting every later launch's samples onto the wrong result.
+            var launches = allLaunchResults
+                .Select((launch, i) => (Result: launch.FirstOrDefault(r => r.Name == name), Index: i))
+                .Where(x => x.Result is not null)
+                .Select(x => new LaunchAggregator.Launch(
+                    x.Result!, allLaunchSamples[x.Index].GetValueOrDefault(name, [])))
                 .ToList();
 
-            if (perLaunch.Count == 0)
+            if (launches.Count == 0)
                 continue;
 
-            var stats = LaunchAggregator.Aggregate(perLaunch);
-            var best = LaunchAggregator.BestLaunch(perLaunch);
-            aggregated.Add(LaunchAggregator.Apply(best, stats));
+            aggregated.Add(LaunchAggregator.Combine(launches));
 
             if (pooledSamples.TryGetValue(name, out var launchSamples))
                 samples[name] = launchSamples;
@@ -1590,44 +1600,12 @@ public sealed class BenchmarkHarness
         RunOrder order,
         int? seed)
     {
-        if (order != RunOrder.Random)
-            return benchmarks;
-
-        var hasParameters = benchmarks.Any(b => b.ParameterSet.Count > 0);
-
-        if (!hasParameters)
-        {
-            var shuffled = benchmarks.ToList();
-            var rng = new Random(seed ?? Random.Shared.Next());
-            ShuffleInPlace(shuffled, rng);
-            return shuffled;
-        }
-
-        var parameterGroups = benchmarks
-            .GroupBy(b => BenchmarkParameter.GetKey(b.ParameterSet))
-            .ToList();
-
-        var ordered = new List<BenchmarkMethodDefinition>(benchmarks.Count);
-        var groupSeedRng = new Random(seed ?? Random.Shared.Next());
-
-        foreach (var group in parameterGroups)
-        {
-            var groupList = group.ToList();
-            var groupRng = new Random(groupSeedRng.Next());
-            ShuffleInPlace(groupList, groupRng);
-            ordered.AddRange(groupList);
-        }
-
-        return ordered;
-    }
-
-    private static void ShuffleInPlace<T>(List<T> items, Random rng)
-    {
-        for (var i = items.Count - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (items[i], items[j]) = (items[j], items[i]);
-        }
+        // A parameter sweep keeps its parameter values in declaration order and randomizes only
+        // within each of them, because every comparison the table invites is within a parameter
+        // value and interleaving the values would make the table unreadable for no statistical gain.
+        return benchmarks.Any(b => b.ParameterSet.Count > 0)
+            ? RunOrdering.ApplyWithinGroups(benchmarks, order, seed, b => BenchmarkParameter.GetKey(b.ParameterSet))
+            : RunOrdering.Apply(benchmarks, order, seed);
     }
 
     /// <summary>
@@ -1731,7 +1709,7 @@ public sealed class BenchmarkHarness
                 WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _));
 
             allLaunchItems.Add(
-                await RunGroupInWorkerAsync(request, names, suite, timeout, observer, cancellationToken)
+                await RunGroupInWorkerAsync(request, replicate, names, suite, timeout, observer, cancellationToken)
                     .ConfigureAwait(false));
         }
 
@@ -1865,13 +1843,14 @@ public sealed class BenchmarkHarness
     /// </summary>
     private async Task<IReadOnlyList<IsolatedResultItem>> RunGroupInWorkerAsync(
         RunGroupPayload request,
+        int replicate,
         IReadOnlyList<string> benchmarkNames,
         BenchmarkSuiteDefinition suite,
         TimeSpan timeout,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
-        var isFirstReplicate = request.GroupId.EndsWith("#0", StringComparison.Ordinal);
+        var isFirstReplicate = replicate == 0;
 
         var group = await WorkerLauncher.Current.RunGroupAsync(
                 request,
@@ -1912,14 +1891,14 @@ public sealed class BenchmarkHarness
         foreach (var benchmark in benchmarks)
         {
             var name = $"{suite.Type.Name}.{benchmark.DisplayName}";
-            var perLaunchResults = new List<BenchmarkResult>();
+            var perLaunchResults = new List<LaunchAggregator.Launch>();
 
             foreach (var launchItems in allLaunchItems)
             {
                 var match = launchItems.FirstOrDefault(item => item.Result.Name == name);
 
                 if (match is not null)
-                    perLaunchResults.Add(match.Result with { RawSamples = match.RawSamples });
+                    perLaunchResults.Add(new LaunchAggregator.Launch(match.Result, match.RawSamples));
             }
 
             if (perLaunchResults.Count == 0)
@@ -1939,24 +1918,23 @@ public sealed class BenchmarkHarness
                 continue;
             }
 
-            var stats = LaunchAggregator.Aggregate(perLaunchResults);
-            var best = LaunchAggregator.BestLaunch(perLaunchResults);
             var rawSamples = allLaunchItems
                 .SelectMany(launchItems => launchItems.Where(item => item.Result.Name == name))
                 .SelectMany(item => item.RawSamples)
                 .ToArray();
 
-            // Keep representative-launch samples on the displayed result so statistical fields
-            // and TrimmedOrdinals remain aligned; pooled samples still travel alongside for
-            // significance calculations.
-            // Pooling samples across replicate workers multiplies statistical power without
-            // improving reproducibility, so a difference far below the run-to-run noise can still
-            // read as overwhelmingly significant. Apply attaches a warning where that is happening.
-            var aggregatedResult = LaunchAggregator.Apply(best, stats);
-
+            // Combine averages the per-launch estimates and takes the reported interval from the
+            // spread between the workers, so the number describes what a re-run would produce rather
+            // than how precisely the luckiest worker measured it. It keeps the representative launch's
+            // own samples on the row so the trim marks still index the array they came from; the
+            // pooled array travels alongside for significance.
+            //
+            // Pooling samples across replicate workers multiplies statistical power without improving
+            // reproducibility, so a difference far below the run-to-run noise can still read as
+            // overwhelmingly significant. Combine attaches a warning where that is happening.
             aggregated.Add(new IsolatedResultItem
             {
-                Result = aggregatedResult,
+                Result = LaunchAggregator.Combine(perLaunchResults),
                 RawSamples = rawSamples,
             });
         }
@@ -1965,10 +1943,9 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     Child-process entry point: run the class the parent requested (one or more of
-    ///     its benchmarks) in this fresh CLR and write the serialized samples to the output
-    ///     file the parent supplied. No banner, progress, or reporters - the parent owns
-    ///     presentation and computes significance over the returned samples.
+    ///     Warns on every result from a class that shares one instance across several benchmark
+    ///     methods, because the second method can observe state the first left behind - which breaks
+    ///     the independence assumption the significance test rests on.
     /// </summary>
     private static void ApplyPerClassIndependenceWarning(
         List<BenchmarkResult> results,

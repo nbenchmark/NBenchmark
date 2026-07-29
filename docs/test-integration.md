@@ -1,0 +1,666 @@
+# mstest.md
+
+---
+title: "Test integration: MSTest"
+description: Run NBenchmark benchmarks as MSTest tests using [PerformanceTestMethod] or PerformanceAssert.
+order: 3
+---
+
+# MSTest integration
+
+`NBenchmark.Integration.MSTest` lets you enforce performance thresholds on MSTest tests. There are two ways to use it:
+
+- **`[PerformanceTestMethod]` attribute** - the entire test method is run as a benchmark.
+- **`PerformanceAssert`** - benchmark a specific piece of code inline from any test.
+
+## Installation
+
+```bash
+dotnet add package NBenchmark.Integration.MSTest
+```
+
+This automatically pulls in `NBenchmark` and `NBenchmark.Integration.Abstractions`.
+
+## [PerformanceTestMethod]
+
+Add `[PerformanceTestMethod]` in place of `[TestMethod]`. The method body is run as a benchmark and the result is checked against the configured thresholds. If a threshold is exceeded the test fails.
+
+```csharp
+using NBenchmark.Integration.MSTest;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+[TestClass]
+public class SerializationTests
+{
+    [PerformanceTestMethod(MaxMeanNs = 500_000)]
+    public void Serialize_Is_Fast_Enough()
+    {
+        JsonSerializer.Serialize(new MyDto { Id = 1, Name = "test" });
+    }
+}
+```
+
+### Async tests
+
+```csharp
+[PerformanceTestMethod(MaxMeanNs = 2_000_000)]
+public async Task FetchFromCache_Is_Fast_Enough()
+{
+    await _cache.GetAsync("key");
+}
+```
+
+Both `Task` and `Task<T>` return types are supported.
+
+### Data-driven tests
+
+`[PerformanceTestMethod]` works with MSTest's data-driven attributes:
+
+```csharp
+[PerformanceTestMethod(MaxMeanNs = 1_000_000)]
+[DataRow(10)]
+[DataRow(100)]
+[DataRow(1_000)]
+public void Sort_Scales_Reasonably(int size)
+{
+    var data = Enumerable.Range(0, size).Reverse().ToArray();
+    Array.Sort(data);
+}
+```
+
+Each data row is benchmarked independently and reported as a separate test case.
+
+> [!NOTE]
+> Thresholds apply to every data row. If you need different limits per row, split into separate methods or use `PerformanceAssert` (see below) for per-row control.
+
+## Threshold properties
+
+See the [thresholds reference](./index.md#thresholds-reference) for the complete list. All properties are `init`-only.
+
+```csharp
+[PerformanceTestMethod(
+    MaxMeanNs         = 100_000,   // fail if mean > 100 us
+    MaxP95Ns          = 300_000,   // fail if P95  > 300 us
+    MaxAllocatedBytes = 4096,      // fail if mean allocs > 4 KiB per op
+    MaxSlowdownRatio  = 5.0,      // fail if >5x the calibration benchmark
+    ReferenceMethod   = nameof(ReferenceImpl),  // compare against this method instead of calibration
+    Iterations        = 300,
+    WarmupIterations  = 30,
+    OutlierMode       = OutlierMode.IqrFence,
+    ConfidenceLevel   = 0.99)]
+public void CriticalPath() { /* ... */ }
+
+private static void ReferenceImpl() { /* ... */ }
+```
+
+## PerformanceAssert
+
+Use `PerformanceAssert` when you want to benchmark a specific piece of code inside an existing test, rather than benchmarking the entire test method.
+
+### Synchronous
+
+```csharp
+[TestMethod]
+public void Repository_Query_Is_Fast_Enough()
+{
+    var repo = new OrderRepository(connection);
+
+    var result = PerformanceAssert.Run(
+        () => repo.GetRecentOrders(limit: 100),
+        new PerformanceAssertionOptions { MaxMeanNs = 2_000_000 },
+        name: "GetRecentOrders");
+
+    // result is a BenchmarkResult - inspect it further if needed
+    Assert.IsTrue(result.Mean < 3_000_000);
+}
+```
+
+### Async
+
+```csharp
+[TestMethod]
+public async Task Cache_Lookup_Is_Fast_Enough()
+{
+    await PerformanceAssert.RunAsync(
+        async () => await _cache.GetAsync("key"),
+        new PerformanceAssertionOptions { MaxMeanNs = 500_000 });
+}
+```
+
+### Validate an existing BenchmarkResult
+
+If you already have a `BenchmarkResult` from `Benchmark.Run`, call `PerformanceAssert.Validate` to assert against it:
+
+```csharp
+[TestMethod]
+public void Manually_Measured_Code_Meets_Threshold()
+{
+    var result = Benchmark.Run(() => DoWork(), name: "DoWork");
+
+    PerformanceAssert.Validate(result, new PerformanceAssertionOptions
+    {
+        MaxMeanNs = 100_000,
+        MaxP95Ns  = 200_000,
+    });
+}
+```
+
+### PerformanceAssertionOptions reference
+
+`PerformanceAssertionOptions` exposes the same properties as the `[PerformanceTestMethod]` attribute. All properties are optional; omitting them disables the corresponding check.
+
+```csharp
+new PerformanceAssertionOptions
+{
+    MaxMeanNs          = 100_000,
+    MaxP95Ns           = 300_000,
+    MaxAllocatedBytes  = 4096,
+    MaxSlowdownRatio   = 5.0,      // calibration mode (assert pattern does not support ReferenceMethod)
+    Iterations         = 300,
+    WarmupIterations   = 30,
+    MeasureAllocations = true,
+    OutlierMode        = OutlierMode.IqrFence,
+    ConfidenceLevel    = 0.99,
+}
+```
+
+## Failure output
+
+When a threshold is violated the test fails with a `PerformanceAssertException` (which extends `AssertFailedException`). The message lists every violated threshold:
+
+```
+Performance thresholds exceeded for 'GetRecentOrders':
+  - Mean 2,341,289.50 ns exceeds maximum 2,000,000.00 ns (excess: 341,289.50 ns)
+```
+
+
+---
+
+# xunit.md
+
+---
+title: "Test integration: xUnit"
+description: Run NBenchmark benchmarks as xUnit tests using PerformanceFact and PerformanceTheory attributes.
+order: 1
+---
+
+# xUnit integration
+
+`NBenchmark.Integration.xUnit` lets you enforce performance thresholds on xUnit tests. Replace `[Fact]` with `[PerformanceFact]` or `[Theory]` with `[PerformanceTheory]` and set threshold properties as named arguments. If any threshold is exceeded the test fails.
+
+## Installation
+
+```bash
+dotnet add package NBenchmark.Integration.xUnit
+```
+
+This automatically pulls in `NBenchmark` and `NBenchmark.Integration.Abstractions`.
+
+## Quick start
+
+```csharp
+using NBenchmark.Integration.xUnit;
+
+public class SerializationTests
+{
+    [PerformanceFact(MaxMeanNs = 500_000)]
+    public void Serialize_Is_Fast_Enough()
+    {
+        JsonSerializer.Serialize(new MyDto { Id = 1, Name = "test" });
+    }
+}
+```
+
+`PerformanceFact` discovers this test through xUnit's extensibility API. The method body is run as a benchmark (warmup + measured iterations) and the measured mean is compared to `MaxMeanNs`. If the mean exceeds 500 µs the test fails.
+
+## [PerformanceFact]
+
+`PerformanceFact` extends `FactAttribute`. Every `[Fact]` property (`DisplayName`, `Skip`, etc.) continues to work. Add any threshold properties as named arguments.
+
+```csharp
+[PerformanceFact(
+    MaxMeanNs = 100_000,
+    MaxP95Ns  = 250_000,
+    MaxAllocatedBytes = 1024,
+    Iterations = 500,
+    WarmupIterations = 50)]
+public void ProcessMessage()
+{
+    MessageProcessor.Process(SampleMessage);
+}
+```
+
+### Async tests
+
+```csharp
+[PerformanceFact(MaxMeanNs = 2_000_000)]
+public async Task FetchFromCache_Is_Fast_Enough()
+{
+    await _cache.GetAsync("key");
+}
+```
+
+Both `Task` and `ValueTask` return types are supported.
+
+## [PerformanceTheory]
+
+`PerformanceTheory` extends `TheoryAttribute`. Use it together with any standard xUnit data source (`[InlineData]`, `[MemberData]`, `[ClassData]`). The benchmark runs once per data row and each row is reported as a separate test case.
+
+```csharp
+[PerformanceTheory(MaxMeanNs = 1_000_000)]
+[InlineData(10)]
+[InlineData(100)]
+[InlineData(1_000)]
+public void Sort_Scales_Reasonably(int size)
+{
+    var data = Enumerable.Range(0, size).Reverse().ToArray();
+    Array.Sort(data);
+}
+```
+
+> [!NOTE]
+> Thresholds apply to every data row. If you need different limits per row, split the test into separate `[PerformanceFact]` methods.
+
+## Threshold properties
+
+See the [thresholds reference](./index.md#thresholds-reference) for the complete list. All properties are `init`-only.
+
+```csharp
+[PerformanceFact(
+    MaxMeanNs        = 100_000,    // fail if mean > 100 us
+    MaxP95Ns         = 300_000,    // fail if P95  > 300 us
+    MaxAllocatedBytes = 4096,      // fail if mean allocs > 4 KiB per op
+    MaxSlowdownRatio = 5.0,       // fail if >5x the calibration benchmark
+    ReferenceMethod  = nameof(ReferenceImpl),  // compare against this method instead of calibration
+    Iterations       = 300,
+    WarmupIterations = 30,
+    OutlierMode      = OutlierMode.IqrFence,
+    ConfidenceLevel  = 0.99)]
+public void CriticalPath() { /* ... */ }
+
+private static void ReferenceImpl() { /* ... */ }
+```
+
+## Failure output
+
+When a threshold is violated the test fails with a `PerformanceAssertException`. The message lists every violated threshold:
+
+```
+Performance thresholds exceeded for 'CriticalPath':
+  - Mean 612,847.23 ns exceeds maximum 500,000.00 ns (excess: 112,847.23 ns)
+  - P95 1,204,312.00 ns exceeds maximum 1,000,000.00 ns (excess: 204,312.00 ns)
+```
+
+## Inline assertions from a plain [Fact]
+
+If you need to benchmark only part of a test and you want to stay within a regular `[Fact]`, use `Benchmark.Run` from the core package and inspect the result:
+
+```csharp
+using NBenchmark;
+using NBenchmark.Integration.Abstractions;
+using Xunit;
+
+[Fact]
+public void Critical_Section_Is_Fast()
+{
+    // setup ...
+
+    var result = Benchmark.Run(() => CriticalSection());
+
+    var violations = BenchmarkAssert.Validate(result, new PerformanceThresholds
+    {
+        MaxMeanNs = 200_000,
+    });
+
+    Assert.Empty(violations);
+}
+```
+
+`BenchmarkAssert.Validate` is in `NBenchmark.Integration.Abstractions`, which is already a transitive dependency of `NBenchmark.Integration.xUnit`.
+
+
+---
+
+# nunit.md
+
+---
+title: "Test integration: NUnit"
+description: Run NBenchmark benchmarks as NUnit tests using the [Performance] attribute or PerformanceAssert.
+order: 2
+---
+
+# NUnit integration
+
+`NBenchmark.Integration.NUnit` lets you enforce performance thresholds on NUnit tests. There are two ways to use it:
+
+- **`[Performance]` attribute** - the entire test method is run as a benchmark.
+- **`PerformanceAssert`** - benchmark a specific piece of code inline from any test.
+
+## Installation
+
+```bash
+dotnet add package NBenchmark.Integration.NUnit
+```
+
+This automatically pulls in `NBenchmark` and `NBenchmark.Integration.Abstractions`.
+
+## [Performance] attribute
+
+Add `[Performance]` to any test method in place of (or in addition to) `[Test]`. The method body is run as a benchmark and the result is checked against the configured thresholds. If a threshold is exceeded the test fails.
+
+```csharp
+using NBenchmark.Integration.NUnit;
+using NUnit.Framework;
+
+[TestFixture]
+public class SerializationTests
+{
+    [Performance(MaxMeanNs = 500_000)]
+    public void Serialize_Is_Fast_Enough()
+    {
+        JsonSerializer.Serialize(new MyDto { Id = 1, Name = "test" });
+    }
+}
+```
+
+### Async tests
+
+```csharp
+[Performance(MaxMeanNs = 2_000_000)]
+public async Task FetchFromCache_Is_Fast_Enough()
+{
+    await _cache.GetAsync("key");
+}
+```
+
+`Task`, `Task<T>`, `ValueTask`, and `ValueTask<T>` return types are all supported.
+
+### Parameterised tests
+
+`[Performance]` works together with NUnit's built-in parameterisation attributes:
+
+```csharp
+[Performance(MaxMeanNs = 1_000_000)]
+[TestCase(10)]
+[TestCase(100)]
+[TestCase(1_000)]
+public void Sort_Scales_Reasonably(int size)
+{
+    var data = Enumerable.Range(0, size).Reverse().ToArray();
+    Array.Sort(data);
+}
+```
+
+Each test case is benchmarked independently and reported as a separate NUnit test.
+
+> [!NOTE]
+> Thresholds apply to every test case. If you need different limits per case, split into separate methods or use `PerformanceAssert` (see below) for per-case control.
+
+## Threshold properties
+
+See the [thresholds reference](./index.md#thresholds-reference) for the complete list. All properties are `init`-only.
+
+```csharp
+[Performance(
+    MaxMeanNs         = 100_000,   // fail if mean > 100 us
+    MaxP95Ns          = 300_000,   // fail if P95  > 300 us
+    MaxAllocatedBytes = 4096,      // fail if mean allocs > 4 KiB per op
+    MaxSlowdownRatio  = 5.0,      // fail if >5x the calibration benchmark
+    ReferenceMethod   = nameof(ReferenceImpl),  // compare against this method instead of calibration
+    Iterations        = 300,
+    WarmupIterations  = 30,
+    OutlierMode       = OutlierMode.IqrFence,
+    ConfidenceLevel   = 0.99)]
+public void CriticalPath() { /* ... */ }
+
+private static void ReferenceImpl() { /* ... */ }
+```
+
+## PerformanceAssert
+
+Use `PerformanceAssert` when you want to benchmark a specific piece of code inside an existing test, rather than benchmarking the entire test method.
+
+### Synchronous
+
+```csharp
+[Test]
+public void Repository_Query_Is_Fast_Enough()
+{
+    var repo = new OrderRepository(connection);
+
+    var result = PerformanceAssert.Run(
+        () => repo.GetRecentOrders(limit: 100),
+        new PerformanceAssertionOptions { MaxMeanNs = 2_000_000 },
+        name: "GetRecentOrders");
+
+    // result is a BenchmarkResult - inspect it further if needed
+    Assert.That(result.Mean, Is.LessThan(3_000_000));
+}
+```
+
+### Async
+
+```csharp
+[Test]
+public async Task Cache_Lookup_Is_Fast_Enough()
+{
+    await PerformanceAssert.RunAsync(
+        async () => await _cache.GetAsync("key"),
+        new PerformanceAssertionOptions { MaxMeanNs = 500_000 });
+}
+```
+
+### Validate an existing BenchmarkResult
+
+If you already have a `BenchmarkResult` from `Benchmark.Run`, call `PerformanceAssert.Validate` to assert against it:
+
+```csharp
+[Test]
+public void Manually_Measured_Code_Meets_Threshold()
+{
+    var result = Benchmark.Run(() => DoWork(), name: "DoWork");
+
+    PerformanceAssert.Validate(result, new PerformanceAssertionOptions
+    {
+        MaxMeanNs = 100_000,
+        MaxP95Ns  = 200_000,
+    });
+}
+```
+
+### PerformanceAssertionOptions reference
+
+`PerformanceAssertionOptions` exposes the same properties as the `[Performance]` attribute. All properties are optional; omitting them disables the corresponding check.
+
+```csharp
+new PerformanceAssertionOptions
+{
+    MaxMeanNs         = 100_000,
+    MaxP95Ns          = 300_000,
+    MaxAllocatedBytes = 4096,
+    MaxSlowdownRatio  = 5.0,       // calibration mode (assert pattern does not support ReferenceMethod)
+    Iterations        = 300,
+    WarmupIterations  = 30,
+    MeasureAllocations = true,
+    OutlierMode       = OutlierMode.IqrFence,
+    ConfidenceLevel   = 0.99,
+}
+```
+
+## Failure output
+
+When a threshold is violated the test fails with an NUnit assertion failure. The message lists every violated threshold:
+
+```
+Performance thresholds exceeded for 'GetRecentOrders':
+  - Mean 2,341,289.50 ns exceeds maximum 2,000,000.00 ns (excess: 341,289.50 ns)
+```
+
+
+---
+
+# index.md
+
+---
+title: Test integration
+description: Enforce performance thresholds inside an existing xUnit, NUnit, or MSTest test suite.
+order: 7
+---
+
+# Test integration
+
+NBenchmark's integration packages connect it to the rest of your toolchain. The current integrations focus on test frameworks, letting you enforce performance thresholds directly inside your existing test suite - no separate benchmark project or CI step required.
+
+## Test framework packages
+
+| Package | Framework |
+| --- | --- |
+| `NBenchmark.Integration.xUnit` | xUnit v2 |
+| `NBenchmark.Integration.NUnit` | NUnit 3 / 4 |
+| `NBenchmark.Integration.MSTest` | MSTest v2 / v3 |
+
+Each package has **no opinion on your test runner** - it slots into whichever framework you already use. All three packages depend on `NBenchmark` (the core package) and on a shared `NBenchmark.Integration.Abstractions` package that is pulled in automatically.
+
+## Two usage patterns
+
+### Attribute pattern
+
+Replace the test attribute on a test method. The entire method body becomes the benchmark. Thresholds are set as named arguments on the attribute.
+
+```csharp
+// xUnit
+[PerformanceFact(MaxMeanNs = 500_000)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+
+// NUnit
+[Performance(MaxMeanNs = 500_000)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+
+// MSTest
+[PerformanceTestMethod(MaxMeanNs = 500_000)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+```
+
+If the measured mean exceeds `500_000 ns` (500 us), the test fails with a message describing the violation.
+
+### Assert pattern (NUnit and MSTest)
+
+Call `PerformanceAssert.Run` from inside any test. The benchmark runs inline and violations fail the test immediately. This is useful when you want to measure just one part of a larger test.
+
+```csharp
+// NUnit
+[Test]
+public void Repository_Query_Is_Fast_Enough()
+{
+    var repo = new OrderRepository(connection);
+
+    PerformanceAssert.Run(
+        () => repo.GetRecentOrders(limit: 100),
+        new PerformanceAssertionOptions { MaxMeanNs = 2_000_000 });
+}
+
+// MSTest
+[TestMethod]
+public void Repository_Query_Is_Fast_Enough()
+{
+    var repo = new OrderRepository(connection);
+
+    PerformanceAssert.Run(
+        () => repo.GetRecentOrders(limit: 100),
+        new PerformanceAssertionOptions { MaxMeanNs = 2_000_000 });
+}
+```
+
+## Relative regression checks
+
+Regression checks compare your benchmark against a reference point measured in the same run, so a fast developer machine and a slow CI runner produce a similar ratio. No stored files, no environment mismatch, no CI workflow setup.
+
+Both sides are measured in worker processes when they can be, and the ratio gate is only enforced when they were - two measurements sharing a test host also share its JIT tiering state, which on bodies of identical cost fabricated a 2.80x ratio. See [when a ratio gate is enforced](../guides/performance-gates.md#when-a-ratio-gate-is-enforced), `[AllowInProcessGate]`, and `RequireIsolation`.
+
+### Calibration mode (zero config)
+
+When you set `MaxSlowdownRatio` without `ReferenceMethod`, the test runs a built-in CPU-bound calibration benchmark alongside your method. The ratio between your method and the calibration is stable across hardware for CPU-bound work - both scale with machine speed. For allocation-heavy or I/O-bound benchmarks, the ratio to a CPU calibration loop is less stable across hardware; use `ReferenceMethod` to compare against a method with a similar resource profile, or use absolute thresholds with `MaxAbsoluteThresholdTolerance`.
+
+The calibration is measured in the same place as the method it divides into. When your test runs in an isolated worker the worker measures the calibration too, so both sides of the ratio share a runtime configuration - the worker's tiering and ReadyToRun settings differ from the test host's, and on bodies of identical cost that difference alone moved the number by ~3.3x. When the worker cannot produce one, the gate falls back to a host-measured calibration and adds a note to the test output saying the ratio spans two configurations.
+
+```csharp
+// xUnit
+[PerformanceFact(MaxSlowdownRatio = 5.0)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+
+// NUnit
+[Performance(MaxSlowdownRatio = 5.0)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+
+// MSTest
+[PerformanceTestMethod(MaxSlowdownRatio = 5.0)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+```
+
+The test fails when the slowdown is **both** statistically significant (Mann-Whitney U p-value below the significance level) **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
+
+Failure output includes ratio and significance details (`ratio`, `p`, and Cliff's delta) when a slowdown breaches the gate. A practical tuning workflow is to start with a loose value (for example `MaxSlowdownRatio = 10.0`) and tighten it based on several runs in your CI environment.
+
+### ReferenceMethod mode (compare two implementations)
+
+When you have two implementations to compare, point `ReferenceMethod` at the baseline implementation. The candidate must not exceed `MaxSlowdownRatio` relative to the reference; both are measured the same way, in matching worker processes when they isolate.
+
+```csharp
+// xUnit
+[PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse))]
+public void OptimisedParse() => OptimisedParser.Parse(Payload);
+
+private static void NaiveParse() => NaiveParser.Parse(Payload);
+```
+
+The reference method can be private. It runs with the same measurement options as the candidate (iterations, warmup, outlier mode, confidence level). This keeps the comparison apples-to-apples: if the candidate uses `Iterations = 300`, the reference also runs 300 iterations. Wall-clock cost for the test is therefore candidate + reference durations.
+
+`ReferenceMethod` is only available in the attribute pattern. The assert pattern (`PerformanceAssert.Run`) supports calibration mode only.
+
+See [Statistics: Significance Testing](../statistics/significance.md) for how the comparison is performed.
+
+## Thresholds reference
+
+All three packages share the same set of threshold properties. A threshold of `-1` (double) or `-1` (long) means the check is disabled. Omitting a property is equivalent to `-1`.
+
+| Property | Type | Default | Description |
+| --- | --- | --- | --- |
+| `MaxMeanNs` | `double` | -1 (disabled) | Maximum allowed mean execution time in nanoseconds. |
+| `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles` (the default set includes `0.95`). If P95 was not computed, a clear error message guides you to check the configuration. |
+| `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
+| `MaxSlowdownRatio` | `double` | 0 (disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g. `5.0` = 5x the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
+| `ReferenceMethod` | `string?` | null | Name of a method on the same class to use as the reference for ratio comparison. When null, calibration mode runs (built-in CPU-bound benchmark). |
+| `Iterations` | `int` | 0 (use default) | Override the number of measured samples. `0` uses the framework default (auto-resolved). |
+| `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup samples. `0` uses the framework default (auto-detected). |
+| `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
+| `RequireIsolation` | `bool` | false | Fail the test when the measurement was taken in the test host rather than a worker process. Use it on gates that matter: isolation can be lost quietly when a fixture argument is added or a worker fails to deploy, and the gate would otherwise keep passing against a number measured somewhere you did not choose. |
+| `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
+| `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |
+| `MaxAbsoluteThresholdTolerance` | `double` | 1.0 | Multiplier applied to absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) when a shared runner or high-jitter host is detected. Set to e.g. `1.25` for 25% relaxation on shared CI runners. |
+
+See [Configuration](../reference/configuration.md) for a full explanation of each option.
+
+## SLA-style hard limits
+
+Absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) are susceptible to shared-runner noise in CI. Prefer `MaxSlowdownRatio` (calibration or `ReferenceMethod`) for regression gates; use absolute thresholds only when you have a hard SLA.
+
+On shared CI runners, set `MaxAbsoluteThresholdTolerance` to relax absolute thresholds for jitter:
+
+```csharp
+[PerformanceFact(
+    MaxMeanNs = 500_000,
+    MaxAbsoluteThresholdTolerance = 1.25)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+```
+
+When a shared runner or high-jitter host is detected, the effective threshold becomes `500_000 x 1.25 = 625_000 ns`. On a dedicated host, the original `500_000 ns` threshold applies.
+
+## Per-framework reference
+
+- [xUnit integration](./xunit.md)
+- [NUnit integration](./nunit.md)
+- [MSTest integration](./mstest.md)
+
+
+---
+

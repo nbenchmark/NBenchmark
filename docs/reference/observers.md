@@ -148,6 +148,21 @@ A typical benchmark with auto-warmup and auto-measurement emits events in this o
 
 When `OpsPerSample` is pinned (calibration skipped) or `WarmupIterations=0` (warmup skipped), the corresponding phases are omitted.
 
+## What an isolated run delivers
+
+Benchmarks are measured in a separate `nbworker` process by default, and the observer you registered lives in *your* process. Your instance is still called — the worker streams events back over its pipe and the coordinator replays them into the live object — but not every callback crosses:
+
+| Callback | Isolated (default) | `--in-process` / `RunInProcess` |
+| --- | --- | --- |
+| `OnPhase` | ✅ every transition, with its payload | ✅ |
+| `OnResult` | ✅ once per benchmark, raised from the completion frame | ✅ |
+| `OnSample` | ❌ not forwarded | ✅ |
+| `OnDetector` | ❌ not forwarded | ✅ |
+
+`OnSample` and `OnDetector` stop at the boundary deliberately. A single benchmark emits thousands of them, and encoding thousands of frames would put the cost of observing the run *inside* the run — the opposite of what a worker is for. Nothing is lost from the result: the worker computes every statistic over the full sample array and ships the samples themselves on the completion frame, so `BenchmarkResult.RawSamples` is complete (subject to `MaxRawSamples`, which `--emit-raw` lifts).
+
+If your observer genuinely needs the per-sample stream — a live histogram, a sample-level exporter — measure in-process for that run and accept the fidelity cost, which is stamped on every result as `host`. See [Isolated runs](../features/isolated-runs.md).
+
 ## Throttling
 
 Sample events are throttled by `ProgressCadence(n) = Math.Min(Math.Max(1, n / 20), 50)` where `n` is the current sample count. For 5 samples all emit; for 100,000 samples every 50th emits. This prevents the observer from dominating the hot path on long runs.

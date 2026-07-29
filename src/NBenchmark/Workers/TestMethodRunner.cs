@@ -49,7 +49,12 @@ public static class TestMethodRunner
     ///     an argument's <i>declared parameter type</i> - not its runtime type - is what has to be
     ///     reconstructible, and only the method knows that.
     /// </remarks>
-    public static bool CanAddress(MethodInfo method, out string? refusal)
+    /// <param name="options">
+    ///     The measurement configuration, so a pinned outlier detector or significance test that a
+    ///     worker cannot rebuild is caught here instead of being silently replaced by the built-in one
+    ///     on the far side. <c>null</c> skips that check.
+    /// </param>
+    public static bool CanAddress(MethodInfo method, out string? refusal, MeasurementOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(method);
 
@@ -76,6 +81,13 @@ public static class TestMethodRunner
             return false;
         }
 
+        if (options is not null && WorkerRunPlan.UnrebuildableStrategy(options) is { } strategyRefusal)
+        {
+            refusal = strategyRefusal;
+
+            return false;
+        }
+
         return true;
     }
 
@@ -97,7 +109,7 @@ public static class TestMethodRunner
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (!CanAddress(method, out var refusal))
+        if (!CanAddress(method, out var refusal, options))
             return new Outcome(null, [], refusal);
 
         var declaringType = method.DeclaringType!;

@@ -140,11 +140,13 @@ CI-sourced values take precedence over the git CLI fallback. When no CI or git e
 
 ## Cross-process streaming
 
-Harness mode runs each discovered class in an isolated child process by default. The in-memory `IMeasurementObserver` callback cannot cross the process boundary, so OTLP export is the cross-process channel: instrument the child, point its exporter at a collector, and live telemetry crosses the process boundary cleanly.
+Benchmarks are measured in a separate `nbworker` process by default. Your own `IMeasurementObserver` and `IBenchmarkProgress` instances still fire: the worker streams its phase and progress events back over its pipe and the coordinator replays them into the live objects you registered, so no OTLP configuration is needed to observe an isolated run.
+
+What OTLP adds is a channel to something *outside* both processes — a collector, a tracing backend, a dashboard. For that the worker needs its own exporter configuration, which it inherits from the coordinator's environment.
 
 ### Env-var forwarding
 
-`ChildProcessLauncher` forwards the following environment variables from parent to every spawned child:
+`MeasurementBudget.ApplyTelemetryEnvironment` writes the following environment variables into every worker's environment block before it starts:
 
 | Env var | Purpose |
 | --- | --- |
@@ -156,7 +158,7 @@ Harness mode runs each discovered class in an isolated child process by default.
 | `OTEL_SERVICE_NAME` | Service name (passed through) |
 | `NBENCHMARK_OTEL_ENDPOINT` | NBenchmark-specific endpoint mirror (see `--otlp-endpoint` CLI flag) |
 
-When `NBENCHMARK_OTEL_ENDPOINT` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is not, the launcher mirrors it into `OTEL_EXPORTER_OTLP_ENDPOINT` so an SDK wired only against the standard variable picks it up without extra configuration.
+When `NBENCHMARK_OTEL_ENDPOINT` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is not, the mirror is applied so an SDK wired only against the standard variable picks it up without extra configuration.
 
 ### `--otlp-endpoint` CLI flag
 

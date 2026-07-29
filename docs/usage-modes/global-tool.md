@@ -110,7 +110,9 @@ dotnet benchmark                              # isolated (default)
 dotnet benchmark --in-process                 # all in-process
 ```
 
-When using `--project`, the tool forwards the built benchmark assembly paths to child processes automatically, so isolated runs work from any working directory.
+The tool itself never measures. It loads your assembly to discover benchmarks, then hands each class to a worker along with the path to the assembly that declares it — so no environment forwarding is involved and isolated runs work from any working directory.
+
+The worker it launches is the one deployed **beside the assembly under test**, not beside the tool. That matters because a worker is framework-dependent: only the net8.0 worker can load a net8.0 build, and it is your project's own `bin` that has it. If a run reports every benchmark as `in-process (no worker)`, the usual cause is that the target project was built without the worker — check that it references the `NBenchmark` package and has not set `NBenchmarkDeployWorker=false`.
 
 ## Examples
 

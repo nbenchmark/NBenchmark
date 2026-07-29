@@ -61,11 +61,26 @@
     <Error Condition="!Exists('$(_NBenchmarkWorkerOutput)nbworker.dll')"
            Text="The measurement worker was not built for $(TargetFramework). Packing without it would ship a package whose benchmarks silently fall back to in-process measurement."/>
 
+    <!--
+      The whole worker output, not just nbworker's own three files. nbworker.deps.json lists
+      NBenchmark as a dependency resolved relative to nbworker.dll's own directory, so a tools
+      folder holding only nbworker would fail to start with a host-level FileNotFoundException
+      before reaching any of our code - and the coordinator would report an unexplained dead
+      worker and fall back to in-process measurement for every package consumer.
+
+      Globbed rather than enumerated so a future dependency cannot reintroduce that failure by
+      being forgotten here. Symbols are excluded; everything the host resolver reads is not.
+    -->
     <ItemGroup>
-      <TfmSpecificPackageFile Include="$(_NBenchmarkWorkerOutput)nbworker.dll;$(_NBenchmarkWorkerOutput)nbworker.deps.json;$(_NBenchmarkWorkerOutput)nbworker.runtimeconfig.json">
-        <PackagePath>tools/$(TargetFramework)/</PackagePath>
+      <_NBenchmarkWorkerPayload Include="$(_NBenchmarkWorkerOutput)**\*.dll;$(_NBenchmarkWorkerOutput)**\*.json"/>
+
+      <TfmSpecificPackageFile Include="@(_NBenchmarkWorkerPayload)">
+        <PackagePath>tools/$(TargetFramework)/%(RecursiveDir)</PackagePath>
       </TfmSpecificPackageFile>
     </ItemGroup>
+
+    <Error Condition="!Exists('$(_NBenchmarkWorkerOutput)NBenchmark.dll')"
+           Text="The measurement worker's copy of NBenchmark.dll is missing from '$(_NBenchmarkWorkerOutput)'. nbworker cannot start without it, so packing would ship a worker that dies before its handshake."/>
   </Target>
 
 </Project>

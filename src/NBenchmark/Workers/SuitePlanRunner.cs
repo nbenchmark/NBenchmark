@@ -315,25 +315,24 @@ internal static class SuitePlanRunner
 
         foreach (var name in perReplicate[0].Select(r => r.Name))
         {
+            // Each replicate's result is paired with its own samples before anything is filtered, so
+            // a replicate that produced no result for this benchmark cannot shift the remaining
+            // replicates' samples onto the wrong rows.
             var launches = perReplicate
-                .Select(replicate => replicate.FirstOrDefault(r => r.Name == name))
-                .OfType<BenchmarkResult>()
+                .Select((replicate, i) => (Result: replicate.FirstOrDefault(r => r.Name == name), Index: i))
+                .Where(x => x.Result is not null)
+                .Select(x => new LaunchAggregator.Launch(
+                    x.Result!, perReplicateSamples[x.Index].GetValueOrDefault(name, [])))
                 .ToList();
 
             if (launches.Count == 0)
                 continue;
 
-            var bestIndex = IndexOfBestLaunch(launches);
-            var best = launches[bestIndex];
-            var aggregated = LaunchAggregator.Apply(best, LaunchAggregator.Aggregate(launches));
-
-            // The displayed result keeps the representative launch's own samples, so its statistical
-            // fields and trimmed-sample ordinals stay aligned with the distribution it describes.
-            // The pooled samples travel separately, for significance across all replicates.
-            aggregated = aggregated with
-            {
-                RawSamples = perReplicateSamples[bestIndex].GetValueOrDefault(name, []),
-            };
+            // Combine averages the per-replicate estimates and takes the interval from the spread
+            // between the workers, keeping the representative replicate's own samples on the row so
+            // its trimmed-sample ordinals still index the array they were computed against. The pooled
+            // samples travel separately, for significance across all replicates.
+            var aggregated = LaunchAggregator.Combine(launches);
 
             results.Add(aggregated);
 
@@ -343,28 +342,6 @@ internal static class SuitePlanRunner
         }
 
         return (results, samples);
-    }
-
-    /// <summary>
-    ///     The position of the lowest-median successful launch. <see cref="LaunchAggregator.BestLaunch" />
-    ///     returns the result itself, but the samples live in a parallel list addressed by position,
-    ///     so the index is what pairs them.
-    /// </summary>
-    private static int IndexOfBestLaunch(IReadOnlyList<BenchmarkResult> launches)
-    {
-        var bestIndex = 0;
-        var bestMedian = double.MaxValue;
-
-        for (var i = 0; i < launches.Count; i++)
-        {
-            if (launches[i].Errored || launches[i].Median >= bestMedian)
-                continue;
-
-            bestMedian = launches[i].Median;
-            bestIndex = i;
-        }
-
-        return bestIndex;
     }
 }
 

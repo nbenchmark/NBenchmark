@@ -69,17 +69,12 @@ internal static class InlineSuitePlan
                 + "produces the parameter values itself.");
         }
 
-        foreach (var strategy in new object?[] { options.OutlierDetector, options.SignificanceTest })
+        if (WorkerRunPlan.UnrebuildableStrategy(options) is { } strategyRefusal)
         {
-            _ = WorkerRunPlan.StrategyTypeName(strategy, out var strategyRefusal);
-
-            if (strategyRefusal is not null)
-            {
-                return Decision.Refuse(
-                    IsolationStatus.InProcessUnaddressablePlan,
-                    $"{strategyRefusal} Move the suite into a static [BenchmarkPlan] factory so the "
-                    + "worker constructs it the same way you did.");
-            }
+            return Decision.Refuse(
+                IsolationStatus.InProcessUnaddressablePlan,
+                $"{strategyRefusal} Move the suite into a static [BenchmarkPlan] factory so the "
+                + "worker constructs it the same way you did.");
         }
 
         var bodies = new List<BodyRef>(benchmarks.Count);
@@ -128,10 +123,17 @@ internal static class InlineSuitePlan
     /// <summary>
     ///     Builds the request that measures all of an inline suite's bodies together in one worker.
     /// </summary>
+    /// <param name="order">
+    ///     The suite's configured run order, which the worker applies to the bodies it was sent.
+    ///     Threaded through rather than baked in: the previous isolated path hardcoded declaration
+    ///     order, so <see cref="RunOrder.Random" /> - the default - was silently discarded the moment
+    ///     isolation was on, which is now always.
+    /// </param>
     public static RunGroupPayload Request(
         string suiteName,
         IReadOnlyList<BodyRef> bodies,
         MeasurementOptions options,
+        RunOrder order,
         int? seed,
         int replicate)
         => new()
@@ -150,6 +152,7 @@ internal static class InlineSuitePlan
             Options = options with { LaunchCount = 1 },
             OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
             SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
+            Order = order,
             Seed = seed,
             TotalBenchmarks = bodies.Count,
         };

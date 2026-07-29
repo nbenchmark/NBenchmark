@@ -169,10 +169,16 @@ internal static class WorkerLocator
     }
 
     /// <summary>
-    ///     Directories named by <see cref="WorkerDirectoryMetadataKey" /> on the entry assembly, and
-    ///     on the assembly that called in. Both are checked because under a test host the entry
-    ///     assembly is the test runner, which carries no metadata of ours.
+    ///     Directories named by <see cref="WorkerDirectoryMetadataKey" /> on the entry assembly or on
+    ///     this one.
     /// </summary>
+    /// <remarks>
+    ///     A repository-local escape hatch, not part of the shipped layout: it exists so a project
+    ///     built inside this repository can point at the worker's own <c>bin</c> without depending on
+    ///     a copy step that races the worker's build. A package consumer is found by the
+    ///     output-relative search above instead, which is why the entry assembly being a test runner
+    ///     (and carrying no metadata of ours) is not a problem.
+    /// </remarks>
     private static IEnumerable<string> MetadataDirectories()
     {
         foreach (var assembly in new[] { Assembly.GetEntryAssembly(), typeof(WorkerLocator).Assembly })

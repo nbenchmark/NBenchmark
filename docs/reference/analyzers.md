@@ -268,6 +268,8 @@ The runtime already reports this after the fact, in the `Iso` column and the iso
 
 **It is `Info`, not a warning**, because capturing is the idiomatic way to benchmark over prepared data. Warning on it would push you towards contorted code to silence a build. What it costs is fidelity, not correctness.
 
+**Scope:** only the `Benchmark.Run*` family. A capturing lambda passed to `BenchmarkSuite.Add(...)` is refused for isolation by the same rule at run time, and reported the same way, but there is no compile-time diagnostic for it yet.
+
 To isolate the body, move the state inside it:
 
 ```csharp

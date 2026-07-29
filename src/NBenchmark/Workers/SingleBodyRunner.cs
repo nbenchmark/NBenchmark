@@ -41,7 +41,7 @@ internal static class SingleBodyRunner
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(measureInProcess);
 
-        if (!TryPlan(body, name, out var bodyRef, out var status, out var refusal))
+        if (!TryPlan(body, name, options, out var bodyRef, out var status, out var refusal))
         {
             SimpleModeGuidance.EmitOnce(name, status, refusal);
 
@@ -116,6 +116,7 @@ internal static class SingleBodyRunner
     private static bool TryPlan(
         Delegate body,
         string name,
+        MeasurementOptions options,
         out BodyRef bodyRef,
         out IsolationStatus status,
         out string? refusal)
@@ -128,6 +129,17 @@ internal static class SingleBodyRunner
 
             refusal = "the measurement worker (nbworker) is not deployed alongside this application. "
                       + $"Looked in {WorkerLocator.DescribeSearch()}.";
+
+            return false;
+        }
+
+        // A pinned detector or significance test that a worker cannot rebuild would otherwise be
+        // silently replaced by the built-in one, scoring the result under a method the caller did not
+        // choose. Measuring here keeps the strategy they were explicit about.
+        if (WorkerRunPlan.UnrebuildableStrategy(options) is { } strategyRefusal)
+        {
+            status = IsolationStatus.InProcessLiveFixture;
+            refusal = strategyRefusal;
 
             return false;
         }

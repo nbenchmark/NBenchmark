@@ -22,9 +22,13 @@ namespace NBenchmark.Workers;
 ///         for, a test suite running many performance tests one after another.
 ///     </para>
 ///     <para>
-///         Keyed by profile name because the runtime configuration is applied to the environment
-///         block before the process starts; a worker parked under one profile can never serve a
-///         request for another.
+///         Keyed by worker path <i>and</i> profile name. The profile is applied to the environment
+///         block before the process starts, so a worker parked under one profile can never serve a
+///         request for another. The path matters for the same reason and is easier to overlook: a
+///         worker is framework-dependent and is chosen to match the assembly under test, so a
+///         multi-runtime run or <c>dotnet benchmark --assembly</c> asks for a different
+///         <c>nbworker</c> than the one this application sits beside. Keying on the profile alone
+///         would hand a net10.0 worker out to measure a net8.0 build.
 ///     </para>
 /// </remarks>
 internal static class WorkerPrewarm
@@ -51,7 +55,7 @@ internal static class WorkerPrewarm
         if (WorkerLocator.WorkerAssemblyPath is not { } workerPath)
             return;
 
-        var pool = Pools.GetOrAdd(KeyFor(profile), _ => new Pool());
+        var pool = Pools.GetOrAdd(KeyFor(workerPath, profile), _ => new Pool());
 
         while (pool.Reserve(Depth))
         {
@@ -83,7 +87,7 @@ internal static class WorkerPrewarm
         RuntimeProfile? profile,
         CancellationToken cancellationToken)
     {
-        var pool = Pools.GetOrAdd(KeyFor(profile), _ => new Pool());
+        var pool = Pools.GetOrAdd(KeyFor(workerAssemblyPath, profile), _ => new Pool());
 
         if (pool.TryTake(out var parked))
         {
@@ -99,25 +103,14 @@ internal static class WorkerPrewarm
         return await WorkerHost.StartAsync(workerAssemblyPath, profile, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>
-    ///     Shuts down everything still parked. A parked worker is idle and harmless, but leaving one
-    ///     alive past the end of a run would surprise anyone watching their process list.
-    /// </summary>
-    public static async Task DrainAsync()
-    {
-        foreach (var key in Pools.Keys.ToArray())
-        {
-            if (!Pools.TryRemove(key, out var pool))
-                continue;
-
-            while (pool.TryTake(out var worker))
-            {
-                await worker.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    /// <summary>Parked workers for one runtime profile.</summary>
+    /// <summary>Parked workers for one (worker path, runtime profile) pair.</summary>
+    /// <remarks>
+    ///     There is deliberately no drain method. Every worker is registered with
+    ///     <see cref="Engine.ChildProcessReaper" /> at start, which kills the whole set on
+    ///     <c>ProcessExit</c> and on Ctrl-C - so a parked worker cannot outlive this process whether
+    ///     it was ever handed out or not. A second teardown path here would be one more thing to keep
+    ///     in agreement with the first, for no coverage the first does not already give.
+    /// </remarks>
     private sealed class Pool
     {
         private readonly ConcurrentQueue<WorkerHost> _ready = new();
@@ -159,6 +152,12 @@ internal static class WorkerPrewarm
     ///     A profile that sets nothing is indistinguishable from no profile at all, so both park
     ///     under the same key rather than starting two identical processes.
     /// </summary>
-    private static string KeyFor(RuntimeProfile? profile)
-        => profile is null || profile.InheritsEverything ? RuntimeProfile.Host.Name : profile.Name;
+    private static string KeyFor(string workerAssemblyPath, RuntimeProfile? profile)
+    {
+        var profileName = profile is null || profile.InheritsEverything
+            ? RuntimeProfile.Host.Name
+            : profile.Name;
+
+        return $"{workerAssemblyPath}\0{profileName}";
+    }
 }
