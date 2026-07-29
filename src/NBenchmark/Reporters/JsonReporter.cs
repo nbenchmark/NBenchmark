@@ -43,6 +43,8 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
 
         var envelope = new ResultEnvelope
         {
+            SchemaVersion = ReportFormat.SchemaVersion,
+            MeasurementEpoch = ReportFormat.MeasurementEpoch,
             GeneratedAt = DateTimeOffset.UtcNow,
             Detail = Detail,
             Profile = results.FirstOrDefault()?.Profile ?? MeasurementProfile.Realistic,
@@ -55,6 +57,10 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
 
     private sealed class ResultEnvelope
     {
+        // First two fields on purpose: a consumer deciding whether it can read the rest should not
+        // have to parse the rest to find out.
+        public int SchemaVersion { get; init; }
+        public int MeasurementEpoch { get; init; }
         public DateTimeOffset GeneratedAt { get; init; }
         public ReportDetail Detail { get; init; }
         public MeasurementProfile Profile { get; init; }

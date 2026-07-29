@@ -58,6 +58,12 @@ public sealed class MarkdownReporter : IReporter
 
         sb.AppendLine($"> Runtime: **{tables[0].RuntimeProfileName}** ({runtimeKnobs})");
 
+        // Provenance for a file someone will still have in six months. The epoch is the part that
+        // is not guessable from the numbers: two runs can look comparable and not be.
+        sb.AppendLine(
+            $"> Format: schema {ReportFormat.SchemaVersion}, measurement epoch "
+            + $"{ReportFormat.MeasurementEpoch} (numbers are comparable only with the same epoch)");
+
         if (tables.Any(t => t.MixedRuntimeProfiles))
         {
             sb.AppendLine(

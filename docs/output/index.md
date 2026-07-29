@@ -110,6 +110,58 @@ If you reference an unknown reporter name, the host prints the list of available
 
 Reporters support three detail levels - **Simple** (default), **Standard**, and **Advanced** - that control how much statistical information is included in the output. Set the level via `WithDetail(ReportDetail.Standard)` on both `BenchmarkHarness` and `BenchmarkSuite`, or via the `--detail standard` CLI flag in harness mode. See the [Report Detail Levels guide](./report-detail-levels.md) for the full column reference.
 
+## Report format versioning
+
+Every file-writing reporter stamps its output with two independent numbers. They exist for whoever
+stores NBenchmark output over time - a CI trend dashboard, a regression script, a spreadsheet.
+NBenchmark itself never reads its own reports back.
+
+| Stamp | Question it answers | Bumped when |
+| --- | --- | --- |
+| `schemaVersion` | Can my parser still read this file? | A field is renamed, removed, or changes type; the envelope is restructured. **Not** bumped for added fields. |
+| `measurementEpoch` | Can I plot this number next to that one? | NBenchmark changes what a benchmark reports: harness overhead, the default runtime profile, or the definition of a reported statistic. |
+
+Both are `1` today. They are separate because they move independently, and the case that proves it
+is the one that prompted them: replacing NBenchmark's boxing dispatch path with typed delegates
+moved the calibration standard from **9.34 ns / 24 B per op to 2.53 ns / 0 B** while leaving the
+JSON shape byte-for-byte identical. A schema version alone would have said nothing had changed. A
+dashboard would have drawn a 3.7x improvement that no application code earned.
+
+Where the stamps appear:
+
+- **JSON** - `schemaVersion` and `measurementEpoch`, the first two fields of the envelope, so a
+  consumer can decide whether to read the rest without parsing the rest.
+- **CSV** - `SchemaVersion` and `MeasurementEpoch` columns, alongside `Detail`, `Profile`,
+  `RuntimeProfile` and `RuntimeKnobs`.
+- **Markdown** - a `> Format:` line in the header block.
+
+### Consuming them
+
+Compare the epoch before comparing numbers, and treat a mismatch as a discontinuity rather than a
+result:
+
+```python
+import json
+
+with open("benchmarks.json") as f:
+    report = json.load(f)
+
+# An absent stamp is not epoch 0. The file predates the concept, and nothing is known
+# about whether its numbers line up with anything - reject it rather than assume.
+if "measurementEpoch" not in report:
+    raise ValueError("report predates measurement epochs; not comparable")
+
+if report["measurementEpoch"] != baseline_epoch:
+    raise ValueError(
+        f"epoch {report['measurementEpoch']} != baseline {baseline_epoch}; "
+        "the harness changed, so a diff would measure NBenchmark, not your code"
+    )
+```
+
+The constants are `NBenchmark.Reporters.ReportFormat.SchemaVersion` and
+`ReportFormat.MeasurementEpoch` if you are writing a [custom reporter](./custom-reporters.md) and
+want to stamp it the same way.
+
 ## Writing a custom reporter
 
 See the [Custom Reporters](./custom-reporters.md) page for a step-by-step guide to implementing `IReporter`, registering it with `ReporterRegistry`, and using `BenchmarkTable` for comparison output. That page also documents **auto-attached reporters** (`ReporterRegistry.RegisterAutoAttach`) - side-effect reporters that fire on every run after the user's explicit reporters, with no opt-in required.

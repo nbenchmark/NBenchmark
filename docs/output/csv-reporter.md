@@ -68,7 +68,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 
 ## Column reference
 
-### Simple mode (9 columns)
+### Simple mode (16 columns)
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -79,8 +79,13 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `Ratio` | float or `null` | Speed relative to the baseline. `null` if no baseline or only one benchmark. |
 | `Significant` | `"true"` / `"false"` / empty | [Mann-Whitney U](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) significance result. Empty for the baseline or when significance testing is disabled. |
 | `AllocPerOp` | integer or `null` | Mean heap bytes per iteration. `null` if allocation tracking is disabled. |
+| `Gen0`, `Gen1`, `Gen2` | integer or empty | Collection counts per generation. Empty when GC diagnostics are off. |
+| `SchemaVersion` | integer | The report shape. See [Report format versioning](./index.md#report-format-versioning). |
+| `MeasurementEpoch` | integer | Whether these numbers may be compared with another file's. A different epoch means NBenchmark itself changed what it measures, so a diff would report the harness rather than your code. |
 | `Detail` | string | Active detail level (`simple`, `standard`, or `advanced`). |
 | `Profile` | string | Active measurement profile (`realistic` or `independent`). |
+| `RuntimeProfile` | string | The runtime profile the measuring process was launched under (`steady-state`, `host`, ...). |
+| `RuntimeKnobs` | string | The environment variables that profile applied, or empty when the configuration was inherited rather than chosen. |
 
 ### Standard mode (dynamic columns - adds the following after the simple columns)
 
