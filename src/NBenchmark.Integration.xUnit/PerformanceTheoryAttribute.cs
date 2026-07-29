@@ -20,4 +20,10 @@ public sealed class PerformanceTheoryAttribute : TheoryAttribute, IPerformanceTh
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; init; } = 0.95;
     public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
+
+    /// <summary>
+    ///     Fails the test when the measurement was taken in the test host rather than in a worker
+    ///     process. See <see cref="IPerformanceThresholds.RequireIsolation" />.
+    /// </summary>
+    public bool RequireIsolation { get; init; }
 }

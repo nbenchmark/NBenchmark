@@ -121,30 +121,21 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                     var result = measured.Result;
                     var rawSamples = measured.RawSamples;
 
-                    // A ratio between one isolated and one host measurement describes the difference
-                    // between two processes' runtime state more than the two bodies, so it is not
-                    // gated on.
-                    var mixedIsolation = refResult is not null
-                                         && refResult.IsolationStatus != result.IsolationStatus;
-
-                    var violations = ValidateResult(
+                    var gate = PerformanceGate.Evaluate(
                         result,
                         rawSamples,
-                        mixedIsolation ? null : refResult,
-                        mixedIsolation ? null : refSamples,
-                        data);
+                        refResult,
+                        refSamples,
+                        data,
+                        PerformanceGate.AllowsInProcessGate(methodInfo));
 
+                    var violations = gate.Violations;
                     var notes = new List<string>();
 
                     if (measured.Refusal is not null)
                         notes.Add($"NBenchmark: '{name}' measured in the test host - {measured.Refusal}");
 
-                    if (mixedIsolation)
-                    {
-                        notes.Add(
-                            $"NBenchmark: the ratio gate for '{name}' was skipped - the benchmark and "
-                            + "its reference were measured in different processes.");
-                    }
+                    notes.AddRange(gate.Notes);
 
                     var output = notes.Count == 0
                         ? MetricsFormatter.Format(result)
@@ -190,44 +181,18 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         return Activator.CreateInstance(testClass)!;
     }
 
+    /// <summary>
+    ///     Thin wrapper over <see cref="PerformanceGate.Evaluate" />, kept so the gate can be
+    ///     exercised without standing up an xUnit test case.
+    /// </summary>
     internal static IReadOnlyList<string> ValidateResult(
         BenchmarkResult result, double[] rawSamples,
         BenchmarkResult? refResult, double[]? refSamples,
-        PerformanceTestData data)
-    {
-        var violations = new List<string>();
-
-        if (result.Errored)
-            violations.Add($"Benchmark errored: {result.ErrorMessage}");
-
-        var thresholds = new PerformanceThresholds
-        {
-            MaxMeanNs = data.MaxMeanNs >= 0 ? data.MaxMeanNs : null,
-            MaxP95Ns = data.MaxP95Ns >= 0 ? data.MaxP95Ns : null,
-            MaxAllocatedBytes = data.MaxAllocatedBytes >= 0 ? data.MaxAllocatedBytes : null,
-            MaxAbsoluteThresholdTolerance = data.MaxAbsoluteThresholdTolerance,
-        };
-
-        violations.AddRange(BenchmarkAssert.Validate(result, thresholds));
-
-        if (data.MaxSlowdownRatio > 0 && !result.Errored)
-        {
-            if (refResult is not null && refSamples is not null)
-            {
-                violations.AddRange(RelativeComparison.Check(
-                    result, rawSamples, refResult, refSamples, data.MaxSlowdownRatio));
-            }
-            else
-            {
-                var calibration = PerformanceCalibration.Run();
-
-                violations.AddRange(RelativeComparison.Check(
-                    result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, data.MaxSlowdownRatio));
-            }
-        }
-
-        return violations;
-    }
+        PerformanceTestData data,
+        bool allowInProcessGate = false)
+        => PerformanceGate
+            .Evaluate(result, rawSamples, refResult, refSamples, data, allowInProcessGate)
+            .Violations;
 
     /// <summary>
     ///     Compiles the test method into a benchmark body.

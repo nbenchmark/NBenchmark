@@ -59,26 +59,20 @@ public sealed class PerformanceCommand : DelegatingTestCommand
             var result = measured.Result;
             var rawSamples = measured.RawSamples;
 
-            // A ratio between one isolated and one host measurement is not a ratio between the two
-            // bodies - it is mostly the difference between the two processes' runtime state. Better
-            // to say so than to gate on it.
-            var mixedIsolation = refResult is not null
-                                 && refResult.IsolationStatus != result.IsolationStatus;
-
             if (measured.Refusal is not null)
                 context.OutWriter.WriteLine($"NBenchmark: '{name}' measured in the test host - {measured.Refusal}");
 
             WriteMetrics(context, result);
 
-            var violations = ValidateResult(
-                result, rawSamples, mixedIsolation ? null : refResult, mixedIsolation ? null : refSamples, _attribute);
+            var gate = PerformanceGate.Evaluate(
+                result, rawSamples, refResult, refSamples, _attribute,
+                PerformanceGate.AllowsInProcessGate(methodInfo));
 
-            if (mixedIsolation)
+            var violations = gate.Violations;
+
+            foreach (var note in gate.Notes)
             {
-                context.OutWriter.WriteLine(
-                    $"NBenchmark: the ratio gate for '{name}' was skipped - the benchmark and its "
-                    + "reference were measured in different processes, so their ratio would describe "
-                    + "the processes rather than the code.");
+                context.OutWriter.WriteLine(note);
             }
 
             if (violations.Count > 0)
@@ -97,44 +91,18 @@ public sealed class PerformanceCommand : DelegatingTestCommand
         return context.CurrentResult;
     }
 
+    /// <summary>
+    ///     Thin wrapper over <see cref="PerformanceGate.Evaluate" />, kept so the gate can be
+    ///     exercised without standing up an NUnit test command.
+    /// </summary>
     internal static IReadOnlyList<string> ValidateResult(
         BenchmarkResult result, double[] rawSamples,
         BenchmarkResult? refResult, double[]? refSamples,
-        IPerformanceThresholds thresholds)
-    {
-        var violations = new List<string>();
-
-        if (result.Errored)
-            violations.Add($"Benchmark errored: {result.ErrorMessage}");
-
-        var thresholdBag = new PerformanceThresholds
-        {
-            MaxMeanNs = thresholds.MaxMeanNs >= 0 ? thresholds.MaxMeanNs : null,
-            MaxP95Ns = thresholds.MaxP95Ns >= 0 ? thresholds.MaxP95Ns : null,
-            MaxAllocatedBytes = thresholds.MaxAllocatedBytes >= 0 ? thresholds.MaxAllocatedBytes : null,
-            MaxAbsoluteThresholdTolerance = thresholds.MaxAbsoluteThresholdTolerance,
-        };
-
-        violations.AddRange(BenchmarkAssert.Validate(result, thresholdBag));
-
-        if (thresholds.MaxSlowdownRatio > 0 && !result.Errored)
-        {
-            if (refResult is not null && refSamples is not null)
-            {
-                violations.AddRange(RelativeComparison.Check(
-                    result, rawSamples, refResult, refSamples, thresholds.MaxSlowdownRatio));
-            }
-            else
-            {
-                var calibration = PerformanceCalibration.Run();
-
-                violations.AddRange(RelativeComparison.Check(
-                    result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, thresholds.MaxSlowdownRatio));
-            }
-        }
-
-        return violations;
-    }
+        IPerformanceThresholds thresholds,
+        bool allowInProcessGate = false)
+        => PerformanceGate
+            .Evaluate(result, rawSamples, refResult, refSamples, thresholds, allowInProcessGate)
+            .Violations;
 
     private static void WriteMetrics(TestExecutionContext context, BenchmarkResult result) => context.OutWriter.WriteLine(MetricsFormatter.Format(result));
 

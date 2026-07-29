@@ -10,7 +10,10 @@ order: 6
 
 You already run a unit test suite in CI. You don't want a separate benchmark project, a separate CI step, or a separate `--threshold-pct` invocation - you want a perf regression to fail a test the same way any other assertion failure fails a test, visible in the same test report and the same PR check.
 
-NBenchmark's test-integration packages attach to xUnit, NUnit, and MSTest and run the benchmark inline as part of the test method. Thresholds can be absolute (a hard SLA: "this method must complete in under 500 µs") or relative (a regression gate: "this method must not be more than 5x slower than a calibration benchmark"), and relative thresholds are hardware-independent because the comparison runs in the same test session.
+NBenchmark's test-integration packages attach to xUnit, NUnit, and MSTest and run the benchmark as part of the test method. Thresholds can be absolute (a hard SLA: "this method must complete in under 500 µs") or relative (a regression gate: "this method must not be more than 5x slower than a reference"), and a relative threshold largely absorbs a change of machine, because both sides scale with machine speed.
+
+> [!IMPORTANT]
+> An earlier version of this page said relative thresholds were "hardware-independent because the comparison runs in the same test session". The second half of that is not true, and measurement says so: on four benchmark bodies of provably identical cost, running them in one test host produced a **2.80x** ratio between two of them, with a tight confidence interval on each side. Sharing a session does not cancel the host out - the host's JIT tiering state is *itself* the variable. That is why NBenchmark measures test bodies in worker processes, and why a ratio gate is only enforced between two measurements taken the same way. See [Where your test is measured](#where-your-test-is-measured).
 
 ## Complete example
 
@@ -41,7 +44,7 @@ public void OptimisedParse() => OptimisedParser.Parse(Payload);
 private static void NaiveParse() => NaiveParser.Parse(Payload);
 ```
 
-Both methods run in the same test session; the candidate must not exceed 1.2x the reference. The reference can be private and runs with the same measurement options as the candidate (same iterations, warmup, outlier mode), so the comparison is apples-to-apples.
+The candidate must not exceed 1.2x the reference. The reference can be private and runs with the same measurement options as the candidate (same iterations, warmup, outlier mode), so the comparison is apples-to-apples - and, when both sides isolate, in matching worker processes.
 
 ### NUnit / MSTest equivalents
 
@@ -106,12 +109,58 @@ NBenchmark: 'ParserTests.Parse' measured in the test host - parameter 'documents
 (of type 'List`1') is a live object that exists only in this test process.
 ```
 
-Those results are still produced and still gated on absolute thresholds. What changes is a **ratio** gate: when a benchmark and its `ReferenceMethod` end up measured in different processes, the ratio describes the two processes more than the two bodies, so the ratio check is skipped and the reason logged. Making both sides isolatable - usually by moving injected state into the method - restores it.
+Those results are still produced and still gated on absolute thresholds. What changes is the **ratio** gate.
+
+### When a ratio gate is enforced
+
+| Candidate | Reference | Ratio gate |
+| --- | --- | --- |
+| Worker | Worker | **Enforced.** |
+| Test host | Test host | Not enforced, and the reason is logged. Add `[AllowInProcessGate]` to enforce it anyway. |
+| Worker | Test host (or the reverse) | **Never enforced.** No opt-in covers it. |
+
+The middle row is the one to understand. Two bodies measured in the same test host share its JIT tiering and PGO state, and that state is whatever the preceding tests left behind - the source of the 2.80x fabricated ratio above. The gate declines rather than reporting an effect that may not exist, and prints why:
+
+```
+NBenchmark: the ratio gate for 'ParserTests.Parse' was not enforced - both it and its
+reference were measured in the test host, where the runtime configuration is whatever
+the preceding tests left behind. On bodies of provably identical cost that produced a
+2.80x ratio with a tight interval. Make the test isolatable, or add
+[AllowInProcessGate] to gate on it anyway.
+```
+
+The bottom row is refused outright: a ratio spanning a process boundary is dominated by the difference between the two runtime configurations, which on the same identical-cost bodies was worth about 3.3x. Making both sides isolatable - usually by moving injected state into the method - is the fix.
+
+### `[AllowInProcessGate]`
+
+Applies to a method, a class, or a whole assembly. It says: this test cannot be isolated, and a noisy ratio is more useful to me than none.
+
+```csharp
+[AllowInProcessGate]
+public class ParserTests : IClassFixture<ParserFixture>
+{
+    [PerformanceFact(MaxSlowdownRatio = 1.5, ReferenceMethod = nameof(Naive))]
+    public void Optimised() => _fixture.Parser.Parse(Payload);
+}
+```
+
+The gate then runs on host measurements and the result carries a note saying so. Treat a marginal outcome as inconclusive rather than as evidence.
+
+### `RequireIsolation`
+
+The opposite lever: fail the test when the measurement was *not* taken in a worker.
+
+```csharp
+[PerformanceFact(MaxMeanNs = 500_000, RequireIsolation = true)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+```
+
+Use it on gates that matter. Isolation can be lost quietly - somebody adds a fixture argument, or the worker fails to deploy on a build agent - and the test keeps passing against a number measured somewhere you did not choose. `RequireIsolation` turns that into a failure that names the reason and its remedy. It applies to absolute-threshold gates too, and is available on all three attributes and on the `PerformanceAssert` option bags.
 
 Simple values reach the worker intact: `int`, `string`, `bool`, `enum`, `decimal`, `DateTime`, `Guid` and the like, so `[InlineData]` and `[DataRow]` cases isolate normally. Object arguments are refused rather than reconstructed, because a reconstruction that is usually right is worse than one that declines.
 
 > [!TIP] Absolute vs. relative - which to use?
-> Use **absolute** thresholds only when you have a hard SLA ("parse must complete in under 500 µs"). Use **relative** thresholds for regression gates ("this PR must not regress the parser"). Relative thresholds tolerate a change of machine, which absolute ones do not - but neither is immune to the host process's runtime state, so start `MaxSlowdownRatio` loose (e.g. `10.0`) and tighten from several runs in your own CI environment.
+> Use **absolute** thresholds only when you have a hard SLA ("parse must complete in under 500 µs"). Use **relative** thresholds for regression gates ("this PR must not regress the parser"). Relative thresholds tolerate a change of machine, which absolute ones do not. Start `MaxSlowdownRatio` loose (e.g. `10.0`) and tighten from several runs in your own CI environment.
 
 ## Run it
 

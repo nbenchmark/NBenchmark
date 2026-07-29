@@ -24,6 +24,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         OutlierMode outlierMode,
         double confidenceLevel,
         double maxAbsoluteThresholdTolerance,
+        bool requireIsolation = false,
         string? skipReason = null)
     {
         MaxMeanNs = maxMeanNs;
@@ -37,6 +38,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         OutlierMode = outlierMode;
         ConfidenceLevel = confidenceLevel;
         MaxAbsoluteThresholdTolerance = maxAbsoluteThresholdTolerance;
+        RequireIsolation = requireIsolation;
         SkipReason = skipReason;
     }
 
@@ -52,6 +54,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     public OutlierMode OutlierMode { get; private set; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; private set; } = 0.95;
     public double MaxAbsoluteThresholdTolerance { get; private set; } = 1.0;
+    public bool RequireIsolation { get; private set; }
 
     public void Serialize(IXunitSerializationInfo info)
     {
@@ -66,6 +69,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         info.AddValue(nameof(OutlierMode), (int)OutlierMode);
         info.AddValue(nameof(ConfidenceLevel), ConfidenceLevel);
         info.AddValue(nameof(MaxAbsoluteThresholdTolerance), MaxAbsoluteThresholdTolerance);
+        info.AddValue(nameof(RequireIsolation), RequireIsolation);
         info.AddValue(nameof(SkipReason), SkipReason ?? NullSentinel);
     }
 
@@ -83,6 +87,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         OutlierMode = (OutlierMode)info.GetValue<int>(nameof(OutlierMode));
         ConfidenceLevel = info.GetValue<double>(nameof(ConfidenceLevel));
         MaxAbsoluteThresholdTolerance = info.GetValue<double>(nameof(MaxAbsoluteThresholdTolerance));
+        RequireIsolation = info.GetValue<bool>(nameof(RequireIsolation));
         var skipReason = info.GetValue<string>(nameof(SkipReason));
         SkipReason = skipReason == NullSentinel ? null : skipReason;
     }
@@ -100,5 +105,6 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
             thresholds.OutlierMode,
             thresholds.ConfidenceLevel,
             thresholds.MaxAbsoluteThresholdTolerance,
+            thresholds.RequireIsolation,
             skipReason);
 }

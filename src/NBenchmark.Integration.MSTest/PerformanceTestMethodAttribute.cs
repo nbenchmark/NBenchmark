@@ -22,6 +22,12 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
     public double ConfidenceLevel { get; init; } = 0.95;
     public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
 
+    /// <summary>
+    ///     Fails the test when the measurement was taken in the test host rather than in a worker
+    ///     process. See <see cref="IPerformanceThresholds.RequireIsolation" />.
+    /// </summary>
+    public bool RequireIsolation { get; init; }
+
     public override Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
         var methodInfo = testMethod.MethodInfo;
@@ -81,25 +87,17 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
             return Task.FromResult<TestResult[]>([CreateErrorResult(ex)]);
         }
 
-        // A ratio between one isolated and one host measurement is mostly the difference between
-        // two processes' runtime state, not between the two bodies. Gating on it would be worse
-        // than not gating.
-        var mixedIsolation = refResult is not null && refResult.IsolationStatus != result.IsolationStatus;
+        var gate = PerformanceGate.Evaluate(
+            result, rawSamples, refResult, refSamples, this,
+            PerformanceGate.AllowsInProcessGate(methodInfo));
 
-        var violations = ValidateResult(
-            result, rawSamples, mixedIsolation ? null : refResult, mixedIsolation ? null : refSamples, this);
-
+        var violations = gate.Violations;
         var notes = new List<string>();
 
         if (refusal is not null)
             notes.Add($"NBenchmark: '{name}' measured in the test host - {refusal}");
 
-        if (mixedIsolation)
-        {
-            notes.Add(
-                $"NBenchmark: the ratio gate for '{name}' was skipped - the benchmark and its "
-                + "reference were measured in different processes.");
-        }
+        notes.AddRange(gate.Notes);
 
         var testResult = new TestResult
         {
@@ -126,44 +124,18 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         return Task.FromResult<TestResult[]>([testResult]);
     }
 
+    /// <summary>
+    ///     Thin wrapper over <see cref="PerformanceGate.Evaluate" />, kept so the gate can be
+    ///     exercised without standing up an MSTest test method.
+    /// </summary>
     internal static IReadOnlyList<string> ValidateResult(
         BenchmarkResult result, double[] rawSamples,
         BenchmarkResult? refResult, double[]? refSamples,
-        IPerformanceThresholds thresholds)
-    {
-        var violations = new List<string>();
-
-        if (result.Errored)
-            violations.Add($"Benchmark errored: {result.ErrorMessage}");
-
-        var thresholdBag = new PerformanceThresholds
-        {
-            MaxMeanNs = thresholds.MaxMeanNs >= 0 ? thresholds.MaxMeanNs : null,
-            MaxP95Ns = thresholds.MaxP95Ns >= 0 ? thresholds.MaxP95Ns : null,
-            MaxAllocatedBytes = thresholds.MaxAllocatedBytes >= 0 ? thresholds.MaxAllocatedBytes : null,
-            MaxAbsoluteThresholdTolerance = thresholds.MaxAbsoluteThresholdTolerance,
-        };
-
-        violations.AddRange(BenchmarkAssert.Validate(result, thresholdBag));
-
-        if (thresholds.MaxSlowdownRatio > 0 && !result.Errored)
-        {
-            if (refResult is not null && refSamples is not null)
-            {
-                violations.AddRange(RelativeComparison.Check(
-                    result, rawSamples, refResult, refSamples, thresholds.MaxSlowdownRatio));
-            }
-            else
-            {
-                var calibration = PerformanceCalibration.Run();
-
-                violations.AddRange(RelativeComparison.Check(
-                    result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, thresholds.MaxSlowdownRatio));
-            }
-        }
-
-        return violations;
-    }
+        IPerformanceThresholds thresholds,
+        bool allowInProcessGate = false)
+        => PerformanceGate
+            .Evaluate(result, rawSamples, refResult, refSamples, thresholds, allowInProcessGate)
+            .Violations;
 
     private static TestResult CreateErrorResult(string message)
     {

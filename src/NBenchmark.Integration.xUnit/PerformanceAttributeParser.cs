@@ -28,6 +28,7 @@ internal static class PerformanceAttributeParser
             OutlierMode = NormalizeOutlierMode(ParseOutlierMode(attribute), true),
             ConfidenceLevel = NormalizeConfidenceLevel(ParseDouble(attribute, nameof(PerformanceFactAttribute.ConfidenceLevel))),
             MaxAbsoluteThresholdTolerance = NormalizeTolerance(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxAbsoluteThresholdTolerance))),
+            RequireIsolation = ParseBool(attribute, nameof(PerformanceFactAttribute.RequireIsolation)),
         };
     }
 
@@ -51,6 +52,7 @@ internal static class PerformanceAttributeParser
             OutlierMode = NormalizeOutlierMode(runtime.OutlierMode, false),
             ConfidenceLevel = NormalizeConfidenceLevel(runtime.ConfidenceLevel),
             MaxAbsoluteThresholdTolerance = NormalizeTolerance(runtime.MaxAbsoluteThresholdTolerance),
+            RequireIsolation = runtime.RequireIsolation,
         };
 
         return true;
@@ -125,5 +127,6 @@ internal static class PerformanceAttributeParser
         public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
         public double ConfidenceLevel { get; init; } = 0.95;
         public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
+        public bool RequireIsolation { get; init; }
     }
 }

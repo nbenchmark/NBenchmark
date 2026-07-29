@@ -70,7 +70,9 @@ public void Repository_Query_Is_Fast_Enough()
 
 ## Relative regression checks
 
-Regression checks compare your benchmark against a reference point that runs in the same test session, so the comparison is hardware-independent. A fast developer machine and a slow CI runner produce the same ratio. No stored files, no environment mismatch, no CI workflow setup.
+Regression checks compare your benchmark against a reference point measured in the same run, so a fast developer machine and a slow CI runner produce a similar ratio. No stored files, no environment mismatch, no CI workflow setup.
+
+Both sides are measured in worker processes when they can be, and the ratio gate is only enforced when they were - two measurements sharing a test host also share its JIT tiering state, which on bodies of identical cost fabricated a 2.80x ratio. See [when a ratio gate is enforced](../guides/performance-gates.md#when-a-ratio-gate-is-enforced), `[AllowInProcessGate]`, and `RequireIsolation`.
 
 ### Calibration mode (zero config)
 
@@ -96,7 +98,7 @@ Failure output includes ratio and significance details (`ratio`, `p`, and Cliff'
 
 ### ReferenceMethod mode (compare two implementations)
 
-When you have two implementations to compare, point `ReferenceMethod` at the baseline implementation. Both methods run in the same test session; the candidate must not exceed `MaxSlowdownRatio` relative to the reference.
+When you have two implementations to compare, point `ReferenceMethod` at the baseline implementation. The candidate must not exceed `MaxSlowdownRatio` relative to the reference; both are measured the same way, in matching worker processes when they isolate.
 
 ```csharp
 // xUnit
@@ -122,10 +124,11 @@ All three packages share the same set of threshold properties. A threshold of `-
 | `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles` (the default set includes `0.95`). If P95 was not computed, a clear error message guides you to check the configuration. |
 | `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
 | `MaxSlowdownRatio` | `double` | 0 (disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g. `5.0` = 5x the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
-| `ReferenceMethod` | `string?` | null | Name of a method on the same class to use as the reference for ratio comparison. When null, calibration mode runs (built-in CPU-bound benchmark). When set, both methods run in the same test session. |
+| `ReferenceMethod` | `string?` | null | Name of a method on the same class to use as the reference for ratio comparison. When null, calibration mode runs (built-in CPU-bound benchmark). |
 | `Iterations` | `int` | 0 (use default) | Override the number of measured samples. `0` uses the framework default (auto-resolved). |
 | `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup samples. `0` uses the framework default (auto-detected). |
 | `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
+| `RequireIsolation` | `bool` | false | Fail the test when the measurement was taken in the test host rather than a worker process. Use it on gates that matter: isolation can be lost quietly when a fixture argument is added or a worker fails to deploy, and the gate would otherwise keep passing against a number measured somewhere you did not choose. |
 | `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
 | `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |
 | `MaxAbsoluteThresholdTolerance` | `double` | 1.0 | Multiplier applied to absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) when a shared runner or high-jitter host is detected. Set to e.g. `1.25` for 25% relaxation on shared CI runners. |
