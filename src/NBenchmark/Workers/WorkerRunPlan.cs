@@ -72,13 +72,18 @@ internal static class WorkerRunPlan
     /// </param>
     public static Decision ForDiscoveredClass(string? declaringAssemblyLocation, bool usesInstanceFactory)
     {
-        if (!WorkerLauncher.Current.IsAvailable)
+        // Asked about the assembly under test, not about this application. Those differ under
+        // `dotnet benchmark --assembly`, where the target build has its own worker beside it and the
+        // tool's directory has none - the application-wide question answers "no worker" there and
+        // silently costs the run its isolation.
+        if (!WorkerLauncher.Current.IsAvailableFor(declaringAssemblyLocation))
         {
             return new Decision(
                 Refusal.WorkerNotDeployed,
-                "the measurement worker (nbworker) is not deployed alongside this application, so no "
-                + "child process is available to control JIT tiering or GC flavour. It normally arrives "
-                + $"with the NBenchmark package; looked in {WorkerLocator.DescribeSearch()}.");
+                "the measurement worker (nbworker) is not deployed alongside this application or the "
+                + "assembly under test, so no child process is available to control JIT tiering or GC "
+                + "flavour. It normally arrives with the NBenchmark package; looked in "
+                + $"{WorkerLocator.DescribeSearch(declaringAssemblyLocation)}.");
         }
 
         if (string.IsNullOrEmpty(declaringAssemblyLocation))

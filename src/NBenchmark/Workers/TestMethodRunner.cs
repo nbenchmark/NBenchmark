@@ -55,10 +55,12 @@ public static class TestMethodRunner
 
         refusal = null;
 
-        if (!WorkerLauncher.Current.IsAvailable)
+        var declaringAssemblyLocation = method.DeclaringType?.Assembly.Location;
+
+        if (!WorkerLauncher.Current.IsAvailableFor(declaringAssemblyLocation))
         {
             refusal = "the measurement worker (nbworker) is not deployed alongside these tests. "
-                      + $"Looked in {WorkerLocator.DescribeSearch()}.";
+                      + $"Looked in {WorkerLocator.DescribeSearch(declaringAssemblyLocation)}.";
 
             return false;
         }

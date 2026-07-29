@@ -18,6 +18,19 @@ internal interface IWorkerLauncher
     /// </summary>
     bool IsAvailable { get; }
 
+    /// <summary>
+    ///     Whether a worker can be launched to measure benchmarks declared in
+    ///     <paramref name="targetAssemblyPath" />.
+    /// </summary>
+    /// <remarks>
+    ///     Distinct from <see cref="IsAvailable" /> because the two differ whenever the code under
+    ///     test is not the running application - under <c>dotnet benchmark --assembly</c> the target
+    ///     is a separate build with its own worker beside it, and the tool's own directory has none.
+    ///     Asking the application-wide question there answers <c>false</c> and drops to in-process
+    ///     measurement while a perfectly good worker sits next to the target.
+    /// </remarks>
+    bool IsAvailableFor(string? targetAssemblyPath) => IsAvailable;
+
     /// <summary>Measures one replicate of one group in a fresh worker.</summary>
     Task<WorkerGroupRunner.GroupResult> RunGroupAsync(
         RunGroupPayload request,
@@ -49,6 +62,9 @@ internal static class WorkerLauncher
     {
         public bool IsAvailable => WorkerLocator.WorkerAssemblyPath is not null;
 
+        public bool IsAvailableFor(string? targetAssemblyPath)
+            => WorkerLocator.ForAssembly(targetAssemblyPath) is not null || IsAvailable;
+
         public async Task<WorkerGroupRunner.GroupResult> RunGroupAsync(
             RunGroupPayload request,
             IBenchmarkProgress progress,
@@ -58,9 +74,14 @@ internal static class WorkerLauncher
         {
             ArgumentNullException.ThrowIfNull(request);
 
-            // The request may name a worker - a multi-runtime run measures a build for another
-            // target framework and needs that framework's worker, not this process's.
-            var workerPath = request.WorkerAssemblyPath ?? WorkerLocator.WorkerAssemblyPath;
+            // Most specific first. An explicit path wins - a multi-runtime run measures a build for
+            // another target framework and names that framework's worker. Otherwise the worker beside
+            // the code under test, which is the one built against it and therefore the one that can
+            // load it. The application's own worker is the fallback, and in every mode where the
+            // application *is* the code under test it is the same file.
+            var workerPath = request.WorkerAssemblyPath
+                             ?? WorkerLocator.ForAssembly(request.TargetAssemblyPath)
+                             ?? WorkerLocator.WorkerAssemblyPath;
 
             if (workerPath is null)
             {
@@ -73,7 +94,8 @@ internal static class WorkerLauncher
                         new FaultPayload
                         {
                             Message = "The measurement worker (nbworker) is not deployed alongside this "
-                                      + $"application. Looked in {WorkerLocator.DescribeSearch()}.",
+                                      + "application, nor beside the assembly under test. Looked in "
+                                      + $"{WorkerLocator.DescribeSearch(request.TargetAssemblyPath)}.",
                         },
                     ],
                     WorkerDied = true,

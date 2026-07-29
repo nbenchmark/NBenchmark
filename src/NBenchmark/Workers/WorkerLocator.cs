@@ -51,20 +51,78 @@ internal static class WorkerLocator
     ///     </para>
     /// </summary>
     public static string? ForOutputDirectory(string? outputDirectory)
-        => string.IsNullOrEmpty(outputDirectory)
+    {
+        if (string.IsNullOrEmpty(outputDirectory))
+            return null;
+
+        foreach (var candidate in DirectoryCandidates(outputDirectory))
+        {
+            if (File.Exists(candidate))
+                return Path.GetFullPath(candidate);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    ///     The worker deployed beside <paramref name="assemblyPath" />, or <c>null</c> when there is
+    ///     none.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The assembly that <i>declares</i> the benchmarks is not always the one that is running.
+    ///         Under <c>dotnet benchmark --assembly</c> the two are entirely different builds, in
+    ///         different directories, potentially targeting different frameworks. A worker is
+    ///         framework-dependent, so the one that can measure a given build is the one that build
+    ///         deployed - searching beside the running application instead finds a worker for the
+    ///         wrong framework, or none at all, and silently falls back to in-process measurement.
+    ///     </para>
+    ///     <para>
+    ///         For every other usage mode the declaring assembly <i>is</i> the application, so this
+    ///         resolves to the same file the general search would have found.
+    ///     </para>
+    /// </remarks>
+    public static string? ForAssembly(string? assemblyPath)
+        => string.IsNullOrEmpty(assemblyPath)
             ? null
-            : Path.Combine(outputDirectory, WorkerAssemblyFileName) is var candidate && File.Exists(candidate)
-                ? Path.GetFullPath(candidate)
-                : null;
+            : ForOutputDirectory(Path.GetDirectoryName(assemblyPath));
+
+    /// <summary>
+    ///     Both deployment layouts, in the order the general search uses them: the <c>nbworker</c>
+    ///     subdirectory the build targets produce, then the directory itself.
+    /// </summary>
+    /// <remarks>
+    ///     The subdirectory is the shipped layout - the worker carries its own
+    ///     <c>runtimeconfig.json</c> and <c>deps.json</c>, which describe a different program and must
+    ///     not sit beside the application's. <see cref="ForOutputDirectory" /> checked only the flat
+    ///     form, which happens to be present in an in-repo build and is not what a package consumer
+    ///     gets.
+    /// </remarks>
+    private static IEnumerable<string> DirectoryCandidates(string directory)
+    {
+        yield return Path.Combine(directory, "nbworker", WorkerAssemblyFileName);
+        yield return Path.Combine(directory, WorkerAssemblyFileName);
+    }
 
     /// <summary>Explains where the worker was looked for, for a diagnostic the user can act on.</summary>
-    public static string DescribeSearch()
+    /// <param name="targetAssemblyPath">
+    ///     The assembly declaring the benchmarks, when it is known and differs from the running
+    ///     application. Named first because it is where the worker <i>should</i> be, and because a
+    ///     diagnostic listing only the application's own directory sends the reader to fix the wrong
+    ///     build.
+    /// </param>
+    public static string DescribeSearch(string? targetAssemblyPath = null)
     {
-        var candidates = Candidates().ToList();
+        var candidates = new List<string>();
+
+        if (Path.GetDirectoryName(targetAssemblyPath) is { Length: > 0 } targetDirectory)
+            candidates.AddRange(DirectoryCandidates(targetDirectory));
+
+        candidates.AddRange(Candidates());
 
         return candidates.Count == 0
             ? "no candidate locations could be derived"
-            : string.Join(", ", candidates.Select(c => $"'{c}'"));
+            : string.Join(", ", candidates.Distinct(StringComparer.Ordinal).Select(c => $"'{c}'"));
     }
 
     private static string? Locate()
@@ -98,8 +156,10 @@ internal static class WorkerLocator
             if (string.IsNullOrEmpty(directory))
                 continue;
 
-            yield return Path.Combine(directory, "nbworker", WorkerAssemblyFileName);
-            yield return Path.Combine(directory, WorkerAssemblyFileName);
+            foreach (var candidate in DirectoryCandidates(directory))
+            {
+                yield return candidate;
+            }
         }
 
         foreach (var directory in MetadataDirectories())
