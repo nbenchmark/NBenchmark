@@ -42,7 +42,7 @@ dotnet run -- --runtimes net8.0,net10.0
 dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output ./results
 ```
 
-When `--runtimes` is specified, the host builds the project for each target framework via `dotnet build -f <tfm>`, runs the benchmarks in a child process under that runtime, and aggregates the results.
+When `--runtimes` is specified, the coordinator builds the project for each target framework via `dotnet build -f <tfm>`, measures the benchmarks in **that build's own worker process**, and aggregates the results. A worker is framework-dependent, so only the net8.0 worker can load a net8.0 build - the build targets already deploy the right one beside each build's assemblies, which makes worker selection a lookup rather than a guess.
 
 ## Harness mode: `[Runtimes]` attribute
 
@@ -76,7 +76,23 @@ When `--runtimes` is passed on the CLI, the CLI list wins and `[Runtimes]` is ig
 
 ## How it works
 
-`WithRuntimes` and `--runtimes` implicitly enable process isolation: each runtime runs in a freshly spawned child process via `dotnet exec`, so JIT, GC, and thread-pool state from one runtime cannot bias another. `--runtimes` overrides `--in-process`; cross-runtime always uses child processes.
+`WithRuntimes` and `--runtimes` always isolate: each runtime is measured in a freshly spawned worker, so JIT, GC and thread-pool state from one runtime cannot bias another. `--runtimes` overrides `--in-process`, because a comparison across runtimes measured in one process would not be a comparison across runtimes at all.
+
+In **Suite mode**, multi-runtime needs a `[BenchmarkPlan]` factory rather than an inline suite:
+
+```csharp
+await BenchmarkSuite.RunPlanAsync(BuildSuite);
+
+[BenchmarkPlan]
+static BenchmarkSuite BuildSuite() =>
+    new BenchmarkSuite("comparison")
+        .Add("concat", () => Concat())
+        .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net10);
+```
+
+Measuring another target framework means measuring a *different build* of your code, and an inline suite's bodies are located by metadata token - a number that only means anything inside the build that produced it. A factory is found by name, which is stable across builds, so each runtime's worker constructs the suite from that runtime's own assemblies. An inline suite with `WithRuntimes` says so rather than measuring the wrong thing.
+
+Harness mode needs no change: it already addresses benchmark classes by name.
 
 The console and markdown reporters add a "Runtime" column when results span multiple runtimes. Significance testing is performed within each runtime (net8 results are compared against the net8 baseline, not the net10 one). The first runtime in the list is the implicit baseline for ratio calculations.
 

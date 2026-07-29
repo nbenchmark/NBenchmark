@@ -79,7 +79,7 @@ When `--dry-run` (Iterations=0, WarmupIterations=0) is combined with `LaunchCoun
 
 In isolated mode (the Harness mode default), the parent spawns N child processes per isolated group. The child process is unaware of the launch count; the parent orchestrates the repeats. Per-method attribute overrides are respected: the parent uses the maximum launch count across all benchmarks in the group so that every benchmark receives at least the launches it requested.
 
-When combined with `WithIsolation()` in Suite mode, the suite repeats in a fresh child process per launch. The child process is unaware of the launch count; the parent orchestrates the repeats.
+In Suite mode the suite repeats in a fresh worker process per launch. The worker is unaware of the launch count; the coordinator orchestrates the repeats, which is what makes the spread between them a run-to-run reproducibility estimate.
 
 ## Example
 

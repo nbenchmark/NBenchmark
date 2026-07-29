@@ -22,7 +22,7 @@ Run a benchmark body across multiple input values using the `[BenchmarkCase]` an
 
 ## [Isolated runs](./isolated-runs.md)
 
-Run Suite and Harness benchmarks in clean child processes when runtime state contamination matters more than raw execution speed. Harness mode is isolated by default; suites opt in with `WithIsolation()`.
+Every mode measures in a clean worker process by default, because JIT tiering and GC flavour are fixed at process start and can only be chosen for a process that has not begun. `WithIsolation(false)` opts a suite back into the host process.
 
 ## [Multi-runtime comparison](./multi-runtime.md)
 

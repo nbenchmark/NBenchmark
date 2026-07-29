@@ -535,9 +535,7 @@ public sealed class BenchmarkHarness
         // process. Keep OTEL_EXPORTER_OTLP_ENDPOINT authoritative when the user already set it.
         using var _ = ApplyCliOtelEndpointScope(_cliArgs.OtlpEndpoint);
 
-        return await IsolatedRunContext
-            .WithCurrentRequestAsync(() => RunCoreAsync(cancellationToken))
-            .ConfigureAwait(false);
+        return await RunCoreAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -614,10 +612,10 @@ public sealed class BenchmarkHarness
         if (string.IsNullOrEmpty(endpoint))
             return NoopScope.Instance;
 
-        var previousNBenchmarkEndpoint = Environment.GetEnvironmentVariable(ChildProcessLauncher.OtelEndpointEnvVar);
+        var previousNBenchmarkEndpoint = Environment.GetEnvironmentVariable(MeasurementBudget.OtelEndpointEnvVar);
         var previousOtlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
 
-        Environment.SetEnvironmentVariable(ChildProcessLauncher.OtelEndpointEnvVar, endpoint);
+        Environment.SetEnvironmentVariable(MeasurementBudget.OtelEndpointEnvVar, endpoint);
 
         if (string.IsNullOrEmpty(previousOtlpEndpoint))
             Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint);
@@ -627,25 +625,6 @@ public sealed class BenchmarkHarness
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(CancellationToken cancellationToken)
     {
-        // Isolated child entry: serve only the class the parent requested, write its
-        // samples back, and return. A child belonging to a sibling suite (not this harness)
-        // does nothing here, so it neither recurses nor duplicates output.
-        if (IsolatedRunContext.TryGetActiveRequest(out var activeRequest))
-        {
-            var results = activeRequest.Kind == IsolatedRunKind.Host
-                ? await RunHostChildAsync(activeRequest, cancellationToken).ConfigureAwait(false)
-                : Array.Empty<BenchmarkResult>();
-
-            // Stamp RuntimeMoniker on child results.
-            if (activeRequest.RuntimeMoniker is { } runtimeMoniker)
-            {
-                var tfm = runtimeMoniker.ToTargetFramework();
-                results = results.Select(r => r with { RuntimeMoniker = tfm }).ToList();
-            }
-
-            return results;
-        }
-
         if (_cliArgs.ShowHelp)
         {
             CliArgs.PrintHelp();
@@ -985,19 +964,17 @@ public sealed class BenchmarkHarness
                 {
                     Console.WriteLine($"Running benchmarks under {tfm}...");
 
-                    var runtimeResults = await RunForRuntimeAsync(
-                            build.Moniker, build.DllPath!, filtered, observer, cancellationToken)
+                    var (runtimeResults, runtimeSamples) = await RunForRuntimeAsync(
+                            build.Moniker, build, filtered, observer, cancellationToken)
                         .ConfigureAwait(false);
 
-                    foreach (var item in runtimeResults)
+                    // Results already carry their own samples: they arrived in the same frame, so
+                    // there is no side table to look them up in and no key that can fail to match.
+                    allResults.AddRange(runtimeResults);
+
+                    foreach (var (key, samples) in runtimeSamples)
                     {
-                        // Re-attach display samples the child stripped from its serialized result
-                        // (see IsolatedRunContext.WriteChildPayloadIfRequestedAsync). For
-                        // launch-aggregated items, prefer the representative launch samples kept
-                        // on Result so TrimmedOrdinals stay aligned with the shown distribution.
-                        var withSamples = item.Result with { RawSamples = ResolveResultRawSamples(item) };
-                        allResults.Add(withSamples);
-                        rawSamples[RawSampleKey.For(withSamples.Name, tfm)] = item.RawSamples;
+                        rawSamples[key] = samples;
                     }
                 }
                 finally
@@ -1062,48 +1039,108 @@ public sealed class BenchmarkHarness
         }
     }
 
-    private async Task<IReadOnlyList<IsolatedResultItem>> RunForRuntimeAsync(
-        RuntimeMoniker moniker,
-        string entryAssemblyPath,
-        IReadOnlyList<BenchmarkSuiteDefinition> filteredSuites,
-        IMeasurementObserver observer,
-        CancellationToken cancellationToken)
+    /// <summary>
+    ///     Measures every selected class against one target framework's build, in that build's own
+    ///     worker.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The worker is taken from the build's output directory rather than from beside this
+    ///         process. A worker is a framework-dependent assembly, so only the net8.0 worker can
+    ///         load a net8.0 build - and the build targets already deployed it there, next to the
+    ///         code under test. That makes worker selection a lookup rather than a policy.
+    ///     </para>
+    ///     <para>
+    ///         A build whose output has no worker is reported and skipped rather than measured in
+    ///         this process. Falling back would measure the <i>coordinator's</i> runtime while
+    ///         labelling the row with another framework's moniker, which is a worse answer than no
+    ///         answer.
+    ///     </para>
+    /// </remarks>
+    private async Task<(List<BenchmarkResult> Results, Dictionary<string, double[]> RawSamples)>
+        RunForRuntimeAsync(
+            RuntimeMoniker moniker,
+            TfmBuild build,
+            IReadOnlyList<BenchmarkSuiteDefinition> filteredSuites,
+            IMeasurementObserver observer,
+            CancellationToken cancellationToken)
     {
-        var allItems = new List<IsolatedResultItem>();
+        var results = new List<BenchmarkResult>();
+        var rawSamples = new Dictionary<string, double[]>(StringComparer.Ordinal);
         var tfm = moniker.ToTargetFramework();
+
+        var workerPath = WorkerLocator.ForOutputDirectory(build.OutputDirectory);
+
+        if (workerPath is null)
+        {
+            Console.Error.WriteLine(
+                $"  {tfm}: no measurement worker was found in the build output "
+                + $"('{build.OutputDirectory}'), so this runtime was skipped. Measuring it in this "
+                + "process would report this runtime's numbers from a different one.");
+
+            return (results, rawSamples);
+        }
+
+        var options = ChildLaunchOptions;
 
         foreach (var suite in filteredSuites)
         {
-            var request = new IsolatedRunRequest
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var displayNames = suite.Benchmarks.Select(b => b.DisplayName).ToList();
+
+            var request = new RunGroupPayload
             {
-                Kind = IsolatedRunKind.Host,
+                GroupId = $"{tfm}:{suite.Type.Name}",
+                Kind = WorkGroupKind.DiscoveredClass,
+
+                // The class under test lives in the build for this framework, not in the assembly
+                // this coordinator was loaded from.
+                TargetAssemblyPath = build.DllPath!,
+                WorkerAssemblyPath = workerPath,
                 DeclaringTypeFullName = suite.Type.FullName,
                 DisplayPrefix = suite.Type.Name,
-                BenchmarkDisplayNames = suite.Benchmarks.Select(b => b.DisplayName).ToList(),
-                Overrides = MeasurementOverrides.FromCliArgs(_cliArgs),
-                RuntimeMoniker = moniker,
-                EntryAssemblyPath = entryAssemblyPath,
-                ObserverNames = ResolveObserverNames(),
-                Timeout = ChildProcessLauncher.ComputeTimeout(ChildLaunchOptions, suite.Benchmarks.Count),
-                RuntimeProfile = ChildLaunchOptions.RuntimeProfile,
+                BenchmarkNames = displayNames,
+                Options = options,
+                OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
+                SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
+                Order = _cliArgs.RunOrder ?? _runOrder,
+                Seed = _cliArgs.Seed,
+                DefaultInstanceLifetime = _defaultInstanceLifetime,
+                TotalBenchmarks = displayNames.Count,
             };
 
-            var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+            var group = await WorkerLauncher.Current.RunGroupAsync(
+                    request, _progress, observer, MeasurementBudget.For(options, displayNames.Count),
+                    cancellationToken)
                 .ConfigureAwait(false);
 
-            foreach (var item in items)
+            foreach (var fault in group.Faults)
             {
-                var stamped = item with { Result = item.Result with { RuntimeMoniker = tfm } };
-                allItems.Add(stamped);
+                Console.Error.WriteLine($"  {tfm}: {fault.Message}");
+            }
 
-                // The parent emits OnResult for each child result so the observer sees every
-                // benchmark across all runtimes in one stream. The child has its own observer
-                // (resolved from the forwarded names); this is the parent-side aggregation.
-                observer.OnResult(stamped.Result);
+            foreach (var result in group.Results)
+            {
+                // Stamped with the framework it was measured under, which is what keeps rows from
+                // different runtimes out of each other's comparison groups.
+                var stamped = result with
+                {
+                    RuntimeMoniker = tfm,
+                    IsolationStatus = IsolationStatus.Isolated,
+                    RawSamples = group.RawSamples.GetValueOrDefault(result.Name, []),
+                };
+
+                results.Add(stamped);
+                rawSamples[RawSampleKey.For(stamped.Name, tfm)] = group.RawSamples.GetValueOrDefault(result.Name, []);
+
+                // The coordinator emits OnResult for every runtime's results so an observer sees one
+                // stream across the whole run.
+                observer.OnResult(stamped);
             }
         }
 
-        return allItems;
+        return (results, rawSamples);
     }
 
     private static void ApplyPerClassSignificance(
@@ -1669,7 +1706,7 @@ public sealed class BenchmarkHarness
 
         var options = ChildLaunchOptions;
         var names = benchmarks.Select(b => b.DisplayName).ToList();
-        var timeout = ChildProcessLauncher.ComputeTimeout(options, benchmarks.Count);
+        var timeout = MeasurementBudget.For(options, benchmarks.Count);
 
         // Each replicate is its own worker, so LaunchCount buys a between-process variance estimate
         // rather than repeated measurements inside one process. That is the reproducibility number a
@@ -1933,212 +1970,6 @@ public sealed class BenchmarkHarness
     ///     file the parent supplied. No banner, progress, or reporters - the parent owns
     ///     presentation and computes significance over the returned samples.
     /// </summary>
-    private async Task<IReadOnlyList<BenchmarkResult>> RunHostChildAsync(
-        IsolatedRunRequest request,
-        CancellationToken cancellationToken)
-    {
-        var options = request.Overrides.Apply(_options);
-        var requested = new HashSet<string>(request.BenchmarkDisplayNames, StringComparer.Ordinal);
-
-        // A child re-runs in a fresh CLR; apply the propagated environment controls (CPU
-        // affinity, priority, guidance) so the child's measurements run under the same
-        // hardware constraints as the parent. The scope restores on dispose.
-        using var _ = EnvironmentControl.Apply(options.Environment);
-
-        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
-
-        foreach (var suite in _assemblies.SelectMany(discoverer.Discover))
-        {
-            if (suite.Type.FullName != request.DeclaringTypeFullName)
-                continue;
-
-            var selected = suite.Benchmarks.Where(b => requested.Contains(b.DisplayName)).ToList();
-
-            if (selected.Count == 0)
-                continue;
-
-            if (suite.Lifetime == InstanceLifetime.PerClass)
-            {
-                return await RunPerClassHostChildAsync(suite, selected, options, ResolveChildObserver(request), cancellationToken)
-                    .ConfigureAwait(false);
-            }
-
-            return await RunPerMethodHostChildAsync(suite, selected, options, ResolveChildObserver(request), cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        Console.Error.WriteLine($"Isolated class '{request.DeclaringTypeFullName}' was not found.");
-
-        // In the child: a non-zero exit code is what the parent's launcher reads as failure.
-        Environment.ExitCode = 1;
-        return Array.Empty<BenchmarkResult>();
-    }
-
-    /// <summary>
-    ///     Resolves the observer names forwarded by the parent into a single
-    ///     <see cref="IMeasurementObserver" /> the child's measurement loop should see. The
-    ///     child re-runs the entry assembly, so <c>[ModuleInitializer]</c> self-registration
-    ///     populates <see cref="ObserverRegistry" /> identically and the names resolve to the
-    ///     same factories. An empty list collapses to <see cref="NullMeasurementObserver.Instance" />
-    ///     so the hot-path guard stays false and the child pays no dispatch cost.
-    /// </summary>
-    private static IMeasurementObserver ResolveChildObserver(IsolatedRunRequest request)
-    {
-        var names = request.ObserverNames;
-        var resolved = new List<IMeasurementObserver>(names.Count);
-
-        foreach (var name in names)
-        {
-            if (ObserverRegistry.TryCreate(name, out var observer)
-                && observer != NullMeasurementObserver.Instance)
-                resolved.Add(observer);
-        }
-
-        // Auto-attached observers also fire in children. EnsureExtensionsLoaded (called by
-        // CreateAutoAttachedObservers) has loaded NBenchmark.* assemblies (including
-        // NBenchmark.Studio, if referenced) and their [ModuleInitializer]s have registered
-        // auto-attached observers. Dedup against the request's explicit observer names so
-        // --observer studio does not double-attach. Mirrors the parent-side ResolveObserver.
-        var explicitNames = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
-        var autoAttached = ObserverRegistry.CreateAutoAttachedObservers(explicitNames);
-        resolved.AddRange(autoAttached);
-
-        return resolved.Count switch
-        {
-            0 => NullMeasurementObserver.Instance,
-            1 => resolved[0],
-            _ => new CompositeMeasurementObserver(resolved),
-        };
-    }
-
-    private async Task<IReadOnlyList<BenchmarkResult>> RunPerClassHostChildAsync(
-        BenchmarkSuiteDefinition suite,
-        IReadOnlyList<BenchmarkMethodDefinition> selected,
-        MeasurementOptions options,
-        IMeasurementObserver observer,
-        CancellationToken cancellationToken)
-    {
-        var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
-
-        if (created is null)
-        {
-            Environment.ExitCode = 1;
-            return Array.Empty<BenchmarkResult>();
-        }
-
-        var (instance, instanceTeardown) = created.Value;
-        var instanceFromFactory = _instanceFactory is not null;
-        List<BenchmarkResult> results;
-        var samples = new Dictionary<string, double[]>();
-
-        try
-        {
-            var selectedSuite = suite with { Benchmarks = selected };
-            var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(selectedSuite, instance, options);
-
-            if (!setupSuccess)
-                results = setupErrors!.ToList();
-            else
-            {
-                var factory = () => instance;
-
-                var envelopes = selected
-                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
-                    .ToList();
-
-                // When the class implements IStateReset, fire ResetAsync between benchmark methods
-                // to keep the shared instance's state clean across PerClass execution in the child.
-                Func<Task>? betweenBenchmarksReset = typeof(IStateReset).IsAssignableFrom(suite.Type)
-                    ? () => ((IStateReset)instance).ResetAsync(cancellationToken)
-                    : null;
-
-                (results, samples) = await SuiteRunner.RunAsync(
-                    envelopes, RunOrder.Declaration, null, options,
-                    0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken, betweenBenchmarksReset,
-                    observer).ConfigureAwait(false);
-
-                ApplyPerClassIndependenceWarning(results, suite, options);
-            }
-        }
-        finally
-        {
-            await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, PostSuiteCleanup);
-        }
-
-        // SuiteRunner keys samples by plain benchmark name, and a child runs a single runtime,
-        // so the plain name is unambiguous here. Looking these up by the composite
-        // name+runtime key returned nothing for every benchmark, which silently emptied
-        // RawSamples on every isolated Harness result and disabled significance testing.
-        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(
-                results, r => samples.GetValueOrDefault(r.Name, []), cancellationToken)
-            .ConfigureAwait(false);
-
-        return results;
-    }
-
-    private async Task<IReadOnlyList<BenchmarkResult>> RunPerMethodHostChildAsync(
-        BenchmarkSuiteDefinition suite,
-        IReadOnlyList<BenchmarkMethodDefinition> selected,
-        MeasurementOptions options,
-        IMeasurementObserver observer,
-        CancellationToken cancellationToken)
-    {
-        var results = new List<BenchmarkResult>();
-        var samples = new Dictionary<string, double[]>();
-
-        foreach (var benchmark in selected)
-        {
-            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
-
-            if (created is null)
-            {
-                Environment.ExitCode = 1;
-                return Array.Empty<BenchmarkResult>();
-            }
-
-            var (instance, instanceTeardown) = created.Value;
-            var instanceFromFactory = _instanceFactory is not null;
-
-            try
-            {
-                var singleBenchmarkSuite = suite with { Benchmarks = [benchmark] };
-                var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(singleBenchmarkSuite, instance, options);
-
-                if (!setupSuccess)
-                {
-                    results.AddRange(setupErrors!);
-                    continue;
-                }
-
-                var factory = () => instance;
-                var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
-
-                var (batchResults, batchSamples) = await SuiteRunner.RunAsync(
-                    [envelope], RunOrder.Declaration, null, options,
-                    0, 1, NullBenchmarkProgress.Instance, cancellationToken,
-                    null, observer).ConfigureAwait(false);
-
-                results.AddRange(batchResults);
-
-                foreach (var kvp in batchSamples)
-                {
-                    samples[kvp.Key] = kvp.Value;
-                }
-            }
-            finally
-            {
-                await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, null);
-            }
-        }
-
-        // Keyed by plain benchmark name - see the note in RunPerClassHostChildAsync.
-        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(
-                results, r => samples.GetValueOrDefault(r.Name, []), cancellationToken)
-            .ConfigureAwait(false);
-
-        return results;
-    }
-
     private static void ApplyPerClassIndependenceWarning(
         List<BenchmarkResult> results,
         BenchmarkSuiteDefinition suite,
@@ -2346,7 +2177,7 @@ public sealed class BenchmarkHarness
     {
         public void Dispose()
         {
-            Environment.SetEnvironmentVariable(ChildProcessLauncher.OtelEndpointEnvVar, previousNBenchmarkEndpoint);
+            Environment.SetEnvironmentVariable(MeasurementBudget.OtelEndpointEnvVar, previousNBenchmarkEndpoint);
             Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", previousOtlpEndpoint);
         }
     }

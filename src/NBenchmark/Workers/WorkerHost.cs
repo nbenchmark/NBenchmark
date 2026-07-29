@@ -152,6 +152,7 @@ internal sealed class WorkerHost : IAsyncDisposable
             startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
 
             MeasurementBudget.ApplyRuntimeProfile(startInfo, profile);
+            MeasurementBudget.ApplyTelemetryEnvironment(startInfo);
 
             process = new Process { StartInfo = startInfo };
 

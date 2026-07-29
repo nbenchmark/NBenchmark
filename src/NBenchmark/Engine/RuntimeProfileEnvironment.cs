@@ -12,7 +12,7 @@ namespace NBenchmark.Engine;
 ///         it does not have.
 ///     </para>
 ///     <para>
-///         A child spawned by <see cref="ChildProcessLauncher" /> sees both the
+///         A measurement worker sees both the
 ///         <c>DOTNET_*</c> knobs and the <see cref="RuntimeProfile.ProfileNameEnvVar" /> marker in
 ///         its own environment, so it reports the profile by name with no plumbing across the
 ///         process boundary. A host process sees no marker and reports

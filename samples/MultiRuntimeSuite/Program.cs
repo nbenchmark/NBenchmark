@@ -1,30 +1,35 @@
 using NBenchmark;
+using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
-// MultiRuntimeSuite demonstrates running the same benchmarks across multiple .NET
-// runtimes (net8.0, net9.0, net10.0) and comparing results side-by-side.
+// MultiRuntimeSuite runs the same benchmarks across net8.0, net9.0 and net10.0 and compares the
+// results side by side.
 //
-// The project must target all runtimes you want to compare. The .csproj uses
-// <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks> so dotnet build -f <tfm>
-// can produce output for each runtime.
+// The project must target every runtime you want to compare. The .csproj uses
+// <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>, because each one is built and then
+// measured in a worker process built for that same framework.
 //
-// WithRuntimes implicitly enables process isolation: each runtime runs in a freshly
-// spawned child process via dotnet exec, so JIT, GC, and thread-pool state from one
-// runtime cannot bias another.
+// Multi-runtime needs a [BenchmarkPlan] factory rather than an inline suite. Measuring another
+// target framework means measuring a *different build* of this code, and an inline suite's bodies
+// are located by metadata token - a number that only means anything inside the build that produced
+// it. A factory is found by name, which is stable across builds, so each runtime's worker can
+// construct the suite from that runtime's own assemblies.
 //
 // Run with: dotnet run --project samples/MultiRuntimeSuite
 //
-// The console output shows a "Runtime" column grouping results by target framework.
-// The first runtime in the list (Net8) is the implicit baseline for ratio calculations.
+// The console output groups rows by runtime. The first runtime listed is the implicit baseline.
 
-var results = await new BenchmarkSuite("string-concat")
-    .Add("concat", () => "a" + "b" + "c" + "d" + "e")
-    .Add("interpolate", () => $"a {"b"} {"c"} {"d"} {"e"}")
-    .Add("join", () => string.Join("", "a", "b", "c", "d", "e"))
-    .WithBaseline("concat")
-    .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)
-    .WithWarmup(3)
-    .WithIterations(50)
-    .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress())
-    .RunAsync();
+await BenchmarkSuite.RunPlanAsync(BuildSuite);
+
+[BenchmarkPlan]
+static BenchmarkSuite BuildSuite() =>
+    new BenchmarkSuite("string-concat")
+        .Add("concat", () => "a" + "b" + "c" + "d" + "e")
+        .Add("interpolate", () => $"a {"b"} {"c"} {"d"} {"e"}")
+        .Add("join", () => string.Join("", "a", "b", "c", "d", "e"))
+        .WithBaseline("concat")
+        .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)
+        .WithWarmup(3)
+        .WithIterations(50)
+        .WithReporter(new ConsoleReporter())
+        .WithProgress(new ConsoleBenchmarkProgress());

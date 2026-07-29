@@ -236,6 +236,36 @@ internal sealed record RunGroupPayload
     public IReadOnlyList<BodyRef> Bodies { get; init; } = [];
 
     /// <summary>
+    ///     <see cref="WorkGroupKind.Plan" />: the factory method's name, resolved against
+    ///     <see cref="DeclaringTypeFullName" /> rather than by metadata token.
+    ///     <para>
+    ///         Name resolution exists for multi-runtime runs, where the assembly under test is a
+    ///         <i>different build</i> of the same source. A metadata token is only meaningful within
+    ///         the build that produced it - and the module version id that guards against a stale
+    ///         token differs between two target frameworks' builds by construction, so token
+    ///         addressing cannot be made safe across them. A fully-qualified name is stable.
+    ///     </para>
+    ///     <para>
+    ///         <c>null</c> for same-build runs, which address by token and get the stronger guarantee
+    ///         that the method is precisely the one the caller passed.
+    ///     </para>
+    /// </summary>
+    public string? PlanMethodName { get; init; }
+
+    /// <summary>
+    ///     Which <c>nbworker</c> to launch. <c>null</c> uses the one deployed beside this
+    ///     application, which is right for everything measured against the running build.
+    ///     <para>
+    ///         Set for multi-runtime runs. A worker is a framework-dependent assembly, so measuring a
+    ///         net8.0 build requires the net8.0 worker - the one this net10.0 coordinator sits beside
+    ///         could not load that build's assemblies at all. The build targets already deploy the
+    ///         correct worker into each target framework's output directory, so this is simply the
+    ///         path to the one that was built alongside the code under test.
+    ///     </para>
+    /// </summary>
+    public string? WorkerAssemblyPath { get; init; }
+
+    /// <summary>
     ///     The measurement configuration, serialized whole. Everything on
     ///     <see cref="MeasurementOptions" /> is value data except the two strategy interfaces,
     ///     which travel as <see cref="OutlierDetectorTypeName" /> and

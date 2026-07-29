@@ -1,3 +1,5 @@
+using NBenchmark.Tests.Workers;
+using NBenchmark.Workers;
 using System.Diagnostics;
 using NBenchmark.Engine;
 using Xunit;
@@ -109,7 +111,7 @@ public class RuntimeProfileTests
     {
         var psi = new ProcessStartInfo();
 
-        ChildProcessLauncher.ApplyRuntimeProfile(psi, RuntimeProfile.SteadyState);
+        MeasurementBudget.ApplyRuntimeProfile(psi, RuntimeProfile.SteadyState);
 
         Assert.Equal("0", psi.Environment["DOTNET_TieredCompilation"]);
         Assert.Equal("0", psi.Environment["DOTNET_ReadyToRun"]);
@@ -123,10 +125,10 @@ public class RuntimeProfileTests
     public void ApplyRuntimeProfile_LeavesTheEnvironmentAloneForHostAndNull()
     {
         var forHost = new ProcessStartInfo();
-        ChildProcessLauncher.ApplyRuntimeProfile(forHost, RuntimeProfile.Host);
+        MeasurementBudget.ApplyRuntimeProfile(forHost, RuntimeProfile.Host);
 
         var forNull = new ProcessStartInfo();
-        ChildProcessLauncher.ApplyRuntimeProfile(forNull, null);
+        MeasurementBudget.ApplyRuntimeProfile(forNull, null);
 
         foreach (var psi in (ProcessStartInfo[])[forHost, forNull])
         {
@@ -207,62 +209,55 @@ public class RuntimeProfileTests
     }
 
     /// <summary>
-    ///     The end-to-end proof: a real child process, launched under a real profile, reports back
-    ///     what it was actually running under. This is the only assertion that covers the whole
+    ///     The end-to-end proof: a real worker process, launched under a real profile, reports back
+    ///     what it was actually running under. This is the only assertion covering the whole
     ///     mechanism - env-block delivery, the runtime honouring the knobs at startup, and the
-    ///     child reading its own environment to stamp the result.
+    ///     worker reading its own environment to stamp the result.
     /// </summary>
     [Theory]
     [InlineData("steady-state", "tiered=off pgo=off r2r=off")]
     [InlineData("production", "tiered=on pgo=on r2r=on")]
-    public async Task RealChild_ReportsTheProfileItWasLaunchedUnder(string profileName, string expectedKnobs)
+    public async Task RealWorker_ReportsTheProfileItWasLaunchedUnder(string profileName, string expectedKnobs)
     {
         Assert.True(RuntimeProfile.TryParse(profileName, out var profile));
 
-        var items = await ChildProcessLauncher.LaunchAsync(
-            ChildRequest(profile),
-            CancellationToken.None);
+        var results = await MeasureFixtureAsync(profile);
 
-        Assert.NotEmpty(items);
+        Assert.NotEmpty(results);
 
-        foreach (var item in items)
+        foreach (var result in results)
         {
-            Assert.False(item.Result.Errored, item.Result.ErrorMessage);
-            Assert.Equal(profileName, item.Result.RuntimeProfileName);
-            Assert.Equal(expectedKnobs, item.Result.RuntimeKnobs);
+            Assert.False(result.Errored, result.ErrorMessage);
+            Assert.Equal(profileName, result.RuntimeProfileName);
+            Assert.Equal(expectedKnobs, result.RuntimeKnobs);
         }
     }
 
     /// <summary>
-    ///     With no profile the child inherits the parent's environment, so it must report
-    ///     <c>host</c> rather than claiming the default profile was applied. Stamping the
-    ///     requested profile here would make every result overstate its own fidelity.
+    ///     With no profile the worker inherits the coordinator's environment, so it must report
+    ///     <c>host</c> rather than claiming the default profile was applied. Stamping the requested
+    ///     profile here would make every result overstate its own fidelity.
     /// </summary>
     [Fact]
-    public async Task RealChild_LaunchedWithoutAProfile_ReportsHost()
+    public async Task RealWorker_LaunchedWithoutAProfile_ReportsHost()
     {
-        var items = await ChildProcessLauncher.LaunchAsync(
-            ChildRequest(RuntimeProfile.Host),
-            CancellationToken.None);
-
-        foreach (var item in items)
+        foreach (var result in await MeasureFixtureAsync(RuntimeProfile.Host))
         {
-            Assert.False(item.Result.Errored, item.Result.ErrorMessage);
-            Assert.Equal(RuntimeProfile.Host.Name, item.Result.RuntimeProfileName);
+            Assert.False(result.Errored, result.ErrorMessage);
+            Assert.Equal(RuntimeProfile.Host.Name, result.RuntimeProfileName);
         }
     }
 
     /// <summary>
-    ///     The honesty property, and the one most easily got wrong: an in-process measurement
-    ///     requests <see cref="RuntimeProfile.SteadyState" /> by default and <b>cannot</b> honour it,
-    ///     because the runtime fixes these knobs at startup. It must therefore stamp
-    ///     <c>host</c>.
+    ///     The honesty property, and the one most easily got wrong: a measurement taken in this
+    ///     process requests <see cref="RuntimeProfile.SteadyState" /> by default and <b>cannot</b>
+    ///     honour it, because the runtime fixes these knobs at startup. It must stamp <c>host</c>.
     ///     <para>
     ///         Stamping <c>options.RuntimeProfile</c> instead - the obvious implementation - would
-    ///         make every in-process result claim steady-state fidelity it does not have, and would
-    ///         also defeat <see cref="ComparisonGroup" />, silently allowing in-process rows to be
-    ///         compared against isolated ones. That is why the stamp is read from the measuring
-    ///         process's own environment rather than from its configuration.
+    ///         make every in-process result claim a fidelity it does not have, and would defeat
+    ///         <see cref="ComparisonGroup" />, silently allowing in-process rows to be compared
+    ///         against isolated ones. That is why the stamp is read from the measuring process's own
+    ///         environment rather than from its configuration.
     ///     </para>
     /// </summary>
     [Fact]
@@ -277,21 +272,61 @@ public class RuntimeProfileTests
 
         Assert.Equal(RuntimeProfile.SteadyState.Name, options.RuntimeProfile.Name);
 
-        var result = Benchmark.Run(() => Thread.SpinWait(50), options, "in-process-stamp");
+        var result = Benchmark.RunInProcess(() => Thread.SpinWait(50), options, "in-process-stamp");
 
         Assert.Equal(RuntimeProfile.Host.Name, result.RuntimeProfileName);
     }
 
-    private static IsolatedRunRequest ChildRequest(RuntimeProfile profile) => new()
+    /// <summary>Measures the isolation fixture's benchmark in a worker under a given profile.</summary>
+    private static async Task<IReadOnlyList<BenchmarkResult>> MeasureFixtureAsync(RuntimeProfile profile)
     {
-        Kind = IsolatedRunKind.Host,
-        DeclaringTypeFullName = IsolationFixtureLocator.ClassFullName("IsolationFixtureBenchmarks"),
-        DisplayPrefix = "IsolationFixtureBenchmarks",
-        BenchmarkDisplayNames = ["Fast"],
-        Overrides = new MeasurementOverrides { Iterations = 20, WarmupIterations = 1 },
-        EntryAssemblyPath = IsolationFixtureLocator.AssemblyPath(),
-        RuntimeProfile = profile,
-    };
+        var prior = WorkerLauncher.Current;
+        WorkerLauncher.Current = new RealWorkerLauncher(WorkerLocatorForTests.WorkerAssemblyPath());
+
+        try
+        {
+            var options = MeasurementOptions.Default with
+            {
+                Iterations = 20,
+                WarmupIterations = 1,
+                RuntimeProfile = profile,
+                AutoTune = AutoTuneOptions.Default with
+                {
+                    MaxTuningTime = TimeSpan.FromSeconds(5),
+                    MinWarmupTime = TimeSpan.Zero,
+                    MinMeasurementTime = TimeSpan.Zero,
+                    RequireJitQuiescence = false,
+                    EnableJitterCalibration = false,
+                },
+            };
+
+            var group = await WorkerLauncher.Current.RunGroupAsync(
+                new RunGroupPayload
+                {
+                    GroupId = $"profile:{profile.Name}",
+                    Kind = WorkGroupKind.DiscoveredClass,
+                    TargetAssemblyPath = IsolationFixtureLocator.AssemblyPath(),
+                    DeclaringTypeFullName =
+                        IsolationFixtureLocator.ClassFullName("IsolationFixtureBenchmarks"),
+                    DisplayPrefix = "IsolationFixtureBenchmarks",
+                    BenchmarkNames = ["Fast"],
+                    Options = options,
+                    TotalBenchmarks = 1,
+                },
+                NullBenchmarkProgress.Instance,
+                NullMeasurementObserver.Instance,
+                TimeSpan.FromSeconds(120),
+                CancellationToken.None);
+
+            Assert.Empty(group.Faults.Select(f => f.Message));
+
+            return group.Results;
+        }
+        finally
+        {
+            WorkerLauncher.Current = prior;
+        }
+    }
 
     [Fact]
     public void NotAppliedGuidance_IsEmittedOnceAndIsSuppressible()

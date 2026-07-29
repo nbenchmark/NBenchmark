@@ -248,28 +248,56 @@ internal sealed class WorkerSession(FrameChannel channel)
         StreamingProgress progress,
         CancellationToken cancellationToken)
     {
-        if (request.Bodies.Count != 1)
-        {
-            Fault($"A plan group must carry exactly one factory address; got {request.Bodies.Count}.");
-            return;
-        }
-
-        var planRef = request.Bodies[0];
         var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
 
-        if (!BodyResolver.TryResolve(context, planRef, out var resolved, out var error))
+        Func<BenchmarkSuite>? factory;
+        string description;
+
+        if (request.PlanMethodName is { Length: > 0 } planMethodName)
         {
-            Fault($"The benchmark plan '{planRef.DisplayName}' could not be resolved because {error}");
-            return;
+            // Name resolution: the assembly is a different build of the same source, so tokens from
+            // the coordinator's build mean nothing here.
+            description = $"{request.DeclaringTypeFullName}.{planMethodName}";
+
+            if (!TryResolvePlanByName(context, request, out factory, out var nameError))
+            {
+                Fault($"The benchmark plan '{description}' could not be resolved because {nameError}");
+                return;
+            }
+        }
+        else
+        {
+            if (request.Bodies.Count != 1)
+            {
+                Fault($"A plan group must carry exactly one factory address; got {request.Bodies.Count}.");
+                return;
+            }
+
+            var planRef = request.Bodies[0];
+            description = planRef.DisplayName;
+
+            if (!BodyResolver.TryResolve(context, planRef, out var resolved, out var error))
+            {
+                Fault($"The benchmark plan '{description}' could not be resolved because {error}");
+                return;
+            }
+
+            factory = resolved as Func<BenchmarkSuite>;
+
+            if (factory is null)
+            {
+                Fault(
+                    $"'{description}' resolved to {resolved.GetType().Name} rather than a "
+                    + $"{nameof(Func<BenchmarkSuite>)}. A benchmark plan must be a parameterless method "
+                    + $"returning {nameof(BenchmarkSuite)}.");
+
+                return;
+            }
         }
 
-        if (resolved is not Func<BenchmarkSuite> factory)
+        if (factory is null)
         {
-            Fault(
-                $"'{planRef.DisplayName}' resolved to {resolved.GetType().Name} rather than a "
-                + $"{nameof(Func<BenchmarkSuite>)}. A benchmark plan must be a parameterless method "
-                + $"returning {nameof(BenchmarkSuite)}.");
-
+            Fault($"The benchmark plan '{description}' could not be bound to a factory.");
             return;
         }
 
@@ -283,7 +311,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         {
             // The factory is user code and can fail for any reason. Reporting it as the group's
             // fault is far more useful than letting it surface as a dead worker.
-            Fault($"The benchmark plan '{planRef.DisplayName}' threw while building the suite: {ex.Message}",
+            Fault($"The benchmark plan '{description}' threw while building the suite: {ex.Message}",
                 ex.ToString());
 
             return;
@@ -291,7 +319,7 @@ internal sealed class WorkerSession(FrameChannel channel)
 
         if (suite is null)
         {
-            Fault($"The benchmark plan '{planRef.DisplayName}' returned null.");
+            Fault($"The benchmark plan '{description}' returned null.");
             return;
         }
 
@@ -306,6 +334,63 @@ internal sealed class WorkerSession(FrameChannel channel)
             .ConfigureAwait(false);
 
         SendResults(outcome.Results, r => outcome.RawSamples.GetValueOrDefault(r.Name, []));
+    }
+
+    /// <summary>
+    ///     Binds a plan factory by fully-qualified name from the assembly under test.
+    /// </summary>
+    /// <remarks>
+    ///     The shape checks mirror <c>BenchmarkPlanDiscovery</c>'s, because a plan that the
+    ///     coordinator accepted must not be rejected here for a different reason - and because the
+    ///     assembly here is a <i>different build</i>, where the method genuinely might have changed
+    ///     shape under a different target framework's conditional compilation.
+    /// </remarks>
+    private static bool TryResolvePlanByName(
+        BenchmarkLoadContext context,
+        RunGroupPayload request,
+        out Func<BenchmarkSuite>? factory,
+        out string? error)
+    {
+        factory = null;
+        error = null;
+
+        var target = context.LoadFromAssemblyPath(Path.GetFullPath(request.TargetAssemblyPath));
+        var type = target.GetType(request.DeclaringTypeFullName!, throwOnError: false);
+
+        if (type is null)
+        {
+            error = $"the type '{request.DeclaringTypeFullName}' was not found in "
+                    + $"'{Path.GetFileName(request.TargetAssemblyPath)}'.";
+
+            return false;
+        }
+
+        var method = type.GetMethod(
+            request.PlanMethodName!,
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            types: Type.EmptyTypes,
+            modifiers: null);
+
+        if (method is null)
+        {
+            error = $"'{request.DeclaringTypeFullName}' has no static parameterless method named "
+                    + $"'{request.PlanMethodName}'.";
+
+            return false;
+        }
+
+        if (!typeof(BenchmarkSuite).IsAssignableFrom(method.ReturnType))
+        {
+            error = $"'{request.PlanMethodName}' returns {method.ReturnType.Name} rather than "
+                    + $"{nameof(BenchmarkSuite)}.";
+
+            return false;
+        }
+
+        factory = method.CreateDelegate<Func<BenchmarkSuite>>();
+
+        return true;
     }
 
     private async Task RunLambdasAsync(

@@ -7,7 +7,7 @@ namespace NBenchmark.Engine;
 ///     under the same name, so the key must carry both.
 ///     <para>
 ///         This type exists because the format was previously inlined at nine call sites
-///         across <c>BenchmarkHarness</c>, <c>BenchmarkSuite</c> and <c>IsolatedRunContext</c>,
+///         across <c>BenchmarkHarness</c> and <c>BenchmarkSuite</c>,
 ///         and two of them disagreed about whether a dictionary was keyed by plain name or by
 ///         the composite key. The result was that every isolated Harness child returned zero
 ///         raw samples and significance testing silently produced nothing in the library's

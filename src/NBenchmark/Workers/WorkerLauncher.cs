@@ -58,7 +58,9 @@ internal static class WorkerLauncher
         {
             ArgumentNullException.ThrowIfNull(request);
 
-            var workerPath = WorkerLocator.WorkerAssemblyPath;
+            // The request may name a worker - a multi-runtime run measures a build for another
+            // target framework and needs that framework's worker, not this process's.
+            var workerPath = request.WorkerAssemblyPath ?? WorkerLocator.WorkerAssemblyPath;
 
             if (workerPath is null)
             {

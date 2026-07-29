@@ -102,40 +102,6 @@ public class EnvironmentControlBuildConfigTests
     }
 
     [Fact]
-    public async Task EmitBuildConfigurationGuidance_SkippedInIsolatedChild()
-    {
-        EnvironmentControl.ResetBuildConfigurationWarningGuard();
-
-        // Simulate an isolated child by setting the active request scope, then call the
-        // guidance method. The child must not re-emit the warning its parent already
-        // produced - the parent and child share the same entry assembly, so the warning
-        // would be a duplicate.
-        var request = new IsolatedRunRequest
-        {
-            Kind = IsolatedRunKind.Suite,
-            InvocationOrdinal = 1,
-            CallerFilePath = "test",
-            CallerLineNumber = 0,
-            CallerMemberName = "test",
-            SuiteName = "child-scope-test",
-        };
-
-        var stderr = await CaptureStderrAsync(async () =>
-        {
-            await IsolatedRunContext.WithActiveRequestForTestingAsync(
-                request,
-                outputPath: null,
-                () => Task.Run(() =>
-                {
-                    EnvironmentControl.EmitBuildConfigurationGuidance(null);
-                    return 0;
-                }));
-        });
-
-        Assert.DoesNotContain("Build configuration guidance", stderr);
-    }
-
-    [Fact]
     public void Apply_NullOptions_DoesNotThrow_AndRespectsSuppressEnvVar()
     {
         // Apply(null) takes the no-op fast path for hardware/OS options, but must still

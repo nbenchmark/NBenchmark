@@ -120,9 +120,10 @@ await new BenchmarkSuite("name")
     .WithSignificance(false)        // disable significance testing
     .WithSignificanceTest(new MyTest())   // custom ISignificanceTest
     .WithRunOrder(RunOrder.Declaration)   // default: RunOrder.Random
+    .WithSeed(1234)                 // pin the shuffle seed for a reproducible order
     .WithSuiteSetup(() => { })      // runs once before all benchmarks
     .WithSuiteTeardown(() => { })   // runs once after all benchmarks
-    .WithIsolation()                // run the whole suite in one clean child process
+    .WithIsolation(false)           // measure in this process; the default is a worker
     .WithReporter(new ConsoleReporter())
     .WithReporter(new MarkdownReporter("results/"))
     .WithProgress(new ConsoleBenchmarkProgress())

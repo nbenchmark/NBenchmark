@@ -57,7 +57,7 @@ public class SharedInstanceBenchmarks
 ///     tested against a genuinely wedged child rather than a mock.
 ///     <para>
 ///         It lives in its own class so it is only ever reached when a test names it explicitly
-///         in an <c>IsolatedRunRequest</c>. Any end-to-end run of this fixture must exclude it
+///         in a worker run request. Any end-to-end run of this fixture must exclude it
 ///         with <c>--filter IsolationFixtureBenchmarks.*</c>.
 ///     </para>
 /// </summary>

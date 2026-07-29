@@ -129,10 +129,6 @@ static BenchmarkSuite BuildSuite()
 
 The factory must be `static` and capture nothing itself, so a worker can locate it by metadata token. `RunPlansAsync(typeof(Plans))` runs every `[BenchmarkPlan]` on a type, each in its own worker. A method marked `[BenchmarkPlan]` but shaped wrongly throws rather than being skipped - a silently skipped suite gives its author nothing to go on.
 
-### `WithIsolation()`
-
-`WithIsolation()` predates all of this. It still works, but isolates by **re-executing your whole program** to rebuild the suite, so side effects in `Main` repeat once per child and *M* isolated suites do *M²* work. It is no longer needed: a plain `RunAsync()` already isolates.
-
 ## Harness mode
 
 Harness mode is **isolated by default**: each benchmark class runs in its own clean child process. You usually don't configure anything - `BenchmarkHarness.Create(args)...RunAsync()` already isolates per class.
@@ -224,12 +220,12 @@ This is also why an in-process benchmark can never be as trustworthy as an isola
 
 ## Important behavior notes
 
-- Isolation adds overhead: one process launch per child. A worker costs roughly 70 ms to start and complete its handshake; a legacy `WithIsolation()` child re-runs your entry point and costs about 200 ms. Against the per-benchmark wall-clock floor of about 600 ms (`MinWarmupTime` plus `MinMeasurementTime`), either is a small tax for a comparison group of any size.
+- Isolation adds overhead: one worker launch per group. A worker costs roughly 70 ms to start and complete its handshake. Against the per-benchmark wall-clock floor of about 600 ms (`MinWarmupTime` plus `MinMeasurementTime`), either is a small tax for a comparison group of any size.
 - **Do not rely on `--in-process` for anything comparative.** On four benchmarks with provably identical cost, repeated in-process runs spanned 3.27x and fabricated a 2.80x difference between two of them, while reporting a tight confidence interval on each. The same benchmarks measured in workers under the default runtime profile spanned 1.03x. See `plans/out-of-process-pivot.md` for the measurements and the reason.
 - **`LaunchCount` is a replicate count, and each replicate is a fresh process.** In Harness mode, `--launch-count 3` measures the group in three separate workers, each with its own shuffle order derived from the session seed. That is what gives a run-to-run reproducibility estimate rather than three repetitions inside one process - and reproducibility, not within-process precision, is what a regression gate should read.
-- Run-order randomization is honoured in Harness workers and in `RunPlanAsync` suites. Legacy `WithIsolation()` children still run in **declaration** order.
+- Run-order randomization is honoured everywhere, and each replicate derives a distinct order from the session seed, so run order is a randomized nuisance factor rather than a fixed confound.
 - `--dry-run` (equivalent to `--iterations 0 --warmup 0`) always runs in-process - no child is spawned.
-- `RunPlanAsync` suites need no configuration transfer at all: the worker runs your factory, so custom detectors, significance tests and lifecycle delegates are constructed there rather than described to it. Harness workers receive the resolved configuration directly and rebuild custom strategies from their type names. Legacy `WithIsolation()` children rebuild everything by re-running your `Main`.
+- `RunPlanAsync` suites need no configuration transfer at all: the worker runs your factory, so custom detectors, significance tests and lifecycle delegates are constructed there rather than described to it. Harness workers receive the resolved configuration directly and rebuild custom strategies from their type names.
 - A child that never returns is killed, along with its whole process tree, once it exceeds a wall-clock ceiling derived from the tuning budget (`MaxTuningTime` and `CapGraceFactor`, plus warmup and process-start allowances). The affected benchmarks are reported as errored, naming the timeout, rather than hanging the run. Raise `--max-tuning-time` if the work is genuinely that slow.
 - A worker cannot outlive the run that started it. It blocks reading its inbound pipe, so if the coordinator exits for any reason - a clean finish, a Ctrl-C, a crash, an IDE stop button - the read ends and the worker exits on its own, measured at 7 ms. Nothing supervises it, which matters because the supervisor would be the process most likely to have died.
 

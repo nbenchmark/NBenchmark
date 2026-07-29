@@ -227,7 +227,7 @@ See [Custom outlier detectors](./statistics/outliers.md#custom-outlier-detectors
 Demonstrates process isolation:
 
 - Single mode is always in-process (`Benchmark.Run`).
-- Suite mode opts into a single clean child process with `WithIsolation()`.
+- Suite mode measures in a single clean worker process, with a `[BenchmarkPlan]` factory for suites that hold live state.
 
 ```bash
 cd samples/IsolatedRuns

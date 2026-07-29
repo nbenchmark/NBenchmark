@@ -40,6 +40,23 @@ internal static class WorkerLocator
     /// </summary>
     public static string? WorkerAssemblyPath => Cached.Value;
 
+    /// <summary>
+    ///     The worker deployed inside a specific build's output directory, or <c>null</c> when that
+    ///     build has none.
+    ///     <para>
+    ///         Used for multi-runtime runs. A worker is framework-dependent, so the one that can
+    ///         measure a net8.0 build is the net8.0 worker - and the build targets already copied it
+    ///         next to that build's own assemblies. No search heuristics are needed: the right worker
+    ///         is the one sitting beside the code under test.
+    ///     </para>
+    /// </summary>
+    public static string? ForOutputDirectory(string? outputDirectory)
+        => string.IsNullOrEmpty(outputDirectory)
+            ? null
+            : Path.Combine(outputDirectory, WorkerAssemblyFileName) is var candidate && File.Exists(candidate)
+                ? Path.GetFullPath(candidate)
+                : null;
+
     /// <summary>Explains where the worker was looked for, for a diagnostic the user can act on.</summary>
     public static string DescribeSearch()
     {

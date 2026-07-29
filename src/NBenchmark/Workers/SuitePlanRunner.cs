@@ -118,6 +118,138 @@ internal static class SuitePlanRunner
     }
 
     /// <summary>
+    ///     Builds the project for each requested target framework and measures the plan's suite in
+    ///     each build's own worker.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The factory is addressed <b>by name</b> here, not by metadata token. Each runtime's
+    ///         assembly is a separate build, so a token from the coordinator's build identifies
+    ///         nothing in it - and the module version id that normally guards against a stale token
+    ///         differs between builds by construction, so token addressing could not be made safe.
+    ///     </para>
+    ///     <para>
+    ///         The worker likewise comes from each build's own output directory. A worker is
+    ///         framework-dependent, so only the net8.0 worker can load a net8.0 build; the build
+    ///         targets already deploy the right one beside the code under test.
+    ///     </para>
+    /// </remarks>
+    public static async Task<IReadOnlyList<BenchmarkResult>> RunAcrossRuntimesAsync(
+        Func<BenchmarkSuite> plan,
+        BenchmarkSuite localSuite,
+        IBenchmarkProgress progress,
+        IMeasurementObserver observer,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(localSuite);
+
+        var declaringType = plan.Method.DeclaringType?.FullName;
+
+        if (!plan.Method.IsStatic || declaringType is null)
+        {
+            throw new InvalidOperationException(
+                $"The benchmark plan '{plan.Method.Name}' must be a static method on a named type to "
+                + "run across runtimes, because each runtime's worker locates it by name in that "
+                + "runtime's own build.");
+        }
+
+        var runtimes = localSuite.RequestedRuntimes;
+        var options = localSuite.ResolvedOptions;
+        var names = localSuite.BenchmarkNames();
+
+        Console.WriteLine($"Building for runtimes: {string.Join(", ", runtimes.Select(r => r.ToTargetFramework()))}");
+
+        var builds = await MultiRuntimeOrchestrator
+            .BuildForRuntimesAsync(runtimes, cancellationToken).ConfigureAwait(false);
+
+        foreach (var failed in builds.Where(b => b.Error is not null))
+        {
+            Console.Error.WriteLine($"  {failed.Moniker.ToTargetFramework()}: {failed.Error}");
+        }
+
+        var allResults = new List<BenchmarkResult>();
+        var rawSamples = new Dictionary<string, double[]>(StringComparer.Ordinal);
+
+        foreach (var build in builds.Where(b => b.DllPath is not null))
+        {
+            var tfm = build.Moniker.ToTargetFramework();
+
+            try
+            {
+                var workerPath = WorkerLocator.ForOutputDirectory(build.OutputDirectory);
+
+                if (workerPath is null)
+                {
+                    // Skipped rather than measured here. Measuring in the coordinator would report
+                    // this process's runtime under another framework's label, which is worse than a
+                    // missing row.
+                    Console.Error.WriteLine(
+                        $"  {tfm}: no measurement worker was found in the build output, so this "
+                        + "runtime was skipped.");
+
+                    continue;
+                }
+
+                Console.WriteLine($"  Running under {tfm}...");
+
+                var request = new RunGroupPayload
+                {
+                    GroupId = $"{tfm}:plan:{plan.Method.Name}",
+                    Kind = WorkGroupKind.Plan,
+                    TargetAssemblyPath = build.DllPath!,
+                    WorkerAssemblyPath = workerPath,
+                    DeclaringTypeFullName = declaringType,
+                    PlanMethodName = plan.Method.Name,
+                    Options = options with { LaunchCount = 1 },
+                    TotalBenchmarks = names.Count,
+                };
+
+                var group = await WorkerLauncher.Current.RunGroupAsync(
+                        request, progress, observer, MeasurementBudget.For(options, names.Count),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var fault in group.Faults)
+                {
+                    Console.Error.WriteLine($"  {tfm}: {fault.Message}");
+                }
+
+                foreach (var result in group.Results)
+                {
+                    var samples = group.RawSamples.GetValueOrDefault(result.Name, []);
+
+                    var stamped = result with
+                    {
+                        RuntimeMoniker = tfm,
+                        IsolationStatus = IsolationStatus.Isolated,
+                        RawSamples = samples,
+                    };
+
+                    allResults.Add(stamped);
+                    rawSamples[RawSampleKey.For(stamped.Name, tfm)] = samples;
+                    observer.OnResult(stamped);
+                }
+            }
+            finally
+            {
+                MultiRuntimeOrchestrator.TryDeleteBuildOutput(build.OutputDirectory);
+            }
+        }
+
+        await progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
+
+        observer.OnPhase(new MeasurementPhaseEvent(
+            string.Empty, MeasurementPhase.SuiteCompleted, PhaseTransition.Completed, Succeeded: true));
+
+        localSuite.ScoreAndReport(allResults, rawSamples);
+
+        await localSuite.ReportAsync(allResults, cancellationToken).ConfigureAwait(false);
+
+        return allResults;
+    }
+
+    /// <summary>
     ///     Whether the factory can be invoked in a worker. A capturing factory is refused for the
     ///     same reason a capturing benchmark body is: the captured state lives only here, and
     ///     reconstructing it was measured to return plausible, wrong numbers rather than failing.

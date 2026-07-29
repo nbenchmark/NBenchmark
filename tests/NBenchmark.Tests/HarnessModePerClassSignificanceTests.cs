@@ -11,7 +11,6 @@ public class HarnessModePerClassSignificanceTests
     [Fact]
     public async Task HarnessIsolated_PerClassSignificance_EachClassHasOwnBaseline()
     {
-        IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
@@ -65,7 +64,6 @@ public class HarnessModePerClassSignificanceTests
     [Fact]
     public async Task HarnessIsolated_CrossClassSignificance_SingleBaselineAcrossClasses()
     {
-        IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
