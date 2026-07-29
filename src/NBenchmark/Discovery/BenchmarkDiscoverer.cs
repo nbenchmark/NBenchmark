@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Globalization;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using NBenchmark.Attributes;
@@ -476,9 +475,6 @@ public sealed class BenchmarkDiscoverer
             new BenchmarkAttribute(),
             displayName,
 
-            // Null would mean "no arguments to bind" and take the direct-delegate path, which
-            // cannot express a static method or an argument conversion. An empty array keeps the
-            // expression-tree path for every shape.
             arguments,
             paramNames: method.GetParameters().Select(pa => pa.Name ?? string.Empty).ToArray(),
             iterSetupDel: null,
@@ -499,57 +495,16 @@ public sealed class BenchmarkDiscoverer
         IReadOnlyList<string> classCategories,
         bool isBaseline = false)
     {
-        var isAsync = IsAwaitable(method.ReturnType);
-
-        Func<object, object?>? syncDelegate = null;
-        Func<object, Task>? asyncDelegate = null;
-        Action<Task>? resultConsumer = null;
-
-        if (isAsync)
-        {
-            asyncDelegate = arguments is null && typeof(Task).IsAssignableFrom(method.ReturnType)
-                ? BuildAsyncDelegate(method)
-
-                // A ValueTask needs .AsTask() before it can be awaited as a Task, which the
-                // direct Delegate.CreateDelegate path cannot express.
-                : BuildArgumentBoundAsyncDelegate(method, arguments ?? []);
-
-            // Only a Task<T> exposes .Result to consume. A ValueTask<T> has already been
-            // converted to a Task<T> by the delegate above, so its consumer is built from the
-            // converted type rather than the declared one.
-            if (method.ReturnType.IsGenericType)
-                resultConsumer = BuildResultConsumer(method.ReturnType);
-        }
-        else if (method.ReturnType == typeof(void))
-        {
-            if (arguments is null)
-            {
-                var act = BuildVoidDelegate(method)!;
-
-                syncDelegate = instance =>
-                {
-                    act(instance);
-                    return null;
-                };
-            }
-            else
-                syncDelegate = BuildArgumentBoundSyncDelegate(method, arguments);
-        }
-        else
-        {
-            syncDelegate = arguments is null
-                ? BuildSyncDelegate(method)
-                : BuildArgumentBoundSyncDelegate(method, arguments);
-        }
-
         var parameterSet = BuildParameterSet(paramNames, arguments);
 
         return new BenchmarkMethodDefinition(method, attribute)
         {
             DisplayName = displayName,
-            SyncDelegate = syncDelegate,
-            AsyncDelegate = asyncDelegate,
-            ResultConsumer = resultConsumer,
+
+            // One binder for every shape. The delegate it produces carries the method's own
+            // signature, so the engine reaches the body without boxing its result - see
+            // BenchmarkBodyFactory.
+            BodyFactory = BenchmarkBodyFactory.Create(method, arguments),
             IterationSetupDelegate = iterSetupDel,
             IterationTeardownDelegate = iterTeardownDel,
             Isolation = ResolveIsolationMode(method),
@@ -655,77 +610,12 @@ public sealed class BenchmarkDiscoverer
         return result;
     }
 
-    private static Func<object, object?> BuildArgumentBoundSyncDelegate(MethodInfo method, object?[] arguments)
-    {
-        var instanceParam = Expression.Parameter(typeof(object), "instance");
-        var call = BuildCall(method, instanceParam, arguments);
-
-        Expression body = method.ReturnType == typeof(void)
-            ? Expression.Block(call, Expression.Constant(null, typeof(object)))
-            : Expression.Convert(call, typeof(object));
-
-        return Expression.Lambda<Func<object, object?>>(body, instanceParam).Compile();
-    }
-
-    private static Func<object, Task> BuildArgumentBoundAsyncDelegate(MethodInfo method, object?[] arguments)
-    {
-        var instanceParam = Expression.Parameter(typeof(object), "instance");
-        var call = BuildCall(method, instanceParam, arguments);
-
-        return Expression.Lambda<Func<object, Task>>(AsTask(call, method.ReturnType), instanceParam).Compile();
-    }
-
-    /// <summary>
-    ///     Whether a benchmark's return type is one the engine awaits.
-    /// </summary>
+    /// <summary>Builds the delegate for a lifecycle hook - setup, teardown, or their per-iteration pair.</summary>
     /// <remarks>
-    ///     <c>ValueTask</c> is included, and used not to be. Because <c>ValueTask</c> is a struct and
-    ///     therefore not assignable to <c>Task</c>, the old check classified an
-    ///     <c>async ValueTask</c> benchmark as <i>synchronous</i> and boxed the returned struct
-    ///     instead of awaiting it - so the measurement stopped at the first <c>await</c> inside the
-    ///     body. Measured on a body that delays 50 ms, that reported <b>1 ms</b>: a plausible,
-    ///     confidently-wrong number rather than an error.
+    ///     A hook runs outside the timed window, so it keeps the uniform
+    ///     <c>Action&lt;object&gt;</c> shape rather than reconstructing its exact signature the way
+    ///     <see cref="BenchmarkBodyFactory" /> does for a measured body.
     /// </remarks>
-    private static bool IsAwaitable(Type returnType)
-    {
-        if (typeof(Task).IsAssignableFrom(returnType) || returnType == typeof(ValueTask))
-            return true;
-
-        return returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>);
-    }
-
-    /// <summary>Converts a call expression's awaitable result to a <see cref="Task" />.</summary>
-    private static Expression AsTask(Expression call, Type returnType)
-    {
-        if (returnType == typeof(ValueTask))
-            return Expression.Call(call, nameof(ValueTask.AsTask), Type.EmptyTypes);
-
-        if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
-            return Expression.Call(call, nameof(ValueTask<int>.AsTask), Type.EmptyTypes);
-
-        return Expression.Convert(call, typeof(Task));
-    }
-
-    private static MethodCallExpression BuildCall(
-        MethodInfo method, ParameterExpression instanceParam, object?[] arguments)
-    {
-        var parameters = method.GetParameters();
-        var argExpressions = new Expression[parameters.Length];
-
-        for (var i = 0; i < parameters.Length; i++)
-        {
-            argExpressions[i] = Expression.Constant(arguments[i], parameters[i].ParameterType);
-        }
-
-        // A static method has no receiver, and passing one to Expression.Call throws. Attribute
-        // discovery never reaches this with a static method, but DefineExplicit does - a test
-        // framework will happily hand over a static test method.
-        if (method.IsStatic)
-            return Expression.Call(method, argExpressions);
-
-        return Expression.Call(Expression.Convert(instanceParam, method.DeclaringType!), method, argExpressions);
-    }
-
     private static Action<object>? BuildVoidDelegate(MethodInfo? method)
     {
         if (method is null)
@@ -742,52 +632,5 @@ public sealed class BenchmarkDiscoverer
     {
         var typed = (Action<TInstance>)Delegate.CreateDelegate(typeof(Action<TInstance>), method);
         return instance => typed((TInstance)instance);
-    }
-
-    private static Func<object, object?> BuildSyncDelegate(MethodInfo method)
-    {
-        var helper = typeof(BenchmarkDiscoverer)
-            .GetMethod(nameof(BuildSyncDelegateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(method.DeclaringType!, method.ReturnType);
-
-        return (Func<object, object?>)helper.Invoke(null, [method])!;
-    }
-
-    private static Func<object, object?> BuildSyncDelegateGeneric<TInstance, TReturn>(MethodInfo method)
-    {
-        var typed = (Func<TInstance, TReturn>)Delegate.CreateDelegate(typeof(Func<TInstance, TReturn>), method);
-        return instance => typed((TInstance)instance);
-    }
-
-    private static Func<object, Task> BuildAsyncDelegate(MethodInfo method)
-    {
-        var helper = typeof(BenchmarkDiscoverer)
-            .GetMethod(nameof(BuildAsyncDelegateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(method.DeclaringType!);
-
-        return (Func<object, Task>)helper.Invoke(null, [method])!;
-    }
-
-    private static Func<object, Task> BuildAsyncDelegateGeneric<TInstance>(MethodInfo method)
-    {
-        var typed = (Func<TInstance, Task>)Delegate.CreateDelegate(typeof(Func<TInstance, Task>), method);
-        return instance => typed((TInstance)instance);
-    }
-
-    private static Action<Task> BuildResultConsumer(Type taskType)
-    {
-        var resultType = taskType.GetGenericArguments()[0];
-
-        var helper = typeof(BenchmarkDiscoverer)
-            .GetMethod(nameof(BuildResultConsumerGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(resultType);
-
-        return (Action<Task>)helper.Invoke(null, [])!;
-    }
-
-    private static Action<Task> BuildResultConsumerGeneric<T>()
-    {
-        var consume = BenchmarkRunner.GetResultConsumer<T>();
-        return task => consume(((Task<T>)task).Result);
     }
 }

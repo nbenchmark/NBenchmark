@@ -89,30 +89,34 @@ public class BenchmarkDiscovererTests
         var suite = suites.First(s => s.Type == typeof(PublicBenchmarks));
         var benchmark = suite.Benchmarks.First();
 
-        Assert.NotNull(benchmark.SyncDelegate);
+        Assert.NotNull(benchmark.BodyFactory);
     }
 
     [Fact]
-    public void Caches_Sync_Delegate_For_Void_Returning_Method()
+    public void Binds_An_Action_For_A_Void_Returning_Method()
     {
         var suites = new BenchmarkDiscoverer().Discover(typeof(PublicBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(PublicBenchmarks));
         var benchmark = suite.Benchmarks.First(m => m.Method.Name == "ReturnsNothing");
 
-        Assert.NotNull(benchmark.SyncDelegate);
-        var result = benchmark.SyncDelegate!(new PublicBenchmarks());
-        Assert.Null(result);
+        var body = Assert.IsType<Action>(benchmark.BodyFactory!(new PublicBenchmarks()));
+        body();
     }
 
+    /// <summary>
+    ///     The body delegate carries the method's own return type, so the value never gets boxed on
+    ///     its way to the elision sink. A <c>Func&lt;object&gt;</c> here would cost 24 bytes an
+    ///     operation and report them as the benchmark's own allocation.
+    /// </summary>
     [Fact]
-    public void Caches_Sync_Delegate_For_Value_Returning_Method()
+    public void Binds_A_Typed_Func_For_A_Value_Returning_Method()
     {
         var suites = new BenchmarkDiscoverer().Discover(typeof(PublicBenchmarks).Assembly);
         var suite = suites.First(s => s.Type == typeof(PublicBenchmarks));
         var benchmark = suite.Benchmarks.First(m => m.Method.Name == "ReturnsInt");
 
-        var result = benchmark.SyncDelegate!(new PublicBenchmarks());
-        Assert.Equal(42, result);
+        var body = Assert.IsType<Func<int>>(benchmark.BodyFactory!(new PublicBenchmarks()));
+        Assert.Equal(42, body());
     }
 
     [Fact]
@@ -147,13 +151,9 @@ public class BenchmarkDiscovererTests
         var suite = suites.First(s => s.Type == typeof(AsyncBenchmarks));
         var benchmark = suite.Benchmarks.First(m => m.Method.Name == "ReturnsValueAsync");
 
-        Assert.NotNull(benchmark.AsyncDelegate);
-        Assert.NotNull(benchmark.ResultConsumer);
+        var body = Assert.IsType<Func<Task<int>>>(benchmark.BodyFactory!(new AsyncBenchmarks()));
 
-        var instance = new AsyncBenchmarks();
-        var task = benchmark.AsyncDelegate!(instance);
-        await task;
-        benchmark.ResultConsumer!(task);
+        Assert.Equal(7, await body());
     }
 
     [Fact]
@@ -163,10 +163,9 @@ public class BenchmarkDiscovererTests
         var suite = suites.First(s => s.Type == typeof(AsyncBenchmarks));
         var benchmark = suite.Benchmarks.First(m => m.Method.Name == "ReturnsTask");
 
-        Assert.NotNull(benchmark.AsyncDelegate);
-        Assert.Null(benchmark.ResultConsumer);
+        var body = Assert.IsType<Func<Task>>(benchmark.BodyFactory!(new AsyncBenchmarks()));
 
-        await benchmark.AsyncDelegate!(new AsyncBenchmarks());
+        await body();
     }
 
     [Fact]
@@ -188,8 +187,8 @@ public class BenchmarkDiscovererTests
         var suite = suites.First(s => s.Type == typeof(ParametricBenchmarks));
         var benchmark = suite.Benchmarks.First(b => b.DisplayName == "Compute(n=1000)");
 
-        var result = benchmark.SyncDelegate!(new ParametricBenchmarks());
-        Assert.Equal(1000, result);
+        var body = Assert.IsType<Func<int>>(benchmark.BodyFactory!(new ParametricBenchmarks()));
+        Assert.Equal(1000, body());
     }
 
     [Fact]
@@ -201,8 +200,8 @@ public class BenchmarkDiscovererTests
         var concat = suite.Benchmarks.First(b => b.Method.Name == "Concat");
         Assert.Equal("Concat(value=a, times=3)", concat.DisplayName);
 
-        var result = concat.SyncDelegate!(new ParametricBenchmarks());
-        Assert.Equal("aaa", result);
+        var body = Assert.IsType<Func<string>>(concat.BodyFactory!(new ParametricBenchmarks()));
+        Assert.Equal("aaa", body());
     }
 
     [Fact]

@@ -31,8 +31,7 @@ public sealed class ValueTaskDiscoveryTests
     {
         var benchmark = Single<ValueTaskBenchmarks>();
 
-        Assert.NotNull(benchmark.AsyncDelegate);
-        Assert.Null(benchmark.SyncDelegate);
+        Assert.IsType<Func<Task>>(benchmark.BodyFactory!(new ValueTaskBenchmarks()));
 
         var elapsed = await TimeAsync(benchmark, new ValueTaskBenchmarks());
 
@@ -46,8 +45,9 @@ public sealed class ValueTaskDiscoveryTests
     {
         var benchmark = Single<GenericValueTaskBenchmarks>();
 
-        Assert.NotNull(benchmark.AsyncDelegate);
-        Assert.Null(benchmark.SyncDelegate);
+        // Func<Task<int>>, not Func<Task>: the result reaches the elision sink as an int rather
+        // than being awaited and dropped.
+        Assert.IsType<Func<Task<int>>>(benchmark.BodyFactory!(new GenericValueTaskBenchmarks()));
 
         var elapsed = await TimeAsync(benchmark, new GenericValueTaskBenchmarks());
 
@@ -69,7 +69,7 @@ public sealed class ValueTaskDiscoveryTests
             .Benchmarks
             .First();
 
-        Assert.NotNull(benchmark.AsyncDelegate);
+        Assert.IsType<Func<Task>>(benchmark.BodyFactory!(new ParameterizedValueTaskBenchmarks()));
 
         var elapsed = await TimeAsync(benchmark, new ParameterizedValueTaskBenchmarks());
 
@@ -84,7 +84,7 @@ public sealed class ValueTaskDiscoveryTests
     {
         var benchmark = Single<TaskBenchmarks>();
 
-        Assert.NotNull(benchmark.AsyncDelegate);
+        Assert.IsType<Func<Task>>(benchmark.BodyFactory!(new TaskBenchmarks()));
 
         var elapsed = await TimeAsync(benchmark, new TaskBenchmarks());
 
@@ -97,18 +97,19 @@ public sealed class ValueTaskDiscoveryTests
     {
         var benchmark = Single<SyncBenchmarks>();
 
-        Assert.Null(benchmark.AsyncDelegate);
-        Assert.NotNull(benchmark.SyncDelegate);
+        Assert.IsType<Func<int>>(benchmark.BodyFactory!(new SyncBenchmarks()));
     }
 
     private static async Task<long> TimeAsync(BenchmarkMethodDefinition benchmark, object instance)
     {
+        var body = benchmark.BodyFactory!(instance);
         var stopwatch = Stopwatch.StartNew();
 
-        if (benchmark.AsyncDelegate is { } asyncDelegate)
-            await asyncDelegate(instance);
+        // Func<Task<T>> is a Func<Task> by delegate covariance, so this covers both awaitable shapes.
+        if (body is Func<Task> awaitable)
+            await awaitable();
         else
-            benchmark.SyncDelegate!(instance);
+            body.DynamicInvoke();
 
         stopwatch.Stop();
 

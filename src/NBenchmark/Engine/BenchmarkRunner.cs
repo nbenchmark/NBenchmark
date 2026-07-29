@@ -413,6 +413,16 @@ public sealed class BenchmarkRunner
     public static Action<T> GetResultConsumer<T>() =>
         JitSinkCache<T>.Instance;
 
+    /// <summary>
+    ///     The last value the generic sink received for <typeparamref name="T" />.
+    /// </summary>
+    /// <remarks>
+    ///     A test seam. Whether a body's return value actually reaches the sink is otherwise
+    ///     unobservable, and it is the difference between measuring the body and measuring an empty
+    ///     loop the JIT was free to delete - so it needs an assertion, not an assumption.
+    /// </remarks>
+    internal static T? LastConsumed<T>() => JitSinkCache<T>._hole;
+
     private static class JitSinkCache<T>
     {
         public static readonly Action<T> Instance = CreateTypedConsumer();

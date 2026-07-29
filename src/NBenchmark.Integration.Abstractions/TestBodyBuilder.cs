@@ -54,12 +54,21 @@ public static class TestBodyBuilder
             return true;
         }
 
-        body = returnType == typeof(void)
-            ? BuildSyncBody(method, instance, args)
+        if (returnType == typeof(void))
+        {
+            body = BuildSyncBody(method, instance, args);
+            return true;
+        }
 
-            // A returned value is stored rather than discarded, so the JIT cannot delete the call
-            // it came from and leave the benchmark measuring an empty loop.
-            : BuildReturningSyncBody(method, instance, args);
+        // A by-ref-like return cannot be stored anywhere the JIT would treat as a use, so there is
+        // no honest way to measure the call. Refusing beats measuring a body the optimizer is free
+        // to delete.
+        if (returnType.IsByRefLike)
+            return false;
+
+        // A returned value is stored rather than discarded, so the JIT cannot delete the call it
+        // came from and leave the benchmark measuring an empty loop.
+        body = BuildReturningSyncBody(method, instance, args);
 
         return true;
     }
@@ -86,12 +95,17 @@ public static class TestBodyBuilder
     private static Action BuildReturningSyncBody(MethodInfo method, object? instance, object?[] args)
     {
         var call = BuildCall(method, instance, args);
-        var sink = Expression.Field(null, typeof(ReturnSink).GetField(nameof(ReturnSink.Hole))!);
+
+        // The sink is closed over the method's own return type, so the value is stored as itself.
+        // Storing it into an object field instead would box every value-typed return: 24 bytes an
+        // operation, attributed in the report to a test method that allocated nothing.
+        var sinkType = typeof(ReturnSink<>).MakeGenericType(method.ReturnType);
+        var sink = Expression.Field(null, sinkType.GetField(nameof(ReturnSink<object>.Hole))!);
 
         // Assigned to a static field so the call is observably used. Without this the JIT is free to
         // eliminate a pure call entirely, and the benchmark measures nothing while reporting a
         // plausible, very fast number.
-        var assign = Expression.Assign(sink, Expression.Convert(call, typeof(object)));
+        var assign = Expression.Assign(sink, call);
 
         return Expression.Lambda<Action>(assign).Compile();
     }
@@ -161,14 +175,23 @@ public static class TestBodyBuilder
 }
 
 /// <summary>
-///     Where a benchmarked method's return value goes.
+///     Where a benchmarked method's return value goes, held as its own type.
 /// </summary>
 /// <remarks>
-///     A static field, and deliberately not <c>readonly</c>: the point is that the write is
-///     observable to the JIT, so the call producing the value cannot be optimized away. A benchmark
-///     that measures a deleted call reports a number that looks excellent and means nothing.
+///     <para>
+///         A static field, and deliberately not <c>readonly</c>: the point is that the write is
+///         observable to the JIT, so the call producing the value cannot be optimized away. A
+///         benchmark that measures a deleted call reports a number that looks excellent and means
+///         nothing.
+///     </para>
+///     <para>
+///         Generic, and deliberately not an <c>object</c> field, which is what it used to be. A
+///         single <c>object</c> sink boxes every value-typed return - 24 bytes charged to the test
+///         method on every operation, plus the time to allocate them. One closed generic per return
+///         type stores the value directly.
+///     </para>
 /// </remarks>
-public static class ReturnSink
+public static class ReturnSink<T>
 {
-    public static object? Hole;
+    public static T? Hole;
 }

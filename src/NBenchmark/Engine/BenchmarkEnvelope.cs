@@ -1,4 +1,5 @@
 using NBenchmark.Discovery;
+using NBenchmark.Workers;
 
 namespace NBenchmark.Engine;
 
@@ -49,9 +50,10 @@ internal sealed record BenchmarkEnvelope(
         var hasLaunchCountOverride = method.Attribute.HasLaunchCountOverride;
         var iterationSetupDel = method.IterationSetupDelegate;
         var iterationTeardownDel = method.IterationTeardownDelegate;
-        var asyncDel = method.AsyncDelegate;
-        var syncDel = method.SyncDelegate;
-        var resultConsumer = method.ResultConsumer;
+        var bodyFactory = method.BodyFactory
+                          ?? throw new InvalidOperationException(
+                              $"Benchmark '{method.DisplayName}' carries no body factory, so there is "
+                              + "nothing to measure. Definitions must come from BenchmarkDiscoverer.");
 
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync = (spec, ct) =>
         {
@@ -93,7 +95,10 @@ internal sealed record BenchmarkEnvelope(
             };
 
             var specWithClass = specWithIter with { ClassName = className };
-            return ExecuteAsync(name, asyncDel, syncDel, resultConsumer, instance, specWithClass, ct);
+
+            // Bound once per run, outside the measured region: the delegate handed to the engine
+            // has the benchmark method's own signature and its receiver already captured.
+            return DelegateDispatch.MeasureAsync(name, bodyFactory(instance), specWithClass, ct);
         };
 
         var parameterSet = method.ParameterSet;
@@ -102,44 +107,6 @@ internal sealed record BenchmarkEnvelope(
         {
             ParameterSet = parameterSet,
         };
-    }
-
-    private static Task<MeasurementOutcome> ExecuteAsync(
-        string name,
-        Func<object, Task>? asyncDel,
-        Func<object, object?>? syncDel,
-        Action<Task>? resultConsumer,
-        object instance,
-        RunSpec spec,
-        CancellationToken ct)
-    {
-        if (asyncDel is not null)
-        {
-            if (resultConsumer is not null)
-            {
-                var returningBody = async () =>
-                {
-                    var task = asyncDel(instance);
-                    await task.ConfigureAwait(false);
-                    resultConsumer(task);
-                };
-
-                return BenchmarkRunner.Instance.RunAsync(name, returningBody, spec, ct);
-            }
-
-            var voidBody = async () =>
-            {
-                var task = asyncDel(instance);
-                await task.ConfigureAwait(false);
-            };
-
-            return BenchmarkRunner.Instance.RunAsync(name, voidBody, spec, ct);
-        }
-
-        var sd = syncDel!;
-        var consumer = BenchmarkRunner.GetResultConsumer<object?>();
-        var syncBody = () => consumer(sd(instance));
-        return Task.FromResult(BenchmarkRunner.Instance.Run(name, syncBody, spec, ct));
     }
 }
 
