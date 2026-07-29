@@ -1,4 +1,5 @@
 using System.Globalization;
+using NBenchmark.Engine;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
 
@@ -63,6 +64,14 @@ public sealed record BenchmarkTable
     public IReadOnlyList<IsolationStatus> InProcessReasons { get; init; } = [];
 
     /// <summary>
+    ///     <c>true</c> when the rows carry more than one <see cref="IsolationStatus" />. Reporters
+    ///     add a per-row status column when this is set, because a single table-wide footer cannot
+    ///     say <i>which</i> rows were isolated, and that is exactly what a reader needs to know
+    ///     before trusting any comparison between them.
+    /// </summary>
+    public bool MixedIsolationStatuses { get; init; }
+
+    /// <summary>
     ///     The omnibus significance verdict (e.g. Kruskal-Wallis) across all benchmarks, when
     ///     an omnibus test was run (three or more groups); otherwise <c>null</c>.
     /// </summary>
@@ -83,7 +92,7 @@ public sealed record BenchmarkTable
         BenchmarkResult? baseline = null;
 
         if (successful.Count > 0)
-            baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+            baseline = ComparisonGroup.PickBaseline(successful);
 
         return BuildInternal(results, baseline, multiBenchmark);
     }
@@ -102,7 +111,7 @@ public sealed record BenchmarkTable
                 return [BuildParameterised(results)];
 
             var successful = results.Where(r => !r.Errored).ToList();
-            var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+            var baseline = ComparisonGroup.PickBaseline(successful);
             return [BuildInternal(results, baseline, results.Count > 1)];
         }
 
@@ -129,7 +138,7 @@ public sealed record BenchmarkTable
             }
 
             var successful = groupResults.Where(r => !r.Errored).ToList();
-            var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+            var baseline = ComparisonGroup.PickBaseline(successful);
             tables.Add(BuildInternal(groupResults, baseline, groupResults.Count > 1));
         }
 
@@ -177,7 +186,7 @@ public sealed record BenchmarkTable
                     // ratios read naturally as 1.00x (fastest) up to the slowest parameter value.
                     reference = explicitBaselines.Count == 1
                         ? explicitBaselines[0]
-                        : successful.MinBy(r => r.Median);
+                        : ComparisonGroup.PickBaseline(successful);
                 }
 
                 foreach (var result in runtimeResults.OrderBy(r => r.Median))
@@ -200,7 +209,7 @@ public sealed record BenchmarkTable
             {
                 var runtimeResults = runtimeGroup.ToList();
                 var successful = runtimeResults.Where(r => !r.Errored).ToList();
-                var baseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+                var baseline = ComparisonGroup.PickBaseline(successful);
                 var multiBenchmark = successful.Count > 1;
 
                 foreach (var result in runtimeResults.OrderBy(r => r.Median))
@@ -248,7 +257,7 @@ public sealed record BenchmarkTable
             {
                 var runtimeResults = runtimeGroup.ToList();
                 var successful = runtimeResults.Where(r => !r.Errored).ToList();
-                var runtimeBaseline = successful.FirstOrDefault(r => r.IsBaseline) ?? successful.MinBy(r => r.Median);
+                var runtimeBaseline = ComparisonGroup.PickBaseline(successful);
                 var runtimeMultiBenchmark = runtimeResults.Count > 1;
 
                 foreach (var result in runtimeResults.OrderBy(r => r.Median))
@@ -300,6 +309,10 @@ public sealed record BenchmarkTable
                 .Distinct()
                 .OrderBy(s => s)
                 .ToList(),
+            MixedIsolationStatuses = results
+                .Select(r => r.IsolationStatus)
+                .Distinct()
+                .Count() > 1,
             Omnibus = results.FirstOrDefault(r => r.Omnibus is not null)?.Omnibus,
         };
     }
@@ -311,6 +324,15 @@ public sealed record BenchmarkTable
         bool comparable = true,
         bool? isBaselineOverride = null)
     {
+        // A ratio between two different comparison groups is not a measurement of the two bodies.
+        // The dominant term across a process boundary is the runtime configuration, worth ~3.3x on
+        // bodies of provably identical cost, so dividing an in-process median by an isolated one
+        // reports that configuration difference under the name of a speedup. Significance testing
+        // already partitions on this key; the ratio column did not, and printed a number.
+        var mixedGroup = baseline is not null
+                         && !ReferenceEquals(result, baseline)
+                         && !ComparisonGroup.SameGroup(result, baseline);
+
         return new BenchmarkRow
         {
             Name = result.Name,
@@ -328,7 +350,10 @@ public sealed record BenchmarkTable
             Histogram = result.Histogram,
             RawSamples = result.RawSamples,
             TrimmedOrdinals = result.TrimmedOrdinals,
-            Ratio = comparable ? ComputeRatio(result, baseline) : double.NaN,
+            Ratio = comparable && !mixedGroup ? ComputeRatio(result, baseline) : double.NaN,
+            RatioSuppressed = mixedGroup,
+            IsolationStatus = result.IsolationStatus,
+            RuntimeProfileName = result.RuntimeProfileName,
             IsBaseline = comparable && (isBaselineOverride ?? result.IsBaseline),
             Errored = result.Errored,
             ErrorMessage = result.ErrorMessage,
@@ -629,6 +654,24 @@ public record BenchmarkRow
     public IReadOnlyList<int> TrimmedOrdinals { get; init; } = [];
 
     public required double Ratio { get; init; }
+
+    /// <summary>
+    ///     Whether <see cref="Ratio" /> is <c>NaN</c> because this row and the baseline were measured
+    ///     under different runtime configurations, rather than because there was nothing to compare.
+    /// </summary>
+    /// <remarks>
+    ///     Reporters render these as <c>n/a</c> and say why. The distinction matters: an absent
+    ///     ratio on a single-benchmark table means "no comparison exists", while this one means
+    ///     "a comparison exists and would have been misleading".
+    /// </remarks>
+    public bool RatioSuppressed { get; init; }
+
+    /// <summary>Where this row was measured, and if it was not isolated, why not.</summary>
+    public IsolationStatus IsolationStatus { get; init; } = IsolationStatus.InProcessRequested;
+
+    /// <summary>The runtime profile the measuring process was launched under.</summary>
+    public string RuntimeProfileName { get; init; } = RuntimeProfile.Host.Name;
+
     public required bool IsBaseline { get; init; }
     public required bool Errored { get; init; }
     public string? ErrorMessage { get; init; }

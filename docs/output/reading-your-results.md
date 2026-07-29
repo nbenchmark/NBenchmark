@@ -73,7 +73,13 @@ See [Descriptive Statistics: Percentiles](../statistics/descriptive.md#percentil
 
 ### Ratio (suite mode)
 
-Speed relative to the baseline. `0.75x` = 25% faster; `2.0x` = twice as slow. The baseline is either the benchmark you designated with `WithBaseline` or the benchmark with the lowest median.
+Speed relative to the baseline. `0.75x` = 25% faster; `2.0x` = twice as slow. The baseline is either the benchmark you designated with `WithBaseline` or the fastest benchmark among those measured the same way as the rest of the table.
+
+#### `n/a` in the Ratio column
+
+A ratio is only formed between two rows measured under the same runtime configuration. When a row was not - typically a `[InProcess]` benchmark sitting in a table of isolated ones - its ratio reads `n/a`, an **Iso** column appears saying which rows were isolated, and a footer explains the withholding.
+
+This is not the tool being coy. Runtime configuration is the dominant term in a small measurement: on four benchmark bodies of provably identical cost, the difference between an in-process reading and an isolated one moved the reported median by about 3.3x. Dividing one by the other produces a large, confident, entirely fabricated speedup. Compare rows measured the same way, or drop `[InProcess]` so the whole group is isolated.
 
 ### Sig (suite mode)
 

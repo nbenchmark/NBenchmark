@@ -148,6 +148,26 @@ public sealed class ConsoleReporter : IReporter
                 + "means in-process benchmarks were mixed with isolated ones.[/]");
         }
 
+        if (benchTable.MixedIsolationStatuses)
+        {
+            AnsiConsole.MarkupLine(
+                "[dim]Iso: whether the row was measured in an isolated worker process launched with "
+                + "the requested runtime profile, or in this one.[/]");
+        }
+
+        var suppressed = benchTable.Rows.Count(r => r.RatioSuppressed);
+
+        if (suppressed > 0)
+        {
+            AnsiConsole.MarkupLine(
+                $"[yellow]Warning:[/] [dim]{suppressed} row(s) show [bold]n/a[/] in place of a ratio. "
+                + "They were not measured under the baseline's runtime configuration, and the "
+                + "difference between two configurations is worth roughly 3.3x on bodies of "
+                + "identical cost - so the ratio would have reported that, under the name of a "
+                + "speedup. Compare rows measured the same way, or run the group without "
+                + "[bold]--in-process[/] / [bold][[InProcess]][/] so every row is isolated.[/]");
+        }
+
         // Naming the reason matters as much as naming the fact. "You asked for in-process" and "the
         // measurement worker is not installed" produce identical numbers and identical labels, but
         // only one of them is a problem the user can fix.
@@ -177,6 +197,11 @@ public sealed class ConsoleReporter : IReporter
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
         var showRuntime = benchTable.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+
+        // Only when the rows disagree. On a uniform table the column would be a constant, and the
+        // footer already names the configuration; when they disagree it is the difference between
+        // reading the table and misreading it.
+        var showIsolation = benchTable.MixedIsolationStatuses;
         var isSimple = detail == ReportDetail.Simple;
         var showClass = BenchmarkTable.CrossClassMode && benchTable.Rows.Any(r => r.ClassName.Length > 0);
 
@@ -197,6 +222,16 @@ public sealed class ConsoleReporter : IReporter
 
         if (showRuntime)
             table.AddColumn(new TableColumn("[bold]Runtime[/]").RightAligned().NoWrap());
+
+        // Short labels, and a short header: at 80 columns a phrase here squeezes the numbers it
+        // exists to qualify. Which rows were isolated goes in the column; why they were not goes in
+        // the footer, which has a full line to say it in.
+        // "Iso: yes/no" rather than a phrase. An 80-column table is already truncating its own
+        // headers, and a wider column here buys its width from the measurements. Which rows were
+        // isolated belongs in the table; why the others were not is a sentence, and goes in the
+        // footer where there is a line to spend on it.
+        if (showIsolation)
+            table.AddColumn(new TableColumn("[bold]Iso[/]").Centered().NoWrap());
 
         foreach (var paramName in benchTable.ParameterNames)
         {
@@ -250,6 +285,9 @@ public sealed class ConsoleReporter : IReporter
                 if (showRuntime)
                     errorCols.Add(Esc(row.RuntimeMoniker));
 
+                if (showIsolation)
+                    errorCols.Add("[dim]-[/]");
+
                 errorCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
                 errorCols.Add("[dim]-[/]");
 
@@ -288,12 +326,17 @@ public sealed class ConsoleReporter : IReporter
 
             string barCell;
 
+            // The bar is decorative and costs 12 columns. In a mixed table those columns are needed
+            // by the Iso column, which is not decorative: without it the reader cannot tell which
+            // rows the n/a applies to. An 80-column terminal cannot have both.
+            var showBar = !showIsolation;
+
             if (!hasComparisons)
                 barCell = bar;
             else if (row.IsBaseline)
-                barCell = $"{bar} [dim]{ratioText}[/]";
+                barCell = showBar ? $"{bar} [dim]{ratioText}[/]" : $"[dim]{ratioText}[/]";
             else
-                barCell = $"{bar} [{ratioColor}]{ratioText}[/]";
+                barCell = showBar ? $"{bar} [{ratioColor}]{ratioText}[/]" : $"[{ratioColor}]{ratioText}[/]";
 
             var allocText = row.MeanAllocatedBytes.HasValue
                 ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
@@ -306,6 +349,13 @@ public sealed class ConsoleReporter : IReporter
 
             if (showRuntime)
                 rowCols.Add(Esc(row.RuntimeMoniker));
+
+            if (showIsolation)
+            {
+                rowCols.Add(row.IsolationStatus.IsIsolated()
+                    ? "[dim]yes[/]"
+                    : "[yellow]no[/]");
+            }
 
             rowCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
 
@@ -1102,6 +1152,12 @@ public sealed class ConsoleReporter : IReporter
 
     private static (string Text, string Color) FormatRatio(BenchmarkRow row)
     {
+        // "n/a" rather than "-": the dash means there was nothing to compare, and this row had
+        // something to compare and was refused. A reader who cannot tell the two apart will assume
+        // the tool simply did not compute it.
+        if (row.RatioSuppressed)
+            return ("n/a", "dim");
+
         if (double.IsNaN(row.Ratio))
             return ("-", "dim");
 

@@ -65,6 +65,14 @@ public sealed class MarkdownReporter : IReporter
                 + "comparable with each other.");
         }
 
+        if (tables.Any(t => t.Rows.Any(r => r.RatioSuppressed)))
+        {
+            sb.AppendLine(
+                "> ⚠️ Ratios shown as `n/a` were withheld: those rows were not measured under the "
+                + "baseline's runtime configuration, so the ratio would have reported that "
+                + "difference rather than a difference between the benchmarks.");
+        }
+
         sb.AppendLine();
 
         foreach (var table in tables)
@@ -111,6 +119,9 @@ public sealed class MarkdownReporter : IReporter
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
         var showRuntime = table.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+
+        // Only when the rows disagree; on a uniform table it would be a constant column.
+        var showIsolation = table.MixedIsolationStatuses;
         var showClass = BenchmarkTable.CrossClassMode && table.Rows.Any(r => r.ClassName.Length > 0);
         var paramNames = table.ParameterNames;
         var isSimple = detail == ReportDetail.Simple;
@@ -129,6 +140,9 @@ public sealed class MarkdownReporter : IReporter
         if (showRuntime)
             header.Append(" Runtime |");
 
+        if (showIsolation)
+            header.Append(" Isolation |");
+
         foreach (var name in paramNames)
         {
             header.Append($" {name} |");
@@ -142,6 +156,9 @@ public sealed class MarkdownReporter : IReporter
 
         if (showRuntime)
             separator.Append("---:|");
+
+        if (showIsolation)
+            separator.Append("---|");
 
         foreach (var _ in paramNames)
         {
@@ -202,6 +219,9 @@ public sealed class MarkdownReporter : IReporter
                 if (showRuntime)
                     errored.Append($" {row.RuntimeMoniker} |");
 
+                if (showIsolation)
+                    errored.Append($" {row.IsolationStatus.ToLabel()} |");
+
                 foreach (var name in paramNames)
                 {
                     errored.Append($" {FormatParameterCell(row, name)} |");
@@ -247,6 +267,9 @@ public sealed class MarkdownReporter : IReporter
 
             if (showRuntime)
                 line.Append($" {row.RuntimeMoniker} |");
+
+            if (showIsolation)
+                line.Append($" {row.IsolationStatus.ToLabel()} |");
 
             foreach (var name in paramNames)
             {
@@ -594,6 +617,11 @@ public sealed class MarkdownReporter : IReporter
 
     private static string FormatRatioText(BenchmarkRow row)
     {
+        // Distinct from "-", which means there was nothing to compare. This row had something to
+        // compare against and the comparison was refused; saying so is the point.
+        if (row.RatioSuppressed)
+            return "n/a";
+
         if (double.IsNaN(row.Ratio))
             return "-";
 

@@ -153,6 +153,57 @@ public class ReporterTests
         }
     }
 
+    /// <summary>
+    ///     A row measured under a different runtime configuration than the baseline gets
+    ///     <c>n/a</c> where its ratio would go, an Isolation column saying which rows were measured
+    ///     where, and a note explaining the withholding.
+    /// </summary>
+    [Fact]
+    public async Task MarkdownReporter_Withholds_The_Ratio_Of_A_Row_Measured_Differently()
+    {
+        var tempDir = MakeSubDir("nb-md-mixed-isolation");
+
+        try
+        {
+            var reporter = new MarkdownReporter(tempDir, "out.md");
+
+            var isolated = MakeResult("iso-baseline", 400) with
+            {
+                IsBaseline = true,
+                IsolationStatus = IsolationStatus.Isolated,
+                RuntimeProfileName = RuntimeProfile.SteadyState.Name,
+            };
+
+            var alsoIsolated = MakeResult("iso-candidate", 800) with
+            {
+                IsolationStatus = IsolationStatus.Isolated,
+                RuntimeProfileName = RuntimeProfile.SteadyState.Name,
+            };
+
+            var inHost = MakeResult("in-process", 100) with
+            {
+                IsolationStatus = IsolationStatus.InProcessRequested,
+                RuntimeProfileName = RuntimeProfile.Host.Name,
+            };
+
+            await reporter.ReportAsync([isolated, alsoIsolated, inHost]);
+
+            var content = await File.ReadAllTextAsync(Path.Combine(tempDir, "out.md"));
+
+            Assert.Contains("| Isolation |", content);
+            Assert.Contains("| n/a |", content);
+
+            // The comparison that is legitimate survives; the one that is not never appears.
+            Assert.Contains("2.00x", content);
+            Assert.DoesNotContain("0.25x", content);
+            Assert.Contains("Ratios shown as `n/a` were withheld", content);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
     [Fact]
     public async Task MarkdownReporter_TimingDetail_Does_Not_Render_Empty_Tail_Columns_When_No_Percentiles()
     {
