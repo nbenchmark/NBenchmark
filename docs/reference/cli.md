@@ -263,6 +263,56 @@ dotnet run -- --in-process
 
 ---
 
+### `--strict-isolation`
+
+Fail the run if any benchmark was **not** measured in an isolated worker.
+
+```bash
+dotnet run -- --strict-isolation
+```
+
+Every non-isolated result is already labelled in the table and explained on the console, but neither survives CI: a label scrolls past, and a warning in a log nobody reads is indistinguishable from no warning. This turns the label into exit code 1.
+
+The failure names each benchmark, grouped by cause, with the remedy for each:
+
+```
+--strict-isolation: 1 of 4 benchmark(s) were measured in this process rather than an
+isolated worker, so their numbers carry the host's JIT and GC configuration.
+  in-process: HarnessBenchmarks.InHarness
+```
+
+Use it on any pipeline that gates on benchmark numbers. A benchmark that quietly fell back to the host process - because the worker was not deployed on the build agent, or because a body captures state - produces numbers that cannot be compared against a stored baseline measured under a different runtime configuration.
+
+---
+
+### `--verify-isolation`
+
+Measure everything a second time in the host process and print the per-benchmark difference.
+
+```bash
+dotnet run -- --verify-isolation
+```
+
+```
+Isolation verification - the same benchmarks measured both ways:
+
+  Benchmark                        Isolated    In-process  Difference
+  ---------------------------  ------------  ------------  ----------
+  HarnessBenchmarks.Compute         9.32 ns      11.47 ns  1.23x
+  HarnessBenchmarks.Baseline        9.56 ns      11.19 ns  1.17x
+  HarnessBenchmarks.InHarness             -      10.99 ns  not isolated
+```
+
+This exists because the case for isolation is not believable in the abstract. On this library's own sample, in-process measurement of one body reported 7,009 ns and 320 ns on consecutive attempts - a 21x error, with a tight confidence interval on each. Reading that in a changelog persuades nobody; seeing it on your own benchmarks does.
+
+The output reports a **ratio per benchmark** rather than an aggregate, because the finding is that host measurement is *unpredictable*: one row at 21x beside another at 1.0x is the point, and averaging would erase it. Rows are ordered by distance from parity, so a host reading at half the isolated one ranks alongside one at double.
+
+When the two agree, it says so. A workload insensitive to the host's runtime configuration is a real result worth knowing - though it is a property of those benchmarks, not a general one.
+
+The comparison pass runs no reporters, writes no files, and cannot change the exit code. It is a diagnostic, not a second set of results.
+
+---
+
 ### `--cross-class`
 
 Compute significance across all classes in a single comparison table instead of per class. The baseline is chosen from the whole group, and the reporter adds a `Class` column so rows can be distinguished.

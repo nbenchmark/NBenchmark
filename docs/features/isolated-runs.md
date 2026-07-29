@@ -195,6 +195,15 @@ A worker does not re-run your entry point, so anything NBenchmark holds as *live
 
 The rule throughout is to refuse rather than guess. Reconstructing captured state was tried and did not fail loudly: it returned plausible, *wrong* numbers - a body over a captured `5` measured as though it were `1`, with no error and a tight confidence interval.
 
+## Checking isolation rather than trusting it
+
+Two flags make the claim verifiable on your own code:
+
+- **`--strict-isolation`** fails the run if any benchmark was measured in the host process, naming each one and its remedy. Use it wherever a pipeline gates on benchmark numbers: a benchmark that quietly fell back - a build agent without the worker deployed, or a body that captures state - cannot be compared against a baseline measured under a different runtime configuration.
+- **`--verify-isolation`** measures everything a second time in the host process and prints the per-benchmark difference, so you can see what your own numbers would have been. It reports a ratio per benchmark rather than an aggregate, because the finding is that host measurement is *unpredictable* rather than uniformly wrong.
+
+See [CLI reference](../reference/cli.md#--strict-isolation) for both.
+
 ## Why isolation actually matters
 
 The intuitive case for isolation is that a benchmark should not inherit JIT, GC or thread-pool state left behind by its siblings. That is true, but it is not the main reason, and measuring it shows why.

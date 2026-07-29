@@ -34,6 +34,30 @@ internal sealed record CliArgs
     public bool InProcess { get; init; }
 
     /// <summary>
+    ///     When true, any benchmark that was <b>not</b> measured in an isolated worker fails the
+    ///     run.
+    ///     <para>
+    ///         For CI. Without it, a machine missing the worker, or a benchmark whose body captures
+    ///         state, silently produces host-process numbers - correctly labelled, but a label in
+    ///         scrollback is not a gate. This turns the label into an exit code.
+    ///     </para>
+    /// </summary>
+    public bool StrictIsolation { get; init; }
+
+    /// <summary>
+    ///     When true, measures everything a second time in the host process and prints the
+    ///     per-benchmark difference.
+    ///     <para>
+    ///         This exists because the case for isolation is not believable in the abstract. On this
+    ///         library's own sample, in-process measurement of the same body reported 7,009 ns and
+    ///         320 ns on consecutive attempts - a 21x error with a tight confidence interval on
+    ///         each. Reading that in a changelog persuades nobody; seeing it on your own benchmarks
+    ///         does.
+    ///     </para>
+    /// </summary>
+    public bool VerifyIsolation { get; init; }
+
+    /// <summary>
     ///     When true, significance is computed across all classes in a single comparison
     ///     table instead of per class. The baseline is chosen from the whole group.
     /// </summary>
@@ -230,6 +254,8 @@ internal sealed record CliArgs
 
         double? alpha = null;
         var inProcess = false;
+        var strictIsolation = false;
+        var verifyIsolation = false;
         OutlierMode? outlierMode = null;
         TailMetricsBasis? tailMetricsBasis = null;
         MeasurementProfile? profile = null;
@@ -395,6 +421,12 @@ internal sealed record CliArgs
                     break;
                 case "--in-process":
                     inProcess = true;
+                    break;
+                case "--strict-isolation":
+                    strictIsolation = true;
+                    break;
+                case "--verify-isolation":
+                    verifyIsolation = true;
                     break;
                 case "--cross-class":
                     crossClass = true;
@@ -715,6 +747,8 @@ internal sealed record CliArgs
             CategoryFilterExclude = categoryExclude,
             Detail = detail,
             InProcess = inProcess,
+            StrictIsolation = strictIsolation,
+            VerifyIsolation = verifyIsolation,
             CrossClass = crossClass,
             Profile = profile,
             RuntimeProfile = runtimeProfile,

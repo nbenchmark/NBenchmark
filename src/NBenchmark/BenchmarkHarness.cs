@@ -540,6 +540,75 @@ public sealed class BenchmarkHarness
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    ///     Measures everything a second time in this process and prints the difference.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The second pass is a full re-run rather than a cheap estimate, because the effect
+    ///         being demonstrated <i>is</i> the measurement: an in-process reading that has not gone
+    ///         through the real warmup and tuning path is not the number a user would have trusted.
+    ///     </para>
+    ///     <para>
+    ///         Reporters and gates are suppressed for it. It exists to be compared against, not to be
+    ///         published, and letting it write files or move an exit code would make a diagnostic
+    ///         command change the build's outcome.
+    ///     </para>
+    /// </remarks>
+    private async Task VerifyIsolationAsync(
+        IReadOnlyList<BenchmarkResult> isolated,
+        CancellationToken cancellationToken)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Re-measuring in this process for comparison...");
+
+        // The same harness re-run with isolation forced off, rather than a second harness built to
+        // look like this one. A copy would have to reproduce every builder call the user made -
+        // filters, categories, options, instance lifetime - and any field missed would silently
+        // compare two different sets of benchmarks while presenting the result as one set measured
+        // two ways. That is a worse failure than not offering the command.
+        var savedArgs = _cliArgs;
+        var savedReporters = _reporters.ToList();
+        var savedProgress = _progress;
+        var savedProgressExplicit = _progressExplicitlySet;
+
+        // Reporters and gates are suppressed: this pass exists to be compared against, not
+        // published. Letting it write files or move the exit code would make a diagnostic command
+        // change the build's outcome.
+        _cliArgs = _cliArgs with
+        {
+            InProcess = true,
+            VerifyIsolation = false,
+            StrictIsolation = false,
+            ThresholdPct = null,
+            OutputDir = null,
+        };
+
+        _reporters.Clear();
+        _progress = NullBenchmarkProgress.Instance;
+        _progressExplicitlySet = true;
+
+        try
+        {
+            var inProcess = await RunCoreAsync(cancellationToken).ConfigureAwait(false);
+
+            IsolationAudit.Render(isolated, inProcess, Console.Out);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A failed comparison pass must not fail the run it was only commenting on.
+            Console.Error.WriteLine($"--verify-isolation: the in-process comparison pass failed: {ex.Message}");
+        }
+        finally
+        {
+            _cliArgs = savedArgs;
+            _reporters.Clear();
+            _reporters.AddRange(savedReporters);
+            _progress = savedProgress;
+            _progressExplicitlySet = savedProgressExplicit;
+        }
+    }
+
     private static IDisposable ApplyCliOtelEndpointScope(string? endpoint)
     {
         if (string.IsNullOrEmpty(endpoint))
@@ -812,6 +881,35 @@ public sealed class BenchmarkHarness
             Environment.ExitCode = 1;
         }
 
+        await FinalizeRunAsync(allResults, cancellationToken).ConfigureAwait(false);
+
+        // After the reporters, because the comparison is commentary on the table just shown and is
+        // meaningless without it.
+        if (_cliArgs.VerifyIsolation)
+            await VerifyIsolationAsync(allResults, cancellationToken).ConfigureAwait(false);
+
+        return allResults;
+    }
+
+    /// <summary>
+    ///     The steps every completed harness run ends with: the isolation gate, the output
+    ///     directory, the reporters, and the isolation comparison.
+    /// </summary>
+    /// <remarks>
+    ///     Shared because there are two run paths that both finish this way, and they had already
+    ///     drifted once - a flag wired into one of them appeared to do nothing at all from the other.
+    ///     That is the same defect shape as the composite-key bug that spread across nine call sites
+    ///     and silently disagreed, so the tail lives in one place.
+    /// </remarks>
+    private async Task FinalizeRunAsync(
+        IReadOnlyList<BenchmarkResult> allResults,
+        CancellationToken cancellationToken)
+    {
+        // Enforced before reporters run, so the failure is stated up front rather than after several
+        // screens of tables the user is being told not to trust.
+        if (_cliArgs.StrictIsolation && !IsolationAudit.Enforce(allResults, Console.Error))
+            Environment.ExitCode = 1;
+
         if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
             ApplyOutputDirectory(_cliArgs.OutputDir);
 
@@ -825,8 +923,6 @@ public sealed class BenchmarkHarness
         {
             BenchmarkTable.CrossClassMode = false;
         }
-
-        return allResults;
     }
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunMultiRuntimeAsync(
@@ -935,19 +1031,7 @@ public sealed class BenchmarkHarness
                 }
             }
 
-            if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
-                ApplyOutputDirectory(_cliArgs.OutputDir);
-
-            BenchmarkTable.CrossClassMode = _cliArgs.CrossClass || _crossClass;
-
-            try
-            {
-                await InvokeReportersAsync(allResults, cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                BenchmarkTable.CrossClassMode = false;
-            }
+            await FinalizeRunAsync(allResults, cancellationToken).ConfigureAwait(false);
 
             // SuiteCompleted sentinel: emit on the success path with Succeeded = true.
             observer.OnPhase(new MeasurementPhaseEvent(
@@ -957,6 +1041,11 @@ public sealed class BenchmarkHarness
                 Succeeded: true));
 
             sentinelEmitted = true;
+
+            // After the reporters, because the comparison is a commentary on the table just shown
+            // and is meaningless without it.
+            if (_cliArgs.VerifyIsolation)
+                await VerifyIsolationAsync(allResults, cancellationToken).ConfigureAwait(false);
 
             return allResults;
         }
