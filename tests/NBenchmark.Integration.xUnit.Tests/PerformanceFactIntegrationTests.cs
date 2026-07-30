@@ -6,6 +6,7 @@ using Xunit.Abstractions;
 
 namespace NBenchmark.Integration.xUnit.Tests;
 
+[Collection(HostAssessmentCollection.Name)]
 public sealed class PerformanceFactIntegrationTests
 {
     private readonly ITestOutputHelper _output;
