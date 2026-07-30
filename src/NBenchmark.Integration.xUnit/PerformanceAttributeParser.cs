@@ -29,6 +29,7 @@ internal static class PerformanceAttributeParser
             ConfidenceLevel = NormalizeConfidenceLevel(ParseDouble(attribute, nameof(PerformanceFactAttribute.ConfidenceLevel))),
             MaxAbsoluteThresholdTolerance = NormalizeTolerance(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxAbsoluteThresholdTolerance))),
             RequireIsolation = ParseBool(attribute, nameof(PerformanceFactAttribute.RequireIsolation)),
+            LaunchCount = NormalizeLaunchCount(ParseInt(attribute, nameof(PerformanceFactAttribute.LaunchCount))),
         };
     }
 
@@ -53,6 +54,7 @@ internal static class PerformanceAttributeParser
             ConfidenceLevel = NormalizeConfidenceLevel(runtime.ConfidenceLevel),
             MaxAbsoluteThresholdTolerance = NormalizeTolerance(runtime.MaxAbsoluteThresholdTolerance),
             RequireIsolation = runtime.RequireIsolation,
+            LaunchCount = NormalizeLaunchCount(runtime.LaunchCount),
         };
 
         return true;
@@ -100,6 +102,14 @@ internal static class PerformanceAttributeParser
 
     private static double NormalizeTolerance(double value) => value > 0 ? value : 1.0;
 
+    /// <summary>
+    ///     One replicate unless the test asked for more. An unset named argument reads as <c>0</c> here,
+    ///     which is not a valid launch count - and clamping rather than throwing keeps a mistyped
+    ///     attribute from failing the test with a configuration error instead of measuring it.
+    /// </summary>
+    private static int NormalizeLaunchCount(int value)
+        => value < 1 ? 1 : Math.Min(value, MeasurementOptions.MaxLaunchCount);
+
     private static OutlierMode NormalizeOutlierMode(OutlierMode value, bool treatNoneAsUnset)
     {
         if (treatNoneAsUnset && value == OutlierMode.None)
@@ -128,5 +138,6 @@ internal static class PerformanceAttributeParser
         public double ConfidenceLevel { get; init; } = 0.95;
         public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
         public bool RequireIsolation { get; init; }
+        public int LaunchCount { get; init; } = 1;
     }
 }

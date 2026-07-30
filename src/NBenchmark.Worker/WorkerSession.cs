@@ -192,14 +192,22 @@ internal sealed class WorkerSession(FrameChannel channel)
     }
 
     /// <summary>
-    ///     Measures one method from a test assembly - a method with no <c>[Benchmark]</c> attribute,
-    ///     handed over by an xUnit, NUnit or MSTest integration.
+    ///     Measures the methods of a test-framework group - methods with no <c>[Benchmark]</c>
+    ///     attribute, handed over by an xUnit, NUnit or MSTest integration.
     /// </summary>
     /// <remarks>
-    ///     The test-class instance is built here rather than sent, which is why the coordinator only
-    ///     routes classes it has already confirmed are constructible from nothing. Everything after
-    ///     the method is resolved is the ordinary discovery path, so instance lifetime, iteration
-    ///     structure and sample transport are the same code that measures a <c>[Benchmark]</c>.
+    ///     <para>
+    ///         The test-class instance is built here rather than sent, which is why the coordinator only
+    ///         routes classes it has already confirmed are constructible from nothing. Everything after
+    ///         the methods are resolved is the ordinary discovery path, so instance lifetime, iteration
+    ///         structure and sample transport are the same code that measures a <c>[Benchmark]</c>.
+    ///     </para>
+    ///     <para>
+    ///         A group carries more than one method when the test names a reference to compare against.
+    ///         They are measured in one suite here, in this process, so the per-replicate ratio the
+    ///         coordinator forms is paired. Splitting them across two workers is the thing that makes a
+    ///         test-integration ratio describe the two processes instead of the two bodies.
+    ///     </para>
     /// </remarks>
     private async Task RunTestMethodAsync(
         RunGroupPayload request,
@@ -207,6 +215,13 @@ internal sealed class WorkerSession(FrameChannel channel)
         StreamingProgress progress,
         CancellationToken cancellationToken)
     {
+        if (request.TestMethods.Count == 0)
+        {
+            Fault("A test-method group carried no methods to measure.");
+
+            return;
+        }
+
         var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
         var target = context.LoadFromAssemblyPath(Path.GetFullPath(request.TargetAssemblyPath));
         var module = target.ManifestModule;
@@ -221,55 +236,18 @@ internal sealed class WorkerSession(FrameChannel channel)
             return;
         }
 
-        MethodInfo method;
+        var resolvedMethods = new List<(MethodInfo Method, object?[] Arguments, string DisplayName)>(
+            request.TestMethods.Count);
 
-        try
+        foreach (var requested in request.TestMethods)
         {
-            if (module.ResolveMethod(request.TestMethodToken) is not MethodInfo resolved)
-            {
-                Fault($"Token 0x{request.TestMethodToken:X8} did not resolve to a method.");
-
+            if (!TryResolveTestMethod(module, requested, out var method, out var arguments))
                 return;
-            }
 
-            method = resolved;
-        }
-        catch (Exception ex) when (ex is ArgumentException or BadImageFormatException)
-        {
-            Fault($"Token 0x{request.TestMethodToken:X8} could not be resolved: {ex.Message}");
-
-            return;
+            resolvedMethods.Add((method!, arguments!, requested.DisplayName));
         }
 
-        var parameters = method.GetParameters();
-
-        if (parameters.Length != request.TestMethodArguments.Count)
-        {
-            Fault(
-                $"'{method.Name}' takes {parameters.Length} argument(s) but {request.TestMethodArguments.Count} "
-                + "were sent. This usually means the assembly was rebuilt between addressing and running.");
-
-            return;
-        }
-
-        var arguments = new object?[parameters.Length];
-
-        try
-        {
-            for (var i = 0; i < parameters.Length; i++)
-            {
-                arguments[i] = TestArgumentCodec.Decode(request.TestMethodArguments[i], parameters[i].ParameterType);
-            }
-        }
-        catch (Exception ex)
-        {
-            Fault($"An argument for '{method.Name}' could not be rebuilt in this worker: {ex.Message}");
-
-            return;
-        }
-
-        var displayName = request.BenchmarkNames.Count > 0 ? request.BenchmarkNames[0] : method.Name;
-        var suite = BenchmarkDiscoverer.DefineExplicit(method, arguments, displayName);
+        var suite = BenchmarkDiscoverer.DefineExplicit(resolvedMethods);
 
         var outcome = await DiscoveredGroupExecutor.RunAsync(
                 suite,
@@ -292,13 +270,98 @@ internal sealed class WorkerSession(FrameChannel channel)
             // reaching this means the two disagreed. Reporting it is the only honest option: a
             // silent fallback would measure nothing and report a gap.
             Fault(
-                $"'{method.DeclaringType?.FullName}' could not be instantiated in the worker, even "
+                $"'{suite.Type.FullName}' could not be instantiated in the worker, even "
                 + "though it appeared to have a usable parameterless constructor.");
 
             return;
         }
 
-        SendResults(outcome.Results, r => outcome.RawSamples.GetValueOrDefault(r.Name, []));
+        // Discovery names a result '<Class>.<DisplayName>', which is the right convention for a
+        // benchmark class and the wrong one here - the caller's display name is already qualified
+        // however its test framework qualifies names. Renamed on this side, where the convention that
+        // produced the name is known, rather than reconstructed by the coordinator from a rule it
+        // would then own a second copy of.
+        var renamed = new List<BenchmarkResult>(outcome.Results.Count);
+        var samplesByName = new Dictionary<string, double[]>(StringComparer.Ordinal);
+
+        foreach (var result in outcome.Results)
+        {
+            var samples = outcome.RawSamples.GetValueOrDefault(result.Name, []);
+
+            var requestedName = resolvedMethods
+                .Select(m => m.DisplayName)
+                .FirstOrDefault(name => result.Name == $"{suite.Type.Name}.{name}");
+
+            var final = requestedName is null ? result : result with { Name = requestedName };
+
+            renamed.Add(final);
+            samplesByName[final.Name] = samples;
+        }
+
+        SendResults(renamed, r => samplesByName.GetValueOrDefault(r.Name, []));
+    }
+
+    /// <summary>
+    ///     Resolves one addressed test method and rebuilds its arguments, faulting the group when
+    ///     either cannot be done.
+    /// </summary>
+    private bool TryResolveTestMethod(
+        Module module,
+        TestMethodPayload requested,
+        out MethodInfo? method,
+        out object?[]? arguments)
+    {
+        method = null;
+        arguments = null;
+
+        try
+        {
+            if (module.ResolveMethod(requested.Token) is not MethodInfo resolved)
+            {
+                Fault($"Token 0x{requested.Token:X8} did not resolve to a method.");
+
+                return false;
+            }
+
+            method = resolved;
+        }
+        catch (Exception ex) when (ex is ArgumentException or BadImageFormatException)
+        {
+            Fault($"Token 0x{requested.Token:X8} could not be resolved: {ex.Message}");
+
+            return false;
+        }
+
+        var parameters = method.GetParameters();
+
+        if (parameters.Length != requested.Arguments.Count)
+        {
+            Fault(
+                $"'{method.Name}' takes {parameters.Length} argument(s) but {requested.Arguments.Count} "
+                + "were sent. This usually means the assembly was rebuilt between addressing and running.");
+
+            return false;
+        }
+
+        var decoded = new object?[parameters.Length];
+
+        try
+        {
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                decoded[i] = TestArgumentCodec.Decode(requested.Arguments[i], parameters[i].ParameterType);
+            }
+        }
+        catch (Exception ex)
+        {
+            Fault($"An argument for '{method.Name}' could not be rebuilt in this worker: {ex.Message}");
+
+            return false;
+        }
+
+        arguments = decoded;
+
+        return true;
     }
 
     private async Task RunDiscoveredClassAsync(

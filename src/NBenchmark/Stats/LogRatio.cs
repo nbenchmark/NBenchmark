@@ -120,4 +120,41 @@ public static class LogRatio
             paired.Select(l => baselineByIndex[l.LaunchIndex]).ToList(),
             candidate.ConfidenceLevel);
     }
+
+    /// <summary>
+    ///     The paired ratio of a result to a divisor that is not itself a benchmark - the calibration
+    ///     standard, whose per-launch medians the caller holds as a plain list.
+    /// </summary>
+    /// <param name="baselineLaunchMedians">
+    ///     The divisor's median for each launch, <b>indexed by launch index</b>: entry <i>i</i> is the
+    ///     value measured in the same worker as launch <i>i</i> of <paramref name="candidate" />. A
+    ///     non-positive entry means that launch produced no divisor, and drops the pair.
+    ///     <para>
+    ///         Indexed rather than "in order" because that is the whole load-bearing assumption. A list
+    ///         that had silently dropped its failed launches would line entry 1 up against launch 2 and
+    ///         report the difference between two processes as a property of the code.
+    ///     </para>
+    /// </param>
+    public static RatioEstimate? Estimate(
+        BenchmarkResult candidate,
+        IReadOnlyList<double> baselineLaunchMedians)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        ArgumentNullException.ThrowIfNull(baselineLaunchMedians);
+
+        if (candidate.LaunchStatistics is not { } launches)
+            return null;
+
+        var candidateMedians = new double[baselineLaunchMedians.Count];
+
+        foreach (var launch in launches.Launches)
+        {
+            if (launch.Errored || launch.LaunchIndex < 0 || launch.LaunchIndex >= candidateMedians.Length)
+                continue;
+
+            candidateMedians[launch.LaunchIndex] = launch.Median;
+        }
+
+        return Estimate(candidateMedians, baselineLaunchMedians, candidate.ConfidenceLevel);
+    }
 }

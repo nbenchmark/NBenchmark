@@ -23,6 +23,12 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
     public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
 
     /// <summary>
+    ///     Worker processes to measure this test in. Defaults to 1; two or more give the ratio gate a
+    ///     paired confidence interval. See <see cref="IPerformanceThresholds.LaunchCount" />.
+    /// </summary>
+    public int LaunchCount { get; init; } = 1;
+
+    /// <summary>
     ///     Fails the test when the measurement was taken in the test host rather than in a worker
     ///     process. See <see cref="IPerformanceThresholds.RequireIsolation" />.
     /// </summary>
@@ -41,15 +47,12 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
 
         var instance = methodInfo.IsStatic ? null : CreateInstance(methodInfo);
 
-        BenchmarkResult? refResult = null;
-        double[]? refSamples = null;
-        BenchmarkResult result = null!;
-        double[] rawSamples = null!;
-        string? refusal = null;
-        CalibrationResult? calibration = null;
+        TestMeasurement.MeasuredPair pair;
 
         try
         {
+            TestMeasurement.Target? referenceTarget = null;
+
             if (!string.IsNullOrWhiteSpace(ReferenceMethod))
             {
                 MethodInfo refMethodInfo;
@@ -66,33 +69,33 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
 
                 var refName = $"{testMethod.TestClassName}.{ReferenceMethod}";
 
-                // MSTest's Execute is synchronous, so the async path is blocked on here.
-                var reference = TestMeasurement
-                    .MeasureAsync(refMethodInfo, instance, refArgs, refName, runSpec, CancellationToken.None)
-                    .GetAwaiter().GetResult();
-
-                refResult = reference.Result;
-                refSamples = reference.RawSamples;
+                referenceTarget = new TestMeasurement.Target(refMethodInfo, refArgs, refName);
             }
 
-            var measured = TestMeasurement
-                .MeasureAsync(methodInfo, instance, args, name, runSpec, CancellationToken.None,
+            // Both sides in one call, so each replicate measures them co-resident and their ratio is
+            // paired. MSTest's Execute is synchronous, so the async path is blocked on here.
+            pair = TestMeasurement
+                .MeasurePairAsync(
+                    new TestMeasurement.Target(methodInfo, args, name),
+                    referenceTarget,
+                    instance,
+                    runSpec,
+                    CancellationToken.None,
                     PerformanceGate.NeedsCalibration(this))
                 .GetAwaiter().GetResult();
-
-            result = measured.Result;
-            rawSamples = measured.RawSamples;
-            refusal = measured.Refusal;
-            calibration = measured.Calibration;
         }
         catch (Exception ex)
         {
             return Task.FromResult<TestResult[]>([CreateErrorResult(ex)]);
         }
 
+        var result = pair.Candidate.Result;
+        var rawSamples = pair.Candidate.RawSamples;
+        var refusal = pair.Candidate.Refusal;
+
         var gate = PerformanceGate.Evaluate(
-            result, rawSamples, refResult, refSamples, this,
-            PerformanceGate.AllowsInProcessGate(methodInfo), calibration);
+            result, rawSamples, pair.Reference?.Result, pair.Reference?.RawSamples, this,
+            PerformanceGate.AllowsInProcessGate(methodInfo), pair.Candidate.Calibration, pair.PairedRatio);
 
         var violations = gate.Violations;
         var notes = new List<string>();

@@ -74,6 +74,21 @@ Pairing removes a worker's own CPU draw and memory layout from the ratio. It doe
 
 `--threshold-pct` applies its percentage to the paired ratio when the run had launches to pair, so a CI gate compares code rather than whichever worker drew the quietest core. `RegressionCandidate.Estimate` carries the interval, so a consumer building an alert can report whether a failure is supported by the data.
 
+## Test-framework gates
+
+A `[Performance]` test measures one launch by default, so its ratio is a quotient with no interval — all a single measurement can support. Setting `LaunchCount` on the attribute buys the same paired estimate the engine uses:
+
+```csharp
+[PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(Naive), LaunchCount = 3)]
+public void Optimised() => Optimised.Parse(Payload);
+```
+
+The candidate and its reference are measured **co-resident in one worker per replicate**, not in a worker each, so the pairing is the same within-process pairing described above — and it costs three launches rather than six.
+
+With an interval present the gate changes what it turns on: the threshold applies to the paired estimate, and "is the difference real" becomes "does the interval exclude `1.00x`" rather than a p-value over pooled samples. A ratio past the threshold whose interval spans `1.00x` is **not** enforced, and the test output says so rather than passing in silence. In calibration mode - `MaxSlowdownRatio` with no `ReferenceMethod` - each replicate's worker measures the calibration standard after its own benchmark work, so those medians pair by launch too.
+
+See [Test integration](../test-integration/index.md#replicates-and-the-paired-ratio).
+
 ## See also
 
 - [Multiple launches](../features/multiple-launches.md) — what `LaunchCount` buys and how the launches are combined

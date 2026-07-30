@@ -25,7 +25,13 @@ public sealed class PerformanceGateIsolationTests
             Result("reference", 100, IsolationStatus.Isolated));
 
         Assert.Contains(outcome.Violations, v => v.Contains("Regression detected"));
-        Assert.Empty(outcome.Notes);
+
+        // Enforced, and said to rest on a single launch. Both sides being isolated makes the ratio
+        // meaningful; it does not make one quotient an estimate of what a re-run would report, and a
+        // failure is the moment that distinction matters.
+        var note = Assert.Single(outcome.Notes);
+        Assert.Contains("point estimate with no interval", note);
+        Assert.Contains("LaunchCount", note);
     }
 
     [Fact]

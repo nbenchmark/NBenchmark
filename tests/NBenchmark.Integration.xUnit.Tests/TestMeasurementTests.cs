@@ -130,6 +130,87 @@ public sealed class TestMeasurementTests
             $"a 20 ms body measured {measured.Result.Median / 1_000_000:F1} ms, so it was not awaited");
     }
 
+    /// <summary>
+    ///     A candidate and its reference, measured together with replicates, produce the paired ratio a
+    ///     gate can be judged against - end to end, through real workers.
+    /// </summary>
+    /// <remarks>
+    ///     The two bodies differ by 10x in spin count, so a large ratio is the expected answer and it
+    ///     comes from the arguments rather than from either process. What the interval adds is the
+    ///     statement the single-launch path cannot make: that three separate workers agreed.
+    /// </remarks>
+    [Fact]
+    public async Task APairWithReplicates_ProducesAPairedRatio()
+    {
+        var spec = Fast();
+
+        var pair = await TestMeasurement.MeasurePairAsync(
+            new TestMeasurement.Target(
+                Method<PlainSubject>(nameof(PlainSubject.Spin)), [5_000], "Plain.Spin(5000)"),
+            new TestMeasurement.Target(
+                Method<PlainSubject>(nameof(PlainSubject.Spin)), [500], "Plain.Spin(500)"),
+            new PlainSubject(),
+            new RunSpec { Options = spec.Options with { LaunchCount = 3 } });
+
+        Assert.Null(pair.Candidate.Refusal);
+        Assert.Equal(IsolationStatus.Isolated, pair.Candidate.Result.IsolationStatus);
+        Assert.Equal(IsolationStatus.Isolated, pair.Reference!.Value.Result.IsolationStatus);
+
+        var estimate = pair.PairedRatio;
+
+        Assert.NotNull(estimate);
+        Assert.Equal(3, estimate.Replicates);
+
+        Assert.True(
+            estimate.Value > 2,
+            $"10x the spin work produced {estimate.Value:F2}x [{estimate.Lower:F2}-{estimate.Upper:F2}x]");
+    }
+
+    /// <summary>
+    ///     One replicate cannot produce a paired ratio, and does not pretend to. This is the default, so
+    ///     it is also the shape every existing suite keeps.
+    /// </summary>
+    [Fact]
+    public async Task APairWithOneLaunch_ProducesNoPairedRatio()
+    {
+        var pair = await TestMeasurement.MeasurePairAsync(
+            new TestMeasurement.Target(
+                Method<PlainSubject>(nameof(PlainSubject.Spin)), [5_000], "Plain.Spin(5000)"),
+            new TestMeasurement.Target(
+                Method<PlainSubject>(nameof(PlainSubject.Spin)), [500], "Plain.Spin(500)"),
+            new PlainSubject(),
+            Fast());
+
+        Assert.Null(pair.Candidate.Refusal);
+        Assert.Null(pair.PairedRatio);
+        Assert.Null(pair.Candidate.Result.LaunchStatistics);
+    }
+
+    /// <summary>
+    ///     A pair that cannot be isolated goes to the host <b>together</b>, with the reason, and reports
+    ///     no paired ratio - a sequence of measurements in the test host is not a set of replicates, and
+    ///     treating it as one would put an interval on a number that has no reproducibility behind it.
+    /// </summary>
+    [Fact]
+    public async Task AnUnisolatablePair_FallsBackToTheHostWithoutAPairedRatio()
+    {
+        var spec = Fast();
+
+        var pair = await TestMeasurement.MeasurePairAsync(
+            new TestMeasurement.Target(
+                Method<FixtureSubject>(nameof(FixtureSubject.Work)), [], "Fixture.Work"),
+            new TestMeasurement.Target(
+                Method<FixtureSubject>(nameof(FixtureSubject.Other)), [], "Fixture.Other"),
+            new FixtureSubject(new Fixture()),
+            new RunSpec { Options = spec.Options with { LaunchCount = 3 } });
+
+        Assert.NotNull(pair.Candidate.Refusal);
+        Assert.Contains("Fixture", pair.Candidate.Refusal);
+        Assert.Equal(IsolationStatus.InProcessLiveFixture, pair.Candidate.Result.IsolationStatus);
+        Assert.Equal(IsolationStatus.InProcessLiveFixture, pair.Reference!.Value.Result.IsolationStatus);
+        Assert.Null(pair.PairedRatio);
+    }
+
     public class PlainSubject
     {
         public void Work() => Thread.SpinWait(300);
@@ -144,6 +225,8 @@ public sealed class TestMeasurementTests
     public class FixtureSubject(Fixture fixture)
     {
         public void Work() => _ = fixture.Value;
+
+        public void Other() => _ = fixture.Value + 1;
     }
 
     public sealed class Fixture

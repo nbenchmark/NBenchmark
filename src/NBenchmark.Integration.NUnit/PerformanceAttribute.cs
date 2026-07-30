@@ -33,6 +33,12 @@ public sealed class PerformanceAttribute : NUnitAttribute, ISimpleTestBuilder, I
     public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
 
     /// <summary>
+    ///     Worker processes to measure this test in. Defaults to 1; two or more give the ratio gate a
+    ///     paired confidence interval. See <see cref="IPerformanceThresholds.LaunchCount" />.
+    /// </summary>
+    public int LaunchCount { get; init; } = 1;
+
+    /// <summary>
     ///     Fails the test when the measurement was taken in the test host rather than in a worker
     ///     process. See <see cref="IPerformanceThresholds.RequireIsolation" />.
     /// </summary>

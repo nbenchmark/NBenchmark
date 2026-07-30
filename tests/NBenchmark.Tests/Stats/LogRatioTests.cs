@@ -202,6 +202,57 @@ public class LogRatioTests
         Assert.Null(LogRatio.Estimate(baseline, candidate));
     }
 
+    /// <summary>
+    ///     The divisor overload - used where the divisor is the calibration standard rather than a
+    ///     benchmark - addresses its list by launch index, not by position.
+    /// </summary>
+    /// <remarks>
+    ///     The candidate here is missing launch 1, and the divisor list still has three entries because
+    ///     it is indexed rather than compacted. Only launches 0 and 2 pair, and both agree the candidate
+    ///     is 3x its divisor. A positional reading would pair the candidate's launch 2 against the
+    ///     divisor's launch 1 and report 1.5x - a difference between two processes, presented as a
+    ///     property of the code.
+    /// </remarks>
+    [Fact]
+    public void Estimate_AgainstADivisorList_PairsByLaunchIndex()
+    {
+        var candidate = ResultWithLaunches("cand", [(0, 300, false), (1, 0, true), (2, 600, false)]);
+
+        var estimate = LogRatio.Estimate(candidate, [100, 500, 200]);
+
+        Assert.NotNull(estimate);
+        Assert.Equal(2, estimate.Replicates);
+        Assert.Equal(3.0, estimate.Value, 10);
+    }
+
+    /// <summary>
+    ///     A launch for which the divisor was never measured drops the pair rather than the single
+    ///     survivor, because a lone survivor would contribute a comparison against another process.
+    /// </summary>
+    [Fact]
+    public void Estimate_AgainstADivisorList_DropsLaunchesWithNoDivisor()
+    {
+        var candidate = ResultWithLaunches("cand", [(0, 300, false), (1, 900, false), (2, 600, false)]);
+
+        var estimate = LogRatio.Estimate(candidate, [100, 0, 200]);
+
+        Assert.NotNull(estimate);
+        Assert.Equal(2, estimate.Replicates);
+        Assert.Equal(3.0, estimate.Value, 10);
+    }
+
+    /// <summary>
+    ///     An empty divisor list is what a single-launch run produces, and one pair is not an estimate.
+    /// </summary>
+    [Fact]
+    public void Estimate_AgainstAnEmptyDivisorList_IsNull()
+    {
+        var candidate = ResultWithLaunches("cand", [(0, 300, false), (1, 900, false)]);
+
+        Assert.Null(LogRatio.Estimate(candidate, []));
+        Assert.Null(LogRatio.Estimate(candidate, [100]));
+    }
+
     private static BenchmarkResult ResultWithLaunches(
         string name,
         (int Index, double Median, bool Errored)[] launches)

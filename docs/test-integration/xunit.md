@@ -80,6 +80,8 @@ public void Sort_Scales_Reasonably(int size)
 
 > [!NOTE]
 > Thresholds apply to every data row. If you need different limits per row, split the test into separate `[PerformanceFact]` methods.
+>
+> `LaunchCount` is also spent per data row: a theory with eight rows and `LaunchCount = 3` launches twenty-four workers.
 
 ## Threshold properties
 
@@ -92,6 +94,7 @@ See the [thresholds reference](./index.md#thresholds-reference) for the complete
     MaxAllocatedBytes = 4096,      // fail if mean allocs > 4 KiB per op
     MaxSlowdownRatio = 5.0,       // fail if >5x the calibration benchmark
     ReferenceMethod  = nameof(ReferenceImpl),  // compare against this method instead of calibration
+    LaunchCount      = 3,          // measure the pair in 3 workers, for a paired ratio interval
     Iterations       = 300,
     WarmupIterations = 30,
     OutlierMode      = OutlierMode.IqrFence,

@@ -466,22 +466,61 @@ public sealed class BenchmarkDiscoverer
         ArgumentNullException.ThrowIfNull(method);
         ArgumentNullException.ThrowIfNull(arguments);
 
-        var declaringType = method.DeclaringType
+        return DefineExplicit([(method, arguments, displayName)]);
+    }
+
+    /// <summary>
+    ///     Builds one suite around several caller-chosen methods, so they are measured co-resident.
+    /// </summary>
+    /// <remarks>
+    ///     The multi-method form exists for a <c>[Performance]</c> test that names a reference method:
+    ///     both sides of the ratio belong in one suite, in one worker, per replicate. Two suites in two
+    ///     workers would measure the same bodies and produce a ratio with every worker-to-worker
+    ///     difference left in it.
+    ///     <para>
+    ///         Every method must be declared by the same type - the suite has one
+    ///         <see cref="BenchmarkSuiteDefinition.Type" />, and it is the type the worker instantiates.
+    ///     </para>
+    /// </remarks>
+    internal static BenchmarkSuiteDefinition DefineExplicit(
+        IReadOnlyList<(MethodInfo Method, object?[] Arguments, string DisplayName)> methods)
+    {
+        ArgumentNullException.ThrowIfNull(methods);
+
+        if (methods.Count == 0)
+            throw new ArgumentException("At least one method is required.", nameof(methods));
+
+        var declaringType = methods[0].Method.DeclaringType
                             ?? throw new InvalidOperationException(
-                                $"Method '{method.Name}' has no declaring type.");
+                                $"Method '{methods[0].Method.Name}' has no declaring type.");
 
-        var definition = CreateDefinition(
-            method,
-            new BenchmarkAttribute(),
-            displayName,
+        var definitions = new List<BenchmarkMethodDefinition>(methods.Count);
 
-            arguments,
-            paramNames: method.GetParameters().Select(pa => pa.Name ?? string.Empty).ToArray(),
-            iterSetupDel: null,
-            iterTeardownDel: null,
-            classCategories: []);
+        foreach (var (method, arguments, displayName) in methods)
+        {
+            ArgumentNullException.ThrowIfNull(method);
+            ArgumentNullException.ThrowIfNull(arguments);
 
-        return new BenchmarkSuiteDefinition(declaringType, [definition]);
+            if (method.DeclaringType != declaringType)
+            {
+                throw new InvalidOperationException(
+                    $"'{method.Name}' is declared by '{method.DeclaringType?.FullName}' but the suite is "
+                    + $"built around '{declaringType.FullName}'. A co-resident group shares one instance "
+                    + "type.");
+            }
+
+            definitions.Add(CreateDefinition(
+                method,
+                new BenchmarkAttribute(),
+                displayName,
+                arguments,
+                paramNames: method.GetParameters().Select(pa => pa.Name ?? string.Empty).ToArray(),
+                iterSetupDel: null,
+                iterTeardownDel: null,
+                classCategories: []));
+        }
+
+        return new BenchmarkSuiteDefinition(declaringType, definitions);
     }
 
     private static BenchmarkMethodDefinition CreateDefinition(

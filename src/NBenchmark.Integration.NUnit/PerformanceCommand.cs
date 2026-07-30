@@ -34,29 +34,30 @@ public sealed class PerformanceCommand : DelegatingTestCommand
 
         try
         {
-            BenchmarkResult? refResult = null;
-            double[]? refSamples = null;
+            TestMeasurement.Target? referenceTarget = null;
 
             if (!string.IsNullOrWhiteSpace(_attribute.ReferenceMethod))
             {
                 var (refMethodInfo, refArgs) = ResolveReferenceMethod(methodInfo, _attribute.ReferenceMethod, args);
                 var refName = $"{testMethod.Method.TypeInfo.FullName}.{_attribute.ReferenceMethod}";
 
-                // NUnit's DelegatingTestCommand.Execute is synchronous, so the async path is blocked
-                // on here rather than propagated.
-                var reference = TestMeasurement
-                    .MeasureAsync(refMethodInfo, instance, refArgs, refName, runSpec, context.CancellationToken)
-                    .GetAwaiter().GetResult();
-
-                refResult = reference.Result;
-                refSamples = reference.RawSamples;
+                referenceTarget = new TestMeasurement.Target(refMethodInfo, refArgs, refName);
             }
 
-            var measured = TestMeasurement
-                .MeasureAsync(methodInfo, instance, args, name, runSpec, context.CancellationToken,
+            // Both sides in one call, so each replicate measures them co-resident and their ratio is
+            // paired. NUnit's DelegatingTestCommand.Execute is synchronous, so the async path is
+            // blocked on here rather than propagated.
+            var pair = TestMeasurement
+                .MeasurePairAsync(
+                    new TestMeasurement.Target(methodInfo, args, name),
+                    referenceTarget,
+                    instance,
+                    runSpec,
+                    context.CancellationToken,
                     PerformanceGate.NeedsCalibration(_attribute))
                 .GetAwaiter().GetResult();
 
+            var measured = pair.Candidate;
             var result = measured.Result;
             var rawSamples = measured.RawSamples;
 
@@ -66,8 +67,8 @@ public sealed class PerformanceCommand : DelegatingTestCommand
             WriteMetrics(context, result);
 
             var gate = PerformanceGate.Evaluate(
-                result, rawSamples, refResult, refSamples, _attribute,
-                PerformanceGate.AllowsInProcessGate(methodInfo), measured.Calibration);
+                result, rawSamples, pair.Reference?.Result, pair.Reference?.RawSamples, _attribute,
+                PerformanceGate.AllowsInProcessGate(methodInfo), measured.Calibration, pair.PairedRatio);
 
             var violations = gate.Violations;
 

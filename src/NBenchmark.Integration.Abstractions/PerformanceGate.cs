@@ -1,4 +1,5 @@
 using System.Reflection;
+using NBenchmark.Stats;
 
 namespace NBenchmark.Integration.Abstractions;
 
@@ -83,6 +84,17 @@ public static class PerformanceGate
     ///     calibration so that both sides of a <c>MaxSlowdownRatio</c> ratio share a runtime
     ///     configuration. <c>null</c> falls back to the host measurement, which is the right
     ///     comparison when the benchmark also ran in the host.
+    ///     <para>
+    ///         With replicates its <see cref="CalibrationResult.LaunchMedians" /> makes the
+    ///         calibration ratio paired as well, since each launch's divisor was measured in the same
+    ///         process as that launch of the benchmark.
+    ///     </para>
+    /// </param>
+    /// <param name="pairedRatio">
+    ///     The per-replicate ratio of <paramref name="result" /> to <paramref name="referenceResult" />
+    ///     with its interval, from <see cref="TestMeasurement.MeasurePairAsync" />. Pass it only when the
+    ///     two were measured co-resident in the same worker per replicate - that co-residency is what
+    ///     the pairing means, and it is not something this method can verify from two results.
     /// </param>
     public static Outcome Evaluate(
         BenchmarkResult result,
@@ -91,7 +103,8 @@ public static class PerformanceGate
         double[]? referenceSamples,
         IPerformanceThresholds thresholds,
         bool allowInProcessGate = false,
-        CalibrationResult? workerCalibration = null)
+        CalibrationResult? workerCalibration = null,
+        RatioEstimate? pairedRatio = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(thresholds);
@@ -129,8 +142,12 @@ public static class PerformanceGate
         {
             if (RatioIsEnforceable(result, referenceResult, allowInProcessGate, notes))
             {
-                violations.AddRange(RelativeComparison.Check(
-                    result, samples, referenceResult, referenceSamples, thresholds.MaxSlowdownRatio));
+                var verdict = RelativeComparison.CheckStructured(
+                    result, samples, referenceResult, referenceSamples, thresholds.MaxSlowdownRatio,
+                    pairedRatio: pairedRatio);
+
+                violations.AddRange(verdict.Violations);
+                NoteRatioEvidence(verdict, thresholds.MaxSlowdownRatio, result.Name, notes);
             }
 
             return new Outcome(violations, notes);
@@ -150,12 +167,19 @@ public static class PerformanceGate
             ? IsolationStatus.Isolated
             : IsolationStatus.InProcessRequested;
 
-        violations.AddRange(RelativeComparison.Check(
+        // The calibration is measured once per replicate worker, after that worker's own benchmark
+        // work, so its per-launch medians pair with the benchmark's the same way a reference method's
+        // do. Empty for a single-launch run, and Estimate then returns null.
+        var calibrationVerdict = RelativeComparison.CheckStructured(
             result,
             samples,
             CalibrationStandard.ToBenchmarkResult(calibration, calibrationStatus),
             calibration.Samples,
-            thresholds.MaxSlowdownRatio));
+            thresholds.MaxSlowdownRatio,
+            pairedRatio: LogRatio.Estimate(result, calibration.LaunchMedians));
+
+        violations.AddRange(calibrationVerdict.Violations);
+        NoteRatioEvidence(calibrationVerdict, thresholds.MaxSlowdownRatio, result.Name, notes);
 
         // Only the mismatched case needs saying. When both were measured the same way the ratio is
         // sound, and a note on every passing test is noise that trains people to skip the notes.
@@ -169,6 +193,57 @@ public static class PerformanceGate
         }
 
         return new Outcome(violations, notes);
+    }
+
+    /// <summary>
+    ///     Says what evidence the ratio verdict rests on, in the two cases where the verdict alone
+    ///     misleads.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A pass that only just passed.</b> With replicates, a ratio past the gate whose interval
+    ///         still spans <c>1.00x</c> does not fail - the run cannot distinguish the two bodies at all,
+    ///         and failing a build on it would be failing on noise. But silence there is indistinguishable
+    ///         from a comfortable pass, so the note says the gate was not enforced and why.
+    ///     </para>
+    ///     <para>
+    ///         <b>A failure with no interval.</b> Without replicates the ratio is one quotient of two
+    ///         numbers, and nothing about it says whether a re-run would produce the same verdict. Said
+    ///         only on failure, where someone is already reading the output and about to act on it.
+    ///     </para>
+    /// </remarks>
+    private static void NoteRatioEvidence(
+        RelativeComparisonVerdict verdict,
+        double maxSlowdownRatio,
+        string name,
+        List<string> notes)
+    {
+        if (double.IsNaN(verdict.Ratio))
+            return;
+
+        if (verdict.Estimate is { } estimate)
+        {
+            if (!verdict.IsRegression && estimate.Value > maxSlowdownRatio && estimate.IncludesUnity)
+            {
+                notes.Add(
+                    $"NBenchmark: the ratio gate for '{name}' was not enforced - the paired ratio is "
+                    + $"{estimate.Value:F2}x, past the {maxSlowdownRatio:F2}x gate, but its "
+                    + $"{estimate.ConfidenceLevel:P0} interval [{estimate.Lower:F2}-{estimate.Upper:F2}x] over "
+                    + $"{estimate.Replicates} replicates spans 1.00x, so this run cannot distinguish the two "
+                    + "bodies. Raise LaunchCount to narrow it.");
+            }
+
+            return;
+        }
+
+        if (verdict.IsRegression)
+        {
+            notes.Add(
+                $"NBenchmark: the ratio for '{name}' is a point estimate with no interval, because the test "
+                + "was measured in a single launch. It says nothing about whether a re-run would agree. Set "
+                + "LaunchCount = 3 on the attribute to gate on a paired ratio with a confidence interval "
+                + "instead.");
+        }
     }
 
     /// <summary>

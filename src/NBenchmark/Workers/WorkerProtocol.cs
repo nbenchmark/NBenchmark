@@ -61,7 +61,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 1;
+    public const int Version = 2;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -253,31 +253,34 @@ internal sealed record RunGroupPayload
     public string? PlanMethodName { get; init; }
 
     /// <summary>
-    ///     <see cref="WorkGroupKind.TestMethod" />: metadata token of the method under test, within
-    ///     <see cref="TargetAssemblyPath" />.
+    ///     <see cref="WorkGroupKind.TestMethod" />: the methods under test, in the order the caller
+    ///     listed them.
+    ///     <para>
+    ///         A list rather than a single method because a <c>[Performance]</c> test that names a
+    ///         <c>ReferenceMethod</c> sends <b>both</b> in one group, so that each replicate measures
+    ///         the pair co-resident in one worker and their ratio is paired - the same property the
+    ///         group-per-worker rule buys every other comparison. Measuring them in two workers leaves
+    ///         each worker's core draw and address-space layout in the numerator and denominator
+    ///         independently, and costs twice the wall clock to do it.
+    ///     </para>
     /// </summary>
-    public int TestMethodToken { get; init; }
+    public IReadOnlyList<TestMethodPayload> TestMethods { get; init; } = [];
 
     /// <summary>
-    ///     <see cref="WorkGroupKind.TestMethod" />: the defining module's MVID, checked before the
+    ///     <see cref="WorkGroupKind.TestMethod" />: the defining module's MVID, checked before any
     ///     token is trusted.
     ///     <para>
     ///         The same gate the lambda path uses, and mandatory for the same reason: deterministic
     ///         builds keep a token valid across a rebuild that inserted a method above it, so a
     ///         stale token addresses a <i>different</i> method and reports it under the right name.
     ///     </para>
-    /// </summary>
-    public Guid TestMethodModuleVersionId { get; init; }
-
-    /// <summary>
-    ///     <see cref="WorkGroupKind.TestMethod" />: the test case's argument values, in order.
     ///     <para>
-    ///         Only simple values ever reach here - the coordinator refuses to route a test whose
-    ///         arguments are live objects, rather than reconstructing them and measuring something
-    ///         subtly different.
+    ///         One value for the group, not one per method: every method in a
+    ///         <see cref="WorkGroupKind.TestMethod" /> group is declared by the same type, so they
+    ///         share a module by construction.
     ///     </para>
     /// </summary>
-    public IReadOnlyList<TestArgumentPayload> TestMethodArguments { get; init; } = [];
+    public Guid TestMethodModuleVersionId { get; init; }
 
     /// <summary>
     ///     Which <c>nbworker</c> to launch. <c>null</c> uses the one deployed beside this
@@ -444,6 +447,35 @@ internal sealed record FaultPayload
     ///     that could not be addressed). <c>null</c> means the whole group failed.
     /// </summary>
     public string? BenchmarkName { get; init; }
+}
+
+/// <summary>
+///     One method a <see cref="WorkGroupKind.TestMethod" /> group measures.
+/// </summary>
+/// <remarks>
+///     <see cref="DisplayName" /> travels with the token rather than being derived on either side.
+///     The worker names its results from it, so a group carrying several methods can be mapped back
+///     to the caller's own names without either side reconstructing a naming rule the other applies -
+///     the class-prefixing convention discovery uses is not the one a test integration wants, and two
+///     copies of it would be free to drift.
+/// </remarks>
+internal sealed record TestMethodPayload
+{
+    /// <summary>Metadata token of the method, within <see cref="RunGroupPayload.TargetAssemblyPath" />.</summary>
+    public required int Token { get; init; }
+
+    /// <summary>The name the caller wants results reported under.</summary>
+    public required string DisplayName { get; init; }
+
+    /// <summary>
+    ///     The test case's argument values, in declaration order.
+    ///     <para>
+    ///         Only simple values ever reach here - the coordinator refuses to route a test whose
+    ///         arguments are live objects, rather than reconstructing them and measuring something
+    ///         subtly different.
+    ///     </para>
+    /// </summary>
+    public IReadOnlyList<TestArgumentPayload> Arguments { get; init; } = [];
 }
 
 /// <summary>

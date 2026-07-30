@@ -3,7 +3,31 @@ using System.Diagnostics;
 namespace NBenchmark;
 
 /// <summary>What one run of the calibration standard measured.</summary>
-public sealed record CalibrationResult(double Mean, double Median, double[] Samples);
+/// <param name="Mean">The mean, averaged across launches when there was more than one.</param>
+/// <param name="Median">The median, averaged across launches when there was more than one.</param>
+/// <param name="Samples">
+///     The samples of a single launch. Pooling across launches would multiply the count without
+///     improving reproducibility, which is the failure mode <see cref="LaunchMedians" /> exists to
+///     measure instead.
+/// </param>
+public sealed record CalibrationResult(double Mean, double Median, double[] Samples)
+{
+    /// <summary>
+    ///     The median measured in each launch, <b>indexed by launch index</b>, when the caller measured
+    ///     the standard once per replicate worker. Empty when there was only one measurement.
+    /// </summary>
+    /// <remarks>
+    ///     This is what makes a calibration-divided ratio a <i>paired</i> one: entry <i>i</i> was
+    ///     measured in the same process, after the same work, as launch <i>i</i> of the benchmark being
+    ///     judged, so that worker's core draw and thermal state divide out.
+    ///     <see cref="Stats.LogRatio.Estimate(BenchmarkResult, IReadOnlyList{double})" /> consumes it.
+    ///     <para>
+    ///         A launch that produced no calibration is recorded as <c>0</c> rather than omitted, so the
+    ///         index keeps meaning the launch it names.
+    ///     </para>
+    /// </remarks>
+    public IReadOnlyList<double> LaunchMedians { get; init; } = [];
+}
 
 /// <summary>
 ///     A fixed synthetic workload used to normalise a threshold for machine speed.

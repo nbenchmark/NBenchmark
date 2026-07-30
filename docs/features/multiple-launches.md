@@ -96,6 +96,10 @@ In isolated mode (the Harness mode default), the parent spawns N child processes
 
 In Suite mode the suite repeats in a fresh worker process per launch. The worker is unaware of the launch count; the coordinator orchestrates the repeats, which is what makes the spread between them a run-to-run reproducibility estimate.
 
+## Test-integration interaction
+
+A `[Performance]` test defaults to `LaunchCount = 1`, because replicates cost a worker launch each and a test suite should not be made to pay for them everywhere. Setting it on the attribute spends them the same way the coordinator does - one worker per replicate - and gives the test's ratio gate a paired confidence interval instead of a bare quotient. A test that names a `ReferenceMethod` measures both sides inside each of those workers, so the replicate count is the number of launches, not twice it. See [test integration](../test-integration/index.md#replicates-and-the-paired-ratio).
+
 ## Example
 
 ```bash

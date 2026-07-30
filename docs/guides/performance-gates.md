@@ -46,7 +46,16 @@ public void OptimisedParse() => OptimisedParser.Parse(Payload);
 private static void NaiveParse() => NaiveParser.Parse(Payload);
 ```
 
-The candidate must not exceed 1.2x the reference. The reference can be private and runs with the same measurement options as the candidate (same iterations, warmup, outlier mode), so the comparison is apples-to-apples - and, when both sides isolate, in matching worker processes.
+The candidate must not exceed 1.2x the reference. The reference can be private and runs with the same measurement options as the candidate (same iterations, warmup, outlier mode), so the comparison is apples-to-apples - and, when both sides isolate, in the *same* worker process, so the ratio has that worker's core draw and memory layout divided out rather than left in it.
+
+What that ratio does not have, at the default `LaunchCount = 1`, is an interval: it is one quotient, and nothing about it says whether a re-run would agree. Add replicates when the gate decides a build:
+
+```csharp
+[PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse), LaunchCount = 3)]
+public void OptimisedParse() => OptimisedParser.Parse(Payload);
+```
+
+Three workers, each measuring the pair, each producing its own ratio. The gate then applies the threshold to the combined estimate and fails only when the interval excludes `1.00x` - so a failure means the slowdown is larger than the difference between two runs of the same code. See [replicates and the paired ratio](../test-integration/index.md#replicates-and-the-paired-ratio).
 
 ### NUnit / MSTest equivalents
 
@@ -88,7 +97,9 @@ public void Repository_Query_Is_Fast_Enough()
 
   **A ratio cancels the hardware, not the runtime state.** This guide previously said the host "cancels out" outright; that is measurably false. On four benchmarks of *provably identical cost*, repeated in-process runs fabricated a **2.80x** ratio between two of them - each reported with a tight confidence interval. Whatever the JIT happened to have tiered up when a given body ran does not cancel, because it is not shared between the two bodies. Set `MaxSlowdownRatio` loosely enough to survive that (start around `10.0` and tighten from observed CI runs), and lean on the statistical gate rather than the ratio alone.
 
-- **Statistical gating** - the test fails only when the slowdown is **both** statistically significant (Mann-Whitney U p-value below the significance level) **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes; a large-but-noisy slowdown passes. This mirrors the [practical-significance gate](../statistics/significance.md#practical-significance-gate) in the suite / harness flow.
+- **Statistical gating** - the test fails only when the slowdown is **both** real **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes; a large-but-noisy slowdown passes. This mirrors the [practical-significance gate](../statistics/significance.md#practical-significance-gate) in the suite / harness flow.
+
+  What counts as *real* depends on `LaunchCount`. At the default of one launch it is a Mann-Whitney U p-value below the significance level, computed on the samples of that single measurement. At two or more it is the paired ratio interval excluding `1.00x`, which is a statement about reproducibility rather than about sample count - and the stronger claim, because a pooled sample count grants statistical power regardless of whether the difference survives a re-run.
 
 ## Where your test is measured
 
@@ -117,7 +128,7 @@ Those results are still produced and still gated on absolute thresholds. What ch
 
 | Candidate | Reference | Ratio gate |
 | --- | --- | --- |
-| Worker | Worker | **Enforced.** |
+| Worker | Worker | **Enforced.** With `LaunchCount >= 2`, only when the paired interval excludes `1.00x`; the reason is logged when it does not. |
 | Test host | Test host | Not enforced, and the reason is logged. Add `[AllowInProcessGate]` to enforce it anyway. |
 | Worker | Test host (or the reverse) | **Never enforced.** No opt-in covers it. |
 

@@ -98,8 +98,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
 
                     var name = $"{TestMethod.TestClass.Class.Name}.{TestMethod.Method.Name}";
 
-                    BenchmarkResult? refResult = null;
-                    double[]? refSamples = null;
+                    TestMeasurement.Target? referenceTarget = null;
 
                     if (!string.IsNullOrWhiteSpace(data.ReferenceMethod))
                     {
@@ -108,28 +107,33 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
 
                         var refName = $"{TestMethod.TestClass.Class.Name}.{data.ReferenceMethod}";
 
-                        var reference = await TestMeasurement.MeasureAsync(
-                            refMethodInfo, instance, refArgs, refName, runSpec, cancellationTokenSource.Token);
-
-                        refResult = reference.Result;
-                        refSamples = reference.RawSamples;
+                        referenceTarget = new TestMeasurement.Target(refMethodInfo, refArgs, refName);
                     }
 
-                    var measured = await TestMeasurement.MeasureAsync(
-                        methodInfo, instance, methodArgs, name, runSpec, cancellationTokenSource.Token,
+                    // Both sides in one call, so each replicate measures them co-resident and their
+                    // ratio is paired. Measured separately they would be two workers per replicate,
+                    // and the ratio would carry both workers' differences instead of neither's.
+                    var pair = await TestMeasurement.MeasurePairAsync(
+                        new TestMeasurement.Target(methodInfo, methodArgs, name),
+                        referenceTarget,
+                        instance,
+                        runSpec,
+                        cancellationTokenSource.Token,
                         PerformanceGate.NeedsCalibration(data));
 
+                    var measured = pair.Candidate;
                     var result = measured.Result;
                     var rawSamples = measured.RawSamples;
 
                     var gate = PerformanceGate.Evaluate(
                         result,
                         rawSamples,
-                        refResult,
-                        refSamples,
+                        pair.Reference?.Result,
+                        pair.Reference?.RawSamples,
                         data,
                         PerformanceGate.AllowsInProcessGate(methodInfo),
-                        measured.Calibration);
+                        measured.Calibration,
+                        pair.PairedRatio);
 
                     var violations = gate.Violations;
                     var notes = new List<string>();

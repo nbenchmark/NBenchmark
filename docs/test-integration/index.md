@@ -94,7 +94,7 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-The test fails when the slowdown is **both** statistically significant (Mann-Whitney U p-value below the significance level) **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
+The test fails when the slowdown is **both** real **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). What counts as "real" depends on whether the test asked for replicates — see [Replicates and the paired ratio](#replicates-and-the-paired-ratio). With the default single launch it is a Mann-Whitney U p-value below the significance level. A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
 
 Failure output includes ratio and significance details (`ratio`, `p`, and Cliff's delta) when a slowdown breaches the gate. A practical tuning workflow is to start with a loose value (for example `MaxSlowdownRatio = 10.0`) and tighten it based on several runs in your CI environment.
 
@@ -112,9 +112,45 @@ private static void NaiveParse() => NaiveParser.Parse(Payload);
 
 The reference method can be private. It runs with the same measurement options as the candidate (iterations, warmup, outlier mode, confidence level). This keeps the comparison apples-to-apples: if the candidate uses `Iterations = 300`, the reference also runs 300 iterations. Wall-clock cost for the test is therefore candidate + reference durations.
 
+**Both run in the same worker process.** The candidate and its reference are measured co-resident, one worker per replicate, so their ratio has that worker's core draw, thermal state and address-space layout divided out of it rather than left in the numerator and denominator independently. This is the same rule the engine applies to a comparison group, and it is why the pair is a single measurement request rather than two.
+
 `ReferenceMethod` is only available in the attribute pattern. The assert pattern (`PerformanceAssert.Run`) supports calibration mode only.
 
 See [Statistics: Significance Testing](../statistics/significance.md) for how the comparison is performed.
+
+## Replicates and the paired ratio
+
+A ratio gate decides a build, so the question that matters is not "is this number above the threshold" but "would it still be tomorrow". A single measurement cannot answer it. `LaunchCount` is how you ask.
+
+```csharp
+[PerformanceFact(
+    MaxSlowdownRatio = 1.2,
+    ReferenceMethod = nameof(NaiveParse),
+    LaunchCount = 3)]
+public void OptimisedParse() => OptimisedParser.Parse(Payload);
+```
+
+That measures the pair in **three separate worker processes**. Each one produces its own candidate/reference ratio, and the three are combined on the log scale into a geometric mean with a confidence interval — the same estimator the engine's `Ratio CI` column uses. See [Ratios](../statistics/ratios.md).
+
+What changes when the interval exists:
+
+| | `LaunchCount = 1` (default) | `LaunchCount >= 2` |
+| --- | --- | --- |
+| ratio gated on | candidate mean / reference mean | geometric mean of the per-launch ratios |
+| "is the difference real?" | Mann-Whitney U on pooled samples | does the interval exclude `1.00x`? |
+| worker launches | 1 | one per replicate — the pair shares each |
+| test output | mean, P95, allocations, iterations | the above plus a `Launches:` line with the run-to-run spread |
+
+The p-value is still computed and reported at `LaunchCount >= 2`, but it is no longer what the gate turns on. Pooling samples across launches multiplies statistical power without improving reproducibility, so a difference far below the run-to-run noise can read as overwhelmingly significant — on NBenchmark's own calibration sample, four bodies of provably identical cost, that combination marks one significantly slower than another routinely. The interval over per-replicate ratios is the run-to-run spread, and that is the quantity a gate must survive.
+
+Two consequences worth knowing before you set it:
+
+- **It costs launches.** `LaunchCount = 3` spends three worker launches on that test instead of one, and a `[PerformanceTheory]` spends them per test case. Raise it on the comparisons that decide a build, not across the suite. Two is the smallest value that produces an interval; three is enough for the interval to be worth reading.
+- **A noisy comparison stops failing.** When the point estimate is past the gate but the interval spans `1.00x`, the gate is **not** enforced — the run cannot distinguish the two bodies, and failing on that is failing on noise. The test output says so explicitly rather than passing in silence. Raising `LaunchCount` narrows the interval; if it stays wide, the difference is smaller than your machine's run-to-run variation and no threshold can honestly detect it.
+
+Conversely, a failure at `LaunchCount = 1` now carries a note saying the ratio is a point estimate with no interval behind it. That is not a defect in the gate; it is the most the single-launch measurement supports.
+
+`LaunchCount` applies to calibration mode too: each replicate's worker measures the calibration standard after its own benchmark work, so those medians pair by launch exactly as a reference method's do.
 
 ## Thresholds reference
 
@@ -131,6 +167,7 @@ All three packages share the same set of threshold properties. A threshold of `-
 | `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup samples. `0` uses the framework default (auto-detected). |
 | `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
 | `RequireIsolation` | `bool` | false | Fail the test when the measurement was taken in the test host rather than a worker process. Use it on gates that matter: isolation can be lost quietly when a fixture argument is added or a worker fails to deploy, and the gate would otherwise keep passing against a number measured somewhere you did not choose. |
+| `LaunchCount` | `int` | 1 | Worker processes to measure this test in. Two or more turn the ratio gate into a paired per-replicate estimate with a confidence interval, at the cost of a worker launch each. See [Replicates and the paired ratio](#replicates-and-the-paired-ratio). |
 | `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
 | `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |
 | `MaxAbsoluteThresholdTolerance` | `double` | 1.0 | Multiplier applied to absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) when a shared runner or high-jitter host is detected. Set to e.g. `1.25` for 25% relaxation on shared CI runners. |

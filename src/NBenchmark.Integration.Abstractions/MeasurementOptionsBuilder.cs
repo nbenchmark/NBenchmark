@@ -19,6 +19,11 @@ public static class MeasurementOptionsBuilder
         {
             OutlierMode = NormalizeOutlierMode(thresholds.OutlierMode),
             ConfidenceLevel = thresholds.ConfidenceLevel is > 0 and <= 1 ? thresholds.ConfidenceLevel : 0.95,
+
+            // The replicate count, spent by TestMethodRunner spawning one worker per launch. Clamped
+            // rather than validated: an attribute is a compile-time constant, and throwing from an
+            // options builder would fail the test with a configuration error instead of measuring it.
+            LaunchCount = Math.Clamp(thresholds.LaunchCount, 1, MeasurementOptions.MaxLaunchCount),
         };
 
         return options;

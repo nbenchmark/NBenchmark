@@ -155,6 +155,62 @@ public sealed class TestMethodIsolationTests : IDisposable
             $"a 20 ms body measured {outcome.Result.Median / 1_000_000:F1} ms, so it was not awaited");
     }
 
+    /// <summary>
+    ///     The end-to-end paired path: two methods, three real workers, one paired ratio.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The two subjects are the <i>same method</i> with a 10x difference in argument, so the true
+    ///         ratio is known to be large and to come from the arguments rather than from the bodies.
+    ///         That also exercises two payload entries sharing one metadata token, which is what a
+    ///         parameterized test compared against itself produces.
+    ///     </para>
+    ///     <para>
+    ///         What this pins that a fake launcher cannot: that a real worker accepts a group of several
+    ///         test methods at all, reports them under the names the caller asked for, and that three
+    ///         such workers produce launch statistics the paired estimator can pair.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task APairWithReplicates_IsMeasuredCoResidentAndPaired()
+    {
+        var outcome = await TestMethodRunner.RunAsync(
+            [
+                new TestMethodRunner.Subject(Method(nameof(SubjectTests.Spin)), [20_000], "Spin(20000)"),
+                new TestMethodRunner.Subject(Method(nameof(SubjectTests.Spin)), [2_000], "Spin(2000)"),
+            ],
+            Fast() with { LaunchCount = 3 });
+
+        Assert.True(outcome.Measured, outcome.Refusal);
+        Assert.Equal(2, outcome.Measurements.Count);
+
+        // In request order, under the requested names. Discovery's own '<Class>.<Name>' convention would
+        // report these as 'SubjectTests.Spin(20000)', which is not the name the caller is gating on.
+        Assert.Equal("Spin(20000)", outcome.Measurements[0].Result.Name);
+        Assert.Equal("Spin(2000)", outcome.Measurements[1].Result.Name);
+
+        var costly = outcome.Measurements[0].Result;
+        var cheap = outcome.Measurements[1].Result;
+
+        Assert.False(costly.Errored, costly.ErrorMessage);
+        Assert.False(cheap.Errored, cheap.ErrorMessage);
+        Assert.Equal(3, costly.LaunchStatistics!.LaunchCount);
+        Assert.Equal(3, cheap.LaunchStatistics!.LaunchCount);
+
+        // Pooled across the three launches, which is what a significance test on this path reads.
+        Assert.NotEmpty(outcome.Measurements[0].RawSamples);
+
+        var estimate = NBenchmark.Stats.LogRatio.Estimate(costly, cheap);
+
+        Assert.NotNull(estimate);
+        Assert.Equal(3, estimate.Replicates);
+
+        Assert.True(
+            estimate.Value > 2,
+            $"10x the spin work produced a paired ratio of {estimate.Value:F2}x "
+            + $"[{estimate.Lower:F2}-{estimate.Upper:F2}x]");
+    }
+
     /// <summary>The subject under measurement - deliberately not a benchmark class.</summary>
     public class SubjectTests
     {
