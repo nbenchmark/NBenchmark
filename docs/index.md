@@ -106,14 +106,23 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 ## Features
 
 - **Parameterized benchmarks.** Run the same body across multiple input values to see how an algorithm scales - `WithParameter` in Suite mode, `[BenchmarkCase]` in Harness mode. ([Suite](./features/parameterized-suite.md) / [Harness](./features/parameterized-harness.md))
+
 - **Categories.** Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from a run via CLI flags or the programmatic filter API. ([Categories](./features/categories.md))
+
 - **Isolated runs.** Run benchmarks in freshly spawned workers so JIT, GC, and thread-pool state from earlier work can't bias later measurements; isolated by default in Harness mode. ([Isolated runs](./features/isolated-runs.md))
+
 - **Multi-runtime comparison.** Build and run the same benchmarks across net8, net9, and net10 in separate workers and compare side-by-side. ([Multi-runtime](./features/multi-runtime.md))
+
 - **Multiple launches.** Repeat each benchmark as independent launches to surface run-to-run variance and produce cross-launch aggregation stats. ([Multiple launches](./features/multiple-launches.md))
+
 - **Environment control.** Pin CPU affinity, raise process priority, and detect noisy hosts to reduce measurement noise at its source. ([Environment control](./features/environment-control.md))
+
 - **Performance gates in CI.** Enforce absolute or relative performance thresholds as xUnit, NUnit, or MSTest tests that fail on regression. ([Test integration](./test-integration/index.md))
+
 - **CI regression gate.** Fail the harness run with a non-zero exit code when any benchmark regresses beyond a percentage against the baseline (`--threshold-pct`). ([CLI reference](./reference/cli.md))
+
 - **Runtime diagnostics.** Record GC collection counts, heap state, exceptions, and CPU time per operation alongside timings. ([Diagnostics](./statistics/diagnostics.md))
+
 - **Live telemetry.** Stream per-sample, per-phase, and per-detector events to an `IMeasurementObserver`, or export spans and metrics to OpenTelemetry via the built-in `System.Diagnostics` instrumentation. ([Observers](./reference/observers.md) / [OTel](./reference/bcl-instrumentation.md))
 
 ## Packages
