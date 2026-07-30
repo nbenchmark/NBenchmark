@@ -105,8 +105,8 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 
 - **Parameterized benchmarks.** Run the same body across multiple input values to see how an algorithm scales - `WithParameter` in Suite mode, `[BenchmarkCase]` in Harness mode. ([Suite](./features/parameterized-suite.md) / [Harness](./features/parameterized-harness.md))
 - **Categories.** Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from a run via CLI flags or the programmatic filter API. ([Categories](./features/categories.md))
-- **Isolated runs.** Run benchmarks in freshly spawned child processes so JIT, GC, and thread-pool state from earlier work can't bias later measurements; isolated by default in Harness mode. ([Isolated runs](./features/isolated-runs.md))
-- **Multi-runtime comparison.** Build and run the same benchmarks across net8, net9, and net10 in separate child processes and compare side-by-side. ([Multi-runtime](./features/multi-runtime.md))
+- **Isolated runs.** Run benchmarks in freshly spawned workers so JIT, GC, and thread-pool state from earlier work can't bias later measurements; isolated by default in Harness mode. ([Isolated runs](./features/isolated-runs.md))
+- **Multi-runtime comparison.** Build and run the same benchmarks across net8, net9, and net10 in separate workers and compare side-by-side. ([Multi-runtime](./features/multi-runtime.md))
 - **Multiple launches.** Repeat each benchmark as independent launches to surface run-to-run variance and produce cross-launch aggregation stats. ([Multiple launches](./features/multiple-launches.md))
 - **Environment control.** Pin CPU affinity, raise process priority, and detect noisy hosts to reduce measurement noise at its source. ([Environment control](./features/environment-control.md))
 - **Performance gates in CI.** Enforce absolute or relative performance thresholds as xUnit, NUnit, or MSTest tests that fail on regression. ([Test integration](./test-integration/index.md))

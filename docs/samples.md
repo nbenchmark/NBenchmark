@@ -237,7 +237,7 @@ dotnet run
 What to look at:
 
 - The quick in-process result.
-- The isolated suite comparison, where the whole suite runs in one fresh child process.
+- The isolated suite comparison, where the whole suite runs in one fresh worker.
 - The tradeoff between cleaner measurements and additional process-launch overhead.
 
 ---
@@ -360,7 +360,7 @@ What to look at:
 
 - How `--runtimes net8,net9,net10` triggers cross-runtime builds and execution.
 - The "Runtime" column in the console output.
-- How the host builds the project for each TFM, runs benchmarks in child processes, and aggregates results.
+- How the host builds the project for each TFM, runs benchmarks in workers, and aggregates results.
 - Combining `--runtimes` with other CLI flags like `--iterations`, `--reporter`, and `--output`.
 
 ---

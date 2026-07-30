@@ -1,12 +1,12 @@
 ---
 title: "Isolated Runs (Advanced)"
-description: Run benchmarks in clean child processes to avoid runtime cross-contamination.
+description: Run benchmarks in clean workers to avoid runtime cross-contamination.
 order: 4
 ---
 
 # Isolated Runs (Advanced)
 
-Process isolation runs benchmarks in a freshly spawned child process so their measurements are not biased by runtime state - JIT warmup, heap and GC pressure, or thread-pool and process-level state - left behind by earlier work in the same process.
+Process isolation runs benchmarks in a freshly spawned worker so their measurements are not biased by runtime state - JIT warmup, heap and GC pressure, or thread-pool and process-level state - left behind by earlier work in the same process.
 
 How you reach for isolation depends on the mode:
 
@@ -105,7 +105,7 @@ Measuring each benchmark in its own process sounds safer, but the measurements s
 | Configuration | Spread across runs | Largest fabricated difference |
 | --- | --- | --- |
 | in-process | 3.27x | 2.80x |
-| **isolated per child, host runtime configuration** | **3.10x** | **3.06x** |
+| **isolated per worker, host runtime configuration** | **3.10x** | **3.06x** |
 | isolated, `steady-state` runtime configuration | 1.03x | 1.03x |
 
 Per-benchmark isolation buys the middle row. Sibling contamination was never the dominant error - uncontrolled JIT tiering was, and that is a *per-process* setting which is identical whether one worker runs one benchmark or five. Splitting them would convert every ratio into a between-process contrast, inflating its variance for no accuracy gain.
@@ -145,7 +145,7 @@ The factory must be `static` and capture nothing itself, so a worker can locate 
 
 ## Harness mode
 
-Harness mode is **isolated by default**: each benchmark class runs in its own clean child process. You usually don't configure anything - `BenchmarkHarness.Create(args)...RunAsync()` already isolates per class.
+Harness mode is **isolated by default**: each benchmark class runs in its own clean worker. You usually don't configure anything - `BenchmarkHarness.Create(args)...RunAsync()` already isolates per class.
 
 ```csharp
 using NBenchmark.Attributes;
@@ -159,7 +159,7 @@ public sealed class StartupBenchmarks
 
 You can tune the granularity:
 
-- **`[IsolatedProcess]`** on a method (finest granularity) gives that one benchmark its own dedicated child process, isolated even from siblings in the same class.
+- **`[IsolatedProcess]`** on a method (finest granularity) gives that one benchmark its own dedicated worker, isolated even from siblings in the same class.
 - **`[InProcess]`** on a method (or class) opts that benchmark back into the host process.
 - **`--in-process`** on the command line, or **`WithIsolation(false)`** in code, disables isolation for the whole run.
 
@@ -167,11 +167,11 @@ You can tune the granularity:
 public sealed class MixedBenchmarks
 {
     [Benchmark]
-    public int Default() => Work();              // shares one per-class child
+    public int Default() => Work();              // shares one per-class worker
 
     [Benchmark]
     [IsolatedProcess]
-    public int OwnProcess() => ColdWork();        // its own dedicated child
+    public int OwnProcess() => ColdWork();        // its own dedicated worker
 
     [Benchmark]
     [InProcess]
@@ -179,17 +179,17 @@ public sealed class MixedBenchmarks
 }
 ```
 
-When isolation resolves to a mix, NBenchmark runs the in-process benchmarks in the host, the per-class benchmarks together in one child, and each `[IsolatedProcess]` benchmark in its own child.
+When isolation resolves to a mix, NBenchmark runs the in-process benchmarks in the host, the per-class benchmarks together in one worker, and each `[IsolatedProcess]` benchmark in its own worker.
 
 See [Harness mode](../usage-modes/harness-mode.md#isolatedprocess) for the full attribute reference.
 
-### How the child works
+### How the worker works
 
 Harness mode measures in a dedicated worker process, `nbworker`, which ships inside the NBenchmark package and is copied next to your application at build time. The coordinator - the process you started - plans the work, aggregates statistics and renders reports, but never measures.
 
 A worker loads the assembly declaring your benchmarks into its own load context, runs the same attribute discovery the host would, measures with the same engine, and streams results back over a private pipe. Three consequences are worth knowing:
 
-- **Your `Main` does not re-run.** Earlier versions re-executed the entry assembly for every child, so a program with *M* isolated suites did *M²* work and any side effect in `Main` - a file write, an HTTP call, database seeding - happened once per child. A worker is given an assembly and a class name instead.
+- **Your `Main` does not re-run.** Earlier versions re-executed the entry assembly for every worker, so a program with *M* isolated suites did *M²* work and any side effect in `Main` - a file write, an HTTP call, database seeding - happened once per worker. A worker is given an assembly and a class name instead.
 - **Progress is live.** Warmup and measurement phases, detector snapshots and results stream from the worker into your own `IBenchmarkProgress` and `IMeasurementObserver` as they happen. Per-*sample* observer events are the exception: they stop at the process boundary unless `--stream-samples` asks for them, because a benchmark emits them in the thousands and forwarding all of them would add measurable time to the run. The full raw samples arrive with each result either way. See [Measurement Observer](../reference/observers.md#what-an-isolated-run-delivers) for the per-callback table.
 - **Results and their samples arrive together.** There is no side table to look them up in, which is what previously allowed every isolated result to lose its samples and silently disable significance testing.
 
@@ -238,9 +238,9 @@ This is also why an in-process benchmark can never be as trustworthy as an isola
 - **Do not rely on `--in-process` for anything comparative.** On four benchmarks with provably identical cost, repeated in-process runs spanned 3.27x and fabricated a 2.80x difference between two of them, while reporting a tight confidence interval on each. The same benchmarks measured in workers under the default runtime profile spanned 1.03x. See `plans/out-of-process-pivot.md` for the measurements and the reason.
 - **`LaunchCount` is a replicate count, and each replicate is a fresh process.** In Harness mode, `--launch-count 3` measures the group in three separate workers, each with its own shuffle order derived from the session seed. That is what gives a run-to-run reproducibility estimate rather than three repetitions inside one process - and reproducibility, not within-process precision, is what a regression gate should read.
 - Run-order randomization is honoured everywhere, and each replicate derives a distinct order from the session seed, so run order is a randomized nuisance factor rather than a fixed confound.
-- `--dry-run` (equivalent to `--iterations 0 --warmup 0`) always runs in-process - no child is spawned.
+- `--dry-run` (equivalent to `--iterations 0 --warmup 0`) always runs in-process - no worker is spawned.
 - `RunPlanAsync` suites need no configuration transfer at all: the worker runs your factory, so custom detectors, significance tests and lifecycle delegates are constructed there rather than described to it. Harness workers receive the resolved configuration directly and rebuild custom strategies from their type names.
-- A child that never returns is killed, along with its whole process tree, once it exceeds a wall-clock ceiling derived from the tuning budget (`MaxTuningTime` and `CapGraceFactor`, plus warmup and process-start allowances). The affected benchmarks are reported as errored, naming the timeout, rather than hanging the run. Raise `--max-tuning-time` if the work is genuinely that slow.
+- A worker that never returns is killed, along with its whole process tree, once it exceeds a wall-clock ceiling derived from the tuning budget (`MaxTuningTime` and `CapGraceFactor`, plus warmup and process-start allowances). The affected benchmarks are reported as errored, naming the timeout, rather than hanging the run. Raise `--max-tuning-time` if the work is genuinely that slow.
 - A worker cannot outlive the run that started it. It blocks reading its inbound pipe, so if the coordinator exits for any reason - a clean finish, a Ctrl-C, a crash, an IDE stop button - the read ends and the worker exits on its own, measured at 7 ms. Nothing supervises it, which matters because the supervisor would be the process most likely to have died.
 
 ## Related

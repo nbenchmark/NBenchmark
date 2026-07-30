@@ -103,7 +103,7 @@ dotnet benchmark --reporter json --reporter markdown  # both files
 
 ## Process isolation
 
-The tool inherits Harness mode's isolated-by-default execution. Each benchmark class runs in a clean child process unless you pass `--in-process`.
+The tool inherits Harness mode's isolated-by-default execution. Each benchmark class runs in a clean worker unless you pass `--in-process`.
 
 ```bash
 dotnet benchmark                              # isolated (default)

@@ -1,6 +1,6 @@
 ---
 title: Cross-runtime comparison
-description: Verify your code benefits from net10 vs net8 with multi-runtime comparison, always-child isolation, and significance grouped within each runtime.
+description: Verify your code benefits from net10 vs net8 with multi-runtime comparison, always-worker isolation, and significance grouped within each runtime.
 order: 5
 ---
 
@@ -77,7 +77,7 @@ When `--runtimes` is passed on the CLI, the CLI list wins and `[Runtimes]` is ig
 
 - **The first runtime in the list is the implicit baseline** for ratio calculations within that runtime. Use `WithBaseline` (Suite) or `[Benchmark(Baseline = true)]` (Harness) to designate the benchmark that's the 1.00x reference; the runtime order controls which runtime's results are presented first.
 
-- **Environment controls propagate to the children.** `--cpu-affinity`, `--priority`, and `--dedicated-host-guidance` apply to each spawned child, so every runtime runs under the same hardware constraints. See [Environment control: Isolated-process propagation](../features/environment-control.md#isolated-process-propagation).
+- **Environment controls propagate to the workers.** `--cpu-affinity`, `--priority`, and `--dedicated-host-guidance` apply to each spawned worker, so every runtime runs under the same hardware constraints. See [Environment control: Isolated-process propagation](../features/environment-control.md#isolated-process-propagation).
 
 > [!IMPORTANT] Compare on the same host
 > Cross-runtime comparisons are only meaningful when the runtimes run on the same machine in the same conditions. Don't compare net8 results from your laptop against net10 results from CI - the host difference will dwarf the runtime difference. Run all three runtimes in the same invocation, on the same runner, with the same environment controls.
@@ -126,6 +126,6 @@ See [Reading Your Results](../output/reading-your-results.md) for every column, 
 
 - [Multi-runtime comparison](../features/multi-runtime.md) - the full model, including how `--runtimes` and `[Runtimes]` interact, the build / DLL-location / cleanup lifecycle, and the moniker-to-TFM mapping.
 - [Isolated runs](../features/isolated-runs.md) - the underlying process-isolation model that cross-runtime execution builds on.
-- [Environment control](../features/environment-control.md) - controls that propagate to every spawned child so each runtime runs under the same hardware constraints.
+- [Environment control](../features/environment-control.md) - controls that propagate to every spawned worker so each runtime runs under the same hardware constraints.
 - [Samples: MultiRuntimeSuite](../samples.md#multiruntimesuite---suite-mode-multi-runtime) and [MultiRuntimeHarness](../samples.md#multiruntimehost---harness-mode-multi-runtime) - runnable sample projects.
 - [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) - the noise-reduction stack to apply when running cross-runtime in CI, where the host difference can dwarf the runtime difference.

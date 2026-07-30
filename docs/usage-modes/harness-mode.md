@@ -194,22 +194,22 @@ public class DatabaseBenchmarks
 
 ### `[IsolatedProcess]`
 
-Harness mode is **isolated by default**: every benchmark class runs in its own freshly spawned child process, so it is not influenced by JIT, GC, or thread-pool state warmed up by other classes. You don't need any attribute to get this behavior.
+Harness mode is **isolated by default**: every benchmark class runs in its own freshly spawned worker, so it is not influenced by JIT, GC, or thread-pool state warmed up by other classes. You don't need any attribute to get this behavior.
 
 Use the isolation attributes to change the granularity:
 
-- **`[IsolatedProcess]`** on a method gives that single benchmark its **own dedicated** child process - the finest granularity, isolated even from sibling benchmarks in the same class.
+- **`[IsolatedProcess]`** on a method gives that single benchmark its **own dedicated** worker - the finest granularity, isolated even from sibling benchmarks in the same class.
 - **`[InProcess]`** on a method (or class) opts that benchmark back into the **host process**.
 
 ```csharp
 public class StartupBenchmarks
 {
     [Benchmark]
-    public int Warm() => RunWarmWork();           // shares one per-class child
+    public int Warm() => RunWarmWork();           // shares one per-class worker
 
     [Benchmark]
     [IsolatedProcess]
-    public int ColdPath() => RunColdSensitiveWork();  // its own dedicated child
+    public int ColdPath() => RunColdSensitiveWork();  // its own dedicated worker
 
     [Benchmark]
     [InProcess]

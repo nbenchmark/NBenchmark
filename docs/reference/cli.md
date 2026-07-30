@@ -253,7 +253,7 @@ Has no effect when `--order declaration` is used.
 
 ### `--in-process`
 
-Disable process isolation for the whole run. Harness mode is isolated by default - each benchmark class runs in its own child process - and this flag forces every benchmark to run in the host process instead. It overrides `[IsolatedProcess]` and is equivalent to calling `WithIsolation(false)` in code.
+Disable process isolation for the whole run. Harness mode is isolated by default - each benchmark class runs in its own worker - and this flag forces every benchmark to run in the host process instead. It overrides `[IsolatedProcess]` and is equivalent to calling `WithIsolation(false)` in code.
 
 ```bash
 dotnet run -- --in-process
@@ -533,7 +533,7 @@ Repeat each benchmark N times, each in its own worker process. The primary resul
 dotnet run -- --launch-count 3
 ```
 
-When combined with `--dry-run`, exactly one dry launch is performed regardless of the count. When combined with process isolation, the parent spawns N child processes per isolated group.
+When combined with `--dry-run`, exactly one dry launch is performed regardless of the count. When combined with process isolation, the host spawns N workers per isolated group.
 
 ---
 
@@ -564,7 +564,7 @@ dotnet run -- --runtimes net8,net9,net10
 dotnet run -- --runtimes net8.0,net10.0
 ```
 
-When `--runtimes` is specified, the host builds the project for each target framework via `dotnet build -f <tfm>`, runs the benchmarks in a child process under that runtime, and aggregates the results. The project must target all specified runtimes in its `.csproj` file:
+When `--runtimes` is specified, the host builds the project for each target framework via `dotnet build -f <tfm>`, runs the benchmarks in a worker under that runtime, and aggregates the results. The project must target all specified runtimes in its `.csproj` file:
 
 ```xml
 <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
@@ -572,7 +572,7 @@ When `--runtimes` is specified, the host builds the project for each target fram
 
 The console and markdown reporters add a "Runtime" column when results span multiple runtimes. Significance testing is performed within each runtime (net8 results are compared against the net8 baseline, not the net10 one). The first runtime in the list is the implicit baseline for ratio calculations.
 
-`--runtimes` overrides `--in-process`; cross-runtime always uses child processes. When `--runtimes` is passed, it also overrides any `[Runtimes]` attribute on discovered classes.
+`--runtimes` overrides `--in-process`; cross-runtime always uses workers. When `--runtimes` is passed, it also overrides any `[Runtimes]` attribute on discovered classes.
 
 ---
 
@@ -700,9 +700,9 @@ Related warning: NBenchmark also emits a one-time build-configuration warning wh
 
 ### `--otlp-endpoint <url>`
 
-Set the OTLP endpoint an OpenTelemetry SDK in the entry assembly should export to. The value must be an absolute `http://` or `https://` URL. The harness mirrors it into the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable before spawning isolated children, so children stream their telemetry to the same collector as the parent. When `OTEL_EXPORTER_OTLP_ENDPOINT` is already set in the environment, the explicit flag does not override it.
+Set the OTLP endpoint an OpenTelemetry SDK in the entry assembly should export to. The value must be an absolute `http://` or `https://` URL. The harness mirrors it into the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable before spawning isolated workers, so workers stream their telemetry to the same collector as the host. When `OTEL_EXPORTER_OTLP_ENDPOINT` is already set in the environment, the explicit flag does not override it.
 
-This is the cross-process channel for live telemetry: the in-memory `IMeasurementObserver` callback cannot cross the process boundary, so OTLP export is how isolated children stream live data to a collector. See [BCL instrumentation](bcl-instrumentation.md#cross-process-streaming) for the full topology and the env vars forwarded to children.
+This is the cross-process channel for live telemetry: the in-memory `IMeasurementObserver` callback cannot cross the process boundary, so OTLP export is how isolated workers stream live data to a collector. See [BCL instrumentation](bcl-instrumentation.md#cross-process-streaming) for the full topology and the env vars forwarded to workers.
 
 ```bash
 dotnet run -- --otlp-endpoint http://localhost:4317
@@ -755,7 +755,7 @@ dotnet run -- --cpu-affinity 2,3 --priority high --dedicated-host-guidance
 # Collect all diagnostics (GC counts, heap info, exceptions, CPU time)
 dotnet run -- --diagnostics all --detail standard
 
-# Stream live telemetry to a local OTLP collector (isolated children inherit the endpoint)
+# Stream live telemetry to a local OTLP collector (isolated workers inherit the endpoint)
 dotnet run -- --otlp-endpoint http://localhost:4317
 
 # Check what will run before committing to a full benchmark

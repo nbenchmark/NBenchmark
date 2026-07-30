@@ -77,7 +77,7 @@ dotnet run -c Release -- --iterations 1 --warmup 0
 dotnet run -c Release -- --reporter json --output ./results
 ```
 
-The harness is **isolated by default**: each benchmark class runs in its own freshly spawned child process, so JIT, GC, and thread-pool state from one class cannot bias another. See [Isolated runs](../features/isolated-runs.md).
+The harness is **isolated by default**: each benchmark class runs in its own freshly spawned worker, so JIT, GC, and thread-pool state from one class cannot bias another. See [Isolated runs](../features/isolated-runs.md).
 
 ## Read the results
 

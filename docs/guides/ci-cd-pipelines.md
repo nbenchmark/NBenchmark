@@ -37,9 +37,9 @@ dotnet run -c Release -- \
 
 ## What's happening
 
-- **Isolated runs** (Harness mode default). Each discovered class runs in its own freshly spawned child process, so JIT, GC, and thread-pool state from one class cannot bias another. You don't configure anything - `BenchmarkHarness.Create(args)...RunAsync()` already isolates per class. For a single benchmark that needs its own clean room, add `[IsolatedProcess]` to that method. See [Isolated runs](../features/isolated-runs.md).
+- **Isolated runs** (Harness mode default). Each discovered class runs in its own freshly spawned worker, so JIT, GC, and thread-pool state from one class cannot bias another. You don't configure anything - `BenchmarkHarness.Create(args)...RunAsync()` already isolates per class. For a single benchmark that needs its own clean room, add `[IsolatedProcess]` to that method. See [Isolated runs](../features/isolated-runs.md).
 
-- **CPU affinity** (`--cpu-affinity 2,3`). Pins the benchmark process to specific cores so the OS scheduler cannot migrate the thread to a cold-cache core mid-measurement. Choose cores away from core 0 (OS driver interrupt handling). Propagates to isolated children automatically.
+- **CPU affinity** (`--cpu-affinity 2,3`). Pins the benchmark process to specific cores so the OS scheduler cannot migrate the thread to a cold-cache core mid-measurement. Choose cores away from core 0 (OS driver interrupt handling). Propagates to isolated workers automatically.
 
 - **Process priority** (`--priority high`). Reduces preemption by unrelated OS work. A refused elevation (common on locked-down runners) is a warning, not an error - the run proceeds at whatever priority the host allows. Restored when the run completes.
 
@@ -115,8 +115,8 @@ jobs:
 
 ## When to go deeper
 
-- [Environment control](../features/environment-control.md) - the full model for CPU affinity, process priority, dedicated-host guidance, and how they propagate to isolated children.
-- [Isolated runs](../features/isolated-runs.md) - per-class vs. per-benchmark isolation, `[InProcess]` opt-out, the child-process dispatch model.
+- [Environment control](../features/environment-control.md) - the full model for CPU affinity, process priority, dedicated-host guidance, and how they propagate to isolated workers.
+- [Isolated runs](../features/isolated-runs.md) - per-class vs. per-benchmark isolation, `[InProcess]` opt-out, the worker dispatch model.
 - [Multiple launches](../features/multiple-launches.md) - cross-launch aggregation, the `[Benchmark(LaunchCount = n)]` per-method attribute, and how launch count interacts with isolation.
 - [Configuration: AutoTune](../reference/configuration.md#autotune) - the `Quick` / `Default` / `Thorough` presets and when to use each.
 - [Performance gates in your test suite](./performance-gates.md) - the in-test alternative to `--threshold-pct`, for projects that already run a unit test suite in CI.

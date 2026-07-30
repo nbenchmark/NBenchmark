@@ -448,7 +448,7 @@ The runtime-startup configuration a benchmark is measured under: JIT tiering, dy
 | `RuntimeProfile.ServerGc` | `SteadyState` + non-concurrent server GC | code destined for a server-GC host |
 | `RuntimeProfile.Host` | nothing set | inherit the host's configuration |
 
-**These settings can only be applied to a process as it starts** - the runtime reads them once and never re-reads them. So they can be honoured for benchmarks that run in a child process, and cannot be honoured for anything measured in the host process.
+**These settings can only be applied to a process as it starts** - the runtime reads them once and never re-reads them. So they can be honoured for benchmarks that run in a worker, and cannot be honoured for anything measured in the host process.
 
 NBenchmark therefore reports what was *actually* applied rather than what was requested. Every result carries:
 

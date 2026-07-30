@@ -140,7 +140,7 @@ new BenchmarkSuite("MySuite")
 
 ## Isolated-process propagation
 
-In [Harness mode](../usage-modes/harness-mode.md) the host runs each discovered class in a child process by default. Environment controls are propagated to those children via the isolated-run request, so each child pins itself to the same cores and priority as the parent - the clean-room CLR runs under the same hardware constraints as the parent's in-process benchmarks.
+In [Harness mode](../usage-modes/harness-mode.md) the host runs each discovered class in a worker by default. Environment controls are propagated to those workers via the isolated-run request, so each worker pins itself to the same cores and priority as the host - the clean-room CLR runs under the same hardware constraints as the host's in-process benchmarks.
 
 A `[BenchmarkPlan]` suite builds itself inside the worker, so it derives the same `MeasurementOptions` (including `Environment`) there and applies them itself. No extra wiring is needed.
 
