@@ -116,6 +116,38 @@ internal static class TestSources
                                         public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync(System.Func<System.Threading.Tasks.Task> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
                                         public static System.Threading.Tasks.Task<MeasurementOutcome> RunRawAsync<T>(System.Func<System.Threading.Tasks.Task<T>> action) { return System.Threading.Tasks.Task.FromResult(new MeasurementOutcome()); }
                                     }
+
+                                    /// Mirrors the real Add signatures closely enough to matter to NB0014: the body is the
+                                    /// second parameter and is followed by optional setup/teardown delegates, so an analyzer
+                                    /// that found the body by argument position would report the wrong lambda here.
+                                    public sealed class BenchmarkSuite
+                                    {
+                                        public BenchmarkSuite(string name) {}
+
+                                        public BenchmarkSuite Add(string name, System.Action action,
+                                            System.Action? setup = null, System.Action? teardown = null,
+                                            System.Collections.Generic.IReadOnlyList<string>? categories = null) { return this; }
+
+                                        public BenchmarkSuite Add(string name, System.Func<System.Threading.Tasks.Task> action,
+                                            System.Action? setup = null, System.Action? teardown = null,
+                                            System.Collections.Generic.IReadOnlyList<string>? categories = null) { return this; }
+
+                                        public BenchmarkSuite Add<T>(string name, System.Func<T> action,
+                                            System.Action? setup = null, System.Action? teardown = null,
+                                            System.Collections.Generic.IReadOnlyList<string>? categories = null) { return this; }
+
+                                        public BenchmarkSuite Add<T>(string name, System.Func<System.Threading.Tasks.Task<T>> action,
+                                            System.Action? setup = null, System.Action? teardown = null,
+                                            System.Collections.Generic.IReadOnlyList<string>? categories = null) { return this; }
+
+                                        public BenchmarkSuite Add<T>(string name, System.Action<T> action,
+                                            System.Action? setup = null, System.Action? teardown = null,
+                                            System.Collections.Generic.IReadOnlyList<string>? categories = null) { return this; }
+
+                                        public BenchmarkSuite WithParameter<T>(string name, params T[] values) { return this; }
+
+                                        public System.Threading.Tasks.Task<BenchmarkResult> RunAsync() { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
+                                    }
                                 }
                                     namespace NBenchmark.Lifecycle
                                     {
@@ -215,6 +247,39 @@ public static class NBAnalyzerVerifier<TAnalyzer>
 
         Assert.True(actualTree.IsEquivalentTo(expectedTree),
             $"Code fix output does not match expected.\nExpected:\n{fixedSource}\n\nActual:\n{changedText}");
+    }
+
+    /// <summary>
+    ///     Every diagnostic the analyzer produced, compiling against the real NBenchmark assembly
+    ///     instead of <see cref="TestSources.Stubs" />.
+    /// </summary>
+    /// <remarks>
+    ///     The stub is a convenience, not evidence: a rule that matches on a symbol's shape - a
+    ///     containing type, a method name, a parameter name - can stop matching the shipped API while
+    ///     every stub test stays green, because the stub is the thing the tests also own.
+    /// </remarks>
+    public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAgainstNBenchmarkAsync(string source)
+    {
+        var userTree = CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp12));
+
+        var references = SharedReferences.Get()
+            .Append(MetadataReference.CreateFromFile(typeof(NBenchmark.BenchmarkSuite).Assembly.Location))
+            .ToArray();
+
+        var compilation = CSharpCompilation.Create("TestAssembly", [userTree], references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        // A source that failed to bind would produce no diagnostics and read as a passing negative
+        // test, so the compile is checked before the analyzer's answer is trusted.
+        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+
+        Assert.True(errors.Length == 0,
+            $"Test source did not compile against NBenchmark:\n{string.Join("\n", errors.Select(d => d.ToString()))}");
+
+        var compilationWithAnalyzers = compilation.WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(Analyzer));
+        var analyzerDiagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync().ConfigureAwait(false);
+        var supportedIds = Analyzer.SupportedDiagnostics.Select(d => d.Id).ToImmutableHashSet();
+        return analyzerDiagnostics.Where(d => supportedIds.Contains(d.Id)).ToImmutableArray();
     }
 
     /// <summary>

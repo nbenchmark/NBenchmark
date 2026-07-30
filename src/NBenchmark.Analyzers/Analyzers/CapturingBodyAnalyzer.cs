@@ -28,6 +28,15 @@ namespace NBenchmark.Analyzers.Analyzers;
 ///         are fields on a compiler-generated class.
 ///     </para>
 ///     <para>
+///         Both entry points that take a body are covered: <c>Benchmark.Run</c> and its family, and
+///         <c>BenchmarkSuite.Add</c>. <c>Add</c> is where capture is most idiomatic
+///         (<c>.Add("Sort", () =&gt; Sort(data))</c>) and where the consequence is largest, because a
+///         suite is addressed as a set - the first body that cannot be addressed takes every sibling
+///         in-process with it. The parameterized <c>Add</c> overloads are deliberately silent: a suite
+///         with parameters is refused isolation for its parameter values regardless of capture, so a
+///         capture diagnostic there would name a cause that is not the operative one.
+///     </para>
+///     <para>
 ///         The rule is per-lambda, and measurement confirms the runtime's decision is too: a
 ///         non-capturing lambda is hoisted to the shared field-less singleton even when a sibling in
 ///         the same scope captures, so it keeps its isolation and this rule stays silent. Scope
@@ -41,6 +50,15 @@ namespace NBenchmark.Analyzers.Analyzers;
 public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
 {
     private const string BenchmarkClassName = "NBenchmark.Benchmark";
+    private const string SuiteClassName = "NBenchmark.BenchmarkSuite";
+
+    /// <summary>
+    ///     The parameter that receives the measured body, on every entry point this rule covers. The
+    ///     argument is found by parameter name rather than by position because <c>Add</c> takes the
+    ///     name first and the body second, has sixteen overloads, and also takes <c>setup</c> and
+    ///     <c>teardown</c> delegates - which are not measured bodies and must not be reported.
+    /// </summary>
+    private const string BodyParameterName = "action";
 
     private static readonly ImmutableHashSet<string> TargetMethodNames =
         ImmutableHashSet.Create("Run", "RunAsync", "RunRaw", "RunRawAsync");
@@ -54,10 +72,8 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticIds.CapturingBody,
         "Benchmark body captures state and cannot be isolated",
-        "The lambda passed to Benchmark.{0} captures {1} from its enclosing scope, so it will be "
-        + "measured in this process instead of an isolated worker. In-process measurement inherits "
-        + "the host's JIT and GC state. To isolate it, move the captured state inside the lambda or "
-        + "use a [Benchmark] class.",
+        "The lambda passed to {0} captures {1} from its enclosing scope, so it will not be measured "
+        + "in an isolated worker. {2} In-process measurement inherits the host's JIT and GC state.",
         "NBenchmark.Performance",
         DiagnosticSeverity.Info,
         true,
@@ -84,16 +100,20 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
         if (invocation.ArgumentList.Arguments.Count < 1)
             return;
 
-        if (invocation.ArgumentList.Arguments[0].Expression is not LambdaExpressionSyntax lambda)
-            return;
-
         if (context.SemanticModel.GetSymbolInfo(invocation).Symbol is not IMethodSymbol methodSymbol)
             return;
 
-        if (methodSymbol.ContainingType?.ToDisplayString() != BenchmarkClassName)
+        if (DescribeTarget(methodSymbol) is not { } target)
             return;
 
-        if (!TargetMethodNames.Contains(methodSymbol.Name))
+        if (FindBody(invocation, methodSymbol) is not { } lambda)
+            return;
+
+        // A lambda with parameters can only have reached a parameterized `Add` overload, and a suite
+        // holding parameters is already refused isolation for the parameter values themselves - they
+        // exist only in this process. Reporting a capture there would name the wrong cause, and
+        // removing the capture would not restore isolation.
+        if (HasParameters(lambda))
             return;
 
         var captured = DescribeCaptures(context.SemanticModel, lambda);
@@ -102,8 +122,71 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
             return;
 
         context.ReportDiagnostic(Diagnostic.Create(
-            Rule, lambda.GetLocation(), methodSymbol.Name, captured));
+            Rule, lambda.GetLocation(), target.Target, captured, target.Consequence));
     }
+
+    /// <summary>
+    ///     Names the entry point and states what a capture costs there, or returns <c>null</c> for an
+    ///     invocation this rule has nothing to say about.
+    /// </summary>
+    /// <remarks>
+    ///     The consequence differs between the two shapes, and the difference is the point of covering
+    ///     <c>Add</c> at all: <c>InlineSuitePlan.TryAddress</c> refuses the <i>whole suite</i> on the
+    ///     first body it cannot address, so one capturing lambda takes every sibling benchmark
+    ///     in-process with it. A reader told only "this body" would under-read it.
+    /// </remarks>
+    private static (string Target, string Consequence)? DescribeTarget(IMethodSymbol method)
+    {
+        var containingType = method.ContainingType?.ToDisplayString();
+
+        if (containingType == BenchmarkClassName && TargetMethodNames.Contains(method.Name))
+        {
+            return ($"Benchmark.{method.Name}",
+                "This body is measured in this process instead; to isolate it, move the captured "
+                + "state inside the lambda or use a [Benchmark] class.");
+        }
+
+        if (containingType == SuiteClassName && method.Name == "Add")
+        {
+            return ("BenchmarkSuite.Add",
+                "The whole suite falls back to this process, not just this benchmark; to isolate it, "
+                + "remove the capture or move the suite into a static [BenchmarkPlan] factory so the "
+                + "worker builds that state itself.");
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    ///     The lambda supplied as the measured body, matched to its parameter rather than to an
+    ///     argument position so that named arguments and <c>Add</c>'s trailing delegates behave.
+    /// </summary>
+    private static LambdaExpressionSyntax? FindBody(InvocationExpressionSyntax invocation, IMethodSymbol method)
+    {
+        var arguments = invocation.ArgumentList.Arguments;
+
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            if (arguments[i].Expression is not LambdaExpressionSyntax lambda)
+                continue;
+
+            var parameterName = arguments[i].NameColon?.Name.Identifier.ValueText
+                                ?? (i < method.Parameters.Length ? method.Parameters[i].Name : null);
+
+            if (parameterName == BodyParameterName)
+                return lambda;
+        }
+
+        return null;
+    }
+
+    private static bool HasParameters(LambdaExpressionSyntax lambda)
+        => lambda switch
+        {
+            SimpleLambdaExpressionSyntax => true,
+            ParenthesizedLambdaExpressionSyntax parenthesized => parenthesized.ParameterList.Parameters.Count > 0,
+            _ => false,
+        };
 
     /// <summary>
     ///     Names what <paramref name="lambda" /> captures, or <c>null</c> when it captures nothing.
@@ -121,7 +204,16 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
         if (flow is null || !flow.Succeeded)
             return null;
 
+        // `Captured` is scoped to the enclosing statement, not to the analyzed region: for
+        // `.Add("A", () => Sort(data)).Add("B", () => Sort(own))` it lists `data` for *both* lambdas.
+        // Intersecting with the region's own read/write sets narrows it back to this lambda, which is
+        // what makes the per-lambda claim in the type-level remarks true for a fluent chain. Latent
+        // before `Add` was covered, because a Run call carries one lambda per statement.
+        var touched = new HashSet<ISymbol>(flow.ReadInside, SymbolEqualityComparer.Default);
+        touched.UnionWith(flow.WrittenInside);
+
         var names = flow.Captured
+            .Where(touched.Contains)
             .Where(symbol => !IsOwnParameter(symbol, lambda))
             .Select(DescribeSymbol)
             .Where(name => name is not null)

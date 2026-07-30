@@ -33,7 +33,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that may hold per-instance state (any non-primitive, non-ambient reference type), which can leak warmed state across benchmark methods. |
 | NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method has both `[BenchmarkCase]` and `[BenchmarkCases]`. Use one or the other. |
 | NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a mutable instance field that is read or written by at least two `[Benchmark]` methods, which can leak warmed state across methods. |
-| NB0014 | Benchmark body captures state and cannot be isolated | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, or `Benchmark.RunRawAsync()` captures a local, a parameter, or `this`. Captured state cannot cross a process boundary, so the body is measured in the host process instead of an isolated worker. |
+| NB0014 | Benchmark body captures state and cannot be isolated | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, `Benchmark.RunRawAsync()` or `BenchmarkSuite.Add()` captures a local, a parameter, or `this`. Captured state cannot cross a process boundary, so the body is measured in the host process instead of an isolated worker - and for a suite, so is every other benchmark in it. |
 
 ### NB0001 - Missing parameterless constructor
 
@@ -268,7 +268,25 @@ The runtime already reports this after the fact, in the `Iso` column and the iso
 
 **It is `Info`, not a warning**, because capturing is the idiomatic way to benchmark over prepared data. Warning on it would push you towards contorted code to silence a build. What it costs is fidelity, not correctness.
 
-**Scope:** only the `Benchmark.Run*` family. A capturing lambda passed to `BenchmarkSuite.Add(...)` is refused for isolation by the same rule at run time, and reported the same way, but there is no compile-time diagnostic for it yet.
+**Scope:** the `Benchmark.Run*` family and `BenchmarkSuite.Add(...)`.
+
+`Add` is where capture reads as most idiomatic, and where it costs most. A suite is addressed as a *set* - one worker measures all of its bodies - so the first body that cannot be addressed takes every sibling in-process with it, including the ones that would have isolated fine on their own. The message says so:
+
+```csharp
+var data = BuildInput();
+
+await new BenchmarkSuite("Sorting")
+    // Info NB0014: captures 'data' - the whole suite falls back to this process
+    .Add("Sort", () => Array.Sort(data))
+    .Add("Own", () => { var own = BuildInput(); Array.Sort(own); })
+    .RunAsync();
+```
+
+One diagnostic is reported per capturing body, and none on a self-contained sibling - so a suite mixing the two shows exactly which bodies to change.
+
+**Parameterized `Add` overloads are silent.** A suite carrying `WithParameter(...)` is refused isolation for the parameter values themselves, which exist only in your process, whether or not any body captures. A capture diagnostic there would name a cause whose removal would not restore isolation; the runtime says the operative one. The remedy for both is a static `[BenchmarkPlan]` factory, so the worker produces the parameter values itself.
+
+The `setup:` and `teardown:` delegates on `Add` are not reported either. They are not measured bodies, and a suite with per-iteration lifecycle is refused isolation for having delegates on the wrong side of the boundary at all.
 
 To isolate the body, move the state inside it:
 
