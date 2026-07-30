@@ -44,7 +44,7 @@ public sealed class TestMeasurementTests
     public async Task PlainTest_IsMeasuredInAWorker()
     {
         var measured = await TestMeasurement.MeasureAsync(
-            Method<PlainSubject>(nameof(PlainSubject.Work)), new PlainSubject(), [], "Plain.Work", Fast());
+            Method<PlainSubject>(nameof(PlainSubject.Work)), new PlainSubject(), [], "Plain.Work", Fast(), LaunchCounts.Single);
 
         Assert.Null(measured.Refusal);
         Assert.Equal(IsolationStatus.Isolated, measured.Result.IsolationStatus);
@@ -67,7 +67,8 @@ public sealed class TestMeasurementTests
             new FixtureSubject(new Fixture()),
             [],
             "Fixture.Work",
-            Fast());
+            Fast(),
+            LaunchCounts.Single);
 
         Assert.Equal(IsolationStatus.InProcessLiveFixture, measured.Result.IsolationStatus);
         Assert.NotNull(measured.Refusal);
@@ -89,7 +90,8 @@ public sealed class TestMeasurementTests
             new PlainSubject(),
             [new System.Text.StringBuilder("x")],
             "Plain.WorkWith",
-            Fast());
+            Fast(),
+            LaunchCounts.Single);
 
         Assert.NotEqual(IsolationStatus.Isolated, measured.Result.IsolationStatus);
         Assert.NotNull(measured.Refusal);
@@ -101,7 +103,7 @@ public sealed class TestMeasurementTests
     public async Task TestWithSimpleArguments_IsMeasuredInAWorker()
     {
         var measured = await TestMeasurement.MeasureAsync(
-            Method<PlainSubject>(nameof(PlainSubject.Spin)), new PlainSubject(), [500], "Plain.Spin(500)", Fast());
+            Method<PlainSubject>(nameof(PlainSubject.Spin)), new PlainSubject(), [500], "Plain.Spin(500)", Fast(), LaunchCounts.Single);
 
         Assert.Null(measured.Refusal);
         Assert.Equal(IsolationStatus.Isolated, measured.Result.IsolationStatus);
@@ -121,7 +123,8 @@ public sealed class TestMeasurementTests
             new PlainSubject(),
             [],
             "Plain.DelayAsync",
-            new RunSpec { Options = spec.Options with { Iterations = 3, WarmupIterations = 0 } });
+            new RunSpec { Options = spec.Options with { Iterations = 3, WarmupIterations = 0 } },
+            LaunchCounts.Single);
 
         Assert.Equal(IsolationStatus.Isolated, measured.Result.IsolationStatus);
 
@@ -150,7 +153,8 @@ public sealed class TestMeasurementTests
             new TestMeasurement.Target(
                 Method<PlainSubject>(nameof(PlainSubject.Spin)), [500], "Plain.Spin(500)"),
             new PlainSubject(),
-            new RunSpec { Options = spec.Options with { LaunchCount = 3 } });
+            spec,
+            launchCount: 3);
 
         Assert.Null(pair.Candidate.Refusal);
         Assert.Equal(IsolationStatus.Isolated, pair.Candidate.Result.IsolationStatus);
@@ -179,7 +183,8 @@ public sealed class TestMeasurementTests
             new TestMeasurement.Target(
                 Method<PlainSubject>(nameof(PlainSubject.Spin)), [500], "Plain.Spin(500)"),
             new PlainSubject(),
-            Fast());
+            Fast(),
+            LaunchCounts.Single);
 
         Assert.Null(pair.Candidate.Refusal);
         Assert.Null(pair.PairedRatio);
@@ -202,7 +207,8 @@ public sealed class TestMeasurementTests
             new TestMeasurement.Target(
                 Method<FixtureSubject>(nameof(FixtureSubject.Other)), [], "Fixture.Other"),
             new FixtureSubject(new Fixture()),
-            new RunSpec { Options = spec.Options with { LaunchCount = 3 } });
+            spec,
+            launchCount: 3);
 
         Assert.NotNull(pair.Candidate.Refusal);
         Assert.Contains("Fixture", pair.Candidate.Refusal);

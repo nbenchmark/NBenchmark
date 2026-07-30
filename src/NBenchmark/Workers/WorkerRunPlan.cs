@@ -183,9 +183,7 @@ internal static class WorkerRunPlan
             DeclaringTypeFullName = declaringType.FullName,
             BenchmarkNames = benchmarkNames,
 
-            // LaunchCount is the replicate count and is spent by the coordinator spawning workers,
-            // so each worker measures exactly once. Leaving it above 1 here would multiply the two.
-            Options = options with { LaunchCount = 1 },
+            Options = options,
             OutlierDetectorTypeName = outlierDetectorTypeName,
             SignificanceTestTypeName = significanceTestTypeName,
             Order = order,

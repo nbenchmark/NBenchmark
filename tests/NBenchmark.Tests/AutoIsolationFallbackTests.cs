@@ -176,8 +176,10 @@ public class AutoIsolationFallbackTests
         Assert.Equal(3, scope.Launcher.Requests.Count);
         Assert.All(scope.Launcher.Requests, r => Assert.Equal(RunOrder.Random, r.Order));
 
-        // Each worker measures once; LaunchCount is spent on workers, not repeated inside one.
-        Assert.All(scope.Launcher.Requests, r => Assert.Equal(1, r.Options.LaunchCount));
+        // Each worker measures once. The request has no launch count on it to say otherwise - the
+        // replicate count is spent here, by launching, and never travels - so what is left to check is
+        // that three distinct requests were made rather than one asking for three passes.
+        Assert.Equal(3, scope.Launcher.Requests.Select(r => r.GroupId).Distinct().Count());
 
         // With no pinned session seed, each replicate picks its own order in the worker, so the
         // request carries no seed. Seed derivation itself is covered directly below.

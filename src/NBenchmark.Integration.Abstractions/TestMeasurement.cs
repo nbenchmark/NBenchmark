@@ -72,8 +72,8 @@ public static class TestMeasurement
     ///         The reason this exists as one call rather than two: a ratio between two measurements taken
     ///         in different processes carries both processes' differences in it. Measured in one worker per
     ///         replicate, the pair's ratio has that worker's core draw, thermal state and address-space
-    ///         layout divided out - and with
-    ///         <see cref="IPerformanceThresholds.LaunchCount" /> above one, the spread of those
+    ///         layout divided out - and with <paramref name="launchCount" /> (that is,
+    ///         <see cref="IPerformanceThresholds.LaunchCount" />) above one, the spread of those
     ///         per-replicate ratios becomes the interval a gate can be judged against. It is also half the
     ///         work: <i>n</i> workers rather than <i>2n</i>.
     ///     </para>
@@ -88,11 +88,18 @@ public static class TestMeasurement
     ///     The method to compare against, or <c>null</c> when the test names none - in which case this is
     ///     an ordinary single measurement and the gate divides by the calibration standard instead.
     /// </param>
+    /// <param name="launchCount">
+    ///     How many replicates to measure, one worker each. Passed separately from
+    ///     <paramref name="runSpec" /> because a launch is a process rather than a property of a
+    ///     measurement - see <see cref="LaunchCounts" />. Above one is what produces
+    ///     <see cref="MeasuredPair.PairedRatio" />.
+    /// </param>
     public static async Task<MeasuredPair> MeasurePairAsync(
         Target candidate,
         Target? reference,
         object? instance,
         RunSpec runSpec,
+        int launchCount,
         CancellationToken cancellationToken = default,
         bool measureCalibration = false)
     {
@@ -102,7 +109,7 @@ public static class TestMeasurement
         {
             var single = await MeasureAsync(
                     candidate.Method, instance, candidate.Arguments, candidate.Name, runSpec,
-                    cancellationToken, measureCalibration)
+                    launchCount, cancellationToken, measureCalibration)
                 .ConfigureAwait(false);
 
             return new MeasuredPair(single, null);
@@ -120,7 +127,7 @@ public static class TestMeasurement
         if (refusal is null)
         {
             var outcome = await TestMethodRunner
-                .RunAsync(subjects, runSpec.Options, cancellationToken, measureCalibration)
+                .RunAsync(subjects, runSpec.Options, launchCount, cancellationToken, measureCalibration)
                 .ConfigureAwait(false);
 
             if (outcome.Measurements.Count == subjects.Length)
@@ -188,6 +195,7 @@ public static class TestMeasurement
         object?[] args,
         string name,
         RunSpec runSpec,
+        int launchCount,
         CancellationToken cancellationToken = default,
         bool measureCalibration = false)
     {
@@ -206,7 +214,7 @@ public static class TestMeasurement
         if (refusal is null)
         {
             var outcome = await TestMethodRunner
-                .RunAsync(method, args, name, runSpec.Options, cancellationToken, measureCalibration)
+                .RunAsync(method, args, name, runSpec.Options, launchCount, cancellationToken, measureCalibration)
                 .ConfigureAwait(false);
 
             if (outcome.Measured)

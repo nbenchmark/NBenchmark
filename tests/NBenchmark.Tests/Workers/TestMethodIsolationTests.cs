@@ -44,7 +44,7 @@ public sealed class TestMethodIsolationTests : IDisposable
     public async Task PlainTestMethod_IsMeasuredInAWorker()
     {
         var outcome = await TestMethodRunner.RunAsync(
-            Method(nameof(SubjectTests.Fast)), [], "SubjectTests.Fast", Fast());
+            Method(nameof(SubjectTests.Fast)), [], "SubjectTests.Fast", Fast(), LaunchCounts.Single);
 
         Assert.True(outcome.Measured, outcome.Refusal);
         Assert.False(outcome.Result!.Errored, outcome.Result.ErrorMessage);
@@ -67,7 +67,7 @@ public sealed class TestMethodIsolationTests : IDisposable
     public async Task StaticTestMethod_IsMeasuredInAWorker()
     {
         var outcome = await TestMethodRunner.RunAsync(
-            Method(nameof(SubjectTests.FastStatic)), [], "SubjectTests.FastStatic", Fast());
+            Method(nameof(SubjectTests.FastStatic)), [], "SubjectTests.FastStatic", Fast(), LaunchCounts.Single);
 
         Assert.True(outcome.Measured, outcome.Refusal);
         Assert.False(outcome.Result!.Errored, outcome.Result.ErrorMessage);
@@ -81,10 +81,10 @@ public sealed class TestMethodIsolationTests : IDisposable
     public async Task ParameterizedTestMethod_MeasuresTheDeclaredArguments()
     {
         var cheap = await TestMethodRunner.RunAsync(
-            Method(nameof(SubjectTests.Spin)), [200], "Spin(200)", Fast());
+            Method(nameof(SubjectTests.Spin)), [200], "Spin(200)", Fast(), LaunchCounts.Single);
 
         var costly = await TestMethodRunner.RunAsync(
-            Method(nameof(SubjectTests.Spin)), [20_000], "Spin(20000)", Fast());
+            Method(nameof(SubjectTests.Spin)), [20_000], "Spin(20000)", Fast(), LaunchCounts.Single);
 
         Assert.True(cheap.Measured, cheap.Refusal);
         Assert.True(costly.Measured, costly.Refusal);
@@ -103,7 +103,7 @@ public sealed class TestMethodIsolationTests : IDisposable
     public async Task WideningArgument_BindsToTheDeclaredParameterType()
     {
         var outcome = await TestMethodRunner.RunAsync(
-            Method(nameof(SubjectTests.TakesLong)), [1], "TakesLong(1)", Fast());
+            Method(nameof(SubjectTests.TakesLong)), [1], "TakesLong(1)", Fast(), LaunchCounts.Single);
 
         Assert.True(outcome.Measured, outcome.Refusal);
         Assert.False(outcome.Result!.Errored, outcome.Result.ErrorMessage);
@@ -114,7 +114,7 @@ public sealed class TestMethodIsolationTests : IDisposable
     public async Task EnumArgument_RoundTrips()
     {
         var outcome = await TestMethodRunner.RunAsync(
-            Method(nameof(SubjectTests.TakesEnum)), [Choice.Second], "TakesEnum(Second)", Fast());
+            Method(nameof(SubjectTests.TakesEnum)), [Choice.Second], "TakesEnum(Second)", Fast(), LaunchCounts.Single);
 
         Assert.True(outcome.Measured, outcome.Refusal);
         Assert.False(outcome.Result!.Errored, outcome.Result.ErrorMessage);
@@ -139,11 +139,13 @@ public sealed class TestMethodIsolationTests : IDisposable
     public async Task AsyncTestMethod_IsAwaitedInTheWorker()
     {
         var outcome = await TestMethodRunner.RunAsync(
-            Method(nameof(SubjectTests.DelayAsync)), [], "SubjectTests.DelayAsync", Fast() with
+            Method(nameof(SubjectTests.DelayAsync)), [], "SubjectTests.DelayAsync",
+            Fast() with
             {
                 Iterations = 3,
                 WarmupIterations = 0,
-            });
+            },
+            LaunchCounts.Single);
 
         Assert.True(outcome.Measured, outcome.Refusal);
         Assert.False(outcome.Result!.Errored, outcome.Result.ErrorMessage);
@@ -179,7 +181,8 @@ public sealed class TestMethodIsolationTests : IDisposable
                 new TestMethodRunner.Subject(Method(nameof(SubjectTests.Spin)), [20_000], "Spin(20000)"),
                 new TestMethodRunner.Subject(Method(nameof(SubjectTests.Spin)), [2_000], "Spin(2000)"),
             ],
-            Fast() with { LaunchCount = 3 });
+            Fast(),
+            launchCount: 3);
 
         Assert.True(outcome.Measured, outcome.Refusal);
         Assert.Equal(2, outcome.Measurements.Count);

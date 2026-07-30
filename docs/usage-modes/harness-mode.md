@@ -319,7 +319,7 @@ Use the `--runtimes` CLI flag (or the `[Runtimes]` attribute) to run the same be
 
 ## Multiple launches
 
-Use `--launch-count <n>` on the CLI (or `WithOptions(new MeasurementOptions { LaunchCount = n })` in code) to run each benchmark N times as independent launches. See [Multiple launches](../features/multiple-launches.md) for the full guide, including per-method attribute overrides and isolation interaction.
+Use `--launch-count <n>` on the CLI (or `WithLaunchCount(n)` in code) to run each benchmark N times as independent launches. See [Multiple launches](../features/multiple-launches.md) for the full guide, including per-method attribute overrides and isolation interaction.
 
 ## Category filtering
 

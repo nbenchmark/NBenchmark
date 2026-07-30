@@ -24,7 +24,6 @@ public sealed class RealWorkerTests
         Iterations = 24,
         WarmupIterations = 2,
         OpsPerSample = 1,
-        LaunchCount = 1,
         AutoTune = AutoTuneOptions.Default with
         {
             MaxTuningTime = TimeSpan.FromSeconds(5),

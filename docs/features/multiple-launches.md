@@ -46,13 +46,15 @@ await new BenchmarkSuite("sorting")
 dotnet run -- --launch-count 5
 ```
 
-Or in code via `WithOptions`:
+Or in code via `WithLaunchCount`:
 
 ```csharp
 BenchmarkHarness.Create(args)
-    .WithOptions(new MeasurementOptions { LaunchCount = 5 })
+    .WithLaunchCount(5)
     .RunAsync();
 ```
+
+The launch count is **not** a field on `MeasurementOptions`, so `WithOptions` cannot carry one. A launch is a process: the count is spent by the coordinator launching workers, and a worker - which measures exactly once - is never sent it. See [why](../reference/configuration.md#launchcount).
 
 ## Per-method attribute override
 
@@ -88,13 +90,13 @@ public class MyBenchmarks
 
 ## Dry-run interaction
 
-When `--dry-run` (Iterations=0, WarmupIterations=0) is combined with `LaunchCount > 1`, exactly one dry launch is performed. Extra launches would not add information since dry runs skip the body.
+`--dry-run` (Iterations=0, WarmupIterations=0) takes neither the harness default nor `--launch-count`, so exactly one dry launch is performed. Extra launches would not add information since dry runs skip the body. An explicit `WithLaunchCount(n)` in code is still honoured.
 
 ## Isolation interaction
 
-In isolated mode (the Harness mode default), the parent spawns N child processes per isolated group. The child process is unaware of the launch count; the parent orchestrates the repeats. Per-method attribute overrides are respected: the parent uses the maximum launch count across all benchmarks in the group so that every benchmark receives at least the launches it requested.
+In isolated mode (the Harness mode default), the coordinator spawns N worker processes per isolated group. A worker is not merely unaware of the launch count - it is never sent one, so it cannot repeat the measurement internally and report within-process precision as though it were reproducibility. Per-method attribute overrides are respected: the coordinator uses the maximum launch count across all benchmarks in the group so that every benchmark receives at least the launches it requested.
 
-In Suite mode the suite repeats in a fresh worker process per launch. The worker is unaware of the launch count; the coordinator orchestrates the repeats, which is what makes the spread between them a run-to-run reproducibility estimate.
+In Suite mode the suite repeats in a fresh worker process per launch. The coordinator orchestrates the repeats, which is what makes the spread between them a run-to-run reproducibility estimate. This matters most on the `[BenchmarkPlan]` path, where the user's factory runs in the coordinator *and* in every worker: the worker's copy of the suite carries the same `WithLaunchCount(3)`, and the worker's measurement path does not read it.
 
 ## Test-integration interaction
 

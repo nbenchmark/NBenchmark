@@ -179,17 +179,52 @@ public class BenchmarkHarnessCliTests
         Assert.All(results, r =>
         {
             Assert.NotNull(r.LaunchStatistics);
-            Assert.Equal(BenchmarkHarness.DefaultHarnessLaunchCount, r.LaunchStatistics!.LaunchCount);
+            Assert.Equal(LaunchCounts.HarnessDefault, r.LaunchStatistics!.LaunchCount);
         });
     }
 
+    /// <summary>
+    ///     <c>WithOptions</c> says nothing about how many launches to spend, so the harness default
+    ///     still applies. Only <c>WithLaunchCount</c> - or the flag - suppresses it.
+    /// </summary>
+    /// <remarks>
+    ///     This used to go the other way: a launch count lived on <see cref="MeasurementOptions" />, so
+    ///     handing the harness any options object was read as choosing one, and
+    ///     <c>WithRuntimeProfile</c> silently did the same thing for the same reason. Neither call has
+    ///     an opinion on replicates, and now neither is treated as having one.
+    /// </remarks>
     [Fact]
-    public async Task RunAsync_WithOptions_Suppresses_Harness_Default_MultiLaunch()
+    public async Task RunAsync_WithOptions_Keeps_The_Harness_Default_MultiLaunch()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithOptions(MeasurementOptions.Default with { Iterations = 1, WarmupIterations = 0 })
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync()
+        );
+
+        Assert.Equal(2, results.Count);
+
+        Assert.All(results, r =>
+        {
+            Assert.NotNull(r.LaunchStatistics);
+            Assert.Equal(LaunchCounts.HarnessDefault, r.LaunchStatistics!.LaunchCount);
+        });
+    }
+
+    /// <summary>
+    ///     <c>WithLaunchCount(1)</c> is how a caller opts out of the harness default.
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_WithLaunchCount_One_Suppresses_Harness_Default_MultiLaunch()
+    {
+        var results = await CaptureConsoleOutputAsync(async () =>
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*"])
+                .AddFromAssembly<TestBenchmarks>()
+                .WithOptions(MeasurementOptions.Default with { Iterations = 1, WarmupIterations = 0 })
+                .WithLaunchCount(LaunchCounts.Single)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync()

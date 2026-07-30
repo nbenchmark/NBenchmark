@@ -13,19 +13,6 @@ namespace NBenchmark;
 
 public sealed class BenchmarkHarness
 {
-    /// <summary>
-    ///     The default number of launches each benchmark runs when the user has not pinned
-    ///     <see cref="MeasurementOptions.LaunchCount" /> via <see cref="WithLaunchCount" />,
-    ///     <see cref="WithOptions" />, the <c>--launch-count</c> CLI flag, or a
-    ///     <c>[Benchmark(LaunchCount = ...)]</c> attribute. Harness mode defaults to multiple
-    ///     launches so the launch-aggregation table - the honest view of run-to-run variance
-    ///     from process-level effects (ASLR, scheduler placement, tiered JIT) - is surfaced
-    ///     without users having to opt in. Single mode (<see cref="Benchmark.Run" />) and
-    ///     <see cref="BenchmarkSuite" /> are unaffected: they keep <c>LaunchCount = 1</c>
-    ///     unless the caller raises it.
-    /// </summary>
-    internal const int DefaultHarnessLaunchCount = 3;
-
     private readonly List<Assembly> _assemblies = [];
     private readonly List<string> _categoryFilterExclude = [];
     private readonly List<string> _categoryFilterInclude = [];
@@ -37,9 +24,15 @@ public sealed class BenchmarkHarness
     private ReportDetail _detail;
     private Func<Type, InstanceHandle>? _instanceFactory;
     private bool _isolationEnabled = true;
-    private bool _launchCountExplicit;
+
+    /// <summary>
+    ///     The launch count the caller pinned, or <c>null</c> for "not pinned" - which is what
+    ///     <see cref="LaunchCounts.HarnessDefault" /> fills in. A separate field rather than a value on
+    ///     <see cref="_options" /> because a launch is a <i>process</i>, spent here; see
+    ///     <see cref="LaunchCounts" />.
+    /// </summary>
+    private int? _launchCount;
     private MeasurementOptions _options = MeasurementOptions.Default;
-    private bool _optionsExplicitlySet;
     private bool _noSamples;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
@@ -52,20 +45,25 @@ public sealed class BenchmarkHarness
     internal Action? PostSuiteCleanup { get; set; }
 
     /// <summary>
-    ///     The effective base options with the harness-mode launch-count default applied.
-    ///     When the user has not pinned <see cref="MeasurementOptions.LaunchCount" /> via
-    ///     <see cref="WithLaunchCount" />, <see cref="WithOptions" />, or
-    ///     <c>--launch-count</c>, harness mode defaults to
-    ///     <see cref="DefaultHarnessLaunchCount" /> so the launch-aggregation table surfaces
-    ///     run-to-run variance without opt-in. Calling <see cref="WithOptions" /> with any
-    ///     options object (even one where <c>LaunchCount</c> happens to be 1) is treated as
-    ///     an explicit choice and suppresses the default. The CLI flag is layered on top by
-    ///     <see cref="MergeCliOptions" /> at the call sites, so a CLI override still wins.
+    ///     How many launches - that is, how many worker processes - each benchmark gets, before any
+    ///     per-method <c>[Benchmark(LaunchCount = ...)]</c> override is layered on top.
+    ///     <para>
+    ///         <c>--launch-count</c> wins over <see cref="WithLaunchCount" />, and with neither set
+    ///         harness mode launches <see cref="LaunchCounts.HarnessDefault" /> times so the
+    ///         launch-aggregation view surfaces run-to-run variance without opt-in.
+    ///         <see cref="WithOptions" /> has no say here, because a launch count is not a
+    ///         measurement option - see <see cref="LaunchCounts" />.
+    ///     </para>
+    ///     <para>
+    ///         A dry run takes neither the default nor the flag: it exists to prove the wiring works
+    ///         without measuring anything, so repeating it in three processes would be three times the
+    ///         startup cost for the same nothing.
+    ///     </para>
     /// </summary>
-    private MeasurementOptions EffectiveBaseOptions
-        => _launchCountExplicit || _optionsExplicitlySet || _cliArgs.LaunchCount.HasValue
-            ? _options
-            : _options with { LaunchCount = DefaultHarnessLaunchCount };
+    private int EffectiveLaunchCount
+        => _cliArgs.DryRun
+            ? _launchCount ?? LaunchCounts.Single
+            : _cliArgs.LaunchCount ?? _launchCount ?? LaunchCounts.HarnessDefault;
 
     /// <summary>
     ///     The options an isolated child should be launched under, with CLI overrides merged in.
@@ -74,7 +72,7 @@ public sealed class BenchmarkHarness
     ///     work out for itself (no user arguments are forwarded, and runtime knobs are fixed before
     ///     any managed code runs).
     /// </summary>
-    private MeasurementOptions ChildLaunchOptions => MergeCliOptions(EffectiveBaseOptions, _cliArgs);
+    private MeasurementOptions ChildLaunchOptions => MergeCliOptions(_options, _cliArgs);
 
     public static BenchmarkHarness Create(string[] args)
     {
@@ -125,31 +123,29 @@ public sealed class BenchmarkHarness
     public BenchmarkHarness WithOptions(MeasurementOptions options)
     {
         _options = options;
-        _optionsExplicitlySet = true;
         return this;
     }
 
     /// <summary>
-    ///     Pins the number of times each benchmark repeats as an independent launch. Each
-    ///     launch gets its own warmup and measurement pass; the per-launch medians are
-    ///     aggregated into a launch-level confidence interval that surfaces run-to-run
-    ///     variance from process-level effects (ASLR, scheduler placement, tiered JIT).
+    ///     Pins the number of times each benchmark repeats as an independent launch - one worker
+    ///     process each, with its own warmup and measurement pass. The per-launch medians are
+    ///     aggregated into a launch-level confidence interval that surfaces run-to-run variance from
+    ///     process-level effects (ASLR, scheduler placement, tiered JIT).
     ///     <para>
-    ///         When unset, harness mode defaults to <see cref="DefaultHarnessLaunchCount" />
-    ///         so the launch-aggregation table is shown without opt-in. Set to 1 to restore
-    ///         single-launch behaviour.
+    ///         When unset, harness mode launches <see cref="LaunchCounts.HarnessDefault" /> times so
+    ///         the launch-aggregation table is shown without opt-in. Pass
+    ///         <see cref="LaunchCounts.Single" /> to restore single-launch behaviour.
     ///     </para>
     /// </summary>
     public BenchmarkHarness WithLaunchCount(int count)
     {
-        if (count is < 1 or > MeasurementOptions.MaxLaunchCount)
+        if (!LaunchCounts.IsValid(count))
         {
             throw new ArgumentOutOfRangeException(nameof(count), count,
-                $"LaunchCount must be between 1 and {MeasurementOptions.MaxLaunchCount}.");
+                $"LaunchCount must be between {LaunchCounts.Single} and {LaunchCounts.Max}.");
         }
 
-        _options = _options with { LaunchCount = count };
-        _launchCountExplicit = true;
+        _launchCount = count;
         return this;
     }
 
@@ -420,7 +416,6 @@ public sealed class BenchmarkHarness
     {
         ArgumentNullException.ThrowIfNull(profile);
         _options = _options with { RuntimeProfile = profile };
-        _optionsExplicitlySet = true;
         return this;
     }
 
@@ -681,7 +676,7 @@ public sealed class BenchmarkHarness
 
         var suiteOptions = _cliArgs.DryRun
             ? _options with { Iterations = 0, WarmupIterations = 0 }
-            : MergeCliOptions(EffectiveBaseOptions, _cliArgs);
+            : MergeCliOptions(_options, _cliArgs);
 
         // Apply opt-in hardware/OS controls (CPU affinity, process priority, dedicated-host
         // guidance) for the duration of the run. The scope restores the prior process state on
@@ -929,7 +924,7 @@ public sealed class BenchmarkHarness
 
         var suiteOptions = _cliArgs.DryRun
             ? _options with { Iterations = 0, WarmupIterations = 0 }
-            : MergeCliOptions(EffectiveBaseOptions, _cliArgs);
+            : MergeCliOptions(_options, _cliArgs);
 
         // Apply opt-in hardware/OS controls to this process for the duration of the multi-runtime
         // run, mirroring the single-runtime path. Each worker applies the same settings to itself
@@ -1101,10 +1096,11 @@ public sealed class BenchmarkHarness
                 DisplayPrefix = suite.Type.Name,
                 BenchmarkNames = displayNames,
 
-                // One worker per (runtime x class), so this worker measures once - the same invariant
-                // every other request path pins, and leaving it unpinned here made this the one place
-                // a worker could be asked to spend replicates it has no way to report separately.
-                Options = options with { LaunchCount = 1 },
+                // One worker per (runtime x class), so this worker measures once. A multi-runtime run
+                // spends no replicates: the comparison it exists to make is between frameworks, and a
+                // launch count multiplied by the runtime count would be a different, longer run than
+                // the one asked for.
+                Options = options,
                 OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
                 SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
                 Order = _cliArgs.RunOrder ?? _runOrder,
@@ -1375,12 +1371,15 @@ public sealed class BenchmarkHarness
                 ? () => ((IStateReset)instance).ResetAsync(cancellationToken)
                 : null;
 
-            var effectiveClassLaunchCount = suiteOptions.LaunchCount;
+            var effectiveClassLaunchCount = EffectiveLaunchCount;
 
+            // Clamped, because an attribute argument is a compile-time constant nothing else validates -
+            // the fluent builders and the CLI parser reject an out-of-range count, and this is the one
+            // path where a typo could ask for ten thousand launches.
             foreach (var b in suite.Benchmarks)
             {
-                if (b.Attribute.HasLaunchCountOverride && b.Attribute.LaunchCount > effectiveClassLaunchCount)
-                    effectiveClassLaunchCount = b.Attribute.LaunchCount;
+                if (b.Attribute.HasLaunchCountOverride)
+                    effectiveClassLaunchCount = Math.Max(effectiveClassLaunchCount, LaunchCounts.Clamp(b.Attribute.LaunchCount));
             }
 
             if (effectiveClassLaunchCount > 1)
@@ -1479,8 +1478,8 @@ public sealed class BenchmarkHarness
                 var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
 
                 var perMethodLaunchCount = benchmark.Attribute.HasLaunchCountOverride
-                    ? benchmark.Attribute.LaunchCount
-                    : suiteOptions.LaunchCount;
+                    ? LaunchCounts.Clamp(benchmark.Attribute.LaunchCount)
+                    : EffectiveLaunchCount;
 
                 if (perMethodLaunchCount > 1)
                 {
@@ -1672,14 +1671,14 @@ public sealed class BenchmarkHarness
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
-        var effectiveLaunchCount = _cliArgs.LaunchCount ?? EffectiveBaseOptions.LaunchCount;
+        var effectiveLaunchCount = EffectiveLaunchCount;
 
         // Check per-benchmark attribute overrides; take the maximum so all
         // benchmarks in the group get enough launches for their overrides.
         foreach (var b in benchmarks)
         {
-            if (b.Attribute.HasLaunchCountOverride && b.Attribute.LaunchCount > effectiveLaunchCount)
-                effectiveLaunchCount = b.Attribute.LaunchCount;
+            if (b.Attribute.HasLaunchCountOverride)
+                effectiveLaunchCount = Math.Max(effectiveLaunchCount, LaunchCounts.Clamp(b.Attribute.LaunchCount));
         }
 
         var options = ChildLaunchOptions;

@@ -727,9 +727,8 @@ public record BenchmarkRow
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     /// <summary>
-    ///     Cross-launch summary when the benchmark was run with
-    ///     <see cref="MeasurementOptions.LaunchCount" /> > 1. <c>null</c> for
-    ///     single-launch runs. Reporters can display this to explain
+    ///     Cross-launch summary when the benchmark was run with a launch count above one.
+    ///     <c>null</c> for single-launch runs. Reporters can display this to explain
     ///     between-launch variance.
     /// </summary>
     public LaunchStatistics? LaunchStatistics { get; init; }

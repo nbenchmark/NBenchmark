@@ -37,6 +37,13 @@ public sealed class BenchmarkSuite(string name)
 
     /// <summary>The session shuffle seed, so each replicate worker gets a distinct run order.</summary>
     private int? _seed;
+
+    /// <summary>
+    ///     How many launches this suite asked for. A field rather than a value on
+    ///     <see cref="_options" /> because a launch is a <i>process</i>, spent by whoever coordinates
+    ///     this suite's run and meaningless to a worker measuring it - see <see cref="LaunchCounts" />.
+    /// </summary>
+    private int _launchCount = LaunchCounts.Single;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private string[]? _pendingCategories;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
@@ -460,13 +467,19 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Repeats every benchmark in this suite across multiple launches and aggregates
-    ///     the per-launch results into cross-launch summary statistics.
-    ///     Pass 1 (the default) for standard single-launch measurement.
+    ///     Repeats every benchmark in this suite across multiple launches - one worker process each -
+    ///     and aggregates the per-launch results into cross-launch summary statistics.
+    ///     Pass <see cref="LaunchCounts.Single" /> (the default) for standard single-launch measurement.
     /// </summary>
     public BenchmarkSuite WithLaunchCount(int count)
     {
-        _options = _options with { LaunchCount = count };
+        if (!LaunchCounts.IsValid(count))
+        {
+            throw new ArgumentOutOfRangeException(nameof(count), count,
+                $"LaunchCount must be between {LaunchCounts.Single} and {LaunchCounts.Max}.");
+        }
+
+        _launchCount = count;
         return this;
     }
 
@@ -1190,7 +1203,7 @@ public sealed class BenchmarkSuite(string name)
             return null;
         }
 
-        var replicates = Math.Max(1, _options.LaunchCount);
+        var replicates = _launchCount;
         var timeout = MeasurementBudget.For(_options, decision.Bodies.Count);
 
         var perReplicate = new List<IReadOnlyList<BenchmarkResult>>(replicates);
@@ -1298,12 +1311,12 @@ public sealed class BenchmarkSuite(string name)
             {
                 var effectiveOrder = _parameterDefs.Count > 0 ? RunOrder.Declaration : order;
 
-                if (_options.LaunchCount > 1)
+                if (_launchCount > 1)
                 {
                     var allLaunchResults = new List<IReadOnlyList<BenchmarkResult>>();
                     var allLaunchSamples = new List<Dictionary<string, double[]>>();
 
-                    for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
+                    for (var launchIdx = 0; launchIdx < _launchCount; launchIdx++)
                     {
                         var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
 
@@ -1387,9 +1400,9 @@ public sealed class BenchmarkSuite(string name)
     ///     </para>
     ///     <para>
     ///         Reporters and significance stay with the coordinator, which owns presentation and can
-    ///         see all replicates. <see cref="MeasurementOptions.LaunchCount" /> is ignored here for
-    ///         the same reason: the coordinator spends it on replicate workers, and honouring it
-    ///         again inside one worker would multiply the two.
+    ///         see all replicates. So does the launch count, which this method does not read at all:
+    ///         the coordinator spends it on replicate workers, and honouring the factory's
+    ///         <c>WithLaunchCount</c> again inside one of them would multiply the two.
     ///     </para>
     /// </summary>
     internal async Task<(List<BenchmarkResult> Results, Dictionary<string, double[]> RawSamples)>
@@ -1427,7 +1440,7 @@ public sealed class BenchmarkSuite(string name)
                     envelopes,
                     effectiveOrder,
                     seed,
-                    _options with { LaunchCount = 1 },
+                    _options,
                     startIndex,
                     totalBenchmarks,
                     progress,
@@ -1452,6 +1465,11 @@ public sealed class BenchmarkSuite(string name)
 
     /// <summary>The measurement configuration this suite was built with.</summary>
     internal MeasurementOptions ResolvedOptions => _options;
+
+    /// <summary>
+    ///     How many launches this suite asked for, read by whoever coordinates its run.
+    /// </summary>
+    internal int ResolvedLaunchCount => _launchCount;
 
     /// <summary>The target frameworks this suite asked to be measured against.</summary>
     internal IReadOnlyList<RuntimeMoniker> RequestedRuntimes => _runtimes;

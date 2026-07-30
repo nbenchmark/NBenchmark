@@ -71,8 +71,7 @@ public sealed record RuntimeProfile
     ///     <para>
     ///         Use it to answer "what will my users actually see?". Be aware that it is
     ///         <i>imprecise</i> - this is the configuration measured at a 3.27x spread - so raise
-    ///         <see cref="MeasurementOptions.LaunchCount" /> and read the cross-launch interval
-    ///         rather than the within-launch one.
+    ///         the launch count and read the cross-launch interval rather than the within-launch one.
     ///     </para>
     /// </summary>
     public static readonly RuntimeProfile Production = new()

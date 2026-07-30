@@ -80,6 +80,7 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                     referenceTarget,
                     instance,
                     runSpec,
+                    MeasurementOptionsBuilder.LaunchCount(this),
                     CancellationToken.None,
                     PerformanceGate.NeedsCalibration(this))
                 .GetAwaiter().GetResult();

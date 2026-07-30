@@ -1,8 +1,8 @@
 namespace NBenchmark;
 
 /// <summary>
-///     Cross-launch summary statistics. Populated when
-///     <see cref="MeasurementOptions.LaunchCount" /> > 1.
+///     Cross-launch summary statistics. Populated when the launch count (see
+///     <see cref="LaunchCounts" />) is above one.
 /// </summary>
 public sealed record LaunchStatistics
 {

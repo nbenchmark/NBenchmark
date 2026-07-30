@@ -74,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 3;
+    public const int Version = 4;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -325,6 +325,13 @@ internal sealed record RunGroupPayload
     ///     <see cref="MeasurementOptions" /> is value data except the two strategy interfaces,
     ///     which travel as <see cref="OutlierDetectorTypeName" /> and
     ///     <see cref="SignificanceTestTypeName" />.
+    ///     <para>
+    ///         A request is always <b>one</b> measurement pass over the group. The replicate count is
+    ///         spent by the coordinator, which sends one request per replicate - so nothing here says
+    ///         how many launches were asked for, and there is no field a worker could act on and
+    ///         double the run. See <see cref="LaunchCounts" />; the replicate index is in
+    ///         <see cref="GroupId" /> and its distinct shuffle in <see cref="Seed" />.
+    ///     </para>
     /// </summary>
     public required MeasurementOptions Options { get; init; }
 

@@ -59,6 +59,12 @@ public sealed class SuitePlanIsolationTests : IDisposable
             .Add("only", () => Thread.SpinWait(200))
             .WithOutlierDetector(new ProbeDetector(sentinel: 4242)));
 
+    /// <summary>A factory whose suite asks for replicates.</summary>
+    private static BenchmarkSuite BuildReplicated() =>
+        Fast(new BenchmarkSuite("plan-replicated")
+            .Add("only", () => Thread.SpinWait(200))
+            .WithLaunchCount(3));
+
     /// <summary>A factory whose suite runs setup and teardown delegates.</summary>
     private static BenchmarkSuite BuildWithLifecycle() =>
         Fast(new BenchmarkSuite("plan-lifecycle")
@@ -281,6 +287,57 @@ public sealed class SuitePlanIsolationTests : IDisposable
             () => BenchmarkSuite.RunPlansAsync<SuitePlanIsolationTests>());
 
         Assert.Contains("no benchmark plans", ex.Message);
+    }
+
+    /// <summary>
+    ///     One worker per replicate, from a launch count the <i>factory</i> set.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The plan path is the only one where the same suite object exists on both sides of the
+    ///         boundary: the factory runs here, so the coordinator can read what it asked for, and again
+    ///         in every worker, where its <c>WithLaunchCount(3)</c> must be ignored or each replicate
+    ///         would measure three times and the between-worker spread would be three within-worker
+    ///         ones averaged. Ignoring it is structural rather than defensive - the worker's
+    ///         measurement path does not read the count, and the request has no field carrying it.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task RunPlanAsync_LaunchCount_SpawnsOneWorkerPerReplicate()
+    {
+        var launcher = new CountingLauncher(WorkerLocatorForTests.WorkerAssemblyPath());
+        WorkerLauncher.Current = launcher;
+
+        var results = await BenchmarkSuite.RunPlanAsync(BuildReplicated);
+
+        Assert.Equal(3, launcher.GroupsRun);
+
+        var result = Assert.Single(results);
+        Assert.False(result.Errored, result.ErrorMessage);
+        Assert.NotNull(result.LaunchStatistics);
+        Assert.Equal(3, result.LaunchStatistics!.LaunchCount);
+    }
+
+    /// <summary>Wraps the real launcher to count the groups a run actually launched.</summary>
+    private sealed class CountingLauncher(string workerAssemblyPath) : IWorkerLauncher
+    {
+        private readonly RealWorkerLauncher _inner = new(workerAssemblyPath);
+
+        public int GroupsRun { get; private set; }
+
+        public bool IsAvailable => true;
+
+        public Task<WorkerGroupRunner.GroupResult> RunGroupAsync(
+            RunGroupPayload request,
+            IBenchmarkProgress progress,
+            IMeasurementObserver observer,
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
+        {
+            GroupsRun++;
+
+            return _inner.RunGroupAsync(request, progress, observer, timeout, cancellationToken);
+        }
     }
 
     /// <summary>Counters proving which process ran the suite lifecycle.</summary>

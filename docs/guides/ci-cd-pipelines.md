@@ -45,7 +45,7 @@ dotnet run -c Release -- \
 
 - **Dedicated-host guidance** (`--dedicated-host-guidance`). A non-fatal pre-run probe that warns when the host looks noisy (low core count, unraisable priority, macOS thermal/frequency scaling). Guidance, not a gate - the run still proceeds. See [Environment control](../features/environment-control.md).
 
-- **Launch count** (`--launch-count 5`). Runs each benchmark 5 times as independent launches and reports cross-launch aggregation. On a contested host the per-launch medians will disagree, and that disagreement **is the honest signal**: it tells you the noise is real, not hidden behind a single lucky launch. The best (lowest-median) launch is the representative result; its raw samples feed significance. See [Multiple launches](../features/multiple-launches.md).
+- **Launch count** (`--launch-count 5`). Runs each benchmark 5 times as independent launches and reports cross-launch aggregation. On a contested host the per-launch medians will disagree, and that disagreement **is the honest signal**: it tells you the noise is real, not hidden behind a single lucky launch. The reported number is the average across launches and the reported interval is the spread between them; significance reads the samples pooled across all of them. See [Multiple launches](../features/multiple-launches.md).
 
 - **Threshold gate** (`--threshold-pct 10`). After all results are collected, the harness compares each non-baseline result's median against the baseline. If any exceeds `baseline * (1 + 10/100)`, the harness sets `Environment.ExitCode = 1` and prints the regressed names to stderr. In multi-runtime mode the check is grouped within each runtime. See the [CLI reference](../reference/cli.md).
 

@@ -643,10 +643,13 @@ internal sealed record CliArgs
 
                     break;
                 case "--launch-count" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var lc) && lc >= 1 && lc <= MeasurementOptions.MaxLaunchCount)
+                    if (int.TryParse(args[++i], out var lc) && LaunchCounts.IsValid(lc))
                         launchCount = lc;
                     else
-                        errors.Add($"Invalid --launch-count value '{args[i]}'. Must be 1-{MeasurementOptions.MaxLaunchCount}.");
+                    {
+                        errors.Add($"Invalid --launch-count value '{args[i]}'. "
+                                   + $"Must be {LaunchCounts.Single}-{LaunchCounts.Max}.");
+                    }
 
                     break;
                 case "--percentiles" when i + 1 < args.Length:

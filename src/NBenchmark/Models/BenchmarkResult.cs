@@ -258,8 +258,7 @@ public record BenchmarkResult
     public AutoTuneDiagnostic? AutoTune { get; init; }
 
     /// <summary>
-    ///     Cross-launch summary statistics populated when
-    ///     <see cref="MeasurementOptions.LaunchCount" /> > 1.
+    ///     Cross-launch summary statistics, populated when the launch count is above one.
     ///     <c>null</c> when the benchmark ran a single launch.
     /// </summary>
     public LaunchStatistics? LaunchStatistics { get; init; }

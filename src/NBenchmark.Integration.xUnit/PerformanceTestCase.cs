@@ -118,6 +118,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
                         referenceTarget,
                         instance,
                         runSpec,
+                        MeasurementOptionsBuilder.LaunchCount(data),
                         cancellationTokenSource.Token,
                         PerformanceGate.NeedsCalibration(data));
 

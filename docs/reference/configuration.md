@@ -22,7 +22,7 @@ Task-based configuration guides for common benchmarking situations. Each guide s
 | --- | --- |
 | `Environment.ProcessPriority = High` | Reduces preemption by unrelated OS work. The benchmark thread is less likely to be paused mid-sample. |
 | `OutlierMode.MedianAbsoluteDeviation` | More robust than the default IQR fence when a heavy tail of preempted samples distorts the quartile-based fence. MAD has a 50% breakdown point. |
-| `LaunchCount = 3` | Runs the benchmark 3 times as independent launches. The best (lowest-median) launch is reported, giving you a second layer of noise rejection. |
+| `.WithLaunchCount(3)` | Runs the benchmark 3 times as independent launches, one worker process each. The reported number is the average across them and the interval is the spread between them, so it describes reproducibility rather than one process's precision. |
 | `AutoTune.CapBehavior = Error` | If the wall-clock cap is hit before the CI target is met, the benchmark errors instead of silently reporting a wide interval. |
 
 **Fluent API:**
@@ -103,7 +103,7 @@ dotnet run -- --auto-tune quick --warmup 4 --iterations 20 --confidence 0.90
 | --- | --- |
 | `AutoTune = AutoTuneOptions.Thorough` | Raises the CI target to ±1%, minimum samples to 100, and minimum warmup to 16. |
 | `ConfidenceLevel = 0.99` | A 99% CI is wider and more conservative. |
-| `LaunchCount = 5` | Multiple independent launches let you report cross-launch statistics and the best representative run. |
+| `.WithLaunchCount(5)` | Multiple independent launches let you report cross-launch statistics and an interval that reflects run-to-run variance. |
 | `EnableHistogram = true` | The latency histogram gives you the full distribution, not just summary statistics. |
 
 **Fluent API:**
@@ -322,12 +322,14 @@ Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per 
 ### LaunchCount
 
 ```csharp
-LaunchCount = 1   // default
+.WithLaunchCount(1)   // default
 ```
 
-The number of times to repeat each benchmark as a separate launch, typed as `int`:
+The number of times to repeat each benchmark as a separate launch, typed as `int`.
 
-`MeasurementOptions` default is `1`; Harness mode applies `3` by default when launch count is not explicitly pinned via `WithLaunchCount`, `WithOptions`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`.
+**It is deliberately not a field on `MeasurementOptions`.** A launch is a *process*, so the count is spent by whichever coordinator launches them and means nothing to a worker, which measures exactly once. `MeasurementOptions` is serialized whole into every worker's request, so a launch count living there would travel to a process that must ignore it - and it did, which is how a transport detail (every request path pinning the field to 1) came to decide whether a `[Benchmark(LaunchCount = n)]` attribute took effect. The bounds and defaults live on the `LaunchCounts` static class; the value is set through the fluent builders, the attributes, or the flag.
+
+The default is `1`; Harness mode applies `LaunchCounts.HarnessDefault` (`3`) when the launch count is not pinned via `WithLaunchCount`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`. `WithOptions` has no say - it carries no launch count to have an opinion with. Pass `WithLaunchCount(1)` to opt out of the harness default.
 
 | Value | Behaviour |
 |---|---|
@@ -336,9 +338,9 @@ The number of times to repeat each benchmark as a separate launch, typed as `int
 
 Use multiple launches when single-run noise is a concern and you want to see how much the median itself varies across independent measurements. Each launch includes its own warmup and GC cycle, so consecutive launches are independent measurements of the same body - not correlated samples.
 
-**Dry-run interaction:** When `--dry-run` (Iterations=0, WarmupIterations=0) is combined with `LaunchCount > 1`, exactly one dry launch is performed. The extra launches would not add information since dry runs skip the body.
+**Dry-run interaction:** `--dry-run` (Iterations=0, WarmupIterations=0) takes neither the harness default nor `--launch-count`, so it performs exactly one dry launch. A dry run exists to prove the wiring works without measuring anything, and repeating it would be several times the startup cost for the same nothing. An explicit `WithLaunchCount(n)` in code is still honoured, because it is the only signal that could have meant a dry run specifically.
 
-**Isolation interaction:** When the benchmark runs in a child process (Harness mode default, or `WithIsolation()` in suite mode), the parent spawns N children. The child process is unaware of the launch count.
+**Isolation interaction:** When the benchmark runs in a worker process (Harness mode default, or `WithIsolation()` in suite mode), the coordinator spawns N workers. A worker is not merely unaware of the launch count - it is never sent one.
 
 **Attribute override:** In Harness mode each `[Benchmark]` can override the launch count per-method:
 
@@ -348,7 +350,7 @@ Use multiple launches when single-run noise is a concern and you want to see how
 public void MyNoisyBenchmark() => SlowOperation();
 ```
 
-The CLI flag `--launch-count` always takes priority over both `WithOptions` and the per-method attribute.
+The CLI flag `--launch-count` always takes priority over `WithLaunchCount`. The per-method attribute is applied on top for that method, and an isolated group takes the maximum across its members so every benchmark in it gets at least the launches it asked for.
 
 BenchmarkSuite fluent method: `.WithLaunchCount(5)`  
 CLI flag: `--launch-count <n>`

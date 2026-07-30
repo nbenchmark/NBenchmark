@@ -15,13 +15,17 @@ namespace NBenchmark.Integration.xUnit.Tests;
 /// </remarks>
 public sealed class MeasurementOptionsBuilderTests
 {
+    /// <summary>
+    ///     The launch count is reported <b>beside</b> the options rather than on them, because a launch
+    ///     is a worker process and the options are what each of those workers measures with.
+    /// </summary>
     [Fact]
-    public void LaunchCount_Reaches_The_Options()
-        => Assert.Equal(3, MeasurementOptionsBuilder.Build(new Thresholds { LaunchCount = 3 }).LaunchCount);
+    public void LaunchCount_Is_Read_From_The_Thresholds()
+        => Assert.Equal(3, MeasurementOptionsBuilder.LaunchCount(new Thresholds { LaunchCount = 3 }));
 
     [Fact]
     public void LaunchCount_Defaults_To_One()
-        => Assert.Equal(1, MeasurementOptionsBuilder.Build(new Thresholds()).LaunchCount);
+        => Assert.Equal(LaunchCounts.Single, MeasurementOptionsBuilder.LaunchCount(new Thresholds()));
 
     /// <summary>
     ///     An out-of-range value is clamped rather than thrown on. An attribute argument is a compile-time
@@ -31,11 +35,11 @@ public sealed class MeasurementOptionsBuilderTests
     [Theory]
     [InlineData(0, 1)]
     [InlineData(-7, 1)]
-    [InlineData(10_000, MeasurementOptions.MaxLaunchCount)]
+    [InlineData(10_000, LaunchCounts.Max)]
     public void An_Out_Of_Range_LaunchCount_Is_Clamped(int declared, int expected)
         => Assert.Equal(
             expected,
-            MeasurementOptionsBuilder.Build(new Thresholds { LaunchCount = declared }).LaunchCount);
+            MeasurementOptionsBuilder.LaunchCount(new Thresholds { LaunchCount = declared }));
 
     private sealed class Thresholds : IPerformanceThresholds
     {

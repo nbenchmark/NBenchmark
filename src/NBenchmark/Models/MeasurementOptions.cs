@@ -3,6 +3,15 @@ using NBenchmark.Stats;
 
 namespace NBenchmark;
 
+/// <summary>
+///     How <em>one</em> measurement is taken.
+/// </summary>
+/// <remarks>
+///     Every field here is consumed by the process doing the measuring, and this record is serialized
+///     whole into each worker's request - so a field that only a coordinator could act on has no
+///     business on it. That is why the replicate count is not here but in
+///     <see cref="LaunchCounts" />, which explains the reasoning.
+/// </remarks>
 public record MeasurementOptions
 {
     internal const double PercentileEqualityTolerance = 1e-9;
@@ -22,7 +31,6 @@ public record MeasurementOptions
     public const int MaxAutoWarmupIterations = 100_000;
 
     public const int MaxOpsPerSampleLimit = 1 << 24;
-    public const int MaxLaunchCount = 100;
     public const int MinHistogramBucketCount = 5;
     public const int MaxHistogramBucketCount = 100;
 
@@ -43,7 +51,6 @@ public record MeasurementOptions
     private readonly int _histogramBucketCount = 20;
     private readonly int _maxRawSamples = DefaultMaxRawSamples;
     private readonly int? _iterations;
-    private readonly int _launchCount = 1;
     private readonly double? _minimumPracticalEffect = DefaultMinimumPracticalEffect;
 
     /// <summary>
@@ -372,27 +379,6 @@ public record MeasurementOptions
             }
 
             _minimumPracticalEffect = delta;
-        }
-    }
-
-    /// <summary>
-    ///     Number of times to repeat the benchmark as separate launches.
-    ///     1 (default) runs the benchmark once. Higher values trigger per-launch
-    ///     aggregation and populate <see cref="BenchmarkResult.LaunchStatistics" />.
-    ///     Must be between 1 and <see cref="MaxLaunchCount" />.
-    /// </summary>
-    public int LaunchCount
-    {
-        get => _launchCount;
-        init
-        {
-            if (value is < 1 or > MaxLaunchCount)
-            {
-                throw new ArgumentOutOfRangeException(nameof(value), value,
-                    $"LaunchCount must be between 1 and {MaxLaunchCount}.");
-            }
-
-            _launchCount = value;
         }
     }
 

@@ -53,6 +53,7 @@ public sealed class PerformanceCommand : DelegatingTestCommand
                     referenceTarget,
                     instance,
                     runSpec,
+                    MeasurementOptionsBuilder.LaunchCount(_attribute),
                     context.CancellationToken,
                     PerformanceGate.NeedsCalibration(_attribute))
                 .GetAwaiter().GetResult();

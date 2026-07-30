@@ -147,9 +147,7 @@ internal static class InlineSuitePlan
             TargetAssemblyPath = bodies[0].AssemblyPath,
             Bodies = bodies,
 
-            // LaunchCount is the replicate count and is spent by the coordinator spawning workers, so
-            // each worker measures exactly once.
-            Options = options with { LaunchCount = 1 },
+            Options = options,
             OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
             SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
             Order = order,

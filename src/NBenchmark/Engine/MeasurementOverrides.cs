@@ -81,8 +81,6 @@ internal sealed record MeasurementOverrides
 
     public int? MaxDriftRestarts { get; init; }
 
-    public int? LaunchCount { get; init; }
-
     public IReadOnlyList<double>? ReportedPercentiles { get; init; }
 
     public bool? NoHistogram { get; init; }
@@ -139,7 +137,6 @@ internal sealed record MeasurementOverrides
         MinMeasurementTime = cliArgs.MinMeasurementTime,
         DriftTolerance = cliArgs.DriftTolerance,
         MaxDriftRestarts = cliArgs.MaxDriftRestarts,
-        LaunchCount = cliArgs.LaunchCount,
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
         EmitRaw = cliArgs.EmitRaw,
@@ -287,9 +284,6 @@ internal sealed record MeasurementOverrides
 
         if (OpsPerSample.HasValue)
             result = result with { OpsPerSample = OpsPerSample.Value };
-
-        if (LaunchCount.HasValue)
-            result = result with { LaunchCount = LaunchCount.Value };
 
         if (ReportedPercentiles is not null)
             result = result with { ReportedPercentiles = ReportedPercentiles };

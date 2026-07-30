@@ -94,7 +94,6 @@ public sealed class FrameChannelTests
             OpsPerSample = 64,
             ConfidenceLevel = 0.99,
             SignificanceLevel = 0.01,
-            LaunchCount = 3,
             OutlierMode = OutlierMode.MedianAbsoluteDeviation,
             TailMetricsBasis = TailMetricsBasis.Trimmed,
             Profile = MeasurementProfile.Independent,
@@ -166,7 +165,6 @@ public sealed class FrameChannelTests
         Assert.Equal(64, actual.OpsPerSample);
         Assert.Equal(0.99, actual.ConfidenceLevel);
         Assert.Equal(0.01, actual.SignificanceLevel);
-        Assert.Equal(3, actual.LaunchCount);
         Assert.Equal(OutlierMode.MedianAbsoluteDeviation, actual.OutlierMode);
         Assert.Equal(TailMetricsBasis.Trimmed, actual.TailMetricsBasis);
         Assert.Equal(MeasurementProfile.Independent, actual.Profile);

@@ -107,8 +107,7 @@ internal static class PerformanceAttributeParser
     ///     which is not a valid launch count - and clamping rather than throwing keeps a mistyped
     ///     attribute from failing the test with a configuration error instead of measuring it.
     /// </summary>
-    private static int NormalizeLaunchCount(int value)
-        => value < 1 ? 1 : Math.Min(value, MeasurementOptions.MaxLaunchCount);
+    private static int NormalizeLaunchCount(int value) => LaunchCounts.Clamp(value);
 
     private static OutlierMode NormalizeOutlierMode(OutlierMode value, bool treatNoneAsUnset)
     {

@@ -45,7 +45,7 @@ internal static class SuitePlanRunner
         if (!TryPlan(plan, out var planRef, out var status, out var refusal))
             return PlanOutcome.Declined(status, refusal);
 
-        var replicates = Math.Max(1, options.LaunchCount);
+        var replicates = localSuite.ResolvedLaunchCount;
         var timeout = MeasurementBudget.For(options, names.Count);
 
         var perReplicate = new List<IReadOnlyList<BenchmarkResult>>(replicates);
@@ -64,7 +64,7 @@ internal static class SuitePlanRunner
                 // Sent so the coordinator and worker agree on the runtime profile to launch under.
                 // The worker measures with the options its own factory produced, which is the point
                 // of the design - see WorkerSession.RunPlanAsync.
-                Options = options with { LaunchCount = 1 },
+                Options = options,
                 Seed = WorkerRunPlan.DeriveSeed(sessionSeed, replicate),
                 TotalBenchmarks = names.Count,
             };
@@ -201,7 +201,7 @@ internal static class SuitePlanRunner
                     WorkerAssemblyPath = workerPath,
                     DeclaringTypeFullName = declaringType,
                     PlanMethodName = plan.Method.Name,
-                    Options = options with { LaunchCount = 1 },
+                    Options = options,
                     TotalBenchmarks = names.Count,
                 };
 

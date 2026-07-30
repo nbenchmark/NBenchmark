@@ -44,10 +44,8 @@ internal sealed record BenchmarkEnvelope(
         var categories = method.Categories;
         var attributeIterations = method.Attribute.Iterations;
         var attributeWarmupIterations = method.Attribute.WarmupIterations;
-        var attributeLaunchCount = method.Attribute.LaunchCount;
         var hasIterationsOverride = method.Attribute.HasIterationsOverride;
         var hasWarmupIterationsOverride = method.Attribute.HasWarmupIterationsOverride;
-        var hasLaunchCountOverride = method.Attribute.HasLaunchCountOverride;
         var iterationSetupDel = method.IterationSetupDelegate;
         var iterationTeardownDel = method.IterationTeardownDelegate;
         var bodyFactory = method.BodyFactory
@@ -60,6 +58,11 @@ internal sealed record BenchmarkEnvelope(
             var instance = instanceFactory();
             var specWithOverride = spec;
 
+            // Only the attribute overrides a measurement pass can act on. [Benchmark(LaunchCount)] is
+            // not one of them: a launch is a process, so it is read by whichever coordinator spawns
+            // them and never reaches here. It used to be applied to the options anyway, guarded on
+            // their launch count already being 1 - which every request path had pinned it to, making
+            // a transport detail decide whether a user's attribute took effect.
             if (spec.Options.Iterations is not 0)
             {
                 var overriddenOptions = spec.Options;
@@ -69,9 +72,6 @@ internal sealed record BenchmarkEnvelope(
 
                 if (hasWarmupIterationsOverride)
                     overriddenOptions = overriddenOptions with { WarmupIterations = attributeWarmupIterations };
-
-                if (hasLaunchCountOverride && spec.Options.LaunchCount == 1)
-                    overriddenOptions = overriddenOptions with { LaunchCount = attributeLaunchCount };
 
                 specWithOverride = spec with { Options = overriddenOptions };
             }

@@ -133,13 +133,16 @@ public static class TestMethodRunner
         object?[] arguments,
         string displayName,
         MeasurementOptions options,
+        int launchCount,
         CancellationToken cancellationToken = default,
         bool measureCalibration = false)
     {
         ArgumentNullException.ThrowIfNull(method);
         ArgumentNullException.ThrowIfNull(arguments);
 
-        return RunAsync([new Subject(method, arguments, displayName)], options, cancellationToken, measureCalibration);
+        return RunAsync(
+            [new Subject(method, arguments, displayName)], options, launchCount, cancellationToken,
+            measureCalibration);
     }
 
     /// <summary>
@@ -155,22 +158,29 @@ public static class TestMethodRunner
     ///         the wall clock to do it.
     ///     </para>
     ///     <para>
-    ///         <b>Why replicates are spent here.</b> <see cref="MeasurementOptions.LaunchCount" /> is the
-    ///         number of <i>workers</i>, so it is spent by this method and pinned to 1 in the request. A
-    ///         worker that repeated the measurement internally would report within-process precision as
-    ///         though it were reproducibility, which is the one thing a replicate is for. Above one
-    ///         replicate the results carry <see cref="BenchmarkResult.LaunchStatistics" /> and the ratio
-    ///         gate becomes a paired estimate with an interval; at one - the default - nothing about the
-    ///         result changes, so an existing suite is neither slower nor differently judged.
+    ///         <b>Why replicates are spent here.</b> A launch is a <i>worker</i>, so
+    ///         <paramref name="launchCount" /> is spent by this method and appears nowhere in the
+    ///         request it builds. A worker that repeated the measurement internally would report
+    ///         within-process precision as though it were reproducibility, which is the one thing a
+    ///         replicate is for. Above one replicate the results carry
+    ///         <see cref="BenchmarkResult.LaunchStatistics" /> and the ratio gate becomes a paired
+    ///         estimate with an interval; at one - the default - nothing about the result changes, so an
+    ///         existing suite is neither slower nor differently judged.
     ///     </para>
     /// </remarks>
     /// <param name="subjects">
     ///     The methods to measure. The first is the one under test; any others are references it is
     ///     compared against. All must be declared by the same type, because the worker instantiates one.
     /// </param>
+    /// <param name="launchCount">
+    ///     How many workers to spend, one per replicate. Clamped rather than validated, for the reason
+    ///     <see cref="LaunchCounts.Clamp" /> gives: the value reaches here from a test attribute, and
+    ///     throwing would fail the test with a configuration error instead of measuring it.
+    /// </param>
     public static async Task<Outcome> RunAsync(
         IReadOnlyList<Subject> subjects,
         MeasurementOptions options,
+        int launchCount,
         CancellationToken cancellationToken = default,
         bool measureCalibration = false)
     {
@@ -189,7 +199,7 @@ public static class TestMethodRunner
         }
 
         var declaringType = subjects[0].Method.DeclaringType!;
-        var replicates = Math.Max(1, options.LaunchCount);
+        var replicates = LaunchCounts.Clamp(launchCount);
         var timeout = MeasurementBudget.For(options, subjects.Count);
 
         // One list per subject, one entry per replicate - including replicates that produced nothing,
@@ -389,9 +399,7 @@ public static class TestMethodRunner
             TestMethods = encoded,
             BenchmarkNames = subjects.Select(s => s.DisplayName).ToList(),
 
-            // LaunchCount is spent above by spawning one worker per replicate, so each worker measures
-            // exactly once. Leaving it above 1 here would multiply the two.
-            Options = options with { LaunchCount = 1 },
+            Options = options,
             OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
             SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
 

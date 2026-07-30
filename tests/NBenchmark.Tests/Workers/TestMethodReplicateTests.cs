@@ -99,11 +99,10 @@ public sealed class TestMethodReplicateTests
         IsolationStatus = IsolationStatus.Isolated,
     };
 
-    private static MeasurementOptions Options(int launchCount) => MeasurementOptions.Default with
+    private static MeasurementOptions Options() => MeasurementOptions.Default with
     {
         Iterations = 2,
         WarmupIterations = 0,
-        LaunchCount = launchCount,
     };
 
     /// <summary>
@@ -119,7 +118,7 @@ public sealed class TestMethodReplicateTests
         }));
 
         var outcome = await TestMethodRunner.RunAsync(
-            [Candidate(), Reference()], Options(3));
+            [Candidate(), Reference()], Options(), launchCount: 3);
 
         Assert.True(outcome.Measured, outcome.Refusal);
 
@@ -133,10 +132,12 @@ public sealed class TestMethodReplicateTests
                 new[] { "Subject.Candidate", "Subject.Reference" },
                 request.TestMethods.Select(m => m.DisplayName));
 
-            // The replicate count is spent here, by launching workers. A worker handed LaunchCount > 1
-            // would repeat the measurement internally and report within-process precision as though it
-            // were reproducibility.
-            Assert.Equal(1, request.Options.LaunchCount);
+            // The replicate count is spent here, by launching workers, and the request carries no
+            // launch count at all - so a worker cannot repeat the measurement internally and report
+            // within-process precision as though it were reproducibility. That invariant is now
+            // structural rather than pinned per request path; this asserts what remains observable,
+            // which is that each worker was asked for exactly one pass over the group.
+            Assert.Equal(1, request.TotalBenchmarks / request.TestMethods.Count);
         }
     }
 
@@ -154,7 +155,7 @@ public sealed class TestMethodReplicateTests
             ["Subject.Reference"] = [100, 110],
         }));
 
-        await TestMethodRunner.RunAsync([Candidate(), Reference()], Options(2));
+        await TestMethodRunner.RunAsync([Candidate(), Reference()], Options(), launchCount: 2);
 
         Assert.All(scope.Launcher.Requests, r => Assert.Equal(RunOrder.Random, r.Order));
     }
@@ -171,7 +172,7 @@ public sealed class TestMethodReplicateTests
             ["Subject.Candidate"] = [120],
         }));
 
-        await TestMethodRunner.RunAsync([Candidate()], Options(1));
+        await TestMethodRunner.RunAsync([Candidate()], Options(), LaunchCounts.Single);
 
         Assert.Equal(RunOrder.Declaration, Assert.Single(scope.Launcher.Requests).Order);
     }
@@ -189,11 +190,7 @@ public sealed class TestMethodReplicateTests
             ["Subject.Candidate"] = [120],
         }));
 
-        var outcome = await TestMethodRunner.RunAsync([Candidate()], MeasurementOptions.Default with
-        {
-            Iterations = 2,
-            WarmupIterations = 0,
-        });
+        var outcome = await TestMethodRunner.RunAsync([Candidate()], Options(), LaunchCounts.Single);
 
         Assert.Single(scope.Launcher.Requests);
         Assert.Null(outcome.Result!.LaunchStatistics);
@@ -220,7 +217,7 @@ public sealed class TestMethodReplicateTests
             ["Subject.Reference"] = [100, 500, 200],
         }));
 
-        var outcome = await TestMethodRunner.RunAsync([Candidate(), Reference()], Options(3));
+        var outcome = await TestMethodRunner.RunAsync([Candidate(), Reference()], Options(), launchCount: 3);
 
         var candidate = outcome.Measurements[0].Result;
         var reference = outcome.Measurements[1].Result;
@@ -258,7 +255,7 @@ public sealed class TestMethodReplicateTests
             ["Subject.Reference"] = [100, 500, double.NaN],
         }));
 
-        var outcome = await TestMethodRunner.RunAsync([Candidate(), Reference()], Options(3));
+        var outcome = await TestMethodRunner.RunAsync([Candidate(), Reference()], Options(), launchCount: 3);
 
         var candidateLaunches = outcome.Measurements[0].Result.LaunchStatistics!.Launches;
         var referenceLaunches = outcome.Measurements[1].Result.LaunchStatistics!.Launches;
@@ -303,7 +300,8 @@ public sealed class TestMethodReplicateTests
                 new TestMethodRunner.Subject(
                     typeof(OtherSubject).GetMethod(nameof(OtherSubject.Elsewhere))!, [], "Other.Elsewhere"),
             ],
-            Options(2)));
+            Options(),
+            launchCount: 2));
 
         Assert.Contains("same class", error.Message);
         Assert.Empty(scope.Launcher.Requests);
@@ -323,7 +321,7 @@ public sealed class TestMethodReplicateTests
         using var scope = FakeWorkerLauncher.Install(Answering([]));
 
         var error = await Assert.ThrowsAsync<ArgumentException>(() => TestMethodRunner.RunAsync(
-            [Candidate(), Candidate()], Options(2)));
+            [Candidate(), Candidate()], Options(), launchCount: 2));
 
         Assert.Contains("comparison against itself", error.Message);
         Assert.Empty(scope.Launcher.Requests);

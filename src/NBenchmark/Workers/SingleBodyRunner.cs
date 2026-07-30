@@ -55,10 +55,7 @@ internal static class SingleBodyRunner
             TargetAssemblyPath = bodyRef.AssemblyPath,
             Bodies = [bodyRef],
 
-            // A worker measures once; Simple mode has no replicate concept of its own, so a
-            // LaunchCount above 1 would silently multiply the work inside a single process rather
-            // than giving the between-process estimate it implies.
-            Options = options with { LaunchCount = 1 },
+            Options = options,
             OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
             SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
             TotalBenchmarks = 1,
