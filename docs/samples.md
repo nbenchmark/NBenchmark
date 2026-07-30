@@ -8,6 +8,32 @@ order: 9
 
 The repository includes several sample projects in the `samples/` directory that demonstrate each usage mode. Run any of them with `dotnet run`.
 
+## PreparedState - benchmarking over input you have to build
+
+**`samples/PreparedState/`**
+
+Runs the same work two ways - closing over prepared data, and passing the preparation as its own
+delegate - and prints where each was measured. The capturing form is measured in this process and
+labelled `host`; the split form is isolated. Also shows `WithState` on a suite.
+
+```bash
+cd samples/PreparedState
+dotnet run
+```
+
+```csharp
+// captures 'data' -> measured in this process
+var data = BuildData();
+Benchmark.Run(() => Sum(data), options, "captured");
+
+// both delegates capture nothing -> isolated, and the worker builds the data itself
+Benchmark.Run(
+    prepare: () => BuildData(),
+    body: values => Sum(values),
+    options,
+    "prepared");
+```
+
 ## Single - Single mode
 
 **`samples/Single/`**
@@ -226,7 +252,7 @@ See [Custom outlier detectors](./statistics/outliers.md#custom-outlier-detectors
 
 Demonstrates process isolation:
 
-- Single mode is always in-process (`Benchmark.Run`).
+- Single mode is isolated by default (`Benchmark.Run`), with `Benchmark.RunInProcess` as the deliberate opt-out.
 - Suite mode measures in a single clean worker process, with a `[BenchmarkPlan]` factory for suites that hold live state.
 
 ```bash

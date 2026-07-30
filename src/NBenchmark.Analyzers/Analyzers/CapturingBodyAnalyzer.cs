@@ -32,9 +32,15 @@ namespace NBenchmark.Analyzers.Analyzers;
 ///         <c>BenchmarkSuite.Add</c>. <c>Add</c> is where capture is most idiomatic
 ///         (<c>.Add("Sort", () =&gt; Sort(data))</c>) and where the consequence is largest, because a
 ///         suite is addressed as a set - the first body that cannot be addressed takes every sibling
-///         in-process with it. The parameterized <c>Add</c> overloads are deliberately silent: a suite
-///         with parameters is refused isolation for its parameter values regardless of capture, so a
-///         capture diagnostic there would name a cause that is not the operative one.
+///         in-process with it.
+///     </para>
+///     <para>
+///         The parameterized <c>Add</c> overloads are covered too. They were previously excluded, on the
+///         grounds that a suite carrying parameters was refused isolation for its parameter values
+///         regardless of capture - so a capture diagnostic would have named a cause whose removal
+///         changed nothing. That is no longer true: parameter values now travel as serialized constants
+///         and a sweep is isolated like any other suite, which makes a capture in a parameterized body
+///         the operative cause again.
 ///     </para>
 ///     <para>
 ///         The rule is per-lambda, and measurement confirms the runtime's decision is too: a
@@ -109,13 +115,6 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
         if (FindBody(invocation, methodSymbol) is not { } lambda)
             return;
 
-        // A lambda with parameters can only have reached a parameterized `Add` overload, and a suite
-        // holding parameters is already refused isolation for the parameter values themselves - they
-        // exist only in this process. Reporting a capture there would name the wrong cause, and
-        // removing the capture would not restore isolation.
-        if (HasParameters(lambda))
-            return;
-
         var captured = DescribeCaptures(context.SemanticModel, lambda);
 
         if (captured is null)
@@ -142,16 +141,17 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
         if (containingType == BenchmarkClassName && TargetMethodNames.Contains(method.Name))
         {
             return ($"Benchmark.{method.Name}",
-                "This body is measured in this process instead; to isolate it, move the captured "
-                + "state inside the lambda or use a [Benchmark] class.");
+                "This body is measured in this process instead; to isolate it, pass the preparation as "
+                + "its own delegate - Benchmark.Run(prepare: () => Build(), body: d => Use(d)) - so the "
+                + "worker builds that state itself.");
         }
 
         if (containingType == SuiteClassName && method.Name == "Add")
         {
             return ("BenchmarkSuite.Add",
                 "The whole suite falls back to this process, not just this benchmark; to isolate it, "
-                + "remove the capture or move the suite into a static [BenchmarkPlan] factory so the "
-                + "worker builds that state itself.");
+                + "declare the state with .WithState(() => Build()) and take it as a body parameter, or "
+                + "move the suite into a static [BenchmarkPlan] factory.");
         }
 
         return null;
@@ -179,14 +179,6 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
 
         return null;
     }
-
-    private static bool HasParameters(LambdaExpressionSyntax lambda)
-        => lambda switch
-        {
-            SimpleLambdaExpressionSyntax => true,
-            ParenthesizedLambdaExpressionSyntax parenthesized => parenthesized.ParameterList.Parameters.Count > 0,
-            _ => false,
-        };
 
     /// <summary>
     ///     Names what <paramref name="lambda" /> captures, or <c>null</c> when it captures nothing.

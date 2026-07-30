@@ -30,25 +30,31 @@ internal static class SingleBodyRunner
     ///     The outcome, and the status describing where it ran. Never throws for an un-isolatable
     ///     body: falling back is the designed behaviour, not an error.
     /// </returns>
+    /// <param name="stateFactory">
+    ///     A parameterless factory producing the body's single argument, run in the worker before
+    ///     warmup. <c>null</c> for the ordinary parameterless body.
+    /// </param>
     public static async Task<(MeasurementOutcome Outcome, IsolationStatus Status)> RunAsync(
         string name,
         Delegate body,
         MeasurementOptions options,
         IBenchmarkProgress progress,
         Func<Task<MeasurementOutcome>> measureInProcess,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Delegate? stateFactory = null)
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(measureInProcess);
 
-        if (!TryPlan(body, name, options, out var bodyRef, out var status, out var refusal))
+        if (!TryPlan(body, name, options, stateFactory, out var bodyRef, out var status, out var refusal))
         {
+            IsolationAudit.ThrowIfRequired(options, name, status, refusal);
             SimpleModeGuidance.EmitOnce(name, status, refusal);
 
             return (await measureInProcess().ConfigureAwait(false), status);
         }
 
-        var request = new RunGroupPayload
+        var request = WorkerRunPlan.WithStrategies(new RunGroupPayload
         {
             GroupId = $"single:{name}",
             Kind = WorkGroupKind.Lambdas,
@@ -56,10 +62,8 @@ internal static class SingleBodyRunner
             Bodies = [bodyRef],
 
             Options = options,
-            OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
-            SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
             TotalBenchmarks = 1,
-        };
+        }, options);
 
         var group = await WorkerLauncher.Current.RunGroupAsync(
                 request,
@@ -114,6 +118,7 @@ internal static class SingleBodyRunner
         Delegate body,
         string name,
         MeasurementOptions options,
+        Delegate? stateFactory,
         out BodyRef bodyRef,
         out IsolationStatus status,
         out string? refusal)
@@ -141,7 +146,7 @@ internal static class SingleBodyRunner
             return false;
         }
 
-        if (!BodyRef.TryCreate(body, name, out bodyRef, out refusal))
+        if (!BodyRef.TryCreate(body, name, out bodyRef, out refusal, arguments: null, stateFactory))
         {
             // A capturing body is by far the most common refusal here, and the one with a remedy the
             // user can act on, so it is distinguished from the rest.

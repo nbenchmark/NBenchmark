@@ -114,16 +114,60 @@ Residual order effects are handled instead by randomizing run order per replicat
 
 If a specific benchmark genuinely pollutes its siblings - one that permanently fills a static cache, say - put it in its own suite. Harness mode's `[IsolatedProcess]` gives per-benchmark isolation when you need it named at the benchmark level.
 
-### When a suite cannot be isolated on its own
+### Prepared state: hand over a recipe, not a value
 
-Some suites hold things a worker cannot be handed and must instead **build for itself**. NBenchmark says which benchmark and why, then measures in the host process and labels the results:
+The obvious way to benchmark over input is to build it and close over it, and that is the one shape a worker cannot measure:
 
-- a body that **captures a local** - the captured value exists only in your process
-- **suite setup/teardown**, or per-iteration setup/teardown - live delegates that would otherwise run on the wrong side of the boundary, preparing state the benchmarks never see
-- **parameterized** benchmarks, which close over their parameter values
-- a custom `IOutlierDetector` / `ISignificanceTest` that cannot be rebuilt from a type name
+```csharp
+var data = BuildData();
+Benchmark.Run(() => Sort(data));          // captures 'data' -> measured in this process
+```
 
-For those, move the suite into a static factory and hand the method group to `RunPlanAsync`. The worker invokes *your factory* in its own process, so all of that is constructed there rather than described to it - nothing has to be serializable:
+The captured value exists in your process and nowhere else. NBenchmark will not fabricate a replacement - probing showed a fabricated closure does not throw, it returns plausible, silently wrong numbers - so the body is measured here and labelled `host`.
+
+Split the preparation into its own delegate and both halves capture nothing, so both can be addressed. The worker follows the recipe in the process that measures:
+
+```csharp
+Benchmark.Run(
+    prepare: () => BuildData(),           // runs once, before warmup, in the worker
+    body:    d => Sort(d));
+```
+
+In Suite mode the same idea is `WithState`, and the payoff is larger: one worker measures the whole suite, so a single capturing body takes every sibling in-process with it.
+
+```csharp
+await new BenchmarkSuite("sorting")
+    .WithState(() => BuildData())
+    .Add("array", d => Array.Sort(d))
+    .Add("linq",  d => d.OrderBy(x => x).ToArray())
+    .WithBaseline("array")
+    .RunAsync();
+```
+
+`prepare` runs **once per benchmark**, before that benchmark's warmup - not once per suite. Two sorts sharing one array would have the second measure what the first already sorted, and under the default random run order which one that is would change between runs. Where the body mutates its state and you need it reset every iteration, use the per-iteration `setup:` argument on `Add`, which runs outside the timed region.
+
+### What still cannot be isolated on its own
+
+A few things a worker must be *given* rather than able to *build*. NBenchmark says which benchmark and why, then measures in the host process and labels the results:
+
+- a body or lifecycle delegate that **captures a local**, and the same for a `prepare` delegate - the remedy is the split above
+- a lambda capturing **`this`**, an `IClassFixture`, a mock or a `[MemberData]` graph: there is no address for a live object. In a test, use `[PerformanceFact]` / `[Performance]`, which address the test method itself
+- a **parameter value** outside the marshallable set (primitives, strings, enums, `decimal`, `DateTime`, `DateTimeOffset`, `TimeSpan`, `Guid`)
+- a suite carrying **both** `WithState` and `WithParameter`
+- an assembly with **no file on disk** - single-file, in-memory or dynamically emitted
+
+A custom `IOutlierDetector` or `ISignificanceTest` needing constructor arguments, and a DI container, are no longer on this list: pass a static factory instead of an instance and the worker builds its own.
+
+```csharp
+.WithOutlierDetector(static () => new KeepFastestDetector(0.90))
+.WithSignificanceTest(static () => new MedianRatioSignificanceTest(25))
+```
+
+```csharp
+.UseDependencyInjection<MyBenchmarks>(BuildServices)   // static IServiceProvider BuildServices()
+```
+
+For anything genuinely left, move the suite into a static factory and hand the method group to `RunPlanAsync`. The worker invokes *your factory* in its own process, so all of that is constructed there rather than described to it - nothing has to be serializable:
 
 ```csharp
 using NBenchmark.Attributes;

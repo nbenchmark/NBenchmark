@@ -37,22 +37,43 @@ await new BenchmarkSuite("hashing")
 
 // 3: The same comparison, but with a custom trimming strategy and a custom
 // significance rule supplied through the fluent builder.
+//
+// Both are passed as *factories* rather than as built instances, and that choice decides whether
+// this suite is isolated. A strategy object cannot be sent to a measurement worker; only its type
+// name can, and a type name reaches a parameterless constructor and nothing else. Neither of these
+// has one - `0.90` and `25` are constructor arguments - so handing over the instances would leave
+// the worker with no way to rebuild them. Rather than score the results under a silently
+// substituted method, NBenchmark declines to isolate at all and measures in this process.
+//
+// A static factory is addressable, so the worker runs it and gets these exact objects with these
+// exact arguments.
 Console.WriteLine();
 Console.WriteLine(">> Custom: KeepFastest detector + median-ratio significance");
 Console.WriteLine();
 
-await new BenchmarkSuite("hashing-custom")
+var custom = await new BenchmarkSuite("hashing-custom")
     .Add("sha256", () => SHA256.HashData(Payload))
     .Add("sha1", () => SHA1.HashData(Payload))
     .Add("md5", () => MD5.HashData(Payload))
     .WithBaseline("md5")
     .WithWarmup(5)
     .WithIterations(60)
-    .WithOutlierDetector(new KeepFastestDetector(0.90))
-    .WithSignificanceTest(new MedianRatioSignificanceTest(25))
+    .WithOutlierDetector(static () => new KeepFastestDetector(0.90))
+    .WithSignificanceTest(static () => new MedianRatioSignificanceTest(25))
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
+
+// Printed so the sample asserts its own fidelity: if a custom strategy ever stops being isolatable,
+// this line says so rather than leaving it to be noticed in the header.
+Console.WriteLine();
+
+foreach (var result in custom)
+{
+    Console.WriteLine(
+        $"  {result.Name}: {result.IsolationStatus} under '{result.RuntimeProfileName}', "
+        + $"trimmed by '{result.OutlierDetector}'");
+}
 
 internal static partial class Program
 {

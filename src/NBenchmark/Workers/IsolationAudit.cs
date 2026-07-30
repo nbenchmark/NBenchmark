@@ -19,6 +19,43 @@ internal static class IsolationAudit
     ///     nobody reads is indistinguishable from no warning at all. A build that must not accept
     ///     host-process numbers needs them to be an error.
     /// </remarks>
+    /// <summary>
+    ///     Throws when <see cref="MeasurementOptions.RequireIsolation" /> is set and isolation was
+    ///     refused.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The library-side counterpart to <see cref="Enforce" />, and deliberately a different
+    ///         mechanism rather than the same one. <c>--strict-isolation</c> audits <i>results</i>, which
+    ///         is right for a CLI: it can name every offender in one report and set an exit code CI reads.
+    ///         A library caller has no exit code, so waiting until the run finished would mean measuring
+    ///         everything first and then discarding it. This throws at the point of refusal instead,
+    ///         before any work is done.
+    ///     </para>
+    ///     <para>
+    ///         The message carries the refusal verbatim. A "strict isolation was required" exception with
+    ///         no cause would send the reader back to a stderr line that, in this mode, was never printed.
+    ///     </para>
+    /// </remarks>
+    public static void ThrowIfRequired(
+        MeasurementOptions options,
+        string name,
+        IsolationStatus status,
+        string? refusal)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (!options.RequireIsolation || status.IsIsolated())
+            return;
+
+        var remedy = status.ToRemedy() is { } text ? $" To isolate it: {text}." : "";
+
+        throw new InvalidOperationException(
+            $"'{name}' could not be measured in an isolated worker, and RequireIsolation is set. "
+            + $"It was refused because {refusal ?? "it could not be addressed across a process boundary."}"
+            + remedy);
+    }
+
     /// <returns><c>true</c> when every result was isolated.</returns>
     public static bool Enforce(IReadOnlyList<BenchmarkResult> results, TextWriter error)
     {

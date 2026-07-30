@@ -23,6 +23,13 @@ public sealed class BenchmarkHarness
     private InstanceLifetime _defaultInstanceLifetime = InstanceLifetime.PerMethod;
     private ReportDetail _detail;
     private Func<Type, InstanceHandle>? _instanceFactory;
+
+    /// <summary>
+    ///     The addressable recipe for the service provider, when one was supplied. Its presence is what
+    ///     lets a DI-backed run stay isolated: the instance factory itself is live code the worker cannot
+    ///     be handed, but a factory for the container is something it can run.
+    /// </summary>
+    private Func<IServiceProvider>? _serviceProviderFactory;
     private bool _isolationEnabled = true;
 
     /// <summary>
@@ -293,19 +300,75 @@ public sealed class BenchmarkHarness
     ///     <c>NBenchmark.DependencyInjection</c> package and use
     ///     <c>WithScopedServiceProvider</c> instead.
     /// </summary>
+    /// <remarks>
+    ///     A live provider cannot be sent to a measurement worker, so benchmarks resolved this way are
+    ///     measured in the host process and labelled
+    ///     <see cref="IsolationStatus.InProcessLiveFixture" />. Use
+    ///     <see cref="WithServiceProvider(Func{IServiceProvider})" /> to keep isolation: the worker runs
+    ///     your factory and builds an equivalent container in the process that measures.
+    /// </remarks>
     public BenchmarkHarness WithServiceProvider(IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
 
-        return WithInstanceFactory(type =>
+        return WithInstanceFactory(ResolverFor(serviceProvider));
+    }
+
+    /// <summary>
+    ///     Configures the harness to resolve benchmark instances from a provider built by
+    ///     <paramref name="factory" />, so DI-backed benchmarks can still be measured in a worker.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A service provider is live code: it holds singletons, open connections and closures that
+    ///         cannot cross a process boundary, so passing one costs the run its isolation. The
+    ///         <i>recipe</i> for a provider can cross, though - a static factory that registers the
+    ///         services and builds the container is addressable, and the worker runs it to get an
+    ///         equivalent container in the process doing the measuring:
+    ///     </para>
+    ///     <code>
+    ///     await BenchmarkHarness.Create(args)
+    ///         .AddFromAssembly&lt;MyBenchmarks&gt;()
+    ///         .WithServiceProvider(BuildServices)
+    ///         .RunAsync();
+    ///
+    ///     static IServiceProvider BuildServices() =&gt; new ServiceCollection()
+    ///         .AddSingleton&lt;IDataStore, InMemoryDataStore&gt;()
+    ///         .AddTransient&lt;MyBenchmarks&gt;()
+    ///         .BuildServiceProvider();
+    ///     </code>
+    ///     <para>
+    ///         The container the worker builds is a <i>different instance</i> from the one built here, and
+    ///         that is the point rather than a caveat: a benchmark measured against a container warmed by
+    ///         this process's own startup is measuring that warmth. The factory must capture nothing, for
+    ///         the same reason a benchmark body must.
+    ///     </para>
+    /// </remarks>
+    public BenchmarkHarness WithServiceProvider(Func<IServiceProvider> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        var provider = factory() ?? throw new ArgumentException(
+            "The service provider factory returned null.", nameof(factory));
+
+        _serviceProviderFactory = factory;
+
+        return WithInstanceFactory(ResolverFor(provider));
+    }
+
+    /// <summary>
+    ///     The instance resolver for a provider, shared by both <c>WithServiceProvider</c> overloads so
+    ///     the host-side behaviour cannot differ between them.
+    /// </summary>
+    private static Func<Type, InstanceHandle> ResolverFor(IServiceProvider serviceProvider)
+        => type =>
         {
             var instance = serviceProvider.GetService(type)
                            ?? throw new InvalidOperationException(
                                $"No service of type '{type.FullName}' is registered in the service provider.");
 
             return InstanceHandle.NoTeardown(instance);
-        });
-    }
+        };
 
     /// <summary>
     ///     Requires a minimum strategy-defined practical effect in [0, 1] for a candidate
@@ -729,7 +792,8 @@ public sealed class BenchmarkHarness
                 var workerDecision = inProcessGlobal
                     ? new WorkerRunPlan.Decision(WorkerRunPlan.Refusal.RequestedInProcess, null)
                     : WorkerRunPlan.ForDiscoveredClass(
-                        suite.Type.Assembly.Location, _instanceFactory is not null, suiteOptions);
+                        suite.Type.Assembly.Location, _instanceFactory is not null, suiteOptions,
+                        _serviceProviderFactory);
 
                 if (workerDecision is { CanIsolate: false, Explanation: { } explanation })
                     EmitIsolationRefusal(suite.Type.Name, explanation);
@@ -1083,7 +1147,7 @@ public sealed class BenchmarkHarness
 
             var displayNames = suite.Benchmarks.Select(b => b.DisplayName).ToList();
 
-            var request = new RunGroupPayload
+            var request = WorkerRunPlan.WithStrategies(new RunGroupPayload
             {
                 GroupId = $"{tfm}:{suite.Type.Name}",
                 Kind = WorkGroupKind.DiscoveredClass,
@@ -1101,13 +1165,12 @@ public sealed class BenchmarkHarness
                 // launch count multiplied by the runtime count would be a different, longer run than
                 // the one asked for.
                 Options = options,
-                OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
-                SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
+                ServiceProviderFactory = WorkerRunPlan.ServiceProviderFactoryRef(_serviceProviderFactory),
                 Order = _cliArgs.RunOrder ?? _runOrder,
                 Seed = _cliArgs.Seed,
                 DefaultInstanceLifetime = _defaultInstanceLifetime,
                 TotalBenchmarks = displayNames.Count,
-            };
+            }, options);
 
             var group = await WorkerLauncher.Current.RunGroupAsync(
                     request, _progress, observer, MeasurementBudget.For(options, displayNames.Count),
@@ -1704,8 +1767,7 @@ public sealed class BenchmarkHarness
                 replicate,
                 startIndex,
                 totalBenchmarks,
-                WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
-                WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _));
+                WorkerRunPlan.ServiceProviderFactoryRef(_serviceProviderFactory));
 
             allLaunchItems.Add(
                 await RunGroupInWorkerAsync(request, replicate, names, suite, timeout, observer, cancellationToken)

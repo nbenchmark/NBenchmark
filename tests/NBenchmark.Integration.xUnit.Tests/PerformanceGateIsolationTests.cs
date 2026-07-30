@@ -109,7 +109,15 @@ public sealed class PerformanceGateIsolationTests
 
         // The reason carries its own remedy; a failure that does not say what to do about it just
         // relocates the problem to whoever reads the CI log.
-        Assert.Contains("a worker cannot reproduce it", violation);
+        //
+        // Asserted against ToRemedy() rather than against a copy of its text. A literal here pins the
+        // wording rather than the requirement, so improving the advice breaks the test that exists to
+        // guarantee advice is present - which is what happened when the remedy was rewritten to name
+        // the static-factory shape.
+        var remedy = IsolationStatus.InProcessLiveFixture.ToRemedy();
+
+        Assert.NotNull(remedy);
+        Assert.Contains(remedy, violation);
     }
 
     [Fact]

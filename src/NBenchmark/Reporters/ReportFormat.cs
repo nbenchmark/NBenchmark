@@ -111,7 +111,23 @@ public static class ReportFormat
     ///                 </list>
     ///             </description>
     ///         </item>
+    ///         <item>
+    ///             <term>3</term>
+    ///             <description>
+    ///                 Shapes that previously fell back to the host process are now measured in a
+    ///                 worker: parameter sweeps, suite and per-iteration lifecycle, custom statistical
+    ///                 strategies built with constructor arguments, and DI-resolved benchmark instances.
+    ///                 <para>
+    ///                     No statistic was redefined and no harness overhead changed - a row that was
+    ///                     already isolated reports the same number as under epoch 2. But a row that was
+    ///                     <i>not</i> moves by however much the host's JIT tiering was worth to it, which
+    ///                     on bodies of provably identical cost was up to 3.3x. That is a change of
+    ///                     measurement regime for those rows, which is exactly what this counter exists to
+    ///                     announce; a stored baseline covering any of them is not comparable across it.
+    ///                 </para>
+    ///             </description>
+    ///         </item>
     ///     </list>
     /// </remarks>
-    public const int MeasurementEpoch = 2;
+    public const int MeasurementEpoch = 3;
 }

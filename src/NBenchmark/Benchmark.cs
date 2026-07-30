@@ -16,10 +16,17 @@ namespace NBenchmark;
 ///         plausible, silently wrong numbers.
 ///     </para>
 ///     <para>
-///         All eight overloads keep their original signatures, including the synchronous return of
+///         Every original overload keeps its signature, including the synchronous return of
 ///         <see cref="Run(Action, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />.
 ///         Use the <c>RunInProcess</c> family when measuring the current process is the point -
 ///         cold-start cost, or a body that must observe host state.
+///     </para>
+///     <para>
+///         For a benchmark over prepared data, pass the preparation as its own delegate:
+///         <c>Run(prepare: () =&gt; BuildData(), body: d =&gt; Sort(d))</c>. The <c>var data = Build();
+///         Run(() =&gt; Sort(data))</c> shape captures, so it can only be refused - splitting it makes
+///         both halves addressable and the worker builds the data itself. See
+///         <see cref="Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />.
 ///     </para>
 /// </summary>
 public static class Benchmark
@@ -79,6 +86,106 @@ public static class Benchmark
         IBenchmarkProgress? progress = null,
         CancellationToken cancellationToken = default)
         => MeasureAsync(action, options, name, progress, cancellationToken);
+
+    // ---------- Prepared state ----------
+
+    /// <summary>
+    ///     Measures <paramref name="body" /> over state built by <paramref name="prepare" />.
+    ///     <para>
+    ///         This is the isolatable form of the shape everyone writes first:
+    ///         <c>var data = Build(); Run(() =&gt; Sort(data));</c>. That lambda <i>captures</i>
+    ///         <c>data</c>, and a capture can only be refused - the value exists in this process and
+    ///         nowhere else, and fabricating it in a worker was measured to return plausible, silently
+    ///         wrong numbers. Splitting it in two makes both halves non-capturing, so the worker gets a
+    ///         recipe for the data rather than a value it cannot have:
+    ///     </para>
+    ///     <code>
+    ///     Benchmark.Run(
+    ///         prepare: () =&gt; BuildData(),
+    ///         body:    d  =&gt; Sort(d));
+    ///     </code>
+    /// </summary>
+    /// <param name="prepare">
+    ///     Builds the state, once, before warmup, in the process that measures - so the cost of building
+    ///     it is never inside a reading. Must capture nothing itself, for the same reason the body must.
+    /// </param>
+    /// <param name="body">The measured code, receiving what <paramref name="prepare" /> returned.</param>
+    /// <remarks>
+    ///     <paramref name="prepare" /> runs <b>once</b>, not per iteration. A body that mutates its state
+    ///     therefore sees the mutation on every iteration after the first - <c>d =&gt; Array.Sort(d)</c>
+    ///     sorts an already-sorted array from the second sample onward. Where that matters, reset it with
+    ///     the per-iteration hooks on <see cref="BenchmarkSuite" />, which run outside the timed region.
+    /// </remarks>
+    public static BenchmarkResult Run<TState>(Func<TState> prepare, Action<TState> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => RunRaw(prepare, body, options, name, progress, cancellationToken).Result;
+
+    /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static BenchmarkResult Run<TState, T>(Func<TState> prepare, Func<TState, T> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => RunRaw(prepare, body, options, name, progress, cancellationToken).Result;
+
+    /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static async Task<BenchmarkResult> RunAsync<TState>(Func<TState> prepare, Func<TState, Task> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => (await RunRawAsync(prepare, body, options, name, progress, cancellationToken).ConfigureAwait(false)).Result;
+
+    /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static async Task<BenchmarkResult> RunAsync<TState, T>(Func<TState> prepare, Func<TState, Task<T>> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => (await RunRawAsync(prepare, body, options, name, progress, cancellationToken).ConfigureAwait(false)).Result;
+
+    /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static MeasurementOutcome RunRaw<TState>(Func<TState> prepare, Action<TState> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => MeasureWithState(
+                prepare, body, BindStateSync(prepare, body), options, name, progress, cancellationToken)
+            .GetAwaiter()
+            .GetResult();
+
+    /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static MeasurementOutcome RunRaw<TState, T>(Func<TState> prepare, Func<TState, T> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => MeasureWithState(
+                prepare, body, BindStateValue(prepare, body), options, name, progress, cancellationToken)
+            .GetAwaiter()
+            .GetResult();
+
+    /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static Task<MeasurementOutcome> RunRawAsync<TState>(Func<TState> prepare, Func<TState, Task> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => MeasureWithState(
+            prepare, body, BindStateAsync(prepare, body), options, name, progress, cancellationToken);
+
+    /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static Task<MeasurementOutcome> RunRawAsync<TState, T>(Func<TState> prepare, Func<TState, Task<T>> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => MeasureWithState(
+            prepare, body, BindStateAsyncValue(prepare, body), options, name, progress, cancellationToken);
 
     /// <summary>
     ///     Measures in <b>this</b> process, deliberately and without a warning.
@@ -140,6 +247,38 @@ public static class Benchmark
         return Stamp(outcome, IsolationStatus.InProcessRequested).Result;
     }
 
+    /// <inheritdoc cref="RunInProcess(Action, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static BenchmarkResult RunInProcess<TState>(Func<TState> prepare, Action<TState> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => MeasureHere(BindStateSync(prepare, body), options, name, progress, cancellationToken).Result;
+
+    /// <inheritdoc cref="RunInProcess(Action, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static BenchmarkResult RunInProcess<TState, T>(Func<TState> prepare, Func<TState, T> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => MeasureHere(BindStateValue(prepare, body), options, name, progress, cancellationToken).Result;
+
+    /// <inheritdoc cref="RunInProcess(Action, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static Task<BenchmarkResult> RunInProcessAsync<TState>(Func<TState> prepare, Func<TState, Task> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => RunInProcessAsync(BindStateAsync(prepare, body), options, name, progress, cancellationToken);
+
+    /// <inheritdoc cref="RunInProcess(Action, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    public static Task<BenchmarkResult> RunInProcessAsync<TState, T>(Func<TState> prepare, Func<TState, Task<T>> body,
+        MeasurementOptions? options = null,
+        string name = "Benchmark",
+        IBenchmarkProgress? progress = null,
+        CancellationToken cancellationToken = default)
+        => RunInProcessAsync(BindStateAsyncValue(prepare, body), options, name, progress, cancellationToken);
+
     /// <summary>
     ///     Starts a measurement worker in the background so the first
     ///     <see cref="Run(Action, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
@@ -186,23 +325,112 @@ public static class Benchmark
         MeasurementOptions? options,
         string name,
         IBenchmarkProgress? progress,
-        CancellationToken cancellationToken) where TDelegate : Delegate
+        CancellationToken cancellationToken,
+        Delegate? stateFactory = null,
+        Delegate? inProcessBody = null) where TDelegate : Delegate
     {
         ArgumentNullException.ThrowIfNull(action);
 
         var effective = options ?? MeasurementOptions.Default;
         EmitBuildConfigurationGuidanceOnce(options);
 
+        // The isolated path measures `action` with the state bound in the worker; the fallback measures
+        // an equivalent delegate with the state bound here. Two delegates rather than one because the
+        // worker must receive the body *unbound* - a body already closed over a value built in this
+        // process is exactly the capturing shape that cannot be addressed.
+        var here = inProcessBody ?? action;
+
         var (outcome, status) = await SingleBodyRunner.RunAsync(
                 name,
                 action,
                 effective,
                 progress ?? NullBenchmarkProgress.Instance,
-                () => MeasureHereAsync(action, effective, name, progress, cancellationToken),
-                cancellationToken)
+                () => MeasureHereAsync(here, effective, name, progress, cancellationToken),
+                cancellationToken,
+                stateFactory)
             .ConfigureAwait(false);
 
         return Stamp(outcome, status);
+    }
+
+    /// <summary>
+    ///     Measures a prepared-state body: isolated when both delegates can be addressed, and in this
+    ///     process - with the state built here - when they cannot.
+    /// </summary>
+    /// <remarks>
+    ///     Two delegates travel, not one. The worker must receive the body <b>unbound</b>, because a body
+    ///     already closed over a value built in this process is precisely the capturing shape that cannot
+    ///     be addressed; the pre-bound <paramref name="inProcessBody" /> exists only for the fallback.
+    /// </remarks>
+    private static Task<MeasurementOutcome> MeasureWithState<TBody>(
+        Delegate prepare,
+        TBody body,
+        Delegate inProcessBody,
+        MeasurementOptions? options,
+        string name,
+        IBenchmarkProgress? progress,
+        CancellationToken cancellationToken) where TBody : Delegate
+    {
+        ArgumentNullException.ThrowIfNull(prepare);
+        ArgumentNullException.ThrowIfNull(body);
+
+        return MeasureAsync(body, options, name, progress, cancellationToken, prepare, inProcessBody);
+    }
+
+    /// <summary>
+    ///     A one-shot accessor for the prepared state, built on first use and reused after.
+    /// </summary>
+    /// <remarks>
+    ///     Deferred rather than eager so <paramref name="prepare" /> runs only if the in-process path is
+    ///     actually taken - an isolated run builds its state in the worker, and building it here as well
+    ///     would run the user's preparation twice, once for a delegate nothing measures. Cached rather
+    ///     than per-call because the engine invokes the body thousands of times, and rebuilding would put
+    ///     the cost of preparation inside every reading. Both match what the worker does: once, before
+    ///     warmup.
+    /// </remarks>
+    private static Func<TState> LazyState<TState>(Func<TState> prepare)
+    {
+        var built = false;
+        TState state = default!;
+
+        return () =>
+        {
+            if (built)
+                return state;
+
+            state = prepare();
+            built = true;
+
+            return state;
+        };
+    }
+
+    private static Action BindStateSync<TState>(Func<TState> prepare, Action<TState> body)
+    {
+        var state = LazyState(prepare);
+
+        return () => body(state());
+    }
+
+    private static Func<T> BindStateValue<TState, T>(Func<TState> prepare, Func<TState, T> body)
+    {
+        var state = LazyState(prepare);
+
+        return () => body(state());
+    }
+
+    private static Func<Task> BindStateAsync<TState>(Func<TState> prepare, Func<TState, Task> body)
+    {
+        var state = LazyState(prepare);
+
+        return () => body(state());
+    }
+
+    private static Func<Task<T>> BindStateAsyncValue<TState, T>(Func<TState> prepare, Func<TState, Task<T>> body)
+    {
+        var state = LazyState(prepare);
+
+        return () => body(state());
     }
 
     private static MeasurementOutcome MeasureHere<TDelegate>(

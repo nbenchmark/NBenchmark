@@ -138,6 +138,46 @@ public sealed class MonomorphicDispatchTests
             KnownCostBenchmarks.TargetNanoseconds * 4.0);
     }
 
+    /// <summary>
+    ///     A body reached through <see cref="ArgumentBinder" /> - a parameter sweep's value, or prepared
+    ///     state - allocates nothing per operation and still reaches the elision sink.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Binding wraps the body as <c>() =&gt; body(argument)</c>. That closure is created once,
+    ///         before warmup, and boxing the argument to pass it through reflection happens there too -
+    ///         so neither belongs to a reading. This asserts that: had the binder instead adapted through
+    ///         a <c>Func&lt;object&gt;</c>, or rebuilt the wrapper per invocation, the box would land
+    ///         inside the loop and show up here as 24 bytes.
+    ///     </para>
+    ///     <para>
+    ///         The shape is identical to what an in-process parameterized suite has always measured, which
+    ///         is the property that makes an isolated reading comparable with a host one at all.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task An_Argument_Bound_Body_Allocates_Nothing_And_Reaches_The_Sink()
+    {
+        var expected = new Token(Expected + 7);
+
+        Assert.True(ArgumentBinder.TryBind(
+            (Func<long, Token>)(value => new Token(value)),
+            [expected.Value],
+            out var bound,
+            out var error));
+
+        Assert.Null(error);
+
+        var outcome = await DelegateDispatch.MeasureAsync(
+            "argument-bound", bound, Spec(), CancellationToken.None);
+
+        Assert.False(outcome.Result.Errored, outcome.Result.ErrorMessage);
+        Assert.Equal(0, outcome.Result.AllocMedian);
+
+        // The bound argument really reached the body, and the body's result really reached the sink.
+        Assert.Equal(expected, BenchmarkRunner.LastConsumed<Token>());
+    }
+
     private static async Task<MeasurementOutcome> MeasureAsync<T>() where T : new()
     {
         var suite = new BenchmarkDiscoverer().Discover(typeof(T)).Single();

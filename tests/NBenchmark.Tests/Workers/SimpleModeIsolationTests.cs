@@ -249,6 +249,199 @@ public sealed class SimpleModeIsolationTests : IDisposable
         Assert.Equal(IsolationStatus.InProcessNoWorker, result.IsolationStatus);
         Assert.Contains("nbworker", stderr.ToString());
     }
+
+    // ---------- Prepared state ----------
+
+    /// <summary>
+    ///     A benchmark over prepared data is isolated when the preparation is its own delegate.
+    /// </summary>
+    /// <remarks>
+    ///     The contrast with <see cref="Run_CapturingLambda_FallsBackAndSaysSo" /> is the whole point:
+    ///     the same benchmark, over the same data, isolated or not depending only on whether the data
+    ///     arrives as a captured value or as a recipe the worker can follow.
+    /// </remarks>
+    [Fact]
+    public void Run_WithPreparedState_IsMeasuredInAWorker()
+    {
+        var result = Benchmark.Run(
+            prepare: () => Enumerable.Range(0, 512).Reverse().ToArray(),
+            body: data => data[^1],
+            FastOptions,
+            name: "prepared");
+
+        Assert.False(result.Errored, result.ErrorMessage);
+        AssertIsolated(result);
+
+        Assert.Equal("steady-state", result.RuntimeProfileName);
+        Assert.NotEmpty(result.RawSamples);
+    }
+
+    /// <summary>
+    ///     The prepare delegate runs in the worker, not here, and runs exactly once.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Both halves are load-bearing and neither is observable directly across a process
+    ///         boundary, so the benchmark's own cost carries the evidence: the state is the spin count,
+    ///         so a body measured over unprepared state would be immeasurably fast.
+    ///     </para>
+    ///     <para>
+    ///         "Exactly once" matters because the alternative is invisible. Building the state per
+    ///         invocation would still produce a plausible number - it would simply include the cost of
+    ///         preparation in every reading, which is what a benchmark over prepared data exists to
+    ///         exclude. The counter proves the worker did not do that.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void Run_WithPreparedState_BuildsStateOnceInTheWorker()
+    {
+        var result = Benchmark.Run(
+            prepare: () => PreparedStateProbe.Build(),
+            body: spins => Thread.SpinWait(spins),
+            FastOptions,
+            name: "prepared-once");
+
+        Assert.False(result.Errored, result.ErrorMessage);
+        AssertIsolated(result);
+
+        Assert.True(
+            result.Median > 10_000,
+            $"expected the worker to have built the state before measuring, but the body cost "
+            + $"{result.Median:F1} ns - which is what an unprepared state would produce");
+
+        // This process never built it, which is the other half of the same claim.
+        Assert.Equal(0, PreparedStateProbe.Builds);
+    }
+
+    /// <summary>
+    ///     A prepare delegate that captures is refused, exactly as a capturing body is.
+    /// </summary>
+    /// <remarks>
+    ///     Splitting the shape is only worth anything if both halves are held to the same rule. A
+    ///     capturing factory would leave the value in this process while claiming to be a recipe for it,
+    ///     which is the reconstruction hazard wearing a different hat.
+    /// </remarks>
+    [Fact]
+    public void Run_WithCapturingPrepare_FallsBackAndSaysSo()
+    {
+        var size = 512;
+
+        using var stderr = new StringWriter();
+        var priorError = Console.Error;
+        Console.SetError(stderr);
+
+        BenchmarkResult result;
+
+        try
+        {
+            result = Benchmark.Run(
+                prepare: () => new int[size],
+                body: data => data.Length,
+                FastOptions,
+                name: "captured-prepare");
+        }
+        finally
+        {
+            Console.SetError(priorError);
+        }
+
+        Assert.False(result.Errored, result.ErrorMessage);
+        Assert.Equal(IsolationStatus.InProcessCapturedState, result.IsolationStatus);
+
+        var message = stderr.ToString();
+        Assert.Contains("prepare delegate", message);
+        Assert.Contains("captures", message);
+    }
+
+    /// <summary>
+    ///     The fallback path builds the state here, once, and outside the timed region.
+    /// </summary>
+    /// <remarks>
+    ///     With no worker available there is nothing to address, so the whole thing is measured in this
+    ///     process - and must still honour the contract that preparation is not part of the reading.
+    /// </remarks>
+    [Fact]
+    public void Run_WithPreparedState_AndNoWorker_BuildsStateOnceHere()
+    {
+        using var _ = FakeWorkerLauncher.InstallUnavailable();
+        SimpleModeGuidance.ResetForTesting();
+
+        var builds = 0;
+
+        using var stderr = new StringWriter();
+        var priorError = Console.Error;
+        Console.SetError(stderr);
+
+        BenchmarkResult result;
+
+        try
+        {
+            result = Benchmark.Run(
+                prepare: () =>
+                {
+                    builds++;
+
+                    return 200_000;
+                },
+                body: spins => Thread.SpinWait(spins),
+                FastOptions,
+                name: "prepared-fallback");
+        }
+        finally
+        {
+            Console.SetError(priorError);
+        }
+
+        Assert.False(result.Errored, result.ErrorMessage);
+        Assert.Equal(IsolationStatus.InProcessNoWorker, result.IsolationStatus);
+
+        Assert.Equal(1, builds);
+        Assert.True(result.Median > 10_000, $"body measured {result.Median:F1} ns");
+    }
+
+    /// <summary>
+    ///     <c>RunInProcess</c> accepts prepared state too, so opting into the host process does not cost
+    ///     the shape.
+    /// </summary>
+    [Fact]
+    public void RunInProcess_WithPreparedState_MeasuresHereWithoutComplaint()
+    {
+        var builds = 0;
+
+        var result = Benchmark.RunInProcess(
+            prepare: () =>
+            {
+                builds++;
+
+                return 512;
+            },
+            body: size => size + 1,
+            FastOptions,
+            name: "prepared-here");
+
+        Assert.False(result.Errored, result.ErrorMessage);
+        Assert.Equal(IsolationStatus.InProcessRequested, result.IsolationStatus);
+        Assert.Equal(1, builds);
+    }
+}
+
+/// <summary>
+///     A prepare delegate the worker can address, counting builds in whichever process runs it.
+/// </summary>
+/// <remarks>
+///     Static so the lambda naming it captures nothing. The counter is per-process by construction,
+///     which is exactly what makes it evidence about <i>where</i> preparation happened.
+/// </remarks>
+internal static class PreparedStateProbe
+{
+    public static int Builds;
+
+    public static int Build()
+    {
+        Builds++;
+
+        return 200_000;
+    }
 }
 
 /// <summary>

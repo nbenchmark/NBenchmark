@@ -384,12 +384,24 @@ public sealed class CapturingBodyAnalyzerTests
     }
 
     /// <summary>
-    ///     A parameterized suite is refused isolation for its parameter values, which exist only in
-    ///     this process, whether or not any body captures. Reporting a capture here would point at
-    ///     something whose removal would not restore isolation.
+    ///     A capture in a <i>parameterized</i> body is reported.
     /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This assertion is the inverse of the one it replaces, and the replacement is the point
+    ///         rather than an accommodation. The old rule stayed silent here on sound reasoning: a suite
+    ///         carrying parameters was refused isolation for the parameter values themselves, so naming a
+    ///         capture would have pointed at something whose removal changed nothing - the developer
+    ///         deletes it, reruns, and is still in-process with no new information.
+    ///     </para>
+    ///     <para>
+    ///         Parameter values now travel as serialized constants and a sweep is isolated like any other
+    ///         suite. The capture is therefore the only remaining obstacle, which makes it exactly what
+    ///         the developer needs told.
+    ///     </para>
+    /// </remarks>
     [Fact]
-    public async Task No_diagnostic_for_a_parameterized_suite_body()
+    public async Task Reports_a_capture_in_a_parameterized_suite_body()
     {
         var code = """
                    using NBenchmark;
@@ -399,6 +411,27 @@ public sealed class CapturingBodyAnalyzerTests
                            new BenchmarkSuite("s")
                                .WithParameter("n", 1, 2)
                                .Add<int>("Sort", n => System.Array.Sort(data, 0, n));
+                       }
+                   }
+                   """;
+
+        await NBAnalyzerVerifier<CapturingBodyAnalyzer>.VerifyAnalyzerAsync(code, "NB0014");
+    }
+
+    /// <summary>
+    ///     A parameterized body that captures nothing stays silent: its parameter is supplied at each
+    ///     invocation, not closed over, so there is nothing standing between it and a worker.
+    /// </summary>
+    [Fact]
+    public async Task No_diagnostic_for_a_self_contained_parameterized_body()
+    {
+        var code = """
+                   using NBenchmark;
+                   public class C {
+                       public void M() {
+                           new BenchmarkSuite("s")
+                               .WithParameter("n", 1, 2)
+                               .Add<int>("Sort", n => System.Array.Sort(new int[n]));
                        }
                    }
                    """;

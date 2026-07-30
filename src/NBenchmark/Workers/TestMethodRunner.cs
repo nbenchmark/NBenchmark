@@ -389,7 +389,7 @@ public static class TestMethodRunner
             };
         }
 
-        return new RunGroupPayload
+        return WorkerRunPlan.WithStrategies(new RunGroupPayload
         {
             GroupId = $"test:{declaringType.FullName}.{subjects[0].Method.Name}#{replicate}",
             Kind = WorkGroupKind.TestMethod,
@@ -400,8 +400,6 @@ public static class TestMethodRunner
             BenchmarkNames = subjects.Select(s => s.DisplayName).ToList(),
 
             Options = options,
-            OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
-            SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
 
             // Order matters only once there are two bodies in the group, and then it matters a lot:
             // measured in a fixed order every time, whichever runs first carries the cost of warming
@@ -410,6 +408,6 @@ public static class TestMethodRunner
             Order = subjects.Count > 1 ? RunOrder.Random : RunOrder.Declaration,
             TotalBenchmarks = subjects.Count,
             MeasureCalibration = measureCalibration,
-        };
+        }, options);
     }
 }

@@ -74,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 4;
+    public const int Version = 5;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -261,6 +261,24 @@ internal sealed record RunGroupPayload
     public IReadOnlyList<BodyRef> Bodies { get; init; } = [];
 
     /// <summary>
+    ///     <see cref="WorkGroupKind.Lambdas" />: the suite's own setup, run once in the worker before
+    ///     any benchmark in the group.
+    ///     <para>
+    ///         In the worker rather than the coordinator because that is the only place it can do
+    ///         anything useful. A setup run on this side would warm a cache, fill a buffer or open a
+    ///         handle in a process that then measures nothing - which is why the presence of one used to
+    ///         disqualify a suite from isolation altogether.
+    ///     </para>
+    /// </summary>
+    public BodyRef? SuiteSetup { get; init; }
+
+    /// <summary>
+    ///     <see cref="WorkGroupKind.Lambdas" />: the suite's own teardown, run once after the group's
+    ///     work, before the worker reports completion.
+    /// </summary>
+    public BodyRef? SuiteTeardown { get; init; }
+
+    /// <summary>
     ///     <see cref="WorkGroupKind.Plan" />: the factory method's name, resolved against
     ///     <see cref="DeclaringTypeFullName" /> rather than by metadata token.
     ///     <para>
@@ -344,6 +362,38 @@ internal sealed record RunGroupPayload
 
     /// <summary>Assembly-qualified type name of a custom <see cref="Stats.ISignificanceTest" />.</summary>
     public string? SignificanceTestTypeName { get; init; }
+
+    /// <summary>
+    ///     Address of a factory producing the custom <see cref="Stats.IOutlierDetector" />, used in
+    ///     preference to <see cref="OutlierDetectorTypeName" /> when the caller supplied one.
+    ///     <para>
+    ///         A type name can only rebuild a detector with a parameterless constructor. A factory
+    ///         rebuilds a configured one - <c>new KeepFastestDetector(0.9)</c> - which previously cost
+    ///         the whole group its isolation, because scoring under a silently substituted statistical
+    ///         method is worse than measuring in the host and saying so.
+    ///     </para>
+    /// </summary>
+    public BodyRef? OutlierDetectorFactory { get; init; }
+
+    /// <summary>
+    ///     Address of a factory producing the custom <see cref="Stats.ISignificanceTest" />, for the
+    ///     reason given on <see cref="OutlierDetectorFactory" />.
+    /// </summary>
+    public BodyRef? SignificanceTestFactory { get; init; }
+
+    /// <summary>
+    ///     Address of a factory producing the <see cref="IServiceProvider" /> that resolves benchmark
+    ///     instances, for <see cref="WorkGroupKind.DiscoveredClass" /> groups using dependency
+    ///     injection.
+    ///     <para>
+    ///         A service provider is live code and cannot be sent. But the <i>recipe</i> for one can be:
+    ///         a static factory that registers the services and builds the container is addressable, so
+    ///         the worker constructs an equivalent container in its own process. Without it, every
+    ///         DI-backed benchmark was measured in the host - the case
+    ///         <see cref="Refusal.LiveInstanceFactory" /> exists for.
+    ///     </para>
+    /// </summary>
+    public BodyRef? ServiceProviderFactory { get; init; }
 
     public RunOrder Order { get; init; } = RunOrder.Declaration;
 

@@ -213,6 +213,27 @@ public record MeasurementOptions
     public IOutlierDetector? OutlierDetector { get; init; }
 
     /// <summary>
+    ///     A factory for <see cref="OutlierDetector" />, which is what lets a detector needing
+    ///     constructor arguments be used in an isolated run.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Sending a type name works only for a detector with a parameterless constructor. Anything
+    ///         configured - <c>new KeepFastestDetector(0.9)</c> - could not be rebuilt in the worker, so
+    ///         the whole group was measured in the host process instead, to avoid the far worse outcome
+    ///         of scoring it under a different statistical method than the caller chose.
+    ///     </para>
+    ///     <para>
+    ///         A static, non-capturing factory is addressable, so the worker can run it and get the
+    ///         caller's own detector with its own arguments. Set alongside
+    ///         <see cref="OutlierDetector" /> rather than instead of it: the coordinator still needs a
+    ///         live instance for its own scoring, and the factory is only how the worker obtains one.
+    ///     </para>
+    /// </remarks>
+    [JsonIgnore]
+    public Func<IOutlierDetector>? OutlierDetectorFactory { get; init; }
+
+    /// <summary>
     ///     Confidence level for the interval reported on the mean (e.g. 0.95 for 95%).
     ///     Must be strictly between 0 and 1.
     /// </summary>
@@ -334,6 +355,13 @@ public record MeasurementOptions
     public ISignificanceTest? SignificanceTest { get; init; }
 
     /// <summary>
+    ///     A factory for <see cref="SignificanceTest" />, for the reason given on
+    ///     <see cref="OutlierDetectorFactory" />.
+    /// </summary>
+    [JsonIgnore]
+    public Func<ISignificanceTest>? SignificanceTestFactory { get; init; }
+
+    /// <summary>
     ///     The significance level (alpha) a benchmark's p-value must fall below to be
     ///     reported as a statistically significant change versus the baseline. Must be
     ///     strictly between 0 and 1. Default 0.05. Tighten (e.g. 0.001) to gate releases
@@ -425,6 +453,32 @@ public record MeasurementOptions
     ///     is unaffected - suppressing the message never suppresses the provenance.
     /// </summary>
     public bool SuppressRuntimeProfileWarning { get; init; }
+
+    /// <summary>
+    ///     Turns an isolation refusal into a thrown exception rather than a labelled fallback.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Off by default, because falling back is the right behaviour for the scratchpad use Simple
+    ///         mode exists for: a number measured in this process, clearly labelled, beats no number at
+    ///         all. A run whose whole point is a trustworthy comparison wants the opposite, and until now
+    ///         only Harness mode could ask for it - <c>--strict-isolation</c> inspects results after the
+    ///         fact and sets an exit code, which a library caller has no access to.
+    ///     </para>
+    ///     <para>
+    ///         Set this and a refusal throws, carrying the refusal text, at the point of refusal - before
+    ///         anything has been measured. That is the earliest a caller can act on it and the cheapest
+    ///         place to fail.
+    ///     </para>
+    ///     <para>
+    ///         Excluded from serialization: this is a decision the coordinator makes before a worker
+    ///         exists, and a worker that received it could do nothing with it. A coordinator-only field
+    ///         travelling to a process that ignores it is how a setting comes to look effective while
+    ///         being inert.
+    ///     </para>
+    /// </remarks>
+    [JsonIgnore]
+    public bool RequireIsolation { get; init; }
 
     /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
     public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };

@@ -25,22 +25,31 @@ namespace NBenchmark.Workers;
 internal static class InlineSuitePlan
 {
     /// <summary>What stops an inline suite from being measured in a worker.</summary>
-    internal readonly record struct Decision(IsolationStatus Status, string? Explanation, IReadOnlyList<BodyRef> Bodies)
+    internal readonly record struct Decision(
+        IsolationStatus Status,
+        string? Explanation,
+        IReadOnlyList<BodyRef> Bodies)
     {
         public bool CanIsolate => Status.IsIsolated();
+
+        /// <summary>The suite's own setup, addressed, when it has one.</summary>
+        public BodyRef? SuiteSetup { get; init; }
+
+        /// <inheritdoc cref="SuiteSetup" />
+        public BodyRef? SuiteTeardown { get; init; }
 
         public static Decision Refuse(IsolationStatus status, string explanation) => new(status, explanation, []);
     }
 
     /// <summary>
-    ///     Addresses every benchmark body in the suite, or explains the first thing that made it
-    ///     impossible.
+    ///     Addresses every benchmark body in the suite - and its lifecycle delegates - or explains the
+    ///     first thing that made it impossible.
     /// </summary>
     public static Decision TryAddress(
         IReadOnlyList<BenchmarkEnvelope> benchmarks,
         MeasurementOptions options,
-        bool hasSuiteLifecycle,
-        bool hasParameters)
+        Delegate? suiteSetup,
+        Delegate? suiteTeardown)
     {
         if (!WorkerLauncher.Current.IsAvailable)
         {
@@ -48,25 +57,6 @@ internal static class InlineSuitePlan
                 IsolationStatus.InProcessNoWorker,
                 "the measurement worker (nbworker) is not deployed alongside this application. "
                 + $"Looked in {WorkerLocator.DescribeSearch()}.");
-        }
-
-        if (hasSuiteLifecycle)
-        {
-            return Decision.Refuse(
-                IsolationStatus.InProcessUnaddressablePlan,
-                "the suite has setup or teardown delegates, which live in this process and would "
-                + "otherwise run on the wrong side of the boundary - preparing state the benchmarks "
-                + "never see. Move the suite into a static [BenchmarkPlan] factory so the worker can "
-                + "build it, lifecycle included.");
-        }
-
-        if (hasParameters)
-        {
-            return Decision.Refuse(
-                IsolationStatus.InProcessUnaddressablePlan,
-                "parameterized benchmarks close over their parameter values, which exist only in "
-                + "this process. Move the suite into a static [BenchmarkPlan] factory so the worker "
-                + "produces the parameter values itself.");
         }
 
         if (WorkerRunPlan.UnrebuildableStrategy(options) is { } strategyRefusal)
@@ -77,18 +67,19 @@ internal static class InlineSuitePlan
                 + "worker constructs it the same way you did.");
         }
 
+        // The suite's lifecycle is addressed rather than refused for existing. A setup that captures
+        // still cannot cross - it would have to run here and prepare state the benchmarks never see -
+        // but one that captures nothing is exactly as reproducible in the worker as the bodies are.
+        if (!TryAddressHook(suiteSetup, "WithSuiteSetup", out var setupRef, out var lifecycleRefusal))
+            return Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal!);
+
+        if (!TryAddressHook(suiteTeardown, "WithSuiteTeardown", out var teardownRef, out lifecycleRefusal))
+            return Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal!);
+
         var bodies = new List<BodyRef>(benchmarks.Count);
 
         foreach (var benchmark in benchmarks)
         {
-            if (benchmark.HasIterationHooks)
-            {
-                return Decision.Refuse(
-                    IsolationStatus.InProcessUnaddressablePlan,
-                    $"'{benchmark.Name}' has per-iteration setup or teardown, which are delegates in "
-                    + "this process. Move the suite into a static [BenchmarkPlan] factory.");
-            }
-
             if (benchmark.Body is null)
             {
                 return Decision.Refuse(
@@ -98,7 +89,13 @@ internal static class InlineSuitePlan
                     + "factory.");
             }
 
-            if (!BodyRef.TryCreate(benchmark.Body, benchmark.Name, out var bodyRef, out var refusal))
+            if (!BodyRef.TryCreate(
+                    benchmark.Body,
+                    benchmark.Name,
+                    out var bodyRef,
+                    out var refusal,
+                    benchmark.Arguments,
+                    benchmark.StateFactory))
             {
                 // Overwhelmingly the common case: the lambda captures a local. Naming the benchmark
                 // matters, because a suite has several and only one of them is the problem.
@@ -112,13 +109,78 @@ internal static class InlineSuitePlan
                     + "a static [BenchmarkPlan] factory so the worker builds that state itself.");
             }
 
-            bodies.Add(bodyRef);
+            if (!TryAddressHook(
+                    benchmark.IterationSetup,
+                    $"'{benchmark.Name}' per-iteration setup",
+                    out var iterationSetup,
+                    out var hookRefusal))
+            {
+                return Decision.Refuse(HookStatus(hookRefusal), hookRefusal!);
+            }
+
+            if (!TryAddressHook(
+                    benchmark.IterationTeardown,
+                    $"'{benchmark.Name}' per-iteration teardown",
+                    out var iterationTeardown,
+                    out hookRefusal))
+            {
+                return Decision.Refuse(HookStatus(hookRefusal), hookRefusal!);
+            }
+
+            bodies.Add(bodyRef with
+            {
+                IterationSetup = iterationSetup,
+                IterationTeardown = iterationTeardown,
+            });
         }
 
         return bodies.Count == 0
             ? Decision.Refuse(IsolationStatus.InProcessRequested, "the suite has no benchmarks.")
-            : new Decision(IsolationStatus.Isolated, null, bodies);
+            : new Decision(IsolationStatus.Isolated, null, bodies)
+            {
+                SuiteSetup = setupRef,
+                SuiteTeardown = teardownRef,
+            };
     }
+
+    /// <summary>
+    ///     Addresses one lifecycle delegate, or explains why it cannot cross. A <c>null</c> hook is a
+    ///     success with nothing to carry.
+    /// </summary>
+    private static bool TryAddressHook(
+        Delegate? hook,
+        string description,
+        out BodyRef? addressed,
+        out string? refusal)
+    {
+        addressed = null;
+        refusal = null;
+
+        if (hook is null)
+            return true;
+
+        if (BodyRef.TryCreate(hook, description, out var hookRef, out var hookRefusal))
+        {
+            addressed = hookRef;
+            return true;
+        }
+
+        refusal = $"{description} {hookRefusal} A lifecycle delegate runs in the process that measures, "
+                  + "so one holding state from here would prepare something the benchmarks never see. "
+                  + "Move the suite into a static [BenchmarkPlan] factory so the worker builds that "
+                  + "state itself.";
+
+        return false;
+    }
+
+    /// <summary>
+    ///     Classifies a hook refusal the same way a body refusal is classified, so a captured local in a
+    ///     setup delegate reports the remedy for a capture rather than the generic one.
+    /// </summary>
+    private static IsolationStatus HookStatus(string? refusal)
+        => refusal is not null && refusal.Contains("captures", StringComparison.Ordinal)
+            ? IsolationStatus.InProcessCapturedState
+            : IsolationStatus.InProcessUnaddressablePlan;
 
     /// <summary>
     ///     Builds the request that measures all of an inline suite's bodies together in one worker.
@@ -135,11 +197,15 @@ internal static class InlineSuitePlan
         MeasurementOptions options,
         RunOrder order,
         int? seed,
-        int replicate)
-        => new()
+        int replicate,
+        BodyRef? suiteSetup = null,
+        BodyRef? suiteTeardown = null)
+        => WorkerRunPlan.WithStrategies(new RunGroupPayload
         {
             GroupId = $"suite:{suiteName}#{replicate}",
             Kind = WorkGroupKind.Lambdas,
+            SuiteSetup = suiteSetup,
+            SuiteTeardown = suiteTeardown,
 
             // Every body in a suite must come from one assembly for a single worker to load them.
             // In practice they are all written together in the same file; a suite spanning assemblies
@@ -148,10 +214,8 @@ internal static class InlineSuitePlan
             Bodies = bodies,
 
             Options = options,
-            OutlierDetectorTypeName = WorkerRunPlan.StrategyTypeName(options.OutlierDetector, out _),
-            SignificanceTestTypeName = WorkerRunPlan.StrategyTypeName(options.SignificanceTest, out _),
             Order = order,
             Seed = seed,
             TotalBenchmarks = bodies.Count,
-        };
+        }, options);
 }

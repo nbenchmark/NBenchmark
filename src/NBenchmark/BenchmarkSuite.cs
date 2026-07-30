@@ -9,7 +9,13 @@ using NBenchmark.Workers;
 
 namespace NBenchmark;
 
-public sealed class BenchmarkSuite(string name)
+/// <remarks>
+///     Not sealed solely so <see cref="BenchmarkSuite{TState}" /> can extend it with typed
+///     state-taking <c>Add</c> overloads. Nothing on this type is <c>public virtual</c>, and it is not
+///     an extension point - a third subclass would inherit behaviour no part of the engine expects to
+///     vary.
+/// </remarks>
+public class BenchmarkSuite(string name)
 {
     private readonly List<BenchmarkEnvelope> _benchmarks = [];
     private readonly List<string> _categoryFilterExclude = [];
@@ -70,7 +76,7 @@ public sealed class BenchmarkSuite(string name)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
                 Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
                     spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
-            action, setup is not null || teardown is not null);
+            action, setup, teardown);
 
     public BenchmarkSuite Add(string name, Func<Task> action,
         Action? setup = null, Action? teardown = null,
@@ -78,7 +84,7 @@ public sealed class BenchmarkSuite(string name)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
                 await BenchmarkRunner.Instance.RunAsync(name, action,
                     spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
-            action, setup is not null || teardown is not null);
+            action, setup, teardown);
 
     public BenchmarkSuite Add<T>(string name, Func<T> action,
         Action? setup = null, Action? teardown = null,
@@ -86,7 +92,7 @@ public sealed class BenchmarkSuite(string name)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
                 Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
                     spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
-            action, setup is not null || teardown is not null);
+            action, setup, teardown);
 
     public BenchmarkSuite Add<T>(string name, Func<Task<T>> action,
         Action? setup = null, Action? teardown = null,
@@ -94,7 +100,7 @@ public sealed class BenchmarkSuite(string name)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
                 await BenchmarkRunner.Instance.RunAsync(name, action,
                     spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
-            action, setup is not null || teardown is not null);
+            action, setup, teardown);
 
     // --- Parameterized Add overloads: arity 1 ---
 
@@ -115,7 +121,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T)]));
+            [typeof(T)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -138,7 +147,10 @@ public sealed class BenchmarkSuite(string name)
                         async () => await action(val).ConfigureAwait(false),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T)]));
+            [typeof(T)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -160,7 +172,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T)]));
+            [typeof(T)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -183,7 +198,10 @@ public sealed class BenchmarkSuite(string name)
                         () => action(val),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T)]));
+            [typeof(T)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -208,7 +226,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T1), typeof(T2)]));
+            [typeof(T1), typeof(T2)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -232,7 +253,10 @@ public sealed class BenchmarkSuite(string name)
                         async () => await action(v1, v2).ConfigureAwait(false),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T1), typeof(T2)]));
+            [typeof(T1), typeof(T2)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -255,7 +279,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T1), typeof(T2)]));
+            [typeof(T1), typeof(T2)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -279,7 +306,10 @@ public sealed class BenchmarkSuite(string name)
                         () => action(v1, v2),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T1), typeof(T2)]));
+            [typeof(T1), typeof(T2)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -305,7 +335,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T1), typeof(T2), typeof(T3)]));
+            [typeof(T1), typeof(T2), typeof(T3)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -330,7 +363,10 @@ public sealed class BenchmarkSuite(string name)
                         async () => await action(v1, v2, v3).ConfigureAwait(false),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T1), typeof(T2), typeof(T3)]));
+            [typeof(T1), typeof(T2), typeof(T3)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -354,7 +390,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T1), typeof(T2), typeof(T3)]));
+            [typeof(T1), typeof(T2), typeof(T3)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -379,7 +418,10 @@ public sealed class BenchmarkSuite(string name)
                         () => action(v1, v2, v3),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T1), typeof(T2), typeof(T3)]));
+            [typeof(T1), typeof(T2), typeof(T3)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -421,6 +463,114 @@ public sealed class BenchmarkSuite(string name)
     // --- Private helpers ---
 
     /// <summary>
+    ///     Switches this suite to one whose benchmarks are measured over state built by
+    ///     <paramref name="prepare" />, in whichever process does the measuring.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This is the suite-shaped answer to the same problem
+    ///         <see cref="Benchmark.Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    ///         solves for a single body. Writing <c>var data = Build();</c> and closing over it makes
+    ///         every benchmark in the suite un-addressable - and because one worker measures the set,
+    ///         a single capturing body takes every sibling in-process with it. Naming the preparation
+    ///         instead means the worker builds the data itself.
+    ///     </para>
+    ///     <para>
+    ///         <paramref name="prepare" /> runs <b>once per benchmark</b>, before that benchmark's
+    ///         warmup - not once for the suite. That is deliberate: two sorts sharing one array would
+    ///         have the second measure what the first already sorted, and with the default random run
+    ///         order which one that is would change between runs.
+    ///     </para>
+    ///     <para>
+    ///         Call it before configuring anything else. A suite that already carries benchmarks or
+    ///         settings cannot be converted without silently transplanting them, and a transplant that
+    ///         forgets a field is the kind of defect that shows up as a setting that simply stopped
+    ///         working - so it throws instead.
+    ///     </para>
+    /// </remarks>
+    /// <example>
+    ///     <code>
+    ///     await new BenchmarkSuite("sorting")
+    ///         .WithState(() => Enumerable.Range(0, 10_000).Reverse().ToArray())
+    ///         .Add("array", d => Array.Sort(d))
+    ///         .Add("linq",  d => d.OrderBy(x => x).ToArray())
+    ///         .WithBaseline("array")
+    ///         .RunAsync();
+    ///     </code>
+    /// </example>
+    public BenchmarkSuite<TState> WithState<TState>(Func<TState> prepare)
+    {
+        ArgumentNullException.ThrowIfNull(prepare);
+
+        if (DescribeConfiguration() is { } configured)
+        {
+            throw new InvalidOperationException(
+                $"WithState must be called before the rest of the suite is configured, but {configured} "
+                + "already set. Move the WithState call directly after the constructor:\n\n"
+                + $"    new BenchmarkSuite(\"{Name}\").WithState(...).Add(...)\n\n"
+                + "It returns a differently-typed suite so the bodies can take the prepared value, and "
+                + "carrying existing configuration across would mean copying it field by field - which "
+                + "fails silently the first time a field is missed.");
+        }
+
+        return new BenchmarkSuite<TState>(Name, prepare);
+    }
+
+    /// <summary>
+    ///     Names what has already been configured on this suite, or <c>null</c> when it is untouched.
+    ///     Used only to explain a misplaced <see cref="WithState{TState}" /> call.
+    /// </summary>
+    private string? DescribeConfiguration()
+    {
+        if (_benchmarks.Count > 0 || _parameterizedFactories.Count > 0)
+            return "benchmarks have been";
+
+        if (_parameterDefs.Count > 0)
+            return "parameters have been";
+
+        if (_reporters.Count > 0 || _observers.Count > 0)
+            return "reporters or observers have been";
+
+        if (_baselineName is not null)
+            return "a baseline has been";
+
+        if (_suiteSetup is not null || _suiteTeardown is not null)
+            return "suite setup or teardown has been";
+
+        if (_options != MeasurementOptions.Default || _launchCount != LaunchCounts.Single)
+            return "measurement options have been";
+
+        return null;
+    }
+
+    /// <summary>
+    ///     Registers a benchmark measured over prepared state. Called by
+    ///     <see cref="BenchmarkSuite{TState}" />, which owns the typed surface.
+    /// </summary>
+    internal BenchmarkSuite AddWithState<TState>(
+        string name,
+        Func<TState> prepare,
+        Delegate body,
+        Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync,
+        Action? setup,
+        Action? teardown,
+        IReadOnlyList<string>? categories)
+    {
+        EnsureUniqueName(name);
+
+        _benchmarks.Add(new BenchmarkEnvelope(
+            name, "", null, false, ResolveAddCategories(categories, _pendingCategories), runAsync)
+        {
+            Body = body,
+            StateFactory = prepare,
+            IterationSetup = setup,
+            IterationTeardown = teardown,
+        });
+
+        return this;
+    }
+
+    /// <summary>
     ///     Records a benchmark, keeping the caller's own delegate alongside the wrapper that runs it.
     ///     <para>
     ///         The wrapper is a closure this library built, so its metadata token addresses
@@ -434,14 +584,19 @@ public sealed class BenchmarkSuite(string name)
         IReadOnlyList<string> categories,
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync,
         Delegate? body = null,
-        bool hasIterationHooks = false)
+        Action? iterationSetup = null,
+        Action? iterationTeardown = null)
     {
         EnsureUniqueName(name);
 
         _benchmarks.Add(new BenchmarkEnvelope(name, "", null, false, categories, runAsync)
         {
             Body = body,
-            HasIterationHooks = hasIterationHooks,
+
+            // The delegates themselves rather than a flag saying they exist, so addressing can try to
+            // carry them to the worker instead of giving up on the whole suite for having them.
+            IterationSetup = iterationSetup,
+            IterationTeardown = iterationTeardown,
         });
 
         return this;
@@ -594,10 +749,66 @@ public sealed class BenchmarkSuite(string name)
     ///     <see cref="WithOutlierMode" />. Pass one of the built-ins from
     ///     <see cref="OutlierDetectors" /> or your own implementation.
     /// </summary>
+    /// <remarks>
+    ///     Works in an isolated run when <paramref name="detector" />'s type has a parameterless
+    ///     constructor, which the built-ins do - only the type name has to cross, and the worker
+    ///     constructs it. A <i>configured</i> detector cannot be rebuilt that way; use
+    ///     <see cref="WithOutlierDetector(Func{IOutlierDetector})" /> for those.
+    /// </remarks>
     public BenchmarkSuite WithOutlierDetector(IOutlierDetector detector)
     {
         ArgumentNullException.ThrowIfNull(detector);
-        _options = _options with { OutlierDetector = detector };
+        _options = _options with { OutlierDetector = detector, OutlierDetectorFactory = null };
+        return this;
+    }
+
+    /// <summary>
+    ///     Uses a custom <see cref="IOutlierDetector" /> built by <paramref name="factory" />, so a
+    ///     detector needing constructor arguments can still be used in an isolated run.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>WithOutlierDetector(new KeepFastestDetector(0.9))</c> cannot be isolated: only a type
+    ///         name crosses the boundary, and a type name cannot carry <c>0.9</c>. Rather than score the
+    ///         results under a silently substituted method, the whole suite was measured in the host
+    ///         process. A static factory is addressable, so the worker runs it and gets your detector
+    ///         with your arguments:
+    ///     </para>
+    ///     <code>
+    ///     .WithOutlierDetector(static () => new KeepFastestDetector(0.9))
+    ///     </code>
+    ///     <para>
+    ///         The factory must capture nothing, for the same reason a benchmark body must. It is invoked
+    ///         here as well, once, to give the coordinator the instance it scores with.
+    ///     </para>
+    /// </remarks>
+    public BenchmarkSuite WithOutlierDetector(Func<IOutlierDetector> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        _options = _options with
+        {
+            OutlierDetector = factory() ?? throw new ArgumentException(
+                "The outlier detector factory returned null.", nameof(factory)),
+
+            OutlierDetectorFactory = factory,
+        };
+
+        return this;
+    }
+
+    /// <summary>
+    ///     Fails the run instead of measuring in this process when the suite cannot be isolated.
+    /// </summary>
+    /// <remarks>
+    ///     The library-side equivalent of <c>--strict-isolation</c>. That flag audits results after the
+    ///     run and sets an exit code, which suits a CLI in CI - it can name every offender at once. A
+    ///     library caller has no exit code to read, so this throws at the point of refusal instead,
+    ///     before anything is measured.
+    /// </remarks>
+    public BenchmarkSuite WithRequireIsolation(bool required = true)
+    {
+        _options = _options with { RequireIsolation = required };
         return this;
     }
 
@@ -624,10 +835,34 @@ public sealed class BenchmarkSuite(string name)
     ///     default (Mann-Whitney U for two groups, Kruskal-Wallis for three or more). Pass
     ///     one of the built-ins from <see cref="NBenchmark.Stats" /> or your own implementation.
     /// </summary>
+    /// <remarks>
+    ///     Isolatable when the type has a parameterless constructor. For a configured test, use
+    ///     <see cref="WithSignificanceTest(Func{ISignificanceTest})" />.
+    /// </remarks>
     public BenchmarkSuite WithSignificanceTest(ISignificanceTest test)
     {
         ArgumentNullException.ThrowIfNull(test);
-        _options = _options with { SignificanceTest = test };
+        _options = _options with { SignificanceTest = test, SignificanceTestFactory = null };
+        return this;
+    }
+
+    /// <summary>
+    ///     Uses a custom <see cref="ISignificanceTest" /> built by <paramref name="factory" />, so a test
+    ///     needing constructor arguments can still be used in an isolated run.
+    /// </summary>
+    /// <remarks>See <see cref="WithOutlierDetector(Func{IOutlierDetector})" /> for why this exists.</remarks>
+    public BenchmarkSuite WithSignificanceTest(Func<ISignificanceTest> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        _options = _options with
+        {
+            SignificanceTest = factory() ?? throw new ArgumentException(
+                "The significance test factory returned null.", nameof(factory)),
+
+            SignificanceTestFactory = factory,
+        };
+
         return this;
     }
 
@@ -1189,14 +1424,12 @@ public sealed class BenchmarkSuite(string name)
         var expanded = ExpandEnvelopes();
         var benchmarks = ApplyCategoryFilter(ApplyExecutionOrder(expanded, RunOrder.Declaration));
 
-        var decision = InlineSuitePlan.TryAddress(
-            benchmarks,
-            _options,
-            hasSuiteLifecycle: _suiteSetup is not null || _suiteTeardown is not null,
-            hasParameters: _parameterDefs.Count > 0);
+        var decision = InlineSuitePlan.TryAddress(benchmarks, _options, _suiteSetup, _suiteTeardown);
 
         if (!decision.CanIsolate)
         {
+            IsolationAudit.ThrowIfRequired(_options, Name, decision.Status, decision.Explanation);
+
             SimpleModeGuidance.EmitOnce(Name, decision.Status, decision.Explanation);
             _inProcessStatus = decision.Status;
 
@@ -1214,7 +1447,8 @@ public sealed class BenchmarkSuite(string name)
         {
             var request = InlineSuitePlan.Request(
                 Name, decision.Bodies, _options, _runOrder,
-                WorkerRunPlan.DeriveSeed(_seed, replicate), replicate);
+                WorkerRunPlan.DeriveSeed(_seed, replicate), replicate,
+                decision.SuiteSetup, decision.SuiteTeardown);
 
             var group = await WorkerLauncher.Current.RunGroupAsync(
                     request,
@@ -1603,13 +1837,22 @@ public sealed class BenchmarkSuite(string name)
                         "Ensure parameter values produce unique display names.");
                 }
 
-                var envelope = factory.Factory(combo.ToArray(), displayName);
+                var arguments = combo.ToArray();
+                var envelope = factory.Factory(arguments, displayName);
 
                 expanded.Add(envelope with
                 {
                     OriginalName = factory.Name,
                     ParameterSet = paramSet,
                     IsBaseline = false,
+
+                    // Set here rather than inside each of the twelve Add overloads' factory lambdas:
+                    // this is the one place that holds both the user's typed delegate and the values
+                    // this expansion will call it with, so there is no second copy to drift.
+                    Body = factory.Action,
+                    Arguments = arguments,
+                    IterationSetup = factory.IterationSetup,
+                    IterationTeardown = factory.IterationTeardown,
                 });
             }
         }
@@ -1849,9 +2092,25 @@ public sealed class BenchmarkSuite(string name)
 
     private sealed record ParameterDef(string Name, Type Type, object?[] Values);
 
+    /// <param name="Action">
+    ///     The user's own typed lambda, kept beside the factory that wraps it. The factory's own
+    ///     metadata token identifies NBenchmark's wrapper; only this points at the method the developer
+    ///     wrote, and it is what lets a parameter sweep be addressed for a worker.
+    /// </param>
+    /// <param name="IterationSetup">
+    ///     The per-iteration <c>setup</c> this registration supplied, if any. Carried here because only
+    ///     the registration knows, and the expansion is what builds the envelope addressing consults.
+    ///     Before parameter sweeps were addressable this went unrecorded and was harmless - a
+    ///     parameterized envelope carried no body, so it was refused for that reason first. It is
+    ///     load-bearing now: an addressed body whose hooks were forgotten would be measured in a worker
+    ///     with its setup silently dropped.
+    /// </param>
     private sealed record ParameterizedAdd(
         string Name,
         IReadOnlyList<string> Categories,
         Func<object?[], string, BenchmarkEnvelope> Factory,
-        Type[] ParamTypes);
+        Type[] ParamTypes,
+        Delegate Action,
+        Action? IterationSetup,
+        Action? IterationTeardown);
 }

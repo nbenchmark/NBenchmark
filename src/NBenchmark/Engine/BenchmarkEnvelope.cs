@@ -20,18 +20,56 @@ internal sealed record BenchmarkEnvelope(
     ///     <para>
     ///         <see cref="RunAsync" /> is a closure this library built; its metadata token identifies
     ///         NBenchmark's own wrapper, not the user's code. Only the raw delegate points at the
-    ///         method the developer actually wrote. <c>null</c> when the body is not a simple
-    ///         delegate - a parameterized benchmark closes over its parameter values, which exist
-    ///         only in this process - and a null here means "cannot be isolated", never "guess".
+    ///         method the developer actually wrote. <c>null</c> means "cannot be isolated", never
+    ///         "guess".
+    ///     </para>
+    ///     <para>
+    ///         For a parameterized benchmark this is the user's <i>typed</i> lambda - the one that still
+    ///         takes its parameters - with the values it should be called with in
+    ///         <see cref="Arguments" />. That pairing is what makes a parameter sweep isolatable: the
+    ///         typed lambda captures nothing and always could be addressed, and what could not cross was
+    ///         only the wrapper NBenchmark built to bind the value.
     ///     </para>
     /// </summary>
     public Delegate? Body { get; init; }
 
     /// <summary>
-    ///     Per-iteration setup and teardown, if the caller supplied any. They are live delegates in
-    ///     this process, so their presence is what stops a body from being isolatable on its own.
+    ///     Values to call <see cref="Body" /> with, in declaration order. Empty for the parameterless
+    ///     bodies that are the common case.
     /// </summary>
-    public bool HasIterationHooks { get; init; }
+    public IReadOnlyList<object?> Arguments { get; init; } = [];
+
+    /// <summary>
+    ///     A parameterless factory producing <see cref="Body" />'s single argument, when the benchmark
+    ///     is measured over prepared state.
+    ///     <para>
+    ///         Invoked once per benchmark, immediately before that benchmark's warmup, in whichever
+    ///         process measures it. Per benchmark rather than per suite deliberately: a suite comparing
+    ///         two sorts over one shared array would have the second measure what the first already
+    ///         sorted, which is the order-dependence trap the run-order randomizer exists to expose.
+    ///     </para>
+    /// </summary>
+    public Delegate? StateFactory { get; init; }
+
+    /// <summary>
+    ///     Per-iteration setup, if the caller supplied one. Kept as the delegate rather than as a flag
+    ///     so it can be <i>addressed</i> like a body: a hook that captures nothing is no less
+    ///     reproducible in a worker than the benchmark it wraps, and refusing on the mere presence of
+    ///     one made the common shape - <c>setup: () =&gt; Cache.Clear()</c> - cost the whole suite its
+    ///     isolation for nothing.
+    /// </summary>
+    public Delegate? IterationSetup { get; init; }
+
+    /// <inheritdoc cref="IterationSetup" />
+    public Delegate? IterationTeardown { get; init; }
+
+    /// <summary>
+    ///     Whether this benchmark carries per-iteration hooks. Derived rather than stored: a stored
+    ///     flag can disagree with the delegates it describes, and it did - the parameterized
+    ///     registrations never set it, which was invisible only because they carried no addressable
+    ///     body either.
+    /// </summary>
+    public bool HasIterationHooks => IterationSetup is not null || IterationTeardown is not null;
 
     public static BenchmarkEnvelope FromDiscovered(
         BenchmarkMethodDefinition method,

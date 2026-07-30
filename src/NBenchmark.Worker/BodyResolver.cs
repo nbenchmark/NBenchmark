@@ -84,19 +84,168 @@ internal static class BodyResolver
             && !TryResolveReceiver(ref method, body, out receiver, out error))
             return false;
 
-        if (!TryDelegateType(method, out var delegateType, out error))
+        if (!TryDelegateType(method, body, out var delegateType, out error))
             return false;
+
+        Delegate created;
 
         try
         {
-            resolved = method.CreateDelegate(delegateType, receiver);
-            return true;
+            created = method.CreateDelegate(delegateType, receiver);
         }
         catch (Exception ex) when (ex is ArgumentException or MissingMethodException)
         {
             error = $"the resolved method '{method.Name}' could not be bound as {delegateType.Name}: {ex.Message}";
             return false;
         }
+
+        if (body.StateFactory is not null)
+            return TryBindPreparedState(context, created, body, out resolved, out error);
+
+        if (body.Arguments.Count == 0)
+        {
+            resolved = created;
+            return true;
+        }
+
+        return TryBindArguments(created, body, out resolved, out error);
+    }
+
+    /// <summary>
+    ///     Runs the state factory in this process and binds what it produced as the body's argument.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Invoked <b>here</b>, once, before the body is ever measured - which is the entire point.
+    ///         The value never crosses the boundary; only the recipe for it does. That is what lets a
+    ///         benchmark over a prepared array, an open connection or a warmed cache be isolated at all,
+    ///         where serializing the prepared value would either fail or, worse, succeed at producing
+    ///         something subtly different.
+    ///     </para>
+    ///     <para>
+    ///         The factory's own exceptions are reported as this benchmark's failure. It is user code
+    ///         running before measurement, so a throw here means the benchmark never had valid input -
+    ///         which is worth saying plainly rather than surfacing as a dead worker.
+    ///     </para>
+    /// </remarks>
+    private static bool TryBindPreparedState(
+        BenchmarkLoadContext context,
+        Delegate created,
+        BodyRef body,
+        out Delegate resolved,
+        out string? error)
+    {
+        resolved = created;
+        error = null;
+
+        if (!TryResolve(context, body.StateFactory!, out var factory, out var factoryError))
+        {
+            error = $"its prepare delegate could not be resolved: {factoryError}";
+
+            return false;
+        }
+
+        var parameters = created.Method.GetParameters();
+
+        if (parameters.Length != 1)
+        {
+            error = $"'{created.Method.Name}' takes {parameters.Length} parameter(s); a body measured "
+                    + "over prepared state must take exactly one.";
+
+            return false;
+        }
+
+        // Re-checked on this side rather than trusted from the plan: both delegates were resolved from
+        // metadata tokens, and a mismatch here means the address no longer describes the code on disk.
+        if (!parameters[0].ParameterType.IsAssignableFrom(factory.Method.ReturnType))
+        {
+            error = $"its prepare delegate returns '{factory.Method.ReturnType.Name}' but the body "
+                    + $"accepts '{parameters[0].ParameterType.Name}'.";
+
+            return false;
+        }
+
+        object? state;
+
+        try
+        {
+            state = factory.DynamicInvoke();
+        }
+        catch (Exception ex)
+        {
+            var inner = (ex as TargetInvocationException)?.InnerException ?? ex;
+
+            error = $"its prepare delegate threw {inner.GetType().Name}: {inner.Message}";
+
+            return false;
+        }
+
+        if (!ArgumentBinder.TryBind(created, [state], out resolved, out var bindError))
+        {
+            error = bindError;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Supplies a parameterized body's argument values, leaving the parameterless delegate the
+    ///     engine measures.
+    /// </summary>
+    /// <remarks>
+    ///     The declared parameter types are read from the <b>resolved method</b> rather than trusted
+    ///     from the payload, which is the same rule the test-method path follows. A payload's type name
+    ///     is a claim about the far side; the method's own signature is the fact. Decoding against the
+    ///     claim would let a stale or mismatched request bind a plausible value of the wrong type.
+    /// </remarks>
+    private static bool TryBindArguments(
+        Delegate created,
+        BodyRef body,
+        out Delegate resolved,
+        out string? error)
+    {
+        resolved = created;
+        error = null;
+
+        var parameters = created.Method.GetParameters();
+
+        if (parameters.Length != body.Arguments.Count)
+        {
+            error = $"'{created.Method.Name}' takes {parameters.Length} parameter(s) but the address "
+                    + $"carries {body.Arguments.Count} argument value(s).";
+
+            return false;
+        }
+
+        var decoded = new object?[parameters.Length];
+
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            try
+            {
+                decoded[i] = TestArgumentCodec.Decode(body.Arguments[i], parameters[i].ParameterType);
+            }
+            catch (Exception ex) when (ex is FormatException
+                                          or OverflowException
+                                          or ArgumentException
+                                          or InvalidOperationException)
+            {
+                error = $"argument '{parameters[i].Name}' could not be decoded as "
+                        + $"{parameters[i].ParameterType.Name}: {ex.Message}";
+
+                return false;
+            }
+        }
+
+        if (!ArgumentBinder.TryBind(created, decoded, out resolved, out var bindError))
+        {
+            error = bindError;
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -202,17 +351,28 @@ internal static class BodyResolver
     ///         in a worker.
     ///     </para>
     /// </summary>
-    private static bool TryDelegateType(MethodInfo method, out Type delegateType, out string? error)
+    private static bool TryDelegateType(MethodInfo method, BodyRef body, out Type delegateType, out string? error)
     {
         delegateType = typeof(Action);
         error = null;
 
         if (method.GetParameters().Length != 0)
         {
-            error = $"'{method.Name}' takes {method.GetParameters().Length} parameter(s); "
-                    + "a benchmark body must take none.";
+            // A parameterized body is bound as its own Action<…>/Func<…, T> here and has its arguments
+            // supplied immediately afterwards. It reaches this point only when the address says where
+            // those values come from - serialized constants for a parameter sweep, or a factory to run
+            // for prepared state. A body with parameters and neither is not addressable, because there
+            // is nothing to call it with.
+            if (body.Arguments.Count == 0 && body.StateFactory is null)
+            {
+                error = $"'{method.Name}' takes {method.GetParameters().Length} parameter(s) but the "
+                        + "address carries neither argument values nor a prepare delegate to supply "
+                        + "them.";
 
-            return false;
+                return false;
+            }
+
+            return ArgumentBinder.TryDelegateTypeFor(method, out delegateType, out error);
         }
 
         var returnType = method.ReturnType;

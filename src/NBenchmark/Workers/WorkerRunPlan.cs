@@ -81,10 +81,16 @@ internal static class WorkerRunPlan
     ///     The measurement configuration, so a strategy object that cannot be rebuilt in a worker is
     ///     caught here rather than silently downgraded. <c>null</c> skips the check.
     /// </param>
+    /// <param name="serviceProviderFactory">
+    ///     An addressable factory for the service provider, when the caller supplied one. Its presence
+    ///     lifts the instance-factory refusal: the worker can build an equivalent container itself, so
+    ///     there is no live object it would have to be handed.
+    /// </param>
     public static Decision ForDiscoveredClass(
         string? declaringAssemblyLocation,
         bool usesInstanceFactory,
-        MeasurementOptions? options = null)
+        MeasurementOptions? options = null,
+        Delegate? serviceProviderFactory = null)
     {
         // Asked about the assembly under test, not about this application. Those differ under
         // `dotnet benchmark --assembly`, where the target build has its own worker beside it and the
@@ -110,12 +116,27 @@ internal static class WorkerRunPlan
 
         if (usesInstanceFactory)
         {
-            return new Decision(
-                Refusal.LiveInstanceFactory,
-                "benchmark instances come from an instance factory or service provider, which is live "
-                + "code in this process and cannot be reproduced in a worker. Constructing the type "
-                + "directly instead would measure a differently-configured object and report it as "
-                + "though nothing had changed.");
+            if (serviceProviderFactory is null)
+            {
+                return new Decision(
+                    Refusal.LiveInstanceFactory,
+                    "benchmark instances come from an instance factory or service provider, which is live "
+                    + "code in this process and cannot be reproduced in a worker. Constructing the type "
+                    + "directly instead would measure a differently-configured object and report it as "
+                    + "though nothing had changed. Pass a factory instead - "
+                    + "WithServiceProvider(BuildServices) with a static BuildServices - and the worker "
+                    + "builds an equivalent container in the process that measures.");
+            }
+
+            // A factory that captures is refused for the same reason a capturing body is: it would have
+            // to run here, and a container built here is exactly the live object that cannot cross.
+            if (!BodyRef.TryCreate(serviceProviderFactory, "service provider factory", out _, out var refusal))
+            {
+                return new Decision(
+                    Refusal.LiveInstanceFactory,
+                    $"the service provider factory {refusal} Make it a static method so a worker can "
+                    + "locate and run it.");
+            }
         }
 
         if (options is not null && UnrebuildableStrategy(options) is { } strategyRefusal)
@@ -140,8 +161,30 @@ internal static class WorkerRunPlan
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        foreach (var strategy in new object?[] { options.OutlierDetector, options.SignificanceTest })
+        // A factory answers the question outright: the worker runs it and gets the caller's own object,
+        // arguments and all, so there is nothing about the strategy left to refuse.
+        var candidates = new (object? Strategy, Delegate? Factory)[]
         {
+            (options.OutlierDetector, options.OutlierDetectorFactory),
+            (options.SignificanceTest, options.SignificanceTestFactory),
+        };
+
+        foreach (var (strategy, factory) in candidates)
+        {
+            if (factory is not null)
+            {
+                // The factory itself still has to be addressable. One that captures is refused for the
+                // same reason a capturing body is - and saying so names the actionable fix, which is to
+                // make the factory static.
+                if (!BodyRef.TryCreate(factory, "strategy factory", out _, out var factoryRefusal))
+                {
+                    return $"the factory supplied for '{strategy?.GetType().Name ?? "a custom strategy"}' "
+                           + $"{factoryRefusal}";
+                }
+
+                continue;
+            }
+
             _ = StrategyTypeName(strategy, out var refusal);
 
             if (refusal is not null)
@@ -149,6 +192,56 @@ internal static class WorkerRunPlan
         }
 
         return null;
+    }
+
+    /// <summary>
+    ///     Addresses a strategy factory so a worker can run it, or <c>null</c> when there is none.
+    /// </summary>
+    /// <remarks>
+    ///     Refusals are not reported here - <see cref="UnrebuildableStrategy" /> has already decided
+    ///     whether the group can be isolated at all, so by the time a request is being built an
+    ///     un-addressable factory cannot be present.
+    /// </remarks>
+    private static BodyRef? StrategyFactoryRef(Delegate? factory, string description)
+        => factory is not null && BodyRef.TryCreate(factory, description, out var bodyRef, out _)
+            ? bodyRef
+            : null;
+
+    /// <summary>
+    ///     Addresses the service-provider factory so a worker can build its own container, or
+    ///     <c>null</c> when there is none.
+    /// </summary>
+    /// <remarks>
+    ///     Refusals are not reported here: <see cref="ForDiscoveredClass" /> has already decided whether
+    ///     the group can be isolated, so an un-addressable factory never reaches request building.
+    /// </remarks>
+    public static BodyRef? ServiceProviderFactoryRef(Delegate? factory)
+        => factory is not null && BodyRef.TryCreate(factory, "service provider factory", out var bodyRef, out _)
+            ? bodyRef
+            : null;
+
+    /// <summary>
+    ///     Fills in every way a custom statistical strategy can reach a worker - type name or factory
+    ///     address - on a request being built.
+    /// </summary>
+    /// <remarks>
+    ///     One helper rather than four assignments repeated at five request-building sites. The repo has
+    ///     already paid for that shape once: two call sites disagreeing about how raw samples were keyed
+    ///     silently emptied every isolated result's sample array. Adding a fifth field here cannot be
+    ///     forgotten at one site, because there is only one site.
+    /// </remarks>
+    public static RunGroupPayload WithStrategies(RunGroupPayload payload, MeasurementOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        ArgumentNullException.ThrowIfNull(options);
+
+        return payload with
+        {
+            OutlierDetectorTypeName = StrategyTypeName(options.OutlierDetector, out _),
+            SignificanceTestTypeName = StrategyTypeName(options.SignificanceTest, out _),
+            OutlierDetectorFactory = StrategyFactoryRef(options.OutlierDetectorFactory, "outlier detector factory"),
+            SignificanceTestFactory = StrategyFactoryRef(options.SignificanceTestFactory, "significance test factory"),
+        };
     }
 
     /// <summary>
@@ -170,29 +263,29 @@ internal static class WorkerRunPlan
         int replicate,
         int startIndex,
         int totalBenchmarks,
-        string? outlierDetectorTypeName,
-        string? significanceTestTypeName)
+        BodyRef? serviceProviderFactory = null)
     {
         ArgumentNullException.ThrowIfNull(declaringType);
 
-        return new RunGroupPayload
-        {
-            GroupId = $"{declaringType.FullName}#{replicate}",
-            Kind = WorkGroupKind.DiscoveredClass,
-            TargetAssemblyPath = declaringType.Assembly.Location,
-            DeclaringTypeFullName = declaringType.FullName,
-            BenchmarkNames = benchmarkNames,
+        return WithStrategies(
+            new RunGroupPayload
+            {
+                GroupId = $"{declaringType.FullName}#{replicate}",
+                Kind = WorkGroupKind.DiscoveredClass,
+                TargetAssemblyPath = declaringType.Assembly.Location,
+                DeclaringTypeFullName = declaringType.FullName,
+                BenchmarkNames = benchmarkNames,
 
-            Options = options,
-            OutlierDetectorTypeName = outlierDetectorTypeName,
-            SignificanceTestTypeName = significanceTestTypeName,
-            Order = order,
-            Seed = DeriveSeed(sessionSeed, replicate),
-            DisplayPrefix = declaringType.Name,
-            DefaultInstanceLifetime = defaultInstanceLifetime,
-            StartIndex = startIndex,
-            TotalBenchmarks = totalBenchmarks,
-        };
+                Options = options,
+                Order = order,
+                Seed = DeriveSeed(sessionSeed, replicate),
+                DisplayPrefix = declaringType.Name,
+                DefaultInstanceLifetime = defaultInstanceLifetime,
+                StartIndex = startIndex,
+                TotalBenchmarks = totalBenchmarks,
+                ServiceProviderFactory = serviceProviderFactory,
+            },
+            options);
     }
 
     /// <summary>

@@ -284,7 +284,9 @@ await new BenchmarkSuite("Sorting")
 
 One diagnostic is reported per capturing body, and none on a self-contained sibling - so a suite mixing the two shows exactly which bodies to change.
 
-**Parameterized `Add` overloads are silent.** A suite carrying `WithParameter(...)` is refused isolation for the parameter values themselves, which exist only in your process, whether or not any body captures. A capture diagnostic there would name a cause whose removal would not restore isolation; the runtime says the operative one. The remedy for both is a static `[BenchmarkPlan]` factory, so the worker produces the parameter values itself.
+**Parameterized `Add` overloads are covered too.** They used to be silent, on sound reasoning: a suite carrying `WithParameter(...)` was refused isolation for the parameter values themselves, so a capture diagnostic would have named a cause whose removal changed nothing. Parameter values now travel as serialized constants and a sweep is isolated like any other suite, which makes a capture in a parameterized body the operative cause again. A parameterized body that captures nothing stays silent - its parameter is supplied at each invocation rather than closed over.
+
+**The remedy the message names is the prepared-state split**, not a `[BenchmarkPlan]` factory. `Benchmark.Run(prepare: () => Build(), body: d => Use(d))` and `.WithState(() => Build())` let the worker build the state itself, which is one line from what you already wrote; a plan factory is the escape hatch for suites holding something no factory can describe.
 
 The `setup:` and `teardown:` delegates on `Add` are not reported either. They are not measured bodies, and a suite with per-iteration lifecycle is refused isolation for having delegates on the wrong side of the boundary at all.
 

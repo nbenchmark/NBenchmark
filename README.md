@@ -23,6 +23,14 @@ result.Print();
 
 - **No setup required.** `Benchmark.Run(() => ...)` - no attributes, no class structure, no dedicated project. Drop it into a console app, a test, or a scratchpad.
 
+- **Measured in a clean process, by default.** JIT tiering, dynamic PGO, ReadyToRun and GC flavour are fixed when a process starts, so NBenchmark starts one and picks them deliberately. On four bodies of provably identical cost, measuring in the host process spanned 3.27x and fabricated a 2.80x difference between two of them - each reported with a tight confidence interval. Benchmarking over prepared data? Pass the preparation as its own delegate and the worker builds it for you:
+
+  ```csharp
+  Benchmark.Run(prepare: () => BuildData(), body: d => Sort(d));
+  ```
+
+  Anything that genuinely cannot cross the boundary is measured here instead, labelled `host` on the row, and never compared against an isolated number. ([Isolated runs](./docs/features/isolated-runs.md))
+
 - **Adaptive measurement.** No iteration counts to guess. The engine calibrates ops-per-sample for fast methods so timer overhead doesn't dominate, and detects when warmup has plateaued so the JIT has settled. Pin any dimension when you want a fixed, reproducible run.
 
 - **Statistical rigor built in.** Samples stream until the confidence interval is tight enough, then stop. Outlier trimming filters OS noise (IQR fence by default, with a bimodal-distribution warning when discarded samples look like real latency spikes rather than random jitter). A/B comparisons automatically determine whether a difference is statistically real or just noise, with an effect-size magnitude (Negligible / Small / Medium / Large) so a ✓ always means "real and at least a small effect". The built-in tests are non-parametric rank-based methods, cross-validated against SciPy and NumPy - see [Significance Testing](./docs/statistics/significance.md) for the methodology.
@@ -65,6 +73,14 @@ Console.WriteLine($"P95: {result.GetPercentile(0.95)} ns, Alloc: {result.MeanAll
 var result = await Benchmark.RunAsync(async () => await FetchDataAsync());
 ```
 
+Benchmarking over data you have to build first? Pass the preparation as its own delegate. It runs once, before warmup, in the process that measures - so building the input is never inside a reading:
+
+```csharp
+var result = Benchmark.Run(
+    prepare: () => Enumerable.Range(0, 10_000).Reverse().ToArray(),
+    body:    data => data.Sum());
+```
+
 ### 2. Suite mode
 
 Compare multiple implementations with a fluent API.
@@ -79,6 +95,17 @@ var results = await new BenchmarkSuite("string concat")
 ```
 
 The output includes a **Ratio** column and a **✓** in the **Sig** column when the speed difference is statistically significant.
+
+`WithState` is the suite-shaped version of `prepare`, and it matters more here: one worker measures the whole suite, so a single body that closes over a local takes every sibling in-process with it.
+
+```csharp
+var results = await new BenchmarkSuite("sorting")
+    .WithState(() => Enumerable.Range(0, 10_000).Reverse().ToArray())
+    .Add("Array.Sort",  data => Array.Sort(data))
+    .Add("LINQ OrderBy", data => data.OrderBy(x => x).ToArray())
+    .WithBaseline("Array.Sort")
+    .RunAsync();
+```
 
 ### 3. Harness mode
 

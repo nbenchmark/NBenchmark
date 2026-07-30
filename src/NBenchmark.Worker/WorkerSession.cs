@@ -122,7 +122,15 @@ internal sealed class WorkerSession(FrameChannel channel)
 
         try
         {
-            var options = ResolveStrategies(request);
+            // One load context for the whole group. Not an optimisation: a second context loads a
+            // second copy of the target assembly, and the same logical type from two contexts is two
+            // distinct Type identities. That broke the service-provider factory outright - the worker
+            // built a container registering the type from one context and then asked it for the type
+            // from the other, which is simply not registered. Anything that resolves user code from a
+            // request has to do it through the same context that discovery used.
+            var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
+
+            var options = ResolveStrategies(request, context);
 
             _maxRawSamples = options.MaxRawSamples;
 
@@ -142,19 +150,19 @@ internal sealed class WorkerSession(FrameChannel channel)
             switch (request.Kind)
             {
                 case WorkGroupKind.DiscoveredClass:
-                    await RunDiscoveredClassAsync(request, options, progress, cancellationToken).ConfigureAwait(false);
+                    await RunDiscoveredClassAsync(request, context, options, progress, cancellationToken).ConfigureAwait(false);
                     break;
 
                 case WorkGroupKind.Lambdas:
-                    await RunLambdasAsync(request, options, progress, cancellationToken).ConfigureAwait(false);
+                    await RunLambdasAsync(request, context, options, progress, cancellationToken).ConfigureAwait(false);
                     break;
 
                 case WorkGroupKind.Plan:
-                    await RunPlanAsync(request, progress, cancellationToken).ConfigureAwait(false);
+                    await RunPlanAsync(request, context, progress, cancellationToken).ConfigureAwait(false);
                     break;
 
                 case WorkGroupKind.TestMethod:
-                    await RunTestMethodAsync(request, options, progress, cancellationToken).ConfigureAwait(false);
+                    await RunTestMethodAsync(request, context, options, progress, cancellationToken).ConfigureAwait(false);
                     break;
 
                 default:
@@ -220,6 +228,7 @@ internal sealed class WorkerSession(FrameChannel channel)
     /// </remarks>
     private async Task RunTestMethodAsync(
         RunGroupPayload request,
+        BenchmarkLoadContext context,
         MeasurementOptions options,
         StreamingProgress progress,
         CancellationToken cancellationToken)
@@ -231,7 +240,6 @@ internal sealed class WorkerSession(FrameChannel channel)
             return;
         }
 
-        var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
         var target = context.LoadFromAssemblyPath(Path.GetFullPath(request.TargetAssemblyPath));
         var module = target.ManifestModule;
 
@@ -373,13 +381,79 @@ internal sealed class WorkerSession(FrameChannel channel)
         return true;
     }
 
+    /// <summary>
+    ///     Builds the instance factory for a discovered-class group from the addressed service-provider
+    ///     factory, or leaves it null when the group resolves its own instances.
+    /// </summary>
+    /// <remarks>
+    ///     A failure here is a <b>fault</b>, not a fallback. Everywhere else in this file an unusable
+    ///     addressed delegate degrades to a built-in - a statistical strategy has a sensible default. A
+    ///     service provider has none: constructing the benchmark type directly instead would produce an
+    ///     object with none of its dependencies configured, measure it, and report it under the name the
+    ///     caller asked for. That is the exact substitution the whole design refuses.
+    /// </remarks>
+    private bool TryBuildInstanceFactory(
+        RunGroupPayload request,
+        BenchmarkLoadContext context,
+        out Func<Type, InstanceHandle>? instanceFactory)
+    {
+        instanceFactory = null;
+
+        if (request.ServiceProviderFactory is null)
+            return true;
+
+        if (!BodyResolver.TryResolve(context, request.ServiceProviderFactory, out var resolved, out var error))
+        {
+            Fault($"The service provider factory could not be resolved because {error}");
+
+            return false;
+        }
+
+        IServiceProvider? provider;
+
+        try
+        {
+            provider = resolved.DynamicInvoke() as IServiceProvider;
+        }
+        catch (Exception ex)
+        {
+            var inner = (ex as TargetInvocationException)?.InnerException ?? ex;
+
+            Fault(
+                $"The service provider factory threw {inner.GetType().Name}: {inner.Message}",
+                inner.ToString());
+
+            return false;
+        }
+
+        if (provider is null)
+        {
+            Fault("The service provider factory returned null, or something that is not an IServiceProvider.");
+
+            return false;
+        }
+
+        instanceFactory = type =>
+        {
+            var instance = provider.GetService(type)
+                           ?? throw new InvalidOperationException(
+                               $"No service of type '{type.FullName}' is registered in the service "
+                               + "provider built by the factory. The worker builds its own container "
+                               + "from your factory, so a registration added outside it is not present.");
+
+            return InstanceHandle.NoTeardown(instance);
+        };
+
+        return true;
+    }
+
     private async Task RunDiscoveredClassAsync(
         RunGroupPayload request,
+        BenchmarkLoadContext context,
         MeasurementOptions options,
         StreamingProgress progress,
         CancellationToken cancellationToken)
     {
-        var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
         var target = context.LoadFromAssemblyPath(Path.GetFullPath(request.TargetAssemblyPath));
 
         var discoverer = new BenchmarkDiscoverer(request.DefaultInstanceLifetime);
@@ -410,14 +484,18 @@ internal sealed class WorkerSession(FrameChannel channel)
             return;
         }
 
+        // A container built here, from the caller's own registrations, rather than a live one sent
+        // across - which is impossible - or a parameterless constructor substituted for it, which would
+        // measure a differently-configured object under the right name. Absent a factory this stays
+        // null and the group was never routed here in the first place.
+        if (!TryBuildInstanceFactory(request, context, out var instanceFactory))
+            return;
+
         var outcome = await DiscoveredGroupExecutor.RunAsync(
                 suite,
                 selected,
                 options,
-                // A worker has no instance factory. Anything requiring one is not routed here -
-                // the coordinator keeps it in-process and labels it, rather than substituting a
-                // parameterless constructor and reporting the result as if nothing changed.
-                instanceFactory: null,
+                instanceFactory,
                 request.Order,
                 request.Seed,
                 request.StartIndex,
@@ -457,11 +535,10 @@ internal sealed class WorkerSession(FrameChannel channel)
     /// </summary>
     private async Task RunPlanAsync(
         RunGroupPayload request,
+        BenchmarkLoadContext context,
         StreamingProgress progress,
         CancellationToken cancellationToken)
     {
-        var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
-
         Func<BenchmarkSuite>? factory;
         string description;
 
@@ -607,49 +684,169 @@ internal sealed class WorkerSession(FrameChannel channel)
 
     private async Task RunLambdasAsync(
         RunGroupPayload request,
+        BenchmarkLoadContext context,
         MeasurementOptions options,
         StreamingProgress progress,
         CancellationToken cancellationToken)
     {
-        var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
         var index = 0;
 
-        // Shuffled here, in the measuring process, for the same reason the discovered-class path
-        // orders inside the worker: the coordinator sends a set of addresses, and the order they are
-        // measured in is a property of the measurement rather than of the request.
-        foreach (var body in RunOrdering.Apply(request.Bodies, request.Order, request.Seed))
+        // The suite's own setup runs here, once, before any body is measured - which is the whole
+        // reason it travels rather than running in the coordinator, where it would prepare state in a
+        // process that goes on to measure nothing.
+        if (!TryRunSuiteHook(context, request.SuiteSetup, "setup"))
+            return;
+
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var spec = new RunSpec
+            // Shuffled here, in the measuring process, for the same reason the discovered-class path
+            // orders inside the worker: the coordinator sends a set of addresses, and the order they are
+            // measured in is a property of the measurement rather than of the request.
+            foreach (var body in RunOrdering.Apply(request.Bodies, request.Order, request.Seed))
             {
-                Options = options,
-                Progress = progress,
-                Observer = progress.AsObserver(),
-            };
+                cancellationToken.ThrowIfCancellationRequested();
 
-            await progress
-                .OnBenchmarkStarting(body.DisplayName, request.StartIndex + index + 1, request.TotalBenchmarks)
-                .ConfigureAwait(false);
+                await progress
+                    .OnBenchmarkStarting(body.DisplayName, request.StartIndex + index + 1, request.TotalBenchmarks)
+                    .ConfigureAwait(false);
 
-            if (!BodyResolver.TryResolve(context, body, out var resolved, out var error))
-            {
-                Fault(
-                    $"'{body.DisplayName}' could not be measured because {error}",
-                    benchmarkName: body.DisplayName);
+                if (!BodyResolver.TryResolve(context, body, out var resolved, out var error))
+                {
+                    Fault(
+                        $"'{body.DisplayName}' could not be measured because {error}",
+                        benchmarkName: body.DisplayName);
+
+                    index++;
+                    continue;
+                }
+
+                if (!TryResolveIterationHooks(context, body, out var iterationSetup, out var iterationTeardown,
+                        out var hookError))
+                {
+                    // Reported as this benchmark's own failure rather than measured without its hooks.
+                    // A body measured with its setup silently dropped produces a plausible number for
+                    // work that never happened, which is the failure this whole area exists to refuse.
+                    Fault(
+                        $"'{body.DisplayName}' could not be measured because {hookError}",
+                        benchmarkName: body.DisplayName);
+
+                    index++;
+                    continue;
+                }
+
+                var spec = new RunSpec
+                {
+                    Options = options,
+                    Progress = progress,
+                    Observer = progress.AsObserver(),
+                    IterationSetup = iterationSetup,
+                    IterationTeardown = iterationTeardown,
+                };
+
+                var outcome = await DelegateDispatch
+                    .MeasureAsync(body.DisplayName, resolved, spec, cancellationToken)
+                    .ConfigureAwait(false);
+
+                SendResults([outcome.Result], _ => outcome.RawSamples);
 
                 index++;
-                continue;
             }
-
-            var outcome = await DelegateDispatch
-                .MeasureAsync(body.DisplayName, resolved, spec, cancellationToken)
-                .ConfigureAwait(false);
-
-            SendResults([outcome.Result], _ => outcome.RawSamples);
-
-            index++;
         }
+        finally
+        {
+            // In a finally so a cancelled or faulted group still releases whatever the setup acquired.
+            // Its own failure is reported but cannot mask the group's results, which are already sent.
+            TryRunSuiteHook(context, request.SuiteTeardown, "teardown");
+        }
+    }
+
+    /// <summary>
+    ///     Resolves and invokes one suite-level lifecycle delegate. Returns <c>false</c> when it could
+    ///     not be resolved or threw, having already reported the fault.
+    /// </summary>
+    private bool TryRunSuiteHook(BenchmarkLoadContext context, BodyRef? hook, string role)
+    {
+        if (hook is null)
+            return true;
+
+        if (!BodyResolver.TryResolve(context, hook, out var resolved, out var error))
+        {
+            Fault($"The suite's {role} could not be resolved because {error}");
+
+            return false;
+        }
+
+        if (resolved is not Action action)
+        {
+            Fault($"The suite's {role} resolved to {resolved.GetType().Name} rather than an Action.");
+
+            return false;
+        }
+
+        try
+        {
+            action();
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Fault($"The suite's {role} threw: {ex.Message}", ex.ToString());
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Resolves a body's per-iteration hooks, which the engine invokes outside the timed region.
+    /// </summary>
+    private static bool TryResolveIterationHooks(
+        BenchmarkLoadContext context,
+        BodyRef body,
+        out Action? setup,
+        out Action? teardown,
+        out string? error)
+    {
+        setup = null;
+        teardown = null;
+        error = null;
+
+        if (!TryResolveHook(context, body.IterationSetup, "per-iteration setup", out setup, out error))
+            return false;
+
+        return TryResolveHook(context, body.IterationTeardown, "per-iteration teardown", out teardown, out error);
+    }
+
+    private static bool TryResolveHook(
+        BenchmarkLoadContext context,
+        BodyRef? hook,
+        string role,
+        out Action? action,
+        out string? error)
+    {
+        action = null;
+        error = null;
+
+        if (hook is null)
+            return true;
+
+        if (!BodyResolver.TryResolve(context, hook, out var resolved, out var resolveError))
+        {
+            error = $"its {role} could not be resolved: {resolveError}";
+
+            return false;
+        }
+
+        if (resolved is not Action typed)
+        {
+            error = $"its {role} resolved to {resolved.GetType().Name} rather than an Action.";
+
+            return false;
+        }
+
+        action = typed;
+
+        return true;
     }
 
     /// <summary>
@@ -658,11 +855,19 @@ internal sealed class WorkerSession(FrameChannel channel)
     ///     context, so a user's custom detector or significance test is the same class the
     ///     coordinator would have used - not a silent fallback to the built-in one.
     /// </summary>
-    private MeasurementOptions ResolveStrategies(RunGroupPayload request)
+    private MeasurementOptions ResolveStrategies(RunGroupPayload request, BenchmarkLoadContext context)
     {
         var options = request.Options;
 
-        if (request.OutlierDetectorTypeName is { Length: > 0 } detectorName)
+        // A factory wins over a type name. It is the stronger mechanism - it reproduces the caller's own
+        // object with its own constructor arguments, where a type name can only reach a parameterless
+        // constructor - so where both are present the type name is the weaker fallback, not a conflict.
+        if (RunFactory<IOutlierDetector>(context, request.OutlierDetectorFactory, "outlier detector") is
+            { } detector)
+        {
+            options = options with { OutlierDetector = detector };
+        }
+        else if (request.OutlierDetectorTypeName is { Length: > 0 } detectorName)
         {
             options = options with
             {
@@ -670,7 +875,12 @@ internal sealed class WorkerSession(FrameChannel channel)
             };
         }
 
-        if (request.SignificanceTestTypeName is { Length: > 0 } testName)
+        if (RunFactory<ISignificanceTest>(context, request.SignificanceTestFactory, "significance test") is
+            { } test)
+        {
+            options = options with { SignificanceTest = test };
+        }
+        else if (request.SignificanceTestTypeName is { Length: > 0 } testName)
         {
             options = options with
             {
@@ -679,6 +889,45 @@ internal sealed class WorkerSession(FrameChannel channel)
         }
 
         return options;
+    }
+
+    /// <summary>
+    ///     Resolves and invokes an addressed factory, returning what it produced.
+    /// </summary>
+    /// <remarks>
+    ///     A failure here is reported on stderr and returns <c>null</c>, letting the caller fall through
+    ///     to the type name and then to the built-in strategy. Not a fault: the benchmark bodies are still
+    ///     measurable, and losing a custom scoring method is worth a loud line rather than a dead group -
+    ///     but it must be loud, because the alternative is a result scored under a method nobody chose.
+    /// </remarks>
+    private static T? RunFactory<T>(BenchmarkLoadContext context, BodyRef? factory, string role) where T : class
+    {
+        if (factory is null)
+            return null;
+
+        if (!BodyResolver.TryResolve(context, factory, out var resolved, out var error))
+        {
+            Console.Error.WriteLine(
+                $"nbworker: the {role} factory could not be resolved ({error}); "
+                + $"using the built-in {typeof(T).Name} instead.");
+
+            return null;
+        }
+
+        try
+        {
+            return resolved.DynamicInvoke() as T;
+        }
+        catch (Exception ex)
+        {
+            var inner = (ex as TargetInvocationException)?.InnerException ?? ex;
+
+            Console.Error.WriteLine(
+                $"nbworker: the {role} factory threw {inner.GetType().Name} ({inner.Message}); "
+                + $"using the built-in {typeof(T).Name} instead.");
+
+            return null;
+        }
     }
 
     private static T? Construct<T>(string typeName, string targetAssemblyPath) where T : class

@@ -191,7 +191,19 @@ This matters because JIT tiering, dynamic PGO, ReadyToRun and GC flavour are fix
 
 `WithIsolation(false)` opts back into the host process, deliberately and silently.
 
-A suite that holds live state a worker cannot be handed - captured locals, suite setup/teardown, parameters, or a custom detector instance - is measured in the host process instead, with the reason named per benchmark. Move it into a static `[BenchmarkPlan]` factory and use `BenchmarkSuite.RunPlanAsync(BuildSuite)`; the worker runs your factory in its own process, so all of that is constructed there. See [Isolated Runs](../features/isolated-runs.md) for the full model.
+Parameter sweeps, suite and per-iteration lifecycle, and custom statistical strategies are all isolated. What is not is a body - or a lifecycle delegate - that **captures a local**, because the captured value exists only in your process. The remedy is to declare the state instead of closing over it:
+
+```csharp
+await new BenchmarkSuite("sorting")
+    .WithState(() => BuildData())          // the worker builds it, once per benchmark
+    .Add("array", d => Array.Sort(d))
+    .Add("linq",  d => d.OrderBy(x => x).ToArray())
+    .RunAsync();
+```
+
+Custom strategies needing constructor arguments take a factory rather than an instance, for the same reason - `.WithOutlierDetector(static () => new KeepFastest(0.9))`.
+
+Anything genuinely un-addressable is measured in the host process, with the reason named per benchmark, and `WithRequireIsolation()` turns that into a failure instead. For a suite holding something no factory can describe, move it into a static `[BenchmarkPlan]` factory and use `BenchmarkSuite.RunPlanAsync(BuildSuite)`; the worker runs your factory in its own process. See [Isolated Runs](../features/isolated-runs.md) for the full model.
 
 ## Multiple launches
 

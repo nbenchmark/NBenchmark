@@ -32,8 +32,14 @@ public enum IsolationStatus
     ///     Measured in the host process because the benchmark body captures state from its enclosing
     ///     scope. Captured values live only in this process, and reconstructing them in a worker was
     ///     found to return plausible but silently wrong numbers rather than failing, so isolation is
-    ///     refused instead. Rewrite the body so it captures nothing - move the state into a field on
-    ///     a benchmark class, or into a <c>[BenchmarkPlan]</c> factory the worker can invoke.
+    ///     refused instead.
+    ///     <para>
+    ///         The remedy is to hand over a recipe rather than a value: pass the preparation as its own
+    ///         delegate, with
+    ///         <see cref="Benchmark.Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    ///         or <see cref="BenchmarkSuite.WithState{TState}" />, and the worker builds the state
+    ///         itself.
+    ///     </para>
     /// </summary>
     InProcessCapturedState = 2,
 
@@ -86,11 +92,17 @@ public static class IsolationStatusExtensions
     /// </summary>
     public static string? ToRemedy(this IsolationStatus status) => status switch
     {
+        // Names the mechanism rather than the prohibition. "Do not capture" leaves the reader to work
+        // out how to benchmark over prepared data at all; passing the preparation as its own delegate
+        // is the answer, and it is one line away from what they already wrote.
         IsolationStatus.InProcessCapturedState =>
-            "rewrite the body so it captures nothing from its enclosing scope, or move it into a "
-            + "benchmark class",
+            "pass the prepared state as its own delegate - Benchmark.Run(prepare: () => Build(), "
+            + "body: d => Use(d)), or .WithState(() => Build()) on a suite - so the worker can build it "
+            + "rather than needing a value from this process",
         IsolationStatus.InProcessLiveFixture =>
-            "instances come from a factory or fixture this process owns; a worker cannot reproduce it",
+            "instances come from a factory or fixture this process owns; supply a static factory instead "
+            + "- WithServiceProvider(BuildServices), WithOutlierDetector(static () => new …) - so the "
+            + "worker can build an equivalent one itself",
         IsolationStatus.InProcessUnaddressablePlan =>
             "add a [BenchmarkPlan] factory so a worker can build the suite itself",
         IsolationStatus.InProcessNoWorker =>
