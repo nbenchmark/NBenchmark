@@ -72,13 +72,13 @@ public void Repository_Query_Is_Fast_Enough()
 
 Regression checks compare your benchmark against a reference point measured in the same run, so a fast developer machine and a slow CI runner produce a similar ratio. No stored files, no environment mismatch, no CI workflow setup.
 
-Both sides are measured in worker processes when they can be, and the ratio gate is only enforced when they were - two measurements sharing a test host also share its JIT tiering state, which on bodies of identical cost fabricated a 2.80x ratio. See [when a ratio gate is enforced](../guides/performance-gates.md#when-a-ratio-gate-is-enforced), `[AllowInProcessGate]`, and `RequireIsolation`.
+Both sides are measured in worker processes when they can be, and the ratio gate is only enforced when they were - two measurements sharing a test host also share its JIT tiering state, which does not cancel between them. See [when a ratio gate is enforced](../guides/performance-gates.md#when-a-ratio-gate-is-enforced), `[AllowInProcessGate]`, and `RequireIsolation`.
 
 ### Calibration mode (zero config)
 
 When you set `MaxSlowdownRatio` without `ReferenceMethod`, the test runs a built-in CPU-bound calibration benchmark alongside your method. The ratio between your method and the calibration is stable across hardware for CPU-bound work - both scale with machine speed. For allocation-heavy or I/O-bound benchmarks, the ratio to a CPU calibration loop is less stable across hardware; use `ReferenceMethod` to compare against a method with a similar resource profile, or use absolute thresholds with `MaxAbsoluteThresholdTolerance`.
 
-The calibration is measured in the same place as the method it divides into. When your test runs in an isolated worker the worker measures the calibration too, so both sides of the ratio share a runtime configuration - the worker's tiering and ReadyToRun settings differ from the test host's, and on bodies of identical cost that difference alone moved the number by ~3.3x. When the worker cannot produce one, the gate falls back to a host-measured calibration and adds a note to the test output saying the ratio spans two configurations.
+The calibration is measured in the same place as the method it divides into. When your test runs in an isolated worker the worker measures the calibration too, so both sides of the ratio share a runtime configuration - the worker's tiering and ReadyToRun settings differ from the test host's, and that difference alone can move the number by ~3x. When the worker cannot produce one, the gate falls back to a host-measured calibration and adds a note to the test output saying the ratio spans two configurations.
 
 ```csharp
 // xUnit
@@ -94,7 +94,7 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-The test fails when the slowdown is **both** real **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). What counts as "real" depends on whether the test asked for replicates — see [Replicates and the paired ratio](#replicates-and-the-paired-ratio). With the default single launch it is a Mann-Whitney U p-value below the significance level. A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
+The test fails when the slowdown is **both** real **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). What counts as "real" depends on whether the test asked for replicates - see [Replicates and the paired ratio](#replicates-and-the-paired-ratio). With the default single launch it is a Mann-Whitney U p-value below the significance level. A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
 
 Failure output includes ratio and significance details (`ratio`, `p`, and Cliff's delta) when a slowdown breaches the gate. A practical tuning workflow is to start with a loose value (for example `MaxSlowdownRatio = 10.0`) and tighten it based on several runs in your CI environment.
 
@@ -130,7 +130,7 @@ A ratio gate decides a build, so the question that matters is not "is this numbe
 public void OptimisedParse() => OptimisedParser.Parse(Payload);
 ```
 
-That measures the pair in **three separate worker processes**. Each one produces its own candidate/reference ratio, and the three are combined on the log scale into a geometric mean with a confidence interval — the same estimator the engine's `Ratio CI` column uses. See [Ratios](../statistics/ratios.md).
+That measures the pair in **three separate worker processes**. Each one produces its own candidate/reference ratio, and the three are combined on the log scale into a geometric mean with a confidence interval - the same estimator the engine's `Ratio CI` column uses. See [Ratios](../statistics/ratios.md).
 
 What changes when the interval exists:
 
@@ -138,15 +138,15 @@ What changes when the interval exists:
 | --- | --- | --- |
 | ratio gated on | candidate mean / reference mean | geometric mean of the per-launch ratios |
 | "is the difference real?" | Mann-Whitney U on pooled samples | does the interval exclude `1.00x`? |
-| worker launches | 1 | one per replicate — the pair shares each |
+| worker launches | 1 | one per replicate - the pair shares each |
 | test output | mean, P95, allocations, iterations | the above plus a `Launches:` line with the run-to-run spread |
 
-The p-value is still computed and reported at `LaunchCount >= 2`, but it is no longer what the gate turns on. Pooling samples across launches multiplies statistical power without improving reproducibility, so a difference far below the run-to-run noise can read as overwhelmingly significant — on NBenchmark's own calibration sample, four bodies of provably identical cost, that combination marks one significantly slower than another routinely. The interval over per-replicate ratios is the run-to-run spread, and that is the quantity a gate must survive.
+The p-value is still computed and reported at `LaunchCount >= 2`, but it is no longer what the gate turns on. Pooling samples across launches multiplies statistical power without improving reproducibility, so a difference far below the run-to-run noise can read as overwhelmingly significant - on NBenchmark's own calibration sample, four bodies of provably identical cost, that combination marks one significantly slower than another routinely. The interval over per-replicate ratios is the run-to-run spread, and that is the quantity a gate must survive.
 
 Two consequences worth knowing before you set it:
 
 - **It costs launches.** `LaunchCount = 3` spends three worker launches on that test instead of one, and a `[PerformanceTheory]` spends them per test case. Raise it on the comparisons that decide a build, not across the suite. Two is the smallest value that produces an interval; three is enough for the interval to be worth reading.
-- **A noisy comparison stops failing.** When the point estimate is past the gate but the interval spans `1.00x`, the gate is **not** enforced — the run cannot distinguish the two bodies, and failing on that is failing on noise. The test output says so explicitly rather than passing in silence. Raising `LaunchCount` narrows the interval; if it stays wide, the difference is smaller than your machine's run-to-run variation and no threshold can honestly detect it.
+- **A noisy comparison stops failing.** When the point estimate is past the gate but the interval spans `1.00x`, the gate is **not** enforced - the run cannot distinguish the two bodies, and failing on that is failing on noise. The test output says so explicitly rather than passing in silence. Raising `LaunchCount` narrows the interval; if it stays wide, the difference is smaller than your machine's run-to-run variation and no threshold can honestly detect it.
 
 Conversely, a failure at `LaunchCount = 1` now carries a note saying the ratio is a point estimate with no interval behind it. That is not a defect in the gate; it is the most the single-launch measurement supports.
 

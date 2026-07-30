@@ -93,12 +93,12 @@ In auto mode NBenchmark resolves warmup length, measured-sample count, and ops-p
 | `--min-samples <n>` | `30` | Floor on auto-resolved measured samples. |
 | `--max-samples <n>` | `5000` | Ceiling on auto-resolved measured samples. Past a coefficient of variation of ~90% the CI rule needs samples growing as `(t × CV / target)²` and cannot converge, so the ceiling stops the chase and the warning names the CV. |
 | `--min-warmup <n>` | `8` | Floor on auto-detected warmup samples. |
-| `--max-warmup <n>` | `100000` | Ceiling on auto-detected warmup samples. Deliberately far above what any body needs so the *time* bounds bind instead — a fast body needs ~25,000 samples to accumulate `--min-warmup-time`. (A *pinned* `--warmup` is still limited to 10,000.) |
+| `--max-warmup <n>` | `100000` | Ceiling on auto-detected warmup samples. Deliberately far above what any body needs so the *time* bounds bind instead - a fast body needs ~25,000 samples to accumulate `--min-warmup-time`. (A *pinned* `--warmup` is still limited to 10,000.) |
 | `--max-tuning-time <s>` | `20` | Per-benchmark wall-clock safety cap, in seconds, for the whole adaptive loop. |
 | `--autotune-cap-behavior <mode>` | `warn` | What happens when the wall-clock cap is hit before the CI target or warmup plateau is reached: `warn` emits a warning; `error` marks the benchmark as errored. |
 | `--warmup-budget-fraction <0-1>` | `0.4` | Max share of `--max-tuning-time` that calibration and warmup may consume together; the remainder is reserved for measurement. Must be in `(0, 1]`. |
 | `--cap-grace-factor <n>` | `1.5` | Multiplier on `--max-tuning-time` that the measurement phase may reach while chasing `--min-samples` after the cap fires. Must be at least 1; set to 1 to disable the grace path. |
-| `--min-warmup-time <ms>` | `500` | Minimum in-body time (milliseconds) auto-warmup must accumulate before it may settle, so background tiered JIT lands before measurement rather than mid-run. 5× the runtime's 100 ms tiered-compilation call-counting delay; a floor at or below that delay reliably lands the tier-up *inside* measurement. Chosen empirically — at 250 ms a `StringBuilder`-append loop still landed in either its tier-0 or its ~4.5× faster steady state depending on the run. Raise this first if a benchmark's median differs between runs while each run reports a tight interval. Must be ≥ 0; `0` disables the floor (and the JIT-quiescence gate). |
+| `--min-warmup-time <ms>` | `500` | Minimum in-body time (milliseconds) auto-warmup must accumulate before it may settle, so background tiered JIT lands before measurement rather than mid-run. 5× the runtime's 100 ms tiered-compilation call-counting delay; a floor at or below that delay reliably lands the tier-up *inside* measurement. Chosen empirically - at 250 ms a `StringBuilder`-append loop still landed in either its tier-0 or its ~4.5× faster steady state depending on the run. Raise this first if a benchmark's median differs between runs while each run reports a tight interval. Must be ≥ 0; `0` disables the floor (and the JIT-quiescence gate). |
 | `--no-jit-quiescence` | off | Disable the JIT-quiescence warmup gate (warmup no longer waits for the JIT to stop compiling); the `--min-warmup-time` floor still applies. |
 | `--jit-quiet-period <ms>` | `50` | How long (milliseconds) the JIT compiled-method count must stay unchanged before auto-warmup may settle. Clamped down to `--min-warmup-time` so it never becomes the binding floor. Must be ≥ 0; `0` disables the gate. |
 | `--min-measurement-time <ms>` | `100` | Minimum in-body time (milliseconds) the measurement phase must span before it may stop on the CI target. Makes the sample count scale with body speed, so a cheap body collects hundreds of samples for milliseconds of extra work instead of stopping at a few dozen (where P95/P99/P99.9 all collapse onto the maximum). Costs nothing for a body already slower than `--min-measurement-time / --min-samples`. Must be ≥ 0; `0` disables the floor. |
@@ -303,9 +303,7 @@ Isolation verification - the same benchmarks measured both ways:
   HarnessBenchmarks.InHarness             -      10.99 ns  not isolated
 ```
 
-This exists because the case for isolation is not believable in the abstract. On this library's own sample, in-process measurement of one body reported 7,009 ns and 320 ns on consecutive attempts - a 21x error, with a tight confidence interval on each. Reading that in a changelog persuades nobody; seeing it on your own benchmarks does.
-
-The output reports a **ratio per benchmark** rather than an aggregate, because the finding is that host measurement is *unpredictable*: one row at 21x beside another at 1.0x is the point, and averaging would erase it. Rows are ordered by distance from parity, so a host reading at half the isolated one ranks alongside one at double.
+This exists because the case for isolation is not believable in the abstract - seeing it on your own benchmarks is what makes it stick. The output reports a **ratio per benchmark** rather than an aggregate, because host measurement is *unpredictable*: one row far from its isolated reading beside another that agrees is the point, and averaging would erase it. Rows are ordered by distance from parity.
 
 When the two agree, it says so. A workload insensitive to the host's runtime configuration is a real result worth knowing - though it is a property of those benchmarks, not a general one.
 
@@ -358,17 +356,7 @@ Set the runtime-startup configuration benchmarks are measured under: JIT tiering
 | `server-gc` | `steady-state` plus `gcServer=1`, `gcConcurrent=0` | Code destined for a server-GC host. |
 | `host` | Nothing set | Inherit the host's configuration. Reproduces pre-profile numbers. |
 
-**Why this exists.** None of these settings can be changed in a process that is already running - the runtime reads them once at startup. That, rather than cross-benchmark state contamination, is the real reason a measurement needs its own process: **the process boundary is how the configuration gets delivered.**
-
-The effect is not subtle. On four benchmarks with provably identical cost:
-
-| Configuration | Spread across runs | Largest fabricated difference |
-| --- | --- | --- |
-| `--runtime-profile host` | 3.10x | 3.06x |
-| `--runtime-profile production` | 2.59x | 2.54x |
-| `--runtime-profile steady-state` | **1.02x** | **1.01x** |
-
-Under `host` and `production`, benchmarks of identical cost differed by up to 3x - each reported with a tight confidence interval. Tiered compilation means a short body may be measured as tier-0 or tier-1 code depending on unrelated process history.
+**Why this exists.** None of these settings can be changed in a process that is already running - the runtime reads them once at startup. That, rather than cross-benchmark state contamination, is the real reason a measurement needs its own process: **the process boundary is how the configuration gets delivered.** The effect is large - on four benchmarks with provably identical cost, `--runtime-profile host` spread 3.10x across runs while `steady-state` spread 1.02x, because tiered compilation means a short body may be measured as tier-0 or tier-1 code depending on unrelated process history.
 
 ```bash
 dotnet run -- --runtime-profile production --launch-count 5   # imprecise: raise the replicate count
@@ -527,7 +515,7 @@ dotnet run -- --help
 
 ### `--launch-count <n>`
 
-Repeat each benchmark N times, each in its own worker process. The primary result is the **average across those launches**, and its confidence interval is derived from the spread between them — so it describes how well the number reproduces rather than how precisely one process measured it. An aggregation table with the per-launch detail appears below the main results when `n > 1`. Valid range: `1` to `100`. Harness-mode default: `3` when the user has not explicitly pinned launch count. See [Multiple launches](../features/multiple-launches.md).
+Repeat each benchmark N times, each in its own worker process. The primary result is the **average across those launches**, and its confidence interval is derived from the spread between them - so it describes how well the number reproduces rather than how precisely one process measured it. An aggregation table with the per-launch detail appears below the main results when `n > 1`. Valid range: `1` to `100`. Harness-mode default: `3` when the user has not explicitly pinned launch count. See [Multiple launches](../features/multiple-launches.md).
 
 ```bash
 dotnet run -- --launch-count 3
@@ -594,7 +582,7 @@ dotnet run -- --no-histogram
 
 Return every raw sample from an isolated worker instead of a bounded representative subset.
 
-By default a worker sends back at most 4,096 raw samples per benchmark. A benchmark can measure up to 100,000, and the whole array crossing the process boundary on every result is 800 KB of JSON for data the coordinator barely uses — **every statistic NBenchmark reports is computed inside the worker, over the complete sample array**. Raising or lowering the cap cannot move a median, an interval, or an outlier count.
+By default a worker sends back at most 4,096 raw samples per benchmark. A benchmark can measure up to 100,000, and the whole array crossing the process boundary on every result is 800 KB of JSON for data the coordinator barely uses - **every statistic NBenchmark reports is computed inside the worker, over the complete sample array**. Raising or lowering the cap cannot move a median, an interval, or an outlier count.
 
 What the samples that cross are used for is the sample dump in JSON output, the Console density sparkline, and significance testing. All three are distribution properties, and a few thousand samples describe a distribution as faithfully as a hundred thousand.
 
@@ -618,9 +606,9 @@ See also [`--no-samples`](#--no-samples), which omits the arrays from JSON outpu
 
 Forward the live per-sample observer stream out of an isolated worker.
 
-An attached observer's `OnSample` callback is the one event that does not cross the process boundary by default. Every other event — phase transitions, detector snapshots, results — is emitted a handful of times per benchmark, but samples arrive in the hundreds or thousands, and a frame each would put the cost of observing the run inside the run.
+An attached observer's `OnSample` callback is the one event that does not cross the process boundary by default. Every other event - phase transitions, detector snapshots, results - is emitted a handful of times per benchmark, but samples arrive in the hundreds or thousands, and a frame each would put the cost of observing the run inside the run.
 
-Pass this when an observer needs the samples *live* — a streaming histogram, a sample-level exporter:
+Pass this when an observer needs the samples *live* - a streaming histogram, a sample-level exporter:
 
 ```bash
 dotnet run -- --observer live --stream-samples
@@ -628,13 +616,13 @@ dotnet run -- --observer live --stream-samples
 
 It needs an observer to be attached; with nothing to replay into, the request is withdrawn and the flag costs nothing. It is also unrelated to [`--emit-raw`](#--emit-raw): that bounds the sample array carried on each *result*, this is the live stream, and the two are selected by different rules for different consumers. The complete array arrives with the result whether or not this is set.
 
-Programmatic equivalent: `WithOptions(o => o with { StreamSamples = true })`. Samples cross in batches — one frame per 128 samples or per 100 ms, whichever comes first — and your observer still sees one `OnSample` call per sample. Measured against a control across eight replicates on a 6.9 µs body, ~780 forwarded events moved neither wall-clock time nor the reported median outside the control's own spread. See [Measurement Observer](observers.md#--stream-samples) for the batching rule and its ordering guarantee.
+Programmatic equivalent: `WithOptions(o => o with { StreamSamples = true })`. Samples cross in batches - one frame per 128 samples or per 100 ms, whichever comes first - and your observer still sees one `OnSample` call per sample. Measured against a control across eight replicates on a 6.9 µs body, ~780 forwarded events moved neither wall-clock time nor the reported median outside the control's own spread. See [Measurement Observer](observers.md#--stream-samples) for the batching rule and its ordering guarantee.
 
 ---
 
 ### `--no-samples`
 
-Omit raw per-sample arrays from JSON reporter output. Samples are still collected, still feed significance testing and the Console histogram, and still cross the process boundary — this only controls whether they are written to the file.
+Omit raw per-sample arrays from JSON reporter output. Samples are still collected, still feed significance testing and the Console histogram, and still cross the process boundary - this only controls whether they are written to the file.
 
 ```bash
 dotnet run -- --no-samples --reporter json

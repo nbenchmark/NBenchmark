@@ -12,9 +12,6 @@ You already run a unit test suite in CI. You don't want a separate benchmark pro
 
 NBenchmark's test-integration packages attach to xUnit, NUnit, and MSTest and run the benchmark as part of the test method. Thresholds can be absolute (a hard SLA: "this method must complete in under 500 µs") or relative (a regression gate: "this method must not be more than 5x slower than a reference"), and a relative threshold largely absorbs a change of machine, because both sides scale with machine speed.
 
-> [!IMPORTANT]
-> An earlier version of this page said relative thresholds were "hardware-independent because the comparison runs in the same test session". The second half of that is not true, and measurement says so: on four benchmark bodies of provably identical cost, running them in one test host produced a **2.80x** ratio between two of them, with a tight confidence interval on each side. Sharing a session does not cancel the host out - the host's JIT tiering state is *itself* the variable. That is why NBenchmark measures test bodies in worker processes, and why a ratio gate is only enforced between two measurements taken the same way. See [Where your test is measured](#where-your-test-is-measured).
-
 ## Complete example
 
 ### Absolute threshold (SLA-style)
@@ -35,7 +32,7 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 
 Without a `ReferenceMethod`, the test runs a built-in CPU-bound calibration benchmark alongside your method. The ratio between your method and the calibration is stable across hardware for CPU-bound work - both scale with machine speed. The test fails only when the slowdown is **both** statistically significant (p < 0.05) **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
 
-**The calibration is measured wherever your method is.** When the test is measured in an isolated worker, the worker measures the calibration too, in the same process and under the same runtime configuration. That matters more than it sounds: the worker starts with JIT tiering and ReadyToRun disabled and the test host does not, and on bodies of provably identical cost that difference alone was worth ~3.3x. A ratio spanning it would report the two process configurations rather than anything about your code. If the worker cannot produce a calibration, the gate falls back to the host's own and says so in the test output - treat that ratio as a rough hardware-scaled bound rather than a code comparison.
+**The calibration is measured wherever your method is.** When the test is measured in an isolated worker, the worker measures the calibration too, in the same process and under the same runtime configuration. That matters: the worker starts with JIT tiering and ReadyToRun disabled and the test host does not, and that configuration gap can move the reported number by ~3x on its own. A ratio spanning it would report the two process configurations rather than anything about your code. If the worker cannot produce a calibration, the gate falls back to the host's own and says so in the test output - treat that ratio as a rough hardware-scaled bound rather than a code comparison.
 
 ### Relative threshold with a reference method (compare two implementations)
 
@@ -93,9 +90,7 @@ public void Repository_Query_Is_Fast_Enough()
 
 - **Absolute thresholds** (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) - hard SLAs. Susceptible to shared-runner noise; prefer `MaxSlowdownRatio` for regression gates. Set `MaxAbsoluteThresholdTolerance` to relax absolute thresholds when a shared runner or high-jitter host is detected (e.g. `1.25` for 25% relaxation).
 
-- **Relative thresholds** (`MaxSlowdownRatio`) - regression gates. Comparing two bodies measured in the same session cancels out how *fast the machine is*, so a quick dev box and a slow CI runner agree on the ratio, with no stored baselines or environment matching. The test fails only when the slowdown is both statistically significant and exceeds the ratio.
-
-  **A ratio cancels the hardware, not the runtime state.** This guide previously said the host "cancels out" outright; that is measurably false. On four benchmarks of *provably identical cost*, repeated in-process runs fabricated a **2.80x** ratio between two of them - each reported with a tight confidence interval. Whatever the JIT happened to have tiered up when a given body ran does not cancel, because it is not shared between the two bodies. Set `MaxSlowdownRatio` loosely enough to survive that (start around `10.0` and tighten from observed CI runs), and lean on the statistical gate rather than the ratio alone.
+- **Relative thresholds** (`MaxSlowdownRatio`) - regression gates. Comparing two bodies measured in the same session cancels out how *fast the machine is*, so a quick dev box and a slow CI runner agree on the ratio, with no stored baselines or environment matching. The ratio cancels the machine, not the runtime state the host happens to be in - set it loosely enough to survive that (start around `10.0` and tighten from observed CI runs), and lean on the statistical gate rather than the ratio alone. The test fails only when the slowdown is both statistically significant and exceeds the ratio.
 
 - **Statistical gating** - the test fails only when the slowdown is **both** real **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes; a large-but-noisy slowdown passes. This mirrors the [practical-significance gate](../statistics/significance.md#practical-significance-gate) in the suite / harness flow.
 
@@ -132,17 +127,16 @@ Those results are still produced and still gated on absolute thresholds. What ch
 | Test host | Test host | Not enforced, and the reason is logged. Add `[AllowInProcessGate]` to enforce it anyway. |
 | Worker | Test host (or the reverse) | **Never enforced.** No opt-in covers it. |
 
-The middle row is the one to understand. Two bodies measured in the same test host share its JIT tiering and PGO state, and that state is whatever the preceding tests left behind - the source of the 2.80x fabricated ratio above. The gate declines rather than reporting an effect that may not exist, and prints why:
+The middle row is the one to understand. Two bodies measured in the same test host share its JIT tiering and PGO state, and that state is whatever the preceding tests left behind - so a ratio between them can report the host's history rather than the code. The gate declines rather than reporting an effect that may not exist, and prints why:
 
 ```
 NBenchmark: the ratio gate for 'ParserTests.Parse' was not enforced - both it and its
 reference were measured in the test host, where the runtime configuration is whatever
-the preceding tests left behind. On bodies of provably identical cost that produced a
-2.80x ratio with a tight interval. Make the test isolatable, or add
+the preceding tests left behind. Make the test isolatable, or add
 [AllowInProcessGate] to gate on it anyway.
 ```
 
-The bottom row is refused outright: a ratio spanning a process boundary is dominated by the difference between the two runtime configurations, which on the same identical-cost bodies was worth about 3.3x. Making both sides isolatable - usually by moving injected state into the method - is the fix.
+The bottom row is refused outright: a ratio spanning a process boundary is dominated by the difference between the two runtime configurations, which can be ~3x on bodies of identical cost. Making both sides isolatable - usually by moving injected state into the method - is the fix.
 
 ### `[AllowInProcessGate]`
 

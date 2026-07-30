@@ -327,9 +327,9 @@ Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per 
 
 The number of times to repeat each benchmark as a separate launch, typed as `int`.
 
-**It is deliberately not a field on `MeasurementOptions`.** A launch is a *process*, so the count is spent by whichever coordinator launches them and means nothing to a worker, which measures exactly once. `MeasurementOptions` is serialized whole into every worker's request, so a launch count living there would travel to a process that must ignore it - and it did, which is how a transport detail (every request path pinning the field to 1) came to decide whether a `[Benchmark(LaunchCount = n)]` attribute took effect. The bounds and defaults live on the `LaunchCounts` static class; the value is set through the fluent builders, the attributes, or the flag.
+**It is not a field on `MeasurementOptions`.** A launch is a *process*, so the count is spent by whichever coordinator launches the workers; a worker measures exactly once and is never sent the count. The bounds and defaults live on the `LaunchCounts` static class; the value is set through the fluent builders, the attributes, or the flag.
 
-The default is `1`; Harness mode applies `LaunchCounts.HarnessDefault` (`3`) when the launch count is not pinned via `WithLaunchCount`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`. `WithOptions` has no say - it carries no launch count to have an opinion with. Pass `WithLaunchCount(1)` to opt out of the harness default.
+The default is `1`; Harness mode applies `LaunchCounts.HarnessDefault` (`3`) when the launch count is not pinned via `WithLaunchCount`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`. Pass `WithLaunchCount(1)` to opt out of the harness default.
 
 | Value | Behaviour |
 |---|---|

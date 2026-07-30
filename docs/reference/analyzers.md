@@ -255,7 +255,7 @@ Typical fixes:
 
 NBenchmark measures a benchmark body in a separate worker process, because the runtime configuration a process starts under is the dominant term in a small measurement - on bodies of provably identical cost it moved the reported number by ~3.3x. It gets the body there by resolving the method the compiler already emitted; it never serializes or regenerates it.
 
-A lambda that captures state cannot be addressed that way. Its captured values live in your process, and there is no honest way to reproduce them elsewhere - reconstructing them was tried and rejected, because a fabricated closure did not throw, it returned plausible wrong numbers. So a capturing body is measured in the test host instead, correctly labelled but less precise.
+A lambda that captures state cannot be addressed that way. Its captured values live in your process, and there is no honest way to reproduce them elsewhere - a fabricated closure does not throw, it returns plausible wrong numbers. So a capturing body is measured in the test host instead, correctly labelled but less precise.
 
 ```csharp
 var data = BuildInput();
@@ -269,6 +269,18 @@ The runtime already reports this after the fact, in the `Iso` column and the iso
 **It is `Info`, not a warning**, because capturing is the idiomatic way to benchmark over prepared data. Warning on it would push you towards contorted code to silence a build. What it costs is fidelity, not correctness.
 
 **Scope:** the `Benchmark.Run*` family and `BenchmarkSuite.Add(...)`.
+
+A few shapes are worth knowing because they do not read the way they lower:
+
+| Body | Isolated? | Why |
+| --- | --- | --- |
+| `() => 43` | yes | Nothing to carry. Roslyn still emits it as an instance method on a cached singleton, so a `Target is null` test would get this wrong. |
+| `static () => 43` | yes | Same as above - `static` documents the intent, it does not change the lowering. |
+| `() => Work(local)` | no | Captures `local`. |
+| `() => Work(_field)` | no | Captures `this` - naming an instance member without a receiver carries the whole object. |
+| `() => Work(StaticField)` | yes | A static needs no receiver. |
+| `widget.Compute` | no | A method group over a live object; the receiver is state this process owns. |
+| `() => 43` beside `() => local` | yes | A non-capturing lambda keeps its isolation even when a sibling in the same scope captures. |
 
 `Add` is where capture reads as most idiomatic, and where it costs most. A suite is addressed as a *set* - one worker measures all of its bodies - so the first body that cannot be addressed takes every sibling in-process with it, including the ones that would have isolated fine on their own. The message says so:
 
@@ -284,7 +296,7 @@ await new BenchmarkSuite("Sorting")
 
 One diagnostic is reported per capturing body, and none on a self-contained sibling - so a suite mixing the two shows exactly which bodies to change.
 
-**Parameterized `Add` overloads are covered too.** They used to be silent, on sound reasoning: a suite carrying `WithParameter(...)` was refused isolation for the parameter values themselves, so a capture diagnostic would have named a cause whose removal changed nothing. Parameter values now travel as serialized constants and a sweep is isolated like any other suite, which makes a capture in a parameterized body the operative cause again. A parameterized body that captures nothing stays silent - its parameter is supplied at each invocation rather than closed over.
+**Parameterized `Add` overloads are covered too.** Parameter values travel as serialized constants, so a sweep is isolated like any other suite and a capture in a parameterized body is the operative cause. A parameterized body that captures nothing stays silent - its parameter is supplied at each invocation rather than closed over.
 
 **The remedy the message names is the prepared-state split**, not a `[BenchmarkPlan]` factory. `Benchmark.Run(prepare: () => Build(), body: d => Use(d))` and `.WithState(() => Build())` let the worker build the state itself, which is one line from what you already wrote; a plan factory is the escape hatch for suites holding something no factory can describe.
 

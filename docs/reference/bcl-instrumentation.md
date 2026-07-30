@@ -142,7 +142,7 @@ CI-sourced values take precedence over the git CLI fallback. When no CI or git e
 
 Benchmarks are measured in a separate `nbworker` process by default. Your own `IMeasurementObserver` and `IBenchmarkProgress` instances still fire: the worker streams its phase and progress events back over its pipe and the coordinator replays them into the live objects you registered, so no OTLP configuration is needed to observe an isolated run.
 
-What OTLP adds is a channel to something *outside* both processes — a collector, a tracing backend, a dashboard. For that the worker needs its own exporter configuration, which it inherits from the coordinator's environment.
+What OTLP adds is a channel to something *outside* both processes - a collector, a tracing backend, a dashboard. For that the worker needs its own exporter configuration, which it inherits from the coordinator's environment.
 
 ### Env-var forwarding
 

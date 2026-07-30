@@ -54,21 +54,9 @@ var iterations = 1000;
 var result = Benchmark.Run(() => Work(iterations));
 ```
 
-NBenchmark measures it here, prints the reason once, and stamps `IsolationStatus.InProcessCapturedState` on the result. It never reconstructs the captured state: doing so was tried, and it did not fail loudly - it returned a plausible number for the wrong value. To isolate a body like this, remove the capture (use a constant, or move the state into a benchmark class field).
+NBenchmark measures it here, prints the reason once, and stamps `IsolationStatus.InProcessCapturedState` on the result. It never reconstructs the captured state - a fabricated closure does not throw, it returns plausible, silently wrong numbers. To isolate a body like this, remove the capture (use a constant, or move the state into a benchmark class field).
 
-The analyzer package reports this at compile time as [NB0014](../reference/analyzers.md#nb0014---capturing-body-cannot-be-isolated), naming the symbols captured - which is more precise than the runtime can be, since by then they are fields on a compiler-generated class. It is informational rather than a warning, because capturing is the idiomatic way to benchmark over prepared data.
-
-A few shapes are worth knowing because they do not read the way they lower:
-
-| Body | Isolated? | Why |
-| --- | --- | --- |
-| `() => 43` | yes | Nothing to carry. Roslyn still emits it as an instance method on a cached singleton, so a `Target is null` test would get this wrong. |
-| `static () => 43` | yes | Same as above - `static` documents the intent, it does not change the lowering. |
-| `() => Work(local)` | no | Captures `local`. |
-| `() => Work(_field)` | no | Captures `this` - naming an instance member without a receiver carries the whole object. |
-| `() => Work(StaticField)` | yes | A static needs no receiver. |
-| `widget.Compute` | no | A method group over a live object; the receiver is state this process owns. |
-| `() => 43` beside `() => local` | yes | A non-capturing lambda keeps its isolation even when a sibling in the same scope captures. |
+The analyzer package reports this at compile time as [NB0014](../reference/analyzers.md#nb0014---capturing-body-cannot-be-isolated), naming the symbols captured - which is more precise than the runtime can be, since by then they are fields on a compiler-generated class. It is informational rather than a warning, because capturing is the idiomatic way to benchmark over prepared data. See the analyzer page for the full lowering table - which shapes capture, which do not, and why a `static` lambda does not change the answer.
 
 ### Measuring this process on purpose
 
@@ -233,9 +221,9 @@ Harness mode measures in a dedicated worker process, `nbworker`, which ships ins
 
 A worker loads the assembly declaring your benchmarks into its own load context, runs the same attribute discovery the host would, measures with the same engine, and streams results back over a private pipe. Three consequences are worth knowing:
 
-- **Your `Main` does not re-run.** Earlier versions re-executed the entry assembly for every worker, so a program with *M* isolated suites did *M²* work and any side effect in `Main` - a file write, an HTTP call, database seeding - happened once per worker. A worker is given an assembly and a class name instead.
+- **Your `Main` does not re-run.** A worker is given an assembly and a class name rather than re-executing the entry assembly, so a program with *M* isolated suites does *M* work, not *M²*, and any side effect in `Main` - a file write, an HTTP call, database seeding - happens once, in the host.
 - **Progress is live.** Warmup and measurement phases, detector snapshots and results stream from the worker into your own `IBenchmarkProgress` and `IMeasurementObserver` as they happen. Per-*sample* observer events are the exception: they stop at the process boundary unless `--stream-samples` asks for them, because a benchmark emits them in the thousands and forwarding all of them would add measurable time to the run. The full raw samples arrive with each result either way. See [Measurement Observer](../reference/observers.md#what-an-isolated-run-delivers) for the per-callback table.
-- **Results and their samples arrive together.** There is no side table to look them up in, which is what previously allowed every isolated result to lose its samples and silently disable significance testing.
+- **Results and their samples arrive together.** A worker computes every statistic over the full sample array and ships the samples on the completion frame, so `BenchmarkResult.RawSamples` is complete and significance testing reads them.
 
 If the worker is missing - an incomplete restore, or `NBenchmarkDeployWorker=false` - benchmarks are measured in the host process, the reason is printed, and the results are stamped `host`. Set `NBENCHMARK_WORKER_PATH` to point at a specific `nbworker.dll` if you need to override discovery.
 
@@ -258,28 +246,10 @@ Two flags make the claim verifiable on your own code:
 
 See [CLI reference](../reference/cli.md#--strict-isolation) for both.
 
-## Why isolation actually matters
-
-The intuitive case for isolation is that a benchmark should not inherit JIT, GC or thread-pool state left behind by its siblings. That is true, but it is not the main reason, and measuring it shows why.
-
-Four benchmarks with provably identical cost, measured repeatedly:
-
-| Configuration | Spread across runs | Largest fabricated difference |
-| --- | --- | --- |
-| in-process | 3.27x | 2.80x |
-| isolated, host runtime configuration | 3.10x | 3.06x |
-| **isolated, `steady-state` runtime configuration** | **1.03x** | **1.03x** |
-
-Isolation on its own barely helped. What fixed it was disabling tiered compilation - and **that can only be done to a process that has not started yet**, because the runtime reads the setting once at startup and never again.
-
-So the process boundary is not the remedy. It is the *delivery mechanism* for the [runtime profile](../reference/cli.md#--runtime-profile-profile), which is the remedy. Isolation without it produces numbers that are reproducible and wrong, reported with a tight confidence interval - which is worse than being obviously noisy, because it invites trust.
-
-This is also why an in-process benchmark can never be as trustworthy as an isolated one, no matter how many samples it collects: it is stuck with whatever configuration its host process was started with. NBenchmark reports that rather than hiding it - in-process results are stamped `host`, and results measured under different runtime configurations are never compared against each other.
-
 ## Important behavior notes
 
 - Isolation adds overhead: one worker launch per group. A worker costs roughly 70 ms to start and complete its handshake. Against the per-benchmark wall-clock floor of about 600 ms (`MinWarmupTime` plus `MinMeasurementTime`), either is a small tax for a comparison group of any size.
-- **Do not rely on `--in-process` for anything comparative.** On four benchmarks with provably identical cost, repeated in-process runs spanned 3.27x and fabricated a 2.80x difference between two of them, while reporting a tight confidence interval on each. The same benchmarks measured in workers under the default runtime profile spanned 1.03x. See `plans/out-of-process-pivot.md` for the measurements and the reason.
+- **Do not rely on `--in-process` for anything comparative.** In-process runs of identical-cost benchmarks can spread 3x across runs while each reports a tight confidence interval. See the table under [Why one worker for the whole suite](#why-one-worker-for-the-whole-suite) and `plans/out-of-process-pivot.md` for the measurements and the reason.
 - **`LaunchCount` is a replicate count, and each replicate is a fresh process.** In Harness mode, `--launch-count 3` measures the group in three separate workers, each with its own shuffle order derived from the session seed. That is what gives a run-to-run reproducibility estimate rather than three repetitions inside one process - and reproducibility, not within-process precision, is what a regression gate should read.
 - Run-order randomization is honoured everywhere, and each replicate derives a distinct order from the session seed, so run order is a randomized nuisance factor rather than a fixed confound.
 - `--dry-run` (equivalent to `--iterations 0 --warmup 0`) always runs in-process - no worker is spawned.
