@@ -284,6 +284,66 @@ public sealed class FrameChannelTests
     }
 
     /// <summary>
+    ///     The coalesced sample stream. Every field has to survive, because the coordinator rebuilds a
+    ///     <see cref="SampleEvent" /> from it and hands that to the user's observer as though it had
+    ///     been emitted locally - a dropped <c>Warmup</c> flag would silently move warmup samples into
+    ///     a consumer's measured series.
+    /// </summary>
+    [Fact]
+    public async Task ObserverSamples_RoundTripsAWholeBatch()
+    {
+        var batch = Enumerable.Range(0, 128)
+            .Select(i => new ObserverSampleEntry($"Bench.Body", i, 2.5 + i, 64, i * 24L, i < 8))
+            .ToArray();
+
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new ObserverSamplesPayload { Samples = batch }), CancellationToken.None);
+
+        var frame = await right.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(WorkerFrameKind.ObserverSamples, frame!.Kind);
+        Assert.Equal(batch, frame.ObserverSamples!.Samples);
+    }
+
+    /// <summary>
+    ///     A detector snapshot's CI half-width is the live convergence signal, and it is legitimately
+    ///     zero or non-finite early in a run - so this rides the same named-literal handling the
+    ///     result frame needs.
+    /// </summary>
+    [Fact]
+    public async Task ObserverDetector_RoundTrips()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new ObserverDetectorPayload
+            {
+                BenchmarkName = "Bench.Body",
+                Phase = MeasurementPhase.Measurement,
+                SampleCount = 512,
+                Mean = 2.53,
+                StdDev = 0.0,
+                CiHalfWidth = double.NaN,
+                CurrentK = 4096,
+            }),
+            CancellationToken.None);
+
+        var received = (await right.ReadAsync(CancellationToken.None))!.ObserverDetector!;
+
+        Assert.Equal("Bench.Body", received.BenchmarkName);
+        Assert.Equal(MeasurementPhase.Measurement, received.Phase);
+        Assert.Equal(512, received.SampleCount);
+        Assert.Equal(2.53, received.Mean);
+        Assert.Equal(0.0, received.StdDev);
+        Assert.True(double.IsNaN(received.CiHalfWidth));
+        Assert.Equal(4096, received.CurrentK);
+    }
+
+    /// <summary>
     ///     Many frames back to back, sized to straddle the pipe buffer, so a payload that arrives
     ///     in several reads is reassembled rather than misread as a truncated frame.
     /// </summary>

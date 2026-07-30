@@ -199,6 +199,17 @@ internal sealed record CliArgs
     public bool EmitRaw { get; init; }
 
     /// <summary>
+    ///     When true, an isolated worker forwards its live per-sample observer stream back to the
+    ///     coordinator, set by <c>--stream-samples</c>.
+    /// </summary>
+    /// <remarks>
+    ///     Off by default because the volume scales with how fast the benchmarked code is - see
+    ///     <see cref="MeasurementOptions.StreamSamples" />. Has no effect without an attached
+    ///     observer, and none at all in-process, where the observer is called directly.
+    /// </remarks>
+    public bool StreamSamples { get; init; }
+
+    /// <summary>
     ///     Diagnostics mode controlling which runtime counters are collected.
     ///     <c>null</c> uses the MeasurementOptions default (GC counts on).
     /// </summary>
@@ -301,6 +312,7 @@ internal sealed record CliArgs
         var noHistogram = false;
         var noSamples = false;
         var emitRaw = false;
+        var streamSamples = false;
         var runtimes = new List<RuntimeMoniker>();
         IReadOnlyList<int>? cpuAffinity = null;
         ProcessPriorityClass? processPriority = null;
@@ -669,6 +681,9 @@ internal sealed record CliArgs
                 case "--emit-raw":
                     emitRaw = true;
                     break;
+                case "--stream-samples":
+                    streamSamples = true;
+                    break;
                 case "--cpu-affinity" when i + 1 < args.Length:
                     var affinityRaw = args[++i];
 
@@ -797,6 +812,7 @@ internal sealed record CliArgs
             NoHistogram = noHistogram,
             NoSamples = noSamples,
             EmitRaw = emitRaw,
+            StreamSamples = streamSamples,
             Runtimes = runtimes,
             CpuAffinity = cpuAffinity,
             ProcessPriority = processPriority,
@@ -972,6 +988,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");
         Console.WriteLine("  --no-samples            Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
         Console.WriteLine($"  --emit-raw              Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset");
+        Console.WriteLine("  --stream-samples        Forward the live per-sample observer stream out of an isolated worker (needs --observer; costs fidelity)");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");

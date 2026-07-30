@@ -93,6 +93,12 @@ internal sealed record MeasurementOverrides
     /// </summary>
     public bool? EmitRaw { get; init; }
 
+    /// <summary>
+    ///     Turns on live forwarding of the per-sample observer stream out of an isolated worker
+    ///     (<see cref="MeasurementOptions.StreamSamples" />), set by <c>--stream-samples</c>.
+    /// </summary>
+    public bool? StreamSamples { get; init; }
+
     public DiagnosticsMode? Diagnostics { get; init; }
 
     /// <summary>
@@ -137,6 +143,7 @@ internal sealed record MeasurementOverrides
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
         EmitRaw = cliArgs.EmitRaw,
+        StreamSamples = cliArgs.StreamSamples ? true : null,
         Diagnostics = cliArgs.Diagnostics,
         Environment = BuildEnvironmentFromCli(cliArgs),
     };
@@ -295,6 +302,11 @@ internal sealed record MeasurementOverrides
         // otherwise be silently reset by any run that parsed a command line.
         if (EmitRaw.HasValue && EmitRaw.Value)
             result = result with { MaxRawSamples = MeasurementOptions.UnboundedRawSamples };
+
+        // One-way for the same reason: --stream-samples asks for the stream, and its absence must
+        // not switch off a programmatic WithOptions that asked for it.
+        if (StreamSamples.HasValue && StreamSamples.Value)
+            result = result with { StreamSamples = true };
 
         if (Diagnostics.HasValue)
             result = result with { Diagnostics = DiagnosticsOptions.FromMode(Diagnostics.Value) };

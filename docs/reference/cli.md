@@ -614,6 +614,24 @@ See also [`--no-samples`](#--no-samples), which omits the arrays from JSON outpu
 
 ---
 
+### `--stream-samples`
+
+Forward the live per-sample observer stream out of an isolated worker.
+
+An attached observer's `OnSample` callback is the one event that does not cross the process boundary by default. Every other event — phase transitions, detector snapshots, results — is emitted a handful of times per benchmark, but samples arrive in the hundreds or thousands, and a frame each would put the cost of observing the run inside the run.
+
+Pass this when an observer needs the samples *live* — a streaming histogram, a sample-level exporter:
+
+```bash
+dotnet run -- --observer live --stream-samples
+```
+
+It needs an observer to be attached; with nothing to replay into, the request is withdrawn and the flag costs nothing. It is also unrelated to [`--emit-raw`](#--emit-raw): that bounds the sample array carried on each *result*, this is the live stream, and the two are selected by different rules for different consumers. The complete array arrives with the result whether or not this is set.
+
+Programmatic equivalent: `WithOptions(o => o with { StreamSamples = true })`. Samples cross in batches — one frame per 128 samples or per 100 ms, whichever comes first — and your observer still sees one `OnSample` call per sample. Measured against a control across eight replicates on a 6.9 µs body, ~780 forwarded events moved neither wall-clock time nor the reported median outside the control's own spread. See [Measurement Observer](observers.md#--stream-samples) for the batching rule and its ordering guarantee.
+
+---
+
 ### `--no-samples`
 
 Omit raw per-sample arrays from JSON reporter output. Samples are still collected, still feed significance testing and the Console histogram, and still cross the process boundary — this only controls whether they are written to the file.

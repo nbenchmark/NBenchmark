@@ -48,6 +48,19 @@ internal enum WorkerFrameKind
 
     /// <summary>Coordinator -&gt; worker. Exit cleanly.</summary>
     Shutdown = 8,
+
+    /// <summary>
+    ///     Worker -&gt; coordinator. A coalesced batch of <see cref="SampleEvent" />s. Batched
+    ///     because this is the only high-volume frame in the protocol; see
+    ///     <see cref="ObserverSamplesPayload" />.
+    /// </summary>
+    ObserverSamples = 9,
+
+    /// <summary>
+    ///     Worker -&gt; coordinator. One <see cref="IMeasurementObserver" /> detector snapshot.
+    ///     Unbatched, because a benchmark emits a handful of these against thousands of samples.
+    /// </summary>
+    ObserverDetector = 10,
 }
 
 /// <summary>
@@ -61,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 2;
+    public const int Version = 3;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -118,6 +131,12 @@ internal sealed record WorkerFrame
     public ObserverPhasePayload? ObserverPhase { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ObserverSamplesPayload? ObserverSamples { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ObserverDetectorPayload? ObserverDetector { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public BenchmarkCompletedPayload? BenchmarkCompleted { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -140,6 +159,12 @@ internal sealed record WorkerFrame
 
     public static WorkerFrame Of(ObserverPhasePayload payload)
         => new() { Kind = WorkerFrameKind.ObserverPhase, ObserverPhase = payload };
+
+    public static WorkerFrame Of(ObserverSamplesPayload payload)
+        => new() { Kind = WorkerFrameKind.ObserverSamples, ObserverSamples = payload };
+
+    public static WorkerFrame Of(ObserverDetectorPayload payload)
+        => new() { Kind = WorkerFrameKind.ObserverDetector, ObserverDetector = payload };
 
     public static WorkerFrame Of(BenchmarkCompletedPayload payload)
         => new() { Kind = WorkerFrameKind.BenchmarkCompleted, BenchmarkCompleted = payload };
@@ -395,6 +420,54 @@ internal sealed record ObserverPhasePayload
     public WarmupStopReason? WarmupStop { get; init; }
     public SampleStopReason? SampleStop { get; init; }
     public bool Succeeded { get; init; } = true;
+}
+
+/// <summary>
+///     A batch of per-sample observer events, in the order the engine emitted them.
+/// </summary>
+/// <remarks>
+///     <para>
+///         Batched because this is the one frame whose volume is a function of how fast the
+///         benchmarked code is. Every other worker-to-coordinator frame is emitted a handful of
+///         times per benchmark; samples arrive in the thousands, and one frame each would put the
+///         cost of observing the run inside the run - which is the opposite of what a worker is
+///         for, and why the stream did not cross the boundary at all before.
+///     </para>
+///     <para>
+///         The engine already throttles <see cref="IMeasurementObserver.OnSample" /> to roughly
+///         every fiftieth sample, so what is batched here is that emitted subset rather than every
+///         reading. It is unrelated to <see cref="MeasurementOptions.MaxRawSamples" />: that bounds
+///         the array a <see cref="BenchmarkResult" /> carries, this is the live stream, and the two
+///         are selected by different rules for different consumers.
+///     </para>
+/// </remarks>
+internal sealed record ObserverSamplesPayload
+{
+    public required IReadOnlyList<ObserverSampleEntry> Samples { get; init; }
+}
+
+/// <summary>
+///     One <see cref="SampleEvent" />, flattened for the wire. A struct so buffering a batch of
+///     them costs one array rather than one object per sample.
+/// </summary>
+internal readonly record struct ObserverSampleEntry(
+    string BenchmarkName,
+    int Ordinal,
+    double PerOpNs,
+    int K,
+    long AllocDelta,
+    bool Warmup);
+
+/// <summary>A <see cref="DetectorStateEvent" />, flattened for the wire.</summary>
+internal sealed record ObserverDetectorPayload
+{
+    public required string BenchmarkName { get; init; }
+    public required MeasurementPhase Phase { get; init; }
+    public required int SampleCount { get; init; }
+    public required double Mean { get; init; }
+    public required double StdDev { get; init; }
+    public required double CiHalfWidth { get; init; }
+    public required int CurrentK { get; init; }
 }
 
 /// <summary>

@@ -1053,6 +1053,41 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_StreamSamples_Sets_StreamSamples_Flag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--stream-samples"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.StreamSamples);
+    }
+
+    [Fact]
+    public void ParseCore_WithoutStreamSamples_LeavesTheStreamOff()
+    {
+        var (result, errors) = CliArgs.ParseCore([]);
+
+        Assert.Empty(errors);
+        Assert.False(result.StreamSamples);
+    }
+
+    /// <summary>
+    ///     One-way, like <c>--emit-raw</c>: the flag's absence must not switch off a programmatic
+    ///     <c>WithOptions</c> that asked for the stream.
+    /// </summary>
+    [Fact]
+    public void StreamSamples_Override_IsOneWay()
+    {
+        var asked = MeasurementOptions.Default with { StreamSamples = true };
+
+        var withFlag = MeasurementOverrides.FromCliArgs(CliArgs.ParseCore(["--stream-samples"]).Args);
+        var without = MeasurementOverrides.FromCliArgs(CliArgs.ParseCore([]).Args);
+
+        Assert.True(withFlag.Apply(MeasurementOptions.Default).StreamSamples);
+        Assert.True(without.Apply(asked).StreamSamples);
+        Assert.False(without.Apply(MeasurementOptions.Default).StreamSamples);
+    }
+
+    [Fact]
     public void ParseCore_NoSamples_Default_Is_False()
     {
         var (result, _) = CliArgs.ParseCore([]);

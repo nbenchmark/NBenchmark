@@ -288,6 +288,32 @@ public record MeasurementOptions
                 $"MaxRawSamples must be {UnboundedRawSamples} (unbounded) or positive.");
     }
 
+    /// <summary>
+    ///     Whether an isolated worker forwards its live per-sample observer stream
+    ///     (<see cref="IMeasurementObserver.OnSample" />) back to the coordinator. Off by default.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Like <see cref="MaxRawSamples" /> this bounds only what crosses a process boundary and
+    ///         cannot move a reported number. It is off by default because it is the one channel whose
+    ///         cost scales with how fast the benchmarked code is: a nanosecond body emits thousands of
+    ///         sample events, and encoding them puts the cost of observing the run inside the run. Phase
+    ///         transitions, detector snapshots and results cross either way - they are emitted a handful
+    ///         of times per benchmark.
+    ///     </para>
+    ///     <para>
+    ///         Turn it on for a consumer that needs the samples <i>live</i> - a streaming histogram, a
+    ///         sample-level exporter - and accept that the run is being observed more intrusively than
+    ///         the default. Nothing needs it to report a result: the complete series arrives with the
+    ///         result either way, subject to <see cref="MaxRawSamples" />.
+    ///     </para>
+    ///     <para>
+    ///         In-process runs ignore this: the observer is called directly, so there is no boundary to
+    ///         forward across and no cost to opt into.
+    ///     </para>
+    /// </remarks>
+    public bool StreamSamples { get; init; }
+
     public bool EnableSignificance { get; init; } = true;
 
     /// <summary>

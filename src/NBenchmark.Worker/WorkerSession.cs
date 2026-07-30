@@ -115,6 +115,11 @@ internal sealed class WorkerSession(FrameChannel channel)
 
     private async Task RunGroupAsync(RunGroupPayload request, CancellationToken cancellationToken)
     {
+        // Held outside the try so the terminal flush can reach it on the failure path too: a group
+        // that faulted mid-measurement has already streamed samples, and leaving them in the buffer
+        // would drop the events leading up to whatever went wrong - the ones worth having.
+        StreamingProgress? progress = null;
+
         try
         {
             var options = ResolveStrategies(request);
@@ -132,7 +137,7 @@ internal sealed class WorkerSession(FrameChannel channel)
             using var _ = EnvironmentControl.Apply(options.Environment);
 
             _queue = new FrameQueue(_channel, cancellationToken);
-            var progress = new StreamingProgress(_queue, cancellationToken);
+            progress = new StreamingProgress(_queue, cancellationToken, options.StreamSamples);
 
             switch (request.Kind)
             {
@@ -167,6 +172,10 @@ internal sealed class WorkerSession(FrameChannel channel)
         }
         finally
         {
+            // Into the queue first, then drain it: a batch still in the sample buffer has not been
+            // enqueued at all, so draining without flushing would lose it rather than wait for it.
+            progress?.FlushSamples();
+
             // Drain before the terminal frame, so the coordinator never sees a group complete
             // while that group's own events are still in flight behind it.
             if (_queue is not null)

@@ -47,6 +47,8 @@ internal static class WorkerGroupRunner
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(request);
 
+        request = WithStreamingForObserver(request, observer);
+
         var results = new List<BenchmarkResult>();
         var samples = new Dictionary<string, double[]>(StringComparer.Ordinal);
         var faults = new List<FaultPayload>();
@@ -137,6 +139,25 @@ internal static class WorkerGroupRunner
                                        + $"{frame.ObserverPhase.Phase}";
 
                         ReplayPhase(frame.ObserverPhase, observer);
+                        break;
+
+                    case WorkerFrameKind.ObserverSamples when frame.ObserverSamples is not null:
+                        var batch = frame.ObserverSamples.Samples;
+
+                        if (batch.Count > 0)
+                        {
+                            var last = batch[^1];
+                            lastActivity = $"'{last.BenchmarkName}' was on sample {last.Ordinal}";
+                        }
+
+                        ReplaySamples(batch, observer);
+                        break;
+
+                    case WorkerFrameKind.ObserverDetector when frame.ObserverDetector is not null:
+                        lastActivity = $"'{frame.ObserverDetector.BenchmarkName}' updated its "
+                                       + $"{frame.ObserverDetector.Phase} detector";
+
+                        ReplayDetector(frame.ObserverDetector, observer);
                         break;
 
                     case WorkerFrameKind.BenchmarkCompleted when frame.BenchmarkCompleted is not null:
@@ -239,6 +260,59 @@ internal static class WorkerGroupRunner
             payload.WarmupStop,
             payload.SampleStop,
             payload.Succeeded));
+
+    /// <summary>
+    ///     Withdraws the request for a live sample stream when there is no observer to replay it
+    ///     into.
+    /// </summary>
+    /// <remarks>
+    ///     Forwarding samples costs the worker frame encoding <i>during</i> the measurement, so it is
+    ///     the one thing in the protocol worth not doing speculatively. Decided here rather than at
+    ///     each of the request-building call sites because this is the one place that holds both the
+    ///     request and the observer the stream would be replayed into - and because it makes the rule
+    ///     hold for the replicates that deliberately pass a null observer, where later workers would
+    ///     otherwise pay for events the coordinator drops on the floor.
+    /// </remarks>
+    internal static RunGroupPayload WithStreamingForObserver(
+        RunGroupPayload request,
+        IMeasurementObserver observer)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!request.Options.StreamSamples || observer != NullMeasurementObserver.Instance)
+            return request;
+
+        return request with { Options = request.Options with { StreamSamples = false } };
+    }
+
+    /// <summary>
+    ///     Replays a coalesced sample batch, in the order the worker emitted it.
+    /// </summary>
+    /// <remarks>
+    ///     The batching is a transport detail and is deliberately not visible to the observer: it
+    ///     receives one <see cref="IMeasurementObserver.OnSample" /> call per sample, exactly as an
+    ///     in-process run delivers them. What an isolated observer does see differently is timing -
+    ///     the events arrive in bursts up to a batch behind the body that produced them - which is
+    ///     the cost of not paying a frame per sample.
+    /// </remarks>
+    private static void ReplaySamples(IReadOnlyList<ObserverSampleEntry> batch, IMeasurementObserver observer)
+    {
+        foreach (var entry in batch)
+        {
+            observer.OnSample(new SampleEvent(
+                entry.BenchmarkName, entry.Ordinal, entry.PerOpNs, entry.K, entry.AllocDelta, entry.Warmup));
+        }
+    }
+
+    private static void ReplayDetector(ObserverDetectorPayload payload, IMeasurementObserver observer)
+        => observer.OnDetector(new DetectorStateEvent(
+            payload.BenchmarkName,
+            payload.Phase,
+            payload.SampleCount,
+            payload.Mean,
+            payload.StdDev,
+            payload.CiHalfWidth,
+            payload.CurrentK));
 
     /// <summary>
     ///     Turns the group's faults into errored results, so a benchmark that could not be measured
