@@ -79,15 +79,36 @@ public static class ReportFormat
     ///         </item>
     ///         <item>
     ///             <description>
-    ///                 A multi-launch benchmark reports the <i>average</i> of its launches rather than
-    ///                 the fastest of them, and its interval comes from the spread between launches
-    ///                 rather than from within one. Both are definitional changes to reported
-    ///                 statistics: medians rise for every benchmark measured with
-    ///                 <c>LaunchCount &gt; 1</c> - which is the Harness default - and intervals widen
-    ///                 wherever between-worker spread is real. On this repository's own sample the
-    ///                 in-process row moved from 1.66 ns with a sub-nanosecond interval to 3.20 ns
-    ///                 ±3.42, which is the honest description of three launches reading 4.32, 3.63 and
-    ///                 1.66.
+    ///                 The multi-launch reporting overhaul. Three definitional changes to reported
+    ///                 statistics, all of which move stored numbers:
+    ///                 <list type="bullet">
+    ///                     <item>
+    ///                         <description>
+    ///                             A multi-launch benchmark reports the <i>average</i> of its launches
+    ///                             rather than the fastest of them, so medians rise for every benchmark
+    ///                             measured with <c>LaunchCount &gt; 1</c> - the Harness default.
+    ///                         </description>
+    ///                     </item>
+    ///                     <item>
+    ///                         <description>
+    ///                             Its interval comes from the spread <i>between</i> launches rather
+    ///                             than from within one, so intervals widen wherever between-worker
+    ///                             spread is real. On this repository's own sample the in-process row
+    ///                             moved from 1.66 ns with a sub-nanosecond interval to 3.20 ns ±3.42,
+    ///                             which is the honest description of three launches reading 4.32, 3.63
+    ///                             and 1.66.
+    ///                         </description>
+    ///                     </item>
+    ///                     <item>
+    ///                         <description>
+    ///                             The ratio is the geometric mean of the <i>per-launch</i> ratios
+    ///                             rather than the quotient of two aggregated medians. The two differ
+    ///                             whenever the launches disagree, which is the case the pairing exists
+    ///                             for. <c>--threshold-pct</c> gates on the paired value, so a gate can
+    ///                             change verdict on unchanged code.
+    ///                         </description>
+    ///                     </item>
+    ///                 </list>
     ///             </description>
     ///         </item>
     ///     </list>

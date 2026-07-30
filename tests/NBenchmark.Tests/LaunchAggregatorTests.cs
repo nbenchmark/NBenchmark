@@ -402,7 +402,7 @@ public class LaunchAggregatorTests
 
         Assert.Contains("only-first", combined.Warnings);
         Assert.Contains("only-second", combined.Warnings);
-        Assert.Single(combined.Warnings.Where(w => w == "shared"));
+        Assert.Single(combined.Warnings, w => w == "shared");
     }
 
     /// <summary>

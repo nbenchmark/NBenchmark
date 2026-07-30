@@ -168,6 +168,38 @@ public sealed class ConsoleReporter : IReporter
                 + "[bold]--in-process[/] / [bold][[InProcess]][/] so every row is isolated.[/]");
         }
 
+        var inconclusive = benchTable.Rows
+            .Where(r => !r.Errored && !r.IsBaseline && r.RatioEstimate is { IncludesUnity: true })
+            .ToList();
+
+        if (inconclusive.Count > 0)
+        {
+            var replicates = inconclusive[0].RatioEstimate!.Replicates;
+
+            AnsiConsole.MarkupLine(
+                $"[dim]Ratios marked [bold]?[/] ({inconclusive.Count} row(s)) have a paired interval "
+                + $"spanning 1.00x across {replicates} launches, so this run cannot tell those "
+                + "benchmarks apart however far the number sits from 1.00. Raise "
+                + "[bold]--launch-count[/] to narrow it, or read the ratio as \"no measured "
+                + "difference\".[/]");
+
+            // The one combination worth calling out rather than leaving to be noticed. A ✓ comes from
+            // pooled within-run samples, whose count buys arbitrary power; the ratio interval comes
+            // from between-launch spread, which is what a re-run would actually reproduce. When they
+            // disagree the ✓ is the one to distrust.
+            var significantButIrreproducible = inconclusive.Count(r => r.SignificanceLabel == "✓");
+
+            if (significantButIrreproducible > 0)
+            {
+                AnsiConsole.MarkupLine(
+                    $"[yellow]Warning:[/] [dim]{significantButIrreproducible} row(s) are marked "
+                    + "significant ([bold]✓[/]) yet their ratio interval spans 1.00x. Significance is "
+                    + "computed on samples pooled across launches, where a large count grants power "
+                    + "regardless of reproducibility; the ratio interval is the run-to-run spread. "
+                    + "Trust the interval.[/]");
+            }
+        }
+
         // Naming the reason matters as much as naming the fact. "You asked for in-process" and "the
         // measurement worker is not installed" produce identical numbers and identical labels, but
         // only one of them is a problem the user can fix.
@@ -1163,6 +1195,13 @@ public sealed class ConsoleReporter : IReporter
 
         if (row.IsBaseline)
             return ("baseline", "dim");
+
+        // A ratio whose paired interval spans 1.00x is not a measured difference, whatever the point
+        // estimate says. It is marked and dimmed rather than hidden: the number is still the best
+        // estimate available, and colouring it red for "1.6x slower" when the run cannot distinguish
+        // it from equal is how a reader is led to act on noise. The footer explains the mark.
+        if (row.RatioEstimate is { IncludesUnity: true })
+            return ($"{row.Ratio:F2}x?", "dim");
 
         var text = $"{row.Ratio:F2}x";
 

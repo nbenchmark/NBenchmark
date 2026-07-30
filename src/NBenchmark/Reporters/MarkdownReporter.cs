@@ -79,6 +79,16 @@ public sealed class MarkdownReporter : IReporter
                 + "difference rather than a difference between the benchmarks.");
         }
 
+        if (tables.Any(t => t.Rows.Any(r => !r.IsBaseline && r.RatioEstimate is { IncludesUnity: true })))
+        {
+            sb.AppendLine(
+                "> ⚠️ A `Ratio CI` spanning `1.00x` means this run cannot distinguish that benchmark "
+                + "from the baseline, however far the ratio sits from 1.00. The interval is the paired "
+                + "per-launch ratio - each launch's own ratio, formed inside one worker process, so "
+                + "that worker's CPU draw and memory layout divide out - and it is what a re-run would "
+                + "reproduce. Raise `--launch-count` to narrow it.");
+        }
+
         sb.AppendLine();
 
         foreach (var table in tables)
@@ -137,6 +147,7 @@ public sealed class MarkdownReporter : IReporter
         // values, the fastest point in the table. They collapse to a lone Scale bar only when
         // nothing could be ranked (for example a class whose benchmarks all errored).
         var hasComparisons = table.Rows.Any(r => !r.Errored && !double.IsNaN(r.Ratio));
+        var showRatioInterval = table.Rows.Any(r => r.RatioEstimate is not null);
 
         var header = new StringBuilder("| | Benchmark |");
 
@@ -184,8 +195,20 @@ public sealed class MarkdownReporter : IReporter
 
         if (hasComparisons)
         {
-            header.Append(" Ratio | Scale | Sig |");
-            separator.Append(":---:|---|---:|");
+            header.Append(" Ratio |");
+            separator.Append(":---:|");
+
+            // Markdown is not width-constrained the way an 80-column terminal is, so the interval gets
+            // its own column here rather than being compressed to a marker. It is the column that says
+            // whether the ratio beside it is a measured difference at all.
+            if (showRatioInterval)
+            {
+                header.Append(" Ratio CI |");
+                separator.Append(":---:|");
+            }
+
+            header.Append(" Scale | Sig |");
+            separator.Append("---|---:|");
 
             if (!isSimple)
             {
@@ -300,7 +323,12 @@ public sealed class MarkdownReporter : IReporter
                     _ => "-",
                 };
 
-                line.Append($" {FormatRatioText(row)} | {bar} | {sigIcon} |");
+                line.Append($" {FormatRatioText(row)} |");
+
+                if (showRatioInterval)
+                    line.Append($" {FormatRatioInterval(row)} |");
+
+                line.Append($" {bar} | {sigIcon} |");
 
                 if (!isSimple)
                 {
@@ -635,6 +663,25 @@ public sealed class MarkdownReporter : IReporter
             return "_baseline_";
 
         return $"**{row.Ratio:F2}x**";
+    }
+
+    /// <summary>
+    ///     The paired interval on the ratio, with the point estimate emphasised only when the interval
+    ///     excludes 1.00x - i.e. only when there is a measured difference to emphasise.
+    /// </summary>
+    private static string FormatRatioInterval(BenchmarkRow row)
+    {
+        if (row.IsBaseline || row.RatioSuppressed)
+            return "-";
+
+        if (row.RatioEstimate is not { } ratio)
+            return "-";
+
+        // Marked rather than merely stated, because a reader scanning a column of ranges will not
+        // mentally test each one against 1.00.
+        return ratio.IncludesUnity
+            ? $"{ratio.FormatInterval()} ⚠️"
+            : ratio.FormatInterval();
     }
 
     private static string FormatP(double p) => p < 0.001 ? "<0.001" : p.ToString("0.###");

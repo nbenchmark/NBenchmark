@@ -333,6 +333,8 @@ public sealed record BenchmarkTable
                          && !ReferenceEquals(result, baseline)
                          && !ComparisonGroup.SameGroup(result, baseline);
 
+        var ratio = comparable && !mixedGroup ? RatioFor(result, baseline) : null;
+
         return new BenchmarkRow
         {
             Name = result.Name,
@@ -350,7 +352,8 @@ public sealed record BenchmarkTable
             Histogram = result.Histogram,
             RawSamples = result.RawSamples,
             TrimmedOrdinals = result.TrimmedOrdinals,
-            Ratio = comparable && !mixedGroup ? ComputeRatio(result, baseline) : double.NaN,
+            Ratio = ratio?.Value ?? (comparable && !mixedGroup ? ComputeRatio(result, baseline) : double.NaN),
+            RatioEstimate = ratio,
             RatioSuppressed = mixedGroup,
             IsolationStatus = result.IsolationStatus,
             RuntimeProfileName = result.RuntimeProfileName,
@@ -409,6 +412,25 @@ public sealed record BenchmarkTable
             : result.Name;
     }
 
+    /// <summary>
+    ///     The paired per-replicate ratio against the baseline, or <c>null</c> when the run had too few
+    ///     replicates to form one and the plain ratio of medians is all there is.
+    /// </summary>
+    /// <remarks>
+    ///     Preferred over the ratio of medians whenever it exists, because a comparison group is
+    ///     measured co-resident in one worker per replicate - so pairing replicate <i>i</i> against
+    ///     replicate <i>i</i> divides that worker's own CPU draw and memory layout out of the ratio.
+    ///     That co-residency is the statistical reason the group shares a worker at all, and dividing
+    ///     the two aggregated medians discarded the benefit at the last step.
+    /// </remarks>
+    private static RatioEstimate? RatioFor(BenchmarkResult result, BenchmarkResult? baseline)
+    {
+        if (result.Errored || baseline is null || baseline.Errored || ReferenceEquals(result, baseline))
+            return null;
+
+        return LogRatio.Estimate(result, baseline);
+    }
+
     private static double ComputeRatio(BenchmarkResult result, BenchmarkResult? baseline)
     {
         if (result.Errored || baseline is null || baseline.Median == 0)
@@ -459,6 +481,21 @@ public sealed record BenchmarkTable
         }
 
         lines.Add($"Margin: ±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}% of Mean)");
+
+        if (row.RatioEstimate is { } ratio)
+        {
+            // Worth its own line rather than a suffix in the table cell, because it answers a
+            // different question from the ratio. The ratio says how much slower; this says whether the
+            // run can tell at all. An interval spanning 1.00 means it cannot, however far the point
+            // estimate sits from it.
+            var verdict = ratio.IncludesUnity
+                ? " - spans 1.00x, so this run cannot distinguish the two"
+                : "";
+
+            lines.Add(
+                $"Ratio: {ratio.Value:0.00}x [{ratio.FormatInterval()}] "
+                + $"(paired across {ratio.Replicates} launches, CI {ratio.ConfidenceLevel * 100:F1}%){verdict}");
+        }
 
         lines.Add($"CV: {row.CoefficientOfVariation:F4} ({row.CoefficientOfVariationPercent:F2}%)");
 
@@ -654,6 +691,13 @@ public record BenchmarkRow
     public IReadOnlyList<int> TrimmedOrdinals { get; init; } = [];
 
     public required double Ratio { get; init; }
+
+    /// <summary>
+    ///     The ratio with an interval on it, estimated by pairing this row's replicates against the
+    ///     baseline's. <c>null</c> when the run had fewer than two replicates to pair, in which case
+    ///     <see cref="Ratio" /> is the plain quotient of the two medians and carries no interval.
+    /// </summary>
+    public RatioEstimate? RatioEstimate { get; init; }
 
     /// <summary>
     ///     Whether <see cref="Ratio" /> is <c>NaN</c> because this row and the baseline were measured

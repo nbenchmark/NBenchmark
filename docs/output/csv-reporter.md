@@ -99,6 +99,9 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `CiUpper` | float | Upper bound of the confidence interval on the mean (`Mean + MarginOfError`). |
 | `ConfidenceLevel` | float | The confidence level used (e.g. `0.95`). |
 | `CoefficientOfVariation` | float | `StdDev / Mean`. Dimensionless measure of relative variability. |
+| `RatioCiLower` | float or empty | Lower bound of the paired per-launch ratio interval. Empty when the run had a single launch, so there was no interval to compute — which is different from a ratio that could not be computed. |
+| `RatioCiUpper` | float or empty | Upper bound of the paired per-launch ratio interval. An interval spanning `1.0` means the run cannot distinguish this benchmark from the baseline, regardless of what `Ratio` says. |
+| `RatioReplicates` | integer or empty | How many launches were paired to produce the interval. Always at least 2 when present. |
 | `P{key}` | float | Dynamic percentile columns. One column per configured percentile value between P50 and Max (e.g. `P95`, `P99`, `P99.9`). Controlled by `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. Values in nanoseconds. |
 | `EffectMetric` | string or empty | Strategy-defined effect metric name (for example `Cliff's δ`, `median-ratio`, `A12`). Empty for the baseline or when significance is not tested. |
 | `EffectValue` | float or empty | Strategy-defined numeric effect value. For built-in Mann-Whitney tests this is **Cliff's delta** (positive = candidate slower than baseline, negative = candidate faster, range `[-1, 1]`). Empty for the baseline or when significance is not tested. See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
@@ -139,7 +142,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 - Results are sorted by median (fastest first).
 - The output directory is created automatically if it does not exist.
 - Names containing double-quotes are escaped by doubling the quote character (standard CSV escaping).
-- Simple mode CSV has 9 fixed columns. Standard mode has 22 base columns plus one column per configured tail-latency percentile. Advanced mode adds 23 advanced fields on top of the standard columns and therefore also has a dynamic total column count.
+- Simple mode CSV has 16 fixed columns. Standard mode has 32 non-percentile columns plus one per configured tail-latency percentile (35 with the default set). Advanced mode adds 35 further fields, for 67 non-percentile columns (70 with the default set).
 
 ## Using with Benchmark (Single mode)
 

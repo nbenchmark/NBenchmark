@@ -70,7 +70,7 @@ public static class ThresholdCheck
         }
         else
         {
-            var thresholdMedian = baselineMedian * (1.0 + thresholdPct / 100.0);
+            var threshold = 1.0 + thresholdPct / 100.0;
 
             for (var i = 0; i < successful.Count; i++)
             {
@@ -80,13 +80,26 @@ public static class ThresholdCheck
                 if (ReferenceEquals(result, baseline))
                     continue;
 
-                if (candidateMedian > thresholdMedian)
-                {
-                    regressedCandidates.Add(new RegressionCandidate(result.Name, candidateMedian, baselineMedian, candidateMedian / baselineMedian,
-                        candidateMedian - baselineMedian));
+                // The paired per-replicate ratio when the run had replicates to pair, because each of
+                // those ratios was formed inside one worker and so has that worker's own CPU draw and
+                // memory layout divided out. Dividing the two aggregated medians instead leaves every
+                // worker-to-worker difference in the numerator and denominator independently, which is
+                // how a gate comes to fail on the machine rather than on the code.
+                var estimate = Stats.LogRatio.Estimate(result, baseline);
+                var ratio = estimate?.Value ?? candidateMedian / baselineMedian;
 
-                    regressedNames.Add(result.Name);
-                }
+                if (ratio <= threshold)
+                    continue;
+
+                regressedCandidates.Add(new RegressionCandidate(
+                    result.Name,
+                    candidateMedian,
+                    baselineMedian,
+                    ratio,
+                    candidateMedian - baselineMedian,
+                    estimate));
+
+                regressedNames.Add(result.Name);
             }
         }
 
@@ -126,8 +139,27 @@ public sealed record RegressionVerdict(
 }
 
 /// <summary>
-///     One regressed candidate: its median, the baseline median, the ratio
-///     (<c>candidate / baseline</c>, <c>NaN</c> when the baseline median is zero), and the
+///     One regressed candidate: its median, the baseline median, the ratio the gate compared, and the
 ///     absolute delta in nanoseconds. Built by <see cref="ThresholdCheck.Check" />.
 /// </summary>
-public sealed record RegressionCandidate(string Name, double CandidateMedian, double BaselineMedian, double Ratio, double DeltaNs);
+/// <param name="Ratio">
+///     The ratio the threshold was applied to: the paired per-replicate estimate when
+///     <paramref name="Estimate" /> is present, otherwise <c>candidate / baseline</c> (<c>NaN</c> when
+///     the baseline median is zero).
+/// </param>
+/// <param name="Estimate">
+///     The paired ratio with its interval, when the run had at least two replicates to pair.
+///     <c>null</c> for a single-launch run, where a ratio has no interval to report.
+///     <para>
+///         Worth reading before acting on a failure: an interval that contains 1.0 means this run
+///         cannot distinguish the two benchmarks at all, so the gate tripped on a number the data does
+///         not support. Raising <c>--launch-count</c> is the remedy.
+///     </para>
+/// </param>
+public sealed record RegressionCandidate(
+    string Name,
+    double CandidateMedian,
+    double BaselineMedian,
+    double Ratio,
+    double DeltaNs,
+    RatioEstimate? Estimate = null);
