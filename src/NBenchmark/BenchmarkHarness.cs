@@ -7,24 +7,12 @@ using NBenchmark.Lifecycle;
 using NBenchmark.Observers;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
+using NBenchmark.Workers;
 
 namespace NBenchmark;
 
 public sealed class BenchmarkHarness
 {
-    /// <summary>
-    ///     The default number of launches each benchmark runs when the user has not pinned
-    ///     <see cref="MeasurementOptions.LaunchCount" /> via <see cref="WithLaunchCount" />,
-    ///     <see cref="WithOptions" />, the <c>--launch-count</c> CLI flag, or a
-    ///     <c>[Benchmark(LaunchCount = ...)]</c> attribute. Harness mode defaults to multiple
-    ///     launches so the launch-aggregation table - the honest view of run-to-run variance
-    ///     from process-level effects (ASLR, scheduler placement, tiered JIT) - is surfaced
-    ///     without users having to opt in. Single mode (<see cref="Benchmark.Run" />) and
-    ///     <see cref="BenchmarkSuite" /> are unaffected: they keep <c>LaunchCount = 1</c>
-    ///     unless the caller raises it.
-    /// </summary>
-    internal const int DefaultHarnessLaunchCount = 3;
-
     private readonly List<Assembly> _assemblies = [];
     private readonly List<string> _categoryFilterExclude = [];
     private readonly List<string> _categoryFilterInclude = [];
@@ -35,10 +23,23 @@ public sealed class BenchmarkHarness
     private InstanceLifetime _defaultInstanceLifetime = InstanceLifetime.PerMethod;
     private ReportDetail _detail;
     private Func<Type, InstanceHandle>? _instanceFactory;
+
+    /// <summary>
+    ///     The addressable recipe for the service provider, when one was supplied. Its presence is what
+    ///     lets a DI-backed run stay isolated: the instance factory itself is live code the worker cannot
+    ///     be handed, but a factory for the container is something it can run.
+    /// </summary>
+    private Func<IServiceProvider>? _serviceProviderFactory;
     private bool _isolationEnabled = true;
-    private bool _launchCountExplicit;
+
+    /// <summary>
+    ///     The launch count the caller pinned, or <c>null</c> for "not pinned" - which is what
+    ///     <see cref="LaunchCounts.HarnessDefault" /> fills in. A separate field rather than a value on
+    ///     <see cref="_options" /> because a launch is a <i>process</i>, spent here; see
+    ///     <see cref="LaunchCounts" />.
+    /// </summary>
+    private int? _launchCount;
     private MeasurementOptions _options = MeasurementOptions.Default;
-    private bool _optionsExplicitlySet;
     private bool _noSamples;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
     private bool _progressExplicitlySet;
@@ -51,20 +52,34 @@ public sealed class BenchmarkHarness
     internal Action? PostSuiteCleanup { get; set; }
 
     /// <summary>
-    ///     The effective base options with the harness-mode launch-count default applied.
-    ///     When the user has not pinned <see cref="MeasurementOptions.LaunchCount" /> via
-    ///     <see cref="WithLaunchCount" />, <see cref="WithOptions" />, or
-    ///     <c>--launch-count</c>, harness mode defaults to
-    ///     <see cref="DefaultHarnessLaunchCount" /> so the launch-aggregation table surfaces
-    ///     run-to-run variance without opt-in. Calling <see cref="WithOptions" /> with any
-    ///     options object (even one where <c>LaunchCount</c> happens to be 1) is treated as
-    ///     an explicit choice and suppresses the default. The CLI flag is layered on top by
-    ///     <see cref="MergeCliOptions" /> at the call sites, so a CLI override still wins.
+    ///     How many launches - that is, how many worker processes - each benchmark gets, before any
+    ///     per-method <c>[Benchmark(LaunchCount = ...)]</c> override is layered on top.
+    ///     <para>
+    ///         <c>--launch-count</c> wins over <see cref="WithLaunchCount" />, and with neither set
+    ///         harness mode launches <see cref="LaunchCounts.HarnessDefault" /> times so the
+    ///         launch-aggregation view surfaces run-to-run variance without opt-in.
+    ///         <see cref="WithOptions" /> has no say here, because a launch count is not a
+    ///         measurement option - see <see cref="LaunchCounts" />.
+    ///     </para>
+    ///     <para>
+    ///         A dry run takes neither the default nor the flag: it exists to prove the wiring works
+    ///         without measuring anything, so repeating it in three processes would be three times the
+    ///         startup cost for the same nothing.
+    ///     </para>
     /// </summary>
-    private MeasurementOptions EffectiveBaseOptions
-        => _launchCountExplicit || _optionsExplicitlySet || _cliArgs.LaunchCount.HasValue
-            ? _options
-            : _options with { LaunchCount = DefaultHarnessLaunchCount };
+    private int EffectiveLaunchCount
+        => _cliArgs.DryRun
+            ? _launchCount ?? LaunchCounts.Single
+            : _cliArgs.LaunchCount ?? _launchCount ?? LaunchCounts.HarnessDefault;
+
+    /// <summary>
+    ///     The options an isolated child should be launched under, with CLI overrides merged in.
+    ///     Used by the child-request builders for the values the parent must resolve on the child's
+    ///     behalf - the wall-clock timeout and the runtime profile, neither of which a child can
+    ///     work out for itself (no user arguments are forwarded, and runtime knobs are fixed before
+    ///     any managed code runs).
+    /// </summary>
+    private MeasurementOptions ChildLaunchOptions => MergeCliOptions(_options, _cliArgs);
 
     public static BenchmarkHarness Create(string[] args)
     {
@@ -115,31 +130,29 @@ public sealed class BenchmarkHarness
     public BenchmarkHarness WithOptions(MeasurementOptions options)
     {
         _options = options;
-        _optionsExplicitlySet = true;
         return this;
     }
 
     /// <summary>
-    ///     Pins the number of times each benchmark repeats as an independent launch. Each
-    ///     launch gets its own warmup and measurement pass; the per-launch medians are
-    ///     aggregated into a launch-level confidence interval that surfaces run-to-run
-    ///     variance from process-level effects (ASLR, scheduler placement, tiered JIT).
+    ///     Pins the number of times each benchmark repeats as an independent launch - one worker
+    ///     process each, with its own warmup and measurement pass. The per-launch medians are
+    ///     aggregated into a launch-level confidence interval that surfaces run-to-run variance from
+    ///     process-level effects (ASLR, scheduler placement, tiered JIT).
     ///     <para>
-    ///         When unset, harness mode defaults to <see cref="DefaultHarnessLaunchCount" />
-    ///         so the launch-aggregation table is shown without opt-in. Set to 1 to restore
-    ///         single-launch behaviour.
+    ///         When unset, harness mode launches <see cref="LaunchCounts.HarnessDefault" /> times so
+    ///         the launch-aggregation table is shown without opt-in. Pass
+    ///         <see cref="LaunchCounts.Single" /> to restore single-launch behaviour.
     ///     </para>
     /// </summary>
     public BenchmarkHarness WithLaunchCount(int count)
     {
-        if (count is < 1 or > MeasurementOptions.MaxLaunchCount)
+        if (!LaunchCounts.IsValid(count))
         {
             throw new ArgumentOutOfRangeException(nameof(count), count,
-                $"LaunchCount must be between 1 and {MeasurementOptions.MaxLaunchCount}.");
+                $"LaunchCount must be between {LaunchCounts.Single} and {LaunchCounts.Max}.");
         }
 
-        _options = _options with { LaunchCount = count };
-        _launchCountExplicit = true;
+        _launchCount = count;
         return this;
     }
 
@@ -267,17 +280,6 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     The observer names forwarded to isolated children so they can activate the same
-    ///     registry-resolved observers as the parent. Only CLI-supplied names
-    ///     (<c>--observer &lt;name&gt;</c>) cross the process boundary: programmatic observer
-    ///     instances added via <see cref="WithObserver(IMeasurementObserver)" /> are live
-    ///     objects and cannot be serialized. The child resolves each name through
-    ///     <see cref="ObserverRegistry" />, which is populated identically by
-    ///     <c>[ModuleInitializer]</c> self-registration in the child's fresh process.
-    /// </summary>
-    private IReadOnlyList<string> ResolveObserverNames()
-        => _cliArgs.ObserverNames;
-
     public BenchmarkHarness WithInstanceFactory(Func<Type, object> factory)
     {
         _instanceFactory = type => InstanceHandle.NoTeardown(factory(type));
@@ -298,19 +300,75 @@ public sealed class BenchmarkHarness
     ///     <c>NBenchmark.DependencyInjection</c> package and use
     ///     <c>WithScopedServiceProvider</c> instead.
     /// </summary>
+    /// <remarks>
+    ///     A live provider cannot be sent to a measurement worker, so benchmarks resolved this way are
+    ///     measured in the host process and labelled
+    ///     <see cref="IsolationStatus.InProcessLiveFixture" />. Use
+    ///     <see cref="WithServiceProvider(Func{IServiceProvider})" /> to keep isolation: the worker runs
+    ///     your factory and builds an equivalent container in the process that measures.
+    /// </remarks>
     public BenchmarkHarness WithServiceProvider(IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
 
-        return WithInstanceFactory(type =>
+        return WithInstanceFactory(ResolverFor(serviceProvider));
+    }
+
+    /// <summary>
+    ///     Configures the harness to resolve benchmark instances from a provider built by
+    ///     <paramref name="factory" />, so DI-backed benchmarks can still be measured in a worker.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A service provider is live code: it holds singletons, open connections and closures that
+    ///         cannot cross a process boundary, so passing one costs the run its isolation. The
+    ///         <i>recipe</i> for a provider can cross, though - a static factory that registers the
+    ///         services and builds the container is addressable, and the worker runs it to get an
+    ///         equivalent container in the process doing the measuring:
+    ///     </para>
+    ///     <code>
+    ///     await BenchmarkHarness.Create(args)
+    ///         .AddFromAssembly&lt;MyBenchmarks&gt;()
+    ///         .WithServiceProvider(BuildServices)
+    ///         .RunAsync();
+    ///
+    ///     static IServiceProvider BuildServices() =&gt; new ServiceCollection()
+    ///         .AddSingleton&lt;IDataStore, InMemoryDataStore&gt;()
+    ///         .AddTransient&lt;MyBenchmarks&gt;()
+    ///         .BuildServiceProvider();
+    ///     </code>
+    ///     <para>
+    ///         The container the worker builds is a <i>different instance</i> from the one built here, and
+    ///         that is the point rather than a caveat: a benchmark measured against a container warmed by
+    ///         this process's own startup is measuring that warmth. The factory must capture nothing, for
+    ///         the same reason a benchmark body must.
+    ///     </para>
+    /// </remarks>
+    public BenchmarkHarness WithServiceProvider(Func<IServiceProvider> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        var provider = factory() ?? throw new ArgumentException(
+            "The service provider factory returned null.", nameof(factory));
+
+        _serviceProviderFactory = factory;
+
+        return WithInstanceFactory(ResolverFor(provider));
+    }
+
+    /// <summary>
+    ///     The instance resolver for a provider, shared by both <c>WithServiceProvider</c> overloads so
+    ///     the host-side behaviour cannot differ between them.
+    /// </summary>
+    private static Func<Type, InstanceHandle> ResolverFor(IServiceProvider serviceProvider)
+        => type =>
         {
             var instance = serviceProvider.GetService(type)
                            ?? throw new InvalidOperationException(
                                $"No service of type '{type.FullName}' is registered in the service provider.");
 
             return InstanceHandle.NoTeardown(instance);
-        });
-    }
+        };
 
     /// <summary>
     ///     Requires a minimum strategy-defined practical effect in [0, 1] for a candidate
@@ -408,6 +466,24 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
+    ///     Sets the runtime-startup configuration to measure under - JIT tiering, dynamic PGO,
+    ///     ReadyToRun and GC flavour. Defaults to <see cref="RuntimeProfile.SteadyState" />.
+    ///     <para>
+    ///         This is the setting that requires a child process to exist: the runtime reads these
+    ///         knobs once at startup, so they can only be applied to a process being launched.
+    ///         Benchmarks that run in the host process report <c>"host"</c> and inherit its
+    ///         configuration.
+    ///     </para>
+    /// </summary>
+    public BenchmarkHarness WithRuntimeProfile(RuntimeProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        _options = _options with { RuntimeProfile = profile };
+        return this;
+    }
+
+
+    /// <summary>
     ///     Tunes the adaptive measurement loop (warmup plateau, CI-width sample count, and
     ///     ops-per-sample calibration). Use <see cref="AutoTuneOptions.Quick" /> for fast feedback
     ///     or <see cref="AutoTuneOptions.Thorough" /> for tighter intervals.
@@ -457,6 +533,13 @@ public sealed class BenchmarkHarness
     ///     or its class opts out with <c>[InProcess]</c>. When disabled, every benchmark
     ///     runs in the host process - equivalent to passing <c>--in-process</c> on the CLI.
     /// </summary>
+    /// <remarks>
+    ///     Not quite the same method as <see cref="BenchmarkSuite.WithIsolation" />, despite the shared
+    ///     name and signature. This one is a <i>global switch</i> that stays settable in both directions,
+    ///     so a later <c>WithIsolation(true)</c> re-enables what an earlier <c>false</c> turned off.
+    ///     Suite mode has one suite and therefore nothing to switch: there, <c>false</c> records an
+    ///     explicit request for the host process and <c>true</c> is a no-op asking for the default.
+    /// </remarks>
     public BenchmarkHarness WithIsolation(bool enabled = true)
     {
         _isolationEnabled = enabled;
@@ -506,9 +589,112 @@ public sealed class BenchmarkHarness
         // process. Keep OTEL_EXPORTER_OTLP_ENDPOINT authoritative when the user already set it.
         using var _ = ApplyCliOtelEndpointScope(_cliArgs.OtlpEndpoint);
 
-        return await IsolatedRunContext
-            .WithCurrentRequestAsync(() => RunCoreAsync(cancellationToken))
-            .ConfigureAwait(false);
+        return await RunCoreAsync(RunPass.Primary, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Which of the two things a run can be: the measured run the user asked for, or the in-process
+    ///     comparison <c>--verify-isolation</c> measures to compare it against.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A parameter rather than a set of fields the comparison pass overwrites and restores. The
+    ///         previous shape saved four fields and leaked through every publish decision it had not
+    ///         thought of: the user's observer received a second full suite stream for a pass whose
+    ///         results are never published <i>and</i> was disposed twice, a second suite activity opened
+    ///         under the same name, the refusal-dedup set was never cleared, and
+    ///         <see cref="CliArgs.Runtimes" /> stayed populated - so on a cross-runtime run the
+    ///         "in-process comparison" re-entered the multi-runtime orchestrator and was not in-process
+    ///         at all.
+    ///     </para>
+    ///     <para>
+    ///         Making it an argument turns "every publish decision must remember to check the flag" into
+    ///         "the comparison pass cannot reach a publisher". There is nothing to restore because
+    ///         nothing was changed.
+    ///     </para>
+    /// </remarks>
+    private sealed record RunPass
+    {
+        public static readonly RunPass Primary = new();
+
+        public static readonly RunPass InProcessComparison = new()
+        {
+            Publishes = false,
+            ForceInProcess = true,
+        };
+
+        /// <summary>
+        ///     Whether this pass owns the run's outputs: reporters, the regression and isolation gates,
+        ///     the output directory, the exit code, the user's observer and progress, and the suite
+        ///     activity's identity.
+        /// </summary>
+        public bool Publishes { get; init; } = true;
+
+        /// <summary>
+        ///     Measures in this process whatever the CLI, attributes or builder asked for.
+        /// </summary>
+        public bool ForceInProcess { get; init; }
+    }
+
+    /// <summary>
+    ///     Measures everything a second time in this process and prints the difference.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The second pass is a full re-run rather than a cheap estimate, because the effect
+    ///         being demonstrated <i>is</i> the measurement: an in-process reading that has not gone
+    ///         through the real warmup and tuning path is not the number a user would have trusted.
+    ///     </para>
+    ///     <para>
+    ///         It is the same harness re-run rather than a second harness built to look like this one. A
+    ///         copy would have to reproduce every builder call the user made - filters, categories,
+    ///         options, instance lifetime - and any field missed would silently compare two different
+    ///         sets of benchmarks while presenting the result as one set measured two ways.
+    ///     </para>
+    ///     <para>
+    ///         Nothing is saved or restored around it: <see cref="RunPass.InProcessComparison" /> says
+    ///         what this pass is, and <see cref="RunCoreAsync" /> declines to publish on that basis. See
+    ///         <see cref="RunPass" /> for what the save-and-restore version leaked.
+    ///     </para>
+    /// </remarks>
+    private async Task VerifyIsolationAsync(
+        IReadOnlyList<BenchmarkResult> isolated,
+        CancellationToken cancellationToken)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Re-measuring in this process for comparison...");
+
+        try
+        {
+            var inProcess = await RunCoreAsync(RunPass.InProcessComparison, cancellationToken)
+                .ConfigureAwait(false);
+
+            IsolationAudit.Render(isolated, inProcess, Console.Out);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A failed comparison pass must not fail the run it was only commenting on.
+            Console.Error.WriteLine($"--verify-isolation: the in-process comparison pass failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    ///     The progress instance for this pass: whatever the caller attached, a console bar when nothing
+    ///     was attached, or nothing at all for the comparison pass.
+    /// </summary>
+    /// <remarks>
+    ///     Returned rather than assigned to <c>_progress</c>. The field used to be overwritten here when
+    ///     no progress had been attached, which is why the comparison pass had to save and restore both
+    ///     it and <c>_progressExplicitlySet</c> - and why forcing the flag true was load-bearing for
+    ///     reasons no reader could see. <c>_progressExplicitlySet</c> is now write-once, set only by
+    ///     <see cref="WithProgress" />.
+    /// </remarks>
+    private IBenchmarkProgress ResolveProgress(RunPass pass)
+    {
+        if (!pass.Publishes)
+            return NullBenchmarkProgress.Instance;
+
+        return _progressExplicitlySet ? _progress : new DefaultConsoleProgress();
     }
 
     private static IDisposable ApplyCliOtelEndpointScope(string? endpoint)
@@ -516,10 +702,10 @@ public sealed class BenchmarkHarness
         if (string.IsNullOrEmpty(endpoint))
             return NoopScope.Instance;
 
-        var previousNBenchmarkEndpoint = Environment.GetEnvironmentVariable(ChildProcessLauncher.OtelEndpointEnvVar);
+        var previousNBenchmarkEndpoint = Environment.GetEnvironmentVariable(MeasurementBudget.OtelEndpointEnvVar);
         var previousOtlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
 
-        Environment.SetEnvironmentVariable(ChildProcessLauncher.OtelEndpointEnvVar, endpoint);
+        Environment.SetEnvironmentVariable(MeasurementBudget.OtelEndpointEnvVar, endpoint);
 
         if (string.IsNullOrEmpty(previousOtlpEndpoint))
             Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint);
@@ -527,52 +713,46 @@ public sealed class BenchmarkHarness
         return new OtlpEndpointScope(previousNBenchmarkEndpoint, previousOtlpEndpoint);
     }
 
-    private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(
+        RunPass pass,
+        CancellationToken cancellationToken)
     {
-        // Isolated child entry: serve only the class the parent requested, write its
-        // samples back, and return. A child belonging to a sibling suite (not this harness)
-        // does nothing here, so it neither recurses nor duplicates output.
-        if (IsolatedRunContext.TryGetActiveRequest(out var activeRequest))
-        {
-            var results = activeRequest.Kind == IsolatedRunKind.Host
-                ? await RunHostChildAsync(activeRequest, cancellationToken).ConfigureAwait(false)
-                : Array.Empty<BenchmarkResult>();
-
-            // Stamp RuntimeMoniker on child results.
-            if (activeRequest.RuntimeMoniker is { } runtimeMoniker)
-            {
-                var tfm = runtimeMoniker.ToTargetFramework();
-                results = results.Select(r => r with { RuntimeMoniker = tfm }).ToList();
-            }
-
-            return results;
-        }
-
         if (_cliArgs.ShowHelp)
         {
             CliArgs.PrintHelp();
             return Array.Empty<BenchmarkResult>();
         }
 
-        // When runtimes are specified (CLI or attribute), delegate to the multi-runtime orchestrator.
-        // --help and --list-only are handled before this so they never trigger multi-runtime builds.
-        var effectiveRuntimes = _cliArgs.Runtimes;
-
-        if (effectiveRuntimes.Count == 0 && !_cliArgs.ListOnly)
-            effectiveRuntimes = DiscoverAttributeRuntimes();
-
-        if (effectiveRuntimes.Count > 0)
+        // Skipped entirely for the comparison pass, which is defined as measuring *this* process. A
+        // cross-runtime run reached here with Runtimes still populated and went straight back into the
+        // multi-runtime orchestrator, so the "in-process comparison" spawned workers per target
+        // framework and compared the run against itself. Not reachable now, rather than guarded there.
+        if (!pass.ForceInProcess)
         {
-            if (_cliArgs.InProcess || !_isolationEnabled)
-                Console.WriteLine("Warning: cross-runtime execution always uses child processes.");
+            // When runtimes are specified (CLI or attribute), delegate to the multi-runtime
+            // orchestrator. --help and --list-only are handled before this so they never trigger
+            // multi-runtime builds.
+            var effectiveRuntimes = _cliArgs.Runtimes;
 
-            return await RunMultiRuntimeAsync(effectiveRuntimes, cancellationToken).ConfigureAwait(false);
+            if (effectiveRuntimes.Count == 0 && !_cliArgs.ListOnly)
+                effectiveRuntimes = DiscoverAttributeRuntimes();
+
+            if (effectiveRuntimes.Count > 0)
+            {
+                if (_cliArgs.InProcess || !_isolationEnabled)
+                    Console.WriteLine("Warning: cross-runtime execution always uses child processes.");
+
+                return await RunMultiRuntimeAsync(effectiveRuntimes, cancellationToken).ConfigureAwait(false);
+            }
         }
 
-        Console.WriteLine($"Timer resolution: {Stopwatch.Frequency:N0} ticks/s "
-                          + $"({1_000_000_000.0 / Stopwatch.Frequency:F2} ns per tick)");
+        if (pass.Publishes)
+        {
+            Console.WriteLine($"Timer resolution: {Stopwatch.Frequency:N0} ticks/s "
+                              + $"({1_000_000_000.0 / Stopwatch.Frequency:F2} ns per tick)");
 
-        Console.WriteLine();
+            Console.WriteLine();
+        }
 
         var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
         var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
@@ -607,21 +787,27 @@ public sealed class BenchmarkHarness
             return Array.Empty<BenchmarkResult>();
         }
 
-        if (!_progressExplicitlySet)
-            _progress = new DefaultConsoleProgress();
+        // A local, threaded down through the run rather than assigned to the field. The field was
+        // mutated here and had to be saved and restored around the comparison pass; a parameter cannot
+        // be left behind.
+        var progress = ResolveProgress(pass);
+
+        // Per-run rather than a field, so a refusal is reported once per run and not once per process.
+        // As a field it was never cleared, which meant a second RunAsync() on the same harness printed
+        // no refusals at all - and the comparison pass inherited the first pass's set.
+        var refusalsReported = new HashSet<string>(StringComparer.Ordinal);
 
         var allResults = new List<BenchmarkResult>();
         var rawSamples = new Dictionary<string, double[]>();
 
         var suiteOptions = _cliArgs.DryRun
             ? _options with { Iterations = 0, WarmupIterations = 0 }
-            : MergeCliOptions(EffectiveBaseOptions, _cliArgs);
+            : MergeCliOptions(_options, _cliArgs);
 
         // Apply opt-in hardware/OS controls (CPU affinity, process priority, dedicated-host
-        // guidance) for the duration of the run. The scope restores the prior process state
-        // on dispose. Isolated children receive the same settings via MeasurementOverrides
-        // and apply them themselves; the parent applies its own so in-process benchmarks and
-        // the parent-side measurement loop run pinned/elevated too.
+        // guidance) for the duration of the run. The scope restores the prior process state on
+        // dispose. A worker applies the same settings to itself from the options it was sent; this
+        // covers in-process benchmarks and the coordinator's own thread.
         using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
 
         var allNames = filtered
@@ -630,8 +816,14 @@ public sealed class BenchmarkHarness
 
         var totalBenchmarks = allNames.Count;
 
+        // Labelled rather than suppressed for the comparison pass. Suppressing only the suite span would
+        // leave the per-benchmark spans - raised from deep inside the engine, where the pass is not
+        // visible - as parentless roots, which is worse than a labelled parent. A diagnostic pass must
+        // not impersonate the run, but it may describe itself.
         NBenchmarkDiagnostics.OnSuiteStarting(
-            _cliArgs.Filter ?? "harness",
+            pass.Publishes
+                ? _cliArgs.Filter ?? "harness"
+                : $"{_cliArgs.Filter ?? "harness"} [in-process comparison]",
             totalBenchmarks,
             _options.Profile.ToString(),
             _cliArgs.Runtimes is { Count: > 0 } runtimes ? string.Join(",", runtimes.Select(r => r.ToTargetFramework())) : null,
@@ -642,16 +834,24 @@ public sealed class BenchmarkHarness
         // live-streaming observer) see one stream per RunAsync, not one per per-class group.
         // The using disposes the observer (and its composite children) on both the success
         // and exception paths; the composite's Dispose fans out with try/catch isolation.
-        using var observer = ResolveObserver();
+        //
+        // The comparison pass gets the null observer, not the user's. It used to resolve the same
+        // instance again from inside the primary pass's `using`, so a streaming observer received a
+        // second SuiteStarting..SuiteCompleted stream for results that are never published and was then
+        // disposed twice - a double-finalise for any observer whose Dispose closes out a session.
+        using var observer = pass.Publishes ? ResolveObserver() : NullMeasurementObserver.Instance;
         var sentinelEmitted = false;
 
         try
         {
-            await _progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
+            await progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
 
             // Under --dry-run, --in-process, or WithIsolation(false), nothing is spawned. A
             // dry run never invokes a body, so isolation would only add process overhead.
-            var inProcessGlobal = _cliArgs.InProcess || !_isolationEnabled || _cliArgs.DryRun;
+            var inProcessGlobal = pass.ForceInProcess
+                                  || _cliArgs.InProcess
+                                  || !_isolationEnabled
+                                  || _cliArgs.DryRun;
 
             var runningIndex = 0;
 
@@ -663,9 +863,23 @@ public sealed class BenchmarkHarness
                 var perBenchmark = new List<BenchmarkMethodDefinition>();
                 var autoUpgradedResultNames = new HashSet<string>();
 
+                // Whether a worker can measure this class at all. When it cannot, the benchmarks run
+                // in the host process and say so, rather than being quietly measured under whatever
+                // configuration the host happened to start with.
+                var workerDecision = inProcessGlobal
+                    ? new WorkerRunPlan.Decision(WorkerRunPlan.Refusal.RequestedInProcess, null)
+                    : WorkerRunPlan.ForDiscoveredClass(
+                        suite.Type.Assembly.Location, _instanceFactory is not null, suiteOptions,
+                        _serviceProviderFactory);
+
+                if (workerDecision is { CanIsolate: false, Explanation: { } explanation })
+                    EmitIsolationRefusal(refusalsReported, suite.Type.Name, explanation);
+
+                var forceInProcess = inProcessGlobal || !workerDecision.CanIsolate;
+
                 foreach (var benchmark in suite.Benchmarks)
                 {
-                    var decision = ResolveIsolation(benchmark, suite, inProcessGlobal, _instanceFactory is not null, out var autoUpgraded);
+                    var decision = ResolveIsolation(benchmark, suite, forceInProcess, _instanceFactory is not null, out var autoUpgraded);
 
                     if (autoUpgraded)
                         autoUpgradedResultNames.Add($"{suite.Type.Name}.{benchmark.DisplayName}");
@@ -686,9 +900,16 @@ public sealed class BenchmarkHarness
 
                 if (inProcess.Count > 0)
                 {
+                    var inProcessStart = allResults.Count;
+
                     await RunInProcessSuiteAsync(
                         suite with { Benchmarks = inProcess }, suiteOptions, runningIndex, totalBenchmarks,
-                        allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                        allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
+
+                    // A benchmark that carries [InProcess] chose the host itself, whatever the class
+                    // as a whole could or could not do; anything else landed here because of the
+                    // class-level refusal, and should say which one.
+                    StampIsolationStatus(allResults, inProcessStart, inProcess, workerDecision.Status);
 
                     runningIndex += inProcess.Count;
                 }
@@ -697,7 +918,7 @@ public sealed class BenchmarkHarness
                 {
                     await RunIsolatedGroupAsync(
                         suite, perClass, runningIndex, totalBenchmarks,
-                        allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                        allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
 
                     runningIndex += perClass.Count;
                 }
@@ -706,7 +927,7 @@ public sealed class BenchmarkHarness
                 {
                     await RunIsolatedGroupAsync(
                         suite, [benchmark], runningIndex, totalBenchmarks,
-                        allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                        allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
 
                     runningIndex++;
                 }
@@ -717,7 +938,7 @@ public sealed class BenchmarkHarness
                     ApplyAutoIsolationUpgradeWarning(allResults, autoUpgradedResultNames, suiteResultStart);
             }
 
-            await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
+            await progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
 
             // SuiteCompleted sentinel: emit on the success path with Succeeded = true. A
             // live-streaming observer treats this as the authoritative run-end signal.
@@ -750,19 +971,56 @@ public sealed class BenchmarkHarness
         // SuiteRunner and the isolated-launch aggregators key raw samples by benchmark name;
         // ApplyPerClassSignificance needs the composite name+runtime key so multi-runtime
         // results don't collide.
-        rawSamples = ToCompositeKeys(allResults, rawSamples);
+        rawSamples = RawSampleKey.ToComposite(allResults, rawSamples);
 
         ApplyPerClassSignificance(allResults, rawSamples, suiteOptions, _cliArgs.CrossClass || _crossClass);
 
-        if (_cliArgs.ThresholdPct.HasValue
-            && ThresholdCheck.HasRegression(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
+        // One gate around everything that leaves this process: the regression and isolation checks, the
+        // exit code, the output directory, the reporters, BenchmarkTable's cross-class static, and the
+        // comparison pass itself. The comparison pass used to be kept out of all of these by editing the
+        // CliArgs it read - five separate nullings, each of which had to be remembered. Now it cannot
+        // reach them, so a sixth output added below is covered without anyone thinking about it.
+        if (pass.Publishes)
         {
-            Console.Error.WriteLine(
-                $"Regression threshold exceeded ({_cliArgs.ThresholdPct.Value}%). "
-                + $"Regressed benchmarks: {string.Join(", ", regressed)}");
+            if (_cliArgs.ThresholdPct.HasValue
+                && ThresholdCheck.HasRegression(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
+            {
+                Console.Error.WriteLine(
+                    $"Regression threshold exceeded ({_cliArgs.ThresholdPct.Value}%). "
+                    + $"Regressed benchmarks: {string.Join(", ", regressed)}");
 
-            Environment.ExitCode = 1;
+                Environment.ExitCode = 1;
+            }
+
+            await FinalizeRunAsync(allResults, cancellationToken).ConfigureAwait(false);
+
+            // After the reporters, because the comparison is commentary on the table just shown and is
+            // meaningless without it.
+            if (_cliArgs.VerifyIsolation)
+                await VerifyIsolationAsync(allResults, cancellationToken).ConfigureAwait(false);
         }
+
+        return allResults;
+    }
+
+    /// <summary>
+    ///     The steps every completed harness run ends with: the isolation gate, the output
+    ///     directory, the reporters, and the isolation comparison.
+    /// </summary>
+    /// <remarks>
+    ///     Shared because there are two run paths that both finish this way, and they had already
+    ///     drifted once - a flag wired into one of them appeared to do nothing at all from the other.
+    ///     That is the same defect shape as the composite-key bug that spread across nine call sites
+    ///     and silently disagreed, so the tail lives in one place.
+    /// </remarks>
+    private async Task FinalizeRunAsync(
+        IReadOnlyList<BenchmarkResult> allResults,
+        CancellationToken cancellationToken)
+    {
+        // Enforced before reporters run, so the failure is stated up front rather than after several
+        // screens of tables the user is being told not to trust.
+        if (_cliArgs.StrictIsolation && !IsolationAudit.Enforce(allResults, Console.Error))
+            Environment.ExitCode = 1;
 
         if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
             ApplyOutputDirectory(_cliArgs.OutputDir);
@@ -777,8 +1035,6 @@ public sealed class BenchmarkHarness
         {
             BenchmarkTable.CrossClassMode = false;
         }
-
-        return allResults;
     }
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunMultiRuntimeAsync(
@@ -817,18 +1073,21 @@ public sealed class BenchmarkHarness
 
         var suiteOptions = _cliArgs.DryRun
             ? _options with { Iterations = 0, WarmupIterations = 0 }
-            : MergeCliOptions(EffectiveBaseOptions, _cliArgs);
+            : MergeCliOptions(_options, _cliArgs);
 
-        // Apply opt-in hardware/OS controls to the parent process for the duration of the
-        // multi-runtime run, mirroring the single-runtime path. Each spawned child also
-        // applies its own settings via MeasurementOverrides; this scope covers the parent's
-        // own measurement/aggregation work.
+        // Apply opt-in hardware/OS controls to this process for the duration of the multi-runtime
+        // run, mirroring the single-runtime path. Each worker applies the same settings to itself
+        // from the options it was sent; this scope covers the coordinator's own aggregation work.
         using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
 
         // Resolve the observer once for the whole multi-runtime run so auto-attached
         // observers see one stream per RunAsync, mirroring the single-runtime path. The
         // using disposes the observer on both the success and exception paths.
+        //
+        // Always the publishing pass: the comparison pass is defined as measuring this process and
+        // returns before the multi-runtime branch is reached, so there is no non-publishing entry here.
         using var observer = ResolveObserver();
+        var progress = ResolveProgress(RunPass.Primary);
         var sentinelEmitted = false;
 
         try
@@ -841,19 +1100,17 @@ public sealed class BenchmarkHarness
                 {
                     Console.WriteLine($"Running benchmarks under {tfm}...");
 
-                    var runtimeResults = await RunForRuntimeAsync(
-                            build.Moniker, build.DllPath!, filtered, observer, cancellationToken)
+                    var (runtimeResults, runtimeSamples) = await RunForRuntimeAsync(
+                            build.Moniker, build, filtered, progress, observer, cancellationToken)
                         .ConfigureAwait(false);
 
-                    foreach (var item in runtimeResults)
+                    // Results already carry their own samples: they arrived in the same frame, so
+                    // there is no side table to look them up in and no key that can fail to match.
+                    allResults.AddRange(runtimeResults);
+
+                    foreach (var (key, samples) in runtimeSamples)
                     {
-                        // Re-attach display samples the child stripped from its serialized result
-                        // (see IsolatedRunContext.WriteChildPayloadIfRequestedAsync). For
-                        // launch-aggregated items, prefer the representative launch samples kept
-                        // on Result so TrimmedOrdinals stay aligned with the shown distribution.
-                        var withSamples = item.Result with { RawSamples = ResolveResultRawSamples(item) };
-                        allResults.Add(withSamples);
-                        rawSamples[$"{withSamples.Name}\0{tfm}"] = item.RawSamples;
+                        rawSamples[key] = samples;
                     }
                 }
                 finally
@@ -871,7 +1128,7 @@ public sealed class BenchmarkHarness
 
                 // Threshold comparisons only make sense within the same runtime - net8 will
                 // always look "slower" than net10, which would false-positive every net8 row.
-                foreach (var runtimeGroup in allResults.GroupBy(r => r.RuntimeMoniker))
+                foreach (var runtimeGroup in allResults.GroupBy(ComparisonGroup.KeyFor))
                 {
                     if (ThresholdCheck.HasRegression(runtimeGroup.ToList(), threshold) is (true, var names))
                         regressedNames.AddRange(names);
@@ -887,19 +1144,7 @@ public sealed class BenchmarkHarness
                 }
             }
 
-            if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
-                ApplyOutputDirectory(_cliArgs.OutputDir);
-
-            BenchmarkTable.CrossClassMode = _cliArgs.CrossClass || _crossClass;
-
-            try
-            {
-                await InvokeReportersAsync(allResults, cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                BenchmarkTable.CrossClassMode = false;
-            }
+            await FinalizeRunAsync(allResults, cancellationToken).ConfigureAwait(false);
 
             // SuiteCompleted sentinel: emit on the success path with Succeeded = true.
             observer.OnPhase(new MeasurementPhaseEvent(
@@ -909,6 +1154,18 @@ public sealed class BenchmarkHarness
                 Succeeded: true));
 
             sentinelEmitted = true;
+
+            // Refused rather than attempted. Forcing this pass in-process would compare every runtime's
+            // rows against one host row - IsolationAudit.Render keys the host side by name, and a
+            // moniker is the only thing that distinguishes those rows - printing a table that looks
+            // like a finding and is not one. "In-process" has no defined meaning for a net8.0 build
+            // measured from a net10.0 coordinator either. Previously this re-entered the multi-runtime
+            // orchestrator and spawned workers, so the "in-process comparison" was neither.
+            if (_cliArgs.VerifyIsolation)
+            {
+                IsolationAudit.RefuseCrossRuntimeComparison(
+                    runtimes.Select(r => r.ToTargetFramework()), Console.Out);
+            }
 
             return allResults;
         }
@@ -925,61 +1182,140 @@ public sealed class BenchmarkHarness
         }
     }
 
-    private async Task<IReadOnlyList<IsolatedResultItem>> RunForRuntimeAsync(
-        RuntimeMoniker moniker,
-        string entryAssemblyPath,
-        IReadOnlyList<BenchmarkSuiteDefinition> filteredSuites,
-        IMeasurementObserver observer,
-        CancellationToken cancellationToken)
+    /// <summary>
+    ///     Measures every selected class against one target framework's build, in that build's own
+    ///     worker.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The worker is taken from the build's output directory rather than from beside this
+    ///         process. A worker is a framework-dependent assembly, so only the net8.0 worker can
+    ///         load a net8.0 build - and the build targets already deployed it there, next to the
+    ///         code under test. That makes worker selection a lookup rather than a policy.
+    ///     </para>
+    ///     <para>
+    ///         A build whose output has no worker is reported and skipped rather than measured in
+    ///         this process. Falling back would measure the <i>coordinator's</i> runtime while
+    ///         labelling the row with another framework's moniker, which is a worse answer than no
+    ///         answer.
+    ///     </para>
+    /// </remarks>
+    private async Task<(List<BenchmarkResult> Results, Dictionary<string, double[]> RawSamples)>
+        RunForRuntimeAsync(
+            RuntimeMoniker moniker,
+            TfmBuild build,
+            IReadOnlyList<BenchmarkSuiteDefinition> filteredSuites,
+            IBenchmarkProgress progress,
+            IMeasurementObserver observer,
+            CancellationToken cancellationToken)
     {
-        var allItems = new List<IsolatedResultItem>();
+        var results = new List<BenchmarkResult>();
+        var rawSamples = new Dictionary<string, double[]>(StringComparer.Ordinal);
         var tfm = moniker.ToTargetFramework();
+
+        var workerPath = WorkerLocator.ForOutputDirectory(build.OutputDirectory);
+
+        if (workerPath is null)
+        {
+            Console.Error.WriteLine(
+                $"  {tfm}: no measurement worker was found in the build output "
+                + $"('{build.OutputDirectory}'), so this runtime was skipped. Measuring it in this "
+                + "process would report this runtime's numbers from a different one.");
+
+            return (results, rawSamples);
+        }
+
+        var options = ChildLaunchOptions;
+
+        // Said out loud rather than refused. Every other mode declines to isolate a run whose custom
+        // strategy a worker cannot rebuild, but this one has no in-process fallback available - the
+        // point is to measure another framework's build - so the honest move is to name the downgrade
+        // instead of hiding it behind a skipped runtime.
+        //
+        // Carried onto the results as well as printed. WorkerRunPlan.Decision.Status exists precisely
+        // so "the reason travels with the numbers rather than living only in a console message that
+        // scrolls by", and this was the one downgrade that had no such carrier: the rows are stamped
+        // Isolated below - correctly, they did run in a worker - so nothing on them said they had been
+        // scored with a different statistical method than the one configured.
+        var strategyDowngrade = WorkerRunPlan.UnrebuildableStrategy(options);
+
+        if (strategyDowngrade is not null)
+        {
+            Console.Error.WriteLine(
+                $"  {tfm}: {strategyDowngrade} These benchmarks will be scored with the built-in "
+                + "strategy instead. Give it a parameterless constructor to carry it across.");
+        }
 
         foreach (var suite in filteredSuites)
         {
-            var request = new IsolatedRunRequest
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var displayNames = suite.Benchmarks.Select(b => b.DisplayName).ToList();
+
+            var request = WorkerRunPlan.WithStrategies(new RunGroupPayload
             {
-                Kind = IsolatedRunKind.Host,
+                GroupId = $"{tfm}:{suite.Type.Name}",
+                Kind = WorkGroupKind.DiscoveredClass,
+
+                // The class under test lives in the build for this framework, not in the assembly
+                // this coordinator was loaded from.
+                TargetAssemblyPath = build.DllPath!,
+                WorkerAssemblyPath = workerPath,
                 DeclaringTypeFullName = suite.Type.FullName,
                 DisplayPrefix = suite.Type.Name,
-                BenchmarkDisplayNames = suite.Benchmarks.Select(b => b.DisplayName).ToList(),
-                Overrides = MeasurementOverrides.FromCliArgs(_cliArgs),
-                RuntimeMoniker = moniker,
-                EntryAssemblyPath = entryAssemblyPath,
-                ObserverNames = ResolveObserverNames(),
-            };
+                BenchmarkNames = displayNames,
 
-            var items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
+                // One worker per (runtime x class), so this worker measures once. A multi-runtime run
+                // spends no replicates: the comparison it exists to make is between frameworks, and a
+                // launch count multiplied by the runtime count would be a different, longer run than
+                // the one asked for.
+                Options = options,
+                ServiceProviderFactory = WorkerRunPlan.ServiceProviderFactoryRef(_serviceProviderFactory),
+                Order = _cliArgs.RunOrder ?? _runOrder,
+                Seed = _cliArgs.Seed,
+                DefaultInstanceLifetime = _defaultInstanceLifetime,
+                TotalBenchmarks = displayNames.Count,
+            }, options);
+
+            var group = await WorkerLauncher.Current.RunGroupAsync(
+                    request, progress, observer, MeasurementBudget.For(options, displayNames.Count),
+                    cancellationToken)
                 .ConfigureAwait(false);
 
-            foreach (var item in items)
+            foreach (var fault in group.Faults)
             {
-                var stamped = item with { Result = item.Result with { RuntimeMoniker = tfm } };
-                allItems.Add(stamped);
+                Console.Error.WriteLine($"  {tfm}: {fault.Message}");
+            }
 
-                // The parent emits OnResult for each child result so the observer sees every
-                // benchmark across all runtimes in one stream. The child has its own observer
-                // (resolved from the forwarded names); this is the parent-side aggregation.
-                observer.OnResult(stamped.Result);
+            foreach (var result in group.Results)
+            {
+                // Stamped with the framework it was measured under, which is what keeps rows from
+                // different runtimes out of each other's comparison groups.
+                var stamped = result with
+                {
+                    RuntimeMoniker = tfm,
+                    IsolationStatus = IsolationStatus.Isolated,
+                    RawSamples = group.RawSamples.GetValueOrDefault(result.Name, []),
+
+                    // Not folded into IsolationStatus: the row *was* isolated, and claiming otherwise
+                    // would misreport where it ran to fix what it was scored with. Those are separate
+                    // facts, so the downgrade rides as a warning instead.
+                    Warnings = strategyDowngrade is null
+                        ? result.Warnings
+                        : [.. result.Warnings, $"Scored with the built-in strategy rather than the one "
+                                               + $"configured: {strategyDowngrade}"],
+                };
+
+                results.Add(stamped);
+                rawSamples[RawSampleKey.For(stamped.Name, tfm)] = group.RawSamples.GetValueOrDefault(result.Name, []);
+
+                // The coordinator emits OnResult for every runtime's results so an observer sees one
+                // stream across the whole run.
+                observer.OnResult(stamped);
             }
         }
 
-        return allItems;
-    }
-
-    private static Dictionary<string, double[]> ToCompositeKeys(
-        IReadOnlyList<BenchmarkResult> results,
-        Dictionary<string, double[]> nameKeyedSamples)
-    {
-        var composite = new Dictionary<string, double[]>(nameKeyedSamples.Count);
-
-        foreach (var r in results)
-        {
-            if (nameKeyedSamples.TryGetValue(r.Name, out var samples))
-                composite[$"{r.Name}\0{r.RuntimeMoniker}"] = samples;
-        }
-
-        return composite;
+        return (results, rawSamples);
     }
 
     private static void ApplyPerClassSignificance(
@@ -990,7 +1326,7 @@ public sealed class BenchmarkHarness
     {
         static string RawKey(BenchmarkResult r)
         {
-            return $"{r.Name}\0{r.RuntimeMoniker}";
+            return RawSampleKey.For(r);
         }
 
         if (crossClass)
@@ -1014,7 +1350,7 @@ public sealed class BenchmarkHarness
             // the net8 baseline, not the net10 one.
             var runtimeGroups = classResults
                 .Select((r, idx) => (Result: r, Index: idx))
-                .GroupBy(ri => ri.Result.RuntimeMoniker)
+                .GroupBy(ri => ComparisonGroup.KeyFor(ri.Result))
                 .ToList();
 
             if (!classResults.Any(r => r.ParameterSet.Count > 0))
@@ -1053,7 +1389,7 @@ public sealed class BenchmarkHarness
             foreach (var paramGroup in paramGroups)
             {
                 var paramRuntimeGroups = paramGroup
-                    .GroupBy(ri => ri.Result.RuntimeMoniker)
+                    .GroupBy(ri => ComparisonGroup.KeyFor(ri.Result))
                     .ToList();
 
                 foreach (var runtimeGroup in paramRuntimeGroups)
@@ -1095,7 +1431,7 @@ public sealed class BenchmarkHarness
         {
             foreach (var runtimeGroup in allResults
                          .Select((r, idx) => (Result: r, Index: idx))
-                         .GroupBy(ri => ri.Result.RuntimeMoniker))
+                         .GroupBy(ri => ComparisonGroup.KeyFor(ri.Result)))
             {
                 var runtimeList = runtimeGroup.ToList();
                 var runtimeResults = runtimeList.Select(ri => ri.Result).ToList();
@@ -1127,7 +1463,7 @@ public sealed class BenchmarkHarness
         foreach (var paramGroup in paramGroups)
         {
             foreach (var runtimeGroup in paramGroup
-                         .GroupBy(ri => ri.Result.RuntimeMoniker))
+                         .GroupBy(ri => ComparisonGroup.KeyFor(ri.Result)))
             {
                 var runtimeList = runtimeGroup.ToList();
                 var runtimeResults = runtimeList.Select(ri => ri.Result).ToList();
@@ -1156,18 +1492,19 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IBenchmarkProgress progress,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
         if (suite.Lifetime == InstanceLifetime.PerClass)
         {
             await RunPerClassInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
-                allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
         }
         else
         {
             await RunPerMethodInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
-                allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -1178,6 +1515,7 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IBenchmarkProgress progress,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
@@ -1211,12 +1549,15 @@ public sealed class BenchmarkHarness
                 ? () => ((IStateReset)instance).ResetAsync(cancellationToken)
                 : null;
 
-            var effectiveClassLaunchCount = suiteOptions.LaunchCount;
+            var effectiveClassLaunchCount = EffectiveLaunchCount;
 
+            // Clamped, because an attribute argument is a compile-time constant nothing else validates -
+            // the fluent builders and the CLI parser reject an out-of-range count, and this is the one
+            // path where a typo could ask for ten thousand launches.
             foreach (var b in suite.Benchmarks)
             {
-                if (b.Attribute.HasLaunchCountOverride && b.Attribute.LaunchCount > effectiveClassLaunchCount)
-                    effectiveClassLaunchCount = b.Attribute.LaunchCount;
+                if (b.Attribute.HasLaunchCountOverride)
+                    effectiveClassLaunchCount = Math.Max(effectiveClassLaunchCount, LaunchCounts.Clamp(b.Attribute.LaunchCount));
             }
 
             if (effectiveClassLaunchCount > 1)
@@ -1226,12 +1567,16 @@ public sealed class BenchmarkHarness
 
                 for (var launchIdx = 0; launchIdx < effectiveClassLaunchCount; launchIdx++)
                 {
-                    var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+                    // Later launches measure the same benchmarks again, so their lifecycle events are
+                    // dropped - forwarding them would make a progress bar run backwards. This local was
+                    // already here and computed correctly; the call below passed the unsuppressed
+                    // instance anyway, so only the observer was actually being quietened.
+                    var launchProgress = launchIdx == 0 ? progress : NullBenchmarkProgress.Instance;
                     var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
 
                     var (results, samples) = await SuiteRunner.RunAsync(
                         envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset, launchObserver).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, launchProgress, cancellationToken, betweenBenchmarksReset, launchObserver).ConfigureAwait(false);
 
                     allLaunchResults.Add(results);
                     allLaunchSamples.Add(samples);
@@ -1250,7 +1595,7 @@ public sealed class BenchmarkHarness
             {
                 var (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                    startIndex, totalBenchmarks, _progress, cancellationToken, betweenBenchmarksReset, observer).ConfigureAwait(false);
+                    startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset, observer).ConfigureAwait(false);
 
                 ApplyPerClassIndependenceWarning(results, suite, suiteOptions);
                 allResults.AddRange(results);
@@ -1274,6 +1619,7 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IBenchmarkProgress progress,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
@@ -1315,8 +1661,8 @@ public sealed class BenchmarkHarness
                 var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
 
                 var perMethodLaunchCount = benchmark.Attribute.HasLaunchCountOverride
-                    ? benchmark.Attribute.LaunchCount
-                    : suiteOptions.LaunchCount;
+                    ? LaunchCounts.Clamp(benchmark.Attribute.LaunchCount)
+                    : EffectiveLaunchCount;
 
                 if (perMethodLaunchCount > 1)
                 {
@@ -1325,20 +1671,28 @@ public sealed class BenchmarkHarness
 
                     for (var launchIdx = 0; launchIdx < perMethodLaunchCount; launchIdx++)
                     {
-                        var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+                        // See RunPerClassInProcessAsync: suppressed for every launch after the first,
+                        // and previously computed but not passed.
+                        var launchProgress = launchIdx == 0 ? progress : NullBenchmarkProgress.Instance;
                         var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
 
                         var (results, samples) = await SuiteRunner.RunAsync(
                             [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                            startIndex, totalBenchmarks, progress, cancellationToken, null, launchObserver).ConfigureAwait(false);
+                            startIndex, totalBenchmarks, launchProgress, cancellationToken, null, launchObserver).ConfigureAwait(false);
 
                         perLaunchResults.AddRange(results);
                         perLaunchSamples.Add(samples);
                     }
 
-                    var stats = LaunchAggregator.Aggregate(perLaunchResults);
-                    var best = LaunchAggregator.BestLaunch(perLaunchResults);
-                    allResults.Add(best with { LaunchStatistics = stats });
+                    // Combine reads the representative launch's samples off the pairing, so the
+                    // displayed trim marks still index the array they were computed against. The
+                    // pooled samples below are what significance reads across every launch.
+                    var launches = perLaunchResults
+                        .Select((r, i) => new LaunchAggregator.Launch(
+                            r, perLaunchSamples[i].GetValueOrDefault(r.Name, [])))
+                        .ToList();
+
+                    allResults.Add(LaunchAggregator.Combine(launches));
 
                     foreach (var kvp in PoolRawSamplesByName(perLaunchSamples))
                     {
@@ -1349,7 +1703,7 @@ public sealed class BenchmarkHarness
                 {
                     var (results, samples) = await SuiteRunner.RunAsync(
                         [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, _progress, cancellationToken, null, observer).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, progress, cancellationToken, null, observer).ConfigureAwait(false);
 
                     allResults.AddRange(results);
 
@@ -1382,18 +1736,19 @@ public sealed class BenchmarkHarness
 
         foreach (var name in names)
         {
-            var perLaunch = allLaunchResults
-                .Select(launch => launch.FirstOrDefault(r => r.Name == name))
-                .Where(r => r is not null)
-                .Cast<BenchmarkResult>()
+            // Zipped before filtering, so a launch missing this benchmark drops its samples with it
+            // rather than shifting every later launch's samples onto the wrong result.
+            var launches = allLaunchResults
+                .Select((launch, i) => (Result: launch.FirstOrDefault(r => r.Name == name), Index: i))
+                .Where(x => x.Result is not null)
+                .Select(x => new LaunchAggregator.Launch(
+                    x.Result!, allLaunchSamples[x.Index].GetValueOrDefault(name, [])))
                 .ToList();
 
-            if (perLaunch.Count == 0)
+            if (launches.Count == 0)
                 continue;
 
-            var stats = LaunchAggregator.Aggregate(perLaunch);
-            var best = LaunchAggregator.BestLaunch(perLaunch);
-            aggregated.Add(best with { LaunchStatistics = stats });
+            aggregated.Add(LaunchAggregator.Combine(launches));
 
             if (pooledSamples.TryGetValue(name, out var launchSamples))
                 samples[name] = launchSamples;
@@ -1429,44 +1784,12 @@ public sealed class BenchmarkHarness
         RunOrder order,
         int? seed)
     {
-        if (order != RunOrder.Random)
-            return benchmarks;
-
-        var hasParameters = benchmarks.Any(b => b.ParameterSet.Count > 0);
-
-        if (!hasParameters)
-        {
-            var shuffled = benchmarks.ToList();
-            var rng = new Random(seed ?? Random.Shared.Next());
-            ShuffleInPlace(shuffled, rng);
-            return shuffled;
-        }
-
-        var parameterGroups = benchmarks
-            .GroupBy(b => BenchmarkParameter.GetKey(b.ParameterSet))
-            .ToList();
-
-        var ordered = new List<BenchmarkMethodDefinition>(benchmarks.Count);
-        var groupSeedRng = new Random(seed ?? Random.Shared.Next());
-
-        foreach (var group in parameterGroups)
-        {
-            var groupList = group.ToList();
-            var groupRng = new Random(groupSeedRng.Next());
-            ShuffleInPlace(groupList, groupRng);
-            ordered.AddRange(groupList);
-        }
-
-        return ordered;
-    }
-
-    private static void ShuffleInPlace<T>(List<T> items, Random rng)
-    {
-        for (var i = items.Count - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (items[i], items[j]) = (items[j], items[i]);
-        }
+        // A parameter sweep keeps its parameter values in declaration order and randomizes only
+        // within each of them, because every comparison the table invites is within a parameter
+        // value and interleaving the values would make the table unreadable for no statistical gain.
+        return benchmarks.Any(b => b.ParameterSet.Count > 0)
+            ? RunOrdering.ApplyWithinGroups(benchmarks, order, seed, b => BenchmarkParameter.GetKey(b.ParameterSet))
+            : RunOrdering.Apply(benchmarks, order, seed);
     }
 
     /// <summary>
@@ -1530,58 +1853,53 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IBenchmarkProgress progress,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
-        var effectiveLaunchCount = _cliArgs.LaunchCount ?? EffectiveBaseOptions.LaunchCount;
+        var effectiveLaunchCount = EffectiveLaunchCount;
 
         // Check per-benchmark attribute overrides; take the maximum so all
         // benchmarks in the group get enough launches for their overrides.
         foreach (var b in benchmarks)
         {
-            if (b.Attribute.HasLaunchCountOverride && b.Attribute.LaunchCount > effectiveLaunchCount)
-                effectiveLaunchCount = b.Attribute.LaunchCount;
+            if (b.Attribute.HasLaunchCountOverride)
+                effectiveLaunchCount = Math.Max(effectiveLaunchCount, LaunchCounts.Clamp(b.Attribute.LaunchCount));
         }
 
-        for (var i = 0; i < benchmarks.Count; i++)
+        var options = ChildLaunchOptions;
+        var names = benchmarks.Select(b => b.DisplayName).ToList();
+        var timeout = MeasurementBudget.For(options, benchmarks.Count);
+
+        // Each replicate is its own worker, so LaunchCount buys a between-process variance estimate
+        // rather than repeated measurements inside one process. That is the reproducibility number a
+        // regression gate needs; the within-process interval only describes precision, and the data
+        // shows how misleading it is alone - a standard deviation of 0.16 ns on an 11 ns reading
+        // while the true run-to-run spread was 3.27x.
+        var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>(effectiveLaunchCount);
+
+        for (var replicate = 0; replicate < effectiveLaunchCount; replicate++)
         {
-            var name = $"{suite.Type.Name}.{benchmarks[i].DisplayName}";
-            await _progress.OnBenchmarkStarting(name, startIndex + i + 1, totalBenchmarks).ConfigureAwait(false);
+            var request = WorkerRunPlan.DiscoveredClassRequest(
+                suite.Type,
+                names,
+                options,
+                _defaultInstanceLifetime,
+                _cliArgs.RunOrder ?? _runOrder,
+                _cliArgs.Seed,
+                replicate,
+                startIndex,
+                totalBenchmarks,
+                WorkerRunPlan.ServiceProviderFactoryRef(_serviceProviderFactory));
+
+            allLaunchItems.Add(
+                await RunGroupInWorkerAsync(request, replicate, names, suite, timeout, progress, observer, cancellationToken)
+                    .ConfigureAwait(false));
         }
 
-        var request = new IsolatedRunRequest
-        {
-            Kind = IsolatedRunKind.Host,
-            DeclaringTypeFullName = suite.Type.FullName,
-            DisplayPrefix = suite.Type.Name,
-            BenchmarkDisplayNames = benchmarks.Select(b => b.DisplayName).ToList(),
-            Overrides = MeasurementOverrides.FromCliArgs(_cliArgs),
-
-            // Forward the resolved observer names so isolated children activate the same
-            // observers (e.g. the dashboard, an OTLP exporter) as the parent. The child resolves
-            // them through ObserverRegistry, which is populated identically by [ModuleInitializer]
-            // self-registration in the child's fresh process.
-            ObserverNames = ResolveObserverNames(),
-        };
-
-        IReadOnlyList<IsolatedResultItem> items;
-
-        if (effectiveLaunchCount > 1)
-        {
-            var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
-
-            for (var launchIdx = 0; launchIdx < effectiveLaunchCount; launchIdx++)
-            {
-                var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                    .ConfigureAwait(false);
-
-                allLaunchItems.Add(launchItems);
-            }
-
-            items = HostAggregateIsolatedLaunches(allLaunchItems, benchmarks, suite);
-        }
-        else
-            items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
+        var items = effectiveLaunchCount > 1
+            ? HostAggregateIsolatedLaunches(allLaunchItems, benchmarks, suite)
+            : allLaunchItems[0];
 
         var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
 
@@ -1616,9 +1934,134 @@ public sealed class BenchmarkHarness
             allResults.Add(result);
             rawSamples[name] = raw;
 
-            await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+            await progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
             observer.OnResult(result);
         }
+    }
+
+    /// <summary>
+    ///     Records why each in-process result ran in the host, on the result itself.
+    ///     <para>
+    ///         A benchmark carrying <c>[InProcess]</c> asked for the host and is stamped as such even
+    ///         when the class was also refused for another reason - the explicit choice is the true
+    ///         explanation, and reporting a refusal the user never hit would send them chasing a
+    ///         problem they do not have.
+    ///     </para>
+    /// </summary>
+    private static void StampIsolationStatus(
+        List<BenchmarkResult> results,
+        int startIndex,
+        IReadOnlyList<BenchmarkMethodDefinition> benchmarks,
+        IsolationStatus classStatus)
+    {
+        var explicitlyInProcess = benchmarks
+            .Where(b => b.Isolation == IsolationMode.InProcess)
+            .Select(b => b.DisplayName)
+            .ToHashSet(StringComparer.Ordinal);
+
+        for (var i = startIndex; i < results.Count; i++)
+        {
+            var result = results[i];
+
+            var status = explicitlyInProcess.Contains(MethodNameOf(result.Name))
+                ? IsolationStatus.InProcessRequested
+                : classStatus;
+
+            results[i] = result with
+            {
+                IsolationStatus = status == IsolationStatus.Isolated
+                    ? IsolationStatus.InProcessRequested
+                    : status,
+            };
+        }
+    }
+
+    /// <summary>Strips the class prefix from a <c>Class.Method</c> result name.</summary>
+    private static string MethodNameOf(string resultName)
+    {
+        var separator = resultName.LastIndexOf('.');
+
+        return separator < 0 ? resultName : resultName[(separator + 1)..];
+    }
+
+    /// <summary>
+    ///     Reports, once per class, that isolation was declined and why.
+    ///     <para>
+    ///         This is the visible half of "refuse rather than guess". A silent fallback to
+    ///         in-process would be the worst outcome available: on bodies of provably identical cost,
+    ///         in-process runs spanned 3.27x and fabricated a 2.80x difference between two of them,
+    ///         each reported with a tight confidence interval. The results themselves are also
+    ///         stamped <c>host</c>, so the provenance survives even if this message is scrolled past.
+    ///     </para>
+    /// </summary>
+    private static void EmitIsolationRefusal(
+        HashSet<string> reported,
+        string className,
+        string explanation)
+    {
+        if (!reported.Add(className))
+            return;
+
+        Console.Error.WriteLine(
+            $"Isolation: '{className}' is being measured in this process because {explanation}");
+
+        Console.Error.WriteLine(
+            "  In-process measurements cannot control JIT tiering, PGO, ReadyToRun or GC flavour, "
+            + "because the runtime fixes those at startup. They are stamped 'host' and are never "
+            + "compared against isolated results.");
+    }
+
+    /// <summary>
+    ///     Spawns one worker, measures one replicate of a group in it, and shuts it down.
+    ///     <para>
+    ///         A worker is single-use. Recycling one across groups is the obvious optimisation and is
+    ///         disqualified: the only way to unload a target assembly is a collectible load context,
+    ///         and a collectible context reaches static fields through a <c>LoaderAllocator</c>
+    ///         indirection that inflates any benchmark touching a static - an overhead the report
+    ///         would attribute to the user's code.
+    ///     </para>
+    ///     <para>
+    ///         Progress is replayed into the real progress instance for the first replicate only.
+    ///         Later replicates measure the same benchmarks again, so forwarding their lifecycle
+    ///         events would make a progress bar appear to run backwards.
+    ///     </para>
+    /// </summary>
+    private async Task<IReadOnlyList<IsolatedResultItem>> RunGroupInWorkerAsync(
+        RunGroupPayload request,
+        int replicate,
+        IReadOnlyList<string> benchmarkNames,
+        BenchmarkSuiteDefinition suite,
+        TimeSpan timeout,
+        IBenchmarkProgress progress,
+        IMeasurementObserver observer,
+        CancellationToken cancellationToken)
+    {
+        var isFirstReplicate = replicate == 0;
+
+        var group = await WorkerLauncher.Current.RunGroupAsync(
+                request,
+                isFirstReplicate ? progress : NullBenchmarkProgress.Instance,
+                isFirstReplicate ? observer : NullMeasurementObserver.Instance,
+                timeout,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var items = group.Results
+            .Select(result => new IsolatedResultItem
+            {
+                Result = result,
+                RawSamples = group.RawSamples.GetValueOrDefault(result.Name, []),
+            })
+            .ToList();
+
+        // Benchmarks the worker never reported become errored rows naming the reason, so a failure
+        // is visible in the table rather than a silently missing line.
+        foreach (var errored in WorkerGroupRunner.ToErroredResults(group, benchmarkNames, suite.Type.Name))
+        {
+            items.Add(new IsolatedResultItem { Result = errored, RawSamples = [] });
+        }
+
+        return items;
     }
 
     private static IReadOnlyList<IsolatedResultItem> HostAggregateIsolatedLaunches(
@@ -1634,14 +2077,14 @@ public sealed class BenchmarkHarness
         foreach (var benchmark in benchmarks)
         {
             var name = $"{suite.Type.Name}.{benchmark.DisplayName}";
-            var perLaunchResults = new List<BenchmarkResult>();
+            var perLaunchResults = new List<LaunchAggregator.Launch>();
 
             foreach (var launchItems in allLaunchItems)
             {
                 var match = launchItems.FirstOrDefault(item => item.Result.Name == name);
 
                 if (match is not null)
-                    perLaunchResults.Add(match.Result with { RawSamples = match.RawSamples });
+                    perLaunchResults.Add(new LaunchAggregator.Launch(match.Result, match.RawSamples));
             }
 
             if (perLaunchResults.Count == 0)
@@ -1661,21 +2104,23 @@ public sealed class BenchmarkHarness
                 continue;
             }
 
-            var stats = LaunchAggregator.Aggregate(perLaunchResults);
-            var best = LaunchAggregator.BestLaunch(perLaunchResults);
             var rawSamples = allLaunchItems
                 .SelectMany(launchItems => launchItems.Where(item => item.Result.Name == name))
                 .SelectMany(item => item.RawSamples)
                 .ToArray();
 
-            // Keep representative-launch samples on the displayed result so statistical fields
-            // and TrimmedOrdinals remain aligned; pooled samples still travel alongside for
-            // significance calculations.
-            var aggregatedResult = best with { LaunchStatistics = stats };
-
+            // Combine averages the per-launch estimates and takes the reported interval from the
+            // spread between the workers, so the number describes what a re-run would produce rather
+            // than how precisely the luckiest worker measured it. It keeps the representative launch's
+            // own samples on the row so the trim marks still index the array they came from; the
+            // pooled array travels alongside for significance.
+            //
+            // Pooling samples across replicate workers multiplies statistical power without improving
+            // reproducibility, so a difference far below the run-to-run noise can still read as
+            // overwhelmingly significant. Combine attaches a warning where that is happening.
             aggregated.Add(new IsolatedResultItem
             {
-                Result = aggregatedResult,
+                Result = LaunchAggregator.Combine(perLaunchResults),
                 RawSamples = rawSamples,
             });
         }
@@ -1684,210 +2129,10 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     Child-process entry point: run the class the parent requested (one or more of
-    ///     its benchmarks) in this fresh CLR and write the serialized samples to the output
-    ///     file the parent supplied. No banner, progress, or reporters - the parent owns
-    ///     presentation and computes significance over the returned samples.
+    ///     Warns on every result from a class that shares one instance across several benchmark
+    ///     methods, because the second method can observe state the first left behind - which breaks
+    ///     the independence assumption the significance test rests on.
     /// </summary>
-    private async Task<IReadOnlyList<BenchmarkResult>> RunHostChildAsync(
-        IsolatedRunRequest request,
-        CancellationToken cancellationToken)
-    {
-        var options = request.Overrides.Apply(_options);
-        var requested = new HashSet<string>(request.BenchmarkDisplayNames, StringComparer.Ordinal);
-
-        // A child re-runs in a fresh CLR; apply the propagated environment controls (CPU
-        // affinity, priority, guidance) so the child's measurements run under the same
-        // hardware constraints as the parent. The scope restores on dispose.
-        using var _ = EnvironmentControl.Apply(options.Environment);
-
-        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
-
-        foreach (var suite in _assemblies.SelectMany(discoverer.Discover))
-        {
-            if (suite.Type.FullName != request.DeclaringTypeFullName)
-                continue;
-
-            var selected = suite.Benchmarks.Where(b => requested.Contains(b.DisplayName)).ToList();
-
-            if (selected.Count == 0)
-                continue;
-
-            if (suite.Lifetime == InstanceLifetime.PerClass)
-            {
-                return await RunPerClassHostChildAsync(suite, selected, options, ResolveChildObserver(request), cancellationToken)
-                    .ConfigureAwait(false);
-            }
-
-            return await RunPerMethodHostChildAsync(suite, selected, options, ResolveChildObserver(request), cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        Console.Error.WriteLine($"Isolated class '{request.DeclaringTypeFullName}' was not found.");
-
-        // In the child: a non-zero exit code is what the parent's launcher reads as failure.
-        Environment.ExitCode = 1;
-        return Array.Empty<BenchmarkResult>();
-    }
-
-    /// <summary>
-    ///     Resolves the observer names forwarded by the parent into a single
-    ///     <see cref="IMeasurementObserver" /> the child's measurement loop should see. The
-    ///     child re-runs the entry assembly, so <c>[ModuleInitializer]</c> self-registration
-    ///     populates <see cref="ObserverRegistry" /> identically and the names resolve to the
-    ///     same factories. An empty list collapses to <see cref="NullMeasurementObserver.Instance" />
-    ///     so the hot-path guard stays false and the child pays no dispatch cost.
-    /// </summary>
-    private static IMeasurementObserver ResolveChildObserver(IsolatedRunRequest request)
-    {
-        var names = request.ObserverNames;
-        var resolved = new List<IMeasurementObserver>(names.Count);
-
-        foreach (var name in names)
-        {
-            if (ObserverRegistry.TryCreate(name, out var observer)
-                && observer != NullMeasurementObserver.Instance)
-                resolved.Add(observer);
-        }
-
-        // Auto-attached observers also fire in children. EnsureExtensionsLoaded (called by
-        // CreateAutoAttachedObservers) has loaded NBenchmark.* assemblies (including
-        // NBenchmark.Studio, if referenced) and their [ModuleInitializer]s have registered
-        // auto-attached observers. Dedup against the request's explicit observer names so
-        // --observer studio does not double-attach. Mirrors the parent-side ResolveObserver.
-        var explicitNames = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
-        var autoAttached = ObserverRegistry.CreateAutoAttachedObservers(explicitNames);
-        resolved.AddRange(autoAttached);
-
-        return resolved.Count switch
-        {
-            0 => NullMeasurementObserver.Instance,
-            1 => resolved[0],
-            _ => new CompositeMeasurementObserver(resolved),
-        };
-    }
-
-    private async Task<IReadOnlyList<BenchmarkResult>> RunPerClassHostChildAsync(
-        BenchmarkSuiteDefinition suite,
-        IReadOnlyList<BenchmarkMethodDefinition> selected,
-        MeasurementOptions options,
-        IMeasurementObserver observer,
-        CancellationToken cancellationToken)
-    {
-        var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
-
-        if (created is null)
-        {
-            Environment.ExitCode = 1;
-            return Array.Empty<BenchmarkResult>();
-        }
-
-        var (instance, instanceTeardown) = created.Value;
-        var instanceFromFactory = _instanceFactory is not null;
-        List<BenchmarkResult> results;
-        var samples = new Dictionary<string, double[]>();
-
-        try
-        {
-            var selectedSuite = suite with { Benchmarks = selected };
-            var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(selectedSuite, instance, options);
-
-            if (!setupSuccess)
-                results = setupErrors!.ToList();
-            else
-            {
-                var factory = () => instance;
-
-                var envelopes = selected
-                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
-                    .ToList();
-
-                // When the class implements IStateReset, fire ResetAsync between benchmark methods
-                // to keep the shared instance's state clean across PerClass execution in the child.
-                Func<Task>? betweenBenchmarksReset = typeof(IStateReset).IsAssignableFrom(suite.Type)
-                    ? () => ((IStateReset)instance).ResetAsync(cancellationToken)
-                    : null;
-
-                (results, samples) = await SuiteRunner.RunAsync(
-                    envelopes, RunOrder.Declaration, null, options,
-                    0, selected.Count, NullBenchmarkProgress.Instance, cancellationToken, betweenBenchmarksReset,
-                    observer).ConfigureAwait(false);
-
-                ApplyPerClassIndependenceWarning(results, suite, options);
-            }
-        }
-        finally
-        {
-            await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, PostSuiteCleanup);
-        }
-
-        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, samples, cancellationToken)
-            .ConfigureAwait(false);
-
-        return results;
-    }
-
-    private async Task<IReadOnlyList<BenchmarkResult>> RunPerMethodHostChildAsync(
-        BenchmarkSuiteDefinition suite,
-        IReadOnlyList<BenchmarkMethodDefinition> selected,
-        MeasurementOptions options,
-        IMeasurementObserver observer,
-        CancellationToken cancellationToken)
-    {
-        var results = new List<BenchmarkResult>();
-        var samples = new Dictionary<string, double[]>();
-
-        foreach (var benchmark in selected)
-        {
-            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
-
-            if (created is null)
-            {
-                Environment.ExitCode = 1;
-                return Array.Empty<BenchmarkResult>();
-            }
-
-            var (instance, instanceTeardown) = created.Value;
-            var instanceFromFactory = _instanceFactory is not null;
-
-            try
-            {
-                var singleBenchmarkSuite = suite with { Benchmarks = [benchmark] };
-                var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(singleBenchmarkSuite, instance, options);
-
-                if (!setupSuccess)
-                {
-                    results.AddRange(setupErrors!);
-                    continue;
-                }
-
-                var factory = () => instance;
-                var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
-
-                var (batchResults, batchSamples) = await SuiteRunner.RunAsync(
-                    [envelope], RunOrder.Declaration, null, options,
-                    0, 1, NullBenchmarkProgress.Instance, cancellationToken,
-                    null, observer).ConfigureAwait(false);
-
-                results.AddRange(batchResults);
-
-                foreach (var kvp in batchSamples)
-                {
-                    samples[kvp.Key] = kvp.Value;
-                }
-            }
-            finally
-            {
-                await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, null);
-            }
-        }
-
-        await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, samples, cancellationToken)
-            .ConfigureAwait(false);
-
-        return results;
-    }
-
     private static void ApplyPerClassIndependenceWarning(
         List<BenchmarkResult> results,
         BenchmarkSuiteDefinition suite,
@@ -2095,7 +2340,7 @@ public sealed class BenchmarkHarness
     {
         public void Dispose()
         {
-            Environment.SetEnvironmentVariable(ChildProcessLauncher.OtelEndpointEnvVar, previousNBenchmarkEndpoint);
+            Environment.SetEnvironmentVariable(MeasurementBudget.OtelEndpointEnvVar, previousNBenchmarkEndpoint);
             Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", previousOtlpEndpoint);
         }
     }

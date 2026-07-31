@@ -32,6 +32,7 @@ When two or more benchmarks have been run, NBenchmark tests whether their differ
 **What to do:**
 - A ✓ with a small Ratio (e.g. `1.01x`) means the difference is statistically real but may be too small to matter in practice. Check the Magnitude column.
 - A ✗ with a large Ratio (e.g. `1.5x`) means the measurements are too noisy to tell. Try reducing noise (see [Tuning for noisy CI](../reference/configuration.md#tuning-for-noisy-ci-environments)) or collecting more samples.
+- A ✓ whose **ratio interval spans `1.00x`** (shown as `1.24x?` in the console) means the two disagree, and the interval is the one to trust. Significance is computed on samples pooled across launches, where a large count grants power regardless of reproducibility; the ratio interval is the run-to-run spread. See [Ratios](./ratios.md#when-sig-and-the-ratio-interval-disagree).
 
 The significance threshold (alpha) is configurable via `MeasurementOptions.SignificanceLevel`, the `.WithSignificanceLevel(...)` fluent method, or the `--alpha` CLI flag. Lower it (e.g. `0.01`) to demand stronger evidence before calling a difference real.
 

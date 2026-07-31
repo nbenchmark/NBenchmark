@@ -37,7 +37,9 @@ Run with `dotnet run` and you'll see something like:
   └─────────────────────────────────────────────────
 ```
 
-That's it. NBenchmark warmed up until the timings plateaued (to let the JIT compile your code), collected enough measured samples to tighten the confidence interval, trimmed outliers using the IQR fence rule, and printed a summary.
+That's it. NBenchmark measured your code in a freshly spawned child process, warmed up until the timings plateaued (to let the JIT compile your code), collected enough measured samples to tighten the confidence interval, trimmed outliers using the IQR fence rule, and printed a summary.
+
+The child process is why the `steady-state` label appears in the output. JIT tiering, dynamic PGO and GC flavour are fixed when a process starts and can never be changed afterwards, so the only way to choose them is to measure in a process that has not started yet. This happens by default and needs no setup - see [Process isolation](./key-concepts.md#process-isolation) for what it buys and when a benchmark cannot be isolated.
 
 ## Measuring async code
 
@@ -116,3 +118,4 @@ Now that you have measured one thing, here is a natural progression:
 4. **[Reporters and output](../output/index.md)** - save results to JSON, Markdown, or CSV, and add the optional console reporter for colour-coded tables
 5. **[Configuration](../reference/configuration.md)** - tune for noisy CI, fast feedback, or publication-grade precision
 6. **[Reading Your Results](../output/reading-your-results.md)** - understand every column, indicator, and warning in the output
+7. **[Isolated runs](../features/isolated-runs.md)** - why your benchmark spawned a process, what the `Iso` column means, and when a benchmark cannot be isolated

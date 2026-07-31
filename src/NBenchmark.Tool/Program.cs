@@ -17,9 +17,6 @@ if (remainingArgs.Contains("--help") || remainingArgs.Contains("-h"))
 
 var assemblies = new List<Assembly>();
 
-if (IsIsolatedChildProcess())
-    assemblyPaths.AddRange(ReadForwardedAssemblyPaths());
-
 foreach (var path in projectPaths)
 {
     var dllPath = BuildProject(path);
@@ -92,27 +89,7 @@ foreach (var asm in assemblies)
     harness.AddFromAssembly(asm);
 }
 
-var benchmarkAssemblyPaths = assemblies
-    .Select(a => a.Location)
-    .Where(static p => !string.IsNullOrWhiteSpace(p))
-    .Select(Path.GetFullPath)
-    .Distinct(StringComparer.OrdinalIgnoreCase)
-    .ToList();
-
-var previousForwarded = Environment.GetEnvironmentVariable("NBENCHMARK_TOOL_ASSEMBLIES");
-
-Environment.SetEnvironmentVariable(
-    "NBENCHMARK_TOOL_ASSEMBLIES",
-    string.Join(Path.PathSeparator, benchmarkAssemblyPaths));
-
-try
-{
-    await harness.RunAsync();
-}
-finally
-{
-    Environment.SetEnvironmentVariable("NBENCHMARK_TOOL_ASSEMBLIES", previousForwarded);
-}
+await harness.RunAsync();
 
 return;
 
@@ -151,23 +128,6 @@ static (List<string> projectPaths, List<string> assemblyPaths, List<string> rema
     }
 
     return (projectPaths, assemblyPaths, remaining);
-}
-
-static bool IsIsolatedChildProcess()
-{
-    return !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NBENCHMARK_ISOLATED_REQUEST_PATH"));
-}
-
-static List<string> ReadForwardedAssemblyPaths()
-{
-    var raw = Environment.GetEnvironmentVariable("NBENCHMARK_TOOL_ASSEMBLIES");
-
-    if (string.IsNullOrWhiteSpace(raw))
-        return [];
-
-    return raw
-        .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .ToList();
 }
 
 static string? BuildProject(string projectPath)

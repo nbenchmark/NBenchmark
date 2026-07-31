@@ -8,6 +8,32 @@ order: 9
 
 The repository includes several sample projects in the `samples/` directory that demonstrate each usage mode. Run any of them with `dotnet run`.
 
+## PreparedState - benchmarking over input you have to build
+
+**`samples/PreparedState/`**
+
+Runs the same work two ways - closing over prepared data, and passing the preparation as its own
+delegate - and prints where each was measured. The capturing form is measured in this process and
+labelled `host`; the split form is isolated. Also shows `WithState` on a suite.
+
+```bash
+cd samples/PreparedState
+dotnet run
+```
+
+```csharp
+// captures 'data' -> measured in this process
+var data = BuildData();
+Benchmark.Run(() => Sum(data), options, "captured");
+
+// both delegates capture nothing -> isolated, and the worker builds the data itself
+Benchmark.Run(
+    prepare: () => BuildData(),
+    body: values => Sum(values),
+    options,
+    "prepared");
+```
+
 ## Single - Single mode
 
 **`samples/Single/`**
@@ -226,8 +252,8 @@ See [Custom outlier detectors](./statistics/outliers.md#custom-outlier-detectors
 
 Demonstrates process isolation:
 
-- Single mode is always in-process (`Benchmark.Run`).
-- Suite mode opts into a single clean child process with `WithIsolation()`.
+- Single mode is isolated by default (`Benchmark.Run`), with `Benchmark.RunInProcess` as the deliberate opt-out.
+- Suite mode measures in a single clean worker process, with a `[BenchmarkPlan]` factory for suites that hold live state.
 
 ```bash
 cd samples/IsolatedRuns
@@ -237,7 +263,7 @@ dotnet run
 What to look at:
 
 - The quick in-process result.
-- The isolated suite comparison, where the whole suite runs in one fresh child process.
+- The isolated suite comparison, where the whole suite runs in one fresh worker.
 - The tradeoff between cleaner measurements and additional process-launch overhead.
 
 ---
@@ -274,7 +300,7 @@ await new BenchmarkSuite("sleep")
 What to look at:
 
 - The "Launch Aggregation" table below the main results, showing cross-launch mean, stddev, median, and CI when `LaunchCount > 1`.
-- The primary result fields come from the **best** (lowest median) launch, so the main table reflects the most favourable reading.
+- The primary result fields are the **average across launches**, and the reported interval comes from the spread between them — so a benchmark whose launches disagree shows a wide interval rather than one launch's tight one.
 - How `--launch-count 5` on the CLI overrides the programmatic count.
 - How the per-method `[Benchmark(LaunchCount = 3)]` attribute specifies different counts per benchmark.
 
@@ -360,7 +386,7 @@ What to look at:
 
 - How `--runtimes net8,net9,net10` triggers cross-runtime builds and execution.
 - The "Runtime" column in the console output.
-- How the host builds the project for each TFM, runs benchmarks in child processes, and aggregates results.
+- How the host builds the project for each TFM, runs benchmarks in workers, and aggregates results.
 - Combining `--runtimes` with other CLI flags like `--iterations`, `--reporter`, and `--output`.
 
 ---

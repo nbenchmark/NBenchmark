@@ -130,7 +130,7 @@ new MeasurementOptions
 
 - **The `MinimumPracticalEffect` gate works for any test.** The engine enforces the gate in `Significance.ApplyReport` after the test runs, so a custom test that returns an `EffectSize` with a `PracticalValue` is gated automatically. Tests that don't return a practical value are unaffected. See [Significance Testing: Practical-significance gate](../statistics/significance.md#practical-significance-gate).
 
-- **Isolated children preserve your custom statistics.** Children rebuild the suite from your own `Main` rather than deserializing options, so custom detector / test instances are preserved across the process boundary. In Harness mode, scalar CLI overrides (iterations, warmup, confidence, etc.) are forwarded to each child. See [Isolated runs](../features/isolated-runs.md#important-behavior-notes).
+- **Isolated workers preserve your custom statistics.** Workers rebuild the suite from your own `Main` rather than deserializing options, so custom detector / test instances are preserved across the process boundary. In Harness mode, scalar CLI overrides (iterations, warmup, confidence, etc.) are forwarded to each worker. See [Isolated runs](../features/isolated-runs.md#important-behavior-notes).
 
 > [!TIP] Compose the built-in strategies
 > The built-in strategies - `MannWhitneyUSignificanceTest`, `KruskalWallisSignificanceTest`, and the group-count-aware `DefaultSignificanceTest` - all implement `ISignificanceTest`. You can wrap or compose them: run the built-in test, then add a domain-specific gate on top, or fall back to a custom rule when the built-in test returns `NotTested` (e.g. too few samples).

@@ -4,6 +4,13 @@
     <RootNamespace>NBenchmark.Integration.MSTest.Tests</RootNamespace>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
+
+    <!--
+      Deploys the measurement worker, so these tests prove a performance test really is measured
+      out of process. Without it they would still pass - via the labelled in-host fallback - and a
+      silent fallback looks identical to success.
+    -->
+    <NBenchmarkUseWorker>true</NBenchmarkUseWorker>
   </PropertyGroup>
 
   <ItemGroup>

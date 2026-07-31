@@ -186,6 +186,13 @@ internal static class OutcomeBuilder
                 SignificanceTestName = options.ResolveSignificanceTest().Name,
                 SignificanceLevel = options.SignificanceLevel,
                 Profile = options.Profile,
+
+                // Read from the measuring process's own environment, never from
+                // options.RuntimeProfile: that is what the caller asked for, and an in-process run
+                // cannot honour it because these knobs are fixed at startup. Stamping intent would
+                // make every in-process result claim a fidelity it does not have.
+                RuntimeProfileName = RuntimeProfileEnvironment.Current.Name,
+                RuntimeKnobs = RuntimeProfileEnvironment.Current.Knobs,
                 Warnings = warnings,
                 AutoTune = autoTune,
                 Diagnostics = diagnosticsResult,

@@ -1,73 +1,31 @@
-using System.Diagnostics;
-
 namespace NBenchmark.Integration.Abstractions;
 
-public sealed record CalibrationResult(double Mean, double Median, double[] Samples);
-
+/// <summary>
+///     The test host's own measurement of <see cref="CalibrationStandard" />, cached for the life of
+///     the process.
+/// </summary>
+/// <remarks>
+///     <para>
+///         Caching is what makes this cheap enough to consult on every gated test, and it is safe
+///         because the standard measures the machine rather than anything the tests do.
+///     </para>
+///     <para>
+///         This is the <i>fallback</i> calibration. A test measured in a worker gets one measured in
+///         that same worker instead, so both sides of its ratio share a runtime configuration - see
+///         <see cref="PerformanceGate.Evaluate" />. This one is used when the benchmark also ran in
+///         the host, where it is the correct comparison rather than a compromise.
+///     </para>
+/// </remarks>
 public static class PerformanceCalibration
 {
-    private const int SampleCount = 32;
-    private const int WorkPerSample = 4096;
-
-    private static readonly Lazy<CalibrationResult> Cached = new(RunCalibration);
-
-    private static long Accumulator;
+    private static readonly Lazy<CalibrationResult> Cached = new(CalibrationStandard.Measure);
 
     public static CalibrationResult Run() => Cached.Value;
 
+    /// <summary>
+    ///     The host calibration as a comparable result, labelled as host-measured so a gate can tell
+    ///     it apart from one a worker produced.
+    /// </summary>
     public static BenchmarkResult CreateBenchmarkResult()
-    {
-        var c = Run();
-        return BenchmarkResult.FromCalibration("calibration", c.Mean, c.Median, c.Samples);
-    }
-
-    private static CalibrationResult RunCalibration()
-    {
-        var nanosecondsPerTick = 1_000_000_000.0 / Stopwatch.Frequency;
-
-        var warmAcc = BusyWeight(WorkPerSample);
-        Volatile.Write(ref Accumulator, warmAcc);
-
-        var samples = new double[SampleCount];
-        var accumulator = 0L;
-
-        for (var i = 0; i < SampleCount; i++)
-        {
-            var start = Stopwatch.GetTimestamp();
-            accumulator += BusyWeight(WorkPerSample);
-            samples[i] = (Stopwatch.GetTimestamp() - start) * nanosecondsPerTick;
-        }
-
-        Volatile.Write(ref Accumulator, accumulator);
-
-        var mean = samples.Sum() / samples.Length;
-        var median = ComputeMedian(samples);
-
-        return new CalibrationResult(mean, median, samples);
-    }
-
-    private static long BusyWeight(int iterations)
-    {
-        long acc = 1;
-
-        for (var i = 0; i < iterations; i++)
-        {
-            acc = unchecked(acc * (long)0x9E3779B97F4A7C15UL + i);
-        }
-
-        return acc;
-    }
-
-    private static double ComputeMedian(double[] values)
-    {
-        var sorted = (double[])values.Clone();
-        Array.Sort(sorted);
-
-        var mid = sorted.Length / 2;
-
-        if ((sorted.Length & 1) == 1)
-            return sorted[mid];
-
-        return (sorted[mid - 1] + sorted[mid]) / 2.0;
-    }
+        => CalibrationStandard.ToBenchmarkResult(Run(), IsolationStatus.InProcessRequested);
 }

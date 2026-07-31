@@ -34,4 +34,39 @@ public sealed class PerformanceCalibrationTests
         Assert.True(result.Median > 0);
         Assert.True(result.N > 0);
     }
+
+    /// <summary>
+    ///     The host's calibration says so. A gate that could not tell a host calibration from a
+    ///     worker one would have no way to notice it was comparing across a process boundary, which is
+    ///     the whole thing the isolation labelling exists to prevent.
+    /// </summary>
+    [Fact]
+    public void The_Host_Calibration_Is_Labelled_As_Host_Measured()
+    {
+        Assert.False(PerformanceCalibration.CreateBenchmarkResult().IsolationStatus.IsIsolated());
+    }
+
+    /// <summary>
+    ///     Host and worker measure the same code. Two definitions of the standard would drift, and a
+    ///     ratio between a candidate and a divisor measuring different work is meaningless in a way
+    ///     that produces no error.
+    /// </summary>
+    [Fact]
+    public void The_Host_Calibration_Comes_From_The_Shared_Standard()
+    {
+        var direct = CalibrationStandard.Measure();
+        var viaHost = PerformanceCalibration.Run();
+
+        Assert.Equal(direct.Samples.Length, viaHost.Samples.Length);
+    }
+
+    [Fact]
+    public void A_Worker_Calibration_Presented_As_A_Result_Is_Labelled_Isolated()
+    {
+        var measured = CalibrationStandard.Measure();
+        var result = CalibrationStandard.ToBenchmarkResult(measured, IsolationStatus.Isolated);
+
+        Assert.True(result.IsolationStatus.IsIsolated());
+        Assert.Equal(measured.Median, result.Median);
+    }
 }

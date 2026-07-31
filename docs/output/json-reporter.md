@@ -56,8 +56,13 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 
 ## Output format
 
+The envelope opens with `schemaVersion` and `measurementEpoch` - see
+[Report format versioning](./index.md#report-format-versioning) before diffing two files.
+
 ```json
 {
+  "schemaVersion": 1,
+  "measurementEpoch": 1,
   "generatedAt": "2026-06-06T03:40:00.000Z",
   "detail": "simple",
   "profile": "realistic",

@@ -110,8 +110,108 @@ public sealed class ConsoleReporter : IReporter
     {
         var count = benchTable.Rows.Count(r => !r.Errored);
 
+        // Runtime provenance is included even at Simple detail. The configuration a benchmark was
+        // measured under moves the number by more than most of the effects people are looking for,
+        // so it is not a detail-level nicety - a reader cannot interpret the table without it.
         AnsiConsole.MarkupLine(
-            $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · CI {benchTable.ConfidenceLevel * 100:0.#}%[/]");
+            $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · "
+            + $"CI {benchTable.ConfidenceLevel * 100:0.#}% · runtime {Esc(RuntimeSummary(benchTable))}[/]");
+
+        RenderMixedRuntimeProfileWarning(benchTable);
+    }
+
+    /// <summary>
+    ///     A short description of the runtime configuration the rows were measured under. Reports
+    ///     <c>mixed</c> rather than picking one arbitrarily when the rows disagree, which happens
+    ///     whenever a class combines <c>[InProcess]</c> benchmarks with isolated ones.
+    /// </summary>
+    private static string RuntimeSummary(BenchmarkTable benchTable)
+    {
+        if (benchTable.MixedRuntimeProfiles)
+            return "mixed";
+
+        if (benchTable.RuntimeProfileName != RuntimeProfile.Host.Name)
+            return $"{benchTable.RuntimeProfileName} ({benchTable.RuntimeKnobs})";
+
+        return string.IsNullOrEmpty(benchTable.RuntimeKnobs)
+            ? "host (inherited - not applied by NBenchmark)"
+            : $"host (inherited: {benchTable.RuntimeKnobs})";
+    }
+
+    private static void RenderMixedRuntimeProfileWarning(BenchmarkTable benchTable)
+    {
+        if (benchTable.MixedRuntimeProfiles)
+        {
+            AnsiConsole.MarkupLine(
+                "[yellow]Warning:[/] [dim]rows in this table were measured under different runtime "
+                + "configurations, so their numbers are not comparable with each other. This usually "
+                + "means in-process benchmarks were mixed with isolated ones.[/]");
+        }
+
+        if (benchTable.MixedIsolationStatuses)
+        {
+            AnsiConsole.MarkupLine(
+                "[dim]Iso: whether the row was measured in an isolated worker process launched with "
+                + "the requested runtime profile, or in this one.[/]");
+        }
+
+        var suppressed = benchTable.Rows.Count(r => r.RatioSuppressed);
+
+        if (suppressed > 0)
+        {
+            AnsiConsole.MarkupLine(
+                $"[yellow]Warning:[/] [dim]{suppressed} row(s) show [bold]n/a[/] in place of a ratio. "
+                + "They were not measured under the baseline's runtime configuration, and the "
+                + "difference between two configurations is worth roughly 3.3x on bodies of "
+                + "identical cost - so the ratio would have reported that, under the name of a "
+                + "speedup. Compare rows measured the same way, or run the group without "
+                + "[bold]--in-process[/] / [bold][[InProcess]][/] so every row is isolated.[/]");
+        }
+
+        var inconclusive = benchTable.Rows
+            .Where(r => !r.Errored && !r.IsBaseline && r.RatioEstimate is { IncludesUnity: true })
+            .ToList();
+
+        if (inconclusive.Count > 0)
+        {
+            var replicates = inconclusive[0].RatioEstimate!.Replicates;
+
+            AnsiConsole.MarkupLine(
+                $"[dim]Ratios marked [bold]?[/] ({inconclusive.Count} row(s)) have a paired interval "
+                + $"spanning 1.00x across {replicates} launches, so this run cannot tell those "
+                + "benchmarks apart however far the number sits from 1.00. Raise "
+                + "[bold]--launch-count[/] to narrow it, or read the ratio as \"no measured "
+                + "difference\".[/]");
+
+            // The one combination worth calling out rather than leaving to be noticed. A ✓ comes from
+            // pooled within-run samples, whose count buys arbitrary power; the ratio interval comes
+            // from between-launch spread, which is what a re-run would actually reproduce. When they
+            // disagree the ✓ is the one to distrust.
+            var significantButIrreproducible = inconclusive.Count(r => r.SignificanceLabel == "✓");
+
+            if (significantButIrreproducible > 0)
+            {
+                AnsiConsole.MarkupLine(
+                    $"[yellow]Warning:[/] [dim]{significantButIrreproducible} row(s) are marked "
+                    + "significant ([bold]✓[/]) yet their ratio interval spans 1.00x. Significance is "
+                    + "computed on samples pooled across launches, where a large count grants power "
+                    + "regardless of reproducibility; the ratio interval is the run-to-run spread. "
+                    + "Trust the interval.[/]");
+            }
+        }
+
+        // Naming the reason matters as much as naming the fact. "You asked for in-process" and "the
+        // measurement worker is not installed" produce identical numbers and identical labels, but
+        // only one of them is a problem the user can fix.
+        foreach (var reason in benchTable.InProcessReasons)
+        {
+            if (reason.ToRemedy() is not { } remedy)
+                continue;
+
+            AnsiConsole.MarkupLine(
+                $"[yellow]Warning:[/] [dim]{Esc(reason.ToLabel())} rows were not isolated: "
+                + $"{Esc(remedy)}.[/]");
+        }
     }
 
     private static void RenderHeader(BenchmarkTable benchTable)
@@ -129,6 +229,11 @@ public sealed class ConsoleReporter : IReporter
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
         var showRuntime = benchTable.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+
+        // Only when the rows disagree. On a uniform table the column would be a constant, and the
+        // footer already names the configuration; when they disagree it is the difference between
+        // reading the table and misreading it.
+        var showIsolation = benchTable.MixedIsolationStatuses;
         var isSimple = detail == ReportDetail.Simple;
         var showClass = BenchmarkTable.CrossClassMode && benchTable.Rows.Any(r => r.ClassName.Length > 0);
 
@@ -149,6 +254,16 @@ public sealed class ConsoleReporter : IReporter
 
         if (showRuntime)
             table.AddColumn(new TableColumn("[bold]Runtime[/]").RightAligned().NoWrap());
+
+        // Short labels, and a short header: at 80 columns a phrase here squeezes the numbers it
+        // exists to qualify. Which rows were isolated goes in the column; why they were not goes in
+        // the footer, which has a full line to say it in.
+        // "Iso: yes/no" rather than a phrase. An 80-column table is already truncating its own
+        // headers, and a wider column here buys its width from the measurements. Which rows were
+        // isolated belongs in the table; why the others were not is a sentence, and goes in the
+        // footer where there is a line to spend on it.
+        if (showIsolation)
+            table.AddColumn(new TableColumn("[bold]Iso[/]").Centered().NoWrap());
 
         foreach (var paramName in benchTable.ParameterNames)
         {
@@ -202,6 +317,9 @@ public sealed class ConsoleReporter : IReporter
                 if (showRuntime)
                     errorCols.Add(Esc(row.RuntimeMoniker));
 
+                if (showIsolation)
+                    errorCols.Add("[dim]-[/]");
+
                 errorCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
                 errorCols.Add("[dim]-[/]");
 
@@ -240,12 +358,17 @@ public sealed class ConsoleReporter : IReporter
 
             string barCell;
 
+            // The bar is decorative and costs 12 columns. In a mixed table those columns are needed
+            // by the Iso column, which is not decorative: without it the reader cannot tell which
+            // rows the n/a applies to. An 80-column terminal cannot have both.
+            var showBar = !showIsolation;
+
             if (!hasComparisons)
                 barCell = bar;
             else if (row.IsBaseline)
-                barCell = $"{bar} [dim]{ratioText}[/]";
+                barCell = showBar ? $"{bar} [dim]{ratioText}[/]" : $"[dim]{ratioText}[/]";
             else
-                barCell = $"{bar} [{ratioColor}]{ratioText}[/]";
+                barCell = showBar ? $"{bar} [{ratioColor}]{ratioText}[/]" : $"[{ratioColor}]{ratioText}[/]";
 
             var allocText = row.MeanAllocatedBytes.HasValue
                 ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
@@ -258,6 +381,13 @@ public sealed class ConsoleReporter : IReporter
 
             if (showRuntime)
                 rowCols.Add(Esc(row.RuntimeMoniker));
+
+            if (showIsolation)
+            {
+                rowCols.Add(row.IsolationStatus.IsIsolated()
+                    ? "[dim]yes[/]"
+                    : "[yellow]no[/]");
+            }
 
             rowCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
 
@@ -689,6 +819,10 @@ public sealed class ConsoleReporter : IReporter
 
         AnsiConsole.MarkupLine($"[grey]Profile:[/] [dim]{profileLabel}[/]");
 
+        AnsiConsole.MarkupLine($"[grey]Runtime:[/] [dim]{Esc(RuntimeSummary(benchTable))}[/]");
+
+        RenderMixedRuntimeProfileWarning(benchTable);
+
         AnsiConsole.MarkupLine(
             $"[dim]{count} benchmark(s) · {benchTable.TotalDuration.TotalSeconds:F1}s total · CI {benchTable.ConfidenceLevel * 100:0.#}%[/]");
     }
@@ -1050,11 +1184,24 @@ public sealed class ConsoleReporter : IReporter
 
     private static (string Text, string Color) FormatRatio(BenchmarkRow row)
     {
+        // "n/a" rather than "-": the dash means there was nothing to compare, and this row had
+        // something to compare and was refused. A reader who cannot tell the two apart will assume
+        // the tool simply did not compute it.
+        if (row.RatioSuppressed)
+            return ("n/a", "dim");
+
         if (double.IsNaN(row.Ratio))
             return ("-", "dim");
 
         if (row.IsBaseline)
             return ("baseline", "dim");
+
+        // A ratio whose paired interval spans 1.00x is not a measured difference, whatever the point
+        // estimate says. It is marked and dimmed rather than hidden: the number is still the best
+        // estimate available, and colouring it red for "1.6x slower" when the run cannot distinguish
+        // it from equal is how a reader is led to act on noise. The footer explains the mark.
+        if (row.RatioEstimate is { IncludesUnity: true })
+            return ($"{row.Ratio:F2}x?", "dim");
 
         var text = $"{row.Ratio:F2}x";
 

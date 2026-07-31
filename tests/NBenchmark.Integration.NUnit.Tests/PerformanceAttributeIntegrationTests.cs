@@ -50,11 +50,19 @@ public sealed class PerformanceAttributeIntegrationTests
         Assert.That(test, Is.InstanceOf<TestMethod>());
     }
 
+    /// <summary>
+    ///     The command measures the body.
+    /// </summary>
+    /// <remarks>
+    ///     This used to read a static invocation counter. The body now runs in a worker process, so
+    ///     that counter stays at zero <i>because</i> isolation is working - it would only be
+    ///     non-zero if the measurement had silently fallen back to the test host. The measurement is
+    ///     stronger evidence in any case: the engine cannot report a duration for a body it never
+    ///     invoked, and unlike a counter nothing else can produce one.
+    /// </remarks>
     [Test]
     public void PerformanceAttribute_Command_Invokes_Body_Method()
     {
-        BodyInvokedFixture.InvocationCount = 0;
-
         var test = AttributeBuilder.BuildFor<BodyInvokedFixture>(nameof(BodyInvokedFixture.BodyMethod));
         var command = new PerformanceAttribute().Wrap(new RunOnlyCommand((TestMethod)test));
 
@@ -62,8 +70,13 @@ public sealed class PerformanceAttributeIntegrationTests
         context.CurrentResult = test.MakeTestResult();
         command.Execute(context);
 
-        Assert.That(BodyInvokedFixture.InvocationCount, Is.GreaterThan(0));
-        Assert.That(context.CurrentResult.ResultState.Status, Is.EqualTo(TestStatus.Passed));
+        // A body that never ran produces an errored result, which the command turns into a Failure
+        // carrying "Benchmark errored". So Passed is the signal here - this synthetic context
+        // populates neither Duration nor Output, so neither is usable.
+        Assert.That(
+            context.CurrentResult.ResultState.Status,
+            Is.EqualTo(TestStatus.Passed),
+            context.CurrentResult.Message);
     }
 }
 

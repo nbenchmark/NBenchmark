@@ -23,6 +23,8 @@ result.Print();
 
 - **No setup required.** `Benchmark.Run(() => ...)` - no attributes, no class structure, no dedicated project. Drop it into a console app, a test, or a scratchpad.
 
+- **Measured in a clean process, by default.** Each benchmark runs in its own process with a controlled runtime, so the numbers reflect your code rather than the state of whatever was running before it.
+
 - **Adaptive measurement.** No iteration counts to guess. The engine calibrates ops-per-sample for fast methods so timer overhead doesn't dominate, and detects when warmup has plateaued so the JIT has settled. Pin any dimension when you want a fixed, reproducible run.
 
 - **Statistical rigor built in.** Samples stream until the confidence interval is tight enough, then stop. Outlier trimming filters OS noise (IQR fence by default, with a bimodal-distribution warning when discarded samples look like real latency spikes rather than random jitter). A/B comparisons automatically determine whether a difference is statistically real or just noise, with an effect-size magnitude (Negligible / Small / Medium / Large) so a ✓ always means "real and at least a small effect". The built-in tests are non-parametric rank-based methods, cross-validated against SciPy and NumPy - see [Significance Testing](./statistics/significance.md) for the methodology.
@@ -104,14 +106,23 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 ## Features
 
 - **Parameterized benchmarks.** Run the same body across multiple input values to see how an algorithm scales - `WithParameter` in Suite mode, `[BenchmarkCase]` in Harness mode. ([Suite](./features/parameterized-suite.md) / [Harness](./features/parameterized-harness.md))
+
 - **Categories.** Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from a run via CLI flags or the programmatic filter API. ([Categories](./features/categories.md))
-- **Isolated runs.** Run benchmarks in freshly spawned child processes so JIT, GC, and thread-pool state from earlier work can't bias later measurements; isolated by default in Harness mode. ([Isolated runs](./features/isolated-runs.md))
-- **Multi-runtime comparison.** Build and run the same benchmarks across net8, net9, and net10 in separate child processes and compare side-by-side. ([Multi-runtime](./features/multi-runtime.md))
+
+- **Isolated runs.** Run benchmarks in freshly spawned workers so JIT, GC, and thread-pool state from earlier work can't bias later measurements. On by default in every mode - Single, Suite, and Harness - because JIT tiering and GC flavour are fixed at process start and can only be chosen for a process that has not begun. ([Isolated runs](./features/isolated-runs.md))
+
+- **Multi-runtime comparison.** Build and run the same benchmarks across net8, net9, and net10 in separate workers and compare side-by-side. ([Multi-runtime](./features/multi-runtime.md))
+
 - **Multiple launches.** Repeat each benchmark as independent launches to surface run-to-run variance and produce cross-launch aggregation stats. ([Multiple launches](./features/multiple-launches.md))
+
 - **Environment control.** Pin CPU affinity, raise process priority, and detect noisy hosts to reduce measurement noise at its source. ([Environment control](./features/environment-control.md))
+
 - **Performance gates in CI.** Enforce absolute or relative performance thresholds as xUnit, NUnit, or MSTest tests that fail on regression. ([Test integration](./test-integration/index.md))
+
 - **CI regression gate.** Fail the harness run with a non-zero exit code when any benchmark regresses beyond a percentage against the baseline (`--threshold-pct`). ([CLI reference](./reference/cli.md))
+
 - **Runtime diagnostics.** Record GC collection counts, heap state, exceptions, and CPU time per operation alongside timings. ([Diagnostics](./statistics/diagnostics.md))
+
 - **Live telemetry.** Stream per-sample, per-phase, and per-detector events to an `IMeasurementObserver`, or export spans and metrics to OpenTelemetry via the built-in `System.Diagnostics` instrumentation. ([Observers](./reference/observers.md) / [OTel](./reference/bcl-instrumentation.md))
 
 ## Packages
@@ -136,5 +147,5 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 - **[Features](./features/)** - parameterized benchmarks, categories, isolation, multi-runtime, launches, DI
 - **[Guides](./guides/)** - real-world workflow recipes that combine features (ASP.NET services, CI/CD tuning, refactors, parameter sweeps, cross-runtime, test-suite gates, custom statistics)
 - **[Configuration](./reference/configuration.md)** - task-based guides and the full options reference
-- **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0013)
+- **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0014)
 - **[Statistics](./statistics/)** - how the numbers are calculated

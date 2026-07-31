@@ -40,9 +40,19 @@ public sealed record BenchmarkMethodDefinition(
     /// </summary>
     public bool IsBaseline { get; init; }
 
-    public Func<object, object?>? SyncDelegate { get; init; }
-    public Func<object, Task>? AsyncDelegate { get; init; }
-    public Action<Task>? ResultConsumer { get; init; }
+    /// <summary>
+    ///     Binds a benchmark instance to the delegate the engine measures it through - an
+    ///     <see cref="Action" /> for a void method, a <c>Func&lt;T&gt;</c> for a value-returning
+    ///     one, a <c>Func&lt;Task&gt;</c> or <c>Func&lt;Task&lt;T&gt;&gt;</c> for an awaitable one.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately not a single <c>Func&lt;object, object?&gt;</c>, which is what this used to
+    ///     be. One uniform delegate type is convenient here and charges every value-returning body a
+    ///     box per operation, reported as the user's own allocation. See
+    ///     <see cref="BenchmarkBodyFactory" />.
+    /// </remarks>
+    internal Func<object, Delegate>? BodyFactory { get; init; }
+
     public Action<object>? IterationSetupDelegate { get; init; }
     public Action<object>? IterationTeardownDelegate { get; init; }
 

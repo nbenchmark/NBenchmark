@@ -18,6 +18,36 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
     <ProjectReference Include="..\NBenchmark.Tests.ErrorFixtures\NBenchmark.Tests.ErrorFixtures.csproj"/>
+
+    <!--
+      The isolation fixture is a standalone executable that real-child-process tests launch via
+      `dotnet exec`. ReferenceOutputAssembly=false because we never compile against it - we only
+      need it built, and we need its own output directory (which has its runtimeconfig.json)
+      rather than a copy of the dll next to the test assembly.
+    -->
+    <ProjectReference Include="..\NBenchmark.Tests.IsolationFixture\NBenchmark.Tests.IsolationFixture.csproj"
+                     ReferenceOutputAssembly="false"/>
+
+    <!--
+      The measurement worker, for the tests that spawn a real one. Same rationale as the fixture:
+      we never compile against it, we need it built, and we need its own output directory because
+      that is where its runtimeconfig.json and deps.json live.
+    -->
+    <ProjectReference Include="..\..\src\NBenchmark.Worker\NBenchmark.Worker.csproj"
+                     ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Baked in at build time so the tests never have to guess at relative bin paths. Both
+      projects multi-target the same TFMs and build under the same configuration, so the test's
+      own $(Configuration)/$(TargetFramework) always name the matching fixture output.
+    -->
+    <AssemblyMetadata Include="IsolationFixtureDirectory"
+                      Value="$(MSBuildThisFileDirectory)..\NBenchmark.Tests.IsolationFixture\bin\$(Configuration)\$(TargetFramework)\"/>
+
+    <AssemblyMetadata Include="NBenchmarkWorkerDirectory"
+                      Value="$(MSBuildThisFileDirectory)..\..\src\NBenchmark.Worker\bin\$(Configuration)\$(TargetFramework)\"/>
   </ItemGroup>
 
 </Project>

@@ -226,12 +226,10 @@ public static class EnvironmentControl
     {
         // Suppression and child-scope checks come *before* the once-per-process guard so a
         // suppressed call does not consume it - a later non-suppressed call in the same
-        // process would otherwise stay silent. An isolated child is a fresh process (the
-        // guard starts at 0 regardless), so this ordering does not change child behaviour;
-        // the real child gate is the IsActive check below.
-        if (IsolatedRunContext.IsActive)
-            return;
-
+        // process would otherwise stay silent.
+        //
+        // A measurement worker never reaches here: it is a fresh process whose guard starts at 0,
+        // and it does not run this guidance path at all.
         if (options is { SuppressBuildConfigurationWarning: true })
             return;
 

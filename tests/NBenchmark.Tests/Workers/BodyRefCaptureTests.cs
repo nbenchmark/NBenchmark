@@ -1,0 +1,207 @@
+using NBenchmark.Workers;
+using Xunit;
+
+namespace NBenchmark.Tests.Workers;
+
+/// <summary>
+///     Which benchmark bodies can be addressed across a process boundary, and which are refused.
+/// </summary>
+/// <remarks>
+///     <para>
+///         These cases mirror the ones in <c>CapturingBodyAnalyzerTests</c> one for one. NB0014 tells
+///         a developer at compile time that a body will not be isolated, and that promise is only
+///         worth making if the runtime agrees - a rule that flagged bodies the runtime accepts would
+///         teach people to ignore it, and one that stayed silent on bodies the runtime refuses would
+///         be worse than absent.
+///     </para>
+///     <para>
+///         Roslyn's lowering is measured here rather than assumed, because two of these cases do not
+///         behave the way the obvious reading suggests - see
+///         <see cref="A_Body_Capturing_Only_This_Is_Bound_Directly_To_The_Instance" /> and
+///         <see cref="A_NonCapturing_Sibling_Of_A_Capturing_Lambda_Is_Still_Addressable" />.
+///     </para>
+/// </remarks>
+public class BodyRefCaptureTests
+{
+    private static readonly int[] StaticData = [3, 1, 2];
+
+    private readonly int[] _instanceData = [3, 1, 2];
+
+    private static bool CanAddress(Delegate body, out string? refusal)
+        => BodyRef.TryCreate(body, "test", out _, out refusal);
+
+    [Fact]
+    public void A_Constant_Body_Is_Addressable()
+    {
+        Assert.True(CanAddress(() => 43, out _));
+    }
+
+    [Fact]
+    public void An_Explicitly_Static_Lambda_Is_Addressable()
+    {
+        Assert.True(CanAddress(static () => 43, out _));
+    }
+
+    /// <summary>
+    ///     The finding that makes <c>Delegate.Target is null</c> unusable as the capture test. Roslyn
+    ///     lowers this to an <i>instance</i> method on a cached singleton, so its target is non-null
+    ///     even though it captures nothing.
+    /// </summary>
+    [Fact]
+    public void A_NonCapturing_Lambda_Has_A_Receiver_And_Is_Still_Addressable()
+    {
+        Func<int> body = static () => 43;
+
+        Assert.NotNull(body.Target);
+        Assert.True(CanAddress(body, out _));
+    }
+
+    [Fact]
+    public void A_Body_Over_Its_Own_Locals_Is_Addressable()
+    {
+        Assert.True(CanAddress(() =>
+        {
+            var data = new[] { 3, 1, 2 };
+            Array.Sort(data);
+            return data[0];
+        }, out _));
+    }
+
+    [Fact]
+    public void A_Body_Over_A_Static_Field_Is_Addressable()
+    {
+        Assert.True(CanAddress(() => StaticData.Length, out _));
+    }
+
+    [Fact]
+    public void A_Body_Capturing_A_Local_Is_Refused_And_Names_It()
+    {
+        var data = new[] { 3, 1, 2 };
+
+        Assert.False(CanAddress(() => data.Length, out var refusal));
+        Assert.Contains("captures state", refusal);
+        Assert.Contains("data", refusal);
+    }
+
+    /// <summary>
+    ///     A lambda that captures <i>only</i> <c>this</c> gets no display class at all - Roslyn emits
+    ///     it as an ordinary instance method on the containing type, so its receiver is the live
+    ///     object itself. It is refused, but as live user state rather than as a closure, which is
+    ///     both accurate and a different message than the capture branch produces.
+    /// </summary>
+    [Fact]
+    public void A_Body_Capturing_Only_This_Is_Bound_Directly_To_The_Instance()
+    {
+        Func<int> body = () => _instanceData.Length;
+
+        Assert.Same(this, body.Target);
+        Assert.False(CanAddress(body, out var refusal));
+        Assert.Contains("live state", refusal);
+    }
+
+    /// <summary>
+    ///     Mixing <c>this</c> with a local does produce a display class, holding both the captured
+    ///     local and a reference to the instance.
+    /// </summary>
+    [Fact]
+    public void A_Body_Capturing_This_And_A_Local_Is_Refused_As_A_Closure()
+    {
+        var extra = 5;
+
+        Assert.False(CanAddress(() => _instanceData.Length + extra, out var refusal));
+        Assert.Contains("captures state", refusal);
+    }
+
+    /// <summary>
+    ///     A method group over a live object. The receiver is user state with no cross-process
+    ///     meaning, and unlike a closure it is not even compiler-generated.
+    /// </summary>
+    [Fact]
+    public void A_Method_Group_Over_A_Live_Object_Is_Refused()
+    {
+        var widget = new Widget();
+
+        Assert.False(CanAddress(widget.Compute, out var refusal));
+        Assert.Contains(nameof(Widget), refusal);
+    }
+
+    [Fact]
+    public void A_Method_Group_Over_A_Static_Method_Is_Addressable()
+    {
+        Assert.True(CanAddress(Widget.ComputeStatic, out _));
+    }
+
+    /// <summary>
+    ///     Scope merging does <b>not</b> cost a non-capturing lambda its isolation. Roslyn hoists it
+    ///     to the shared field-less <c>&lt;&gt;c</c> singleton and gives the capturing sibling its own
+    ///     display class, so the two do not share storage and the refusal does not spread.
+    /// </summary>
+    /// <remarks>
+    ///     Worth pinning because the opposite was expected during design: if a non-capturing body
+    ///     could be refused for a neighbour's capture, NB0014 would have a false negative by
+    ///     construction, since a per-lambda rule cannot see a per-scope property. It cannot.
+    /// </remarks>
+    [Fact]
+    public void A_NonCapturing_Sibling_Of_A_Capturing_Lambda_Is_Still_Addressable()
+    {
+        var captured = 5;
+
+        Func<int> capturing = () => captured;
+        Func<int> selfContained = () => 43;
+
+        Assert.False(CanAddress(capturing, out _));
+        Assert.True(CanAddress(selfContained, out _));
+
+        // Kept live so the compiler cannot narrow the scope out from under the premise.
+        Assert.Equal(5, capturing());
+    }
+
+    /// <summary>
+    ///     Where scope merging does show: two lambdas that <i>both</i> capture share one display class
+    ///     holding both sets of fields, so each one's refusal names symbols the other captured.
+    /// </summary>
+    /// <remarks>
+    ///     The decision stays correct - both genuinely capture and both are genuinely refused - but
+    ///     the message is broader than the body it describes. That is the limitation to state rather
+    ///     than to fix: the fields are on one class, and nothing at runtime records which lambda put
+    ///     each one there.
+    /// </remarks>
+    [Fact]
+    public void Two_Capturing_Siblings_Share_A_Display_Class_So_Each_Refusal_Names_Both()
+    {
+        var first = 5;
+        var second = 7;
+
+        Func<int> usesFirst = () => first;
+        Func<int> usesSecond = () => second;
+
+        Assert.False(CanAddress(usesFirst, out var firstRefusal));
+        Assert.False(CanAddress(usesSecond, out var secondRefusal));
+
+        Assert.Contains("first", secondRefusal);
+        Assert.Contains("second", firstRefusal);
+
+        Assert.Equal(5, usesFirst());
+        Assert.Equal(7, usesSecond());
+    }
+
+    /// <summary>
+    ///     The refusal is worth reading, not just acting on: a developer who is told a body cannot be
+    ///     isolated needs to know why reconstructing the closure is not on offer.
+    /// </summary>
+    [Fact]
+    public void A_Refusal_Explains_Why_The_Capture_Is_Not_Reconstructed()
+    {
+        var data = new[] { 3, 1, 2 };
+
+        Assert.False(CanAddress(() => data.Length, out var refusal));
+        Assert.Contains("silently wrong", refusal);
+    }
+
+    private sealed class Widget
+    {
+        public int Compute() => 43;
+
+        public static int ComputeStatic() => 43;
+    }
+}

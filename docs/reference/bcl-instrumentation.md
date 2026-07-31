@@ -140,11 +140,13 @@ CI-sourced values take precedence over the git CLI fallback. When no CI or git e
 
 ## Cross-process streaming
 
-Harness mode runs each discovered class in an isolated child process by default. The in-memory `IMeasurementObserver` callback cannot cross the process boundary, so OTLP export is the cross-process channel: instrument the child, point its exporter at a collector, and live telemetry crosses the process boundary cleanly.
+Benchmarks are measured in a separate `nbworker` process by default. Your own `IMeasurementObserver` and `IBenchmarkProgress` instances still fire: the worker streams its phase and progress events back over its pipe and the coordinator replays them into the live objects you registered, so no OTLP configuration is needed to observe an isolated run.
+
+What OTLP adds is a channel to something *outside* both processes - a collector, a tracing backend, a dashboard. For that the worker needs its own exporter configuration, which it inherits from the coordinator's environment.
 
 ### Env-var forwarding
 
-`ChildProcessLauncher` forwards the following environment variables from parent to every spawned child:
+`MeasurementBudget.ApplyTelemetryEnvironment` writes the following environment variables into every worker's environment block before it starts:
 
 | Env var | Purpose |
 | --- | --- |
@@ -156,7 +158,7 @@ Harness mode runs each discovered class in an isolated child process by default.
 | `OTEL_SERVICE_NAME` | Service name (passed through) |
 | `NBENCHMARK_OTEL_ENDPOINT` | NBenchmark-specific endpoint mirror (see `--otlp-endpoint` CLI flag) |
 
-When `NBENCHMARK_OTEL_ENDPOINT` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is not, the launcher mirrors it into `OTEL_EXPORTER_OTLP_ENDPOINT` so an SDK wired only against the standard variable picks it up without extra configuration.
+When `NBENCHMARK_OTEL_ENDPOINT` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is not, the mirror is applied so an SDK wired only against the standard variable picks it up without extra configuration.
 
 ### `--otlp-endpoint` CLI flag
 
@@ -164,11 +166,11 @@ When `NBENCHMARK_OTEL_ENDPOINT` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is not,
 dotnet run -- --otlp-endpoint http://localhost:4317
 ```
 
-The harness mirrors this into `OTEL_EXPORTER_OTLP_ENDPOINT` before spawning isolated children, so children stream to the same collector as the parent. When the user has already set `OTEL_EXPORTER_OTLP_ENDPOINT` explicitly, the CLI flag does not override it.
+The harness mirrors this into `OTEL_EXPORTER_OTLP_ENDPOINT` before spawning isolated workers, so workers stream to the same collector as the host. When the user has already set `OTEL_EXPORTER_OTLP_ENDPOINT` explicitly, the CLI flag does not override it.
 
 ### Observer forwarding
 
-When `--observer <name>` is supplied, the parent forwards the observer names to isolated children via the `IsolatedRunRequest.ObserverNames` field. The child resolves each name through `ObserverRegistry` (populated identically by `[ModuleInitializer]` self-registration in the child's fresh process), so the same observers fire in the child as in the parent. Programmatic observers added via `WithObserver(IMeasurementObserver)` are live objects and cannot cross a process boundary; only registry-resolvable names are forwarded.
+When `--observer <name>` is supplied, the host forwards the observer names to isolated workers via the `IsolatedRunRequest.ObserverNames` field. The worker resolves each name through `ObserverRegistry` (populated identically by `[ModuleInitializer]` self-registration in the worker's fresh process), so the same observers fire in the worker as in the host. Programmatic observers added via `WithObserver(IMeasurementObserver)` are live objects and cannot cross a process boundary; only registry-resolvable names are forwarded.
 
 ### Topology
 
@@ -177,8 +179,8 @@ In-process / local dev:
   AdaptiveLoop -> Observer shim -> Embedded web host -> React SPA in browser
 
 Isolated / CI:
-  Child process -> OTLP -> Collector
-  Host process  -> OTLP -> Collector
+  Worker       -> OTLP -> Collector
+  Host process -> OTLP -> Collector
   Collector -> Grafana / Jaeger / Honeycomb
 ```
 

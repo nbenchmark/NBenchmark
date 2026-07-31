@@ -50,6 +50,11 @@ public sealed class BenchmarkRunner
         var progress = spec.Progress;
         var observer = spec.Observer;
 
+        // The single funnel every measurement in every mode passes through, so this is the one
+        // place that can tell whether a requested runtime profile actually took effect. In a
+        // child it always has; in the host it never can.
+        RuntimeProfileEnvironment.EmitNotAppliedGuidanceOnce(options);
+
         NBenchmarkDiagnostics.ResetBenchmarkState();
 
         try
@@ -91,6 +96,11 @@ public sealed class BenchmarkRunner
         var options = spec.Options;
         var progress = spec.Progress;
         var observer = spec.Observer;
+
+        // The single funnel every measurement in every mode passes through, so this is the one
+        // place that can tell whether a requested runtime profile actually took effect. In a
+        // child it always has; in the host it never can.
+        RuntimeProfileEnvironment.EmitNotAppliedGuidanceOnce(options);
 
         NBenchmarkDiagnostics.ResetBenchmarkState();
 
@@ -402,6 +412,16 @@ public sealed class BenchmarkRunner
     /// </summary>
     public static Action<T> GetResultConsumer<T>() =>
         JitSinkCache<T>.Instance;
+
+    /// <summary>
+    ///     The last value the generic sink received for <typeparamref name="T" />.
+    /// </summary>
+    /// <remarks>
+    ///     A test seam. Whether a body's return value actually reaches the sink is otherwise
+    ///     unobservable, and it is the difference between measuring the body and measuring an empty
+    ///     loop the JIT was free to delete - so it needs an assertion, not an assumption.
+    /// </remarks>
+    internal static T? LastConsumed<T>() => JitSinkCache<T>._hole;
 
     private static class JitSinkCache<T>
     {

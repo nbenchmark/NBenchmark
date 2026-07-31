@@ -5,10 +5,17 @@ using NBenchmark.Engine;
 using NBenchmark.Observers;
 using NBenchmark.Reporters;
 using NBenchmark.Stats;
+using NBenchmark.Workers;
 
 namespace NBenchmark;
 
-public sealed class BenchmarkSuite(string name)
+/// <remarks>
+///     Not sealed solely so <see cref="BenchmarkSuite{TState}" /> can extend it with typed
+///     state-taking <c>Add</c> overloads. Nothing on this type is <c>public virtual</c>, and it is not
+///     an extension point - a third subclass would inherit behaviour no part of the engine expects to
+///     vary.
+/// </remarks>
+public class BenchmarkSuite(string name)
 {
     private readonly List<BenchmarkEnvelope> _benchmarks = [];
     private readonly List<string> _categoryFilterExclude = [];
@@ -21,7 +28,27 @@ public sealed class BenchmarkSuite(string name)
     private readonly List<IReporter> _reporters = [];
     private string? _baselineName;
     private ReportDetail _detail;
-    private bool _isolated;
+
+    /// <summary>
+    ///     Set by <see cref="WithIsolation" /><c>(false)</c>, i.e. an explicit request to measure in
+    ///     this process. Distinct from simply not having asked: the default is now to isolate when
+    ///     the suite's bodies can be addressed, so "not isolated" and "asked for in-process" need to
+    ///     be told apart in order to label results honestly.
+    /// </summary>
+    private bool _inProcessRequested;
+
+    /// <summary>Why this suite ended up measured in the host process, when it did.</summary>
+    private IsolationStatus _inProcessStatus = IsolationStatus.InProcessRequested;
+
+    /// <summary>The session shuffle seed, so each replicate worker gets a distinct run order.</summary>
+    private int? _seed;
+
+    /// <summary>
+    ///     How many launches this suite asked for. A field rather than a value on
+    ///     <see cref="_options" /> because a launch is a <i>process</i>, spent by whoever coordinates
+    ///     this suite's run and meaningless to a worker measuring it - see <see cref="LaunchCounts" />.
+    /// </summary>
+    private int _launchCount = LaunchCounts.Single;
     private MeasurementOptions _options = MeasurementOptions.Default;
     private string[]? _pendingCategories;
     private IBenchmarkProgress _progress = NullBenchmarkProgress.Instance;
@@ -46,29 +73,33 @@ public sealed class BenchmarkSuite(string name)
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
-            Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+            action, setup, teardown);
 
     public BenchmarkSuite Add(string name, Func<Task> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
-            await BenchmarkRunner.Instance.RunAsync(name, action,
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                await BenchmarkRunner.Instance.RunAsync(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+            action, setup, teardown);
 
     public BenchmarkSuite Add<T>(string name, Func<T> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
-            Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+            action, setup, teardown);
 
     public BenchmarkSuite Add<T>(string name, Func<Task<T>> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
-            await BenchmarkRunner.Instance.RunAsync(name, action,
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                await BenchmarkRunner.Instance.RunAsync(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+            action, setup, teardown);
 
     // --- Parameterized Add overloads: arity 1 ---
 
@@ -89,7 +120,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T)]));
+            [typeof(T)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -112,7 +146,10 @@ public sealed class BenchmarkSuite(string name)
                         async () => await action(val).ConfigureAwait(false),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T)]));
+            [typeof(T)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -134,7 +171,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T)]));
+            [typeof(T)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -157,7 +197,10 @@ public sealed class BenchmarkSuite(string name)
                         () => action(val),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T)]));
+            [typeof(T)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -182,7 +225,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T1), typeof(T2)]));
+            [typeof(T1), typeof(T2)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -206,7 +252,10 @@ public sealed class BenchmarkSuite(string name)
                         async () => await action(v1, v2).ConfigureAwait(false),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T1), typeof(T2)]));
+            [typeof(T1), typeof(T2)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -229,7 +278,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T1), typeof(T2)]));
+            [typeof(T1), typeof(T2)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -253,7 +305,10 @@ public sealed class BenchmarkSuite(string name)
                         () => action(v1, v2),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T1), typeof(T2)]));
+            [typeof(T1), typeof(T2)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -279,7 +334,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T1), typeof(T2), typeof(T3)]));
+            [typeof(T1), typeof(T2), typeof(T3)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -304,7 +362,10 @@ public sealed class BenchmarkSuite(string name)
                         async () => await action(v1, v2, v3).ConfigureAwait(false),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T1), typeof(T2), typeof(T3)]));
+            [typeof(T1), typeof(T2), typeof(T3)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -328,7 +389,10 @@ public sealed class BenchmarkSuite(string name)
                     (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
             },
-            [typeof(T1), typeof(T2), typeof(T3)]));
+            [typeof(T1), typeof(T2), typeof(T3)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -353,7 +417,10 @@ public sealed class BenchmarkSuite(string name)
                         () => action(v1, v2, v3),
                         spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
             },
-            [typeof(T1), typeof(T2), typeof(T3)]));
+            [typeof(T1), typeof(T2), typeof(T3)],
+            action,
+            setup,
+            teardown));
 
         return this;
     }
@@ -394,13 +461,143 @@ public sealed class BenchmarkSuite(string name)
 
     // --- Private helpers ---
 
+    /// <summary>
+    ///     Switches this suite to one whose benchmarks are measured over state built by
+    ///     <paramref name="prepare" />, in whichever process does the measuring.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This is the suite-shaped answer to the same problem
+    ///         <see cref="Benchmark.Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    ///         solves for a single body. Writing <c>var data = Build();</c> and closing over it makes
+    ///         every benchmark in the suite un-addressable - and because one worker measures the set,
+    ///         a single capturing body takes every sibling in-process with it. Naming the preparation
+    ///         instead means the worker builds the data itself.
+    ///     </para>
+    ///     <para>
+    ///         <paramref name="prepare" /> runs <b>once per benchmark</b>, before that benchmark's
+    ///         warmup - not once for the suite. That is deliberate: two sorts sharing one array would
+    ///         have the second measure what the first already sorted, and with the default random run
+    ///         order which one that is would change between runs.
+    ///     </para>
+    ///     <para>
+    ///         Call it before configuring anything else. A suite that already carries benchmarks or
+    ///         settings cannot be converted without silently transplanting them, and a transplant that
+    ///         forgets a field is the kind of defect that shows up as a setting that simply stopped
+    ///         working - so it throws instead.
+    ///     </para>
+    /// </remarks>
+    /// <example>
+    ///     <code>
+    ///     await new BenchmarkSuite("sorting")
+    ///         .WithState(() => Enumerable.Range(0, 10_000).Reverse().ToArray())
+    ///         .Add("array", d => Array.Sort(d))
+    ///         .Add("linq",  d => d.OrderBy(x => x).ToArray())
+    ///         .WithBaseline("array")
+    ///         .RunAsync();
+    ///     </code>
+    /// </example>
+    public BenchmarkSuite<TState> WithState<TState>(Func<TState> prepare)
+    {
+        ArgumentNullException.ThrowIfNull(prepare);
+
+        if (DescribeConfiguration() is { } configured)
+        {
+            throw new InvalidOperationException(
+                $"WithState must be called before the rest of the suite is configured, but {configured} "
+                + "already set. Move the WithState call directly after the constructor:\n\n"
+                + $"    new BenchmarkSuite(\"{Name}\").WithState(...).Add(...)\n\n"
+                + "It returns a differently-typed suite so the bodies can take the prepared value, and "
+                + "carrying existing configuration across would mean copying it field by field - which "
+                + "fails silently the first time a field is missed.");
+        }
+
+        return new BenchmarkSuite<TState>(Name, prepare);
+    }
+
+    /// <summary>
+    ///     Names what has already been configured on this suite, or <c>null</c> when it is untouched.
+    ///     Used only to explain a misplaced <see cref="WithState{TState}" /> call.
+    /// </summary>
+    private string? DescribeConfiguration()
+    {
+        if (_benchmarks.Count > 0 || _parameterizedFactories.Count > 0)
+            return "benchmarks have been";
+
+        if (_parameterDefs.Count > 0)
+            return "parameters have been";
+
+        if (_reporters.Count > 0 || _observers.Count > 0)
+            return "reporters or observers have been";
+
+        if (_baselineName is not null)
+            return "a baseline has been";
+
+        if (_suiteSetup is not null || _suiteTeardown is not null)
+            return "suite setup or teardown has been";
+
+        if (_options != MeasurementOptions.Default || _launchCount != LaunchCounts.Single)
+            return "measurement options have been";
+
+        return null;
+    }
+
+    /// <summary>
+    ///     Registers a benchmark measured over prepared state. Called by
+    ///     <see cref="BenchmarkSuite{TState}" />, which owns the typed surface.
+    /// </summary>
+    internal BenchmarkSuite AddWithState<TState>(
+        string name,
+        Func<TState> prepare,
+        Delegate body,
+        Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync,
+        Action? setup,
+        Action? teardown,
+        IReadOnlyList<string>? categories)
+    {
+        EnsureUniqueName(name);
+
+        _benchmarks.Add(new BenchmarkEnvelope(
+            name, "", null, false, ResolveAddCategories(categories, _pendingCategories), runAsync)
+        {
+            Body = body,
+            StateFactory = prepare,
+            IterationSetup = setup,
+            IterationTeardown = teardown,
+        });
+
+        return this;
+    }
+
+    /// <summary>
+    ///     Records a benchmark, keeping the caller's own delegate alongside the wrapper that runs it.
+    ///     <para>
+    ///         The wrapper is a closure this library built, so its metadata token addresses
+    ///         NBenchmark's code rather than the user's. Keeping <paramref name="body" /> is what
+    ///         lets an inline suite be measured in a worker without the caller restructuring
+    ///         anything - see <see cref="TryAddressBodies" />.
+    ///     </para>
+    /// </summary>
     private BenchmarkSuite AddEnvelope(
         string name,
         IReadOnlyList<string> categories,
-        Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync)
+        Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync,
+        Delegate? body = null,
+        Action? iterationSetup = null,
+        Action? iterationTeardown = null)
     {
         EnsureUniqueName(name);
-        _benchmarks.Add(new BenchmarkEnvelope(name, "", null, false, categories, runAsync));
+
+        _benchmarks.Add(new BenchmarkEnvelope(name, "", null, false, categories, runAsync)
+        {
+            Body = body,
+
+            // The delegates themselves rather than a flag saying they exist, so addressing can try to
+            // carry them to the worker instead of giving up on the whole suite for having them.
+            IterationSetup = iterationSetup,
+            IterationTeardown = iterationTeardown,
+        });
+
         return this;
     }
 
@@ -424,13 +621,19 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Repeats every benchmark in this suite across multiple launches and aggregates
-    ///     the per-launch results into cross-launch summary statistics.
-    ///     Pass 1 (the default) for standard single-launch measurement.
+    ///     Repeats every benchmark in this suite across multiple launches - one worker process each -
+    ///     and aggregates the per-launch results into cross-launch summary statistics.
+    ///     Pass <see cref="LaunchCounts.Single" /> (the default) for standard single-launch measurement.
     /// </summary>
     public BenchmarkSuite WithLaunchCount(int count)
     {
-        _options = _options with { LaunchCount = count };
+        if (!LaunchCounts.IsValid(count))
+        {
+            throw new ArgumentOutOfRangeException(nameof(count), count,
+                $"LaunchCount must be between {LaunchCounts.Single} and {LaunchCounts.Max}.");
+        }
+
+        _launchCount = count;
         return this;
     }
 
@@ -516,6 +719,24 @@ public sealed class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>
+    ///     Sets the runtime-startup configuration to measure under - JIT tiering, dynamic PGO,
+    ///     ReadyToRun and GC flavour. Defaults to <see cref="RuntimeProfile.SteadyState" />.
+    ///     <para>
+    ///         This is the setting that requires a child process to exist: the runtime reads these
+    ///         knobs once at startup, so they can only be applied to a process being launched.
+    ///         Benchmarks that run in the host process report <c>"host"</c> and inherit its
+    ///         configuration.
+    ///     </para>
+    /// </summary>
+    public BenchmarkSuite WithRuntimeProfile(RuntimeProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        _options = _options with { RuntimeProfile = profile };
+        return this;
+    }
+
+
     public BenchmarkSuite WithOutlierMode(OutlierMode mode)
     {
         _options = _options with { OutlierMode = mode };
@@ -527,10 +748,66 @@ public sealed class BenchmarkSuite(string name)
     ///     <see cref="WithOutlierMode" />. Pass one of the built-ins from
     ///     <see cref="OutlierDetectors" /> or your own implementation.
     /// </summary>
+    /// <remarks>
+    ///     Works in an isolated run when <paramref name="detector" />'s type has a parameterless
+    ///     constructor, which the built-ins do - only the type name has to cross, and the worker
+    ///     constructs it. A <i>configured</i> detector cannot be rebuilt that way; use
+    ///     <see cref="WithOutlierDetector(Func{IOutlierDetector})" /> for those.
+    /// </remarks>
     public BenchmarkSuite WithOutlierDetector(IOutlierDetector detector)
     {
         ArgumentNullException.ThrowIfNull(detector);
-        _options = _options with { OutlierDetector = detector };
+        _options = _options with { OutlierDetector = detector, OutlierDetectorFactory = null };
+        return this;
+    }
+
+    /// <summary>
+    ///     Uses a custom <see cref="IOutlierDetector" /> built by <paramref name="factory" />, so a
+    ///     detector needing constructor arguments can still be used in an isolated run.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>WithOutlierDetector(new KeepFastestDetector(0.9))</c> cannot be isolated: only a type
+    ///         name crosses the boundary, and a type name cannot carry <c>0.9</c>. Rather than score the
+    ///         results under a silently substituted method, the whole suite was measured in the host
+    ///         process. A static factory is addressable, so the worker runs it and gets your detector
+    ///         with your arguments:
+    ///     </para>
+    ///     <code>
+    ///     .WithOutlierDetector(static () => new KeepFastestDetector(0.9))
+    ///     </code>
+    ///     <para>
+    ///         The factory must capture nothing, for the same reason a benchmark body must. It is invoked
+    ///         here as well, once, to give the coordinator the instance it scores with.
+    ///     </para>
+    /// </remarks>
+    public BenchmarkSuite WithOutlierDetector(Func<IOutlierDetector> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        _options = _options with
+        {
+            OutlierDetector = factory() ?? throw new ArgumentException(
+                "The outlier detector factory returned null.", nameof(factory)),
+
+            OutlierDetectorFactory = factory,
+        };
+
+        return this;
+    }
+
+    /// <summary>
+    ///     Fails the run instead of measuring in this process when the suite cannot be isolated.
+    /// </summary>
+    /// <remarks>
+    ///     The library-side equivalent of <c>--strict-isolation</c>. That flag audits results after the
+    ///     run and sets an exit code, which suits a CLI in CI - it can name every offender at once. A
+    ///     library caller has no exit code to read, so this throws at the point of refusal instead,
+    ///     before anything is measured.
+    /// </remarks>
+    public BenchmarkSuite WithRequireIsolation(bool required = true)
+    {
+        _options = _options with { RequireIsolation = required };
         return this;
     }
 
@@ -557,10 +834,34 @@ public sealed class BenchmarkSuite(string name)
     ///     default (Mann-Whitney U for two groups, Kruskal-Wallis for three or more). Pass
     ///     one of the built-ins from <see cref="NBenchmark.Stats" /> or your own implementation.
     /// </summary>
+    /// <remarks>
+    ///     Isolatable when the type has a parameterless constructor. For a configured test, use
+    ///     <see cref="WithSignificanceTest(Func{ISignificanceTest})" />.
+    /// </remarks>
     public BenchmarkSuite WithSignificanceTest(ISignificanceTest test)
     {
         ArgumentNullException.ThrowIfNull(test);
-        _options = _options with { SignificanceTest = test };
+        _options = _options with { SignificanceTest = test, SignificanceTestFactory = null };
+        return this;
+    }
+
+    /// <summary>
+    ///     Uses a custom <see cref="ISignificanceTest" /> built by <paramref name="factory" />, so a test
+    ///     needing constructor arguments can still be used in an isolated run.
+    /// </summary>
+    /// <remarks>See <see cref="WithOutlierDetector(Func{IOutlierDetector})" /> for why this exists.</remarks>
+    public BenchmarkSuite WithSignificanceTest(Func<ISignificanceTest> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        _options = _options with
+        {
+            SignificanceTest = factory() ?? throw new ArgumentException(
+                "The significance test factory returned null.", nameof(factory)),
+
+            SignificanceTestFactory = factory,
+        };
+
         return this;
     }
 
@@ -641,6 +942,21 @@ public sealed class BenchmarkSuite(string name)
             },
         };
 
+        return this;
+    }
+
+    /// <summary>
+    ///     Pins the shuffle seed, so a randomized run order is reproducible.
+    ///     <para>
+    ///         Each replicate derives a distinct order from this one seed, so raising
+    ///         <see cref="WithLaunchCount" /> still varies the order between replicates - turning run
+    ///         order into a randomized nuisance factor rather than a fixed confound - while the whole
+    ///         session remains reproducible from a single number.
+    ///     </para>
+    /// </summary>
+    public BenchmarkSuite WithSeed(int seed)
+    {
+        _seed = seed;
         return this;
     }
 
@@ -773,7 +1089,7 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Resolves observer names forwarded by a parent (via <see cref="IsolatedRunRequest.ObserverNames" />)
+    ///     Resolves observer names forwarded by a coordinator
     ///     into a single <see cref="IMeasurementObserver" /> for an isolated suite child. The child
     ///     re-runs the entry assembly, so <c>[ModuleInitializer]</c> self-registration populates
     ///     <see cref="ObserverRegistry" /> identically and the names resolve to the same factories.
@@ -851,23 +1167,51 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Runs the whole suite in a dedicated child process for a clean-room reading,
-    ///     rather than in the current process. The suite's setup, every benchmark, and the
-    ///     suite's teardown all execute together in that one child; the parent process
-    ///     reads the per-benchmark samples back and computes significance and reports as
-    ///     usual. Defaults to enabled when called with no argument.
+    ///     Whether to measure this suite in a worker process. Isolation is the default, so the only
+    ///     call that changes anything is <c>WithIsolation(false)</c> - an explicit request to measure
+    ///     in the current process.
     /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Reach for <c>false</c> when the current process <i>is</i> the subject: cold-start cost, or
+    ///         a body that must observe host state a fresh process cannot rebuild. The result is stamped
+    ///         <see cref="IsolationStatus.InProcessRequested" /> and reports the host's runtime
+    ///         configuration, so it is never silently compared against an isolated measurement.
+    ///     </para>
+    ///     <para>
+    ///         <c>WithIsolation()</c> with no argument is therefore a no-op kept for source
+    ///         compatibility - it asks for what already happens. Only the request for the host process
+    ///         is recorded, because that is the only one that changes anything.
+    ///     </para>
+    ///     <para>
+    ///         That makes it subtly unlike <see cref="BenchmarkHarness.WithIsolation" />, which shares
+    ///         this name and signature but is a global switch settable in both directions - a harness
+    ///         measures many classes, so re-enabling isolation after disabling it means something there.
+    ///         A suite is one group, so there is nothing to re-enable; <c>true</c> only ever restates
+    ///         the default.
+    ///     </para>
+    /// </remarks>
     public BenchmarkSuite WithIsolation(bool enabled = true)
     {
-        _isolated = enabled;
+        // Only the in-process request is stored. There was a second field tracking `enabled` itself,
+        // which nothing ever read once isolation became the default - dead state whose presence
+        // implied a decision was being made here that was not.
+        //
+        // WithIsolation(false) is a real instruction rather than the default, because a suite whose
+        // bodies can be addressed is measured in a worker without being asked. Recording the request
+        // separately is what lets the report distinguish "you chose the host process" from "your suite
+        // could not be isolated", which have entirely different remedies.
+        _inProcessRequested = !enabled;
+
         return this;
     }
 
     /// <summary>
     ///     Runs the suite benchmarks under each specified runtime and compares results.
-    ///     Cross-runtime execution always uses child processes (each runtime is built via
-    ///     <c>dotnet build -f &lt;tfm&gt;</c> and run in a separate child process),
-    ///     regardless of the <see cref="WithIsolation" /> setting.
+    ///     Cross-runtime execution is always isolated (each runtime is built via
+    ///     <c>dotnet build -f &lt;tfm&gt;</c> and measured in that build's own worker),
+    ///     regardless of the <see cref="WithIsolation" /> setting - measuring another framework's
+    ///     build in this process is not something the host can do.
     /// </summary>
     public BenchmarkSuite WithRuntimes(params RuntimeMoniker[] runtimes)
     {
@@ -876,72 +1220,186 @@ public sealed class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Runs every benchmark in the suite and returns their results. When
-    ///     <see cref="WithIsolation" /> is enabled the suite runs in a dedicated child
-    ///     process; otherwise it runs in the current process.
+    ///     Builds a suite with <paramref name="plan" /> and measures it in a dedicated worker
+    ///     process, then scores and reports it here.
     /// </summary>
-    public Task<IReadOnlyList<BenchmarkResult>> RunAsync(
-        CancellationToken cancellationToken = default,
-        [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0,
-        [CallerMemberName] string callerMemberName = "")
-        => IsolatedRunContext.WithCurrentRequestAsync(() =>
-            RunCoreAsync(callerFilePath, callerLineNumber, callerMemberName, cancellationToken));
+    /// <param name="plan">
+    ///     A method group pointing at a <b>static, non-capturing</b> factory that builds and
+    ///     configures the suite - conventionally marked <c>[BenchmarkPlan]</c>. The method group
+    ///     itself is the address: the worker locates that method by metadata token and invokes it,
+    ///     so the suite is constructed in the process that measures it.
+    /// </param>
+    /// <remarks>
+    ///     <para>
+    ///         This is the isolated entry point for Suite mode, and it is strictly better than
+    ///         <see cref="WithIsolation" /> was. That mechanism re-executed the whole program to
+    ///         rebuild the suite, so <i>M</i> isolated suites in one <c>Main</c> did <i>M²</i>
+    ///         measurement work and every side effect in <c>Main</c> re-ran once per child. Here the
+    ///         worker calls one factory and nothing else.
+    ///     </para>
+    ///     <para>
+    ///         Because the worker runs your factory rather than deserializing a description of it,
+    ///         everything the suite holds is live in the measuring process: benchmark bodies, suite
+    ///         setup and teardown, a custom <see cref="Stats.IOutlierDetector" /> or
+    ///         <see cref="Stats.ISignificanceTest" />, an instance factory. None of it has to be
+    ///         serializable.
+    ///     </para>
+    ///     <para>
+    ///         A factory that captures state from its enclosing scope cannot be addressed, and is
+    ///         refused rather than approximated: the suite is then measured in this process, the
+    ///         reason is printed, and every result is stamped accordingly. Make the factory
+    ///         <c>static</c> to isolate it.
+    ///     </para>
+    /// </remarks>
+    /// <example>
+    ///     <code>
+    ///     await BenchmarkSuite.RunPlanAsync(BuildSuite);
+    ///
+    ///     [BenchmarkPlan]
+    ///     static BenchmarkSuite BuildSuite() =>
+    ///         new BenchmarkSuite("comparison")
+    ///             .Add("baseline", () => Baseline())
+    ///             .Add("candidate", () => Candidate())
+    ///             .WithBaseline("baseline")
+    ///             .WithReporter(new ConsoleReporter());
+    ///     </code>
+    /// </example>
+    public static async Task<IReadOnlyList<BenchmarkResult>> RunPlanAsync(
+        Func<BenchmarkSuite> plan,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
 
-    private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(
-        string callerFilePath,
-        int callerLineNumber,
-        string callerMemberName,
-        CancellationToken cancellationToken)
+        // Built here as well as in the worker. The coordinator needs the reporters, the baseline and
+        // the runtime profile to launch under - and building it is cheap, because a factory only
+        // wires delegates up rather than running them.
+        var local = plan() ?? throw new InvalidOperationException(
+            $"The benchmark plan '{plan.Method.Name}' returned null.");
+
+        local.ValidateBaseline();
+
+        if (!local._progressExplicitlySet)
+            local._progress = new DefaultConsoleProgress();
+
+        using var observer = local.ResolveObserver();
+
+        if (local._runtimes.Count > 0)
+        {
+            return await SuitePlanRunner
+                .RunAcrossRuntimesAsync(plan, local, local._progress, observer, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var outcome = await SuitePlanRunner
+            .RunAsync(plan, local, local._progress, observer, sessionSeed: null, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!outcome.WasIsolated)
+        {
+            SimpleModeGuidance.EmitOnce(local.Name, outcome.Status, outcome.Refusal);
+
+            // Measured here instead, and labelled. Returning nothing would be worse; returning
+            // something that claims to be isolated would be worse still.
+            var fallback = await local
+                .RunCoreAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return [.. fallback.Select(r => r with { IsolationStatus = outcome.Status })];
+        }
+
+        var results = outcome.Results.ToList();
+        var rawSamples = outcome.RawSamples.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
+
+        await local._progress.OnSuiteCompleted(results).ConfigureAwait(false);
+
+        observer.OnPhase(new MeasurementPhaseEvent(
+            string.Empty, MeasurementPhase.SuiteCompleted, PhaseTransition.Completed, Succeeded: true));
+
+        local.ApplyPerParameterSignificance(results, rawSamples);
+        await local.InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
+
+        return results;
+    }
+
+    /// <summary>
+    ///     Finds every <c>[BenchmarkPlan]</c> factory on <typeparamref name="T" /> and runs each one
+    ///     in its own measurement worker, in declaration order.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Each plan gets a fresh worker, so several suites in one program cost one worker each -
+    ///         linear, not the <i>M²</i> the previous callsite-replay design produced by re-running
+    ///         the whole program per child.
+    ///     </para>
+    ///     <para>
+    ///         Plans are conventionally grouped on a <c>static class</c>, which C# does not allow as
+    ///         a type argument - use <see cref="RunPlansAsync(Type, CancellationToken)" /> for those.
+    ///     </para>
+    /// </remarks>
+    public static Task<IReadOnlyList<BenchmarkResult>> RunPlansAsync<T>(
+        CancellationToken cancellationToken = default)
+        => RunPlansAsync(typeof(T), cancellationToken);
+
+    /// <inheritdoc cref="RunPlansAsync{T}(CancellationToken)" />
+    public static async Task<IReadOnlyList<BenchmarkResult>> RunPlansAsync(
+        Type declaringType,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(declaringType);
+
+        var plans = BenchmarkPlanDiscovery.Find(declaringType);
+
+        if (plans.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"'{declaringType.Name}' declares no benchmark plans. A plan is a static, "
+                + $"parameterless method returning {nameof(BenchmarkSuite)} and marked "
+                + "[BenchmarkPlan].");
+        }
+
+        var all = new List<BenchmarkResult>();
+
+        foreach (var plan in plans)
+        {
+            all.AddRange(await RunPlanAsync(plan, cancellationToken).ConfigureAwait(false));
+        }
+
+        return all;
+    }
+
+    /// <summary>
+    ///     Runs every benchmark in the suite and returns their results.
+    ///     <para>
+    ///         Measured in a worker process whenever every body in the suite can be addressed there,
+    ///         which needs no attribute and no change to how the suite was written. When something
+    ///         cannot cross the boundary - a captured local, a setup delegate, a parameter sweep - the
+    ///         suite is measured here instead, the reason is printed once, and every result carries
+    ///         the matching <see cref="IsolationStatus" />.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="RunPlanAsync(Func{BenchmarkSuite}, CancellationToken)" /> is the answer for
+    ///         the suites this cannot handle: the worker invokes your factory, so the bodies, the
+    ///         lifecycle delegates and any custom strategy are live objects it built rather than
+    ///         anything that had to be serialized.
+    ///     </para>
+    /// </summary>
+    public Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
+        => RunCoreAsync(cancellationToken);
+
+    private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(CancellationToken cancellationToken)
     {
         ValidateBaseline();
 
-        var invocationOrdinal = IsolatedRunContext.NextSuiteInvocationOrdinal();
-
-        if (IsolatedRunContext.IsActive)
-        {
-            var isTarget = IsolatedRunContext.IsSuiteRequestMatch(
-                invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, Name);
-
-            // Resolve observers the parent forwarded by name (registry-resolvable only; the
-            // suite's programmatic observers are instances and cannot cross a process
-            // boundary). An empty list collapses to NullMeasurementObserver.Instance.
-            var childObserver = IsolatedRunContext.TryGetActiveRequest(out var childRequest)
-                ? ResolveChildObservers(childRequest.ObserverNames)
-                : NullMeasurementObserver.Instance;
-
-            var results = await RunInProcessCoreAsync(
-                NullBenchmarkProgress.Instance,
-                childObserver,
-                RunOrder.Declaration,
-                false,
-                false,
-                isTarget,
-                cancellationToken).ConfigureAwait(false);
-
-            // Stamp RuntimeMoniker on child results before returning/writing payload.
-            if (childRequest is not null && childRequest.RuntimeMoniker is { } runtimeMoniker)
-            {
-                var tfm = runtimeMoniker.ToTargetFramework();
-                results = results.Select(r => r with { RuntimeMoniker = tfm }).ToList();
-            }
-
-            return results;
-        }
-
-        // When runtimes are specified, delegate to the multi-runtime orchestrator.
         if (_runtimes.Count > 0)
         {
-            return await RunMultiRuntimeSuiteAsync(
-                    invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        if (_isolated)
-        {
-            return await RunIsolatedParentAsync(
-                    invocationOrdinal, callerFilePath, callerLineNumber, callerMemberName, cancellationToken)
-                .ConfigureAwait(false);
+            throw new InvalidOperationException(
+                $"Suite '{Name}' asks for multiple runtimes, which needs a static [BenchmarkPlan] "
+                + "factory: run it with BenchmarkSuite.RunPlanAsync(BuildSuite).\n\n"
+                + "Measuring another target framework means measuring a different build of your "
+                + "code, and an inline suite's benchmark bodies are located by metadata token - a "
+                + "number that only means anything inside the build that produced it. A factory is "
+                + "found by name instead, which is stable across builds, so the worker for each "
+                + "runtime can construct the suite from that runtime's own assemblies.");
         }
 
         if (!_progressExplicitlySet)
@@ -949,14 +1407,117 @@ public sealed class BenchmarkSuite(string name)
 
         using var observer = ResolveObserver();
 
+        // An ordinary inline suite is measured in a worker when its bodies can be addressed - which
+        // needs no factory, no attribute and no change to how the suite was written. Isolation that
+        // costs ergonomics is isolation people turn off, so the accurate path has to be the
+        // effortless one.
+        if (!_inProcessRequested)
+        {
+            var isolated = await TryRunInWorkerAsync(observer, cancellationToken).ConfigureAwait(false);
+
+            if (isolated is not null)
+                return isolated;
+        }
+
         return await RunInProcessCoreAsync(
             _progress,
             observer,
             _runOrder,
             true,
             true,
-            false,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Measures this inline suite in a worker, or returns <c>null</c> when it cannot be - having
+    ///     first said why, and what to do about it.
+    /// </summary>
+    private async Task<IReadOnlyList<BenchmarkResult>?> TryRunInWorkerAsync(
+        IMeasurementObserver observer,
+        CancellationToken cancellationToken)
+    {
+        var expanded = ExpandEnvelopes();
+        var benchmarks = ApplyCategoryFilter(ApplyExecutionOrder(expanded, RunOrder.Declaration));
+
+        var decision = InlineSuitePlan.TryAddress(benchmarks, _options, _suiteSetup, _suiteTeardown);
+
+        if (!decision.CanIsolate)
+        {
+            IsolationAudit.ThrowIfRequired(_options, Name, decision.Status, decision.Explanation);
+
+            SimpleModeGuidance.EmitOnce(Name, decision.Status, decision.Explanation);
+            _inProcessStatus = decision.Status;
+
+            return null;
+        }
+
+        var replicates = _launchCount;
+        var timeout = MeasurementBudget.For(_options, decision.Bodies.Count);
+
+        var perReplicate = new List<IReadOnlyList<BenchmarkResult>>(replicates);
+        var perReplicateSamples = new List<Dictionary<string, double[]>>(replicates);
+        var faults = new List<FaultPayload>();
+
+        for (var replicate = 0; replicate < replicates; replicate++)
+        {
+            var request = InlineSuitePlan.Request(
+                Name, decision.Bodies, _options, _runOrder,
+                WorkerRunPlan.DeriveSeed(_seed, replicate), replicate,
+                decision.SuiteSetup, decision.SuiteTeardown);
+
+            var group = await WorkerLauncher.Current.RunGroupAsync(
+                    request,
+                    replicate == 0 ? _progress : NullBenchmarkProgress.Instance,
+                    replicate == 0 ? observer : NullMeasurementObserver.Instance,
+                    timeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            faults.AddRange(group.Faults);
+
+            if (group.Results.Count > 0)
+            {
+                perReplicate.Add(group.Results);
+                perReplicateSamples.Add(group.RawSamples);
+            }
+        }
+
+        if (perReplicate.Count == 0)
+        {
+            // Nothing came back. Measuring here is better than returning nothing, and the caller is
+            // told it is not getting what it asked for.
+            SimpleModeGuidance.EmitOnce(
+                Name,
+                IsolationStatus.InProcessNoWorker,
+                faults.FirstOrDefault()?.Message ?? "no measurement worker produced a result.");
+
+            _inProcessStatus = IsolationStatus.InProcessNoWorker;
+
+            return null;
+        }
+
+        var (results, rawSamples) = SuitePlanRunner.Combine(perReplicate, perReplicateSamples);
+
+        // The suite's own baseline choice is applied here, because the worker measured bare bodies
+        // and has no idea which of them the comparison is against.
+        for (var i = 0; i < results.Count; i++)
+        {
+            results[i] = results[i] with
+            {
+                ClassName = "",
+                IsBaseline = _baselineName is not null && results[i].Name == _baselineName,
+            };
+        }
+
+        await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
+
+        observer.OnPhase(new MeasurementPhaseEvent(
+            string.Empty, MeasurementPhase.SuiteCompleted, PhaseTransition.Completed, Succeeded: true));
+
+        ApplyPerParameterSignificance(results, rawSamples);
+        await InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
+
+        return results;
     }
 
     private async Task<IReadOnlyList<BenchmarkResult>> RunInProcessCoreAsync(
@@ -965,7 +1526,6 @@ public sealed class BenchmarkSuite(string name)
         RunOrder order,
         bool applySignificance,
         bool applyReporters,
-        bool writeChildPayload,
         CancellationToken cancellationToken)
     {
         var expanded = ExpandEnvelopes();
@@ -983,10 +1543,9 @@ public sealed class BenchmarkSuite(string name)
         {
             await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
-            // Apply opt-in hardware/OS controls for the duration of the in-process run. The
-            // scope restores the prior process state on dispose. Isolated suite children
-            // re-run this same entry point and re-derive _options, so they apply the same
-            // settings themselves; Host-mode children receive settings via MeasurementOverrides.
+            // Apply opt-in hardware/OS controls for the duration of the in-process run. The scope
+            // restores the prior process state on dispose. A worker measuring this suite applies the
+            // same settings to itself - see MeasureInWorkerAsync.
             using var _ = EnvironmentControl.Apply(_options.Environment);
 
             _suiteSetup?.Invoke();
@@ -1001,12 +1560,12 @@ public sealed class BenchmarkSuite(string name)
             {
                 var effectiveOrder = _parameterDefs.Count > 0 ? RunOrder.Declaration : order;
 
-                if (_options.LaunchCount > 1)
+                if (_launchCount > 1)
                 {
                     var allLaunchResults = new List<IReadOnlyList<BenchmarkResult>>();
                     var allLaunchSamples = new List<Dictionary<string, double[]>>();
 
-                    for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
+                    for (var launchIdx = 0; launchIdx < _launchCount; launchIdx++)
                     {
                         var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
 
@@ -1046,18 +1605,12 @@ public sealed class BenchmarkSuite(string name)
 
             sentinelEmitted = true;
 
-            // SuiteRunner keys raw samples by benchmark name; the significance and payload paths
-            // need the composite name+runtime key so multi-runtime results don't collide.
-            rawSamples = ToCompositeKeys(results, rawSamples);
+            // SuiteRunner keys raw samples by benchmark name; the significance path needs the
+            // composite name+runtime key so multi-runtime results don't collide.
+            rawSamples = RawSampleKey.ToComposite(results, rawSamples);
 
             if (applySignificance)
                 ApplyPerParameterSignificance(results, rawSamples);
-
-            if (writeChildPayload)
-            {
-                await IsolatedRunContext.WriteChildPayloadIfRequestedAsync(results, rawSamples, cancellationToken)
-                    .ConfigureAwait(false);
-            }
 
             if (applyReporters)
                 await InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
@@ -1083,6 +1636,101 @@ public sealed class BenchmarkSuite(string name)
         }
     }
 
+    /// <summary>
+    ///     Measures this suite inside a measurement worker and hands the results back over the pipe.
+    ///     <para>
+    ///         This is the whole payoff of the <c>[BenchmarkPlan]</c> approach: the worker built this
+    ///         suite by invoking the user's own factory, so the bodies, the setup and teardown
+    ///         delegates, any custom <see cref="Stats.IOutlierDetector" /> or
+    ///         <see cref="Stats.ISignificanceTest" />, and any instance factory are all <i>live
+    ///         objects in the worker's own process</i>. Nothing was serialized, so nothing can be
+    ///         lost in translation - which is what the previous design's "cannot cross the boundary"
+    ///         list was entirely made of.
+    ///     </para>
+    ///     <para>
+    ///         Reporters and significance stay with the coordinator, which owns presentation and can
+    ///         see all replicates. So does the launch count, which this method does not read at all:
+    ///         the coordinator spends it on replicate workers, and honouring the factory's
+    ///         <c>WithLaunchCount</c> again inside one of them would multiply the two.
+    ///     </para>
+    /// </summary>
+    internal async Task<(List<BenchmarkResult> Results, Dictionary<string, double[]> RawSamples)>
+        MeasureInWorkerAsync(
+            IBenchmarkProgress progress,
+            IMeasurementObserver observer,
+            int? seed,
+            int startIndex,
+            int totalBenchmarks,
+            CancellationToken cancellationToken)
+    {
+        var expanded = ExpandEnvelopes();
+        var ordered = ApplyExecutionOrder(expanded, _runOrder);
+        var filtered = ApplyCategoryFilter(ordered);
+
+        // The runtime profile was applied to this process's environment block before it started -
+        // the only moment it could have been. Affinity and priority are settable at any time and
+        // belong here.
+        using var _ = EnvironmentControl.Apply(_options.Environment);
+
+        _suiteSetup?.Invoke();
+
+        try
+        {
+            var envelopes = filtered
+                .Select(b => b with { IsBaseline = _baselineName is not null && b.OriginalName == _baselineName })
+                .ToList();
+
+            // Parameterized suites pin declaration order so a parameter sweep reads in the order it
+            // was declared; everything else honours the suite's configured order, shuffled by the
+            // seed this replicate was given.
+            var effectiveOrder = _parameterDefs.Count > 0 ? RunOrder.Declaration : _runOrder;
+
+            var (results, rawSamples) = await SuiteRunner.RunAsync(
+                    envelopes,
+                    effectiveOrder,
+                    seed,
+                    _options,
+                    startIndex,
+                    totalBenchmarks,
+                    progress,
+                    cancellationToken,
+                    null,
+                    observer)
+                .ConfigureAwait(false);
+
+            return (results.ToList(), rawSamples);
+        }
+        finally
+        {
+            _suiteTeardown?.Invoke();
+        }
+    }
+
+    /// <summary>The benchmark names this suite would measure, for the coordinator's progress and error rows.</summary>
+    internal IReadOnlyList<string> BenchmarkNames()
+        => ApplyCategoryFilter(ApplyExecutionOrder(ExpandEnvelopes(), RunOrder.Declaration))
+            .Select(b => b.Name)
+            .ToList();
+
+    /// <summary>The measurement configuration this suite was built with.</summary>
+    internal MeasurementOptions ResolvedOptions => _options;
+
+    /// <summary>
+    ///     How many launches this suite asked for, read by whoever coordinates its run.
+    /// </summary>
+    internal int ResolvedLaunchCount => _launchCount;
+
+    /// <summary>The target frameworks this suite asked to be measured against.</summary>
+    internal IReadOnlyList<RuntimeMoniker> RequestedRuntimes => _runtimes;
+
+    /// <summary>Applies significance to results measured elsewhere, using this suite's configuration.</summary>
+    internal void ScoreAndReport(List<BenchmarkResult> results, Dictionary<string, double[]> rawSamples)
+        => ApplyPerParameterSignificance(results, rawSamples);
+
+    /// <summary>Runs this suite's reporters over results measured elsewhere.</summary>
+    internal Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
+        => InvokeReportersAsync(results, cancellationToken);
+
     private static (List<BenchmarkResult> Results, Dictionary<string, double[]> RawSamples) AggregateSuiteLaunches(
         IReadOnlyList<IReadOnlyList<BenchmarkResult>> allLaunchResults,
         IReadOnlyList<Dictionary<string, double[]>> allLaunchSamples)
@@ -1097,21 +1745,23 @@ public sealed class BenchmarkSuite(string name)
 
         foreach (var name in names)
         {
-            var perLaunch = allLaunchResults
-                .Select(launch => launch.FirstOrDefault(r => r.Name == name))
-                .Where(r => r is not null)
-                .Cast<BenchmarkResult>()
+            // Zipped before filtering, so a launch that produced no result for this benchmark drops
+            // its samples with it rather than shifting later launches' samples onto the wrong result.
+            var launches = allLaunchResults
+                .Select((launch, i) => (Result: launch.FirstOrDefault(r => r.Name == name), Index: i))
+                .Where(x => x.Result is not null)
+                .Select(x => new LaunchAggregator.Launch(
+                    x.Result!, allLaunchSamples[x.Index].GetValueOrDefault(name, [])))
                 .ToList();
 
-            if (perLaunch.Count == 0)
+            if (launches.Count == 0)
                 continue;
 
-            var stats = LaunchAggregator.Aggregate(perLaunch);
-            var best = LaunchAggregator.BestLaunch(perLaunch);
-            aggregated.Add(best with { LaunchStatistics = stats });
+            var combined = LaunchAggregator.Combine(launches);
+            aggregated.Add(combined);
 
             if (pooledSamples.TryGetValue(name, out var samples))
-                rawSamples[$"{name}\0{best.RuntimeMoniker}"] = samples;
+                rawSamples[RawSampleKey.For(name, combined.RuntimeMoniker)] = samples;
         }
 
         return (aggregated, rawSamples);
@@ -1138,403 +1788,6 @@ public sealed class BenchmarkSuite(string name)
 
         return pooled.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray(), StringComparer.Ordinal);
     }
-
-    private async Task<IReadOnlyList<BenchmarkResult>> RunIsolatedParentAsync(
-        int invocationOrdinal,
-        string callerFilePath,
-        int callerLineNumber,
-        string callerMemberName,
-        CancellationToken cancellationToken)
-    {
-        if (!_progressExplicitlySet)
-            _progress = new DefaultConsoleProgress();
-
-        var expanded = ExpandEnvelopes();
-        var filteredBenchmarks = ApplyCategoryFilter(expanded);
-        var displayNames = filteredBenchmarks.Select(b => b.Name).ToList();
-
-        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, _options.Profile.ToString(),
-            _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
-
-        var results = new List<BenchmarkResult>(filteredBenchmarks.Count);
-        using var observer = ResolveObserver();
-        var sentinelEmitted = false;
-
-        try
-        {
-            await _progress.OnSuiteStarting(displayNames, filteredBenchmarks.Count).ConfigureAwait(false);
-
-            var request = new IsolatedRunRequest
-            {
-                Kind = IsolatedRunKind.Suite,
-                InvocationOrdinal = invocationOrdinal,
-                CallerFilePath = callerFilePath,
-                CallerLineNumber = callerLineNumber,
-                CallerMemberName = callerMemberName,
-                SuiteName = Name,
-                BenchmarkDisplayNames = displayNames,
-            };
-
-            IReadOnlyList<IsolatedResultItem> items;
-
-            if (_options.LaunchCount > 1)
-            {
-                var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
-
-                for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
-                {
-                    var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    allLaunchItems.Add(launchItems);
-                }
-
-                items = AggregateIsolatedLaunches(allLaunchItems, displayNames, filteredBenchmarks);
-            }
-            else
-                items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken).ConfigureAwait(false);
-
-            var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
-
-            var rawSamples = new Dictionary<string, double[]>(filteredBenchmarks.Count);
-
-            for (var i = 0; i < filteredBenchmarks.Count; i++)
-            {
-                var envelope = filteredBenchmarks[i];
-                var isBaseline = _baselineName is not null && envelope.OriginalName == _baselineName;
-
-                await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count).ConfigureAwait(false);
-
-                BenchmarkResult result;
-                double[] raw;
-
-                if (byName.TryGetValue(envelope.Name, out var item))
-                {
-                    // Re-attach display samples the child stripped from its serialized result.
-                    // For launch-aggregated items, prefer the representative launch samples kept
-                    // on Result so TrimmedOrdinals stay aligned with the shown distribution.
-                    result = item.Result with
-                    {
-                        IsBaseline = isBaseline,
-                        Description = envelope.Description,
-                        RawSamples = ResolveResultRawSamples(item),
-                    };
-                    raw = item.RawSamples;
-                }
-                else
-                {
-                    var message = $"Isolated child did not return a result for '{envelope.Name}'.";
-
-                    result = OutcomeBuilder.Build(
-                        new RunOutcome.Errored(new InvalidOperationException(message), message),
-                        envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
-                        _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
-                        envelope.Categories).Result;
-
-                    raw = [];
-                }
-
-                result = result with { ParameterSet = envelope.ParameterSet };
-                results.Add(result);
-                rawSamples[$"{envelope.Name}\0{result.RuntimeMoniker}"] = raw;
-
-                await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
-                observer.OnResult(result);
-            }
-
-            await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
-
-            // SuiteCompleted sentinel: emit on the success path with Succeeded = true.
-            observer.OnPhase(new MeasurementPhaseEvent(
-                string.Empty,
-                MeasurementPhase.SuiteCompleted,
-                PhaseTransition.Completed,
-                Succeeded: true));
-
-            sentinelEmitted = true;
-
-            ApplyPerParameterSignificance(results, rawSamples);
-
-            await InvokeReportersAsync(results, cancellationToken).ConfigureAwait(false);
-
-            return results;
-        }
-        finally
-        {
-            if (!sentinelEmitted)
-            {
-                observer.OnPhase(new MeasurementPhaseEvent(
-                    string.Empty,
-                    MeasurementPhase.SuiteCompleted,
-                    PhaseTransition.Completed,
-                    Succeeded: false));
-            }
-
-            NBenchmarkDiagnostics.OnSuiteCompleted(results);
-        }
-    }
-
-    private async Task<IReadOnlyList<BenchmarkResult>> RunMultiRuntimeSuiteAsync(
-        int invocationOrdinal,
-        string callerFilePath,
-        int callerLineNumber,
-        string callerMemberName,
-        CancellationToken cancellationToken)
-    {
-        if (!_progressExplicitlySet)
-            _progress = new DefaultConsoleProgress();
-
-        Console.WriteLine($"Building for runtimes: {string.Join(", ", _runtimes.Select(r => r.ToTargetFramework()))}");
-
-        var builds = await MultiRuntimeOrchestrator
-            .BuildForRuntimesAsync(_runtimes, cancellationToken).ConfigureAwait(false);
-
-        var failedBuilds = builds.Where(b => b.Error is not null).ToList();
-
-        foreach (var failed in failedBuilds)
-        {
-            Console.Error.WriteLine($"  {failed.Moniker.ToTargetFramework()}: {failed.Error}");
-        }
-
-        var successfulBuilds = builds.Where(b => b.DllPath is not null).ToList();
-
-        if (successfulBuilds.Count == 0)
-        {
-            Console.Error.WriteLine("All runtime builds failed.");
-            return [];
-        }
-
-        var allResults = new List<BenchmarkResult>();
-        var rawSamples = new Dictionary<string, double[]>();
-
-        var expanded = ExpandEnvelopes();
-        var filteredBenchmarks = ApplyCategoryFilter(expanded);
-        var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
-
-        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, _options.Profile.ToString(),
-            _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
-
-        using var observer = ResolveObserver();
-        var sentinelEmitted = false;
-
-        try
-        {
-            await _progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
-
-            // Apply opt-in hardware/OS controls to the parent process for the duration of the
-            // multi-runtime run, mirroring the single-runtime suite path. Each spawned child
-            // re-runs this entry point and re-derives _options, so it applies the same settings
-            // itself; this scope covers the parent's own launch/aggregation work.
-            using var _ = EnvironmentControl.Apply(_options.Environment);
-
-            _suiteSetup?.Invoke();
-
-            try
-            {
-                foreach (var build in successfulBuilds)
-                {
-                    var tfm = build.Moniker.ToTargetFramework();
-
-                    try
-                    {
-                        Console.WriteLine($"  Running under {tfm}...");
-
-                        var request = new IsolatedRunRequest
-                        {
-                            Kind = IsolatedRunKind.Suite,
-                            InvocationOrdinal = invocationOrdinal,
-                            CallerFilePath = callerFilePath,
-                            CallerLineNumber = callerLineNumber,
-                            CallerMemberName = callerMemberName,
-                            SuiteName = Name,
-                            BenchmarkDisplayNames = envelopeNames,
-                            RuntimeMoniker = build.Moniker,
-                            EntryAssemblyPath = build.DllPath,
-                        };
-
-                        IReadOnlyList<IsolatedResultItem> items;
-
-                        if (_options.LaunchCount > 1)
-                        {
-                            var allLaunchItems = new List<IReadOnlyList<IsolatedResultItem>>();
-
-                            for (var launchIdx = 0; launchIdx < _options.LaunchCount; launchIdx++)
-                            {
-                                var launchItems = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                                    .ConfigureAwait(false);
-
-                                allLaunchItems.Add(launchItems);
-                            }
-
-                            items = AggregateIsolatedLaunches(allLaunchItems, envelopeNames, filteredBenchmarks);
-                        }
-                        else
-                        {
-                            items = await ChildProcessLauncher.LaunchAsync(request, cancellationToken)
-                                .ConfigureAwait(false);
-                        }
-
-                        var byName = items.ToDictionary(item => item.Result.Name, StringComparer.Ordinal);
-
-                        for (var i = 0; i < filteredBenchmarks.Count; i++)
-                        {
-                            var envelope = filteredBenchmarks[i];
-                            var isBaseline = _baselineName is not null && envelope.OriginalName == _baselineName;
-
-                            await _progress.OnBenchmarkStarting(envelope.Name, i + 1, filteredBenchmarks.Count)
-                                .ConfigureAwait(false);
-
-                            BenchmarkResult result;
-
-                            if (byName.TryGetValue(envelope.Name, out var item))
-                            {
-                                result = item.Result with
-                                {
-                                    IsBaseline = isBaseline,
-                                    Description = envelope.Description,
-                                    RuntimeMoniker = tfm,
-                                    RawSamples = ResolveResultRawSamples(item),
-                                };
-
-                                if (item.RawSamples.Length > 0)
-                                    rawSamples[$"{envelope.Name}\0{tfm}"] = item.RawSamples;
-                            }
-                            else
-                            {
-                                var message = $"Isolated child did not return a result for '{envelope.Name}'.";
-
-                                result = OutcomeBuilder.Build(
-                                        new RunOutcome.Errored(new InvalidOperationException(message), message),
-                                        envelope.Name, envelope.ClassName, envelope.Description, isBaseline,
-                                        _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
-                                        envelope.Categories).Result with
-                                {
-                                    RuntimeMoniker = tfm,
-                                };
-                            }
-
-                            result = result with { ParameterSet = envelope.ParameterSet };
-                            allResults.Add(result);
-
-                            await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
-                            observer.OnResult(result);
-                        }
-                    }
-                    finally
-                    {
-                        MultiRuntimeOrchestrator.TryDeleteBuildOutput(build.OutputDirectory);
-                    }
-                }
-            }
-            finally
-            {
-                _suiteTeardown?.Invoke();
-            }
-
-            await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
-
-            // SuiteCompleted sentinel: emit on the success path with Succeeded = true.
-            observer.OnPhase(new MeasurementPhaseEvent(
-                string.Empty,
-                MeasurementPhase.SuiteCompleted,
-                PhaseTransition.Completed,
-                Succeeded: true));
-
-            sentinelEmitted = true;
-
-            ApplyPerParameterSignificance(allResults, rawSamples);
-
-            await InvokeReportersAsync(allResults, cancellationToken).ConfigureAwait(false);
-
-            return allResults;
-        }
-        finally
-        {
-            if (!sentinelEmitted)
-            {
-                observer.OnPhase(new MeasurementPhaseEvent(
-                    string.Empty,
-                    MeasurementPhase.SuiteCompleted,
-                    PhaseTransition.Completed,
-                    Succeeded: false));
-            }
-
-            NBenchmarkDiagnostics.OnSuiteCompleted(allResults);
-        }
-    }
-
-    private static IReadOnlyList<IsolatedResultItem> AggregateIsolatedLaunches(
-        IReadOnlyList<IReadOnlyList<IsolatedResultItem>> allLaunchItems,
-        IReadOnlyList<string> displayNames,
-        IReadOnlyList<BenchmarkEnvelope> filteredBenchmarks)
-    {
-        if (allLaunchItems.Count == 0)
-            return [];
-
-        var aggregated = new List<IsolatedResultItem>();
-
-        foreach (var name in displayNames)
-        {
-            var perLaunchResults = new List<BenchmarkResult>();
-
-            foreach (var launchItems in allLaunchItems)
-            {
-                var match = launchItems.FirstOrDefault(item => item.Result.Name == name);
-
-                if (match is not null)
-                    perLaunchResults.Add(match.Result with { RawSamples = match.RawSamples });
-            }
-
-            if (perLaunchResults.Count == 0)
-            {
-                var envelope = filteredBenchmarks.FirstOrDefault(e => e.Name == name);
-
-                if (envelope is not null)
-                {
-                    var message = $"Isolated child did not return a result for '{name}' in any launch.";
-
-                    aggregated.Add(new IsolatedResultItem
-                    {
-                        Result = OutcomeBuilder.Build(
-                            new RunOutcome.Errored(new InvalidOperationException(message), message),
-                            name, envelope.ClassName, envelope.Description, envelope.IsBaseline,
-                            new MeasurementOptions(), TimeSpan.Zero, TimeSpan.Zero, 0, null,
-                            envelope.Categories).Result,
-                        RawSamples = [],
-                    });
-                }
-
-                continue;
-            }
-
-            var stats = LaunchAggregator.Aggregate(perLaunchResults);
-            var best = LaunchAggregator.BestLaunch(perLaunchResults);
-            var rawSamples = allLaunchItems
-                .SelectMany(launchItems => launchItems.Where(item => item.Result.Name == name))
-                .SelectMany(item => item.RawSamples)
-                .ToArray();
-
-            // Keep representative-launch samples on the displayed result so statistical fields
-            // and TrimmedOrdinals remain aligned; pooled samples still travel alongside for
-            // significance calculations.
-            var aggregatedResult = best with { LaunchStatistics = stats };
-
-            aggregated.Add(new IsolatedResultItem
-            {
-                Result = aggregatedResult,
-                RawSamples = rawSamples,
-            });
-        }
-
-        return aggregated;
-    }
-
-    private static IReadOnlyList<double> ResolveResultRawSamples(IsolatedResultItem item)
-    {
-        return item.Result.RawSamples.Count > 0 ? item.Result.RawSamples : item.RawSamples;
-    }
-
-    // --- Parameter expansion ---
 
     private List<BenchmarkEnvelope> ExpandEnvelopes()
     {
@@ -1599,13 +1852,22 @@ public sealed class BenchmarkSuite(string name)
                         "Ensure parameter values produce unique display names.");
                 }
 
-                var envelope = factory.Factory(combo.ToArray(), displayName);
+                var arguments = combo.ToArray();
+                var envelope = factory.Factory(arguments, displayName);
 
                 expanded.Add(envelope with
                 {
                     OriginalName = factory.Name,
                     ParameterSet = paramSet,
                     IsBaseline = false,
+
+                    // Set here rather than inside each of the twelve Add overloads' factory lambdas:
+                    // this is the one place that holds both the user's typed delegate and the values
+                    // this expansion will call it with, so there is no second copy to drift.
+                    Body = factory.Action,
+                    Arguments = arguments,
+                    IterationSetup = factory.IterationSetup,
+                    IterationTeardown = factory.IterationTeardown,
                 });
             }
         }
@@ -1618,6 +1880,77 @@ public sealed class BenchmarkSuite(string name)
         }
 
         return [.. _benchmarks, .. expanded];
+    }
+
+    private void ApplyPerParameterSignificance(List<BenchmarkResult> results, Dictionary<string, double[]> rawSamples)
+    {
+        static string RawKey(BenchmarkResult r)
+        {
+            return RawSampleKey.For(r);
+        }
+
+        if (!results.Any(r => r.ParameterSet.Count > 0))
+        {
+            // Significance only makes sense within the same runtime; net8 vs net10 is not
+            // a meaningful comparison for p-value purposes.
+            foreach (var runtimeGroup in results.GroupBy(ComparisonGroup.KeyFor))
+            {
+                var runtimeList = runtimeGroup.ToList();
+                var runtimeRaw = new Dictionary<string, double[]>();
+
+                foreach (var r in runtimeList)
+                {
+                    if (rawSamples.TryGetValue(RawKey(r), out var samples))
+                        runtimeRaw[r.Name] = samples;
+                }
+
+                var indices = results
+                    .Select((res, idx) => (res, idx))
+                    .Where(x => ComparisonGroup.KeyFor(x.res) == runtimeGroup.Key)
+                    .Select(x => x.idx)
+                    .ToList();
+
+                Significance.ApplyIfEnabled(runtimeList, runtimeRaw, _options);
+
+                for (var j = 0; j < runtimeList.Count; j++)
+                {
+                    results[indices[j]] = runtimeList[j];
+                }
+            }
+
+            return;
+        }
+
+        var indexedResults = results
+            .Select((r, idx) => (Result: r, Index: idx))
+            .ToList();
+
+        var groups = indexedResults
+            .GroupBy(ri => BenchmarkParameter.GetKey(ri.Result.ParameterSet))
+            .ToList();
+
+        foreach (var group in groups)
+        {
+            foreach (var runtimeGroup in group.GroupBy(ri => ComparisonGroup.KeyFor(ri.Result)))
+            {
+                var groupList = runtimeGroup.ToList();
+                var groupResults = groupList.Select(ri => ri.Result).ToList();
+                var groupRaw = new Dictionary<string, double[]>();
+
+                foreach (var ri in groupList)
+                {
+                    if (rawSamples.TryGetValue(RawKey(ri.Result), out var samples))
+                        groupRaw[ri.Result.Name] = samples;
+                }
+
+                Significance.ApplyIfEnabled(groupResults, groupRaw, _options);
+
+                for (var j = 0; j < groupList.Count; j++)
+                {
+                    results[groupList[j].Index] = groupResults[j];
+                }
+            }
+        }
     }
 
     private List<object?[]> ComputeParameterCombinations()
@@ -1649,96 +1982,10 @@ public sealed class BenchmarkSuite(string name)
     private static string FormatParamDisplayName(string benchmarkName, BenchmarkParameter[] paramSet)
         => BenchmarkParameter.FormatDisplayName(benchmarkName, paramSet);
 
-    private static Dictionary<string, double[]> ToCompositeKeys(
-        IReadOnlyList<BenchmarkResult> results,
-        Dictionary<string, double[]> nameKeyedSamples)
-    {
-        var composite = new Dictionary<string, double[]>(nameKeyedSamples.Count);
-
-        foreach (var r in results)
-        {
-            if (nameKeyedSamples.TryGetValue(r.Name, out var samples))
-                composite[$"{r.Name}\0{r.RuntimeMoniker}"] = samples;
-        }
-
-        return composite;
-    }
-
     private async Task InvokeReportersAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
     {
         await ReporterRegistry.InvokeReportersAsync(_reporters, _detail, results, cancellationToken)
             .ConfigureAwait(false);
-    }
-
-    private void ApplyPerParameterSignificance(List<BenchmarkResult> results, Dictionary<string, double[]> rawSamples)
-    {
-        static string RawKey(BenchmarkResult r)
-        {
-            return $"{r.Name}\0{r.RuntimeMoniker}";
-        }
-
-        if (!results.Any(r => r.ParameterSet.Count > 0))
-        {
-            // Significance only makes sense within the same runtime; net8 vs net10 is not
-            // a meaningful comparison for p-value purposes.
-            foreach (var runtimeGroup in results.GroupBy(r => r.RuntimeMoniker))
-            {
-                var runtimeList = runtimeGroup.ToList();
-                var runtimeRaw = new Dictionary<string, double[]>();
-
-                foreach (var r in runtimeList)
-                {
-                    if (rawSamples.TryGetValue(RawKey(r), out var samples))
-                        runtimeRaw[r.Name] = samples;
-                }
-
-                var indices = results
-                    .Select((res, idx) => (res, idx))
-                    .Where(x => x.res.RuntimeMoniker == runtimeGroup.Key)
-                    .Select(x => x.idx)
-                    .ToList();
-
-                Significance.ApplyIfEnabled(runtimeList, runtimeRaw, _options);
-
-                for (var j = 0; j < runtimeList.Count; j++)
-                {
-                    results[indices[j]] = runtimeList[j];
-                }
-            }
-
-            return;
-        }
-
-        var indexedResults = results
-            .Select((r, idx) => (Result: r, Index: idx))
-            .ToList();
-
-        var groups = indexedResults
-            .GroupBy(ri => BenchmarkParameter.GetKey(ri.Result.ParameterSet))
-            .ToList();
-
-        foreach (var group in groups)
-        {
-            foreach (var runtimeGroup in group.GroupBy(ri => ri.Result.RuntimeMoniker))
-            {
-                var groupList = runtimeGroup.ToList();
-                var groupResults = groupList.Select(ri => ri.Result).ToList();
-                var groupRaw = new Dictionary<string, double[]>();
-
-                foreach (var ri in groupList)
-                {
-                    if (rawSamples.TryGetValue(RawKey(ri.Result), out var samples))
-                        groupRaw[ri.Result.Name] = samples;
-                }
-
-                Significance.ApplyIfEnabled(groupResults, groupRaw, _options);
-
-                for (var j = 0; j < groupList.Count; j++)
-                {
-                    results[groupList[j].Index] = groupResults[j];
-                }
-            }
-        }
     }
 
     private static bool AreTypesCompatible(Type[] factoryTypes, Type[] parameterTypes)
@@ -1755,41 +2002,15 @@ public sealed class BenchmarkSuite(string name)
         return true;
     }
 
+    /// <summary>
+    ///     Arranges a parameter sweep: parameter values stay in declaration order and the
+    ///     benchmarks within each value are shuffled. A suite with no parameters is left alone here
+    ///     and shuffled by <see cref="SuiteRunner" /> instead, which is where the run seed reaches.
+    /// </summary>
     private List<BenchmarkEnvelope> ApplyExecutionOrder(IReadOnlyList<BenchmarkEnvelope> expanded, RunOrder order)
-    {
-        if (order == RunOrder.Declaration || _parameterDefs.Count == 0)
-            return [.. expanded];
-
-        // Group by parameter set, then shuffle within each group.
-        var parameterGroups = expanded
-            .GroupBy(e => BenchmarkParameter.GetKey(e.ParameterSet))
-            .ToList();
-
-        var ordered = new List<BenchmarkEnvelope>(expanded.Count);
-        var groupSeedRng = new Random(Random.Shared.Next());
-
-        foreach (var group in parameterGroups)
-        {
-            var shuffled = ShuffleEnvelopes(group.ToList(), groupSeedRng.Next());
-            ordered.AddRange(shuffled);
-        }
-
-        return ordered;
-    }
-
-    private static List<BenchmarkEnvelope> ShuffleEnvelopes(List<BenchmarkEnvelope> items, int seed)
-    {
-        var rng = new Random(seed);
-        var list = items.ToList();
-
-        for (var i = list.Count - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
-        }
-
-        return list;
-    }
+        => _parameterDefs.Count == 0
+            ? [.. expanded]
+            : RunOrdering.ApplyWithinGroups(expanded, order, _seed, e => BenchmarkParameter.GetKey(e.ParameterSet));
 
     // --- Validation ---
 
@@ -1886,9 +2107,25 @@ public sealed class BenchmarkSuite(string name)
 
     private sealed record ParameterDef(string Name, Type Type, object?[] Values);
 
+    /// <param name="Action">
+    ///     The user's own typed lambda, kept beside the factory that wraps it. The factory's own
+    ///     metadata token identifies NBenchmark's wrapper; only this points at the method the developer
+    ///     wrote, and it is what lets a parameter sweep be addressed for a worker.
+    /// </param>
+    /// <param name="IterationSetup">
+    ///     The per-iteration <c>setup</c> this registration supplied, if any. Carried here because only
+    ///     the registration knows, and the expansion is what builds the envelope addressing consults.
+    ///     Before parameter sweeps were addressable this went unrecorded and was harmless - a
+    ///     parameterized envelope carried no body, so it was refused for that reason first. It is
+    ///     load-bearing now: an addressed body whose hooks were forgotten would be measured in a worker
+    ///     with its setup silently dropped.
+    /// </param>
     private sealed record ParameterizedAdd(
         string Name,
         IReadOnlyList<string> Categories,
         Func<object?[], string, BenchmarkEnvelope> Factory,
-        Type[] ParamTypes);
+        Type[] ParamTypes,
+        Delegate Action,
+        Action? IterationSetup,
+        Action? IterationTeardown);
 }

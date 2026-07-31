@@ -4,6 +4,7 @@ using Xunit;
 
 namespace NBenchmark.Integration.xUnit.Tests;
 
+[Collection(HostAssessmentCollection.Name)]
 public sealed class BenchmarkAssertTests
 {
     public BenchmarkAssertTests()

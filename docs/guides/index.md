@@ -30,7 +30,7 @@ See how an algorithm scales across input sizes. Parameterized Suite mode (`WithP
 
 ### [Cross-runtime comparison](./cross-runtime.md)
 
-Verify your code benefits from net10 vs net8. Multi-runtime in Suite mode (`WithRuntimes`) and Harness mode (`--runtimes` / `[Runtimes]`), the `<TargetFrameworks>` project setup, always-child-process isolation, and significance grouped within each runtime.
+Verify your code benefits from net10 vs net8. Multi-runtime in Suite mode (`WithRuntimes`) and Harness mode (`--runtimes` / `[Runtimes]`), the `<TargetFrameworks>` project setup, always-worker isolation, and significance grouped within each runtime.
 
 ### [Performance gates in your test suite](./performance-gates.md)
 

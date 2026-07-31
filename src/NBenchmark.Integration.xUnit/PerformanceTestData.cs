@@ -24,6 +24,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         OutlierMode outlierMode,
         double confidenceLevel,
         double maxAbsoluteThresholdTolerance,
+        bool requireIsolation = false,
+        int launchCount = 1,
         string? skipReason = null)
     {
         MaxMeanNs = maxMeanNs;
@@ -37,6 +39,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         OutlierMode = outlierMode;
         ConfidenceLevel = confidenceLevel;
         MaxAbsoluteThresholdTolerance = maxAbsoluteThresholdTolerance;
+        RequireIsolation = requireIsolation;
+        LaunchCount = launchCount;
         SkipReason = skipReason;
     }
 
@@ -52,6 +56,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     public OutlierMode OutlierMode { get; private set; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; private set; } = 0.95;
     public double MaxAbsoluteThresholdTolerance { get; private set; } = 1.0;
+    public bool RequireIsolation { get; private set; }
+    public int LaunchCount { get; private set; } = 1;
 
     public void Serialize(IXunitSerializationInfo info)
     {
@@ -66,6 +72,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         info.AddValue(nameof(OutlierMode), (int)OutlierMode);
         info.AddValue(nameof(ConfidenceLevel), ConfidenceLevel);
         info.AddValue(nameof(MaxAbsoluteThresholdTolerance), MaxAbsoluteThresholdTolerance);
+        info.AddValue(nameof(RequireIsolation), RequireIsolation);
+        info.AddValue(nameof(LaunchCount), LaunchCount);
         info.AddValue(nameof(SkipReason), SkipReason ?? NullSentinel);
     }
 
@@ -83,6 +91,12 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         OutlierMode = (OutlierMode)info.GetValue<int>(nameof(OutlierMode));
         ConfidenceLevel = info.GetValue<double>(nameof(ConfidenceLevel));
         MaxAbsoluteThresholdTolerance = info.GetValue<double>(nameof(MaxAbsoluteThresholdTolerance));
+        RequireIsolation = info.GetValue<bool>(nameof(RequireIsolation));
+
+        // Defaulted rather than trusted: a test case serialized by an older build carries no value,
+        // and a 0 here would be an invalid replicate count rather than the absent one it really is.
+        var launchCount = info.GetValue<int>(nameof(LaunchCount));
+        LaunchCount = launchCount < 1 ? 1 : launchCount;
         var skipReason = info.GetValue<string>(nameof(SkipReason));
         SkipReason = skipReason == NullSentinel ? null : skipReason;
     }
@@ -100,5 +114,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
             thresholds.OutlierMode,
             thresholds.ConfidenceLevel,
             thresholds.MaxAbsoluteThresholdTolerance,
+            thresholds.RequireIsolation,
+            thresholds.LaunchCount,
             skipReason);
 }

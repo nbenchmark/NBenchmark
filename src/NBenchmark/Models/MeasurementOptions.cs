@@ -1,7 +1,17 @@
+using System.Text.Json.Serialization;
 using NBenchmark.Stats;
 
 namespace NBenchmark;
 
+/// <summary>
+///     How <em>one</em> measurement is taken.
+/// </summary>
+/// <remarks>
+///     Every field here is consumed by the process doing the measuring, and this record is serialized
+///     whole into each worker's request - so a field that only a coordinator could act on has no
+///     business on it. That is why the replicate count is not here but in
+///     <see cref="LaunchCounts" />, which explains the reasoning.
+/// </remarks>
 public record MeasurementOptions
 {
     internal const double PercentileEqualityTolerance = 1e-9;
@@ -21,9 +31,17 @@ public record MeasurementOptions
     public const int MaxAutoWarmupIterations = 100_000;
 
     public const int MaxOpsPerSampleLimit = 1 << 24;
-    public const int MaxLaunchCount = 100;
     public const int MinHistogramBucketCount = 5;
     public const int MaxHistogramBucketCount = 100;
+
+    /// <summary>
+    ///     Default ceiling on how many raw samples an isolated worker sends back per benchmark.
+    ///     See <see cref="MaxRawSamples" />.
+    /// </summary>
+    public const int DefaultMaxRawSamples = 4096;
+
+    /// <summary><see cref="MaxRawSamples" /> value meaning "return every sample".</summary>
+    public const int UnboundedRawSamples = 0;
 
     internal static readonly IReadOnlyList<double> DefaultReportedPercentiles =
         Array.AsReadOnly(new[] { 0.50, 0.95, 0.99, 0.999, 1.0 });
@@ -31,8 +49,8 @@ public record MeasurementOptions
     public static readonly MeasurementOptions Default = new();
     private readonly double _confidenceLevel = 0.95;
     private readonly int _histogramBucketCount = 20;
+    private readonly int _maxRawSamples = DefaultMaxRawSamples;
     private readonly int? _iterations;
-    private readonly int _launchCount = 1;
     private readonly double? _minimumPracticalEffect = DefaultMinimumPracticalEffect;
 
     /// <summary>
@@ -185,7 +203,35 @@ public record MeasurementOptions
     ///     <see cref="OutlierMode" />, letting you plug in your own trimming algorithm.
     ///     Leave <c>null</c> to use the built-in detector selected by <see cref="OutlierMode" />.
     /// </summary>
+    /// <remarks>
+    ///     Excluded from serialization: a strategy object is live code, not data, so it cannot
+    ///     travel to a measurement worker as a value. It travels instead as an assembly-qualified
+    ///     type name that the worker instantiates through its own load context, which works for
+    ///     any detector with a parameterless constructor. See <c>NBenchmark.Workers</c>.
+    /// </remarks>
+    [JsonIgnore]
     public IOutlierDetector? OutlierDetector { get; init; }
+
+    /// <summary>
+    ///     A factory for <see cref="OutlierDetector" />, which is what lets a detector needing
+    ///     constructor arguments be used in an isolated run.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Sending a type name works only for a detector with a parameterless constructor. Anything
+    ///         configured - <c>new KeepFastestDetector(0.9)</c> - could not be rebuilt in the worker, so
+    ///         the whole group was measured in the host process instead, to avoid the far worse outcome
+    ///         of scoring it under a different statistical method than the caller chose.
+    ///     </para>
+    ///     <para>
+    ///         A static, non-capturing factory is addressable, so the worker can run it and get the
+    ///         caller's own detector with its own arguments. Set alongside
+    ///         <see cref="OutlierDetector" /> rather than instead of it: the coordinator still needs a
+    ///         live instance for its own scoring, and the factory is only how the worker obtains one.
+    ///     </para>
+    /// </remarks>
+    [JsonIgnore]
+    public Func<IOutlierDetector>? OutlierDetectorFactory { get; init; }
 
     /// <summary>
     ///     Confidence level for the interval reported on the mean (e.g. 0.95 for 95%).
@@ -234,6 +280,68 @@ public record MeasurementOptions
                 $"HistogramBucketCount must be between {MinHistogramBucketCount} and {MaxHistogramBucketCount}.");
     }
 
+    /// <summary>
+    ///     How many raw samples an isolated worker returns per benchmark.
+    ///     <see cref="UnboundedRawSamples" /> returns all of them. Default
+    ///     <see cref="DefaultMaxRawSamples" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This bounds only what crosses a process boundary. Every statistic NBenchmark reports
+    ///         is computed inside the worker over the complete sample array, so raising or lowering
+    ///         this cannot move a median, an interval, or an outlier count. What it affects is the
+    ///         sample dump in JSON output, the Console density sparkline, and the coordinator-side
+    ///         significance test - all distribution properties, which a few thousand samples describe
+    ///         as faithfully as a hundred thousand.
+    ///     </para>
+    ///     <para>
+    ///         The subset is drawn uniformly at random from the full array and kept in measurement
+    ///         order, seeded from the run's own seed so a repeat of the same configuration ships the
+    ///         same samples. It is not a prefix: the first n samples are the part of the run nearest
+    ///         to warmup, which is the least representative slice available.
+    ///     </para>
+    ///     <para>
+    ///         In-process runs are unaffected - there is no boundary to cross, so they always hold
+    ///         the complete array. A run that mixes the two therefore has more samples on its
+    ///         in-process rows, which changes nothing about the numbers but is worth knowing when
+    ///         comparing sample dumps.
+    ///     </para>
+    /// </remarks>
+    public int MaxRawSamples
+    {
+        get => _maxRawSamples;
+        init => _maxRawSamples = value >= UnboundedRawSamples
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value,
+                $"MaxRawSamples must be {UnboundedRawSamples} (unbounded) or positive.");
+    }
+
+    /// <summary>
+    ///     Whether an isolated worker forwards its live per-sample observer stream
+    ///     (<see cref="IMeasurementObserver.OnSample" />) back to the coordinator. Off by default.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Like <see cref="MaxRawSamples" /> this bounds only what crosses a process boundary and
+    ///         cannot move a reported number. It is off by default because it is the one channel whose
+    ///         cost scales with how fast the benchmarked code is: a nanosecond body emits thousands of
+    ///         sample events, and encoding them puts the cost of observing the run inside the run. Phase
+    ///         transitions, detector snapshots and results cross either way - they are emitted a handful
+    ///         of times per benchmark.
+    ///     </para>
+    ///     <para>
+    ///         Turn it on for a consumer that needs the samples <i>live</i> - a streaming histogram, a
+    ///         sample-level exporter - and accept that the run is being observed more intrusively than
+    ///         the default. Nothing needs it to report a result: the complete series arrives with the
+    ///         result either way, subject to <see cref="MaxRawSamples" />.
+    ///     </para>
+    ///     <para>
+    ///         In-process runs ignore this: the observer is called directly, so there is no boundary to
+    ///         forward across and no cost to opt into.
+    ///     </para>
+    /// </remarks>
+    public bool StreamSamples { get; init; }
+
     public bool EnableSignificance { get; init; } = true;
 
     /// <summary>
@@ -242,7 +350,16 @@ public record MeasurementOptions
     ///     more), letting you plug in your own comparison. Leave <c>null</c> to use the
     ///     default strategy.
     /// </summary>
+    /// <remarks>Excluded from serialization for the reason given on <see cref="OutlierDetector" />.</remarks>
+    [JsonIgnore]
     public ISignificanceTest? SignificanceTest { get; init; }
+
+    /// <summary>
+    ///     A factory for <see cref="SignificanceTest" />, for the reason given on
+    ///     <see cref="OutlierDetectorFactory" />.
+    /// </summary>
+    [JsonIgnore]
+    public Func<ISignificanceTest>? SignificanceTestFactory { get; init; }
 
     /// <summary>
     ///     The significance level (alpha) a benchmark's p-value must fall below to be
@@ -294,27 +411,6 @@ public record MeasurementOptions
     }
 
     /// <summary>
-    ///     Number of times to repeat the benchmark as separate launches.
-    ///     1 (default) runs the benchmark once. Higher values trigger per-launch
-    ///     aggregation and populate <see cref="BenchmarkResult.LaunchStatistics" />.
-    ///     Must be between 1 and <see cref="MaxLaunchCount" />.
-    /// </summary>
-    public int LaunchCount
-    {
-        get => _launchCount;
-        init
-        {
-            if (value is < 1 or > MaxLaunchCount)
-            {
-                throw new ArgumentOutOfRangeException(nameof(value), value,
-                    $"LaunchCount must be between 1 and {MaxLaunchCount}.");
-            }
-
-            _launchCount = value;
-        }
-    }
-
-    /// <summary>
     ///     When <c>false</c> (the default), a runtime warning is emitted when a class with
     ///     <c>InstanceLifetime.PerClass</c> has more than one <c>[Benchmark]</c> method,
     ///     because shared state across methods violates the statistical-independence
@@ -333,6 +429,56 @@ public record MeasurementOptions
     ///     the options record.
     /// </summary>
     public EnvironmentOptions? Environment { get; init; }
+
+    /// <summary>
+    ///     The runtime-startup configuration to measure under - JIT tiering, dynamic PGO,
+    ///     ReadyToRun and GC flavour. Defaults to <see cref="RuntimeProfile.SteadyState" />,
+    ///     which is the only configuration measured to be both precise and accurate.
+    ///     <para>
+    ///         This can only be honoured for benchmarks that run in a child process, because the
+    ///         runtime reads these settings once at startup. An in-process run reports
+    ///         <see cref="RuntimeProfile.Host" /> on its results and carries a warning, rather
+    ///         than claiming a fidelity it does not have. Set
+    ///         <see cref="RuntimeProfile.Host" /> to opt out and inherit the host's configuration
+    ///         everywhere.
+    ///     </para>
+    /// </summary>
+    public RuntimeProfile RuntimeProfile { get; init; } = RuntimeProfile.SteadyState;
+
+    /// <summary>
+    ///     Suppresses the once-per-process guidance that fires when
+    ///     <see cref="RuntimeProfile" /> was requested but could not be applied because the
+    ///     measurement is running in the host process. Set this when in-process measurement is a
+    ///     deliberate choice. The result's <see cref="BenchmarkResult.RuntimeProfileName" /> stamp
+    ///     is unaffected - suppressing the message never suppresses the provenance.
+    /// </summary>
+    public bool SuppressRuntimeProfileWarning { get; init; }
+
+    /// <summary>
+    ///     Turns an isolation refusal into a thrown exception rather than a labelled fallback.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Off by default, because falling back is the right behaviour for the scratchpad use Simple
+    ///         mode exists for: a number measured in this process, clearly labelled, beats no number at
+    ///         all. A run whose whole point is a trustworthy comparison wants the opposite, and until now
+    ///         only Harness mode could ask for it - <c>--strict-isolation</c> inspects results after the
+    ///         fact and sets an exit code, which a library caller has no access to.
+    ///     </para>
+    ///     <para>
+    ///         Set this and a refusal throws, carrying the refusal text, at the point of refusal - before
+    ///         anything has been measured. That is the earliest a caller can act on it and the cheapest
+    ///         place to fail.
+    ///     </para>
+    ///     <para>
+    ///         Excluded from serialization: this is a decision the coordinator makes before a worker
+    ///         exists, and a worker that received it could do nothing with it. A coordinator-only field
+    ///         travelling to a process that ignores it is how a setting comes to look effective while
+    ///         being inert.
+    ///     </para>
+    /// </remarks>
+    [JsonIgnore]
+    public bool RequireIsolation { get; init; }
 
     /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
     public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };

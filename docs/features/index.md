@@ -6,7 +6,7 @@ order: 3
 
 # Features
 
-These pages cover advanced capabilities that apply across the usage modes. They are opt-in features for experienced benchmarkers who need finer control over measurement, filtering, isolation, or runtime environments.
+These pages cover capabilities that apply across the usage modes. Most are opt-in features for finer control over measurement, filtering, or runtime environments; isolated runs are the exception - that one is on by default, and the page explains what it does and how to opt out.
 
 ## [Categories](./categories.md)
 
@@ -22,7 +22,7 @@ Run a benchmark body across multiple input values using the `[BenchmarkCase]` an
 
 ## [Isolated runs](./isolated-runs.md)
 
-Run Suite and Harness benchmarks in clean child processes when runtime state contamination matters more than raw execution speed. Harness mode is isolated by default; suites opt in with `WithIsolation()`.
+Every mode measures in a clean worker process by default, because JIT tiering and GC flavour are fixed at process start and can only be chosen for a process that has not begun. `WithIsolation(false)` opts a suite back into the host process.
 
 ## [Multi-runtime comparison](./multi-runtime.md)
 

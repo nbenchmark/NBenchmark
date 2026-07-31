@@ -28,6 +28,10 @@ internal static class PerformanceAttributeParser
             OutlierMode = NormalizeOutlierMode(ParseOutlierMode(attribute), true),
             ConfidenceLevel = NormalizeConfidenceLevel(ParseDouble(attribute, nameof(PerformanceFactAttribute.ConfidenceLevel))),
             MaxAbsoluteThresholdTolerance = NormalizeTolerance(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxAbsoluteThresholdTolerance))),
+            // RequireIsolation is deliberately absent. It is not an attribute argument - a named
+            // argument cannot distinguish an explicit `false` from an absent one - so it keeps
+            // ParsedThresholds' default of true, and [AllowInProcessGate] is the opt-out.
+            LaunchCount = NormalizeLaunchCount(ParseInt(attribute, nameof(PerformanceFactAttribute.LaunchCount))),
         };
     }
 
@@ -51,6 +55,8 @@ internal static class PerformanceAttributeParser
             OutlierMode = NormalizeOutlierMode(runtime.OutlierMode, false),
             ConfidenceLevel = NormalizeConfidenceLevel(runtime.ConfidenceLevel),
             MaxAbsoluteThresholdTolerance = NormalizeTolerance(runtime.MaxAbsoluteThresholdTolerance),
+            RequireIsolation = runtime.RequireIsolation,
+            LaunchCount = NormalizeLaunchCount(runtime.LaunchCount),
         };
 
         return true;
@@ -98,6 +104,13 @@ internal static class PerformanceAttributeParser
 
     private static double NormalizeTolerance(double value) => value > 0 ? value : 1.0;
 
+    /// <summary>
+    ///     One replicate unless the test asked for more. An unset named argument reads as <c>0</c> here,
+    ///     which is not a valid launch count - and clamping rather than throwing keeps a mistyped
+    ///     attribute from failing the test with a configuration error instead of measuring it.
+    /// </summary>
+    private static int NormalizeLaunchCount(int value) => LaunchCounts.Clamp(value);
+
     private static OutlierMode NormalizeOutlierMode(OutlierMode value, bool treatNoneAsUnset)
     {
         if (treatNoneAsUnset && value == OutlierMode.None)
@@ -125,5 +138,7 @@ internal static class PerformanceAttributeParser
         public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
         public double ConfidenceLevel { get; init; } = 0.95;
         public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
+        public bool RequireIsolation { get; init; } = true;
+        public int LaunchCount { get; init; } = 1;
     }
 }

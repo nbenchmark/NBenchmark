@@ -1,16 +1,6 @@
+using NBenchmark.Observers;
+
 namespace NBenchmark.Engine;
-
-/// <summary>
-///     Distinguishes the two kinds of isolated run that share the unified child launcher.
-/// </summary>
-internal enum IsolatedRunKind
-{
-    /// <summary>A suite launched via <c>BenchmarkSuite.WithIsolation()</c>.</summary>
-    Suite,
-
-    /// <summary>A discovered Host-mode class running under isolated-by-default execution.</summary>
-    Host,
-}
 
 /// <summary>
 ///     The resolved per-benchmark isolation decision in Harness mode, after layering the
@@ -21,19 +11,25 @@ internal enum IsolationDecision
     /// <summary>Run in the host process.</summary>
     InProcess,
 
-    /// <summary>Run with the rest of its declaring class in one shared child process.</summary>
+    /// <summary>Run with the rest of its declaring class in one shared worker process.</summary>
     PerClass,
 
-    /// <summary>Run alone in its own dedicated child process.</summary>
+    /// <summary>Run alone in its own dedicated worker process.</summary>
     PerBenchmark,
 }
 
 /// <summary>
-///     The scalar measurement overrides forwarded to a Host-mode child. The child rebuilds
-///     its base <see cref="MeasurementOptions" /> by re-running the same entry point (so
-///     custom detectors and significance tests survive), then applies these CLI-derived
-///     scalars on top - mirroring what the parent applies in-process.
+///     The CLI-derived deltas layered on top of a programmatically-built
+///     <see cref="MeasurementOptions" />, so a command-line flag overrides a <c>WithOptions</c> call
+///     on that field alone and leaves every other field as the caller configured it.
 /// </summary>
+/// <remarks>
+///     This record is purely a merge step inside one process; nothing here is serialized. Under the
+///     previous file-based isolation design it was also the wire format for a child process, which
+///     re-ran the user's entry point to rebuild its base options and then applied these scalars on
+///     top. A worker now receives the resolved <see cref="MeasurementOptions" /> whole, so the only
+///     surviving job is <c>CliArgs</c> -&gt; <c>MeasurementOptions</c>.
+/// </remarks>
 internal sealed record MeasurementOverrides
 {
     public int? Iterations { get; init; }
@@ -44,13 +40,21 @@ internal sealed record MeasurementOverrides
     public OutlierMode? OutlierMode { get; init; }
     public TailMetricsBasis? TailMetricsBasis { get; init; }
     public MeasurementProfile? Profile { get; init; }
+
+    /// <summary>
+    ///     The runtime-startup configuration requested on the command line. It reaches a worker as
+    ///     environment variables written before the process starts - the only point at which the
+    ///     runtime reads them - so what lands on <see cref="MeasurementOptions" /> here is the record
+    ///     of what was asked for, which is what gets stamped on every result.
+    /// </summary>
+    public RuntimeProfile? RuntimeProfile { get; init; }
     public bool? ForceGc { get; init; }
     public bool? NoAllocations { get; init; }
     public bool? NoGcBetweenBenchmarks { get; init; }
     public double? MinPracticalEffect { get; init; }
 
-    // Auto-tune scalar overrides. AutoTuneOptions is rebuilt by the child re-running its entry
-    // point, so only these CLI-derived deltas travel; the object itself is never serialized.
+    // Auto-tune scalar overrides, layered onto whichever AutoTuneOptions the caller configured
+    // (or onto Preset when one was named) rather than replacing it wholesale.
     public AutoTunePreset? Preset { get; init; }
     public double? CiTarget { get; init; }
     public int? MinSamples { get; init; }
@@ -77,19 +81,28 @@ internal sealed record MeasurementOverrides
 
     public int? MaxDriftRestarts { get; init; }
 
-    public int? LaunchCount { get; init; }
-
     public IReadOnlyList<double>? ReportedPercentiles { get; init; }
 
     public bool? NoHistogram { get; init; }
 
+    /// <summary>
+    ///     Lifts the cap on how many raw samples an isolated worker returns
+    ///     (<see cref="MeasurementOptions.MaxRawSamples" />), set by <c>--emit-raw</c>.
+    /// </summary>
+    public bool? EmitRaw { get; init; }
+
+    /// <summary>
+    ///     Turns on live forwarding of the per-sample observer stream out of an isolated worker
+    ///     (<see cref="MeasurementOptions.StreamSamples" />), set by <c>--stream-samples</c>.
+    /// </summary>
+    public bool? StreamSamples { get; init; }
+
     public DiagnosticsMode? Diagnostics { get; init; }
 
     /// <summary>
-    ///     Environment controls forwarded to a Host-mode child so it can pin itself to
-    ///     the same cores and priority as the parent. The child re-runs the entry point
-    ///     to rebuild its base options, then applies these deltas on top - mirroring what
-    ///     the parent applies in-process. <c>null</c> means the parent set nothing.
+    ///     CPU affinity, process priority and dedicated-host guidance as requested on the command
+    ///     line. Unlike the runtime profile these are settable at any time, so a worker applies them
+    ///     to itself from the options it was sent. <c>null</c> means no environment flag was passed.
     /// </summary>
     public EnvironmentOptions? Environment { get; init; }
 
@@ -103,6 +116,7 @@ internal sealed record MeasurementOverrides
         OutlierMode = cliArgs.OutlierMode,
         TailMetricsBasis = cliArgs.TailMetricsBasis,
         Profile = cliArgs.Profile,
+        RuntimeProfile = cliArgs.RuntimeProfile,
         ForceGc = cliArgs.ForceGc,
         NoAllocations = cliArgs.NoAllocations,
         NoGcBetweenBenchmarks = cliArgs.NoGcBetweenBenchmarks ? true : null,
@@ -123,9 +137,10 @@ internal sealed record MeasurementOverrides
         MinMeasurementTime = cliArgs.MinMeasurementTime,
         DriftTolerance = cliArgs.DriftTolerance,
         MaxDriftRestarts = cliArgs.MaxDriftRestarts,
-        LaunchCount = cliArgs.LaunchCount,
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
+        EmitRaw = cliArgs.EmitRaw,
+        StreamSamples = cliArgs.StreamSamples ? true : null,
         Diagnostics = cliArgs.Diagnostics,
         Environment = BuildEnvironmentFromCli(cliArgs),
     };
@@ -154,6 +169,9 @@ internal sealed record MeasurementOverrides
 
         if (Profile.HasValue)
             result = result with { Profile = Profile.Value };
+
+        if (RuntimeProfile is not null)
+            result = result with { RuntimeProfile = RuntimeProfile };
 
         if (ForceGc.HasValue)
             result = result with { ForceGcBeforeEachIterationOverride = ForceGc.Value };
@@ -267,14 +285,22 @@ internal sealed record MeasurementOverrides
         if (OpsPerSample.HasValue)
             result = result with { OpsPerSample = OpsPerSample.Value };
 
-        if (LaunchCount.HasValue)
-            result = result with { LaunchCount = LaunchCount.Value };
-
         if (ReportedPercentiles is not null)
             result = result with { ReportedPercentiles = ReportedPercentiles };
 
         if (NoHistogram.HasValue && NoHistogram.Value)
             result = result with { EnableHistogram = false };
+
+        // One-way: the flag asks for everything, and its absence means "leave whatever was
+        // configured alone" rather than "impose the default". A programmatic MaxRawSamples would
+        // otherwise be silently reset by any run that parsed a command line.
+        if (EmitRaw.HasValue && EmitRaw.Value)
+            result = result with { MaxRawSamples = MeasurementOptions.UnboundedRawSamples };
+
+        // One-way for the same reason: --stream-samples asks for the stream, and its absence must
+        // not switch off a programmatic WithOptions that asked for it.
+        if (StreamSamples.HasValue && StreamSamples.Value)
+            result = result with { StreamSamples = true };
 
         if (Diagnostics.HasValue)
             result = result with { Diagnostics = DiagnosticsOptions.FromMode(Diagnostics.Value) };
@@ -287,8 +313,8 @@ internal sealed record MeasurementOverrides
 
     /// <summary>
     ///     Builds the <see cref="EnvironmentOptions" /> carried by overrides from the CLI
-    ///     flags. Returns <c>null</c> when no environment flag was set, so the child does
-    ///     nothing when the parent set nothing.
+    ///     flags. Returns <c>null</c> when no environment flag was set, so an absent flag leaves any
+    ///     programmatic configuration alone instead of overwriting it with defaults.
     /// </summary>
     private static EnvironmentOptions? BuildEnvironmentFromCli(CliArgs cliArgs)
     {
@@ -306,7 +332,7 @@ internal sealed record MeasurementOverrides
     }
 
     /// <summary>
-    ///     Layers override environment settings on top of any programmatic ones. CLI
+    ///     Layers CLI environment settings on top of any programmatic ones. CLI
     ///     flags win on a per-field basis for nullable fields (the same pattern as the
     ///     other overrides); unset CLI fields preserve the programmatic value. The
     ///     <see cref="EnvironmentOptions.DedicatedHostGuidance" /> flag is a bool and
@@ -326,214 +352,9 @@ internal sealed record MeasurementOverrides
     }
 }
 
-/// <summary>
-///     The serialized request a parent writes for its child. A Suite request carries the
-///     callsite identity used to replay exactly the right <c>RunAsync</c> call; a Host
-///     request carries the declaring type plus the benchmark names to run. Both carry the
-///     benchmark display names (for naming child results and any errored fallbacks).
-/// </summary>
-internal sealed record IsolatedRunRequest
-{
-    public required IsolatedRunKind Kind { get; init; }
-
-    // Suite callsite-replay identity.
-    public int InvocationOrdinal { get; init; }
-    public string? CallerFilePath { get; init; }
-    public int CallerLineNumber { get; init; }
-    public string? CallerMemberName { get; init; }
-    public string? SuiteName { get; init; }
-
-    // Host discovery identity.
-    public string? DeclaringTypeFullName { get; init; }
-
-    // Shared: which benchmarks to expect results for and how to name them. For Host the
-    // names also select which discovered benchmarks the child runs.
-    public string DisplayPrefix { get; init; } = "";
-    public IReadOnlyList<string> BenchmarkDisplayNames { get; init; } = [];
-
-    // Host-only scalar measurement overrides (Suite children rebuild their own options).
-    public MeasurementOverrides Overrides { get; init; } = new();
-
-    /// <summary>
-    ///     Observer names the parent resolved from <c>--observer</c> flags and programmatic
-    ///     <c>WithObserver</c> calls. The child resolves each through
-    ///     <c>NBenchmark.Observers.ObserverRegistry</c> so the same observers (e.g. the
-    ///     <c>live</c> dashboard observer, an OTLP-exporting observer) fire in the child as in
-    ///     the parent. Empty when the parent attached no observer, in which case the child runs
-    ///     with <c>NullMeasurementObserver.Instance</c>. The child re-runs the entry assembly, so
-    ///     <c>[ModuleInitializer]</c> self-registration populates the registry identically - the
-    ///     names resolve to the same factories.
-    /// </summary>
-    public IReadOnlyList<string> ObserverNames { get; init; } = [];
-
-    /// <summary>
-    ///     The runtime the parent built this child for. When set, the child stamps
-    ///     <see cref="RuntimeMonikerExtensions.ToTargetFramework" /> onto every
-    ///     <see cref="BenchmarkResult.RuntimeMoniker" /> it produces.
-    /// </summary>
-    public RuntimeMoniker? RuntimeMoniker { get; init; }
-
-    /// <summary>
-    ///     Explicit path to the entry assembly DLL. When set, the launcher uses
-    ///     <c>dotnet exec</c> with this path instead of re-running the current process.
-    /// </summary>
-    public string? EntryAssemblyPath { get; init; }
-}
-
-/// <summary>A single benchmark result plus its raw per-iteration samples, as shipped from a child.</summary>
+/// <summary>A single benchmark result paired with the raw samples a worker sent alongside it.</summary>
 internal sealed record IsolatedResultItem
 {
     public required BenchmarkResult Result { get; init; }
     public required double[] RawSamples { get; init; }
-}
-
-/// <summary>The full set of results a child writes back to its parent.</summary>
-internal sealed record IsolatedPayload
-{
-    public required IReadOnlyList<IsolatedResultItem> Items { get; init; }
-}
-
-/// <summary>
-///     The child-side half of isolation: tracks whether the current process is running as
-///     an isolated child, what it was asked to run, and where to write its results. The
-///     parent-side process launch lives in <see cref="ChildProcessLauncher" />.
-/// </summary>
-internal static class IsolatedRunContext
-{
-    private static int SuiteInvocationSequence;
-    private static readonly AsyncLocal<IsolatedRunScope?> Scope = new();
-
-    /// <summary>True when the current process is executing as an isolated child.</summary>
-    public static bool IsActive => Scope.Value is not null;
-
-    public static bool TryGetActiveRequest(out IsolatedRunRequest request)
-    {
-        var scope = Scope.Value;
-
-        if (scope is null)
-        {
-            request = null!;
-            return false;
-        }
-
-        request = scope.Request;
-        return true;
-    }
-
-    /// <summary>
-    ///     Returns the next ordinal for a suite <c>RunAsync</c> call. Parent and child
-    ///     re-run the same entry point, so incrementing on every call keeps their ordinals
-    ///     in lock-step and lets the child identify the requested callsite unambiguously.
-    /// </summary>
-    public static int NextSuiteInvocationOrdinal() => Interlocked.Increment(ref SuiteInvocationSequence);
-
-    internal static void ResetInvocationOrdinalsForTesting() => Interlocked.Exchange(ref SuiteInvocationSequence, 0);
-
-    public static bool IsSuiteRequestMatch(
-        int invocationOrdinal,
-        string callerFilePath,
-        int callerLineNumber,
-        string callerMemberName,
-        string suiteName)
-    {
-        if (!TryGetActiveRequest(out var request))
-            return false;
-
-        return request.Kind == IsolatedRunKind.Suite
-               && request.InvocationOrdinal == invocationOrdinal
-               && PathEquals(request.CallerFilePath, callerFilePath)
-               && request.CallerLineNumber == callerLineNumber
-               && string.Equals(request.CallerMemberName, callerMemberName, StringComparison.Ordinal)
-               && string.Equals(request.SuiteName, suiteName, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    ///     Writes the child's results to the output file the parent supplied. A no-op when
-    ///     the current process is not an isolated child (or has no output path), so the
-    ///     same in-process run helper can be reused by the parent.
-    /// </summary>
-    public static async Task WriteChildPayloadIfRequestedAsync(
-        IReadOnlyList<BenchmarkResult> results,
-        IReadOnlyDictionary<string, double[]> rawSamples,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(results);
-        ArgumentNullException.ThrowIfNull(rawSamples);
-
-        var outputPath = Scope.Value?.OutputPath;
-
-        if (string.IsNullOrWhiteSpace(outputPath))
-            return;
-
-        var items = results
-            .Select(r => new IsolatedResultItem
-            {
-                Result = r with { RawSamples = [] },
-                RawSamples = rawSamples.TryGetValue($"{r.Name}\0{r.RuntimeMoniker}", out var samples) ? samples : [],
-            })
-            .ToList();
-
-        await ChildProcessLauncher.WritePayloadAsync(outputPath, items, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    ///     Child entry wrapper. If the request/output environment variables are set this
-    ///     process is an isolated child: read the request, establish the scope, and run the
-    ///     action. Otherwise run the action unchanged (the common, parent path).
-    /// </summary>
-    public static async Task<T> WithCurrentRequestAsync<T>(Func<Task<T>> action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-
-        var requestPath = Environment.GetEnvironmentVariable(ChildProcessLauncher.RequestPathEnvVar);
-
-        if (string.IsNullOrWhiteSpace(requestPath))
-            return await action().ConfigureAwait(false);
-
-        var request = await ChildProcessLauncher.ReadRequestAsync(requestPath).ConfigureAwait(false);
-        var outputPath = Environment.GetEnvironmentVariable(ChildProcessLauncher.OutputPathEnvVar);
-
-        var prior = Scope.Value;
-        Scope.Value = new IsolatedRunScope(request, outputPath);
-
-        try
-        {
-            return await action().ConfigureAwait(false);
-        }
-        finally
-        {
-            Scope.Value = prior;
-        }
-    }
-
-    internal static async Task<T> WithActiveRequestForTestingAsync<T>(
-        IsolatedRunRequest request,
-        string? outputPath,
-        Func<Task<T>> action)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(action);
-
-        var prior = Scope.Value;
-        Scope.Value = new IsolatedRunScope(request, outputPath);
-
-        try
-        {
-            return await action().ConfigureAwait(false);
-        }
-        finally
-        {
-            Scope.Value = prior;
-        }
-    }
-
-    private static bool PathEquals(string? left, string? right)
-    {
-        if (OperatingSystem.IsWindows())
-            return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
-
-        return string.Equals(left, right, StringComparison.Ordinal);
-    }
-
-    private sealed record IsolatedRunScope(IsolatedRunRequest Request, string? OutputPath);
 }

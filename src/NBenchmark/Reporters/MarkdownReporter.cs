@@ -50,6 +50,45 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine(
             $"> **{tables[0].RunAtUtc} UTC** · {tables[0].WarmupIterations} warmup · {tables[0].MeasuredIterations} measured · {tables[0].Profile.ToString().ToLowerInvariant()} profile");
 
+        // The runtime configuration is provenance a reader needs to interpret the numbers at all,
+        // so it goes in the header rather than a footnote.
+        var runtimeKnobs = string.IsNullOrEmpty(tables[0].RuntimeKnobs)
+            ? "inherited, not applied by NBenchmark"
+            : tables[0].RuntimeKnobs;
+
+        sb.AppendLine($"> Runtime: **{tables[0].RuntimeProfileName}** ({runtimeKnobs})");
+
+        // Provenance for a file someone will still have in six months. The epoch is the part that
+        // is not guessable from the numbers: two runs can look comparable and not be.
+        sb.AppendLine(
+            $"> Format: schema {ReportFormat.SchemaVersion}, measurement epoch "
+            + $"{ReportFormat.MeasurementEpoch} (numbers are comparable only with the same epoch)");
+
+        if (tables.Any(t => t.MixedRuntimeProfiles))
+        {
+            sb.AppendLine(
+                "> ⚠️ Rows were measured under different runtime configurations and are not "
+                + "comparable with each other.");
+        }
+
+        if (tables.Any(t => t.Rows.Any(r => r.RatioSuppressed)))
+        {
+            sb.AppendLine(
+                "> ⚠️ Ratios shown as `n/a` were withheld: those rows were not measured under the "
+                + "baseline's runtime configuration, so the ratio would have reported that "
+                + "difference rather than a difference between the benchmarks.");
+        }
+
+        if (tables.Any(t => t.Rows.Any(r => !r.IsBaseline && r.RatioEstimate is { IncludesUnity: true })))
+        {
+            sb.AppendLine(
+                "> ⚠️ A `Ratio CI` spanning `1.00x` means this run cannot distinguish that benchmark "
+                + "from the baseline, however far the ratio sits from 1.00. The interval is the paired "
+                + "per-launch ratio - each launch's own ratio, formed inside one worker process, so "
+                + "that worker's CPU draw and memory layout divide out - and it is what a re-run would "
+                + "reproduce. Raise `--launch-count` to narrow it.");
+        }
+
         sb.AppendLine();
 
         foreach (var table in tables)
@@ -96,6 +135,9 @@ public sealed class MarkdownReporter : IReporter
         var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
         var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
         var showRuntime = table.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+
+        // Only when the rows disagree; on a uniform table it would be a constant column.
+        var showIsolation = table.MixedIsolationStatuses;
         var showClass = BenchmarkTable.CrossClassMode && table.Rows.Any(r => r.ClassName.Length > 0);
         var paramNames = table.ParameterNames;
         var isSimple = detail == ReportDetail.Simple;
@@ -105,6 +147,7 @@ public sealed class MarkdownReporter : IReporter
         // values, the fastest point in the table. They collapse to a lone Scale bar only when
         // nothing could be ranked (for example a class whose benchmarks all errored).
         var hasComparisons = table.Rows.Any(r => !r.Errored && !double.IsNaN(r.Ratio));
+        var showRatioInterval = table.Rows.Any(r => r.RatioEstimate is not null);
 
         var header = new StringBuilder("| | Benchmark |");
 
@@ -113,6 +156,9 @@ public sealed class MarkdownReporter : IReporter
 
         if (showRuntime)
             header.Append(" Runtime |");
+
+        if (showIsolation)
+            header.Append(" Isolation |");
 
         foreach (var name in paramNames)
         {
@@ -127,6 +173,9 @@ public sealed class MarkdownReporter : IReporter
 
         if (showRuntime)
             separator.Append("---:|");
+
+        if (showIsolation)
+            separator.Append("---|");
 
         foreach (var _ in paramNames)
         {
@@ -146,8 +195,20 @@ public sealed class MarkdownReporter : IReporter
 
         if (hasComparisons)
         {
-            header.Append(" Ratio | Scale | Sig |");
-            separator.Append(":---:|---|---:|");
+            header.Append(" Ratio |");
+            separator.Append(":---:|");
+
+            // Markdown is not width-constrained the way an 80-column terminal is, so the interval gets
+            // its own column here rather than being compressed to a marker. It is the column that says
+            // whether the ratio beside it is a measured difference at all.
+            if (showRatioInterval)
+            {
+                header.Append(" Ratio CI |");
+                separator.Append(":---:|");
+            }
+
+            header.Append(" Scale | Sig |");
+            separator.Append("---|---:|");
 
             if (!isSimple)
             {
@@ -186,6 +247,9 @@ public sealed class MarkdownReporter : IReporter
 
                 if (showRuntime)
                     errored.Append($" {row.RuntimeMoniker} |");
+
+                if (showIsolation)
+                    errored.Append($" {row.IsolationStatus.ToLabel()} |");
 
                 foreach (var name in paramNames)
                 {
@@ -233,6 +297,9 @@ public sealed class MarkdownReporter : IReporter
             if (showRuntime)
                 line.Append($" {row.RuntimeMoniker} |");
 
+            if (showIsolation)
+                line.Append($" {row.IsolationStatus.ToLabel()} |");
+
             foreach (var name in paramNames)
             {
                 line.Append($" {FormatParameterCell(row, name)} |");
@@ -256,7 +323,12 @@ public sealed class MarkdownReporter : IReporter
                     _ => "-",
                 };
 
-                line.Append($" {FormatRatioText(row)} | {bar} | {sigIcon} |");
+                line.Append($" {FormatRatioText(row)} |");
+
+                if (showRatioInterval)
+                    line.Append($" {FormatRatioInterval(row)} |");
+
+                line.Append($" {bar} | {sigIcon} |");
 
                 if (!isSimple)
                 {
@@ -579,6 +651,11 @@ public sealed class MarkdownReporter : IReporter
 
     private static string FormatRatioText(BenchmarkRow row)
     {
+        // Distinct from "-", which means there was nothing to compare. This row had something to
+        // compare against and the comparison was refused; saying so is the point.
+        if (row.RatioSuppressed)
+            return "n/a";
+
         if (double.IsNaN(row.Ratio))
             return "-";
 
@@ -586,6 +663,25 @@ public sealed class MarkdownReporter : IReporter
             return "_baseline_";
 
         return $"**{row.Ratio:F2}x**";
+    }
+
+    /// <summary>
+    ///     The paired interval on the ratio, with the point estimate emphasised only when the interval
+    ///     excludes 1.00x - i.e. only when there is a measured difference to emphasise.
+    /// </summary>
+    private static string FormatRatioInterval(BenchmarkRow row)
+    {
+        if (row.IsBaseline || row.RatioSuppressed)
+            return "-";
+
+        if (row.RatioEstimate is not { } ratio)
+            return "-";
+
+        // Marked rather than merely stated, because a reader scanning a column of ranges will not
+        // mentally test each one against 1.00.
+        return ratio.IncludesUnity
+            ? $"{ratio.FormatInterval()} ⚠️"
+            : ratio.FormatInterval();
     }
 
     private static string FormatP(double p) => p < 0.001 ? "<0.001" : p.ToString("0.###");

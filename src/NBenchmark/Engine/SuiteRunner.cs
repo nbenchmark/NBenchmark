@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using NBenchmark.Diagnostics;
 
 namespace NBenchmark.Engine;
@@ -21,9 +20,7 @@ internal static class SuiteRunner
         ArgumentNullException.ThrowIfNull(envelopes);
         ArgumentNullException.ThrowIfNull(progress);
 
-        var ordered = order == RunOrder.Random
-            ? Shuffle(envelopes.ToList(), seed ?? Random.Shared.Next())
-            : envelopes.ToList();
+        var ordered = RunOrdering.Apply(envelopes, order, seed);
 
         var results = new List<BenchmarkResult>(ordered.Count);
         var rawSamples = new Dictionary<string, double[]>(ordered.Count);
@@ -117,20 +114,6 @@ internal static class SuiteRunner
         }
 
         return (results, rawSamples);
-    }
-
-    private static List<BenchmarkEnvelope> Shuffle(List<BenchmarkEnvelope> items, int seed)
-    {
-        var rng = new Random(seed);
-        var span = CollectionsMarshal.AsSpan(items);
-
-        for (var i = span.Length - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (span[i], span[j]) = (span[j], span[i]);
-        }
-
-        return items;
     }
 
     private static bool ShouldForceGcBetweenBenchmarks(MeasurementOptions options, BenchmarkResult result)

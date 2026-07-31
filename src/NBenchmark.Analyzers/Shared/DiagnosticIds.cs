@@ -15,4 +15,10 @@ public static class DiagnosticIds
     public const string PerClassWithScopedService = "NB0011";
     public const string BenchmarkCaseConflict = "NB0012";
     public const string PerClassMutableField = "NB0013";
+
+    /// <summary>
+    ///     A benchmark lambda captures state from its enclosing scope, so it cannot be addressed
+    ///     across a process boundary and will be measured in the host process.
+    /// </summary>
+    public const string CapturingBody = "NB0014";
 }
