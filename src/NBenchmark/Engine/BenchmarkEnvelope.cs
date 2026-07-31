@@ -1,4 +1,5 @@
 using NBenchmark.Discovery;
+using NBenchmark.Workers;
 
 namespace NBenchmark.Engine;
 
@@ -13,6 +14,63 @@ internal sealed record BenchmarkEnvelope(
     public string OriginalName { get; init; } = Name;
     public IReadOnlyList<BenchmarkParameter> ParameterSet { get; init; } = [];
 
+    /// <summary>
+    ///     The user's own delegate, kept alongside the wrapper that invokes it, so the body can be
+    ///     <i>addressed</i> for measurement in another process.
+    ///     <para>
+    ///         <see cref="RunAsync" /> is a closure this library built; its metadata token identifies
+    ///         NBenchmark's own wrapper, not the user's code. Only the raw delegate points at the
+    ///         method the developer actually wrote. <c>null</c> means "cannot be isolated", never
+    ///         "guess".
+    ///     </para>
+    ///     <para>
+    ///         For a parameterized benchmark this is the user's <i>typed</i> lambda - the one that still
+    ///         takes its parameters - with the values it should be called with in
+    ///         <see cref="Arguments" />. That pairing is what makes a parameter sweep isolatable: the
+    ///         typed lambda captures nothing and always could be addressed, and what could not cross was
+    ///         only the wrapper NBenchmark built to bind the value.
+    ///     </para>
+    /// </summary>
+    public Delegate? Body { get; init; }
+
+    /// <summary>
+    ///     Values to call <see cref="Body" /> with, in declaration order. Empty for the parameterless
+    ///     bodies that are the common case.
+    /// </summary>
+    public IReadOnlyList<object?> Arguments { get; init; } = [];
+
+    /// <summary>
+    ///     A parameterless factory producing <see cref="Body" />'s single argument, when the benchmark
+    ///     is measured over prepared state.
+    ///     <para>
+    ///         Invoked once per benchmark, immediately before that benchmark's warmup, in whichever
+    ///         process measures it. Per benchmark rather than per suite deliberately: a suite comparing
+    ///         two sorts over one shared array would have the second measure what the first already
+    ///         sorted, which is the order-dependence trap the run-order randomizer exists to expose.
+    ///     </para>
+    /// </summary>
+    public Delegate? StateFactory { get; init; }
+
+    /// <summary>
+    ///     Per-iteration setup, if the caller supplied one. Kept as the delegate rather than as a flag
+    ///     so it can be <i>addressed</i> like a body: a hook that captures nothing is no less
+    ///     reproducible in a worker than the benchmark it wraps, and refusing on the mere presence of
+    ///     one made the common shape - <c>setup: () =&gt; Cache.Clear()</c> - cost the whole suite its
+    ///     isolation for nothing.
+    /// </summary>
+    public Delegate? IterationSetup { get; init; }
+
+    /// <inheritdoc cref="IterationSetup" />
+    public Delegate? IterationTeardown { get; init; }
+
+    /// <summary>
+    ///     Whether this benchmark carries per-iteration hooks. Derived rather than stored: a stored
+    ///     flag can disagree with the delegates it describes, and it did - the parameterized
+    ///     registrations never set it, which was invisible only because they carried no addressable
+    ///     body either.
+    /// </summary>
+    public bool HasIterationHooks => IterationSetup is not null || IterationTeardown is not null;
+
     public static BenchmarkEnvelope FromDiscovered(
         BenchmarkMethodDefinition method,
         string className,
@@ -24,21 +82,25 @@ internal sealed record BenchmarkEnvelope(
         var categories = method.Categories;
         var attributeIterations = method.Attribute.Iterations;
         var attributeWarmupIterations = method.Attribute.WarmupIterations;
-        var attributeLaunchCount = method.Attribute.LaunchCount;
         var hasIterationsOverride = method.Attribute.HasIterationsOverride;
         var hasWarmupIterationsOverride = method.Attribute.HasWarmupIterationsOverride;
-        var hasLaunchCountOverride = method.Attribute.HasLaunchCountOverride;
         var iterationSetupDel = method.IterationSetupDelegate;
         var iterationTeardownDel = method.IterationTeardownDelegate;
-        var asyncDel = method.AsyncDelegate;
-        var syncDel = method.SyncDelegate;
-        var resultConsumer = method.ResultConsumer;
+        var bodyFactory = method.BodyFactory
+                          ?? throw new InvalidOperationException(
+                              $"Benchmark '{method.DisplayName}' carries no body factory, so there is "
+                              + "nothing to measure. Definitions must come from BenchmarkDiscoverer.");
 
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync = (spec, ct) =>
         {
             var instance = instanceFactory();
             var specWithOverride = spec;
 
+            // Only the attribute overrides a measurement pass can act on. [Benchmark(LaunchCount)] is
+            // not one of them: a launch is a process, so it is read by whichever coordinator spawns
+            // them and never reaches here. It used to be applied to the options anyway, guarded on
+            // their launch count already being 1 - which every request path had pinned it to, making
+            // a transport detail decide whether a user's attribute took effect.
             if (spec.Options.Iterations is not 0)
             {
                 var overriddenOptions = spec.Options;
@@ -48,9 +110,6 @@ internal sealed record BenchmarkEnvelope(
 
                 if (hasWarmupIterationsOverride)
                     overriddenOptions = overriddenOptions with { WarmupIterations = attributeWarmupIterations };
-
-                if (hasLaunchCountOverride && spec.Options.LaunchCount == 1)
-                    overriddenOptions = overriddenOptions with { LaunchCount = attributeLaunchCount };
 
                 specWithOverride = spec with { Options = overriddenOptions };
             }
@@ -74,7 +133,10 @@ internal sealed record BenchmarkEnvelope(
             };
 
             var specWithClass = specWithIter with { ClassName = className };
-            return ExecuteAsync(name, asyncDel, syncDel, resultConsumer, instance, specWithClass, ct);
+
+            // Bound once per run, outside the measured region: the delegate handed to the engine
+            // has the benchmark method's own signature and its receiver already captured.
+            return DelegateDispatch.MeasureAsync(name, bodyFactory(instance), specWithClass, ct);
         };
 
         var parameterSet = method.ParameterSet;
@@ -83,44 +145,6 @@ internal sealed record BenchmarkEnvelope(
         {
             ParameterSet = parameterSet,
         };
-    }
-
-    private static Task<MeasurementOutcome> ExecuteAsync(
-        string name,
-        Func<object, Task>? asyncDel,
-        Func<object, object?>? syncDel,
-        Action<Task>? resultConsumer,
-        object instance,
-        RunSpec spec,
-        CancellationToken ct)
-    {
-        if (asyncDel is not null)
-        {
-            if (resultConsumer is not null)
-            {
-                var returningBody = async () =>
-                {
-                    var task = asyncDel(instance);
-                    await task.ConfigureAwait(false);
-                    resultConsumer(task);
-                };
-
-                return BenchmarkRunner.Instance.RunAsync(name, returningBody, spec, ct);
-            }
-
-            var voidBody = async () =>
-            {
-                var task = asyncDel(instance);
-                await task.ConfigureAwait(false);
-            };
-
-            return BenchmarkRunner.Instance.RunAsync(name, voidBody, spec, ct);
-        }
-
-        var sd = syncDel!;
-        var consumer = BenchmarkRunner.GetResultConsumer<object?>();
-        var syncBody = () => consumer(sd(instance));
-        return Task.FromResult(BenchmarkRunner.Instance.Run(name, syncBody, spec, ct));
     }
 }
 

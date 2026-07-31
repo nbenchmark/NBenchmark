@@ -107,26 +107,10 @@ public static class PerformanceAssert
             return violations;
         }
 
-        if (result.Errored)
-            violations.Add($"Benchmark errored: {result.ErrorMessage}");
-
-        var thresholds = new PerformanceThresholds
-        {
-            MaxMeanNs = options.MaxMeanNs >= 0 ? options.MaxMeanNs : null,
-            MaxP95Ns = options.MaxP95Ns >= 0 ? options.MaxP95Ns : null,
-            MaxAllocatedBytes = options.MaxAllocatedBytes >= 0 ? options.MaxAllocatedBytes : null,
-            MaxAbsoluteThresholdTolerance = options.MaxAbsoluteThresholdTolerance,
-        };
-
-        violations.AddRange(BenchmarkAssert.Validate(result, thresholds));
-
-        if (options.MaxSlowdownRatio > 0 && !result.Errored)
-        {
-            var calibration = PerformanceCalibration.Run();
-
-            violations.AddRange(RelativeComparison.Check(
-                result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, options.MaxSlowdownRatio));
-        }
+        // The same gate the attribute pattern uses, so an assertion here and a gate there cannot
+        // disagree about the same numbers. There is no reference method on this path, so the ratio
+        // is against the calibration body; the isolation rules still apply.
+        violations.AddRange(PerformanceGate.Evaluate(result, rawSamples, null, null, options).Violations);
 
         return violations;
     }

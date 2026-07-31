@@ -4,11 +4,22 @@ namespace NBenchmark.Engine;
 
 internal static class BenchmarkLifecycle
 {
+    /// <summary>
+    ///     Stands in for the receiver of a static class's benchmarks, which never read it.
+    /// </summary>
+    private static readonly object StaticClassReceiver = new();
+
     public static (object Instance, Action InstanceTeardown)? CreateInstance(
         Type type, Func<Type, InstanceHandle>? instanceFactory)
     {
         try
         {
+            // A static class (abstract and sealed) has no instance and needs none: every delegate
+            // built for its methods ignores the receiver. Trying to construct one throws, which
+            // would report a perfectly measurable benchmark as un-instantiable.
+            if (type.IsAbstract && type.IsSealed)
+                return (StaticClassReceiver, () => { });
+
             if (instanceFactory is null)
             {
                 var instance = Activator.CreateInstance(type);

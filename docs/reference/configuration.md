@@ -22,7 +22,7 @@ Task-based configuration guides for common benchmarking situations. Each guide s
 | --- | --- |
 | `Environment.ProcessPriority = High` | Reduces preemption by unrelated OS work. The benchmark thread is less likely to be paused mid-sample. |
 | `OutlierMode.MedianAbsoluteDeviation` | More robust than the default IQR fence when a heavy tail of preempted samples distorts the quartile-based fence. MAD has a 50% breakdown point. |
-| `LaunchCount = 3` | Runs the benchmark 3 times as independent launches. The best (lowest-median) launch is reported, giving you a second layer of noise rejection. |
+| `.WithLaunchCount(3)` | Runs the benchmark 3 times as independent launches, one worker process each. The reported number is the average across them and the interval is the spread between them, so it describes reproducibility rather than one process's precision. |
 | `AutoTune.CapBehavior = Error` | If the wall-clock cap is hit before the CI target is met, the benchmark errors instead of silently reporting a wide interval. |
 
 **Fluent API:**
@@ -103,7 +103,7 @@ dotnet run -- --auto-tune quick --warmup 4 --iterations 20 --confidence 0.90
 | --- | --- |
 | `AutoTune = AutoTuneOptions.Thorough` | Raises the CI target to ±1%, minimum samples to 100, and minimum warmup to 16. |
 | `ConfidenceLevel = 0.99` | A 99% CI is wider and more conservative. |
-| `LaunchCount = 5` | Multiple independent launches let you report cross-launch statistics and the best representative run. |
+| `.WithLaunchCount(5)` | Multiple independent launches let you report cross-launch statistics and an interval that reflects run-to-run variance. |
 | `EnableHistogram = true` | The latency histogram gives you the full distribution, not just summary statistics. |
 
 **Fluent API:**
@@ -322,23 +322,25 @@ Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per 
 ### LaunchCount
 
 ```csharp
-LaunchCount = 1   // default
+.WithLaunchCount(1)   // default
 ```
 
-The number of times to repeat each benchmark as a separate launch, typed as `int`:
+The number of times to repeat each benchmark as a separate launch, typed as `int`.
 
-`MeasurementOptions` default is `1`; Harness mode applies `3` by default when launch count is not explicitly pinned via `WithLaunchCount`, `WithOptions`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`.
+**It is not a field on `MeasurementOptions`.** A launch is a *process*, so the count is spent by whichever coordinator launches the workers; a worker measures exactly once and is never sent the count. The bounds and defaults live on the `LaunchCounts` static class; the value is set through the fluent builders, the attributes, or the flag.
+
+The default is `1`; Harness mode applies `LaunchCounts.HarnessDefault` (`3`) when the launch count is not pinned via `WithLaunchCount`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`. Pass `WithLaunchCount(1)` to opt out of the harness default.
 
 | Value | Behaviour |
 |---|---|
 | `1` **(default)** | Run the benchmark once. No aggregation. |
-| `> 1` | Repeat the full benchmark (warmup + measurement) N times. Cross-launch statistics (mean, stddev, median, CI across launch medians) are computed and stored in `BenchmarkResult.LaunchStatistics`. The primary result fields reflect the **best** launch (lowest median). Valid range: `2` to `100`. |
+| `> 1` | Repeat the full benchmark (warmup + measurement) N times, each in its own worker process. Cross-launch statistics (mean, stddev, median, CI across launch medians) are computed and stored in `BenchmarkResult.LaunchStatistics`. The primary result fields are the **average across launches**, and the reported interval comes from the spread between them. Valid range: `2` to `100`. |
 
 Use multiple launches when single-run noise is a concern and you want to see how much the median itself varies across independent measurements. Each launch includes its own warmup and GC cycle, so consecutive launches are independent measurements of the same body - not correlated samples.
 
-**Dry-run interaction:** When `--dry-run` (Iterations=0, WarmupIterations=0) is combined with `LaunchCount > 1`, exactly one dry launch is performed. The extra launches would not add information since dry runs skip the body.
+**Dry-run interaction:** `--dry-run` (Iterations=0, WarmupIterations=0) takes neither the harness default nor `--launch-count`, so it performs exactly one dry launch. A dry run exists to prove the wiring works without measuring anything, and repeating it would be several times the startup cost for the same nothing. An explicit `WithLaunchCount(n)` in code is still honoured, because it is the only signal that could have meant a dry run specifically.
 
-**Isolation interaction:** When the benchmark runs in a child process (Harness mode default, or `WithIsolation()` in suite mode), the parent spawns N children. The child process is unaware of the launch count.
+**Isolation interaction:** When the benchmark runs in a worker process - the default in every mode - the coordinator spawns N workers. A worker is not merely unaware of the launch count - it is never sent one.
 
 **Attribute override:** In Harness mode each `[Benchmark]` can override the launch count per-method:
 
@@ -348,7 +350,7 @@ Use multiple launches when single-run noise is a concern and you want to see how
 public void MyNoisyBenchmark() => SlowOperation();
 ```
 
-The CLI flag `--launch-count` always takes priority over both `WithOptions` and the per-method attribute.
+The CLI flag `--launch-count` always takes priority over `WithLaunchCount`. The per-method attribute is applied on top for that method, and an isolated group takes the maximum across its members so every benchmark in it gets at least the launches it asked for.
 
 BenchmarkSuite fluent method: `.WithLaunchCount(5)`  
 CLI flag: `--launch-count <n>`
@@ -430,6 +432,46 @@ options with { ForceGcBetweenBenchmarksOverride = false }
 BenchmarkHarness fluent method: `.WithMeasurementProfile(MeasurementProfile.Independent)`
 BenchmarkSuite fluent method: `.WithMeasurementProfile(MeasurementProfile.Independent)`
 CLI flag: `--profile independent`
+
+### RuntimeProfile
+
+```csharp
+RuntimeProfile = RuntimeProfile.SteadyState   // default
+```
+
+The runtime-startup configuration a benchmark is measured under: JIT tiering, dynamic PGO, ReadyToRun, and GC flavour. Distinct from `Profile` above, which controls GC behaviour *during* a run.
+
+| Profile | Configuration | Use for |
+| --- | --- | --- |
+| `RuntimeProfile.SteadyState` | tiering off, PGO off, R2R off | **(default)** fully-optimized steady-state throughput |
+| `RuntimeProfile.Production` | tiering on, PGO on, R2R on | what ships; reproducible but imprecise |
+| `RuntimeProfile.ServerGc` | `SteadyState` + non-concurrent server GC | code destined for a server-GC host |
+| `RuntimeProfile.Host` | nothing set | inherit the host's configuration |
+
+**These settings can only be applied to a process as it starts** - the runtime reads them once and never re-reads them. So they can be honoured for benchmarks that run in a worker, and cannot be honoured for anything measured in the host process.
+
+NBenchmark therefore reports what was *actually* applied rather than what was requested. Every result carries:
+
+- `RuntimeProfileName` - the profile actually in effect, or `"host"` when the measuring process inherited its configuration.
+- `RuntimeKnobs` - the knobs in effect, e.g. `"tiered=off pgo=off r2r=off"`, read from the measuring process's own environment. A knob you set by hand is reported just as faithfully as one NBenchmark applied.
+
+Results measured under different runtime profiles are **never placed in the same comparison group**, so no significance test, effect size, ratio or threshold gate ever spans them. A table that mixes them (a class combining `[InProcess]` benchmarks with isolated ones) is flagged.
+
+Custom profiles are supported; `ExtraEnvironment` forwards any additional variables verbatim:
+
+```csharp
+var profile = RuntimeProfile.SteadyState with
+{
+    Name = "steady-state-big-gen0",
+    ExtraEnvironment = new Dictionary<string, string> { ["DOTNET_GCgen0size"] = "1E00000" },
+};
+```
+
+BenchmarkHarness fluent method: `.WithRuntimeProfile(RuntimeProfile.Production)`
+BenchmarkSuite fluent method: `.WithRuntimeProfile(RuntimeProfile.Production)`
+CLI flag: `--runtime-profile production`
+
+See [`--runtime-profile`](cli.md#--runtime-profile-profile) for the measured impact and the full list of limitations.
 
 ### ForceGcBeforeEachIteration
 

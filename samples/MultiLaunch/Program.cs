@@ -6,9 +6,10 @@ using NBenchmark.Reporters.Console;
 // Each launch includes its own warmup and GC cycle, so variance across launches
 // reflects real run-to-run differences (process state, ASLR, scheduler placement).
 //
-// When LaunchCount > 1, the console reporter shows an additional "Launch Aggregation"
-// table with cross-launch statistics. The primary result uses the best launch
-// (lowest median), so the main table shows the most favourable reading.
+// Above one launch, the console reporter shows an additional "Launch Aggregation"
+// table with cross-launch statistics. The primary result is the average across the
+// launches, and its interval is the spread between them - so the headline number
+// describes reproducibility rather than one lucky process.
 //
 // Run with: dotnet run --project samples/MultiLaunch
 // Run with: dotnet run --project samples/MultiLaunch -- --launch-count 5

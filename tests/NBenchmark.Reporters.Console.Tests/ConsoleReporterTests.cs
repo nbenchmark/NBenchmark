@@ -134,6 +134,53 @@ public class ConsoleReporterTests
         Assert.Contains("runtime-scoped in multi-runtime runs; combined summary omitted.", output);
     }
 
+    /// <summary>
+    ///     The number that must never be printed. An in-process row measured against an isolated
+    ///     baseline differs from it mostly by runtime configuration, so its "ratio" is a fabricated
+    ///     effect - the default <c>samples/Harness</c> run used to report one as 0.38x.
+    /// </summary>
+    [Fact]
+    public async Task ConsoleReporter_Prints_NA_Instead_Of_A_Cross_Configuration_Ratio()
+    {
+        var reporter = new ConsoleReporter();
+
+        var baseline = MakeResult("iso-baseline", 400) with
+        {
+            IsBaseline = true,
+            IsolationStatus = IsolationStatus.Isolated,
+            RuntimeProfileName = RuntimeProfile.SteadyState.Name,
+        };
+
+        var candidate = MakeResult("iso-candidate", 800) with
+        {
+            IsolationStatus = IsolationStatus.Isolated,
+            RuntimeProfileName = RuntimeProfile.SteadyState.Name,
+        };
+
+        var inHost = MakeResult("in-host", 100) with
+        {
+            IsolationStatus = IsolationStatus.InProcessRequested,
+            RuntimeProfileName = RuntimeProfile.Host.Name,
+        };
+
+        AnsiConsole.Record();
+
+        await reporter.ReportAsync([baseline, candidate, inHost]);
+
+        var output = AnsiConsole.ExportText();
+
+        Assert.Contains("n/a", output);
+        Assert.DoesNotContain("0.25x", output);
+
+        // The legitimate comparison, between the two rows measured the same way, still stands.
+        Assert.Contains("2.00x", output);
+
+        // And the table says which rows were measured where, rather than leaving the reader to
+        // infer it from a footer that names no rows.
+        Assert.Contains("Iso", output);
+        Assert.Contains("isolated worker process", output);
+    }
+
     [Fact]
     public async Task ConsoleReporter_Diagnostics_Leaves_Blank_For_Missing_CpuRatio()
     {

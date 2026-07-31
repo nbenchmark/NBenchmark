@@ -24,6 +24,24 @@ public static class MeasurementOptionsBuilder
         return options;
     }
 
+    /// <summary>
+    ///     The replicate count the attribute asked for, spent by <c>TestMethodRunner</c> launching one
+    ///     worker per launch.
+    /// </summary>
+    /// <remarks>
+    ///     Returned separately from <see cref="Build" /> rather than as a field on
+    ///     <see cref="MeasurementOptions" />, because a launch is a process and the options are handed
+    ///     to each of them - see <see cref="LaunchCounts" />. Clamped rather than validated: an
+    ///     attribute is a compile-time constant, and throwing here would fail the test with a
+    ///     configuration error instead of measuring it.
+    /// </remarks>
+    public static int LaunchCount(IPerformanceThresholds thresholds)
+    {
+        ArgumentNullException.ThrowIfNull(thresholds);
+
+        return LaunchCounts.Clamp(thresholds.LaunchCount);
+    }
+
     private static OutlierMode NormalizeOutlierMode(OutlierMode mode)
     {
         return mode is OutlierMode.None

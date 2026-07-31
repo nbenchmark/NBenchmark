@@ -35,6 +35,51 @@ public class BenchmarkResultTests
         Assert.Equal(102.5, result.ConfidenceIntervalUpper);
     }
 
+    /// <summary>
+    ///     A result nobody stamped must not claim isolation.
+    /// </summary>
+    /// <remarks>
+    ///     This is a guard on a property initializer rather than on behaviour, because the initializer
+    ///     is the entire invariant: <see cref="IsolationStatus.Isolated" /> is <c>0</c>, so
+    ///     <c>default(IsolationStatus)</c> is the <i>permissive</i> value and any construction path
+    ///     that bypassed the initializer would claim a fidelity it never had. The enum cannot be
+    ///     renumbered to remove the hazard - its values travel on the wire inside
+    ///     <see cref="BenchmarkResult" /> - so the initializer stays, and this test fails if it is
+    ///     dropped.
+    /// </remarks>
+    [Fact]
+    public void IsolationStatus_DefaultsToHostMeasured()
+    {
+        var result = new BenchmarkResult
+        {
+            Name = "test",
+            Mean = 0,
+            Median = 0,
+            Percentiles = [],
+            Min = 0,
+            Max = 0,
+            StandardDeviation = 0,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 0,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = null,
+            AllocP95 = null,
+            AllocMax = null,
+        };
+
+        Assert.Equal(IsolationStatus.InProcessRequested, result.IsolationStatus);
+        Assert.False(result.IsolationStatus.IsIsolated());
+
+        // The hazard being guarded against, stated so a future reader does not "tidy" the initializer
+        // away on the grounds that the default looks harmless.
+        Assert.Equal(IsolationStatus.Isolated, default);
+    }
+
     [Fact]
     public void Default_OutlierMode_Is_IqrFence()
     {

@@ -1,15 +1,17 @@
+using System.Diagnostics;
+using NBenchmark.Workers;
 using NBenchmark.Engine;
 using Xunit;
 
 namespace NBenchmark.Tests;
 
-public class ChildProcessLauncherTelemetryTests
+public class WorkerTelemetryForwardingTests
 {
     // The NBenchmark-specific endpoint env var.
     private const string NbenchmarkEndpointEnvVar = "NBENCHMARK_OTEL_ENDPOINT";
 
     // The OTel-standard env vars the launcher forwards from parent to child. Mirrored from
-    // ChildProcessLauncher.OtelStandardEnvVars so the test stays close to the contract.
+    // MeasurementBudget's OtelStandardEnvVars so the test stays close to the contract.
     private static readonly string[] OtelEnvVars =
     [
         "OTEL_EXPORTER_OTLP_ENDPOINT",
@@ -31,7 +33,7 @@ public class ChildProcessLauncherTelemetryTests
     {
         using var _ = WithEnv(("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4317"));
 
-        var psi = ChildProcessLauncher.BuildStartInfo();
+        var psi = BuildStartInfo();
 
         Assert.Equal("http://collector:4317", psi.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"]);
     }
@@ -41,7 +43,7 @@ public class ChildProcessLauncherTelemetryTests
     {
         using var _ = WithEnv(("OTEL_RESOURCE_ATTRIBUTES", "deployment.environment=ci"));
 
-        var psi = ChildProcessLauncher.BuildStartInfo();
+        var psi = BuildStartInfo();
 
         Assert.Equal("deployment.environment=ci", psi.Environment["OTEL_RESOURCE_ATTRIBUTES"]);
     }
@@ -51,7 +53,7 @@ public class ChildProcessLauncherTelemetryTests
     {
         using var _ = WithEnv(("OTEL_SERVICE_NAME", "nbench-ci"));
 
-        var psi = ChildProcessLauncher.BuildStartInfo();
+        var psi = BuildStartInfo();
 
         Assert.Equal("nbench-ci", psi.Environment["OTEL_SERVICE_NAME"]);
     }
@@ -63,7 +65,7 @@ public class ChildProcessLauncherTelemetryTests
         // wired only against OTEL_EXPORTER_OTLP_ENDPOINT still picks it up.
         using var _ = WithEnv((NbenchmarkEndpointEnvVar, "http://mirror-target:4318"));
 
-        var psi = ChildProcessLauncher.BuildStartInfo();
+        var psi = BuildStartInfo();
 
         Assert.Equal("http://mirror-target:4318", psi.Environment[NbenchmarkEndpointEnvVar]);
         Assert.Equal("http://mirror-target:4318", psi.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"]);
@@ -77,35 +79,9 @@ public class ChildProcessLauncherTelemetryTests
         // directly is not surprised.
         using var _ = WithEnv(("OTEL_EXPORTER_OTLP_ENDPOINT", "http://explicit:4317"), (NbenchmarkEndpointEnvVar, "http://mirror:4318"));
 
-        var psi = ChildProcessLauncher.BuildStartInfo();
+        var psi = BuildStartInfo();
 
         Assert.Equal("http://explicit:4317", psi.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-    }
-
-    [Fact]
-    public void BuildStartInfo_Caller_Supplied_Vars_Win_Over_Inherited_Otel_Vars()
-    {
-        using var _ = WithEnv(("OTEL_EXPORTER_OTLP_ENDPOINT", "http://inherited:4317"));
-
-        var psi = ChildProcessLauncher.BuildStartInfo(
-            ("OTEL_EXPORTER_OTLP_ENDPOINT", "http://overridden:4318"));
-
-        Assert.Equal("http://overridden:4318", psi.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-    }
-
-    [Fact]
-    public void BuildStartInfo_WithEntryAssembly_Forwards_Otel_Vars_To_Child()
-    {
-        using var _ = WithEnv(("OTEL_EXPORTER_OTLP_ENDPOINT", "http://cross-runtime:4317"));
-
-        var psi = ChildProcessLauncher.BuildStartInfo("/path/to/child.dll");
-
-        Assert.Equal("http://cross-runtime:4317", psi.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-
-        // The cross-runtime overload uses `dotnet exec <assembly>`.
-        Assert.Equal("dotnet", psi.FileName);
-        Assert.Equal("exec", psi.ArgumentList[0]);
-        Assert.Equal("/path/to/child.dll", psi.ArgumentList[1]);
     }
 
     [Fact]
@@ -113,7 +89,7 @@ public class ChildProcessLauncherTelemetryTests
     {
         using var _ = WithEnv();
 
-        var psi = ChildProcessLauncher.BuildStartInfo();
+        var psi = BuildStartInfo();
 
         foreach (var name in OtelEnvVars)
         {
@@ -161,5 +137,18 @@ public class ChildProcessLauncherTelemetryTests
                 Environment.SetEnvironmentVariable(name, value);
             }
         }
+    }
+
+    /// <summary>
+    ///     A bare start info with telemetry forwarding applied - the same call
+    ///     <see cref="WorkerHost" /> makes before it starts a worker.
+    /// </summary>
+    private static ProcessStartInfo BuildStartInfo()
+    {
+        var psi = new ProcessStartInfo("dotnet");
+
+        MeasurementBudget.ApplyTelemetryEnvironment(psi);
+
+        return psi;
     }
 }

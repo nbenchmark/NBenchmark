@@ -93,12 +93,12 @@ In auto mode NBenchmark resolves warmup length, measured-sample count, and ops-p
 | `--min-samples <n>` | `30` | Floor on auto-resolved measured samples. |
 | `--max-samples <n>` | `5000` | Ceiling on auto-resolved measured samples. Past a coefficient of variation of ~90% the CI rule needs samples growing as `(t × CV / target)²` and cannot converge, so the ceiling stops the chase and the warning names the CV. |
 | `--min-warmup <n>` | `8` | Floor on auto-detected warmup samples. |
-| `--max-warmup <n>` | `100000` | Ceiling on auto-detected warmup samples. Deliberately far above what any body needs so the *time* bounds bind instead — a fast body needs ~25,000 samples to accumulate `--min-warmup-time`. (A *pinned* `--warmup` is still limited to 10,000.) |
+| `--max-warmup <n>` | `100000` | Ceiling on auto-detected warmup samples. Deliberately far above what any body needs so the *time* bounds bind instead - a fast body needs ~25,000 samples to accumulate `--min-warmup-time`. (A *pinned* `--warmup` is still limited to 10,000.) |
 | `--max-tuning-time <s>` | `20` | Per-benchmark wall-clock safety cap, in seconds, for the whole adaptive loop. |
 | `--autotune-cap-behavior <mode>` | `warn` | What happens when the wall-clock cap is hit before the CI target or warmup plateau is reached: `warn` emits a warning; `error` marks the benchmark as errored. |
 | `--warmup-budget-fraction <0-1>` | `0.4` | Max share of `--max-tuning-time` that calibration and warmup may consume together; the remainder is reserved for measurement. Must be in `(0, 1]`. |
 | `--cap-grace-factor <n>` | `1.5` | Multiplier on `--max-tuning-time` that the measurement phase may reach while chasing `--min-samples` after the cap fires. Must be at least 1; set to 1 to disable the grace path. |
-| `--min-warmup-time <ms>` | `500` | Minimum in-body time (milliseconds) auto-warmup must accumulate before it may settle, so background tiered JIT lands before measurement rather than mid-run. 5× the runtime's 100 ms tiered-compilation call-counting delay; a floor at or below that delay reliably lands the tier-up *inside* measurement. Chosen empirically — at 250 ms a `StringBuilder`-append loop still landed in either its tier-0 or its ~4.5× faster steady state depending on the run. Raise this first if a benchmark's median differs between runs while each run reports a tight interval. Must be ≥ 0; `0` disables the floor (and the JIT-quiescence gate). |
+| `--min-warmup-time <ms>` | `500` | Minimum in-body time (milliseconds) auto-warmup must accumulate before it may settle, so background tiered JIT lands before measurement rather than mid-run. 5× the runtime's 100 ms tiered-compilation call-counting delay; a floor at or below that delay reliably lands the tier-up *inside* measurement. Chosen empirically - at 250 ms a `StringBuilder`-append loop still landed in either its tier-0 or its ~4.5× faster steady state depending on the run. Raise this first if a benchmark's median differs between runs while each run reports a tight interval. Must be ≥ 0; `0` disables the floor (and the JIT-quiescence gate). |
 | `--no-jit-quiescence` | off | Disable the JIT-quiescence warmup gate (warmup no longer waits for the JIT to stop compiling); the `--min-warmup-time` floor still applies. |
 | `--jit-quiet-period <ms>` | `50` | How long (milliseconds) the JIT compiled-method count must stay unchanged before auto-warmup may settle. Clamped down to `--min-warmup-time` so it never becomes the binding floor. Must be ≥ 0; `0` disables the gate. |
 | `--min-measurement-time <ms>` | `100` | Minimum in-body time (milliseconds) the measurement phase must span before it may stop on the CI target. Makes the sample count scale with body speed, so a cheap body collects hundreds of samples for milliseconds of extra work instead of stopping at a few dozen (where P95/P99/P99.9 all collapse onto the maximum). Costs nothing for a body already slower than `--min-measurement-time / --min-samples`. Must be ≥ 0; `0` disables the floor. |
@@ -253,13 +253,63 @@ Has no effect when `--order declaration` is used.
 
 ### `--in-process`
 
-Disable process isolation for the whole run. Harness mode is isolated by default - each benchmark class runs in its own child process - and this flag forces every benchmark to run in the host process instead. It overrides `[IsolatedProcess]` and is equivalent to calling `WithIsolation(false)` in code.
+Disable process isolation for the whole run. Harness mode is isolated by default - each benchmark class runs in its own worker - and this flag forces every benchmark to run in the host process instead. It overrides `[IsolatedProcess]` and is equivalent to calling `WithIsolation(false)` in code.
 
 ```bash
 dotnet run -- --in-process
 ```
 
 `--dry-run` also always runs in-process. See [Isolated Runs](../features/isolated-runs.md) for the full isolation model.
+
+---
+
+### `--strict-isolation`
+
+Fail the run if any benchmark was **not** measured in an isolated worker.
+
+```bash
+dotnet run -- --strict-isolation
+```
+
+Every non-isolated result is already labelled in the table and explained on the console, but neither survives CI: a label scrolls past, and a warning in a log nobody reads is indistinguishable from no warning. This turns the label into exit code 1.
+
+The failure names each benchmark, grouped by cause, with the remedy for each:
+
+```
+--strict-isolation: 1 of 4 benchmark(s) were measured in this process rather than an
+isolated worker, so their numbers carry the host's JIT and GC configuration.
+  in-process: HarnessBenchmarks.InHarness
+```
+
+Use it on any pipeline that gates on benchmark numbers. A benchmark that quietly fell back to the host process - because the worker was not deployed on the build agent, or because a body captures state - produces numbers that cannot be compared against a stored baseline measured under a different runtime configuration.
+
+---
+
+### `--verify-isolation`
+
+Measure everything a second time in the host process and print the per-benchmark difference.
+
+```bash
+dotnet run -- --verify-isolation
+```
+
+```
+Isolation verification - the same benchmarks measured both ways:
+
+  Benchmark                        Isolated    In-process  Difference
+  ---------------------------  ------------  ------------  ----------
+  HarnessBenchmarks.Compute         9.32 ns      11.47 ns  1.23x
+  HarnessBenchmarks.Baseline        9.56 ns      11.19 ns  1.17x
+  HarnessBenchmarks.InHarness             -      10.99 ns  not isolated
+```
+
+This exists because the case for isolation is not believable in the abstract - seeing it on your own benchmarks is what makes it stick. The output reports a **ratio per benchmark** rather than an aggregate, because host measurement is *unpredictable*: one row far from its isolated reading beside another that agrees is the point, and averaging would erase it. Rows are ordered by distance from parity.
+
+When the two agree, it says so. A workload insensitive to the host's runtime configuration is a real result worth knowing - though it is a property of those benchmarks, not a general one.
+
+The comparison pass runs no reporters, writes no files, and cannot change the exit code. It is a diagnostic, not a second set of results.
+
+Combined with `--runtimes`, it is skipped and says why. The comparison re-measures in *this* process, and this process is one runtime - so there is no in-process counterpart for the other builds to be compared against, and comparing every runtime against the same host row would print a table that looks like a finding without being one.
 
 ---
 
@@ -291,6 +341,37 @@ dotnet run -- --profile independent
 ```
 
 Individual behaviours can be overridden with `--force-gc`, `--no-gc-between-benchmarks`, and `--no-allocations`. See [Measurement Profiles](../statistics/measurement.md#measurement-profiles) for a worked example.
+
+> [!NOTE]
+> `--profile` controls *GC behaviour during* a run. `--runtime-profile` (below) controls the *runtime configuration a process starts with*. They are independent.
+
+---
+
+### `--runtime-profile <profile>`
+
+Set the runtime-startup configuration benchmarks are measured under: JIT tiering, dynamic PGO, ReadyToRun, and GC flavour.
+
+| Value | Configuration | What it is for |
+| --- | --- | --- |
+| `steady-state` | `TieredCompilation=0`, `TieredPGO=0`, `ReadyToRun=0` | **(default)** Fully-optimized steady-state throughput. |
+| `production` | `TieredCompilation=1`, `TieredPGO=1`, `ReadyToRun=1` | What your users actually run. Reproducible, but imprecise. |
+| `server-gc` | `steady-state` plus `gcServer=1`, `gcConcurrent=0` | Code destined for a server-GC host. |
+| `host` | Nothing set | Inherit the host's configuration. Reproduces pre-profile numbers. |
+
+**Why this exists.** None of these settings can be changed in a process that is already running - the runtime reads them once at startup. That, rather than cross-benchmark state contamination, is the real reason a measurement needs its own process: **the process boundary is how the configuration gets delivered.** The effect is large - on four benchmarks with provably identical cost, `--runtime-profile host` spread 3.10x across runs while `steady-state` spread 1.02x, because tiered compilation means a short body may be measured as tier-0 or tier-1 code depending on unrelated process history.
+
+```bash
+dotnet run -- --runtime-profile production --launch-count 5   # imprecise: raise the replicate count
+dotnet run -- --runtime-profile host                          # reproduce a pre-profile baseline
+```
+
+**Limits, stated plainly:**
+
+- `steady-state` forbids on-stack replacement and changes startup behaviour, so it is **the wrong choice for measuring cold-start or first-call cost**. Use `production` for that.
+- It also costs wall clock, because every method is compiled eagerly at full optimization.
+- **It cannot apply to in-process benchmarks.** Anything measured in the host process - all of Simple mode, and `--in-process` or `[InProcess]` benchmarks - reports `host` and inherits the host's configuration. NBenchmark says so rather than claiming otherwise: every result carries the profile it was *actually* measured under, and results measured under different profiles are never compared against each other.
+
+Set `RuntimeProfile.Host` (or `--runtime-profile host`) to accept the host's configuration everywhere and silence the guidance message; `NBENCHMARK_SUPPRESS_RUNTIME_PROFILE_WARNING=1` suppresses it without changing the profile.
 
 ---
 
@@ -436,13 +517,13 @@ dotnet run -- --help
 
 ### `--launch-count <n>`
 
-Repeat each benchmark N times as separate launches. Statistics (mean, stddev, median, CI) are computed across launch medians, and the best launch (lowest median) is displayed as the primary result. An aggregation table appears below the main results when `n > 1`. Valid range: `1` to `100`. Harness-mode default: `3` when the user has not explicitly pinned launch count.
+Repeat each benchmark N times, each in its own worker process. The primary result is the **average across those launches**, and its confidence interval is derived from the spread between them - so it describes how well the number reproduces rather than how precisely one process measured it. An aggregation table with the per-launch detail appears below the main results when `n > 1`. Valid range: `1` to `100`. Harness-mode default: `3` when the user has not explicitly pinned launch count. See [Multiple launches](../features/multiple-launches.md).
 
 ```bash
 dotnet run -- --launch-count 3
 ```
 
-When combined with `--dry-run`, exactly one dry launch is performed regardless of the count. When combined with process isolation, the parent spawns N child processes per isolated group.
+When combined with `--dry-run`, exactly one dry launch is performed regardless of the count. When combined with process isolation, the host spawns N workers per isolated group.
 
 ---
 
@@ -473,7 +554,7 @@ dotnet run -- --runtimes net8,net9,net10
 dotnet run -- --runtimes net8.0,net10.0
 ```
 
-When `--runtimes` is specified, the host builds the project for each target framework via `dotnet build -f <tfm>`, runs the benchmarks in a child process under that runtime, and aggregates the results. The project must target all specified runtimes in its `.csproj` file:
+When `--runtimes` is specified, the host builds the project for each target framework via `dotnet build -f <tfm>`, runs the benchmarks in a worker under that runtime, and aggregates the results. The project must target all specified runtimes in its `.csproj` file:
 
 ```xml
 <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
@@ -481,7 +562,7 @@ When `--runtimes` is specified, the host builds the project for each target fram
 
 The console and markdown reporters add a "Runtime" column when results span multiple runtimes. Significance testing is performed within each runtime (net8 results are compared against the net8 baseline, not the net10 one). The first runtime in the list is the implicit baseline for ratio calculations.
 
-`--runtimes` overrides `--in-process`; cross-runtime always uses child processes. When `--runtimes` is passed, it also overrides any `[Runtimes]` attribute on discovered classes.
+`--runtimes` overrides `--in-process`; cross-runtime always uses workers. When `--runtimes` is passed, it also overrides any `[Runtimes]` attribute on discovered classes.
 
 ---
 
@@ -495,6 +576,58 @@ Programmatic equivalent: `WithOptions(new MeasurementOptions { EnableHistogram =
 
 ```bash
 dotnet run -- --no-histogram
+```
+
+---
+
+### `--emit-raw`
+
+Return every raw sample from an isolated worker instead of a bounded representative subset.
+
+By default a worker sends back at most 4,096 raw samples per benchmark. A benchmark can measure up to 100,000, and the whole array crossing the process boundary on every result is 800 KB of JSON for data the coordinator barely uses - **every statistic NBenchmark reports is computed inside the worker, over the complete sample array**. Raising or lowering the cap cannot move a median, an interval, or an outlier count.
+
+What the samples that cross are used for is the sample dump in JSON output, the Console density sparkline, and significance testing. All three are distribution properties, and a few thousand samples describe a distribution as faithfully as a hundred thousand.
+
+The subset is not a prefix. It is drawn uniformly at random from the full array and kept in measurement order, seeded from the run's seed so a repeat of the same configuration ships the same samples. A prefix would be the slice of the run nearest to warmup, which is the least representative part of it.
+
+Pass `--emit-raw` when you want the complete series for analysis outside NBenchmark:
+
+```bash
+dotnet run -- --emit-raw --reporter json
+```
+
+Programmatic equivalent: `WithOptions(new MeasurementOptions { MaxRawSamples = MeasurementOptions.UnboundedRawSamples })`. Any positive value sets a different cap.
+
+> **In-process runs are unaffected.** There is no boundary to cross, so they always hold the complete array. A run that mixes isolated and in-process benchmarks has more samples on its in-process rows. This changes none of the reported numbers, but it is worth knowing when comparing sample dumps.
+
+See also [`--no-samples`](#--no-samples), which omits the arrays from JSON output entirely.
+
+---
+
+### `--stream-samples`
+
+Forward the live per-sample observer stream out of an isolated worker.
+
+An attached observer's `OnSample` callback is the one event that does not cross the process boundary by default. Every other event - phase transitions, detector snapshots, results - is emitted a handful of times per benchmark, but samples arrive in the hundreds or thousands, and a frame each would put the cost of observing the run inside the run.
+
+Pass this when an observer needs the samples *live* - a streaming histogram, a sample-level exporter:
+
+```bash
+dotnet run -- --observer live --stream-samples
+```
+
+It needs an observer to be attached; with nothing to replay into, the request is withdrawn and the flag costs nothing. It is also unrelated to [`--emit-raw`](#--emit-raw): that bounds the sample array carried on each *result*, this is the live stream, and the two are selected by different rules for different consumers. The complete array arrives with the result whether or not this is set.
+
+Programmatic equivalent: `WithOptions(o => o with { StreamSamples = true })`. Samples cross in batches - one frame per 128 samples or per 100 ms, whichever comes first - and your observer still sees one `OnSample` call per sample. Measured against a control across eight replicates on a 6.9 µs body, ~780 forwarded events moved neither wall-clock time nor the reported median outside the control's own spread. See [Measurement Observer](observers.md#--stream-samples) for the batching rule and its ordering guarantee.
+
+---
+
+### `--no-samples`
+
+Omit raw per-sample arrays from JSON reporter output. Samples are still collected, still feed significance testing and the Console histogram, and still cross the process boundary - this only controls whether they are written to the file.
+
+```bash
+dotnet run -- --no-samples --reporter json
 ```
 
 ---
@@ -557,9 +690,9 @@ Related warning: NBenchmark also emits a one-time build-configuration warning wh
 
 ### `--otlp-endpoint <url>`
 
-Set the OTLP endpoint an OpenTelemetry SDK in the entry assembly should export to. The value must be an absolute `http://` or `https://` URL. The harness mirrors it into the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable before spawning isolated children, so children stream their telemetry to the same collector as the parent. When `OTEL_EXPORTER_OTLP_ENDPOINT` is already set in the environment, the explicit flag does not override it.
+Set the OTLP endpoint an OpenTelemetry SDK in the entry assembly should export to. The value must be an absolute `http://` or `https://` URL. The harness mirrors it into the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable before spawning isolated workers, so workers stream their telemetry to the same collector as the host. When `OTEL_EXPORTER_OTLP_ENDPOINT` is already set in the environment, the explicit flag does not override it.
 
-This is the cross-process channel for live telemetry: the in-memory `IMeasurementObserver` callback cannot cross the process boundary, so OTLP export is how isolated children stream live data to a collector. See [BCL instrumentation](bcl-instrumentation.md#cross-process-streaming) for the full topology and the env vars forwarded to children.
+This is the cross-process channel for live telemetry: the in-memory `IMeasurementObserver` callback cannot cross the process boundary, so OTLP export is how isolated workers stream live data to a collector. See [BCL instrumentation](bcl-instrumentation.md#cross-process-streaming) for the full topology and the env vars forwarded to workers.
 
 ```bash
 dotnet run -- --otlp-endpoint http://localhost:4317
@@ -612,7 +745,7 @@ dotnet run -- --cpu-affinity 2,3 --priority high --dedicated-host-guidance
 # Collect all diagnostics (GC counts, heap info, exceptions, CPU time)
 dotnet run -- --diagnostics all --detail standard
 
-# Stream live telemetry to a local OTLP collector (isolated children inherit the endpoint)
+# Stream live telemetry to a local OTLP collector (isolated workers inherit the endpoint)
 dotnet run -- --otlp-endpoint http://localhost:4317
 
 # Check what will run before committing to a full benchmark

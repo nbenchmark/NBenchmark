@@ -39,11 +39,12 @@ public static class RelativeComparison
         BenchmarkResult referenceResult,
         double[] referenceSamples,
         double maxSlowdownRatio,
-        double significanceLevel = 0.05)
+        double significanceLevel = 0.05,
+        RatioEstimate? pairedRatio = null)
     {
         var verdict = CheckStructured(
             candidateResult, candidateSamples, referenceResult, referenceSamples,
-            maxSlowdownRatio, significanceLevel);
+            maxSlowdownRatio, significanceLevel, pairedRatio);
 
         return verdict.Violations;
     }
@@ -56,25 +57,45 @@ public static class RelativeComparison
     ///     needs the numeric values (for example to build a regression-alert UI) rather
     ///     than just the formatted messages.
     /// </summary>
+    /// <param name="pairedRatio">
+    ///     The paired per-replicate ratio between the two, when they were measured co-resident in two
+    ///     or more replicate workers. When present it <b>replaces both halves of the gate's test</b>:
+    ///     the ratio compared against <paramref name="maxSlowdownRatio" /> is this estimate rather than
+    ///     the quotient of means, and the difference counts as real only when the interval excludes
+    ///     <c>1.00x</c> rather than when the Mann-Whitney p-value clears
+    ///     <paramref name="significanceLevel" />.
+    ///     <para>
+    ///         The p-value is still computed and reported, but it is not what the gate turns on. It is
+    ///         calculated from samples pooled across replicates, where a large count grants power
+    ///         regardless of reproducibility - on bodies of provably identical cost that combination marks
+    ///         one significantly slower than another routinely. The interval over per-replicate ratios is
+    ///         the run-to-run spread, and it is the quantity a gate that must survive a re-run needs.
+    ///     </para>
+    ///     <para>
+    ///         <c>null</c> keeps the pooled-sample test and the quotient of means, which is all a
+    ///         single-replicate measurement can support.
+    ///     </para>
+    /// </param>
     public static RelativeComparisonVerdict CheckStructured(
         BenchmarkResult candidateResult,
         double[] candidateSamples,
         BenchmarkResult referenceResult,
         double[] referenceSamples,
         double maxSlowdownRatio,
-        double significanceLevel = 0.05)
+        double significanceLevel = 0.05,
+        RatioEstimate? pairedRatio = null)
     {
         var violations = new List<string>();
 
         if (candidateResult.Errored)
-            return new RelativeComparisonVerdict([], double.NaN, double.NaN, double.NaN, false);
+            return new RelativeComparisonVerdict([], double.NaN, double.NaN, double.NaN, false, pairedRatio);
 
         if (referenceResult.Errored)
         {
             violations.Add(
                 $"Reference method '{referenceResult.Name}' errored: {referenceResult.ErrorMessage}; cannot compare.");
 
-            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false);
+            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false, pairedRatio);
         }
 
         if (candidateSamples is null || candidateSamples.Length == 0)
@@ -83,7 +104,7 @@ public static class RelativeComparison
                 "Current run produced no raw samples; cannot run significance test. " +
                 "Ensure the benchmark completed successfully with measurement iterations > 0.");
 
-            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false);
+            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false, pairedRatio);
         }
 
         if (referenceSamples is null || referenceSamples.Length == 0)
@@ -92,7 +113,7 @@ public static class RelativeComparison
                 "Reference produced no raw samples; cannot run significance test. " +
                 "Ensure the reference benchmark completed successfully.");
 
-            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false);
+            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false, pairedRatio);
         }
 
         if (referenceResult.Mean <= 0)
@@ -103,26 +124,40 @@ public static class RelativeComparison
                     $"Regression detected: mean {candidateResult.Mean:F2} ns exceeds non-positive reference {referenceResult.Mean:F2} ns.");
             }
 
-            return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, violations.Count > 0);
+            return new RelativeComparisonVerdict(
+                violations, double.NaN, double.NaN, double.NaN, violations.Count > 0, pairedRatio);
         }
 
         var mwu = MannWhitneyU.Test(referenceSamples, candidateSamples);
-        var statisticallySignificant = !double.IsNaN(mwu.PValue) && mwu.PValue < significanceLevel;
-        var ratio = candidateResult.Mean / referenceResult.Mean;
+
+        // The paired estimate when the measurement produced one, on both counts: the ratio the gate
+        // applies its threshold to, and the test of whether the two differ at all. See the parameter
+        // documentation for why the pooled p-value is reported but not gated on.
+        var ratio = pairedRatio?.Value ?? candidateResult.Mean / referenceResult.Mean;
+
+        var differenceIsReal = pairedRatio is { } estimate
+            ? estimate.Lower > 1.0
+            : !double.IsNaN(mwu.PValue) && mwu.PValue < significanceLevel;
+
         var practicallySignificant = ratio > maxSlowdownRatio;
-        var isRegression = statisticallySignificant && practicallySignificant;
+        var isRegression = differenceIsReal && practicallySignificant;
 
         var referenceName = string.IsNullOrEmpty(referenceResult.Name) ? "reference" : referenceResult.Name;
 
         if (isRegression)
         {
-            violations.Add(
-                $"Regression detected: mean {candidateResult.Mean:F2} ns vs reference '{referenceName}' {referenceResult.Mean:F2} ns " +
-                $"(ratio {ratio:F2}x, p={mwu.PValue:F4}, Cliff's delta={mwu.CliffsDelta:F3}). " +
-                $"Significant slowdown exceeding {maxSlowdownRatio:F2}x ratio gate.");
+            violations.Add(pairedRatio is { } paired
+                ? $"Regression detected: {paired.Value:F2}x reference '{referenceName}' "
+                  + $"[{paired.Lower:F2}-{paired.Upper:F2}x] over {paired.Replicates} paired replicates "
+                  + $"({paired.ConfidenceLevel:P0} interval). Median {candidateResult.Median:F2} ns vs "
+                  + $"{referenceResult.Median:F2} ns. Exceeds the {maxSlowdownRatio:F2}x ratio gate by more "
+                  + "than run-to-run variation."
+                : $"Regression detected: mean {candidateResult.Mean:F2} ns vs reference '{referenceName}' {referenceResult.Mean:F2} ns " +
+                  $"(ratio {ratio:F2}x, p={mwu.PValue:F4}, Cliff's delta={mwu.CliffsDelta:F3}). " +
+                  $"Significant slowdown exceeding {maxSlowdownRatio:F2}x ratio gate.");
         }
 
-        return new RelativeComparisonVerdict(violations, ratio, mwu.PValue, mwu.CliffsDelta, isRegression);
+        return new RelativeComparisonVerdict(violations, ratio, mwu.PValue, mwu.CliffsDelta, isRegression, pairedRatio);
     }
 }
 
@@ -132,13 +167,27 @@ public static class RelativeComparison
 ///     and the human-readable violation strings (empty when the comparison passed).
 /// </summary>
 /// <param name="Violations">Human-readable violation strings; empty when the comparison passed.</param>
-/// <param name="Ratio">Candidate mean divided by reference mean; <c>NaN</c> when undefined.</param>
-/// <param name="PValue">The Mann-Whitney U p-value; <c>NaN</c> when the test could not run.</param>
+/// <param name="Ratio">
+///     The ratio the gate applied its threshold to: the paired per-replicate estimate when
+///     <paramref name="Estimate" /> is present, otherwise candidate mean divided by reference mean.
+///     <c>NaN</c> when undefined.
+/// </param>
+/// <param name="PValue">
+///     The Mann-Whitney U p-value on the pooled samples; <c>NaN</c> when the test could not run.
+///     Reported for context, and <b>not</b> what the verdict turns on when
+///     <paramref name="Estimate" /> is present.
+/// </param>
 /// <param name="CliffsDelta">Cliff's delta effect size; <c>NaN</c> when the test could not run.</param>
-/// <param name="IsRegression"><c>true</c> when the slowdown is both statistically significant and practically significant (exceeds the ratio gate).</param>
+/// <param name="IsRegression"><c>true</c> when the slowdown is both real and larger than the ratio gate.</param>
+/// <param name="Estimate">
+///     The paired ratio with its confidence interval, when the candidate and its reference were measured
+///     co-resident across two or more replicates. <c>null</c> for a single-replicate comparison, where
+///     the ratio is a point estimate and nothing in it says whether a re-run would agree.
+/// </param>
 public sealed record RelativeComparisonVerdict(
     IReadOnlyList<string> Violations,
     double Ratio,
     double PValue,
     double CliffsDelta,
-    bool IsRegression);
+    bool IsRegression,
+    RatioEstimate? Estimate = null);

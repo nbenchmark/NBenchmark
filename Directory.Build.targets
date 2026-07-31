@@ -1,0 +1,51 @@
+﻿<Project>
+
+  <!--
+    In-repo equivalent of the `build/NBenchmark.targets` that ships in the package.
+
+    A package consumer gets the measurement worker copied into its output automatically. A project
+    inside this repository references NBenchmark by ProjectReference instead, which does not import
+    the package's build targets, so worker deployment has to be wired here.
+
+    Rather than copying files - which would race the worker's own build on a clean clone, because
+    item globs are evaluated before referenced projects are built - the worker's output directory is
+    baked into the assembly as metadata that WorkerLocator reads at run time. Same mechanism the
+    isolation-fixture tests already use, and immune to build ordering.
+
+    Opt in with <NBenchmarkUseWorker>true</NBenchmarkUseWorker>.
+  -->
+
+  <ItemGroup Condition="'$(NBenchmarkUseWorker)' == 'true'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src/NBenchmark.Worker/NBenchmark.Worker.csproj"
+                     ReferenceOutputAssembly="false"/>
+
+    <AssemblyMetadata Include="NBenchmarkWorkerDirectory"
+                      Value="$(MSBuildThisFileDirectory)src/NBenchmark.Worker/bin/$(Configuration)/$(TargetFramework)/"/>
+  </ItemGroup>
+
+  <!--
+    Only in the inner, per-framework build: in a multi-targeting project's outer pass both
+    $(TargetFramework) and $(OutDir) are unset, so the glob below would match every framework's
+    worker output at once and land it in the project directory rather than in bin.
+
+    Copies the worker into an `nbworker` subdirectory of the output, which is exactly the layout the
+    packaged build targets produce for a consumer. It matters for a test project specifically: under
+    a test host the entry assembly is the test runner, so the AssemblyMetadata above - which sits on
+    the test project's own assembly - is never consulted, and only the output-relative location is
+    found. Without this, an in-repo test would silently exercise the in-process fallback while
+    appearing to prove isolation.
+  -->
+  <Target Name="NBenchmarkCopyWorkerToOutput"
+          Condition="'$(NBenchmarkUseWorker)' == 'true' AND '$(TargetFramework)' != ''"
+          AfterTargets="Build">
+    <ItemGroup>
+      <NBenchmarkWorkerFile Include="$(MSBuildThisFileDirectory)src/NBenchmark.Worker/bin/$(Configuration)/$(TargetFramework)/**/*"/>
+    </ItemGroup>
+
+    <Copy SourceFiles="@(NBenchmarkWorkerFile)"
+          DestinationFolder="$(OutDir)nbworker/%(RecursiveDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(NBenchmarkWorkerFile)' != ''"/>
+  </Target>
+
+</Project>

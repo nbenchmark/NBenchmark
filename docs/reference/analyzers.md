@@ -33,6 +33,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that may hold per-instance state (any non-primitive, non-ambient reference type), which can leak warmed state across benchmark methods. |
 | NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method has both `[BenchmarkCase]` and `[BenchmarkCases]`. Use one or the other. |
 | NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a mutable instance field that is read or written by at least two `[Benchmark]` methods, which can leak warmed state across methods. |
+| NB0014 | Benchmark body captures state and cannot be isolated | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, `Benchmark.RunRawAsync()` or `BenchmarkSuite.Add()` captures a local, a parameter, or `this`. Captured state cannot cross a process boundary, so the body is measured in the host process instead of an isolated worker - and for a suite, so is every other benchmark in it. |
 
 ### NB0001 - Missing parameterless constructor
 
@@ -250,6 +251,84 @@ Typical fixes:
 2. Make the field `readonly` if it is only assigned once
 3. Keep `PerClass` and suppress with `#pragma warning disable NB0013` when sharing state is intentional
 
+### NB0014 - Capturing body cannot be isolated
+
+NBenchmark measures a benchmark body in a separate worker process, because the runtime configuration a process starts under is the dominant term in a small measurement - on bodies of provably identical cost it moved the reported number by ~3.3x. It gets the body there by resolving the method the compiler already emitted; it never serializes or regenerates it.
+
+A lambda that captures state cannot be addressed that way. Its captured values live in your process, and there is no honest way to reproduce them elsewhere - a fabricated closure does not throw, it returns plausible wrong numbers. So a capturing body is measured in the test host instead, correctly labelled but less precise.
+
+```csharp
+var data = BuildInput();
+
+// Info NB0014: captures 'data' - measured in this process
+Benchmark.Run(() => Process(data));
+```
+
+The runtime already reports this after the fact, in the `Iso` column and the isolation status. NB0014 moves the news to where you can still act on it, and names the symbols responsible - which the runtime cannot do as precisely, because by then they are fields on a compiler-generated class.
+
+**It is `Info`, not a warning**, because capturing is the idiomatic way to benchmark over prepared data. Warning on it would push you towards contorted code to silence a build. What it costs is fidelity, not correctness.
+
+**Scope:** the `Benchmark.Run*` family and `BenchmarkSuite.Add(...)`.
+
+A few shapes are worth knowing because they do not read the way they lower:
+
+| Body | Isolated? | Why |
+| --- | --- | --- |
+| `() => 43` | yes | Nothing to carry. Roslyn still emits it as an instance method on a cached singleton, so a `Target is null` test would get this wrong. |
+| `static () => 43` | yes | Same as above - `static` documents the intent, it does not change the lowering. |
+| `() => Work(local)` | no | Captures `local`. |
+| `() => Work(_field)` | no | Captures `this` - naming an instance member without a receiver carries the whole object. |
+| `() => Work(StaticField)` | yes | A static needs no receiver. |
+| `widget.Compute` | no | A method group over a live object; the receiver is state this process owns. |
+| `() => 43` beside `() => local` | yes | A non-capturing lambda keeps its isolation even when a sibling in the same scope captures. |
+
+`Add` is where capture reads as most idiomatic, and where it costs most. A suite is addressed as a *set* - one worker measures all of its bodies - so the first body that cannot be addressed takes every sibling in-process with it, including the ones that would have isolated fine on their own. The message says so:
+
+```csharp
+var data = BuildInput();
+
+await new BenchmarkSuite("Sorting")
+    // Info NB0014: captures 'data' - the whole suite falls back to this process
+    .Add("Sort", () => Array.Sort(data))
+    .Add("Own", () => { var own = BuildInput(); Array.Sort(own); })
+    .RunAsync();
+```
+
+One diagnostic is reported per capturing body, and none on a self-contained sibling - so a suite mixing the two shows exactly which bodies to change.
+
+**Parameterized `Add` overloads are covered too.** Parameter values travel as serialized constants, so a sweep is isolated like any other suite and a capture in a parameterized body is the operative cause. A parameterized body that captures nothing stays silent - its parameter is supplied at each invocation rather than closed over.
+
+**The remedy the message names is the prepared-state split**, not a `[BenchmarkPlan]` factory. `Benchmark.Run(prepare: () => Build(), body: d => Use(d))` and `.WithState(() => Build())` let the worker build the state itself, which is one line from what you already wrote; a plan factory is the escape hatch for suites holding something no factory can describe.
+
+The `setup:` and `teardown:` delegates on `Add` are not reported either. They are not measured bodies, and a suite with per-iteration lifecycle is refused isolation for having delegates on the wrong side of the boundary at all.
+
+To isolate the body, move the state inside it:
+
+```csharp
+// No capture: the body builds what it needs
+Benchmark.Run(() => Process(BuildInput()));
+```
+
+That measures the setup too, so it is not always what you want. When it is not, use a `[Benchmark]` class - discovery runs inside the worker, so `[GlobalSetup]` and fields are built there and nothing has to cross:
+
+```csharp
+public class ProcessBenchmarks
+{
+    private Input _data = null!;
+
+    [BenchmarkSetup] public void Setup() => _data = BuildInput();
+
+    [Benchmark] public Output Run() => Process(_data);
+}
+```
+
+**What NB0014 does not catch.** Bodies handed to NBenchmark as method groups over live objects (`Benchmark.Run(widget.Compute)`) are refused at runtime for the same reason, but are not lambdas and so are outside this rule. Raise the severity if you want capture to fail a build:
+
+```ini
+[*.cs]
+dotnet_diagnostic.NB0014.severity = warning
+```
+
 ## Runtime independence warning
 
 In addition to the compile-time analyzers above, NBenchmark emits a runtime warning on every `BenchmarkResult.Warnings` list when a class uses `InstanceLifetime.PerClass` and has more than one `[Benchmark]` method. This covers suite mode (where analyzers do not run) and cases where the analyzer package is not installed.
@@ -289,6 +368,7 @@ Diagnostics use the default severity listed in the table above. The default is c
 
 - **Errors** mean the benchmark cannot run or will produce meaningless results. NB0002, NB0003, NB0004, NB0005, NB0006, NB0007, NB0008, and NB0009 are errors.
 - **Warnings** mean the code can run but the measurements may be invalid. NB0001, NB0010, NB0011, and NB0013 are warnings.
+- **Info** means the code and the measurement are both fine, but something about how the measurement was taken is worth knowing. NB0014 is informational.
 
 You can override the severity of any diagnostic in `.editorconfig`. For example, to make all throwaway-lambda warnings errors in Single mode too:
 

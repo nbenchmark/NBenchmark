@@ -148,6 +148,47 @@ A typical benchmark with auto-warmup and auto-measurement emits events in this o
 
 When `OpsPerSample` is pinned (calibration skipped) or `WarmupIterations=0` (warmup skipped), the corresponding phases are omitted.
 
+## What an isolated run delivers
+
+Benchmarks are measured in a separate `nbworker` process by default, and the observer you registered lives in *your* process. Your instance is still called - the worker streams events back over its pipe and the coordinator replays them into the live object - but not every callback crosses:
+
+| Callback | Isolated (default) | `--in-process` / `RunInProcess` |
+| --- | --- | --- |
+| `OnPhase` | ✅ every transition, with its payload | ✅ |
+| `OnDetector` | ✅ every snapshot | ✅ |
+| `OnResult` | ✅ once per benchmark, raised from the completion frame | ✅ |
+| `OnSample` | ⬜ opt in with `--stream-samples` | ✅ |
+
+`OnSample` is the one callback that is off by default, and the reason is volume. Every other event is emitted a handful of times per benchmark; samples arrive in the hundreds or thousands, and a frame each would put the cost of observing the run *inside* the run - the opposite of what a worker is for. `OnDetector` is not in that class: a benchmark emits one snapshot per calibration step, one if warmup recalibrates `K`, and one when the measurement stop rule resolves, so it crosses unconditionally and the live convergence curve is available in the default mode.
+
+Nothing is lost from the *result* either way. The worker computes every statistic over the full sample array and ships the samples themselves on the completion frame, so `BenchmarkResult.RawSamples` is complete (subject to `MaxRawSamples`, which `--emit-raw` lifts). What you do not get without the flag is the samples *live*.
+
+### `--stream-samples`
+
+Turn the per-sample stream on for a consumer that needs it live - a streaming histogram, a sample-level exporter, a dashboard drawing the distribution as it fills:
+
+```bash
+dotnet run -- --observer live --stream-samples
+```
+
+or programmatically, on a suite or harness:
+
+```csharp
+.WithOptions(o => o with { StreamSamples = true })
+```
+
+Your observer sees one `OnSample` call per sample, exactly as an in-process run delivers them - the batching the worker does to get them across is a transport detail and is not visible in the callback. Three things are worth knowing:
+
+- **Events arrive in bursts.** The worker ships a frame per 128 samples or per 100 ms, whichever comes first, so an event can lag the body that produced it by up to a batch - 10 Hz at worst, which is finer than a dashboard renders. The count bound keeps a frame small on a fast body; the time bound keeps a slow body's stream live rather than held until its phase ends. Ordering is exact: the buffer is flushed ahead of every phase and detector boundary, so a phase's samples always arrive before the phase's own completion event.
+- **The stream is the engine's throttled subset**, not every reading. `OnSample` is emitted roughly every fiftieth sample in-process too (see [Throttling](#throttling)), and what crosses is that same subset. It is unrelated to `MaxRawSamples`, which bounds the array on the result: two different selections, for two different consumers.
+- **It has no effect without an attached observer.** The request is withdrawn when there is nothing to replay into, so `--stream-samples` alone costs nothing - and neither do the second and later replicates of a multi-launch run, which deliberately do not forward telemetry.
+
+**What it costs, measured.** Interleaved against a control across eight replicates on a 6.9 µs body, a run streaming ~780 sample events showed no wall-clock or reported-median difference: both sat inside the control's own replicate-to-replicate spread. There is no mechanism for one - `OnSample` fires between samples, outside the timed region, and the frame encoding happens on the worker's outbound queue rather than on the measurement thread. The event count per benchmark is bounded by the throttle rather than by how fast the body is (at most `MaxWarmup / 50` from warmup plus `MaxSamples / 50` from measurement), which is what keeps that true on a nanosecond body.
+
+The flag is still off by default, because "not measurable on one body at one scale" is not the same as free, and a run whose number you intend to keep should not be carrying observation it does not need.
+
+See [Isolated runs](../features/isolated-runs.md).
+
 ## Throttling
 
 Sample events are throttled by `ProgressCadence(n) = Math.Min(Math.Max(1, n / 20), 50)` where `n` is the current sample count. For 5 samples all emit; for 100,000 samples every 50th emits. This prevents the observer from dominating the hot path on long runs.

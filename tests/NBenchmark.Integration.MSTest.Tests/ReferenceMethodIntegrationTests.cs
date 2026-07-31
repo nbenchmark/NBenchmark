@@ -58,9 +58,16 @@ public sealed class ReferenceMethodIntegrationTests
 
     private static BenchmarkResult CreateOkResult(string name) => CreateOkResultWithMean(name, 100);
 
+    /// <summary>
+    ///     Both sides are marked as measured in a worker, which is what a reference-method test
+    ///     produces in practice. The ratio gate is only enforced between two such measurements -
+    ///     see <see cref="PerformanceGate" /> - so a fixture left at the default in-host status
+    ///     would be testing the isolation policy rather than the comparison these tests are about.
+    /// </summary>
     private static BenchmarkResult CreateOkResultWithMean(string name, double mean) => new()
     {
         Name = name,
+        IsolationStatus = IsolationStatus.Isolated,
         Mean = mean,
         Median = mean * 0.9,
         Percentiles = [],

@@ -32,6 +32,15 @@ public sealed class PerformanceAttribute : NUnitAttribute, ISimpleTestBuilder, I
     public double ConfidenceLevel { get; init; } = 0.95;
     public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
 
+    /// <summary>
+    ///     Worker processes to measure this test in. Defaults to 1; two or more give the ratio gate a
+    ///     paired confidence interval. See <see cref="IPerformanceThresholds.LaunchCount" />.
+    /// </summary>
+    public int LaunchCount { get; init; } = 1;
+
+    // No RequireIsolation property - see PerformanceTestMethodAttribute. Defaults to true via
+    // IPerformanceThresholds; opt out with [AllowInProcessGate].
+
     public TestMethod BuildFrom(IMethodInfo method, Test? suite)
     {
         var parms = new TestCaseParameters();

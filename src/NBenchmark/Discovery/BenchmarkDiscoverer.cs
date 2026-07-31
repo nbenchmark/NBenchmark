@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Globalization;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using NBenchmark.Attributes;
@@ -442,6 +441,88 @@ public sealed class BenchmarkDiscoverer
         return BenchmarkParameter.FormatDisplayName(methodName, paramSet);
     }
 
+    /// <summary>
+    ///     Builds a one-benchmark suite around a method chosen by the caller rather than found by
+    ///     attribute discovery.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This is how a test-framework integration measures a test method in a worker. The
+    ///         method carries no <c>[Benchmark]</c> attribute, so discovery would never find it -
+    ///         but everything downstream of discovery (instance lifetime, iteration structure,
+    ///         sample transport, progress streaming) applies unchanged, so a synthesized definition
+    ///         reuses all of it rather than growing a parallel measurement path.
+    ///     </para>
+    ///     <para>
+    ///         <paramref name="arguments" /> are bound into the compiled delegate, so a
+    ///         parameterized test case measures the same call the test framework would have made.
+    ///     </para>
+    /// </remarks>
+    internal static BenchmarkSuiteDefinition DefineExplicit(
+        MethodInfo method,
+        object?[] arguments,
+        string displayName)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        ArgumentNullException.ThrowIfNull(arguments);
+
+        return DefineExplicit([(method, arguments, displayName)]);
+    }
+
+    /// <summary>
+    ///     Builds one suite around several caller-chosen methods, so they are measured co-resident.
+    /// </summary>
+    /// <remarks>
+    ///     The multi-method form exists for a <c>[Performance]</c> test that names a reference method:
+    ///     both sides of the ratio belong in one suite, in one worker, per replicate. Two suites in two
+    ///     workers would measure the same bodies and produce a ratio with every worker-to-worker
+    ///     difference left in it.
+    ///     <para>
+    ///         Every method must be declared by the same type - the suite has one
+    ///         <see cref="BenchmarkSuiteDefinition.Type" />, and it is the type the worker instantiates.
+    ///     </para>
+    /// </remarks>
+    internal static BenchmarkSuiteDefinition DefineExplicit(
+        IReadOnlyList<(MethodInfo Method, object?[] Arguments, string DisplayName)> methods)
+    {
+        ArgumentNullException.ThrowIfNull(methods);
+
+        if (methods.Count == 0)
+            throw new ArgumentException("At least one method is required.", nameof(methods));
+
+        var declaringType = methods[0].Method.DeclaringType
+                            ?? throw new InvalidOperationException(
+                                $"Method '{methods[0].Method.Name}' has no declaring type.");
+
+        var definitions = new List<BenchmarkMethodDefinition>(methods.Count);
+
+        foreach (var (method, arguments, displayName) in methods)
+        {
+            ArgumentNullException.ThrowIfNull(method);
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            if (method.DeclaringType != declaringType)
+            {
+                throw new InvalidOperationException(
+                    $"'{method.Name}' is declared by '{method.DeclaringType?.FullName}' but the suite is "
+                    + $"built around '{declaringType.FullName}'. A co-resident group shares one instance "
+                    + "type.");
+            }
+
+            definitions.Add(CreateDefinition(
+                method,
+                new BenchmarkAttribute(),
+                displayName,
+                arguments,
+                paramNames: method.GetParameters().Select(pa => pa.Name ?? string.Empty).ToArray(),
+                iterSetupDel: null,
+                iterTeardownDel: null,
+                classCategories: []));
+        }
+
+        return new BenchmarkSuiteDefinition(declaringType, definitions);
+    }
+
     private static BenchmarkMethodDefinition CreateDefinition(
         MethodInfo method,
         BenchmarkAttribute attribute,
@@ -453,51 +534,16 @@ public sealed class BenchmarkDiscoverer
         IReadOnlyList<string> classCategories,
         bool isBaseline = false)
     {
-        var isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
-
-        Func<object, object?>? syncDelegate = null;
-        Func<object, Task>? asyncDelegate = null;
-        Action<Task>? resultConsumer = null;
-
-        if (isAsync)
-        {
-            asyncDelegate = arguments is null
-                ? BuildAsyncDelegate(method)
-                : BuildArgumentBoundAsyncDelegate(method, arguments);
-
-            if (method.ReturnType.IsGenericType)
-                resultConsumer = BuildResultConsumer(method.ReturnType);
-        }
-        else if (method.ReturnType == typeof(void))
-        {
-            if (arguments is null)
-            {
-                var act = BuildVoidDelegate(method)!;
-
-                syncDelegate = instance =>
-                {
-                    act(instance);
-                    return null;
-                };
-            }
-            else
-                syncDelegate = BuildArgumentBoundSyncDelegate(method, arguments);
-        }
-        else
-        {
-            syncDelegate = arguments is null
-                ? BuildSyncDelegate(method)
-                : BuildArgumentBoundSyncDelegate(method, arguments);
-        }
-
         var parameterSet = BuildParameterSet(paramNames, arguments);
 
         return new BenchmarkMethodDefinition(method, attribute)
         {
             DisplayName = displayName,
-            SyncDelegate = syncDelegate,
-            AsyncDelegate = asyncDelegate,
-            ResultConsumer = resultConsumer,
+
+            // One binder for every shape. The delegate it produces carries the method's own
+            // signature, so the engine reaches the body without boxing its result - see
+            // BenchmarkBodyFactory.
+            BodyFactory = BenchmarkBodyFactory.Create(method, arguments),
             IterationSetupDelegate = iterSetupDel,
             IterationTeardownDelegate = iterTeardownDel,
             Isolation = ResolveIsolationMode(method),
@@ -603,41 +649,12 @@ public sealed class BenchmarkDiscoverer
         return result;
     }
 
-    private static Func<object, object?> BuildArgumentBoundSyncDelegate(MethodInfo method, object?[] arguments)
-    {
-        var instanceParam = Expression.Parameter(typeof(object), "instance");
-        var call = BuildCall(method, instanceParam, arguments);
-
-        Expression body = method.ReturnType == typeof(void)
-            ? Expression.Block(call, Expression.Constant(null, typeof(object)))
-            : Expression.Convert(call, typeof(object));
-
-        return Expression.Lambda<Func<object, object?>>(body, instanceParam).Compile();
-    }
-
-    private static Func<object, Task> BuildArgumentBoundAsyncDelegate(MethodInfo method, object?[] arguments)
-    {
-        var instanceParam = Expression.Parameter(typeof(object), "instance");
-        var call = BuildCall(method, instanceParam, arguments);
-        var body = Expression.Convert(call, typeof(Task));
-        return Expression.Lambda<Func<object, Task>>(body, instanceParam).Compile();
-    }
-
-    private static MethodCallExpression BuildCall(
-        MethodInfo method, ParameterExpression instanceParam, object?[] arguments)
-    {
-        var typedInstance = Expression.Convert(instanceParam, method.DeclaringType!);
-        var parameters = method.GetParameters();
-        var argExpressions = new Expression[parameters.Length];
-
-        for (var i = 0; i < parameters.Length; i++)
-        {
-            argExpressions[i] = Expression.Constant(arguments[i], parameters[i].ParameterType);
-        }
-
-        return Expression.Call(typedInstance, method, argExpressions);
-    }
-
+    /// <summary>Builds the delegate for a lifecycle hook - setup, teardown, or their per-iteration pair.</summary>
+    /// <remarks>
+    ///     A hook runs outside the timed window, so it keeps the uniform
+    ///     <c>Action&lt;object&gt;</c> shape rather than reconstructing its exact signature the way
+    ///     <see cref="BenchmarkBodyFactory" /> does for a measured body.
+    /// </remarks>
     private static Action<object>? BuildVoidDelegate(MethodInfo? method)
     {
         if (method is null)
@@ -654,52 +671,5 @@ public sealed class BenchmarkDiscoverer
     {
         var typed = (Action<TInstance>)Delegate.CreateDelegate(typeof(Action<TInstance>), method);
         return instance => typed((TInstance)instance);
-    }
-
-    private static Func<object, object?> BuildSyncDelegate(MethodInfo method)
-    {
-        var helper = typeof(BenchmarkDiscoverer)
-            .GetMethod(nameof(BuildSyncDelegateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(method.DeclaringType!, method.ReturnType);
-
-        return (Func<object, object?>)helper.Invoke(null, [method])!;
-    }
-
-    private static Func<object, object?> BuildSyncDelegateGeneric<TInstance, TReturn>(MethodInfo method)
-    {
-        var typed = (Func<TInstance, TReturn>)Delegate.CreateDelegate(typeof(Func<TInstance, TReturn>), method);
-        return instance => typed((TInstance)instance);
-    }
-
-    private static Func<object, Task> BuildAsyncDelegate(MethodInfo method)
-    {
-        var helper = typeof(BenchmarkDiscoverer)
-            .GetMethod(nameof(BuildAsyncDelegateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(method.DeclaringType!);
-
-        return (Func<object, Task>)helper.Invoke(null, [method])!;
-    }
-
-    private static Func<object, Task> BuildAsyncDelegateGeneric<TInstance>(MethodInfo method)
-    {
-        var typed = (Func<TInstance, Task>)Delegate.CreateDelegate(typeof(Func<TInstance, Task>), method);
-        return instance => typed((TInstance)instance);
-    }
-
-    private static Action<Task> BuildResultConsumer(Type taskType)
-    {
-        var resultType = taskType.GetGenericArguments()[0];
-
-        var helper = typeof(BenchmarkDiscoverer)
-            .GetMethod(nameof(BuildResultConsumerGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(resultType);
-
-        return (Action<Task>)helper.Invoke(null, [])!;
-    }
-
-    private static Action<Task> BuildResultConsumerGeneric<T>()
-    {
-        var consume = BenchmarkRunner.GetResultConsumer<T>();
-        return task => consume(((Task<T>)task).Result);
     }
 }

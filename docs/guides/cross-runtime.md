@@ -1,6 +1,6 @@
 ---
 title: Cross-runtime comparison
-description: Verify your code benefits from net10 vs net8 with multi-runtime comparison, always-child isolation, and significance grouped within each runtime.
+description: Verify your code benefits from net10 vs net8 with multi-runtime comparison, always-worker isolation, and significance grouped within each runtime.
 order: 5
 ---
 
@@ -8,7 +8,7 @@ order: 5
 
 ## Scenario
 
-You support net8, net9, and net10. You want to know whether the net10 runtime delivers a real speedup for your hot paths, or whether you should hold off recommending the upgrade. NBenchmark builds and runs the same benchmarks across multiple target frameworks in separate child processes, stamps each result with its `RuntimeMoniker`, and groups significance within each runtime so net8 is never compared against the net10 baseline.
+You support net8, net9, and net10. You want to know whether the net10 runtime delivers a real speedup for your hot paths, or whether you should hold off recommending the upgrade. NBenchmark builds the same benchmarks for each target framework, measures each build in its own worker process, stamps every result with its `RuntimeMoniker`, and groups significance within each runtime so net8 is never compared against the net10 baseline.
 
 ## Complete example
 
@@ -69,15 +69,15 @@ When `--runtimes` is passed on the CLI, the CLI list wins and `[Runtimes]` is ig
 
 ## What's happening
 
-- **`WithRuntimes(...)` / `--runtimes net8,net9,net10` / `[Runtimes(...)]`** - the three ways to trigger cross-runtime execution. Each runtime builds via `dotnet build -f <tfm>`, runs in a separate child process under that runtime, and aggregates the results. See [Multi-runtime comparison](../features/multi-runtime.md).
+- **`WithRuntimes(...)` / `--runtimes net8,net9,net10` / `[Runtimes(...)]`** - the three ways to trigger cross-runtime execution. Each runtime builds via `dotnet build -f <tfm>` and is measured in that build's own worker. In Suite mode this needs a `[BenchmarkPlan]` factory, because a suite's bodies are addressed by metadata token and a token from one build means nothing in another. See [Multi-runtime comparison](../features/multi-runtime.md).
 
-- **Cross-runtime always uses child processes**, regardless of `--in-process` / `WithIsolation` settings. Each runtime is a clean CLR with no JIT, GC, or thread-pool state warmed up by siblings. This is non-negotiable: a comparison across runtimes is meaningless if the runtimes share a process.
+- **Cross-runtime always isolates**, regardless of `--in-process` / `WithIsolation` settings. Each runtime is a clean CLR with no JIT, GC or thread-pool state warmed by siblings. This is non-negotiable: a comparison across runtimes measured in one process is not a comparison across runtimes.
 
 - **Significance is grouped within each runtime.** net8 results are compared against the net8 baseline, not the net10 one. Cross-runtime significance is not computed because a cross-runtime comparison is not a like-for-like comparison of your code - it conflates your code's behavior with the runtime's behavior.
 
 - **The first runtime in the list is the implicit baseline** for ratio calculations within that runtime. Use `WithBaseline` (Suite) or `[Benchmark(Baseline = true)]` (Harness) to designate the benchmark that's the 1.00x reference; the runtime order controls which runtime's results are presented first.
 
-- **Environment controls propagate to the children.** `--cpu-affinity`, `--priority`, and `--dedicated-host-guidance` apply to each spawned child, so every runtime runs under the same hardware constraints. See [Environment control: Isolated-process propagation](../features/environment-control.md#isolated-process-propagation).
+- **Environment controls propagate to the workers.** `--cpu-affinity`, `--priority`, and `--dedicated-host-guidance` apply to each spawned worker, so every runtime runs under the same hardware constraints. See [Environment control: Isolated-process propagation](../features/environment-control.md#isolated-process-propagation).
 
 > [!IMPORTANT] Compare on the same host
 > Cross-runtime comparisons are only meaningful when the runtimes run on the same machine in the same conditions. Don't compare net8 results from your laptop against net10 results from CI - the host difference will dwarf the runtime difference. Run all three runtimes in the same invocation, on the same runner, with the same environment controls.
@@ -126,6 +126,6 @@ See [Reading Your Results](../output/reading-your-results.md) for every column, 
 
 - [Multi-runtime comparison](../features/multi-runtime.md) - the full model, including how `--runtimes` and `[Runtimes]` interact, the build / DLL-location / cleanup lifecycle, and the moniker-to-TFM mapping.
 - [Isolated runs](../features/isolated-runs.md) - the underlying process-isolation model that cross-runtime execution builds on.
-- [Environment control](../features/environment-control.md) - controls that propagate to every spawned child so each runtime runs under the same hardware constraints.
+- [Environment control](../features/environment-control.md) - controls that propagate to every spawned worker so each runtime runs under the same hardware constraints.
 - [Samples: MultiRuntimeSuite](../samples.md#multiruntimesuite---suite-mode-multi-runtime) and [MultiRuntimeHarness](../samples.md#multiruntimehost---harness-mode-multi-runtime) - runnable sample projects.
 - [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) - the noise-reduction stack to apply when running cross-runtime in CI, where the host difference can dwarf the runtime difference.

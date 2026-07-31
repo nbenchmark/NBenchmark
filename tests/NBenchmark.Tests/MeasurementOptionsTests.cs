@@ -27,7 +27,6 @@ public class MeasurementOptionsTests
         Assert.Equal(0.05, opts.SignificanceLevel);
         Assert.Equal(0.147, opts.MinimumPracticalEffect);
         Assert.Equal(MeasurementOptions.DefaultMinimumPracticalEffect, opts.MinimumPracticalEffect);
-        Assert.Equal(1, opts.LaunchCount);
         Assert.Equal(DiagnosticsOptions.Default, opts.Diagnostics);
     }
 

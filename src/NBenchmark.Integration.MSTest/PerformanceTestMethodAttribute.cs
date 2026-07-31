@@ -22,6 +22,17 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
     public double ConfidenceLevel { get; init; } = 0.95;
     public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
 
+    /// <summary>
+    ///     Worker processes to measure this test in. Defaults to 1; two or more give the ratio gate a
+    ///     paired confidence interval. See <see cref="IPerformanceThresholds.LaunchCount" />.
+    /// </summary>
+    public int LaunchCount { get; init; } = 1;
+
+    // No RequireIsolation property. It defaults to true via IPerformanceThresholds and the opt-out is
+    // [AllowInProcessGate], which also covers class and assembly scope. Kept off the attribute even
+    // though MSTest could read it, so the same opt-out works identically across all three frameworks -
+    // on xUnit an explicit `false` is indistinguishable from an absent named argument.
+
     public override Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
         var methodInfo = testMethod.MethodInfo;
@@ -35,13 +46,12 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
 
         var instance = methodInfo.IsStatic ? null : CreateInstance(methodInfo);
 
-        BenchmarkResult? refResult = null;
-        double[]? refSamples = null;
-        BenchmarkResult result = null!;
-        double[] rawSamples = null!;
+        TestMeasurement.MeasuredPair pair;
 
         try
         {
+            TestMeasurement.Target? referenceTarget = null;
+
             if (!string.IsNullOrWhiteSpace(ReferenceMethod))
             {
                 MethodInfo refMethodInfo;
@@ -56,100 +66,52 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                     return Task.FromResult<TestResult[]>([CreateErrorResult(ex.Message)]);
                 }
 
-                if (!TryBuildBody(refMethodInfo, instance, refArgs, out var refBody, out var refIsAsync))
-                {
-                    return Task.FromResult<TestResult[]>([
-                        CreateErrorResult(
-                            $"Could not build body for reference method {ReferenceMethod}."),
-                    ]);
-                }
-
                 var refName = $"{testMethod.TestClassName}.{ReferenceMethod}";
 
-                if (refIsAsync)
-                {
-                    if (refBody is Func<Task> refTaskBody)
-                    {
-                        var refOutcome = BenchmarkRunner.Instance.RunAsync(
-                                refName, refTaskBody, runSpec, CancellationToken.None)
-                            .GetAwaiter().GetResult();
-
-                        refResult = refOutcome.Result;
-                        refSamples = refOutcome.RawSamples;
-                    }
-                    else
-                    {
-                        return Task.FromResult<TestResult[]>([
-                            CreateErrorResult(
-                                $"Unsupported async body type for reference method {ReferenceMethod}."),
-                        ]);
-                    }
-                }
-                else
-                {
-                    if (refBody is Action refActionBody)
-                    {
-                        var refOutcome = BenchmarkRunner.Instance.Run(
-                            refName, refActionBody, runSpec, CancellationToken.None);
-
-                        refResult = refOutcome.Result;
-                        refSamples = refOutcome.RawSamples;
-                    }
-                    else
-                    {
-                        return Task.FromResult<TestResult[]>([
-                            CreateErrorResult(
-                                $"Unsupported sync body type for reference method {ReferenceMethod}."),
-                        ]);
-                    }
-                }
+                referenceTarget = new TestMeasurement.Target(refMethodInfo, refArgs, refName);
             }
 
-            if (TryBuildBody(methodInfo, instance, args, out var body, out var isAsync))
-            {
-                if (isAsync)
-                {
-                    if (body is Func<Task> taskBody)
-                    {
-                        var outcome = BenchmarkRunner.Instance.RunAsync(
-                                name, taskBody, runSpec, CancellationToken.None)
-                            .GetAwaiter().GetResult();
-
-                        result = outcome.Result;
-                        rawSamples = outcome.RawSamples;
-                    }
-                    else
-                        return Task.FromResult<TestResult[]>([CreateErrorResult($"Unsupported async body type for method {methodInfo.Name}.")]);
-                }
-                else
-                {
-                    if (body is Action actionBody)
-                    {
-                        var outcome = BenchmarkRunner.Instance.Run(
-                            name, actionBody, runSpec, CancellationToken.None);
-
-                        result = outcome.Result;
-                        rawSamples = outcome.RawSamples;
-                    }
-                    else
-                        return Task.FromResult<TestResult[]>([CreateErrorResult($"Unsupported sync body type for method {methodInfo.Name}.")]);
-                }
-            }
-            else
-                return Task.FromResult<TestResult[]>([CreateErrorResult($"Could not build body for method {methodInfo.Name}.")]);
+            // Both sides in one call, so each replicate measures them co-resident and their ratio is
+            // paired. MSTest's Execute is synchronous, so the async path is blocked on here.
+            pair = TestMeasurement
+                .MeasurePairAsync(
+                    new TestMeasurement.Target(methodInfo, args, name),
+                    referenceTarget,
+                    instance,
+                    runSpec,
+                    MeasurementOptionsBuilder.LaunchCount(this),
+                    CancellationToken.None,
+                    PerformanceGate.NeedsCalibration(this))
+                .GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
             return Task.FromResult<TestResult[]>([CreateErrorResult(ex)]);
         }
 
-        var violations = ValidateResult(result, rawSamples, refResult, refSamples, this);
+        var result = pair.Candidate.Result;
+        var rawSamples = pair.Candidate.RawSamples;
+        var refusal = pair.Candidate.Refusal;
+
+        var gate = PerformanceGate.Evaluate(
+            result, rawSamples, pair.Reference?.Result, pair.Reference?.RawSamples, this,
+            PerformanceGate.AllowsInProcessGate(methodInfo), pair.Candidate.Calibration, pair.PairedRatio);
+
+        var violations = gate.Violations;
+        var notes = new List<string>();
+
+        if (refusal is not null)
+            notes.Add($"NBenchmark: '{name}' measured in the test host - {refusal}");
+
+        notes.AddRange(gate.Notes);
 
         var testResult = new TestResult
         {
             DisplayName = testMethod.TestMethodName,
             Duration = result.TotalDuration,
-            LogOutput = MetricsFormatter.Format(result),
+            LogOutput = notes.Count == 0
+                ? MetricsFormatter.Format(result)
+                : MetricsFormatter.Format(result) + Environment.NewLine + string.Join(Environment.NewLine, notes),
         };
 
         if (violations.Count > 0)
@@ -168,44 +130,18 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         return Task.FromResult<TestResult[]>([testResult]);
     }
 
+    /// <summary>
+    ///     Thin wrapper over <see cref="PerformanceGate.Evaluate" />, kept so the gate can be
+    ///     exercised without standing up an MSTest test method.
+    /// </summary>
     internal static IReadOnlyList<string> ValidateResult(
         BenchmarkResult result, double[] rawSamples,
         BenchmarkResult? refResult, double[]? refSamples,
-        IPerformanceThresholds thresholds)
-    {
-        var violations = new List<string>();
-
-        if (result.Errored)
-            violations.Add($"Benchmark errored: {result.ErrorMessage}");
-
-        var thresholdBag = new PerformanceThresholds
-        {
-            MaxMeanNs = thresholds.MaxMeanNs >= 0 ? thresholds.MaxMeanNs : null,
-            MaxP95Ns = thresholds.MaxP95Ns >= 0 ? thresholds.MaxP95Ns : null,
-            MaxAllocatedBytes = thresholds.MaxAllocatedBytes >= 0 ? thresholds.MaxAllocatedBytes : null,
-            MaxAbsoluteThresholdTolerance = thresholds.MaxAbsoluteThresholdTolerance,
-        };
-
-        violations.AddRange(BenchmarkAssert.Validate(result, thresholdBag));
-
-        if (thresholds.MaxSlowdownRatio > 0 && !result.Errored)
-        {
-            if (refResult is not null && refSamples is not null)
-            {
-                violations.AddRange(RelativeComparison.Check(
-                    result, rawSamples, refResult, refSamples, thresholds.MaxSlowdownRatio));
-            }
-            else
-            {
-                var calibration = PerformanceCalibration.Run();
-
-                violations.AddRange(RelativeComparison.Check(
-                    result, rawSamples, PerformanceCalibration.CreateBenchmarkResult(), calibration.Samples, thresholds.MaxSlowdownRatio));
-            }
-        }
-
-        return violations;
-    }
+        IPerformanceThresholds thresholds,
+        bool allowInProcessGate = false)
+        => PerformanceGate
+            .Evaluate(result, rawSamples, refResult, refSamples, thresholds, allowInProcessGate)
+            .Violations;
 
     private static TestResult CreateErrorResult(string message)
     {
@@ -236,54 +172,21 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
                    $"Failed to create instance of {declaringType.FullName} for benchmark method {method.Name}.");
     }
 
-    private static Action BuildSyncBody(MethodInfo method, object? instance, object?[] args)
-    {
-        var call = BuildCall(method, instance, args);
-        return Expression.Lambda<Action>(call).Compile();
-    }
-
-    private static Action BuildReturningSyncBody(MethodInfo method, object? instance, object?[] args)
-    {
-        var call = BuildCall(method, instance, args);
-        var consumeField = typeof(ReturnSink).GetField(nameof(ReturnSink.Hole))!;
-        var typedField = Expression.Field(null, consumeField);
-        var assign = Expression.Assign(typedField, Expression.Convert(call, typeof(object)));
-        return Expression.Lambda<Action>(assign).Compile();
-    }
-
+    /// <summary>
+    ///     Compiles the test method into a benchmark body.
+    /// </summary>
+    /// <remarks>
+    ///     Delegates to <see cref="TestBodyBuilder" />, which the three test-framework integrations
+    ///     share. They each carried their own copy of this until the copies were found to differ,
+    ///     and a divergence here changes what gets measured rather than failing loudly.
+    /// </remarks>
     internal static bool TryBuildBody(
         MethodInfo method,
         object? instance,
         object?[] args,
         out Delegate body,
         out bool isAsync)
-    {
-        var returnType = method.ReturnType;
-
-        if (returnType == typeof(void))
-        {
-            body = BuildSyncBody(method, instance, args);
-            isAsync = false;
-            return true;
-        }
-
-        var isSupportedAsyncReturn = returnType == typeof(Task)
-                                     || returnType == typeof(ValueTask)
-                                     || (returnType.IsGenericType
-                                         && (returnType.GetGenericTypeDefinition() == typeof(Task<>)
-                                             || returnType.GetGenericTypeDefinition() == typeof(ValueTask<>)));
-
-        if (isSupportedAsyncReturn)
-        {
-            body = BuildAsyncBody(method, instance, args);
-            isAsync = true;
-            return true;
-        }
-
-        body = BuildReturningSyncBody(method, instance, args);
-        isAsync = false;
-        return true;
-    }
+        => TestBodyBuilder.TryBuild(method, instance, args, out body, out isAsync);
 
     internal static (MethodInfo Method, object?[] Args) ResolveReferenceMethod(
         MethodInfo benchmarkMethod,
@@ -364,73 +267,6 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
         return true;
     }
 
-    private static Func<Task> BuildAsyncBody(MethodInfo method, object? instance, object?[] args)
-    {
-        var call = BuildCall(method, instance, args);
-        var taskExpression = BuildAsyncTaskExpression(call, method.ReturnType);
-        var invokeTask = Expression.Lambda<Func<Task>>(taskExpression).Compile();
-
-        return async () =>
-        {
-            var task = invokeTask();
-
-            if (task is not null)
-                await task.ConfigureAwait(false);
-        };
-    }
-
-    private static Expression BuildAsyncTaskExpression(Expression call, Type returnType)
-    {
-        if (returnType == typeof(Task)
-            || (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>)))
-            return Expression.Convert(call, typeof(Task));
-
-        if (returnType == typeof(ValueTask))
-            return Expression.Call(call, nameof(ValueTask.AsTask), Type.EmptyTypes);
-
-        if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
-        {
-            var helper = typeof(PerformanceTestMethodAttribute)
-                .GetMethod(nameof(ConvertGenericValueTaskToTask), BindingFlags.NonPublic | BindingFlags.Static)!
-                .MakeGenericMethod(returnType.GetGenericArguments()[0]);
-
-            return Expression.Call(helper, call);
-        }
-
-        throw new InvalidOperationException($"Unsupported async return type: {returnType.FullName}");
-    }
-
-    private static MethodCallExpression BuildCall(MethodInfo method, object? instance, object?[] args)
-    {
-        var parameters = method.GetParameters();
-
-        if (parameters.Length != args.Length)
-        {
-            throw new InvalidOperationException(
-                $"Method '{method.Name}' expects {parameters.Length} argument(s) but received {args.Length}.");
-        }
-
-        var argExpressions = new Expression[parameters.Length];
-
-        for (var i = 0; i < parameters.Length; i++)
-        {
-            argExpressions[i] = Expression.Constant(args[i], parameters[i].ParameterType);
-        }
-
-        if (method.IsStatic)
-            return Expression.Call(method, argExpressions);
-
-        if (instance is null)
-            throw new InvalidOperationException($"Method '{method.Name}' requires a target instance.");
-
-        var typedInstance = Expression.Constant(instance, method.DeclaringType!);
-        return Expression.Call(typedInstance, method, argExpressions);
-    }
-
     private static Task ConvertGenericValueTaskToTask<T>(ValueTask<T> valueTask) => valueTask.AsTask();
 
-    private static class ReturnSink
-    {
-        public static object? Hole = new();
-    }
 }

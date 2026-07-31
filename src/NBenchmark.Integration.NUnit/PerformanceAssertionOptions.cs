@@ -15,4 +15,17 @@ public sealed class PerformanceAssertionOptions : IPerformanceThresholds
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; init; } = 0.95;
     public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
+
+    /// <summary>
+    ///     Fails the assertion when the measurement was taken in the test host rather than in a worker
+    ///     process. Defaults to <c>true</c>. See <see cref="IPerformanceThresholds.RequireIsolation" />.
+    /// </summary>
+    /// <remarks>
+    ///     Settable here, unlike on the attributes, because the <c>PerformanceAssert</c> pattern has no
+    ///     attribute target for <c>[AllowInProcessGate]</c> to sit on - the caller has already measured,
+    ///     and the gate call is not tied to a method the gate can inspect. This is that pattern's
+    ///     opt-out, and being a plain object rather than attribute metadata, <c>false</c> here means
+    ///     <c>false</c>.
+    /// </remarks>
+    public bool RequireIsolation { get; init; } = true;
 }

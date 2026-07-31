@@ -50,7 +50,7 @@ This opts the class out of the auto-isolation fallback (below) and silences the 
 
 ## Auto-isolation fallback
 
-When a PerClass class is resolved via a factory (`WithInstanceFactory`, `WithServiceProvider`, or `WithScopedServiceProvider`) and does **not** implement `IStateReset`, the host automatically upgrades the isolation decision from PerClass to PerBenchmark. Each method runs in its own clean child process, preserving statistical independence at the cost of a process launch per method. The affected results carry a warning:
+When a PerClass class is resolved via a factory (`WithInstanceFactory`, `WithServiceProvider`, or `WithScopedServiceProvider`) and does **not** implement `IStateReset`, the host automatically upgrades the isolation decision from PerClass to PerBenchmark. Each method runs in its own clean worker, preserving statistical independence at the cost of a process launch per method. The affected results carry a warning:
 
 > Class 'OrderBenchmarks' uses InstanceLifetime.PerClass with a factory-resolved instance and does not implement IStateReset; upgrading to per-benchmark isolated process to preserve statistical independence. Implement IStateReset on the class to allow in-process PerClass execution.
 

@@ -117,6 +117,99 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(0.99, parsed.ConfidenceLevel);
     }
 
+    /// <summary>
+    ///     <c>LaunchCount</c> survives both parse paths, and an unset one reads as one launch.
+    /// </summary>
+    /// <remarks>
+    ///     Worth its own test because this parser is a field-by-field copy, and the failure mode of a
+    ///     field-by-field copy is silence: a test asking for three replicates would be measured once, its
+    ///     ratio gate would keep comparing unpaired numbers, and nothing anywhere would say so.
+    /// </remarks>
+    [Theory]
+    [InlineData(3, 3)]
+    [InlineData(1, 1)]
+    [InlineData(0, 1)]
+    [InlineData(-4, 1)]
+    public void Parse_Carries_LaunchCount_From_The_Runtime_Attribute(int declared, int expected)
+    {
+        var attributeInfo = new RuntimeBackedAttributeInfo(
+            new PerformanceFactAttribute { LaunchCount = declared });
+
+        Assert.Equal(expected, PerformanceAttributeParser.Parse(attributeInfo).LaunchCount);
+    }
+
+    [Fact]
+    public void Parse_Carries_LaunchCount_From_A_Named_Argument()
+    {
+        var attributeInfo = new NamedOnlyAttributeInfo(new Dictionary<string, object?>
+        {
+            [nameof(PerformanceFactAttribute.LaunchCount)] = 2,
+        });
+
+        Assert.Equal(2, PerformanceAttributeParser.Parse(attributeInfo).LaunchCount);
+    }
+
+    [Fact]
+    public void Parse_Defaults_LaunchCount_To_One_When_Unset()
+        => Assert.Equal(1, PerformanceAttributeParser.Parse(new NamedOnlyAttributeInfo()).LaunchCount);
+
+    /// <summary>
+    ///     And it survives serialization, which is how a test case reaches the runner in xUnit.
+    /// </summary>
+    [Fact]
+    public void PerformanceTestData_RoundTrips_LaunchCount()
+    {
+        var data = PerformanceTestData.FromThresholds(new PerformanceFactAttribute { LaunchCount = 3 });
+
+        Assert.Equal(3, data.LaunchCount);
+
+        var info = new RecordingSerializationInfo();
+        data.Serialize(info);
+
+        var revived = (PerformanceTestData)Activator.CreateInstance(
+            typeof(PerformanceTestData), nonPublic: true)!;
+
+        revived.Deserialize(info);
+
+        Assert.Equal(3, revived.LaunchCount);
+    }
+
+    /// <summary>
+    ///     A test case serialized by an earlier build carries no <c>LaunchCount</c> at all, and must
+    ///     revive as one launch rather than as zero - which is not a valid replicate count.
+    /// </summary>
+    [Fact]
+    public void PerformanceTestData_Revives_A_Missing_LaunchCount_As_One()
+    {
+        var revived = (PerformanceTestData)Activator.CreateInstance(
+            typeof(PerformanceTestData), nonPublic: true)!;
+
+        revived.Deserialize(new RecordingSerializationInfo());
+
+        Assert.Equal(1, revived.LaunchCount);
+    }
+
+    /// <summary>
+    ///     A minimal <see cref="IXunitSerializationInfo" /> that keeps values in a dictionary, so a
+    ///     round-trip can be asserted without standing up xUnit's own serializer.
+    /// </summary>
+    private sealed class RecordingSerializationInfo : IXunitSerializationInfo
+    {
+        private readonly Dictionary<string, object?> _values = new(StringComparer.Ordinal);
+
+        public void AddValue(string key, object? value, Type? type = null) => _values[key] = value;
+
+        public object? GetValue(string key, Type type)
+        {
+            if (_values.TryGetValue(key, out var value))
+                return value;
+
+            return type.IsValueType ? Activator.CreateInstance(type) : null;
+        }
+
+        public T GetValue<T>(string key) => (T)GetValue(key, typeof(T))!;
+    }
+
     private sealed class RuntimeBackedAttributeInfo : NamedOnlyAttributeInfo, IReflectionAttributeInfo
     {
         public RuntimeBackedAttributeInfo(

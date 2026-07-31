@@ -1,0 +1,199 @@
+using NBenchmark.Engine;
+using NBenchmark.Reporters;
+
+namespace NBenchmark;
+
+/// <summary>
+///     A suite whose benchmarks are measured over prepared state, obtained from
+///     <see cref="BenchmarkSuite.WithState{TState}" />.
+/// </summary>
+/// <remarks>
+///     <para>
+///         A separate type rather than extra overloads on <see cref="BenchmarkSuite" />, because
+///         <c>Add&lt;T&gt;(string, Action&lt;T&gt;)</c> there already means <i>parameterized</i> - a
+///         state-taking two-argument <c>Add</c> on the same type would be ambiguous with it, and which
+///         one a call bound to would depend on whether <c>T</c> happened to match a registered parameter
+///         type.
+///     </para>
+///     <para>
+///         The <c>With*</c> methods people chain after <c>Add</c> are re-declared here purely to return
+///         this type, so the chain does not decay to the base and lose the typed <c>Add</c>. They add no
+///         behaviour; each one calls the base and returns <c>this</c>.
+///     </para>
+/// </remarks>
+/// <typeparam name="TState">The prepared value each benchmark body receives.</typeparam>
+public sealed class BenchmarkSuite<TState> : BenchmarkSuite
+{
+    private readonly Func<TState> _prepare;
+
+    internal BenchmarkSuite(string name, Func<TState> prepare) : base(name) => _prepare = prepare;
+
+    // --- Typed Add overloads ---
+
+    /// <summary>Adds a benchmark receiving the prepared state.</summary>
+    /// <param name="setup">
+    ///     Per-iteration setup, run outside the timed region. The place to undo a mutation the body makes
+    ///     to the shared state - a body like <c>d =&gt; Array.Sort(d)</c> otherwise measures an
+    ///     already-sorted array from the second sample onward.
+    /// </param>
+    public BenchmarkSuite<TState> Add(string name, Action<TState> action,
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        // The state is bound lazily and cached, so preparation happens once per benchmark and outside
+        // the timed region - matching what the worker does when this body is isolated instead.
+        var state = Deferred();
+
+        AddWithState(name, _prepare, action,
+            (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(name, () => action(state()),
+                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+            setup, teardown, categories);
+
+        return this;
+    }
+
+    /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?)" />
+    public BenchmarkSuite<TState> Add<TResult>(string name, Func<TState, TResult> action,
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        var state = Deferred();
+
+        AddWithState(name, _prepare, action,
+            (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(name, () => action(state()),
+                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+            setup, teardown, categories);
+
+        return this;
+    }
+
+    /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?)" />
+    public BenchmarkSuite<TState> AddAsync(string name, Func<TState, Task> action,
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        var state = Deferred();
+
+        AddWithState(name, _prepare, action,
+            async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(name, () => action(state()),
+                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+            setup, teardown, categories);
+
+        return this;
+    }
+
+    /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?)" />
+    public BenchmarkSuite<TState> AddAsync<TResult>(string name, Func<TState, Task<TResult>> action,
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        var state = Deferred();
+
+        AddWithState(name, _prepare, action,
+            async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(name, () => action(state()),
+                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+            setup, teardown, categories);
+
+        return this;
+    }
+
+    /// <summary>
+    ///     A per-benchmark accessor that builds the state on first use and reuses it after.
+    /// </summary>
+    /// <remarks>
+    ///     One accessor per <c>Add</c> call, so each benchmark gets its own pristine state rather than
+    ///     whatever the previous one left behind - the same rule the isolated path follows, where the
+    ///     worker invokes the factory once per body. Deferred rather than eager so an isolated run, which
+    ///     prepares in the worker, does not also prepare here for a delegate nothing measures.
+    /// </remarks>
+    private Func<TState> Deferred()
+    {
+        var built = false;
+        TState value = default!;
+
+        return () =>
+        {
+            if (built)
+                return value;
+
+            value = _prepare();
+            built = true;
+
+            return value;
+        };
+    }
+
+    // --- Fluent surface, re-typed ---
+    //
+    // Behaviourless forwarders. They exist because `new BenchmarkSuite("x").WithState(f).Add(...)
+    // .WithBaseline("a").Add(...)` must keep compiling: without them the chain returns the base type
+    // after the first With* call and the typed Add is no longer in scope.
+
+    /// <inheritdoc cref="BenchmarkSuite.WithBaseline" />
+    public new BenchmarkSuite<TState> WithBaseline(string name) => Chain(() => base.WithBaseline(name));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithIterations" />
+    public new BenchmarkSuite<TState> WithIterations(int iterations) => Chain(() => base.WithIterations(iterations));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithWarmup" />
+    public new BenchmarkSuite<TState> WithWarmup(int iterations) => Chain(() => base.WithWarmup(iterations));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithLaunchCount" />
+    public new BenchmarkSuite<TState> WithLaunchCount(int count) => Chain(() => base.WithLaunchCount(count));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithOpsPerSample" />
+    public new BenchmarkSuite<TState> WithOpsPerSample(int opsPerSample)
+        => Chain(() => base.WithOpsPerSample(opsPerSample));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithOutlierMode" />
+    public new BenchmarkSuite<TState> WithOutlierMode(OutlierMode mode) => Chain(() => base.WithOutlierMode(mode));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithRunOrder" />
+    public new BenchmarkSuite<TState> WithRunOrder(RunOrder order) => Chain(() => base.WithRunOrder(order));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithSeed" />
+    public new BenchmarkSuite<TState> WithSeed(int seed) => Chain(() => base.WithSeed(seed));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithDetail" />
+    public new BenchmarkSuite<TState> WithDetail(ReportDetail detail) => Chain(() => base.WithDetail(detail));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithReporter" />
+    public new BenchmarkSuite<TState> WithReporter(IReporter reporter) => Chain(() => base.WithReporter(reporter));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithProgress" />
+    public new BenchmarkSuite<TState> WithProgress(IBenchmarkProgress progress)
+        => Chain(() => base.WithProgress(progress));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithMeasurementProfile" />
+    public new BenchmarkSuite<TState> WithMeasurementProfile(MeasurementProfile profile)
+        => Chain(() => base.WithMeasurementProfile(profile));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithRuntimeProfile" />
+    public new BenchmarkSuite<TState> WithRuntimeProfile(RuntimeProfile profile)
+        => Chain(() => base.WithRuntimeProfile(profile));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithSuiteSetup" />
+    public new BenchmarkSuite<TState> WithSuiteSetup(Action setup) => Chain(() => base.WithSuiteSetup(setup));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithSuiteTeardown" />
+    public new BenchmarkSuite<TState> WithSuiteTeardown(Action teardown)
+        => Chain(() => base.WithSuiteTeardown(teardown));
+
+    /// <inheritdoc cref="BenchmarkSuite.WithIsolation" />
+    public new BenchmarkSuite<TState> WithIsolation(bool enabled = true) => Chain(() => base.WithIsolation(enabled));
+
+    private BenchmarkSuite<TState> Chain(Func<BenchmarkSuite> configure)
+    {
+        configure();
+
+        return this;
+    }
+}

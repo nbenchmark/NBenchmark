@@ -211,6 +211,47 @@ public record BenchmarkResult
     /// <summary>The measurement profile under which this result was produced.</summary>
     public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
 
+    /// <summary>
+    ///     The name of the runtime-startup configuration this result was <b>actually</b> measured
+    ///     under - not the one that was requested. <c>"host"</c> means the measurement ran in a
+    ///     process NBenchmark did not launch, so it inherited whatever runtime configuration that
+    ///     process was started with; every in-process result reports this.
+    ///     <para>
+    ///         Two results measured under different runtime profiles are not comparable, so the
+    ///         significance engine never places them in the same comparison group.
+    ///     </para>
+    /// </summary>
+    public string RuntimeProfileName { get; init; } = RuntimeProfile.Host.Name;
+
+    /// <summary>
+    ///     The runtime-startup knobs in effect for this measurement, e.g.
+    ///     <c>"tiered=off pgo=off r2r=off"</c>. Read from the measuring process's own environment
+    ///     rather than derived from the requested profile, so a knob the user set by hand is
+    ///     reported as faithfully as one NBenchmark applied. Empty when none are set.
+    /// </summary>
+    public string RuntimeKnobs { get; init; } = "";
+
+    /// <summary>
+    ///     Where this measurement ran, and - when it did not run in a worker - why not.
+    ///     <para>
+    ///         The default is <see cref="IsolationStatus.InProcessRequested" /> rather than
+    ///         <see cref="IsolationStatus.Isolated" /> on purpose: a result that nobody explicitly
+    ///         marked as isolated did not come from a worker, and defaulting the other way would let
+    ///         any code path that forgot to set it claim a fidelity it never had.
+    ///     </para>
+    ///     <para>
+    ///         Note that this initializer is the <i>whole</i> of that guarantee.
+    ///         <see cref="IsolationStatus.Isolated" /> is <c>0</c>, so <c>default(IsolationStatus)</c>
+    ///         is the permissive value - the enum cannot be renumbered to fix that, because its values
+    ///         travel on the wire inside this record. Every measurement therefore starts here as
+    ///         host-measured and is re-stamped by the layer that knows better, at
+    ///         <c>WorkerGroupRunner</c> for the streaming path and via <c>with</c> expressions
+    ///         elsewhere. Removing the initializer would silently promote every un-stamped result.
+    ///         Pinned by <c>BenchmarkResultTests.IsolationStatus_DefaultsToHostMeasured</c>.
+    ///     </para>
+    /// </summary>
+    public IsolationStatus IsolationStatus { get; init; } = IsolationStatus.InProcessRequested;
+
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     /// <summary>
@@ -227,8 +268,7 @@ public record BenchmarkResult
     public AutoTuneDiagnostic? AutoTune { get; init; }
 
     /// <summary>
-    ///     Cross-launch summary statistics populated when
-    ///     <see cref="MeasurementOptions.LaunchCount" /> > 1.
+    ///     Cross-launch summary statistics, populated when the launch count is above one.
     ///     <c>null</c> when the benchmark ran a single launch.
     /// </summary>
     public LaunchStatistics? LaunchStatistics { get; init; }

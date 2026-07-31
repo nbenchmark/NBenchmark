@@ -48,21 +48,21 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
             baseHeaders += ",OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,Detail,Profile");
+                $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs");
         }
         else if (Detail == ReportDetail.Standard)
         {
             baseHeaders += ",Mean,OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs");
         }
         else
         {
             baseHeaders += ",Mean,OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,Detail,Profile,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,AutoTuneSplitHalfDrift,AutoTuneRestarts,AutoTuneWarmupTimeFloorMet,AutoTuneWarmupJitMethods,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,AutoTuneSplitHalfDrift,AutoTuneRestarts,AutoTuneWarmupTimeFloorMet,AutoTuneWarmupJitMethods,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories");
         }
 
         foreach (var table in tables)
@@ -102,8 +102,10 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{simpleDiag?.Gen0Collections?.ToString() ?? ""}," +
                     $"{simpleDiag?.Gen1Collections?.ToString() ?? ""}," +
                     $"{simpleDiag?.Gen2Collections?.ToString() ?? ""}," +
+                    $"{ReportFormat.SchemaVersion},{ReportFormat.MeasurementEpoch}," +
                     $"{detail}," +
-                    $"{profile}");
+                    $"{profile}," +
+                    $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\"");
             }
             else
             {
@@ -119,6 +121,13 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                                $"{table.ConfidenceLevel:F2}," +
                                $"{row.CoefficientOfVariation:F4}," +
                                $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
+
+                               // Empty rather than null when the run had a single launch: there is no
+                               // interval to report, which is different from one that could not be
+                               // computed. A trend consumer reading a blank knows not to plot it.
+                               $"{row.RatioEstimate?.Lower.ToString("F3") ?? ""}," +
+                               $"{row.RatioEstimate?.Upper.ToString("F3") ?? ""}," +
+                               $"{row.RatioEstimate?.Replicates.ToString() ?? ""}," +
                                $"\"{safeSig}\"," +
                                $"\"{safeEffectMetric}\"," +
                                $"{row.Effect?.Value?.ToString("F4") ?? ""}," +
@@ -127,8 +136,10 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                                $"{diagCols}," +
                                $"{row.MarginPercent:F2}," +
                                $"{row.OutliersRemoved}," +
+                               $"{ReportFormat.SchemaVersion},{ReportFormat.MeasurementEpoch}," +
                                $"{detail}," +
-                               $"{profile}";
+                               $"{profile}," +
+                               $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\"";
 
                 if (Detail == ReportDetail.Standard)
                     sb.AppendLine(fullData);

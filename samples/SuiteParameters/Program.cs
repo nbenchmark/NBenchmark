@@ -5,6 +5,16 @@ using NBenchmark.Reporters.Console;
 // WithParameter + typed Add lambdas. Each parameter combination produces one
 // benchmark entry with a display name like "sort (size=100)".
 //
+// Parameter sweeps are measured in a worker process like any other suite. The typed lambda
+// `(int size) => ...` captures nothing, so it is addressable; the parameter values travel beside
+// its address as serialized constants and the worker binds each one before measuring. That means a
+// sweep needs no [BenchmarkPlan] factory and no restructuring - the code below is what you would
+// have written anyway.
+//
+// The one limit is the value type: parameters must be primitives, strings, enums, decimal,
+// DateTime, DateTimeOffset, TimeSpan or Guid. Anything else has to be built in the measuring
+// process, which is what a [BenchmarkPlan] factory or WithState is for.
+//
 // Run with: dotnet run --project samples/SuiteParameters
 
 // ---------------------------------------------------------------------------
@@ -14,7 +24,7 @@ using NBenchmark.Reporters.Console;
 Console.WriteLine("=== Example 1: Sorting at different sizes ===");
 Console.WriteLine();
 
-await new BenchmarkSuite("sorting")
+var sorting = await new BenchmarkSuite("sorting")
     .WithParameter("size", 10, 100, 1000)
     .Add("sort", (int size) =>
     {
@@ -27,6 +37,14 @@ await new BenchmarkSuite("sorting")
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
+
+// Printed so the sample asserts its own fidelity rather than leaving it to the report header.
+Console.WriteLine();
+
+foreach (var result in sorting)
+{
+    Console.WriteLine($"  {result.Name}: {result.IsolationStatus} under '{result.RuntimeProfileName}'");
+}
 
 Console.WriteLine();
 

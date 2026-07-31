@@ -120,9 +120,10 @@ await new BenchmarkSuite("name")
     .WithSignificance(false)        // disable significance testing
     .WithSignificanceTest(new MyTest())   // custom ISignificanceTest
     .WithRunOrder(RunOrder.Declaration)   // default: RunOrder.Random
+    .WithSeed(1234)                 // pin the shuffle seed for a reproducible order
     .WithSuiteSetup(() => { })      // runs once before all benchmarks
     .WithSuiteTeardown(() => { })   // runs once after all benchmarks
-    .WithIsolation()                // run the whole suite in one clean child process
+    .WithIsolation(false)           // measure in this process; the default is a worker
     .WithReporter(new ConsoleReporter())
     .WithReporter(new MarkdownReporter("results/"))
     .WithProgress(new ConsoleBenchmarkProgress())
@@ -176,18 +177,33 @@ Use `WithRuntimes` to run the same benchmarks across multiple .NET runtimes and 
 
 ## Process isolation
 
-Call `WithIsolation()` to run the **entire suite** in a single freshly spawned child process, so runtime state (JIT warmup, GC pressure, thread-pool state) from the host can't bias the measurements:
+Suites are measured in a dedicated worker process by default - no configuration, no change to how you write them:
 
 ```csharp
 await new BenchmarkSuite("sorting")
-    .Add("bubble", () => BubbleSort(data))
-    .Add("array", () => Array.Sort(data))
+    .Add("bubble", () => BubbleSort())
+    .Add("array", () => ArraySort())
     .WithBaseline("bubble")
-    .WithIsolation()        // whole suite runs in one clean child process
     .RunAsync();
 ```
 
-`WithIsolation(false)` is the default (in-process). The child rebuilds the suite from your own `Main`, so custom `IOutlierDetector` / `ISignificanceTest` instances and suite setup/teardown are preserved. See [Isolated Runs](../features/isolated-runs.md) for the full model.
+This matters because JIT tiering, dynamic PGO, ReadyToRun and GC flavour are fixed when a process starts and can never be changed afterwards - so they can only be chosen for a process that has not started yet. The whole suite shares one worker, which keeps every ratio between its benchmarks a paired, within-process comparison.
+
+`WithIsolation(false)` opts back into the host process, deliberately and silently.
+
+Parameter sweeps, suite and per-iteration lifecycle, and custom statistical strategies are all isolated. What is not is a body - or a lifecycle delegate - that **captures a local**, because the captured value exists only in your process. The remedy is to declare the state instead of closing over it:
+
+```csharp
+await new BenchmarkSuite("sorting")
+    .WithState(() => BuildData())          // the worker builds it, once per benchmark
+    .Add("array", d => Array.Sort(d))
+    .Add("linq",  d => d.OrderBy(x => x).ToArray())
+    .RunAsync();
+```
+
+Custom strategies needing constructor arguments take a factory rather than an instance, for the same reason - `.WithOutlierDetector(static () => new KeepFastest(0.9))`.
+
+Anything genuinely un-addressable is measured in the host process, with the reason named per benchmark, and `WithRequireIsolation()` turns that into a failure instead. For a suite holding something no factory can describe, move it into a static `[BenchmarkPlan]` factory and use `BenchmarkSuite.RunPlanAsync(BuildSuite)`; the worker runs your factory in its own process. See [Isolated Runs](../features/isolated-runs.md) for the full model.
 
 ## Multiple launches
 
@@ -257,7 +273,7 @@ Errored benchmarks have `result.Errored == true` and a message in `result.ErrorM
 - [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) - run benchmarks across multiple input values
 - [Multi-runtime comparison](../features/multi-runtime.md) - compare across .NET runtimes
 - [Multiple launches](../features/multiple-launches.md) - measure run-to-run variance
-- [Isolated runs](../features/isolated-runs.md) - run in a clean child process
+- [Isolated runs](../features/isolated-runs.md) - run in a clean worker
 - [Harness mode: BenchmarkHarness](./harness-mode.md) - attribute-based discovery and CLI control
 - [Configuration](../reference/configuration.md) - full options reference
 - [Reporters](../output/index.md) - all available reporters

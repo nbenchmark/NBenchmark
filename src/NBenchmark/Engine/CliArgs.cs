@@ -34,12 +34,43 @@ internal sealed record CliArgs
     public bool InProcess { get; init; }
 
     /// <summary>
+    ///     When true, any benchmark that was <b>not</b> measured in an isolated worker fails the
+    ///     run.
+    ///     <para>
+    ///         For CI. Without it, a machine missing the worker, or a benchmark whose body captures
+    ///         state, silently produces host-process numbers - correctly labelled, but a label in
+    ///         scrollback is not a gate. This turns the label into an exit code.
+    ///     </para>
+    /// </summary>
+    public bool StrictIsolation { get; init; }
+
+    /// <summary>
+    ///     When true, measures everything a second time in the host process and prints the
+    ///     per-benchmark difference.
+    ///     <para>
+    ///         This exists because the case for isolation is not believable in the abstract. On this
+    ///         library's own sample, in-process measurement of the same body reported 7,009 ns and
+    ///         320 ns on consecutive attempts - a 21x error with a tight confidence interval on
+    ///         each. Reading that in a changelog persuades nobody; seeing it on your own benchmarks
+    ///         does.
+    ///     </para>
+    /// </summary>
+    public bool VerifyIsolation { get; init; }
+
+    /// <summary>
     ///     When true, significance is computed across all classes in a single comparison
     ///     table instead of per class. The baseline is chosen from the whole group.
     /// </summary>
     public bool CrossClass { get; init; }
 
     public MeasurementProfile? Profile { get; init; }
+
+    /// <summary>
+    ///     The runtime-startup configuration requested via <c>--runtime-profile</c>. Applied to
+    ///     isolated children through their environment block; in-process benchmarks inherit the
+    ///     host's configuration and report <c>"host"</c>.
+    /// </summary>
+    public RuntimeProfile? RuntimeProfile { get; init; }
 
     public bool? ForceGc { get; init; }
 
@@ -154,6 +185,31 @@ internal sealed record CliArgs
     public bool NoSamples { get; init; }
 
     /// <summary>
+    ///     When true, an isolated worker sends back every raw sample it measured instead of a bounded
+    ///     representative subset.
+    /// </summary>
+    /// <remarks>
+    ///     Off by default because a worker can measure up to
+    ///     <see cref="MeasurementOptions.MaxIterations" /> samples, and the coordinator only uses what
+    ///     crosses for significance testing and the Console sparkline - both distribution properties,
+    ///     which a few thousand samples describe as well as a hundred thousand. Turn it on to export
+    ///     the full series for external analysis; it does not change any statistic NBenchmark itself
+    ///     reports, because the worker computes those over the whole array either way.
+    /// </remarks>
+    public bool EmitRaw { get; init; }
+
+    /// <summary>
+    ///     When true, an isolated worker forwards its live per-sample observer stream back to the
+    ///     coordinator, set by <c>--stream-samples</c>.
+    /// </summary>
+    /// <remarks>
+    ///     Off by default because the volume scales with how fast the benchmarked code is - see
+    ///     <see cref="MeasurementOptions.StreamSamples" />. Has no effect without an attached
+    ///     observer, and none at all in-process, where the observer is called directly.
+    /// </remarks>
+    public bool StreamSamples { get; init; }
+
+    /// <summary>
     ///     Diagnostics mode controlling which runtime counters are collected.
     ///     <c>null</c> uses the MeasurementOptions default (GC counts on).
     /// </summary>
@@ -223,9 +279,12 @@ internal sealed record CliArgs
 
         double? alpha = null;
         var inProcess = false;
+        var strictIsolation = false;
+        var verifyIsolation = false;
         OutlierMode? outlierMode = null;
         TailMetricsBasis? tailMetricsBasis = null;
         MeasurementProfile? profile = null;
+        RuntimeProfile? runtimeProfile = null;
         bool? forceGc = null;
         bool? noAllocations = null;
         var noGcBetweenBenchmarks = false;
@@ -252,6 +311,8 @@ internal sealed record CliArgs
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
         var noSamples = false;
+        var emitRaw = false;
+        var streamSamples = false;
         var runtimes = new List<RuntimeMoniker>();
         IReadOnlyList<int>? cpuAffinity = null;
         ProcessPriorityClass? processPriority = null;
@@ -388,6 +449,12 @@ internal sealed record CliArgs
                 case "--in-process":
                     inProcess = true;
                     break;
+                case "--strict-isolation":
+                    strictIsolation = true;
+                    break;
+                case "--verify-isolation":
+                    verifyIsolation = true;
+                    break;
                 case "--cross-class":
                     crossClass = true;
                     break;
@@ -400,6 +467,19 @@ internal sealed record CliArgs
                         profile = MeasurementProfile.Independent;
                     else
                         errors.Add($"Invalid --profile value '{profileStr}'. Must be 'realistic' or 'independent'.");
+
+                    break;
+                case "--runtime-profile" when i + 1 < args.Length:
+                    var runtimeProfileStr = args[++i];
+
+                    if (RuntimeProfile.TryParse(runtimeProfileStr, out var parsedRuntimeProfile))
+                        runtimeProfile = parsedRuntimeProfile;
+                    else
+                    {
+                        errors.Add(
+                            $"Invalid --runtime-profile value '{runtimeProfileStr}'. Must be one of: "
+                            + $"{string.Join(", ", RuntimeProfile.KnownNames)}.");
+                    }
 
                     break;
                 case "--force-gc":
@@ -563,10 +643,13 @@ internal sealed record CliArgs
 
                     break;
                 case "--launch-count" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var lc) && lc >= 1 && lc <= MeasurementOptions.MaxLaunchCount)
+                    if (int.TryParse(args[++i], out var lc) && LaunchCounts.IsValid(lc))
                         launchCount = lc;
                     else
-                        errors.Add($"Invalid --launch-count value '{args[i]}'. Must be 1-{MeasurementOptions.MaxLaunchCount}.");
+                    {
+                        errors.Add($"Invalid --launch-count value '{args[i]}'. "
+                                   + $"Must be {LaunchCounts.Single}-{LaunchCounts.Max}.");
+                    }
 
                     break;
                 case "--percentiles" when i + 1 < args.Length:
@@ -597,6 +680,12 @@ internal sealed record CliArgs
                     break;
                 case "--no-samples":
                     noSamples = true;
+                    break;
+                case "--emit-raw":
+                    emitRaw = true;
+                    break;
+                case "--stream-samples":
+                    streamSamples = true;
                     break;
                 case "--cpu-affinity" when i + 1 < args.Length:
                     var affinityRaw = args[++i];
@@ -656,13 +745,18 @@ internal sealed record CliArgs
                 case "--filter" or "--iterations" or "--warmup" or "--output"
                     or "--reporter" or "--observer" or "--category" or "--exclude-category" or "--confidence" or "--order"
                     or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--tail-basis" or "--detail" or "--profile"
+                    or "--runtime-profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
                     or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
                     or "--warmup-budget-fraction" or "--cap-grace-factor" or "--min-warmup-time"
                     or "--jit-quiet-period" or "--min-measurement-time" or "--drift-tolerance"
                     or "--max-drift-restarts"
                     or "--launch-count" or "--percentiles" or "--runtimes" or "--min-practical-effect"
-                    or "--cpu-affinity" or "--priority" or "--otlp-endpoint":
+                    or "--cpu-affinity" or "--priority" or "--otlp-endpoint" or "--diagnostics":
+                    // Every flag whose case above is guarded by `when i + 1 < args.Length` belongs
+                    // here, or it falls through to `default` and a user who simply forgot the value is
+                    // told the flag does not exist. --diagnostics was missing for exactly that reason;
+                    // CliArgsTests.Parse_RecognisesEveryKnownFlag now pins the whole set.
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -693,8 +787,11 @@ internal sealed record CliArgs
             CategoryFilterExclude = categoryExclude,
             Detail = detail,
             InProcess = inProcess,
+            StrictIsolation = strictIsolation,
+            VerifyIsolation = verifyIsolation,
             CrossClass = crossClass,
             Profile = profile,
+            RuntimeProfile = runtimeProfile,
             ForceGc = forceGc,
             NoAllocations = noAllocations,
             NoGcBetweenBenchmarks = noGcBetweenBenchmarks,
@@ -721,6 +818,8 @@ internal sealed record CliArgs
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
             NoSamples = noSamples,
+            EmitRaw = emitRaw,
+            StreamSamples = streamSamples,
             Runtimes = runtimes,
             CpuAffinity = cpuAffinity,
             ProcessPriority = processPriority,
@@ -853,6 +952,42 @@ internal sealed record CliArgs
             target.Add(normalized);
     }
 
+    /// <summary>
+    ///     Every flag <see cref="Parse" /> accepts, and therefore every flag
+    ///     <see cref="PrintHelp" /> must document.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This exists because <c>--strict-isolation</c> and <c>--verify-isolation</c> shipped
+    ///         parsed but undocumented. They are the two flags a CI pipeline most needs - the whole
+    ///         point of the first is that an advisory warning nobody reads is indistinguishable from no
+    ///         warning - and <c>--help</c> was the one place a user would have looked.
+    ///     </para>
+    ///     <para>
+    ///         <c>CliArgsTests</c> holds this to an exact set equality against the flags named in
+    ///         <see cref="PrintHelp" />'s output, and separately requires <see cref="Parse" /> to
+    ///         recognise each entry, so the list cannot drift from either side. It does not detect a
+    ///         flag added to the parse switch and to neither this list nor the help text - a
+    ///         <c>switch</c>'s labels are not enumerable at runtime - so adding a case here is part of
+    ///         adding a case there.
+    ///     </para>
+    /// </remarks>
+    internal static readonly string[] KnownFlags =
+    [
+        "--alpha", "--auto-tune", "--autotune-cap-behavior", "--cap-grace-factor", "--category",
+        "--ci-target", "--confidence", "--cpu-affinity", "--cross-class",
+        "--dedicated-host-guidance", "--detail", "--diagnostics", "--drift-tolerance", "--dry-run",
+        "--emit-raw", "--exclude-category", "--filter", "--force-gc", "--help", "--in-process",
+        "--iterations", "--jit-quiet-period", "--launch-count", "--list", "--max-drift-restarts",
+        "--max-samples", "--max-tuning-time", "--max-warmup", "--min-measurement-time",
+        "--min-practical-effect", "--min-samples", "--min-warmup", "--min-warmup-time",
+        "--no-allocations", "--no-gc-between-benchmarks", "--no-histogram", "--no-jit-quiescence",
+        "--no-samples", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint", "--outlier",
+        "--output", "--percentiles", "--priority", "--profile", "--reporter", "--runtime-profile",
+        "--runtimes", "--seed", "--stream-samples", "--strict-isolation", "--tail-basis",
+        "--threshold-pct", "--verify-isolation", "--warmup", "--warmup-budget-fraction",
+    ];
+
     internal static void PrintHelp()
     {
         Console.WriteLine("Usage: myapp.exe [options]");
@@ -895,9 +1030,13 @@ internal sealed record CliArgs
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");
         Console.WriteLine("  --no-samples            Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
+        Console.WriteLine($"  --emit-raw              Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset");
+        Console.WriteLine("  --stream-samples        Forward the live per-sample observer stream out of an isolated worker (needs --observer; costs fidelity)");
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");
+        Console.WriteLine("  --strict-isolation     Fail with exit code 1 if any benchmark could not be isolated");
+        Console.WriteLine("  --verify-isolation     Re-measure in this process and print how much isolation changed");
         Console.WriteLine("  --cross-class          Compute significance across all classes instead of per class");
         Console.WriteLine("  --runtimes <list>      Runtimes to compare (comma-separated, e.g. net8,net9,net10)");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
@@ -906,6 +1045,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --threshold-pct <n>    Fail with exit code 1 if any benchmark regresses");
         Console.WriteLine("                        >N% vs baseline (median-based comparison; n >= 1).");
         Console.WriteLine("  --profile <mode>       Measurement profile: realistic (default) or independent");
+        Console.WriteLine("  --runtime-profile <p>   Runtime config for isolated children: steady-state");
+        Console.WriteLine("                          (default), production, server-gc, or host");
         Console.WriteLine("  --force-gc             Force Gen0 GC before every iteration (overrides profile)");
         Console.WriteLine("  --no-allocations       Disable allocation tracking (overrides profile)");
         Console.WriteLine("  --no-gc-between-benchmarks  Disable the full GC between benchmarks (on by default for both profiles)");

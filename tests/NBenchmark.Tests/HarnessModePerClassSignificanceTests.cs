@@ -1,5 +1,7 @@
 using NBenchmark.Attributes;
 using NBenchmark.Engine;
+using NBenchmark.Tests.Workers;
+using NBenchmark.Workers;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -9,7 +11,6 @@ public class HarnessModePerClassSignificanceTests
     [Fact]
     public async Task HarnessIsolated_PerClassSignificance_EachClassHasOwnBaseline()
     {
-        IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
@@ -25,7 +26,7 @@ public class HarnessModePerClassSignificanceTests
             })
             .WithIsolation();
 
-        using (WithFakeLauncher(SimulateHarnessChildRun))
+        using (FakeWorkerLauncher.Install(SimulateWorkerGroup))
         {
             var results = await harness.RunAsync();
 
@@ -63,7 +64,6 @@ public class HarnessModePerClassSignificanceTests
     [Fact]
     public async Task HarnessIsolated_CrossClassSignificance_SingleBaselineAcrossClasses()
     {
-        IsolatedRunContext.ResetInvocationOrdinalsForTesting();
 
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
@@ -80,7 +80,7 @@ public class HarnessModePerClassSignificanceTests
             .WithIsolation()
             .WithCrossClassSignificance();
 
-        using (WithFakeLauncher(SimulateHarnessChildRun))
+        using (FakeWorkerLauncher.Install(SimulateWorkerGroup))
         {
             var results = await harness.RunAsync();
 
@@ -112,19 +112,23 @@ public class HarnessModePerClassSignificanceTests
         }
     }
 
-    private static Task<IReadOnlyList<IsolatedResultItem>> SimulateHarnessChildRun(
-        IsolatedRunRequest request,
-        CancellationToken ct)
+    /// <summary>
+    ///     Synthesizes what a worker would send back for a group: one completion per requested
+    ///     benchmark, each carrying its own raw samples. The samples are deterministic so the
+    ///     significance assertions below test the coordinator's statistics rather than the machine's.
+    /// </summary>
+    private static WorkerGroupRunner.GroupResult SimulateWorkerGroup(RunGroupPayload request)
     {
-        var items = new List<IsolatedResultItem>();
+        var results = new List<BenchmarkResult>();
+        var samples = new Dictionary<string, double[]>(StringComparer.Ordinal);
         var prefix = request.DisplayPrefix;
 
-        foreach (var displayName in request.BenchmarkDisplayNames)
+        foreach (var displayName in request.BenchmarkNames)
         {
             var fullName = string.IsNullOrEmpty(prefix) ? displayName : $"{prefix}.{displayName}";
             var (median, rawSamples, isBaseline) = GetDeterministicData(prefix, displayName);
 
-            var result = new BenchmarkResult
+            results.Add(new BenchmarkResult
             {
                 Name = fullName,
                 ClassName = prefix,
@@ -154,16 +158,12 @@ public class HarnessModePerClassSignificanceTests
                 WarmupIterations = 0,
                 IsBaseline = isBaseline,
                 Errored = false,
-            };
-
-            items.Add(new IsolatedResultItem
-            {
-                Result = result,
-                RawSamples = rawSamples,
             });
+
+            samples[fullName] = rawSamples;
         }
 
-        return Task.FromResult<IReadOnlyList<IsolatedResultItem>>(items);
+        return new WorkerGroupRunner.GroupResult { Results = results, RawSamples = samples, Faults = [] };
     }
 
     private static (double Median, double[] RawSamples, bool IsBaseline) GetDeterministicData(
@@ -189,33 +189,6 @@ public class HarnessModePerClassSignificanceTests
         };
     }
 
-    private static IDisposable WithFakeLauncher(
-        Func<IsolatedRunRequest, CancellationToken, Task<IReadOnlyList<IsolatedResultItem>>> handler)
-    {
-        var prior = ChildProcessLauncher.Current;
-        ChildProcessLauncher.Current = new FakeProcessLauncher(handler);
-        return new Restorer(prior);
-    }
-
-    private sealed class Restorer : IDisposable
-    {
-        private readonly IProcessLauncher _prior;
-        private bool _disposed;
-
-        public Restorer(IProcessLauncher prior)
-        {
-            _prior = prior;
-        }
-
-        public void Dispose()
-        {
-            if (_disposed)
-                return;
-
-            ChildProcessLauncher.Current = _prior;
-            _disposed = true;
-        }
-    }
 }
 
 [BenchmarkCategory("harness-perclass")]
