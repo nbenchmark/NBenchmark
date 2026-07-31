@@ -533,6 +533,13 @@ public sealed class BenchmarkHarness
     ///     or its class opts out with <c>[InProcess]</c>. When disabled, every benchmark
     ///     runs in the host process - equivalent to passing <c>--in-process</c> on the CLI.
     /// </summary>
+    /// <remarks>
+    ///     Not quite the same method as <see cref="BenchmarkSuite.WithIsolation" />, despite the shared
+    ///     name and signature. This one is a <i>global switch</i> that stays settable in both directions,
+    ///     so a later <c>WithIsolation(true)</c> re-enables what an earlier <c>false</c> turned off.
+    ///     Suite mode has one suite and therefore nothing to switch: there, <c>false</c> records an
+    ///     explicit request for the host process and <c>true</c> is a no-op asking for the default.
+    /// </remarks>
     public BenchmarkHarness WithIsolation(bool enabled = true)
     {
         _isolationEnabled = enabled;
@@ -1224,10 +1231,18 @@ public sealed class BenchmarkHarness
         // strategy a worker cannot rebuild, but this one has no in-process fallback available - the
         // point is to measure another framework's build - so the honest move is to name the downgrade
         // instead of hiding it behind a skipped runtime.
-        if (WorkerRunPlan.UnrebuildableStrategy(options) is { } strategyRefusal)
+        //
+        // Carried onto the results as well as printed. WorkerRunPlan.Decision.Status exists precisely
+        // so "the reason travels with the numbers rather than living only in a console message that
+        // scrolls by", and this was the one downgrade that had no such carrier: the rows are stamped
+        // Isolated below - correctly, they did run in a worker - so nothing on them said they had been
+        // scored with a different statistical method than the one configured.
+        var strategyDowngrade = WorkerRunPlan.UnrebuildableStrategy(options);
+
+        if (strategyDowngrade is not null)
         {
             Console.Error.WriteLine(
-                $"  {tfm}: {strategyRefusal} These benchmarks will be scored with the built-in "
+                $"  {tfm}: {strategyDowngrade} These benchmarks will be scored with the built-in "
                 + "strategy instead. Give it a parameterless constructor to carry it across.");
         }
 
@@ -1281,6 +1296,14 @@ public sealed class BenchmarkHarness
                     RuntimeMoniker = tfm,
                     IsolationStatus = IsolationStatus.Isolated,
                     RawSamples = group.RawSamples.GetValueOrDefault(result.Name, []),
+
+                    // Not folded into IsolationStatus: the row *was* isolated, and claiming otherwise
+                    // would misreport where it ran to fix what it was scored with. Those are separate
+                    // facts, so the downgrade rides as a warning instead.
+                    Warnings = strategyDowngrade is null
+                        ? result.Warnings
+                        : [.. result.Warnings, $"Scored with the built-in strategy rather than the one "
+                                               + $"configured: {strategyDowngrade}"],
                 };
 
                 results.Add(stamped);

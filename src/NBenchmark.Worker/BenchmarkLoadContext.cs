@@ -16,6 +16,14 @@ namespace NBenchmark.Worker;
 ///         pre-spawning instead of by recycling.
 ///     </para>
 ///     <para>
+///         Which is also why no instance of this is ever released, including the short-lived one
+///         <c>WorkerSession.Construct</c> builds to resolve a strategy type name.
+///         <see cref="AssemblyLoadContext" /> is not <see cref="IDisposable" />, and
+///         <see cref="AssemblyLoadContext.Unload" /> throws on a non-collectible context - so there is
+///         nothing to release, and making one collectible in order to release it would reintroduce the
+///         measurement error above. The worker process is the unit of cleanup.
+///     </para>
+///     <para>
 ///         <b>NBenchmark itself is unified, not reloaded.</b> The target assembly references
 ///         NBenchmark - that is where <c>[Benchmark]</c> comes from - and its output directory
 ///         contains a copy of <c>NBenchmark.dll</c>. Loading that copy here would produce a second,

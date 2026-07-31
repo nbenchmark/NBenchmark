@@ -1183,6 +1183,13 @@ public class BenchmarkSuite(string name)
     ///         compatibility - it asks for what already happens. Only the request for the host process
     ///         is recorded, because that is the only one that changes anything.
     ///     </para>
+    ///     <para>
+    ///         That makes it subtly unlike <see cref="BenchmarkHarness.WithIsolation" />, which shares
+    ///         this name and signature but is a global switch settable in both directions - a harness
+    ///         measures many classes, so re-enabling isolation after disabling it means something there.
+    ///         A suite is one group, so there is nothing to re-enable; <c>true</c> only ever restates
+    ///         the default.
+    ///     </para>
     /// </remarks>
     public BenchmarkSuite WithIsolation(bool enabled = true)
     {

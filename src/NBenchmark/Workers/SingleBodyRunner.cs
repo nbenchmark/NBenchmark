@@ -68,6 +68,12 @@ internal static class SingleBodyRunner
         var group = await WorkerLauncher.Current.RunGroupAsync(
                 request,
                 progress,
+                // Null because Single mode has no observer to forward, not because one is being
+                // dropped: every Benchmark.Run/RunRaw overload takes an IBenchmarkProgress and none
+                // takes an IMeasurementObserver, and MeasurementOptions carries no observer either.
+                // Observers are attached per-run by BenchmarkSuite and BenchmarkHarness, which own a
+                // suite lifecycle to scope the stream to. If Single mode ever grows one, it is threaded
+                // through here.
                 NullMeasurementObserver.Instance,
                 TimeoutFor(options),
                 cancellationToken)
