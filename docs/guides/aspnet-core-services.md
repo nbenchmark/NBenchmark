@@ -97,5 +97,5 @@ See [Reading Your Results](../output/reading-your-results.md) for every column, 
 - [Dependency Injection](../features/dependency-injection.md) - scoped vs. root provider, multiple assemblies, non-Microsoft containers, the `WithInstanceFactory` escape hatch.
 - [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - `[BenchmarkCases]` for generated or file-backed inputs, named-tuple display names.
 - [State isolation](../features/state-isolation.md) - `IStateReset` for `PerClass` classes that share state intentionally.
-- [Analyzers](../reference/analyzers.md) - the NB0001-NB0013 Roslyn diagnostics, including NB0011 (PerClass + scoped service).
+- [Analyzers](../reference/analyzers.md) - the NB0001-NB0014 Roslyn diagnostics, including NB0011 (PerClass + scoped service).
 - [Performance gates in your test suite](./performance-gates.md) - if you want this comparison to fail a PR on regression instead of just printing a table.
