@@ -49,10 +49,19 @@
     </TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
+  <!--
+    Build the worker into the tools folder unless the caller pinned NoBuild (for example, the
+    release workflow packs with the no-build flag after building the solution). Under NoBuild the
+    worker was already built by the preceding solution build, so re-invoking its Build target
+    would trip NETSDK1085 ("NoBuild=true but Build was invoked"). The Error checks below still
+    verify the output exists, so a genuinely missing worker still fails the pack instead of
+    shipping an empty tools folder.
+  -->
   <Target Name="_NBenchmarkPackWorker">
     <MSBuild Projects="$(MSBuildThisFileDirectory)../NBenchmark.Worker/NBenchmark.Worker.csproj"
              Targets="Build"
-             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)"/>
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)"
+             Condition="'$(NoBuild)' != 'true'"/>
 
     <PropertyGroup>
       <_NBenchmarkWorkerOutput>$(MSBuildThisFileDirectory)../NBenchmark.Worker/bin/$(Configuration)/$(TargetFramework)/</_NBenchmarkWorkerOutput>
