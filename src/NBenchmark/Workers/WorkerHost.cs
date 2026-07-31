@@ -293,12 +293,35 @@ internal sealed class WorkerHost : IAsyncDisposable
     }
 
     /// <summary>
+    ///     Drops this side of the connection without asking the worker to stop and without killing it -
+    ///     what a worker sees when its coordinator dies outright (a crash, a <c>kill -9</c>, an IDE stop
+    ///     button).
+    /// </summary>
+    /// <remarks>
+    ///     Exists so that case is testable. The worker is expected to notice end-of-stream and exit on
+    ///     its own, and it is left tracked by <see cref="ChildProcessReaper" /> so one that fails to
+    ///     notice is still reaped. A subsequent <see cref="DisposeAsync" /> stays safe: its shutdown
+    ///     write throws <see cref="ObjectDisposedException" />, which it already catches.
+    /// </remarks>
+    internal void Abandon()
+    {
+        try
+        {
+            _channel.Dispose();
+        }
+        catch (IOException)
+        {
+            // The worker tore its end down first.
+        }
+    }
+
+    /// <summary>
     ///     Asks the worker to exit, then makes sure it did.
     ///     <para>
-    ///         Closing the pipe alone would be enough - the worker's blocking read returns
-    ///         end-of-stream and it exits, measured at 7 ms. The explicit frame is the polite path so
-    ///         a worker mid-write finishes cleanly; the kill is the backstop for one that is wedged
-    ///         in a benchmark body that never returns.
+    ///         Closing the pipe alone would be enough - the worker reads its inbound pipe continuously,
+    ///         so end-of-stream reaches it whether it is idle or measuring, and it exits on its own.
+    ///         The explicit frame is the polite path so a worker mid-write finishes cleanly; the kill is
+    ///         the backstop for one that is wedged in a benchmark body that never returns.
     ///     </para>
     /// </summary>
     public async ValueTask DisposeAsync()

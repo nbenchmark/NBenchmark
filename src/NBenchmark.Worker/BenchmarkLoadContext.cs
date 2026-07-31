@@ -69,12 +69,33 @@ internal sealed class BenchmarkLoadContext : AssemblyLoadContext
     }
 
     /// <summary>
-    ///     Whether an assembly carries types that appear on both sides of the process boundary and
-    ///     must therefore have a single identity. <c>NBenchmark</c> is the one that matters;
-    ///     matching the whole prefix also unifies first-party extensions the worker happens to
-    ///     ship, and harmlessly falls through for those it does not.
+    ///     The assemblies that carry types appearing on both sides of the process boundary, and must
+    ///     therefore have a single identity.
     /// </summary>
-    private static bool IsEngineAssembly(string simpleName)
-        => simpleName.Equals("NBenchmark", StringComparison.Ordinal)
-           || simpleName.StartsWith("NBenchmark.", StringComparison.Ordinal);
+    /// <remarks>
+    ///     <para>
+    ///         An explicit list rather than an <c>NBenchmark.</c> prefix match. Nothing in this repo is
+    ///         strong-named, so a simple name is the only thing available to match on - which means a
+    ///         prefix test also captures any third-party or user assembly that happens to be called
+    ///         <c>NBenchmark.Something</c>, and silently redirects it to the worker's default context
+    ///         where the target's own copy was meant to load. Naming the seven that matter costs one
+    ///         line per package and cannot claim an assembly that is not ours.
+    ///     </para>
+    ///     <para>
+    ///         <c>nbworker</c> and <c>nbenchmark-tool</c> are absent on purpose: they are entry-point
+    ///         assemblies that a target never references, so there is no identity to unify.
+    ///     </para>
+    /// </remarks>
+    private static readonly HashSet<string> EngineAssemblies = new(StringComparer.Ordinal)
+    {
+        "NBenchmark",
+        "NBenchmark.Integration.Abstractions",
+        "NBenchmark.Integration.xUnit",
+        "NBenchmark.Integration.NUnit",
+        "NBenchmark.Integration.MSTest",
+        "NBenchmark.DependencyInjection",
+        "NBenchmark.Reporters.Console",
+    };
+
+    private static bool IsEngineAssembly(string simpleName) => EngineAssemblies.Contains(simpleName);
 }

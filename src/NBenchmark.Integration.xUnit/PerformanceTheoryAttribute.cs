@@ -31,9 +31,6 @@ public sealed class PerformanceTheoryAttribute : TheoryAttribute, IPerformanceTh
     /// </summary>
     public int LaunchCount { get; init; } = 1;
 
-    /// <summary>
-    ///     Fails the test when the measurement was taken in the test host rather than in a worker
-    ///     process. See <see cref="IPerformanceThresholds.RequireIsolation" />.
-    /// </summary>
-    public bool RequireIsolation { get; init; }
+    // No RequireIsolation property - see PerformanceFactAttribute. It defaults to true via
+    // IPerformanceThresholds and the opt-out is [AllowInProcessGate].
 }

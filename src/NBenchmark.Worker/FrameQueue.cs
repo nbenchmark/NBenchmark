@@ -17,12 +17,22 @@ namespace NBenchmark.Worker;
 ///         a poll.
 ///     </para>
 /// </summary>
-internal sealed class FrameQueue(FrameChannel channel, CancellationToken cancellationToken)
+/// <param name="onTransportFailure">
+///     Invoked at most once, the first time a write proves the coordinator can no longer be reached.
+///     Failures are still swallowed - the chain has to stay usable - but "the coordinator cannot be
+///     written to" and "there is no point continuing to measure" are the same fact, and something has
+///     to carry it out of here.
+/// </param>
+internal sealed class FrameQueue(
+    FrameChannel channel,
+    CancellationToken cancellationToken,
+    Action? onTransportFailure = null)
 {
     private readonly FrameChannel _channel = channel ?? throw new ArgumentNullException(nameof(channel));
     // `object` rather than `System.Threading.Lock`, which does not exist on net8.0.
     private readonly object _gate = new();
     private Task _tail = Task.CompletedTask;
+    private int _reportedFailure;
 
     /// <summary>
     ///     Enqueues a frame. Returns immediately: the only work done on the caller's thread is
@@ -48,10 +58,19 @@ internal sealed class FrameQueue(FrameChannel channel, CancellationToken cancell
         {
             await _channel.WriteAsync(frame, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException or OperationCanceledException)
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
-            // The coordinator is gone or shutting down. Swallowing keeps the chain usable so a
-            // later frame is not blocked by an earlier failure, and there is nobody left to tell.
+            // The pipe is gone. Still swallowed, so a later frame is not blocked by an earlier failure
+            // and the chain stays usable - but reported once, because a worker that cannot reach its
+            // coordinator should stop measuring rather than finish the group for nobody.
+            if (Interlocked.Exchange(ref _reportedFailure, 1) == 0)
+                onTransportFailure?.Invoke();
+        }
+        catch (OperationCanceledException)
+        {
+            // Already shutting down. Deliberately *not* reported as coordinator loss: that is the
+            // benign case, and treating a cancellation as proof the coordinator died would make the
+            // conclusion self-fulfilling once anything cancels the group.
         }
     }
 

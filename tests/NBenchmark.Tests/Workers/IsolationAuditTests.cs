@@ -31,6 +31,55 @@ public sealed class IsolationAuditTests
             IsolationStatus = status,
         };
 
+    /// <summary>
+    ///     A cross-runtime run is refused with a reason rather than compared.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="IsolationAudit.Render" /> keys the host side by name, and a moniker is the only
+    ///     thing distinguishing multi-runtime rows - so comparing would put every runtime against the
+    ///     same unlabelled host row and print a table that looks like a finding. The refusal has to name
+    ///     the runtimes and the remedy, or it is just a message saying nothing happened.
+    /// </remarks>
+    [Fact]
+    public void RefuseCrossRuntimeComparison_NamesTheRuntimesAndTheRemedy()
+    {
+        using var output = new StringWriter();
+
+        IsolationAudit.RefuseCrossRuntimeComparison(["net8.0", "net9.0"], output);
+
+        var text = output.ToString();
+
+        Assert.Contains("net8.0", text);
+        Assert.Contains("net9.0", text);
+        Assert.Contains("--runtimes", text);
+    }
+
+    /// <summary>
+    ///     The same refusal is reachable from <see cref="IsolationAudit.Render" /> itself, so no future
+    ///     caller can produce the misleading table by handing it multi-runtime results directly.
+    /// </summary>
+    [Fact]
+    public void Render_WithCrossRuntimeResults_RefusesInsteadOfComparing()
+    {
+        using var output = new StringWriter();
+
+        var isolated = new[]
+        {
+            Result("Bench.Body", IsolationStatus.Isolated, 100) with { RuntimeMoniker = "net8.0" },
+            Result("Bench.Body", IsolationStatus.Isolated, 80) with { RuntimeMoniker = "net10.0" },
+        };
+
+        IsolationAudit.Render(
+            isolated,
+            [Result("Bench.Body", IsolationStatus.InProcessRequested, 300)],
+            output);
+
+        var text = output.ToString();
+
+        Assert.Contains("more than one runtime", text);
+        Assert.DoesNotContain("Isolation verification", text);
+    }
+
     /// <summary>An all-isolated run passes and says nothing.</summary>
     [Fact]
     public void Enforce_AllIsolated_Passes()

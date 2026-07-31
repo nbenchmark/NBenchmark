@@ -1,9 +1,17 @@
 namespace NBenchmark.Integration.Abstractions;
 
 /// <summary>
-///     Accepts a ratio gate computed from measurements taken in the test host.
+///     Accepts a performance gate computed from measurements taken in the test host.
 /// </summary>
 /// <remarks>
+///     <para>
+///         This is the single opt-out for host measurement, and it does two things. It permits a
+///         <b>ratio</b> gate that would otherwise decline to run, and it waives the
+///         <see cref="IPerformanceThresholds.RequireIsolation" /> requirement that otherwise fails a
+///         host-measured gate outright. Both are the same judgement - "this test cannot be isolated and
+///         I accept a number measured in the host" - so they are the same switch rather than two that
+///         can disagree.
+///     </para>
 ///     <para>
 ///         A ratio gate is only enforced automatically when both sides were measured in worker
 ///         processes. Measured in the test host, a candidate and its reference share whatever JIT

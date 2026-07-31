@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using NBenchmark.Engine;
 using Xunit;
 
@@ -1294,6 +1295,82 @@ public class CliArgsTests
         Assert.Contains("--priority", stdout);
         Assert.Contains("--dedicated-host-guidance", stdout);
         Assert.Contains("--otlp-endpoint", stdout);
+    }
+
+    /// <summary>
+    ///     Exact set equality between the flags <see cref="CliArgs.KnownFlags" /> declares and the
+    ///     flags <c>--help</c> actually names.
+    /// </summary>
+    /// <remarks>
+    ///     The spot-checks above are why this exists: they passed for the whole life of the branch
+    ///     while <c>--strict-isolation</c> and <c>--verify-isolation</c> went undocumented, because a
+    ///     hand-written list of things to assert cannot notice the thing nobody thought to add.
+    /// </remarks>
+    [Fact]
+    public void PrintHelp_DocumentsEveryKnownFlag_AndNothingElse()
+    {
+        var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp());
+
+        var documented = Regex
+            .Matches(stdout, @"--[a-z][a-z-]*")
+            .Select(m => m.Value)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var known = CliArgs.KnownFlags.ToHashSet(StringComparer.Ordinal);
+
+        Assert.Equal(
+            known.OrderBy(f => f, StringComparer.Ordinal),
+            documented.OrderBy(f => f, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    ///     Closes the loop on the other side: every flag the list claims must actually be accepted by
+    ///     the parser, so the list cannot document flags that do not exist.
+    /// </summary>
+    /// <remarks>
+    ///     Passing each flag with no value also pins the parser's <i>diagnosis</i>. A value-taking flag
+    ///     whose case is guarded by <c>when i + 1 &lt; args.Length</c> falls through to the unknown-flag
+    ///     branch when the value is omitted, so a user who simply forgot it is told the flag does not
+    ///     exist. That is how <c>--diagnostics</c> was reported before this test existed.
+    /// </remarks>
+    [Fact]
+    public void Parse_RecognisesEveryKnownFlag()
+    {
+        var unrecognised = CliArgs.KnownFlags
+            .Where(flag => CliArgs.ParseCore([flag]).Errors
+                .Any(e => e.Contains("Unknown flag", StringComparison.Ordinal)))
+            .ToArray();
+
+        Assert.Empty(unrecognised);
+    }
+
+    [Fact]
+    public void ParseCore_StrictIsolation_SetsFlag()
+    {
+        var (args, errors) = CliArgs.ParseCore(["--strict-isolation"]);
+
+        Assert.Empty(errors);
+        Assert.True(args.StrictIsolation);
+        Assert.False(args.VerifyIsolation);
+    }
+
+    [Fact]
+    public void ParseCore_VerifyIsolation_SetsFlag()
+    {
+        var (args, errors) = CliArgs.ParseCore(["--verify-isolation"]);
+
+        Assert.Empty(errors);
+        Assert.True(args.VerifyIsolation);
+        Assert.False(args.StrictIsolation);
+    }
+
+    [Fact]
+    public void ParseCore_IsolationFlags_DefaultToOff()
+    {
+        var (args, _) = CliArgs.ParseCore([]);
+
+        Assert.False(args.StrictIsolation);
+        Assert.False(args.VerifyIsolation);
     }
 
     private static string CaptureConsoleOutput(Action action)

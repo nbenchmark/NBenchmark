@@ -27,9 +27,8 @@ public sealed class PerformanceFactAttribute : FactAttribute, IPerformanceThresh
     /// </summary>
     public int LaunchCount { get; init; } = 1;
 
-    /// <summary>
-    ///     Fails the test when the measurement was taken in the test host rather than in a worker
-    ///     process. See <see cref="IPerformanceThresholds.RequireIsolation" />.
-    /// </summary>
-    public bool RequireIsolation { get; init; }
+    // No RequireIsolation property. It defaults to true via IPerformanceThresholds, and the opt-out is
+    // [AllowInProcessGate]. A settable bool here could not express `false`: xUnit reads attribute values
+    // as named arguments, where absent and explicit-false are indistinguishable and Nullable<bool> is
+    // not a legal attribute argument type - so the property existed only to be silently ignored.
 }

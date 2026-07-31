@@ -6,7 +6,7 @@ order: 3
 
 # Features
 
-These pages cover advanced capabilities that apply across the usage modes. They are opt-in features for experienced benchmarkers who need finer control over measurement, filtering, isolation, or runtime environments.
+These pages cover capabilities that apply across the usage modes. Most are opt-in features for finer control over measurement, filtering, or runtime environments; isolated runs are the exception - that one is on by default, and the page explains what it does and how to opt out.
 
 ## [Categories](./categories.md)
 

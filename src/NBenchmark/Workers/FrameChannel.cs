@@ -33,10 +33,15 @@ internal sealed class FrameChannel : IDisposable
     ///         have caught.
     ///     </para>
     ///     <para>
-    ///         What actually protects this wire is <c>FrameChannelTests</c>, which round-trips every
-    ///         frame kind including a fully-populated <see cref="MeasurementOptions" />. That catches
-    ///         the failure source generation would not - a member that serializes but does not come
-    ///         back, which is silent in both schemes.
+    ///         What protects this wire instead is a pair of test suites. <c>FrameChannelTests</c>
+    ///         round-trips each frame kind by hand, asserting field by field, including a
+    ///         fully-populated <see cref="MeasurementOptions" />. <c>WorkerFrameContractTests</c> then
+    ///         derives its coverage from the types rather than restating it: every
+    ///         <see cref="WorkerFrameKind" /> is built with every property set to a non-default value
+    ///         and required to survive the wire unchanged. Between them they catch the failure source
+    ///         generation would not - a member that serializes but does not come back, which is silent
+    ///         in both schemes - and the second one keeps catching it after a new member is added,
+    ///         which hand-written coverage of a closed set does not.
     ///     </para>
     ///     <para>
     ///         Nulls are written rather than omitted. <see cref="BenchmarkResult" /> declares its
@@ -110,11 +115,17 @@ internal sealed class FrameChannel : IDisposable
     /// <summary>
     ///     Reads one frame, or returns <c>null</c> at end of stream.
     ///     <para>
-    ///         End of stream is the load-bearing signal on the worker side: it blocks here, so a
-    ///         coordinator that dies (crash, kill -9, IDE stop button) closes the write end, this
-    ///         returns <c>null</c>, and the worker exits on its own. Orphan avoidance is therefore
-    ///         structural - measured at 7 ms - rather than dependent on a supervisor that could
-    ///         itself be the thing that died.
+    ///         End of stream is the load-bearing signal on the worker side: a coordinator that dies
+    ///         (crash, kill -9, IDE stop button) closes the write end, this returns <c>null</c>, and the
+    ///         worker exits on its own. Orphan avoidance is therefore structural rather than dependent
+    ///         on a supervisor that could itself be the thing that died.
+    ///     </para>
+    ///     <para>
+    ///         That only holds while something is actually reading. It did not, once: the worker's
+    ///         dispatch loop awaited each group before reading again, so during a group - which is most
+    ///         of a run - nothing was blocked here and an orphan measured on for nobody.
+    ///         <c>WorkerSession</c> now pumps this continuously on its own task for exactly that
+    ///         reason.
     ///     </para>
     /// </summary>
     public async Task<WorkerFrame?> ReadAsync(CancellationToken cancellationToken)

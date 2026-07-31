@@ -167,6 +167,12 @@ internal static class WorkerGroupRunner
                         // Stamped here rather than in the worker, because only this side knows the
                         // result arrived over a process boundary at all. A worker that stamped
                         // itself would be taking its own word for it.
+                        //
+                        // This is the single choke point for the streaming path: BenchmarkResult
+                        // defaults to InProcessRequested, so every result the worker sent arrives
+                        // labelled host-measured and is promoted only here. That is the direction the
+                        // default is chosen to fail in - a forgotten stamp under-claims - so do not
+                        // move this into the worker to save the re-allocation.
                         results.Add(payload.Result with { IsolationStatus = IsolationStatus.Isolated });
                         samples[payload.Result.Name] = payload.RawSamples;
 

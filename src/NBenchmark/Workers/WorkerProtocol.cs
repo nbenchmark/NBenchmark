@@ -96,10 +96,11 @@ internal static class WorkerProtocol
     public const string OutboundHandleArgument = "--outbound-handle";
 
     /// <summary>
-    ///     The coordinator's process id, passed for diagnostics only. Orphan avoidance is
-    ///     structural rather than supervisory: the worker blocks reading its inbound pipe, so a
-    ///     coordinator that dies closes the write end, the read returns end-of-stream, and the
-    ///     worker exits on its own. Measured at 7 ms on macOS with no supervision involved.
+    ///     The coordinator's process id, passed for diagnostics only. Orphan avoidance is structural
+    ///     rather than supervisory: the worker reads its inbound pipe continuously - idle or measuring -
+    ///     so a coordinator that dies closes the write end, the read returns end-of-stream, and the
+    ///     worker stops measuring and exits on its own. Measured at 7 ms on macOS when idle, with no
+    ///     supervision involved.
     /// </summary>
     public const string ParentProcessIdArgument = "--parent-pid";
 }

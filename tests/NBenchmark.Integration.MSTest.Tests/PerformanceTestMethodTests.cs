@@ -221,6 +221,11 @@ public sealed class PerformanceTestMethodTests
                 MaxMeanNs = 500,
                 MaxAbsoluteThresholdTolerance = 1.25,
                 MaxSlowdownRatio = 0,
+
+                // The result is fabricated, not measured, so the isolation requirement has nothing
+                // real to assess here. This is the option bag's opt-out, which the PerformanceAssert
+                // pattern needs because there is no attribute target for [AllowInProcessGate].
+                RequireIsolation = false,
             });
     }
 
@@ -296,6 +301,12 @@ public sealed class PerformanceTestMethodTests
         public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
         public double ConfidenceLevel { get; init; } = 0.95;
         public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
+
+        // Off, unlike production, because these tests exercise threshold arithmetic over fabricated
+        // results that were never measured anywhere. Leaving it on would fail every one of them on the
+        // isolation requirement instead of on the threshold under test. The requirement itself is
+        // covered against the shared PerformanceGate in PerformanceGateIsolationTests.
+        public bool RequireIsolation { get; init; }
     }
 
     private sealed class ReferenceResolutionFixture

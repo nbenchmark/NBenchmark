@@ -28,11 +28,10 @@ public sealed class PerformanceTestMethodAttribute([CallerFilePath] string calle
     /// </summary>
     public int LaunchCount { get; init; } = 1;
 
-    /// <summary>
-    ///     Fails the test when the measurement was taken in the test host rather than in a worker
-    ///     process. See <see cref="IPerformanceThresholds.RequireIsolation" />.
-    /// </summary>
-    public bool RequireIsolation { get; init; }
+    // No RequireIsolation property. It defaults to true via IPerformanceThresholds and the opt-out is
+    // [AllowInProcessGate], which also covers class and assembly scope. Kept off the attribute even
+    // though MSTest could read it, so the same opt-out works identically across all three frameworks -
+    // on xUnit an explicit `false` is indistinguishable from an absent named argument.
 
     public override Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {

@@ -134,9 +134,15 @@ public sealed class PerformanceFactIntegrationTests
         var outcome = BenchmarkRunner.Instance.Run("CalibrationTest", SimpleWork, spec);
         var result = outcome.Result;
 
-        // With a loose ratio, the calibration check should pass
+        // With a loose ratio, the calibration check should pass.
+        //
+        // allowInProcessGate: this measures through BenchmarkRunner directly, so the result is
+        // host-measured by construction and gates require isolation by default. Accepting it here is
+        // exactly what the attribute means, and asserting on the calibration comparison is the point.
         var data = PerformanceTestData.FromThresholds(new PerformanceFactAttribute { MaxSlowdownRatio = 1000.0 });
-        var violations = PerformanceTestCase.ValidateResult(result, outcome.RawSamples, null, null, data);
+
+        var violations = PerformanceTestCase.ValidateResult(
+            result, outcome.RawSamples, null, null, data, allowInProcessGate: true);
 
         Assert.Empty(violations);
     }

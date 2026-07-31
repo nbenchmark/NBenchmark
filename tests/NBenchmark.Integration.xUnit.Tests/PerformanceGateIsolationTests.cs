@@ -104,8 +104,11 @@ public sealed class PerformanceGateIsolationTests
             new Thresholds { RequireIsolation = true });
 
         var violation = Assert.Single(outcome.Violations);
-        Assert.Contains("RequireIsolation", violation);
         Assert.Contains("in-process (fixture)", violation);
+
+        // Names the opt-out, because a failure that does not say how to accept the measurement leaves
+        // the reader to guess between "make it isolatable" and "this gate is unusable".
+        Assert.Contains("[AllowInProcessGate]", violation);
 
         // The reason carries its own remedy; a failure that does not say what to do about it just
         // relocates the problem to whoever reads the CI log.
@@ -133,8 +136,12 @@ public sealed class PerformanceGateIsolationTests
         Assert.Empty(outcome.Violations);
     }
 
+    /// <summary>
+    ///     A gate with no opinion stated fails a host measurement. Labelling is a message to a human,
+    ///     and CI does not read output - so the conservative direction is the default.
+    /// </summary>
     [Fact]
-    public void RequireIsolation_Defaults_To_Off()
+    public void RequireIsolation_Defaults_To_On()
     {
         var outcome = PerformanceGate.Evaluate(
             Result("candidate", 100, IsolationStatus.InProcessNoWorker),
@@ -143,7 +150,46 @@ public sealed class PerformanceGateIsolationTests
             null,
             new Thresholds());
 
+        var violation = Assert.Single(outcome.Violations);
+
+        Assert.Contains("in-process (no worker)", violation);
+    }
+
+    /// <summary>
+    ///     <c>[AllowInProcessGate]</c> waives the requirement rather than silencing it: the gate runs,
+    ///     and the result carries a note saying where the number came from.
+    /// </summary>
+    [Fact]
+    public void AllowInProcessGate_Waives_The_Isolation_Requirement_With_A_Note()
+    {
+        var outcome = PerformanceGate.Evaluate(
+            Result("candidate", 100, IsolationStatus.InProcessLiveFixture),
+            Samples(100),
+            null,
+            null,
+            new Thresholds(),
+            allowInProcessGate: true);
+
         Assert.Empty(outcome.Violations);
+        Assert.Contains(outcome.Notes, n => n.Contains("[AllowInProcessGate] is present"));
+    }
+
+    /// <summary>
+    ///     The option-bag opt-out, which the <c>PerformanceAssert</c> pattern needs because it has no
+    ///     attribute target for <c>[AllowInProcessGate]</c> to sit on.
+    /// </summary>
+    [Fact]
+    public void RequireIsolation_False_On_The_Thresholds_Skips_The_Check_Entirely()
+    {
+        var outcome = PerformanceGate.Evaluate(
+            Result("candidate", 100, IsolationStatus.InProcessNoWorker),
+            Samples(100),
+            null,
+            null,
+            new Thresholds { RequireIsolation = false });
+
+        Assert.Empty(outcome.Violations);
+        Assert.DoesNotContain(outcome.Notes, n => n.Contains("[AllowInProcessGate]"));
     }
 
     [Fact]
@@ -161,6 +207,15 @@ public sealed class PerformanceGateIsolationTests
     private static MethodInfo MethodOf<T>(string name)
         => typeof(T).GetMethod(name, BindingFlags.Public | BindingFlags.Instance)!;
 
+    /// <summary>
+    ///     Drives the ratio-gate decision in isolation from the isolation <i>requirement</i>.
+    /// </summary>
+    /// <remarks>
+    ///     <c>RequireIsolation = false</c> deliberately. These tests are about whether a ratio is
+    ///     enforceable given how each side was measured, and leaving the requirement on would add an
+    ///     isolation violation to every host-measured case - making the assertions about the ratio pass
+    ///     or fail for a reason that has nothing to do with the ratio. The requirement has its own tests.
+    /// </remarks>
     private static PerformanceGate.Outcome Evaluate(
         BenchmarkResult candidate,
         BenchmarkResult reference,
@@ -170,7 +225,7 @@ public sealed class PerformanceGateIsolationTests
             Samples(candidate.Mean),
             reference,
             Samples(reference.Mean),
-            new Thresholds { MaxSlowdownRatio = 1.2 },
+            new Thresholds { MaxSlowdownRatio = 1.2, RequireIsolation = false },
             allowInProcessGate);
 
     private static double[] Samples(double mean)
@@ -271,7 +326,9 @@ public sealed class PerformanceGateIsolationTests
     [Fact]
     public void A_Host_Result_Against_The_Host_Calibration_Draws_No_Note()
     {
-        var thresholds = new Thresholds { MaxSlowdownRatio = 1000 };
+        // RequireIsolation off: this is about the calibration note, and a host-measured candidate would
+        // otherwise fail the isolation requirement before the calibration comparison mattered.
+        var thresholds = new Thresholds { MaxSlowdownRatio = 1000, RequireIsolation = false };
         var candidate = Result("Candidate", 100, IsolationStatus.InProcessRequested);
 
         var outcome = PerformanceGate.Evaluate(candidate, [100, 100], null, null, thresholds);
@@ -292,7 +349,11 @@ public sealed class PerformanceGateIsolationTests
         public OutlierMode OutlierMode => OutlierMode.IqrFence;
         public double ConfidenceLevel => 0.95;
         public double MaxAbsoluteThresholdTolerance => 1.0;
-        public bool RequireIsolation { get; init; }
+
+        // Mirrors the production default, so `new Thresholds()` behaves the way a real gate with
+        // nothing configured behaves. A test double that quietly defaults the other way would let the
+        // dedicated isolation tests pass against a permissiveness production does not have.
+        public bool RequireIsolation { get; init; } = true;
     }
 
     [AllowInProcessGate]

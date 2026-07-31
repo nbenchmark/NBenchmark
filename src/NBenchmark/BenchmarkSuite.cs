@@ -28,7 +28,6 @@ public class BenchmarkSuite(string name)
     private readonly List<IReporter> _reporters = [];
     private string? _baselineName;
     private ReportDetail _detail;
-    private bool _isolated;
 
     /// <summary>
     ///     Set by <see cref="WithIsolation" /><c>(false)</c>, i.e. an explicit request to measure in
@@ -1173,19 +1172,28 @@ public class BenchmarkSuite(string name)
     ///     in the current process.
     /// </summary>
     /// <remarks>
-    ///     Reach for <c>false</c> when the current process <i>is</i> the subject: cold-start cost, or a
-    ///     body that must observe host state a fresh process cannot rebuild. The result is stamped
-    ///     <see cref="IsolationStatus.InProcessRequested" /> and reports the host's runtime
-    ///     configuration, so it is never silently compared against an isolated measurement.
+    ///     <para>
+    ///         Reach for <c>false</c> when the current process <i>is</i> the subject: cold-start cost, or
+    ///         a body that must observe host state a fresh process cannot rebuild. The result is stamped
+    ///         <see cref="IsolationStatus.InProcessRequested" /> and reports the host's runtime
+    ///         configuration, so it is never silently compared against an isolated measurement.
+    ///     </para>
+    ///     <para>
+    ///         <c>WithIsolation()</c> with no argument is therefore a no-op kept for source
+    ///         compatibility - it asks for what already happens. Only the request for the host process
+    ///         is recorded, because that is the only one that changes anything.
+    ///     </para>
     /// </remarks>
     public BenchmarkSuite WithIsolation(bool enabled = true)
     {
-        _isolated = enabled;
-
-        // WithIsolation(false) is now a real instruction rather than the default, because a suite
-        // whose bodies can be addressed is measured in a worker without being asked. Recording the
-        // request separately is what lets the report distinguish "you chose the host process" from
-        // "your suite could not be isolated", which have entirely different remedies.
+        // Only the in-process request is stored. There was a second field tracking `enabled` itself,
+        // which nothing ever read once isolation became the default - dead state whose presence
+        // implied a decision was being made here that was not.
+        //
+        // WithIsolation(false) is a real instruction rather than the default, because a suite whose
+        // bodies can be addressed is measured in a worker without being asked. Recording the request
+        // separately is what lets the report distinguish "you chose the host process" from "your suite
+        // could not be isolated", which have entirely different remedies.
         _inProcessRequested = !enabled;
 
         return this;

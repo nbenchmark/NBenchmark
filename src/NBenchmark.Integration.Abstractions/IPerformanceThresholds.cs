@@ -43,7 +43,7 @@ public interface IPerformanceThresholds
 
     /// <summary>
     ///     Fails the test when the measurement was taken in the test host rather than in a worker
-    ///     process. Defaults to <c>false</c>.
+    ///     process. Defaults to <c>true</c>; opt out with <c>[AllowInProcessGate]</c>.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -51,14 +51,26 @@ public interface IPerformanceThresholds
     ///         about the host: JIT tiering, dynamic PGO and GC flavour are fixed when a process
     ///         starts, and the test host's are whatever the preceding tests left behind. NBenchmark
     ///         isolates what it can and labels what it cannot, but labelling is a message to a human
-    ///         reading output, and CI does not read output.
+    ///         reading output, and CI does not read output. So the default fails the test: a benchmark
+    ///         that silently stops being isolatable - someone adds a fixture argument, or the worker
+    ///         fails to deploy on a build agent - is caught rather than quietly measured elsewhere and
+    ///         reported as a pass. <see cref="BenchmarkResult.IsolationStatus" /> names the reason.
     ///     </para>
     ///     <para>
-    ///         Setting this turns "this was measured somewhere I did not choose" into a test failure,
-    ///         so a benchmark that silently stops being isolatable - someone adds a fixture argument,
-    ///         or the worker fails to deploy - is caught rather than quietly measured elsewhere.
-    ///         <see cref="BenchmarkResult.IsolationStatus" /> names the reason in the failure message.
+    ///         The opt-out is <see cref="AllowInProcessGateAttribute" />, on the test method, its class
+    ///         or its assembly - not a <c>false</c> here. Two reasons. It already means "this test
+    ///         cannot be isolated and I accept a host measurement", so a second knob saying the same
+    ///         thing would be one more place for the two to disagree. And <c>false</c> could not be
+    ///         expressed reliably anyway: xUnit reads attribute values as named arguments, where an
+    ///         absent argument and an explicit <c>false</c> are the same thing, and attribute arguments
+    ///         cannot be <see cref="Nullable{T}" /> to tell them apart. A setting that is silently
+    ///         ignored on one framework is worse than no setting.
+    ///     </para>
+    ///     <para>
+    ///         Implemented rather than inherited only by the <c>PerformanceAssert</c> option bags, which
+    ///         are ordinary objects with no attribute target to carry <c>[AllowInProcessGate]</c>. The
+    ///         attribute pattern leaves this to the default.
     ///     </para>
     /// </remarks>
-    public bool RequireIsolation => false;
+    public bool RequireIsolation => true;
 }

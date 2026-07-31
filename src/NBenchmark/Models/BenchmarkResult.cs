@@ -239,6 +239,16 @@ public record BenchmarkResult
     ///         marked as isolated did not come from a worker, and defaulting the other way would let
     ///         any code path that forgot to set it claim a fidelity it never had.
     ///     </para>
+    ///     <para>
+    ///         Note that this initializer is the <i>whole</i> of that guarantee.
+    ///         <see cref="IsolationStatus.Isolated" /> is <c>0</c>, so <c>default(IsolationStatus)</c>
+    ///         is the permissive value - the enum cannot be renumbered to fix that, because its values
+    ///         travel on the wire inside this record. Every measurement therefore starts here as
+    ///         host-measured and is re-stamped by the layer that knows better, at
+    ///         <c>WorkerGroupRunner</c> for the streaming path and via <c>with</c> expressions
+    ///         elsewhere. Removing the initializer would silently promote every un-stamped result.
+    ///         Pinned by <c>BenchmarkResultTests.IsolationStatus_DefaultsToHostMeasured</c>.
+    ///     </para>
     /// </summary>
     public IsolationStatus IsolationStatus { get; init; } = IsolationStatus.InProcessRequested;
 

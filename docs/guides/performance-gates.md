@@ -153,16 +153,21 @@ public class ParserTests : IClassFixture<ParserFixture>
 
 The gate then runs on host measurements and the result carries a note saying so. Treat a marginal outcome as inconclusive rather than as evidence.
 
-### `RequireIsolation`
+### Isolation is required by default
 
-The opposite lever: fail the test when the measurement was *not* taken in a worker.
+The same attribute is also the *only* opt-out from the isolation requirement. A performance gate fails when its measurement was not taken in a worker process:
 
 ```csharp
-[PerformanceFact(MaxMeanNs = 500_000, RequireIsolation = true)]
+// Fails if this ends up measured in the test host - no configuration needed.
+[PerformanceFact(MaxMeanNs = 500_000)]
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-Use it on gates that matter. Isolation can be lost quietly - somebody adds a fixture argument, or the worker fails to deploy on a build agent - and the test keeps passing against a number measured somewhere you did not choose. `RequireIsolation` turns that into a failure that names the reason and its remedy. It applies to absolute-threshold gates too, and is available on all three attributes and on the `PerformanceAssert` option bags.
+That default is deliberate. Isolation can be lost quietly - somebody adds a fixture argument, or the worker fails to deploy on a build agent - and a labelled-but-passing test is indistinguishable from a healthy one, because CI does not read output. Failing is the conservative direction: the message names the reason and its remedy.
+
+Add `[AllowInProcessGate]` to accept a host measurement, at method, class or assembly scope. It waives both the isolation requirement and the ratio-gate restriction above, because both are the same judgement - "this test cannot be isolated and I accept a noisier number". The result then carries a note saying where it was measured.
+
+There is deliberately no `RequireIsolation = false` on the attributes. xUnit reads attribute values as named arguments, where an absent argument and an explicit `false` are indistinguishable, and attribute arguments cannot be nullable to tell them apart - so the setting would have been silently ignored on one framework and honoured on the others. The `PerformanceAssert` option bags do expose `RequireIsolation`, because they are ordinary objects with no attribute target to carry `[AllowInProcessGate]`.
 
 Simple values reach the worker intact: `int`, `string`, `bool`, `enum`, `decimal`, `DateTime`, `Guid` and the like, so `[InlineData]` and `[DataRow]` cases isolate normally. Object arguments are refused rather than reconstructed, because a reconstruction that is usually right is worse than one that declines.
 

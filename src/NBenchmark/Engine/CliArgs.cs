@@ -752,7 +752,11 @@ internal sealed record CliArgs
                     or "--jit-quiet-period" or "--min-measurement-time" or "--drift-tolerance"
                     or "--max-drift-restarts"
                     or "--launch-count" or "--percentiles" or "--runtimes" or "--min-practical-effect"
-                    or "--cpu-affinity" or "--priority" or "--otlp-endpoint":
+                    or "--cpu-affinity" or "--priority" or "--otlp-endpoint" or "--diagnostics":
+                    // Every flag whose case above is guarded by `when i + 1 < args.Length` belongs
+                    // here, or it falls through to `default` and a user who simply forgot the value is
+                    // told the flag does not exist. --diagnostics was missing for exactly that reason;
+                    // CliArgsTests.Parse_RecognisesEveryKnownFlag now pins the whole set.
                     errors.Add($"Missing value for '{args[i]}'.");
                     break;
                 default:
@@ -948,6 +952,42 @@ internal sealed record CliArgs
             target.Add(normalized);
     }
 
+    /// <summary>
+    ///     Every flag <see cref="Parse" /> accepts, and therefore every flag
+    ///     <see cref="PrintHelp" /> must document.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This exists because <c>--strict-isolation</c> and <c>--verify-isolation</c> shipped
+    ///         parsed but undocumented. They are the two flags a CI pipeline most needs - the whole
+    ///         point of the first is that an advisory warning nobody reads is indistinguishable from no
+    ///         warning - and <c>--help</c> was the one place a user would have looked.
+    ///     </para>
+    ///     <para>
+    ///         <c>CliArgsTests</c> holds this to an exact set equality against the flags named in
+    ///         <see cref="PrintHelp" />'s output, and separately requires <see cref="Parse" /> to
+    ///         recognise each entry, so the list cannot drift from either side. It does not detect a
+    ///         flag added to the parse switch and to neither this list nor the help text - a
+    ///         <c>switch</c>'s labels are not enumerable at runtime - so adding a case here is part of
+    ///         adding a case there.
+    ///     </para>
+    /// </remarks>
+    internal static readonly string[] KnownFlags =
+    [
+        "--alpha", "--auto-tune", "--autotune-cap-behavior", "--cap-grace-factor", "--category",
+        "--ci-target", "--confidence", "--cpu-affinity", "--cross-class",
+        "--dedicated-host-guidance", "--detail", "--diagnostics", "--drift-tolerance", "--dry-run",
+        "--emit-raw", "--exclude-category", "--filter", "--force-gc", "--help", "--in-process",
+        "--iterations", "--jit-quiet-period", "--launch-count", "--list", "--max-drift-restarts",
+        "--max-samples", "--max-tuning-time", "--max-warmup", "--min-measurement-time",
+        "--min-practical-effect", "--min-samples", "--min-warmup", "--min-warmup-time",
+        "--no-allocations", "--no-gc-between-benchmarks", "--no-histogram", "--no-jit-quiescence",
+        "--no-samples", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint", "--outlier",
+        "--output", "--percentiles", "--priority", "--profile", "--reporter", "--runtime-profile",
+        "--runtimes", "--seed", "--stream-samples", "--strict-isolation", "--tail-basis",
+        "--threshold-pct", "--verify-isolation", "--warmup", "--warmup-budget-fraction",
+    ];
+
     internal static void PrintHelp()
     {
         Console.WriteLine("Usage: myapp.exe [options]");
@@ -995,6 +1035,8 @@ internal sealed record CliArgs
         Console.WriteLine("  --list                 List discovered benchmarks without running");
         Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
         Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");
+        Console.WriteLine("  --strict-isolation     Fail with exit code 1 if any benchmark could not be isolated");
+        Console.WriteLine("  --verify-isolation     Re-measure in this process and print how much isolation changed");
         Console.WriteLine("  --cross-class          Compute significance across all classes instead of per class");
         Console.WriteLine("  --runtimes <list>      Runtimes to compare (comma-separated, e.g. net8,net9,net10)");
         Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");

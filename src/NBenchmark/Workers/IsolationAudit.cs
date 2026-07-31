@@ -10,16 +10,6 @@ namespace NBenchmark.Workers;
 internal static class IsolationAudit
 {
     /// <summary>
-    ///     Fails the run when any result was not measured in a worker, naming each one and what to do
-    ///     about it.
-    /// </summary>
-    /// <remarks>
-    ///     Every non-isolated result is already labelled on the row and explained on the console. This
-    ///     exists because neither survives CI: a label scrolls past, and an advisory warning in a log
-    ///     nobody reads is indistinguishable from no warning at all. A build that must not accept
-    ///     host-process numbers needs them to be an error.
-    /// </remarks>
-    /// <summary>
     ///     Throws when <see cref="MeasurementOptions.RequireIsolation" /> is set and isolation was
     ///     refused.
     /// </summary>
@@ -56,6 +46,16 @@ internal static class IsolationAudit
             + remedy);
     }
 
+    /// <summary>
+    ///     Fails the run when any result was not measured in a worker, naming each one and what to do
+    ///     about it.
+    /// </summary>
+    /// <remarks>
+    ///     Every non-isolated result is already labelled on the row and explained on the console. This
+    ///     exists because neither survives CI: a label scrolls past, and an advisory warning in a log
+    ///     nobody reads is indistinguishable from no warning at all. A build that must not accept
+    ///     host-process numbers needs them to be an error.
+    /// </remarks>
     /// <returns><c>true</c> when every result was isolated.</returns>
     public static bool Enforce(IReadOnlyList<BenchmarkResult> results, TextWriter error)
     {
@@ -103,6 +103,42 @@ internal static class IsolationAudit
     ///         compared against themselves, which would print a meaningless 1.00x.
     ///     </para>
     /// </remarks>
+    /// <summary>
+    ///     Says why <c>--verify-isolation</c> has nothing to offer a cross-runtime run.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This process is one runtime. A run that measured net8.0 and net9.0 builds in their own
+    ///         workers has no in-process counterpart here to compare against, and "in-process" has no
+    ///         defined meaning for a net8.0 build measured from a net10.0 coordinator.
+    ///     </para>
+    ///     <para>
+    ///         Refusing beats the alternative. <see cref="Render" /> keys the host side by name, and a
+    ///         moniker is the only thing distinguishing multi-runtime rows, so every runtime would be
+    ///         compared against the same unlabelled host row - a table that looks like a finding and is
+    ///         not one. Printing the reason is the same trade the rest of this area makes: refuse rather
+    ///         than guess, and say which.
+    ///     </para>
+    /// </remarks>
+    public static void RefuseCrossRuntimeComparison(IEnumerable<string> runtimes, TextWriter output)
+    {
+        ArgumentNullException.ThrowIfNull(runtimes);
+        ArgumentNullException.ThrowIfNull(output);
+
+        var names = string.Join(", ", runtimes);
+
+        output.WriteLine();
+
+        output.WriteLine(
+            "--verify-isolation: skipped, because this run measured more than one runtime"
+            + (names.Length == 0 ? "" : $" ({names})") + ".");
+
+        output.WriteLine(
+            "  The comparison re-measures in this process, and this process is one runtime - so there "
+            + "is no in-process counterpart for the other builds to be compared against. Re-run without "
+            + "--runtimes to compare this build's isolated numbers against in-process ones.");
+    }
+
     public static void Render(
         IReadOnlyList<BenchmarkResult> isolated,
         IReadOnlyList<BenchmarkResult> inProcess,
@@ -111,6 +147,18 @@ internal static class IsolationAudit
         ArgumentNullException.ThrowIfNull(isolated);
         ArgumentNullException.ThrowIfNull(inProcess);
         ArgumentNullException.ThrowIfNull(output);
+
+        // The host side is keyed by name alone, so a cross-runtime run - where rows share a name and
+        // differ only by moniker - would compare every runtime against one unlabelled host row. Guarded
+        // here as well as at the call site, so no future caller can produce that table by accident.
+        if (isolated.Any(r => !string.IsNullOrEmpty(r.RuntimeMoniker)))
+        {
+            RefuseCrossRuntimeComparison(
+                isolated.Select(r => r.RuntimeMoniker).Where(m => !string.IsNullOrEmpty(m)).Distinct()!,
+                output);
+
+            return;
+        }
 
         var hostByName = inProcess.ToDictionary(r => r.Name, StringComparer.Ordinal);
         var rows = new List<(string Name, string Isolated, string Host, string Ratio, double? Magnitude)>();

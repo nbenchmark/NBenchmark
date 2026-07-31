@@ -28,7 +28,9 @@ internal static class PerformanceAttributeParser
             OutlierMode = NormalizeOutlierMode(ParseOutlierMode(attribute), true),
             ConfidenceLevel = NormalizeConfidenceLevel(ParseDouble(attribute, nameof(PerformanceFactAttribute.ConfidenceLevel))),
             MaxAbsoluteThresholdTolerance = NormalizeTolerance(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxAbsoluteThresholdTolerance))),
-            RequireIsolation = ParseBool(attribute, nameof(PerformanceFactAttribute.RequireIsolation)),
+            // RequireIsolation is deliberately absent. It is not an attribute argument - a named
+            // argument cannot distinguish an explicit `false` from an absent one - so it keeps
+            // ParsedThresholds' default of true, and [AllowInProcessGate] is the opt-out.
             LaunchCount = NormalizeLaunchCount(ParseInt(attribute, nameof(PerformanceFactAttribute.LaunchCount))),
         };
     }
@@ -136,7 +138,7 @@ internal static class PerformanceAttributeParser
         public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
         public double ConfidenceLevel { get; init; } = 0.95;
         public double MaxAbsoluteThresholdTolerance { get; init; } = 1.0;
-        public bool RequireIsolation { get; init; }
+        public bool RequireIsolation { get; init; } = true;
         public int LaunchCount { get; init; } = 1;
     }
 }

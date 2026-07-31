@@ -582,7 +582,51 @@ public sealed class BenchmarkHarness
         // process. Keep OTEL_EXPORTER_OTLP_ENDPOINT authoritative when the user already set it.
         using var _ = ApplyCliOtelEndpointScope(_cliArgs.OtlpEndpoint);
 
-        return await RunCoreAsync(cancellationToken).ConfigureAwait(false);
+        return await RunCoreAsync(RunPass.Primary, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Which of the two things a run can be: the measured run the user asked for, or the in-process
+    ///     comparison <c>--verify-isolation</c> measures to compare it against.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A parameter rather than a set of fields the comparison pass overwrites and restores. The
+    ///         previous shape saved four fields and leaked through every publish decision it had not
+    ///         thought of: the user's observer received a second full suite stream for a pass whose
+    ///         results are never published <i>and</i> was disposed twice, a second suite activity opened
+    ///         under the same name, the refusal-dedup set was never cleared, and
+    ///         <see cref="CliArgs.Runtimes" /> stayed populated - so on a cross-runtime run the
+    ///         "in-process comparison" re-entered the multi-runtime orchestrator and was not in-process
+    ///         at all.
+    ///     </para>
+    ///     <para>
+    ///         Making it an argument turns "every publish decision must remember to check the flag" into
+    ///         "the comparison pass cannot reach a publisher". There is nothing to restore because
+    ///         nothing was changed.
+    ///     </para>
+    /// </remarks>
+    private sealed record RunPass
+    {
+        public static readonly RunPass Primary = new();
+
+        public static readonly RunPass InProcessComparison = new()
+        {
+            Publishes = false,
+            ForceInProcess = true,
+        };
+
+        /// <summary>
+        ///     Whether this pass owns the run's outputs: reporters, the regression and isolation gates,
+        ///     the output directory, the exit code, the user's observer and progress, and the suite
+        ///     activity's identity.
+        /// </summary>
+        public bool Publishes { get; init; } = true;
+
+        /// <summary>
+        ///     Measures in this process whatever the CLI, attributes or builder asked for.
+        /// </summary>
+        public bool ForceInProcess { get; init; }
     }
 
     /// <summary>
@@ -595,9 +639,15 @@ public sealed class BenchmarkHarness
     ///         through the real warmup and tuning path is not the number a user would have trusted.
     ///     </para>
     ///     <para>
-    ///         Reporters and gates are suppressed for it. It exists to be compared against, not to be
-    ///         published, and letting it write files or move an exit code would make a diagnostic
-    ///         command change the build's outcome.
+    ///         It is the same harness re-run rather than a second harness built to look like this one. A
+    ///         copy would have to reproduce every builder call the user made - filters, categories,
+    ///         options, instance lifetime - and any field missed would silently compare two different
+    ///         sets of benchmarks while presenting the result as one set measured two ways.
+    ///     </para>
+    ///     <para>
+    ///         Nothing is saved or restored around it: <see cref="RunPass.InProcessComparison" /> says
+    ///         what this pass is, and <see cref="RunCoreAsync" /> declines to publish on that basis. See
+    ///         <see cref="RunPass" /> for what the save-and-restore version leaked.
     ///     </para>
     /// </remarks>
     private async Task VerifyIsolationAsync(
@@ -607,35 +657,10 @@ public sealed class BenchmarkHarness
         Console.WriteLine();
         Console.WriteLine("Re-measuring in this process for comparison...");
 
-        // The same harness re-run with isolation forced off, rather than a second harness built to
-        // look like this one. A copy would have to reproduce every builder call the user made -
-        // filters, categories, options, instance lifetime - and any field missed would silently
-        // compare two different sets of benchmarks while presenting the result as one set measured
-        // two ways. That is a worse failure than not offering the command.
-        var savedArgs = _cliArgs;
-        var savedReporters = _reporters.ToList();
-        var savedProgress = _progress;
-        var savedProgressExplicit = _progressExplicitlySet;
-
-        // Reporters and gates are suppressed: this pass exists to be compared against, not
-        // published. Letting it write files or move the exit code would make a diagnostic command
-        // change the build's outcome.
-        _cliArgs = _cliArgs with
-        {
-            InProcess = true,
-            VerifyIsolation = false,
-            StrictIsolation = false,
-            ThresholdPct = null,
-            OutputDir = null,
-        };
-
-        _reporters.Clear();
-        _progress = NullBenchmarkProgress.Instance;
-        _progressExplicitlySet = true;
-
         try
         {
-            var inProcess = await RunCoreAsync(cancellationToken).ConfigureAwait(false);
+            var inProcess = await RunCoreAsync(RunPass.InProcessComparison, cancellationToken)
+                .ConfigureAwait(false);
 
             IsolationAudit.Render(isolated, inProcess, Console.Out);
         }
@@ -644,14 +669,25 @@ public sealed class BenchmarkHarness
             // A failed comparison pass must not fail the run it was only commenting on.
             Console.Error.WriteLine($"--verify-isolation: the in-process comparison pass failed: {ex.Message}");
         }
-        finally
-        {
-            _cliArgs = savedArgs;
-            _reporters.Clear();
-            _reporters.AddRange(savedReporters);
-            _progress = savedProgress;
-            _progressExplicitlySet = savedProgressExplicit;
-        }
+    }
+
+    /// <summary>
+    ///     The progress instance for this pass: whatever the caller attached, a console bar when nothing
+    ///     was attached, or nothing at all for the comparison pass.
+    /// </summary>
+    /// <remarks>
+    ///     Returned rather than assigned to <c>_progress</c>. The field used to be overwritten here when
+    ///     no progress had been attached, which is why the comparison pass had to save and restore both
+    ///     it and <c>_progressExplicitlySet</c> - and why forcing the flag true was load-bearing for
+    ///     reasons no reader could see. <c>_progressExplicitlySet</c> is now write-once, set only by
+    ///     <see cref="WithProgress" />.
+    /// </remarks>
+    private IBenchmarkProgress ResolveProgress(RunPass pass)
+    {
+        if (!pass.Publishes)
+            return NullBenchmarkProgress.Instance;
+
+        return _progressExplicitlySet ? _progress : new DefaultConsoleProgress();
     }
 
     private static IDisposable ApplyCliOtelEndpointScope(string? endpoint)
@@ -670,7 +706,9 @@ public sealed class BenchmarkHarness
         return new OtlpEndpointScope(previousNBenchmarkEndpoint, previousOtlpEndpoint);
     }
 
-    private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<BenchmarkResult>> RunCoreAsync(
+        RunPass pass,
+        CancellationToken cancellationToken)
     {
         if (_cliArgs.ShowHelp)
         {
@@ -678,25 +716,36 @@ public sealed class BenchmarkHarness
             return Array.Empty<BenchmarkResult>();
         }
 
-        // When runtimes are specified (CLI or attribute), delegate to the multi-runtime orchestrator.
-        // --help and --list-only are handled before this so they never trigger multi-runtime builds.
-        var effectiveRuntimes = _cliArgs.Runtimes;
-
-        if (effectiveRuntimes.Count == 0 && !_cliArgs.ListOnly)
-            effectiveRuntimes = DiscoverAttributeRuntimes();
-
-        if (effectiveRuntimes.Count > 0)
+        // Skipped entirely for the comparison pass, which is defined as measuring *this* process. A
+        // cross-runtime run reached here with Runtimes still populated and went straight back into the
+        // multi-runtime orchestrator, so the "in-process comparison" spawned workers per target
+        // framework and compared the run against itself. Not reachable now, rather than guarded there.
+        if (!pass.ForceInProcess)
         {
-            if (_cliArgs.InProcess || !_isolationEnabled)
-                Console.WriteLine("Warning: cross-runtime execution always uses child processes.");
+            // When runtimes are specified (CLI or attribute), delegate to the multi-runtime
+            // orchestrator. --help and --list-only are handled before this so they never trigger
+            // multi-runtime builds.
+            var effectiveRuntimes = _cliArgs.Runtimes;
 
-            return await RunMultiRuntimeAsync(effectiveRuntimes, cancellationToken).ConfigureAwait(false);
+            if (effectiveRuntimes.Count == 0 && !_cliArgs.ListOnly)
+                effectiveRuntimes = DiscoverAttributeRuntimes();
+
+            if (effectiveRuntimes.Count > 0)
+            {
+                if (_cliArgs.InProcess || !_isolationEnabled)
+                    Console.WriteLine("Warning: cross-runtime execution always uses child processes.");
+
+                return await RunMultiRuntimeAsync(effectiveRuntimes, cancellationToken).ConfigureAwait(false);
+            }
         }
 
-        Console.WriteLine($"Timer resolution: {Stopwatch.Frequency:N0} ticks/s "
-                          + $"({1_000_000_000.0 / Stopwatch.Frequency:F2} ns per tick)");
+        if (pass.Publishes)
+        {
+            Console.WriteLine($"Timer resolution: {Stopwatch.Frequency:N0} ticks/s "
+                              + $"({1_000_000_000.0 / Stopwatch.Frequency:F2} ns per tick)");
 
-        Console.WriteLine();
+            Console.WriteLine();
+        }
 
         var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
         var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
@@ -731,8 +780,15 @@ public sealed class BenchmarkHarness
             return Array.Empty<BenchmarkResult>();
         }
 
-        if (!_progressExplicitlySet)
-            _progress = new DefaultConsoleProgress();
+        // A local, threaded down through the run rather than assigned to the field. The field was
+        // mutated here and had to be saved and restored around the comparison pass; a parameter cannot
+        // be left behind.
+        var progress = ResolveProgress(pass);
+
+        // Per-run rather than a field, so a refusal is reported once per run and not once per process.
+        // As a field it was never cleared, which meant a second RunAsync() on the same harness printed
+        // no refusals at all - and the comparison pass inherited the first pass's set.
+        var refusalsReported = new HashSet<string>(StringComparer.Ordinal);
 
         var allResults = new List<BenchmarkResult>();
         var rawSamples = new Dictionary<string, double[]>();
@@ -753,8 +809,14 @@ public sealed class BenchmarkHarness
 
         var totalBenchmarks = allNames.Count;
 
+        // Labelled rather than suppressed for the comparison pass. Suppressing only the suite span would
+        // leave the per-benchmark spans - raised from deep inside the engine, where the pass is not
+        // visible - as parentless roots, which is worse than a labelled parent. A diagnostic pass must
+        // not impersonate the run, but it may describe itself.
         NBenchmarkDiagnostics.OnSuiteStarting(
-            _cliArgs.Filter ?? "harness",
+            pass.Publishes
+                ? _cliArgs.Filter ?? "harness"
+                : $"{_cliArgs.Filter ?? "harness"} [in-process comparison]",
             totalBenchmarks,
             _options.Profile.ToString(),
             _cliArgs.Runtimes is { Count: > 0 } runtimes ? string.Join(",", runtimes.Select(r => r.ToTargetFramework())) : null,
@@ -765,16 +827,24 @@ public sealed class BenchmarkHarness
         // live-streaming observer) see one stream per RunAsync, not one per per-class group.
         // The using disposes the observer (and its composite children) on both the success
         // and exception paths; the composite's Dispose fans out with try/catch isolation.
-        using var observer = ResolveObserver();
+        //
+        // The comparison pass gets the null observer, not the user's. It used to resolve the same
+        // instance again from inside the primary pass's `using`, so a streaming observer received a
+        // second SuiteStarting..SuiteCompleted stream for results that are never published and was then
+        // disposed twice - a double-finalise for any observer whose Dispose closes out a session.
+        using var observer = pass.Publishes ? ResolveObserver() : NullMeasurementObserver.Instance;
         var sentinelEmitted = false;
 
         try
         {
-            await _progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
+            await progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
 
             // Under --dry-run, --in-process, or WithIsolation(false), nothing is spawned. A
             // dry run never invokes a body, so isolation would only add process overhead.
-            var inProcessGlobal = _cliArgs.InProcess || !_isolationEnabled || _cliArgs.DryRun;
+            var inProcessGlobal = pass.ForceInProcess
+                                  || _cliArgs.InProcess
+                                  || !_isolationEnabled
+                                  || _cliArgs.DryRun;
 
             var runningIndex = 0;
 
@@ -796,7 +866,7 @@ public sealed class BenchmarkHarness
                         _serviceProviderFactory);
 
                 if (workerDecision is { CanIsolate: false, Explanation: { } explanation })
-                    EmitIsolationRefusal(suite.Type.Name, explanation);
+                    EmitIsolationRefusal(refusalsReported, suite.Type.Name, explanation);
 
                 var forceInProcess = inProcessGlobal || !workerDecision.CanIsolate;
 
@@ -827,7 +897,7 @@ public sealed class BenchmarkHarness
 
                     await RunInProcessSuiteAsync(
                         suite with { Benchmarks = inProcess }, suiteOptions, runningIndex, totalBenchmarks,
-                        allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                        allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
 
                     // A benchmark that carries [InProcess] chose the host itself, whatever the class
                     // as a whole could or could not do; anything else landed here because of the
@@ -841,7 +911,7 @@ public sealed class BenchmarkHarness
                 {
                     await RunIsolatedGroupAsync(
                         suite, perClass, runningIndex, totalBenchmarks,
-                        allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                        allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
 
                     runningIndex += perClass.Count;
                 }
@@ -850,7 +920,7 @@ public sealed class BenchmarkHarness
                 {
                     await RunIsolatedGroupAsync(
                         suite, [benchmark], runningIndex, totalBenchmarks,
-                        allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                        allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
 
                     runningIndex++;
                 }
@@ -861,7 +931,7 @@ public sealed class BenchmarkHarness
                     ApplyAutoIsolationUpgradeWarning(allResults, autoUpgradedResultNames, suiteResultStart);
             }
 
-            await _progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
+            await progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
 
             // SuiteCompleted sentinel: emit on the success path with Succeeded = true. A
             // live-streaming observer treats this as the authoritative run-end signal.
@@ -898,22 +968,30 @@ public sealed class BenchmarkHarness
 
         ApplyPerClassSignificance(allResults, rawSamples, suiteOptions, _cliArgs.CrossClass || _crossClass);
 
-        if (_cliArgs.ThresholdPct.HasValue
-            && ThresholdCheck.HasRegression(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
+        // One gate around everything that leaves this process: the regression and isolation checks, the
+        // exit code, the output directory, the reporters, BenchmarkTable's cross-class static, and the
+        // comparison pass itself. The comparison pass used to be kept out of all of these by editing the
+        // CliArgs it read - five separate nullings, each of which had to be remembered. Now it cannot
+        // reach them, so a sixth output added below is covered without anyone thinking about it.
+        if (pass.Publishes)
         {
-            Console.Error.WriteLine(
-                $"Regression threshold exceeded ({_cliArgs.ThresholdPct.Value}%). "
-                + $"Regressed benchmarks: {string.Join(", ", regressed)}");
+            if (_cliArgs.ThresholdPct.HasValue
+                && ThresholdCheck.HasRegression(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
+            {
+                Console.Error.WriteLine(
+                    $"Regression threshold exceeded ({_cliArgs.ThresholdPct.Value}%). "
+                    + $"Regressed benchmarks: {string.Join(", ", regressed)}");
 
-            Environment.ExitCode = 1;
+                Environment.ExitCode = 1;
+            }
+
+            await FinalizeRunAsync(allResults, cancellationToken).ConfigureAwait(false);
+
+            // After the reporters, because the comparison is commentary on the table just shown and is
+            // meaningless without it.
+            if (_cliArgs.VerifyIsolation)
+                await VerifyIsolationAsync(allResults, cancellationToken).ConfigureAwait(false);
         }
-
-        await FinalizeRunAsync(allResults, cancellationToken).ConfigureAwait(false);
-
-        // After the reporters, because the comparison is commentary on the table just shown and is
-        // meaningless without it.
-        if (_cliArgs.VerifyIsolation)
-            await VerifyIsolationAsync(allResults, cancellationToken).ConfigureAwait(false);
 
         return allResults;
     }
@@ -998,7 +1076,11 @@ public sealed class BenchmarkHarness
         // Resolve the observer once for the whole multi-runtime run so auto-attached
         // observers see one stream per RunAsync, mirroring the single-runtime path. The
         // using disposes the observer on both the success and exception paths.
+        //
+        // Always the publishing pass: the comparison pass is defined as measuring this process and
+        // returns before the multi-runtime branch is reached, so there is no non-publishing entry here.
         using var observer = ResolveObserver();
+        var progress = ResolveProgress(RunPass.Primary);
         var sentinelEmitted = false;
 
         try
@@ -1012,7 +1094,7 @@ public sealed class BenchmarkHarness
                     Console.WriteLine($"Running benchmarks under {tfm}...");
 
                     var (runtimeResults, runtimeSamples) = await RunForRuntimeAsync(
-                            build.Moniker, build, filtered, observer, cancellationToken)
+                            build.Moniker, build, filtered, progress, observer, cancellationToken)
                         .ConfigureAwait(false);
 
                     // Results already carry their own samples: they arrived in the same frame, so
@@ -1066,10 +1148,17 @@ public sealed class BenchmarkHarness
 
             sentinelEmitted = true;
 
-            // After the reporters, because the comparison is a commentary on the table just shown
-            // and is meaningless without it.
+            // Refused rather than attempted. Forcing this pass in-process would compare every runtime's
+            // rows against one host row - IsolationAudit.Render keys the host side by name, and a
+            // moniker is the only thing that distinguishes those rows - printing a table that looks
+            // like a finding and is not one. "In-process" has no defined meaning for a net8.0 build
+            // measured from a net10.0 coordinator either. Previously this re-entered the multi-runtime
+            // orchestrator and spawned workers, so the "in-process comparison" was neither.
             if (_cliArgs.VerifyIsolation)
-                await VerifyIsolationAsync(allResults, cancellationToken).ConfigureAwait(false);
+            {
+                IsolationAudit.RefuseCrossRuntimeComparison(
+                    runtimes.Select(r => r.ToTargetFramework()), Console.Out);
+            }
 
             return allResults;
         }
@@ -1109,6 +1198,7 @@ public sealed class BenchmarkHarness
             RuntimeMoniker moniker,
             TfmBuild build,
             IReadOnlyList<BenchmarkSuiteDefinition> filteredSuites,
+            IBenchmarkProgress progress,
             IMeasurementObserver observer,
             CancellationToken cancellationToken)
     {
@@ -1173,7 +1263,7 @@ public sealed class BenchmarkHarness
             }, options);
 
             var group = await WorkerLauncher.Current.RunGroupAsync(
-                    request, _progress, observer, MeasurementBudget.For(options, displayNames.Count),
+                    request, progress, observer, MeasurementBudget.For(options, displayNames.Count),
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -1379,18 +1469,19 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IBenchmarkProgress progress,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
         if (suite.Lifetime == InstanceLifetime.PerClass)
         {
             await RunPerClassInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
-                allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
         }
         else
         {
             await RunPerMethodInProcessAsync(suite, suiteOptions, startIndex, totalBenchmarks,
-                allResults, rawSamples, observer, cancellationToken).ConfigureAwait(false);
+                allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -1401,6 +1492,7 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IBenchmarkProgress progress,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
@@ -1452,12 +1544,16 @@ public sealed class BenchmarkHarness
 
                 for (var launchIdx = 0; launchIdx < effectiveClassLaunchCount; launchIdx++)
                 {
-                    var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+                    // Later launches measure the same benchmarks again, so their lifecycle events are
+                    // dropped - forwarding them would make a progress bar run backwards. This local was
+                    // already here and computed correctly; the call below passed the unsuppressed
+                    // instance anyway, so only the observer was actually being quietened.
+                    var launchProgress = launchIdx == 0 ? progress : NullBenchmarkProgress.Instance;
                     var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
 
                     var (results, samples) = await SuiteRunner.RunAsync(
                         envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset, launchObserver).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, launchProgress, cancellationToken, betweenBenchmarksReset, launchObserver).ConfigureAwait(false);
 
                     allLaunchResults.Add(results);
                     allLaunchSamples.Add(samples);
@@ -1476,7 +1572,7 @@ public sealed class BenchmarkHarness
             {
                 var (results, samples) = await SuiteRunner.RunAsync(
                     envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                    startIndex, totalBenchmarks, _progress, cancellationToken, betweenBenchmarksReset, observer).ConfigureAwait(false);
+                    startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset, observer).ConfigureAwait(false);
 
                 ApplyPerClassIndependenceWarning(results, suite, suiteOptions);
                 allResults.AddRange(results);
@@ -1500,6 +1596,7 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IBenchmarkProgress progress,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
@@ -1551,12 +1648,14 @@ public sealed class BenchmarkHarness
 
                     for (var launchIdx = 0; launchIdx < perMethodLaunchCount; launchIdx++)
                     {
-                        var progress = launchIdx == 0 ? _progress : NullBenchmarkProgress.Instance;
+                        // See RunPerClassInProcessAsync: suppressed for every launch after the first,
+                        // and previously computed but not passed.
+                        var launchProgress = launchIdx == 0 ? progress : NullBenchmarkProgress.Instance;
                         var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
 
                         var (results, samples) = await SuiteRunner.RunAsync(
                             [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                            startIndex, totalBenchmarks, progress, cancellationToken, null, launchObserver).ConfigureAwait(false);
+                            startIndex, totalBenchmarks, launchProgress, cancellationToken, null, launchObserver).ConfigureAwait(false);
 
                         perLaunchResults.AddRange(results);
                         perLaunchSamples.Add(samples);
@@ -1581,7 +1680,7 @@ public sealed class BenchmarkHarness
                 {
                     var (results, samples) = await SuiteRunner.RunAsync(
                         [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, _progress, cancellationToken, null, observer).ConfigureAwait(false);
+                        startIndex, totalBenchmarks, progress, cancellationToken, null, observer).ConfigureAwait(false);
 
                     allResults.AddRange(results);
 
@@ -1731,6 +1830,7 @@ public sealed class BenchmarkHarness
         int totalBenchmarks,
         List<BenchmarkResult> allResults,
         Dictionary<string, double[]> rawSamples,
+        IBenchmarkProgress progress,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
@@ -1770,7 +1870,7 @@ public sealed class BenchmarkHarness
                 WorkerRunPlan.ServiceProviderFactoryRef(_serviceProviderFactory));
 
             allLaunchItems.Add(
-                await RunGroupInWorkerAsync(request, replicate, names, suite, timeout, observer, cancellationToken)
+                await RunGroupInWorkerAsync(request, replicate, names, suite, timeout, progress, observer, cancellationToken)
                     .ConfigureAwait(false));
         }
 
@@ -1811,7 +1911,7 @@ public sealed class BenchmarkHarness
             allResults.Add(result);
             rawSamples[name] = raw;
 
-            await _progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+            await progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
             observer.OnResult(result);
         }
     }
@@ -1871,9 +1971,12 @@ public sealed class BenchmarkHarness
     ///         stamped <c>host</c>, so the provenance survives even if this message is scrolled past.
     ///     </para>
     /// </summary>
-    private void EmitIsolationRefusal(string className, string explanation)
+    private static void EmitIsolationRefusal(
+        HashSet<string> reported,
+        string className,
+        string explanation)
     {
-        if (!_isolationRefusalsReported.Add(className))
+        if (!reported.Add(className))
             return;
 
         Console.Error.WriteLine(
@@ -1884,8 +1987,6 @@ public sealed class BenchmarkHarness
             + "because the runtime fixes those at startup. They are stamped 'host' and are never "
             + "compared against isolated results.");
     }
-
-    private readonly HashSet<string> _isolationRefusalsReported = new(StringComparer.Ordinal);
 
     /// <summary>
     ///     Spawns one worker, measures one replicate of a group in it, and shuts it down.
@@ -1908,6 +2009,7 @@ public sealed class BenchmarkHarness
         IReadOnlyList<string> benchmarkNames,
         BenchmarkSuiteDefinition suite,
         TimeSpan timeout,
+        IBenchmarkProgress progress,
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
@@ -1915,7 +2017,7 @@ public sealed class BenchmarkHarness
 
         var group = await WorkerLauncher.Current.RunGroupAsync(
                 request,
-                isFirstReplicate ? _progress : NullBenchmarkProgress.Instance,
+                isFirstReplicate ? progress : NullBenchmarkProgress.Instance,
                 isFirstReplicate ? observer : NullMeasurementObserver.Instance,
                 timeout,
                 cancellationToken)

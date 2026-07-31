@@ -97,12 +97,17 @@ internal static class RuntimeProfileEnvironment
             + "they can only be applied to a benchmark that runs in its own child process. "
             + "Affected results are stamped 'host' and are not compared against isolated ones.");
 
+        // Deliberately does not name WithIsolation(). Isolation is the default in every mode now, so
+        // telling the reader to call it would send them to a no-op; if they are seeing this message,
+        // isolation was either declined explicitly or refused for a reason the result already names.
         Console.Error.WriteLine(
             "  In-process numbers are materially less trustworthy: on benchmarks of provably "
             + "identical cost they spanned 3.27x and fabricated a 2.80x difference, each reported "
-            + "with a tight confidence interval. Harness mode isolates by default; Suite mode needs "
-            + $"WithIsolation(). To accept the host's configuration, set RuntimeProfile.Host - or "
-            + $"{SuppressWarningEnvVar}=1 to silence this without changing the profile.");
+            + "with a tight confidence interval. Every mode isolates by default, so check for an "
+            + "explicit --in-process or WithIsolation(false), and otherwise read the per-benchmark "
+            + "reason on the affected results. To accept the host's configuration, set "
+            + $"RuntimeProfile.Host - or {SuppressWarningEnvVar}=1 to silence this without changing "
+            + "the profile.");
     }
 
     /// <summary>Test-only hook: resets the once-per-process guidance guard.</summary>

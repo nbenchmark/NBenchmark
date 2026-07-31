@@ -1,14 +1,14 @@
 ---
-title: "Isolated Runs (Advanced)"
+title: "Isolated Runs"
 description: Run benchmarks in clean workers to avoid runtime cross-contamination.
 order: 4
 ---
 
-# Isolated Runs (Advanced)
+# Isolated Runs
 
 Process isolation runs benchmarks in a freshly spawned worker so their measurements are not biased by runtime state - JIT warmup, heap and GC pressure, or thread-pool and process-level state - left behind by earlier work in the same process.
 
-How you reach for isolation depends on the mode:
+Isolation is on by default in every mode. What differs is the granularity, and what happens when a benchmark cannot be isolated:
 
 | Mode | Isolation | Granularity |
 | --- | --- | --- |
@@ -16,11 +16,13 @@ How you reach for isolation depends on the mode:
 | **Suite** (`BenchmarkSuite`) | **On by default** | The whole suite runs in one worker |
 | **Harness** (`BenchmarkHarness`) | **On by default** | Per class, with per-benchmark and opt-out controls |
 
-Isolation is useful when you want to reduce contamination from:
+You do not need to turn it on. It is worth understanding because it is what removes contamination from:
 
 - prior JIT warmup from earlier benchmarks
 - heap and GC pressure left by unrelated work
 - thread-pool and process-level runtime state
+
+and because a benchmark that *cannot* be isolated is measured in the host process and labelled, rather than being quietly measured under whatever configuration the host happened to start with. The `Iso` column in your output is where that shows up.
 
 ## Single mode
 
@@ -242,7 +244,9 @@ The rule throughout is to refuse rather than guess. Reconstructing captured stat
 Two flags make the claim verifiable on your own code:
 
 - **`--strict-isolation`** fails the run if any benchmark was measured in the host process, naming each one and its remedy. Use it wherever a pipeline gates on benchmark numbers: a benchmark that quietly fell back - a build agent without the worker deployed, or a body that captures state - cannot be compared against a baseline measured under a different runtime configuration.
-- **`--verify-isolation`** measures everything a second time in the host process and prints the per-benchmark difference, so you can see what your own numbers would have been. It reports a ratio per benchmark rather than an aggregate, because the finding is that host measurement is *unpredictable* rather than uniformly wrong.
+- **`--verify-isolation`** measures everything a second time in the host process and prints the per-benchmark difference, so you can see what your own numbers would have been. It reports a ratio per benchmark rather than an aggregate, because the finding is that host measurement is *unpredictable* rather than uniformly wrong. The comparison pass publishes nothing - no reporters, no output files, no exit code - so a diagnostic command cannot change the build's outcome.
+
+  It is skipped, with a reason, on a run that used `--runtimes`. This process is one runtime, so there is no in-process counterpart for the other builds; comparing every runtime against the same host row would print a table that looks like a finding and is not one.
 
 See [CLI reference](../reference/cli.md#--strict-isolation) for both.
 
@@ -255,7 +259,7 @@ See [CLI reference](../reference/cli.md#--strict-isolation) for both.
 - `--dry-run` (equivalent to `--iterations 0 --warmup 0`) always runs in-process - no worker is spawned.
 - `RunPlanAsync` suites need no configuration transfer at all: the worker runs your factory, so custom detectors, significance tests and lifecycle delegates are constructed there rather than described to it. Harness workers receive the resolved configuration directly and rebuild custom strategies from their type names.
 - A worker that never returns is killed, along with its whole process tree, once it exceeds a wall-clock ceiling derived from the tuning budget (`MaxTuningTime` and `CapGraceFactor`, plus warmup and process-start allowances). The affected benchmarks are reported as errored, naming the timeout, rather than hanging the run. Raise `--max-tuning-time` if the work is genuinely that slow.
-- A worker cannot outlive the run that started it. It blocks reading its inbound pipe, so if the coordinator exits for any reason - a clean finish, a Ctrl-C, a crash, an IDE stop button - the read ends and the worker exits on its own, measured at 7 ms. Nothing supervises it, which matters because the supervisor would be the process most likely to have died.
+- A worker cannot outlive the run that started it, and does not keep measuring for a coordinator that is gone. It reads its inbound pipe continuously - while idle *and* while measuring - so if the coordinator exits for any reason (a clean finish, a Ctrl-C, a crash, an IDE stop button) the read ends, the worker stops at its next sample and exits on its own with a distinct exit code. Nothing supervises it, which matters because the supervisor would be the process most likely to have died.
 
 ## Related
 

@@ -66,3 +66,23 @@ public class HangingBenchmarks
     [Benchmark]
     public void Hang() => Thread.Sleep(Timeout.Infinite);
 }
+
+/// <summary>
+///     A body slow enough per operation that a group of them takes far longer than an orphaned worker
+///     should survive, so "stopped early" is distinguishable from "ran to completion" by wall clock.
+///     <para>
+///         Unlike <see cref="HangingBenchmarks" /> it <i>returns</i> between samples, which is where
+///         the measurement loop observes cancellation. A body that never returns would prove nothing
+///         about a worker noticing it had been orphaned - it would simply be killed as a wedged child.
+///     </para>
+///     <para>
+///         Its own class, and only ever reached when a test names it explicitly in a worker run
+///         request. Any end-to-end run of this fixture must exclude it with
+///         <c>--filter IsolationFixtureBenchmarks.*</c>.
+///     </para>
+/// </summary>
+public class LongGroupBenchmarks
+{
+    [Benchmark]
+    public void Tick() => Thread.Sleep(25);
+}

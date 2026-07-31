@@ -126,13 +126,29 @@ public static class PerformanceGate
 
         if (thresholds.RequireIsolation && !result.IsolationStatus.IsIsolated())
         {
-            var remedy = result.IsolationStatus.ToRemedy();
+            if (allowInProcessGate)
+            {
+                // Waived, and said so. A gate that quietly declines to enforce something is a gate that
+                // passes, and the note is the only thing standing between that and a reader believing
+                // the number was measured somewhere NBenchmark chose.
+                notes.Add(
+                    $"'{result.Name}' was measured in the test host ({result.IsolationStatus.ToLabel()}); "
+                    + "the isolation requirement is waived because [AllowInProcessGate] is present. The "
+                    + "host's JIT tiering, PGO and GC flavour are whatever the preceding tests left "
+                    + "behind, so treat the absolute numbers as indicative.");
+            }
+            else
+            {
+                var remedy = result.IsolationStatus.ToRemedy();
 
-            violations.Add(
-                $"'{result.Name}' was measured in the test host ({result.IsolationStatus.ToLabel()}) but this "
-                + "gate declares RequireIsolation = true, so the number does not describe a runtime "
-                + "configuration NBenchmark chose."
-                + (remedy is null ? "" : $" To isolate it: {remedy}."));
+                violations.Add(
+                    $"'{result.Name}' was measured in the test host ({result.IsolationStatus.ToLabel()}), "
+                    + "so the number does not describe a runtime configuration NBenchmark chose. "
+                    + "Performance gates require isolation by default."
+                    + (remedy is null ? "" : $" To isolate it: {remedy}.")
+                    + " To gate on a host measurement anyway, add [AllowInProcessGate] to the test "
+                    + "method, its class, or its assembly.");
+            }
         }
 
         if (thresholds.MaxSlowdownRatio <= 0 || result.Errored)

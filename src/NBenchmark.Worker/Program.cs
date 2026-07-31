@@ -38,9 +38,14 @@ internal static class Program
             return WorkerExitCode.BadArguments;
         }
 
-        // Ctrl-C is handled by the coordinator, which then closes the pipe. Cancelling here as well
+        // Never cancelled here, and that is deliberate. Ctrl-C is handled by the coordinator, which
+        // kills tracked workers via ChildProcessReaper; cancelling on our own signal handler as well
         // would race the two shutdown paths and could truncate a result the worker had already
         // finished measuring.
+        //
+        // Coordinator loss is a separate concern and is detected by the session, from the inbound
+        // stream, which cancels a token of its own. That is not the race this comment warns about: a
+        // closed pipe means the result could not have been delivered whatever we did with it.
         using var cts = new CancellationTokenSource();
 
         try
@@ -55,10 +60,11 @@ internal static class Program
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
-            // The coordinator went away. This is the normal end for an orphaned worker and is not
-            // an error worth a stack trace - the read returning end-of-stream is exactly the
-            // mechanism that stops workers outliving the run that started them.
-            return WorkerExitCode.Success;
+            // The coordinator went away. This is the normal end for an orphaned worker and is not an
+            // error worth a stack trace - the read returning end-of-stream is exactly the mechanism
+            // that stops workers outliving the run that started them. Reported as CoordinatorLost so
+            // this route and the session's own detection agree on what happened.
+            return WorkerExitCode.CoordinatorLost;
         }
         catch (Exception ex)
         {

@@ -1,4 +1,3 @@
-using System.IO.Pipes;
 using NBenchmark.Stats;
 using NBenchmark.Workers;
 using Xunit;
@@ -14,50 +13,8 @@ namespace NBenchmark.Tests.Workers;
 /// </summary>
 public sealed class FrameChannelTests
 {
-    /// <summary>
-    ///     Builds a connected pair of channels over two anonymous pipes, as the coordinator and
-    ///     worker see them.
-    /// </summary>
     private static (FrameChannel Left, FrameChannel Right, IDisposable Cleanup) CreatePair()
-    {
-        var leftToRight = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.None);
-        var rightToLeft = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
-
-        var rightInbound = new AnonymousPipeClientStream(
-            PipeDirection.In, leftToRight.GetClientHandleAsString());
-
-        var rightOutbound = new AnonymousPipeClientStream(
-            PipeDirection.Out, rightToLeft.GetClientHandleAsString());
-
-        // Deliberately no DisposeLocalCopyOfClientHandle here. That call exists for the
-        // cross-process case, where the child inherited a duplicate of the handle and the
-        // parent's own copy must be closed so the child's exit is visible as end-of-stream.
-        // Both ends live in this process, so the client stream wraps the very same handle and
-        // closing it would break the pipe immediately.
-
-        var left = new FrameChannel(rightToLeft, leftToRight);
-        var right = new FrameChannel(rightInbound, rightOutbound);
-
-        return (left, right, new Disposables(left, right));
-    }
-
-    private sealed class Disposables(params IDisposable[] items) : IDisposable
-    {
-        public void Dispose()
-        {
-            foreach (var item in items)
-            {
-                try
-                {
-                    item.Dispose();
-                }
-                catch (IOException)
-                {
-                    // The peer may already have torn the pipe down; nothing actionable.
-                }
-            }
-        }
-    }
+        => FramePipePair.Create();
 
     [Fact]
     public async Task Handshake_RoundTrips()
@@ -75,6 +32,266 @@ public sealed class FrameChannelTests
         Assert.Equal(WorkerFrameKind.Handshake, frame.Kind);
         Assert.Equal(7, frame.Handshake!.ProtocolVersion);
         Assert.Equal(4242, frame.Handshake.ParentProcessId);
+    }
+
+    /// <summary>
+    ///     The frame the worker exists to deliver. Every field is gated on or stamped onto results by
+    ///     <c>WorkerHost.HandshakeAsync</c>: a version mismatch <i>refuses to start the worker</i>, and
+    ///     the profile name and knobs go onto every result the worker produces. So a member that fails
+    ///     to cross here surfaces either as a bogus "stale nbworker on disk" error or - worse - as a
+    ///     measurement labelled with a runtime configuration it did not run under.
+    /// </summary>
+    [Fact]
+    public async Task Ready_RoundTripsEveryFieldTheHandshakeGatesOn()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new ReadyPayload
+            {
+                ProtocolVersion = 11,
+                WorkerProcessId = 31337,
+                RuntimeProfileName = "steady-state",
+                RuntimeKnobs = "tiered=off pgo=off r2r=off",
+                RuntimeProfileApplied = true,
+                TargetFramework = "net10.0",
+                EngineVersion = "1.2.3-preview.4",
+                ProcessArchitecture = "Arm64",
+            }),
+            CancellationToken.None);
+
+        var frame = await right.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(WorkerFrameKind.Ready, frame!.Kind);
+
+        var received = frame.Ready!;
+
+        Assert.Equal(11, received.ProtocolVersion);
+        Assert.Equal(31337, received.WorkerProcessId);
+        Assert.Equal("steady-state", received.RuntimeProfileName);
+        Assert.Equal("tiered=off pgo=off r2r=off", received.RuntimeKnobs);
+        Assert.True(received.RuntimeProfileApplied);
+        Assert.Equal("net10.0", received.TargetFramework);
+        Assert.Equal("1.2.3-preview.4", received.EngineVersion);
+        Assert.Equal("Arm64", received.ProcessArchitecture);
+    }
+
+    /// <summary>
+    ///     <see cref="ReadyPayload.RuntimeProfileApplied" /> must survive as <c>false</c>. A worker
+    ///     should never report <c>false</c>, and the coordinator surfaces it when one does - so a
+    ///     <c>false</c> that arrives as <c>true</c> would hide precisely the case the flag exists for:
+    ///     the coordinator failed to set the environment block and the process boundary bought nothing.
+    /// </summary>
+    [Fact]
+    public async Task Ready_WithNoProfileApplied_RoundTripsTheFalse()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new ReadyPayload
+            {
+                ProtocolVersion = WorkerProtocol.Version,
+                WorkerProcessId = 1,
+                RuntimeProfileName = "inherited",
+                RuntimeKnobs = "",
+                RuntimeProfileApplied = false,
+                TargetFramework = "net10.0",
+                EngineVersion = "1.0.0",
+                ProcessArchitecture = "X64",
+            }),
+            CancellationToken.None);
+
+        var received = (await right.ReadAsync(CancellationToken.None))!.Ready!;
+
+        Assert.False(received.RuntimeProfileApplied);
+        Assert.Equal("", received.RuntimeKnobs);
+    }
+
+    /// <summary>
+    ///     Every progress callback, because the coordinator replays these into the user's own
+    ///     <see cref="IBenchmarkProgress" /> as though they had been raised locally. <c>Index</c> and
+    ///     <c>Total</c> are not <c>required</c> and default to <c>0</c>, so a member that fails to
+    ///     cross reads as a legitimate "indeterminate" rather than as an error.
+    /// </summary>
+    /// <remarks>
+    ///     Parameterized by name rather than by the enum itself, because
+    ///     <see cref="ProgressCallback" /> is internal and a public test signature cannot take it. The
+    ///     cases still come from <c>Enum.GetNames</c>, so a new callback is covered without touching
+    ///     this test.
+    /// </remarks>
+    public static TheoryData<string> ProgressCallbackNames
+    {
+        get
+        {
+            var data = new TheoryData<string>();
+
+            foreach (var name in Enum.GetNames<ProgressCallback>())
+                data.Add(name);
+
+            return data;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ProgressCallbackNames))]
+    public async Task Progress_RoundTripsEveryCallback(string callbackName)
+    {
+        var callback = Enum.Parse<ProgressCallback>(callbackName);
+
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new ProgressPayload
+            {
+                Callback = callback,
+                Name = "Bench.Body",
+                Index = 17,
+                Total = 42,
+            }),
+            CancellationToken.None);
+
+        var frame = await right.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(WorkerFrameKind.Progress, frame!.Kind);
+
+        var received = frame.Progress!;
+
+        Assert.Equal(callback, received.Callback);
+        Assert.Equal("Bench.Body", received.Name);
+        Assert.Equal(17, received.Index);
+        Assert.Equal(42, received.Total);
+    }
+
+    /// <summary>
+    ///     The widest payload on the wire, and the one whose shape is most able to lie.
+    ///     <see cref="ObserverPhasePayload.Succeeded" /> defaults to <c>true</c>, so a member that
+    ///     serializes but does not come back reports a crashed suite as a clean one - the exact failure
+    ///     class <see cref="FrameChannel.SerializerOptions" /> cites these tests as the guard against.
+    ///     Asserted field by field with <c>Succeeded = false</c> rather than through a populated-object
+    ///     comparison, so a regression names the member it lost.
+    /// </summary>
+    [Fact]
+    public async Task ObserverPhase_RoundTripsEveryField_IncludingSucceededFalse()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new ObserverPhasePayload
+            {
+                Phase = MeasurementPhase.Warmup,
+                Transition = PhaseTransition.Completed,
+                BenchmarkName = "Bench.Body",
+                JitterMetric = 0.42,
+                DetectorSwitched = true,
+                ResolvedK = 4096,
+                ResolvedWarmup = 17,
+                WarmupStop = WarmupStopReason.WallClockCap,
+                SampleStop = SampleStopReason.DriftUnresolved,
+                Succeeded = false,
+            }),
+            CancellationToken.None);
+
+        var frame = await right.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(WorkerFrameKind.ObserverPhase, frame!.Kind);
+
+        var received = frame.ObserverPhase!;
+
+        Assert.Equal(MeasurementPhase.Warmup, received.Phase);
+        Assert.Equal(PhaseTransition.Completed, received.Transition);
+        Assert.Equal("Bench.Body", received.BenchmarkName);
+        Assert.Equal(0.42, received.JitterMetric);
+        Assert.True(received.DetectorSwitched);
+        Assert.Equal(4096, received.ResolvedK);
+        Assert.Equal(17, received.ResolvedWarmup);
+        Assert.Equal(WarmupStopReason.WallClockCap, received.WarmupStop);
+        Assert.Equal(SampleStopReason.DriftUnresolved, received.SampleStop);
+        Assert.False(received.Succeeded);
+    }
+
+    /// <summary>
+    ///     A <see cref="PhaseTransition.Starting" /> event has null outcome fields, and they must arrive
+    ///     null rather than as zeros. The coordinator passes them positionally into a
+    ///     <see cref="MeasurementPhaseEvent" />, where <c>ResolvedK = 0</c> would read as a resolved
+    ///     ops-per-sample of zero instead of "not resolved yet".
+    /// </summary>
+    [Fact]
+    public async Task ObserverPhase_WithNoOptionalFields_RoundTripsThemAsNull()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new ObserverPhasePayload
+            {
+                Phase = MeasurementPhase.Jitter,
+                Transition = PhaseTransition.Starting,
+                BenchmarkName = "Bench.Body",
+            }),
+            CancellationToken.None);
+
+        var received = (await right.ReadAsync(CancellationToken.None))!.ObserverPhase!;
+
+        Assert.Null(received.JitterMetric);
+        Assert.Null(received.ResolvedK);
+        Assert.Null(received.ResolvedWarmup);
+        Assert.Null(received.WarmupStop);
+        Assert.Null(received.SampleStop);
+        Assert.False(received.DetectorSwitched);
+        Assert.True(received.Succeeded);
+    }
+
+    /// <summary>
+    ///     A fault's <see cref="FaultPayload.BenchmarkName" /> decides its blast radius:
+    ///     <c>WorkerGroupRunner.ToErroredResults</c> branches on it, so a name that fails to cross
+    ///     converts one benchmark's failure into a group fault that errors <i>every</i> row.
+    /// </summary>
+    [Fact]
+    public async Task Fault_RoundTripsMessageDetailAndBenchmarkName()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new FaultPayload
+            {
+                Message = "Body could not be addressed.",
+                Detail = "at Some.Type.Method()\n  at Other.Frame()",
+                BenchmarkName = "Bench.Body",
+            }),
+            CancellationToken.None);
+
+        var frame = await right.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(WorkerFrameKind.Fault, frame!.Kind);
+
+        var received = frame.Fault!;
+
+        Assert.Equal("Body could not be addressed.", received.Message);
+        Assert.Equal("at Some.Type.Method()\n  at Other.Frame()", received.Detail);
+        Assert.Equal("Bench.Body", received.BenchmarkName);
+    }
+
+    /// <summary>The other side of the branch above: no name means the whole group failed.</summary>
+    [Fact]
+    public async Task Fault_WithoutABenchmarkName_StaysAGroupFault()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new FaultPayload { Message = "Target assembly would not load." }),
+            CancellationToken.None);
+
+        var received = (await right.ReadAsync(CancellationToken.None))!.Fault!;
+
+        Assert.Equal("Target assembly would not load.", received.Message);
+        Assert.Null(received.Detail);
+        Assert.Null(received.BenchmarkName);
     }
 
     /// <summary>
@@ -418,10 +635,6 @@ public sealed class FrameChannelTests
     }
 
     /// <summary>
-    ///     End of stream reads as <c>null</c>, not an exception. This is what lets a worker exit
-    ///     on its own when the coordinator dies, with no supervisor in the loop.
-    /// </summary>
-    /// <summary>
     ///     The terminal frame carries the worker's own calibration when one was asked for. It rides
     ///     here rather than beside a result because it describes the process, not any one benchmark.
     /// </summary>
@@ -468,6 +681,10 @@ public sealed class FrameChannelTests
         Assert.Null(frame!.GroupCompleted!.Calibration);
     }
 
+    /// <summary>
+    ///     End of stream reads as <c>null</c>, not an exception. This is what lets a worker exit on
+    ///     its own when the coordinator dies, with no supervisor in the loop.
+    /// </summary>
     [Fact]
     public async Task ClosedPeer_ReadsAsEndOfStream()
     {

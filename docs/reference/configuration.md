@@ -340,7 +340,7 @@ Use multiple launches when single-run noise is a concern and you want to see how
 
 **Dry-run interaction:** `--dry-run` (Iterations=0, WarmupIterations=0) takes neither the harness default nor `--launch-count`, so it performs exactly one dry launch. A dry run exists to prove the wiring works without measuring anything, and repeating it would be several times the startup cost for the same nothing. An explicit `WithLaunchCount(n)` in code is still honoured, because it is the only signal that could have meant a dry run specifically.
 
-**Isolation interaction:** When the benchmark runs in a worker process (Harness mode default, or `WithIsolation()` in suite mode), the coordinator spawns N workers. A worker is not merely unaware of the launch count - it is never sent one.
+**Isolation interaction:** When the benchmark runs in a worker process - the default in every mode - the coordinator spawns N workers. A worker is not merely unaware of the launch count - it is never sent one.
 
 **Attribute override:** In Harness mode each `[Benchmark]` can override the launch count per-method:
 

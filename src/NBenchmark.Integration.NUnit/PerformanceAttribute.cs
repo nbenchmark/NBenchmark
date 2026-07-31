@@ -38,11 +38,8 @@ public sealed class PerformanceAttribute : NUnitAttribute, ISimpleTestBuilder, I
     /// </summary>
     public int LaunchCount { get; init; } = 1;
 
-    /// <summary>
-    ///     Fails the test when the measurement was taken in the test host rather than in a worker
-    ///     process. See <see cref="IPerformanceThresholds.RequireIsolation" />.
-    /// </summary>
-    public bool RequireIsolation { get; init; }
+    // No RequireIsolation property - see PerformanceTestMethodAttribute. Defaults to true via
+    // IPerformanceThresholds; opt out with [AllowInProcessGate].
 
     public TestMethod BuildFrom(IMethodInfo method, Test? suite)
     {

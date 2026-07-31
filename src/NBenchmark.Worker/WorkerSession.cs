@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Threading.Channels;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using NBenchmark.Stats;
@@ -31,6 +32,23 @@ internal sealed class WorkerSession(FrameChannel channel)
     private int _sampleSeed;
 
     /// <summary>
+    ///     Cancelled once the coordinator's end of the pipe is provably gone. This is what the
+    ///     measurement loop observes, so a group whose coordinator died stops at the next sample.
+    /// </summary>
+    /// <remarks>
+    ///     Replaced per session rather than nullable, so no call site has to null-check it. Nothing
+    ///     cancels it except <see cref="PumpInboundAsync" /> and a transport failure reported by
+    ///     <see cref="FrameQueue" />.
+    /// </remarks>
+    private CancellationTokenSource _coordinatorLost = new();
+
+    /// <summary>
+    ///     Set when a group was abandoned mid-measurement, so the exit code can say the worker noticed
+    ///     rather than that it finished.
+    /// </summary>
+    private volatile bool _abandonedMidGroup;
+
+    /// <summary>
     ///     Runs until end-of-stream or a shutdown frame. Returns the process exit code.
     /// </summary>
     public async Task<int> RunAsync(CancellationToken cancellationToken)
@@ -59,20 +77,43 @@ internal sealed class WorkerSession(FrameChannel channel)
 
         await _channel.WriteAsync(WorkerFrame.Of(BuildReady()), cancellationToken).ConfigureAwait(false);
 
+        using var coordinatorLost = new CancellationTokenSource();
+
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, coordinatorLost.Token);
+
+        _coordinatorLost = coordinatorLost;
+
+        var inbound = Channel.CreateUnbounded<WorkerFrame>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+
+        // Deliberately not awaited on the way out. A pending pipe read is not reliably interruptible,
+        // and the process is exiting anyway; the pump owns the channel's read side for the rest of the
+        // session, so there is no second reader to desynchronize the stream.
+        _ = PumpInboundAsync(inbound.Writer, coordinatorLost, cancellationToken);
+
         while (true)
         {
-            var frame = await _channel.ReadAsync(cancellationToken).ConfigureAwait(false);
+            WorkerFrame frame;
 
-            // End of stream. The coordinator closed its write end - deliberately, or because it
-            // died. Either way this worker has nothing left to serve and no reason to linger.
-            if (frame is null)
+            try
             {
-                // Said out loud because from the coordinator's side this is indistinguishable from
-                // a crash: its next read returns end-of-stream either way. Without this line a
-                // worker that exited for a perfectly ordinary reason looks like a lost process.
-                Console.Error.WriteLine("nbworker: inbound stream closed while idle; exiting.");
+                frame = await inbound.Reader.ReadAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (ChannelClosedException)
+            {
+                // End of stream. The coordinator closed its write end - deliberately, or because it
+                // died. Either way this worker has nothing left to serve and no reason to linger.
+                //
+                // Said out loud because from the coordinator's side this is indistinguishable from a
+                // crash: its next read returns end-of-stream either way. Without this line a worker
+                // that exited for a perfectly ordinary reason looks like a lost process.
+                Console.Error.WriteLine(
+                    _abandonedMidGroup
+                        ? "nbworker: coordinator went away mid-group; stopped measuring and exiting."
+                        : "nbworker: inbound stream closed while idle; exiting.");
 
-                return WorkerExitCode.Success;
+                return _abandonedMidGroup ? WorkerExitCode.CoordinatorLost : WorkerExitCode.Success;
             }
 
             switch (frame.Kind)
@@ -81,13 +122,99 @@ internal sealed class WorkerSession(FrameChannel channel)
                     return WorkerExitCode.Success;
 
                 case WorkerFrameKind.RunGroup when frame.RunGroup is not null:
-                    await RunGroupAsync(frame.RunGroup, cancellationToken).ConfigureAwait(false);
+                    await RunGroupAsync(frame.RunGroup, linked.Token).ConfigureAwait(false);
                     break;
 
                 default:
                     Fault($"Unexpected frame {frame.Kind} while idle.");
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    ///     Reads the inbound pipe for the whole life of the session - including while a group is being
+    ///     measured, which is the entire point.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         End-of-stream is the signal the orphan-avoidance design rests on, and a read-then-dispatch
+    ///         loop suspended it for exactly the interval that matters. Dispatch awaited
+    ///         <see cref="RunGroupAsync" />, so nothing read the pipe during a group: a coordinator that
+    ///         died mid-group was not noticed until the group's terminal write, and the worker measured
+    ///         the whole remaining group - plus a calibration it could never report - for nobody. The
+    ///         "exits on its own, measured at 7 ms" property was true only while idle.
+    ///     </para>
+    ///     <para>
+    ///         Treating end-of-stream as fatal is safe here because no coordinator path closes its write
+    ///         end early: <c>WorkerGroupRunner</c> holds the channel open for the whole group and only
+    ///         reads, and on Ctrl-C the coordinator's <c>ChildProcessReaper</c> kills tracked workers
+    ///         rather than politely orphaning them. So a mid-group end-of-stream means the coordinator
+    ///         died hard, and cancelling cannot truncate a result anybody could still receive - the pipe
+    ///         that would have carried it is the thing that closed.
+    ///     </para>
+    /// </remarks>
+    private async Task PumpInboundAsync(
+        ChannelWriter<WorkerFrame> writer,
+        CancellationTokenSource coordinatorLost,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (true)
+            {
+                var frame = await _channel.ReadAsync(cancellationToken).ConfigureAwait(false);
+
+                if (frame is null)
+                    break;
+
+                // A shutdown that arrives mid-group is the coordinator saying it is finished, which is
+                // strictly earlier than the pipe close on the polite teardown path. Stop measuring now
+                // rather than finishing a group whose results are already unwanted.
+                if (frame.Kind == WorkerFrameKind.Shutdown && _queue is not null)
+                    SignalCoordinatorLost(coordinatorLost);
+
+                await writer.WriteAsync(frame, CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is IOException
+                                       or ObjectDisposedException
+                                       or OperationCanceledException
+                                       or InvalidDataException)
+        {
+            // The pipe broke or the session is shutting down. Either way there is nothing more to read
+            // and the finally below is the whole response.
+        }
+        finally
+        {
+            // Cancel *before* completing the writer. The measurement loop has to learn the coordinator
+            // is gone even though the dispatch loop is not currently waiting on a frame - completing
+            // first would wake only the dispatch loop, which is blocked behind the group.
+            SignalCoordinatorLost(coordinatorLost);
+
+            writer.TryComplete();
+        }
+    }
+
+    /// <summary>
+    ///     Cancels the coordinator-lost source, tolerating one that has already been disposed.
+    /// </summary>
+    /// <remarks>
+    ///     The source's lifetime is <see cref="RunAsync" />'s, and both callers can outlive it. The pump
+    ///     is deliberately not awaited on the way out, so a clean shutdown disposes the source and then
+    ///     the pump's next read fails and reaches its <c>finally</c>; a queued frame's write can fail
+    ///     after the session has already returned. Neither is worth an unobserved exception on a
+    ///     fire-and-forget task, and by that point there is nothing left to cancel anyway.
+    /// </remarks>
+    private static void SignalCoordinatorLost(CancellationTokenSource source)
+    {
+        try
+        {
+            source.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The session already finished and tore it down.
         }
     }
 
@@ -144,7 +271,10 @@ internal sealed class WorkerSession(FrameChannel channel)
             // contrast, are settable at any time and belong here.
             using var _ = EnvironmentControl.Apply(options.Environment);
 
-            _queue = new FrameQueue(_channel, cancellationToken);
+            // The failure callback is a second, independent route to the same conclusion: the pump sees
+            // the inbound half break, this sees the outbound half. Either one means there is no
+            // coordinator left to measure for.
+            _queue = new FrameQueue(_channel, cancellationToken, OnTransportFailure);
             progress = new StreamingProgress(_queue, cancellationToken, options.StreamSamples);
 
             switch (request.Kind)
@@ -170,6 +300,13 @@ internal sealed class WorkerSession(FrameChannel channel)
                     break;
             }
         }
+        catch (OperationCanceledException) when (_coordinatorLost.IsCancellationRequested)
+        {
+            // Abandoned, not cancelled by the session. Swallowed rather than rethrown: the dispatch
+            // loop ends on its own when the pump completes the frame channel, and rethrowing would
+            // surface a deliberate stop as an unhandled failure in Program's last-resort handler.
+            _abandonedMidGroup = true;
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
@@ -180,33 +317,59 @@ internal sealed class WorkerSession(FrameChannel channel)
         }
         finally
         {
-            // Into the queue first, then drain it: a batch still in the sample buffer has not been
-            // enqueued at all, so draining without flushing would lose it rather than wait for it.
-            progress?.FlushSamples();
+            if (_coordinatorLost.IsCancellationRequested)
+            {
+                // Nothing below can be delivered, so none of it is worth doing. Draining would wait on
+                // writes that cannot land, and the calibration is a full measurement pass spent on a
+                // number with no reader - which is precisely the cost this whole path exists to avoid.
+                _abandonedMidGroup = true;
+            }
+            else
+            {
+                // Into the queue first, then drain it: a batch still in the sample buffer has not been
+                // enqueued at all, so draining without flushing would lose it rather than wait for it.
+                progress?.FlushSamples();
 
-            // Drain before the terminal frame, so the coordinator never sees a group complete
-            // while that group's own events are still in flight behind it.
-            if (_queue is not null)
-                await _queue.DrainAsync().ConfigureAwait(false);
+                // Drain before the terminal frame, so the coordinator never sees a group complete
+                // while that group's own events are still in flight behind it.
+                if (_queue is not null)
+                    await _queue.DrainAsync().ConfigureAwait(false);
 
-            // Measured here, after the group's work, so it reflects the process the benchmark
-            // actually ran in rather than a freshly-started one. Its whole purpose is to be
-            // divisible into that benchmark's number.
-            var calibration = request.MeasureCalibration ? MeasureCalibration() : null;
+                // Measured here, after the group's work, so it reflects the process the benchmark
+                // actually ran in rather than a freshly-started one. Its whole purpose is to be
+                // divisible into that benchmark's number.
+                var calibration = request.MeasureCalibration ? MeasureCalibration() : null;
 
-            await _channel
-                .WriteAsync(
-                    WorkerFrame.Of(new GroupCompletedPayload
-                    {
-                        GroupId = request.GroupId,
-                        Calibration = calibration,
-                    }),
-                    cancellationToken)
-                .ConfigureAwait(false);
+                try
+                {
+                    // CancellationToken.None, not the group's token: this runs in a finally, and a
+                    // cancelled write here would throw out of it and be reported as a crash rather
+                    // than as the deliberate stop it is.
+                    await _channel
+                        .WriteAsync(
+                            WorkerFrame.Of(new GroupCompletedPayload
+                            {
+                                GroupId = request.GroupId,
+                                Calibration = calibration,
+                            }),
+                            CancellationToken.None)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+                {
+                    // The coordinator went away between the last frame and this one.
+                    _abandonedMidGroup = true;
+                }
+            }
 
             _queue = null;
         }
     }
+
+    /// <summary>
+    ///     Called once when an outbound write proves the coordinator can no longer be reached.
+    /// </summary>
+    private void OnTransportFailure() => SignalCoordinatorLost(_coordinatorLost);
 
     /// <summary>
     ///     Measures the methods of a test-framework group - methods with no <c>[Benchmark]</c>
@@ -1058,14 +1221,4 @@ internal sealed class WorkerSession(FrameChannel channel)
             Detail = detail,
             BenchmarkName = benchmarkName,
         }));
-}
-
-/// <summary>Exit codes the coordinator can distinguish when a worker dies early.</summary>
-internal static class WorkerExitCode
-{
-    public const int Success = 0;
-    public const int BadArguments = 64;
-    public const int NoHandshake = 65;
-    public const int ProtocolError = 66;
-    public const int Crashed = 70;
 }

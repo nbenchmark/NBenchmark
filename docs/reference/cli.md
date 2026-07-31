@@ -309,6 +309,8 @@ When the two agree, it says so. A workload insensitive to the host's runtime con
 
 The comparison pass runs no reporters, writes no files, and cannot change the exit code. It is a diagnostic, not a second set of results.
 
+Combined with `--runtimes`, it is skipped and says why. The comparison re-measures in *this* process, and this process is one runtime - so there is no in-process counterpart for the other builds to be compared against, and comparing every runtime against the same host row would print a table that looks like a finding without being one.
+
 ---
 
 ### `--cross-class`
