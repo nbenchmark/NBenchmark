@@ -102,12 +102,22 @@ internal static class WorkerLauncher
                 };
             }
 
+            // A target built against a shared framework the worker does not declare - an ASP.NET
+            // Core project is the ordinary case - cannot be loaded by a worker started without it,
+            // and the framework set is fixed before the process starts. Null for every other target,
+            // which leaves the launch unchanged.
+            var runtimeConfigPath = WorkerRuntimeConfig.ResolveFor(workerPath, request.TargetAssemblyPath);
+
             WorkerHost worker;
 
             try
             {
                 worker = await WorkerPrewarm
-                    .TakeOrStartAsync(workerPath, request.Options.RuntimeProfile, cancellationToken)
+                    .TakeOrStartAsync(
+                        workerPath,
+                        request.Options.RuntimeProfile,
+                        runtimeConfigPath,
+                        cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (WorkerStartException ex)

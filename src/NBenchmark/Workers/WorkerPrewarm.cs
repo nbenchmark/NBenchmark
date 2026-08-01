@@ -30,6 +30,13 @@ namespace NBenchmark.Workers;
 ///         <c>nbworker</c> than the one this application sits beside. Keying on the profile alone
 ///         would hand a net10.0 worker out to measure a net8.0 build.
 ///     </para>
+///     <para>
+///         And by the synthesized runtimeconfig, for the same class of reason: a worker started
+///         without <c>Microsoft.AspNetCore.App</c> cannot load a target that needs it (see
+///         <see cref="WorkerRuntimeConfig" />), and the framework set is fixed before the process
+///         starts. A parked worker is only interchangeable with one launched now if all three inputs
+///         to its launch matched.
+///     </para>
 /// </remarks>
 internal static class WorkerPrewarm
 {
@@ -50,18 +57,23 @@ internal static class WorkerPrewarm
     ///     Fills the pool for <paramref name="profile" /> up to <see cref="Depth" />.
     ///     Awaiting is optional - callers that want the latency hidden simply do not await.
     /// </summary>
-    public static async Task PrimeAsync(RuntimeProfile? profile, CancellationToken cancellationToken = default)
+    public static async Task PrimeAsync(
+        RuntimeProfile? profile,
+        string? workerAssemblyPath = null,
+        string? runtimeConfigPath = null,
+        CancellationToken cancellationToken = default)
     {
-        if (WorkerLocator.WorkerAssemblyPath is not { } workerPath)
+        if ((workerAssemblyPath ?? WorkerLocator.WorkerAssemblyPath) is not { } workerPath)
             return;
 
-        var pool = Pools.GetOrAdd(KeyFor(workerPath, profile), _ => new Pool());
+        var pool = Pools.GetOrAdd(KeyFor(workerPath, profile, runtimeConfigPath), _ => new Pool());
 
         while (pool.Reserve(Depth))
         {
             try
             {
-                var worker = await WorkerHost.StartAsync(workerPath, profile, cancellationToken)
+                var worker = await WorkerHost
+                    .StartAsync(workerPath, profile, runtimeConfigPath, cancellationToken)
                     .ConfigureAwait(false);
 
                 pool.Park(worker);
@@ -85,22 +97,29 @@ internal static class WorkerPrewarm
     public static async Task<WorkerHost> TakeOrStartAsync(
         string workerAssemblyPath,
         RuntimeProfile? profile,
+        string? runtimeConfigPath,
         CancellationToken cancellationToken)
     {
-        var pool = Pools.GetOrAdd(KeyFor(workerAssemblyPath, profile), _ => new Pool());
+        var pool = Pools.GetOrAdd(KeyFor(workerAssemblyPath, profile, runtimeConfigPath), _ => new Pool());
 
         if (pool.TryTake(out var parked))
         {
             // Refilled in the background, so the *next* caller also finds one ready. Not awaited,
             // and not cancelled by this call's token - the refill outlives the request that
             // triggered it, and tying it to that token would cancel the refill the moment the
-            // measurement it was meant to help finished.
-            _ = Task.Run(() => PrimeAsync(profile, CancellationToken.None), CancellationToken.None);
+            // measurement it was meant to help finished. Refilled for the pool that was drained,
+            // not for the application's own worker: those are the same file only in the modes where
+            // the code under test is the running application.
+            _ = Task.Run(
+                () => PrimeAsync(profile, workerAssemblyPath, runtimeConfigPath, CancellationToken.None),
+                CancellationToken.None);
 
             return parked;
         }
 
-        return await WorkerHost.StartAsync(workerAssemblyPath, profile, cancellationToken).ConfigureAwait(false);
+        return await WorkerHost
+            .StartAsync(workerAssemblyPath, profile, runtimeConfigPath, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>Parked workers for one (worker path, runtime profile) pair.</summary>
@@ -152,12 +171,12 @@ internal static class WorkerPrewarm
     ///     A profile that sets nothing is indistinguishable from no profile at all, so both park
     ///     under the same key rather than starting two identical processes.
     /// </summary>
-    private static string KeyFor(string workerAssemblyPath, RuntimeProfile? profile)
+    private static string KeyFor(string workerAssemblyPath, RuntimeProfile? profile, string? runtimeConfigPath)
     {
         var profileName = profile is null || profile.InheritsEverything
             ? RuntimeProfile.Host.Name
             : profile.Name;
 
-        return $"{workerAssemblyPath}\0{profileName}";
+        return $"{workerAssemblyPath}\0{profileName}\0{runtimeConfigPath}";
     }
 }

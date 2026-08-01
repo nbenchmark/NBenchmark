@@ -150,6 +150,20 @@ The host uses `Activator.CreateInstance`, which requires a public parameterless 
 
 See [Dependency Injection](./features/dependency-injection.md) for the full API and [FAQ: instantiation](./faq.md#the-host-throws-could-not-instantiate-myclass-how-do-i-fix-it).
 
+### "Could not load file or assembly" from an ASP.NET Core or WPF project
+
+> [!CAUTION] Quick fix
+> Rebuild, so the `runtimeconfig.json` beside the assembly under test is present and current. That file is how the worker learns which shared frameworks to ask for.
+
+Benchmarks that live in a `Microsoft.NET.Sdk.Web` (or WinForms/WPF) project run in an assembly whose dependency graph reaches a shared framework — `Microsoft.AspNetCore.App` or `Microsoft.WindowsDesktop.App`. Those assemblies ship with the framework rather than in your output directory, so they are absent from your project's `deps.json` and are expected to be supplied by the process. The measurement worker is a plain console application, so on its own it supplies only `Microsoft.NETCore.App`, and the load fails with a message naming an assembly that is not actually missing from disk — `Microsoft.Extensions.Hosting.Abstractions` is the usual one.
+
+The worker's framework set is now extended automatically: before launching it, NBenchmark reads the `runtimeconfig.json` beside the assembly under test and adds any framework the worker does not already declare. Nothing needs configuring, and nothing changes for an ordinary console benchmark project.
+
+Two cases remain:
+
+- **No `runtimeconfig.json` beside the assembly**, or a stale one. Rebuild the project. The fault message names the frameworks the worker was actually started with, so it is clear when this is what happened.
+- **A self-contained (`--self-contained`) target.** Its framework lives in its own output directory, so there is no shared framework to request. Build the benchmark project framework-dependent, or pass `--in-process` and accept host-fidelity numbers.
+
 ### Benchmarks run in a different order each time
 
 > [!CAUTION] Quick fix

@@ -115,9 +115,25 @@ internal sealed class WorkerHost : IAsyncDisposable
     ///         at any price.
     ///     </para>
     /// </summary>
+    public static Task<WorkerHost> StartAsync(
+        string workerAssemblyPath,
+        RuntimeProfile? profile,
+        CancellationToken cancellationToken)
+        => StartAsync(workerAssemblyPath, profile, runtimeConfigPath: null, cancellationToken);
+
+    /// <summary>
+    ///     Spawns a worker under <paramref name="profile" />, optionally with a runtimeconfig other
+    ///     than its own, and completes the handshake.
+    /// </summary>
+    /// <param name="runtimeConfigPath">
+    ///     A config declaring shared frameworks the worker's own does not - see
+    ///     <see cref="WorkerRuntimeConfig" />. <c>null</c> for every target that needs nothing beyond
+    ///     <c>Microsoft.NETCore.App</c>, which leaves the command line exactly as it was.
+    /// </param>
     public static async Task<WorkerHost> StartAsync(
         string workerAssemblyPath,
         RuntimeProfile? profile,
+        string? runtimeConfigPath,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workerAssemblyPath);
@@ -143,6 +159,16 @@ internal sealed class WorkerHost : IAsyncDisposable
             };
 
             startInfo.ArgumentList.Add("exec");
+
+            // Ahead of the worker path, because these are host options rather than arguments to the
+            // application. The deps file is still resolved from the application path, so the worker's
+            // own nbworker.deps.json continues to describe its dependencies.
+            if (runtimeConfigPath is not null)
+            {
+                startInfo.ArgumentList.Add("--runtimeconfig");
+                startInfo.ArgumentList.Add(runtimeConfigPath);
+            }
+
             startInfo.ArgumentList.Add(workerAssemblyPath);
             startInfo.ArgumentList.Add(WorkerProtocol.InboundHandleArgument);
             startInfo.ArgumentList.Add(toWorker.GetClientHandleAsString());
