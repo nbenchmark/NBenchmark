@@ -127,7 +127,7 @@ internal sealed class WorkerHost : IAsyncDisposable
     /// </summary>
     /// <param name="runtimeConfigPath">
     ///     A config declaring shared frameworks the worker's own does not - see
-    ///     <see cref="WorkerRuntimeConfig" />. <c>null</c> for every target that needs nothing beyond
+    ///     <see cref="SharedFrameworkConfig" />. <c>null</c> for every target that needs nothing beyond
     ///     <c>Microsoft.NETCore.App</c>, which leaves the command line exactly as it was.
     /// </param>
     public static async Task<WorkerHost> StartAsync(

@@ -106,7 +106,7 @@ internal static class WorkerLauncher
             // Core project is the ordinary case - cannot be loaded by a worker started without it,
             // and the framework set is fixed before the process starts. Null for every other target,
             // which leaves the launch unchanged.
-            var runtimeConfigPath = WorkerRuntimeConfig.ResolveFor(workerPath, request.TargetAssemblyPath);
+            var runtimeConfigPath = SharedFrameworkConfig.ResolveFor(workerPath, request.TargetAssemblyPath);
 
             WorkerHost worker;
 

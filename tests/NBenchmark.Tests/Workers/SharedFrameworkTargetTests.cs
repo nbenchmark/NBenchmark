@@ -50,8 +50,8 @@ public sealed class SharedFrameworkTargetTests
     {
         var worker = WorkerLocatorForTests.WorkerAssemblyPath();
 
-        Assert.NotNull(WorkerRuntimeConfig.ResolveFor(worker, WebFixtureLocator.AssemblyPath()));
-        Assert.Null(WorkerRuntimeConfig.ResolveFor(worker, IsolationFixtureLocator.AssemblyPath()));
+        Assert.NotNull(SharedFrameworkConfig.ResolveFor(worker, WebFixtureLocator.AssemblyPath()));
+        Assert.Null(SharedFrameworkConfig.ResolveFor(worker, IsolationFixtureLocator.AssemblyPath()));
     }
 
     /// <summary>
@@ -62,7 +62,7 @@ public sealed class SharedFrameworkTargetTests
     public async Task Worker_MeasuresATargetThatNeedsASharedFramework()
     {
         var workerPath = WorkerLocatorForTests.WorkerAssemblyPath();
-        var runtimeConfig = WorkerRuntimeConfig.ResolveFor(workerPath, WebFixtureLocator.AssemblyPath());
+        var runtimeConfig = SharedFrameworkConfig.ResolveFor(workerPath, WebFixtureLocator.AssemblyPath());
 
         Assert.NotNull(runtimeConfig);
 

@@ -157,7 +157,7 @@ See [Dependency Injection](./features/dependency-injection.md) for the full API 
 
 Benchmarks that live in a `Microsoft.NET.Sdk.Web` (or WinForms/WPF) project run in an assembly whose dependency graph reaches a shared framework — `Microsoft.AspNetCore.App` or `Microsoft.WindowsDesktop.App`. Those assemblies ship with the framework rather than in your output directory, so they are absent from your project's `deps.json` and are expected to be supplied by the process. The measurement worker is a plain console application, so on its own it supplies only `Microsoft.NETCore.App`, and the load fails with a message naming an assembly that is not actually missing from disk — `Microsoft.Extensions.Hosting.Abstractions` is the usual one.
 
-The worker's framework set is now extended automatically: before launching it, NBenchmark reads the `runtimeconfig.json` beside the assembly under test and adds any framework the worker does not already declare. Nothing needs configuring, and nothing changes for an ordinary console benchmark project.
+The framework set is now extended automatically: before launching the worker, NBenchmark reads the `runtimeconfig.json` beside the assembly under test and adds any framework the worker does not already declare. `dotnet benchmark` does the same thing for itself — unlike every other mode it loads the target into its own process to discover benchmarks, so it restarts once under the right framework set before reading anything. Nothing needs configuring, and nothing changes for an ordinary console benchmark project.
 
 Two cases remain:
 
