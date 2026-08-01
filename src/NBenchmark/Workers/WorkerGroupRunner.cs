@@ -268,27 +268,55 @@ internal static class WorkerGroupRunner
             payload.Succeeded));
 
     /// <summary>
-    ///     Withdraws the request for a live sample stream when there is no observer to replay it
-    ///     into.
+    ///     Reconciles the request for a live sample stream with the observer that will receive it.
     /// </summary>
     /// <remarks>
-    ///     Forwarding samples costs the worker frame encoding <i>during</i> the measurement, so it is
-    ///     the one thing in the protocol worth not doing speculatively. Decided here rather than at
-    ///     each of the request-building call sites because this is the one place that holds both the
-    ///     request and the observer the stream would be replayed into - and because it makes the rule
-    ///     hold for the replicates that deliberately pass a null observer, where later workers would
-    ///     otherwise pay for events the coordinator drops on the floor.
+    ///     <para>
+    ///         Two rules, both decided here rather than at each request-building call site because this
+    ///         is the one place that holds both the request and the observer the stream would be
+    ///         replayed into:
+    ///     </para>
+    ///     <list type="bullet">
+    ///         <item>
+    ///             <description>
+    ///                 An observer that declares <see cref="IMeasurementObserver.WantsSampleStream" />
+    ///                 turns the stream <i>on</i> when the caller did not already ask for it. A
+    ///                 live-streaming observer (e.g. a dashboard) attaches to see the per-sample stream,
+    ///                 and requiring the caller to remember a separate flag would let the stream go
+    ///                 silently absent - the exact failure mode this exists to prevent.
+    ///             </description>
+    ///         </item>
+    ///         <item>
+    ///             <description>
+    ///                 The stream is <i>withdrawn</i> when no observer is attached to replay it into.
+    ///                 Forwarding samples costs the worker frame encoding <i>during</i> the measurement
+    ///                 (its volume scales with how fast the measured code is), so requesting it with
+    ///                 nothing to replay it into is pure loss, and the wrong answer here is invisible -
+    ///                 the run still produces every number it should, only slower. This also holds for
+    ///                 the replicates that deliberately pass a null observer, where later workers would
+    ///                 otherwise pay for events the coordinator drops on the floor.
+    ///             </description>
+    ///         </item>
+    ///     </list>
     /// </remarks>
     internal static RunGroupPayload WithStreamingForObserver(
         RunGroupPayload request,
         IMeasurementObserver observer)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(observer);
 
-        if (!request.Options.StreamSamples || observer != NullMeasurementObserver.Instance)
-            return request;
+        // No observer to replay into: withdraw a stream the caller asked for, and never turn one on.
+        if (observer == NullMeasurementObserver.Instance)
+            return request.Options.StreamSamples
+                ? request with { Options = request.Options with { StreamSamples = false } }
+                : request;
 
-        return request with { Options = request.Options with { StreamSamples = false } };
+        // An attached observer that wants the stream enables it when the caller did not ask.
+        if (observer.WantsSampleStream && !request.Options.StreamSamples)
+            return request with { Options = request.Options with { StreamSamples = true } };
+
+        return request;
     }
 
     /// <summary>

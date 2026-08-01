@@ -99,6 +99,26 @@ public class CompositeMeasurementObserverTests
     }
 
     [Fact]
+    public void WantsSampleStream_Is_True_When_Any_Child_Wants_It()
+    {
+        var a = new RecordingObserver();
+        var b = new StreamingObserver();
+        var composite = new CompositeMeasurementObserver([a, b]);
+
+        Assert.True(composite.WantsSampleStream);
+    }
+
+    [Fact]
+    public void WantsSampleStream_Is_False_When_No_Child_Wants_It()
+    {
+        var a = new RecordingObserver();
+        var b = new RecordingObserver();
+        var composite = new CompositeMeasurementObserver([a, b]);
+
+        Assert.False(composite.WantsSampleStream);
+    }
+
+    [Fact]
     public async Task BenchmarkSuite_WithObserver_Is_Additive_Both_Observers_Receive_Events()
     {
         var a = new RecordingObserver();
@@ -251,6 +271,27 @@ public class CompositeMeasurementObserverTests
         {
             if (ThrowOnResult)
                 throw _exception;
+        }
+    }
+
+    private sealed class StreamingObserver : IMeasurementObserver
+    {
+        public bool WantsSampleStream => true;
+
+        public void OnPhase(in MeasurementPhaseEvent e)
+        {
+        }
+
+        public void OnSample(in SampleEvent e)
+        {
+        }
+
+        public void OnDetector(in DetectorStateEvent e)
+        {
+        }
+
+        public void OnResult(BenchmarkResult result)
+        {
         }
     }
 }

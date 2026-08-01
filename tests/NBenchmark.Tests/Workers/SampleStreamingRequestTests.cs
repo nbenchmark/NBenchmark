@@ -53,6 +53,42 @@ public sealed class SampleStreamingRequestTests
     }
 
     /// <summary>
+    ///     An observer that declares <c>WantsSampleStream</c> turns the stream on when the caller did
+    ///     not ask for it. This is the contract a live-streaming consumer (e.g. a dashboard) uses to
+    ///     get the per-sample stream without the caller having to remember a flag - the exact failure
+    ///     mode the opt-in exists to prevent is the stream going silently absent.
+    /// </summary>
+    [Fact]
+    public void AnObserverThatWantsTheStream_TurnsItOn()
+    {
+        var request = WorkerGroupRunner.WithStreamingForObserver(Request(false), new StreamingObserver());
+
+        Assert.True(request.Options.StreamSamples);
+    }
+
+    /// <summary>
+    ///     A caller that already asked for the stream keeps it when a <c>WantsSampleStream</c>
+    ///     observer is attached. The observer's declaration is additive, not authoritative: it can
+    ///     turn the stream on but has no reason to turn it off.
+    /// </summary>
+    [Fact]
+    public void AWantingObserver_KeepsAnAlreadyRequestedStream()
+    {
+        var request = WorkerGroupRunner.WithStreamingForObserver(Request(true), new StreamingObserver());
+
+        Assert.True(request.Options.StreamSamples);
+    }
+
+    [Fact]
+    public void NullObserver_ThrowsArgumentNullException()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(
+            () => WorkerGroupRunner.WithStreamingForObserver(Request(true), null!));
+
+        Assert.Equal("observer", ex.ParamName);
+    }
+
+    /// <summary>
     ///     The common case, asserted so the check never becomes a per-group allocation: an untouched
     ///     request comes back as the very same instance.
     /// </summary>
@@ -69,6 +105,27 @@ public sealed class SampleStreamingRequestTests
 
     private sealed class CountingObserver : IMeasurementObserver
     {
+        public void OnPhase(in MeasurementPhaseEvent e)
+        {
+        }
+
+        public void OnSample(in SampleEvent e)
+        {
+        }
+
+        public void OnDetector(in DetectorStateEvent e)
+        {
+        }
+
+        public void OnResult(BenchmarkResult result)
+        {
+        }
+    }
+
+    private sealed class StreamingObserver : IMeasurementObserver
+    {
+        public bool WantsSampleStream => true;
+
         public void OnPhase(in MeasurementPhaseEvent e)
         {
         }
