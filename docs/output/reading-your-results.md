@@ -79,7 +79,7 @@ Speed relative to the baseline. `0.75x` = 25% faster; `2.0x` = twice as slow. Th
 
 A ratio is only formed between two rows measured under the same runtime configuration. When a row was not - typically a `[InProcess]` benchmark sitting in a table of isolated ones - its ratio reads `n/a`, an **Iso** column appears saying which rows were isolated, and a footer explains the withholding.
 
-Runtime configuration dominates small measurements - an in-process reading and an isolated one of the same body can differ by ~3x, so a ratio spanning them reports the configuration rather than the code. Compare rows measured the same way, or drop `[InProcess]` so the whole group is isolated. See [Isolated runs](../features/isolated-runs.md).
+Runtime configuration dominates small measurements - an in-process reading and an isolated one of the same body can differ substantially, so a ratio spanning them reports the configuration rather than the code. Compare rows measured the same way, or drop `[InProcess]` so the whole group is isolated. See [Isolated runs](../features/isolated-runs.md).
 
 ### Sig (suite mode)
 

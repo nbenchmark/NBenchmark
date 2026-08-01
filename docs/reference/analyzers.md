@@ -253,7 +253,7 @@ Typical fixes:
 
 ### NB0014 - Capturing body cannot be isolated
 
-NBenchmark measures a benchmark body in a separate worker process, because the runtime configuration a process starts under is the dominant term in a small measurement - on bodies of provably identical cost it moved the reported number by ~3.3x. It gets the body there by resolving the method the compiler already emitted; it never serializes or regenerates it.
+NBenchmark measures a benchmark body in a separate worker process, because the runtime configuration a process starts under is the dominant term in a small measurement. It gets the body there by resolving the method the compiler already emitted; it never serializes or regenerates it.
 
 A lambda that captures state cannot be addressed that way. Its captured values live in your process, and there is no honest way to reproduce them elsewhere - a fabricated closure does not throw, it returns plausible wrong numbers. So a capturing body is measured in the test host instead, correctly labelled but less precise.
 

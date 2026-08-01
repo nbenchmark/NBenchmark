@@ -26,15 +26,11 @@ By default NBenchmark **auto-detects** how much warmup each benchmark needs: it 
 
 ## Process isolation
 
-By default, NBenchmark measures your benchmarks in a **freshly spawned worker process** rather than in the process that launched them. This is on in every mode and needs no configuration.
+By default, NBenchmark measures your benchmarks in a **freshly spawned worker process** rather than in the process that launched them. This is on in every mode and needs no configuration. The worker starts with a known runtime configuration (JIT tiering, PGO, and GC flavour) so your numbers are consistent across runs.
 
-It exists for a reason warmup cannot solve. **JIT tiering, dynamic PGO, ReadyToRun and GC flavour are read by the runtime once, at startup, and can never be changed afterwards.** A process that is already running cannot choose them for itself - the only way to pick them is to write the environment block of a process that has not started yet. That is what the worker is for, and it is why results are labelled `steady-state` rather than `host`.
+Some benchmarks cannot be isolated - a body that captures a local variable, for example. NBenchmark measures those in the host process, stamps the result with the reason, and never compares a host measurement against an isolated one. The `Iso` column in your output is where that shows up.
 
-The size of the effect is not marginal. On benchmark bodies of *provably identical cost*, in-process measurement spanned 3.27x and fabricated a 2.80x difference between two of them - each reported with a tight confidence interval, which is what makes it dangerous. A narrow interval around a wrong number looks exactly like a narrow interval around a right one.
-
-Some benchmarks cannot be isolated: a body that captures a local variable, one whose instances come from a live factory or a test fixture, or an inline suite with no addressable entry point. NBenchmark **refuses rather than guesses** in those cases - it measures them in the host process, stamps the result with the reason, and never compares a host measurement against an isolated one. The `Iso` column in your output is where that shows up, and each reason carries its own remedy.
-
-See [Isolated runs](../features/isolated-runs.md) for the full model, including how to opt a benchmark into the host process on purpose (measuring cold-start cost, for example) and how to make CI fail rather than accept a host measurement.
+See [Isolated runs](../features/isolated-runs.md) for the full model.
 
 ## Samples and ops
 
