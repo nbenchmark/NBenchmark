@@ -32,6 +32,18 @@ public sealed class CompositeMeasurementObserver : IMeasurementObserver
 {
     private readonly ImmutableArray<IMeasurementObserver> _observers;
 
+    /// <summary>The child observers this composite fans out to.</summary>
+    public IReadOnlyList<IMeasurementObserver> Observers => _observers;
+
+    /// <summary>
+    ///     <c>true</c> when any child observer wants the live per-sample stream forwarded across a
+    ///     worker boundary. The worker-group runner turns <see cref="MeasurementOptions.StreamSamples" />
+    ///     on when this is <c>true</c>, so a consumer that needs the stream gets it without the
+    ///     caller having to set the flag. Aggregated as a disjunction so a single sample-stream
+    ///     consumer attached alongside phase-only observers still gets the stream.
+    /// </summary>
+    public bool WantsSampleStream { get; }
+
     /// <summary>
     ///     Creates a composite over the supplied observers. Callers MUST filter out
     ///     <see cref="NullMeasurementObserver.Instance" /> before constructing the composite so a
@@ -45,10 +57,9 @@ public sealed class CompositeMeasurementObserver : IMeasurementObserver
         _observers = [.. observers];
         Debug.Assert(_observers.Length > 0, "CompositeMeasurementObserver must not be constructed with zero children.");
         Debug.Assert(!_observers.Any(o => o is NullMeasurementObserver), "CompositeMeasurementObserver must not contain NullMeasurementObserver.Instance.");
-    }
 
-    /// <summary>The child observers this composite fans out to.</summary>
-    public IReadOnlyList<IMeasurementObserver> Observers => _observers;
+        WantsSampleStream = _observers.Any(o => o.WantsSampleStream);
+    }
 
     public void OnPhase(in MeasurementPhaseEvent e)
     {

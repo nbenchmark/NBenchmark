@@ -38,6 +38,14 @@ public class ChannelMeasurementObserverTests
     }
 
     [Fact]
+    public void WantsSampleStream_Is_True()
+    {
+        var observer = new ChannelMeasurementObserver();
+
+        Assert.True(observer.WantsSampleStream);
+    }
+
+    [Fact]
     public void OnPhase_Writes_To_Channel()
     {
         var observer = new ChannelMeasurementObserver();

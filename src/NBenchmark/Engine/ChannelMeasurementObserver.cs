@@ -50,6 +50,12 @@ public sealed class ChannelMeasurementObserver : IMeasurementObserver
     /// </summary>
     public ChannelReader<MeasurementEvent> Reader => _channel.Reader;
 
+    /// <summary>
+    ///     This observer's primary value is live telemetry, so attachers should receive the
+    ///     per-sample stream across worker boundaries without having to set an extra option.
+    /// </summary>
+    public bool WantsSampleStream => true;
+
     public void OnPhase(in MeasurementPhaseEvent e) => _writer.TryWrite(new MeasurementEvent(e));
 
     public void OnSample(in SampleEvent e) => _writer.TryWrite(new MeasurementEvent(e));

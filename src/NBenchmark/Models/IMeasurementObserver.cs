@@ -27,16 +27,33 @@ public interface IMeasurementObserver : IDisposable
 {
     /// <summary>
     ///     The registry name this observer was constructed under, or <c>null</c> for a
-    ///     programmatically attached instance not registered through
+    /// programmatically attached instance not registered through
     ///     <see cref="Observers.ObserverRegistry" />. Used by <c>BenchmarkHarness.ResolveObserver</c>
-    ///     and <c>BenchmarkSuite.ResolveObserver</c> to dedup an auto-attached observer against a
-    ///     programmatic <c>.WithObserver(...)</c> instance of the same name, mirroring
-    ///     <see cref="Reporters.IReporter.Name" /> dedup in
-    ///     <see cref="Reporters.ReporterRegistry.InvokeReportersAsync" />. Default is
-    ///     <c>null</c> so existing implementations that do not declare a name continue to
-    ///     compile and run unchanged.
+    /// and <c>BenchmarkSuite.ResolveObserver</c> to dedup an auto-attached observer against a
+    /// programmatic <c>.WithObserver(...)</c> instance of the same name, mirroring
+    /// <see cref="Reporters.IReporter.Name" /> dedup in
+    /// <see cref="Reporters.ReporterRegistry.InvokeReportersAsync" />. Default is
+    /// <c>null</c> so existing implementations that do not declare a name continue to
+    /// compile and run unchanged.
     /// </summary>
     public string? Name => null;
+
+    /// <summary>
+    ///     Whether this observer wants the live per-sample stream forwarded across a worker
+    /// boundary. The default is <c>false</c>: the stream costs frame encoding <i>inside</i> the
+    /// measurement (its volume scales with how fast the measured code is), so an observer that
+    /// only needs phase/detector/result events - or nothing live at all - must not silently make
+    /// the run more intrusive than the user asked for.
+    /// <para>
+    ///         Set this to <c>true</c> when the observer's whole point is the per-sample stream
+    /// (a live scatter chart, a streaming histogram). The worker-group runner turns the
+    /// <see cref="MeasurementOptions.StreamSamples" /> request on when any resolved observer
+    /// declares this, so a consumer that needs the stream gets it without the caller having to
+    /// remember a flag. A caller that already set <c>StreamSamples</c> is unaffected; an observer
+    /// that does not declare this cannot turn the stream on by itself.
+    ///     </para>
+    /// </summary>
+    public bool WantsSampleStream => false;
 
     /// <summary>
     ///     Disposes resources held by this observer. The default implementation is a no-op so
