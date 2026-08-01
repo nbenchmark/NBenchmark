@@ -325,11 +325,9 @@ Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per 
 .WithLaunchCount(1)   // default
 ```
 
-The number of times to repeat each benchmark as a separate launch, typed as `int`.
+The number of times to repeat each benchmark as a separate launch, typed as `int`. Set it through the fluent builders, the attributes, or the CLI flag.
 
-**It is not a field on `MeasurementOptions`.** A launch is a *process*, so the count is spent by whichever coordinator launches the workers; a worker measures exactly once and is never sent the count. The bounds and defaults live on the `LaunchCounts` static class; the value is set through the fluent builders, the attributes, or the flag.
-
-The default is `1`; Harness mode applies `LaunchCounts.HarnessDefault` (`3`) when the launch count is not pinned via `WithLaunchCount`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`. Pass `WithLaunchCount(1)` to opt out of the harness default.
+The default is `1`; Harness mode applies `3` by default when the launch count is not explicitly pinned via `WithLaunchCount`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`. Pass `WithLaunchCount(1)` to opt out of the harness default.
 
 | Value | Behaviour |
 |---|---|
@@ -338,9 +336,9 @@ The default is `1`; Harness mode applies `LaunchCounts.HarnessDefault` (`3`) whe
 
 Use multiple launches when single-run noise is a concern and you want to see how much the median itself varies across independent measurements. Each launch includes its own warmup and GC cycle, so consecutive launches are independent measurements of the same body - not correlated samples.
 
-**Dry-run interaction:** `--dry-run` (Iterations=0, WarmupIterations=0) takes neither the harness default nor `--launch-count`, so it performs exactly one dry launch. A dry run exists to prove the wiring works without measuring anything, and repeating it would be several times the startup cost for the same nothing. An explicit `WithLaunchCount(n)` in code is still honoured, because it is the only signal that could have meant a dry run specifically.
+**Dry-run interaction:** `--dry-run` always performs exactly one launch. An explicit `WithLaunchCount(n)` in code is still honoured.
 
-**Isolation interaction:** When the benchmark runs in a worker process - the default in every mode - the coordinator spawns N workers. A worker is not merely unaware of the launch count - it is never sent one.
+**Isolation interaction:** When the benchmark runs in a worker process - the default in every mode - the coordinator spawns N workers, one per launch.
 
 **Attribute override:** In Harness mode each `[Benchmark]` can override the launch count per-method:
 

@@ -37,9 +37,7 @@ Run with `dotnet run` and you'll see something like:
   └─────────────────────────────────────────────────
 ```
 
-That's it. NBenchmark measured your code in a freshly spawned child process, warmed up until the timings plateaued (to let the JIT compile your code), collected enough measured samples to tighten the confidence interval, trimmed outliers using the IQR fence rule, and printed a summary.
-
-The child process is why the `steady-state` label appears in the output. JIT tiering, dynamic PGO and GC flavour are fixed when a process starts and can never be changed afterwards, so the only way to choose them is to measure in a process that has not started yet. This happens by default and needs no setup - see [Process isolation](./key-concepts.md#process-isolation) for what it buys and when a benchmark cannot be isolated.
+That's it. NBenchmark measured your code in a freshly spawned worker process, warmed up until the timings plateaued (to let the JIT compile your code), collected enough measured samples to tighten the confidence interval, trimmed outliers using the IQR fence rule, and printed a summary. The `steady-state` label means the worker started with a known runtime configuration for consistent results. See [Process isolation](./key-concepts.md#process-isolation).
 
 ## Measuring async code
 

@@ -358,7 +358,7 @@ Set the runtime-startup configuration benchmarks are measured under: JIT tiering
 | `server-gc` | `steady-state` plus `gcServer=1`, `gcConcurrent=0` | Code destined for a server-GC host. |
 | `host` | Nothing set | Inherit the host's configuration. Reproduces pre-profile numbers. |
 
-**Why this exists.** None of these settings can be changed in a process that is already running - the runtime reads them once at startup. That, rather than cross-benchmark state contamination, is the real reason a measurement needs its own process: **the process boundary is how the configuration gets delivered.** The effect is large - on four benchmarks with provably identical cost, `--runtime-profile host` spread 3.10x across runs while `steady-state` spread 1.02x, because tiered compilation means a short body may be measured as tier-0 or tier-1 code depending on unrelated process history.
+**Why this exists.** These settings can only be applied to a process as it starts - the runtime reads them once. The effect is large: on four benchmarks with provably identical cost, `--runtime-profile host` spread 3.10x across runs while `steady-state` spread 1.02x, because tiered compilation means a short body may be measured as tier-0 or tier-1 code depending on unrelated process history.
 
 ```bash
 dotnet run -- --runtime-profile production --launch-count 5   # imprecise: raise the replicate count
@@ -584,11 +584,7 @@ dotnet run -- --no-histogram
 
 Return every raw sample from an isolated worker instead of a bounded representative subset.
 
-By default a worker sends back at most 4,096 raw samples per benchmark. A benchmark can measure up to 100,000, and the whole array crossing the process boundary on every result is 800 KB of JSON for data the coordinator barely uses - **every statistic NBenchmark reports is computed inside the worker, over the complete sample array**. Raising or lowering the cap cannot move a median, an interval, or an outlier count.
-
-What the samples that cross are used for is the sample dump in JSON output, the Console density sparkline, and significance testing. All three are distribution properties, and a few thousand samples describe a distribution as faithfully as a hundred thousand.
-
-The subset is not a prefix. It is drawn uniformly at random from the full array and kept in measurement order, seeded from the run's seed so a repeat of the same configuration ships the same samples. A prefix would be the slice of the run nearest to warmup, which is the least representative part of it.
+By default a worker sends back at most 4,096 raw samples per benchmark. Every statistic NBenchmark reports is computed inside the worker over the complete sample array, so the cap cannot move a median, an interval, or an outlier count. The subset is drawn uniformly at random from the full array and kept in measurement order, seeded from the run's seed so a repeat ships the same samples.
 
 Pass `--emit-raw` when you want the complete series for analysis outside NBenchmark:
 
@@ -598,7 +594,7 @@ dotnet run -- --emit-raw --reporter json
 
 Programmatic equivalent: `WithOptions(new MeasurementOptions { MaxRawSamples = MeasurementOptions.UnboundedRawSamples })`. Any positive value sets a different cap.
 
-> **In-process runs are unaffected.** There is no boundary to cross, so they always hold the complete array. A run that mixes isolated and in-process benchmarks has more samples on its in-process rows. This changes none of the reported numbers, but it is worth knowing when comparing sample dumps.
+> **In-process runs are unaffected.** There is no boundary to cross, so they always hold the complete array.
 
 See also [`--no-samples`](#--no-samples), which omits the arrays from JSON output entirely.
 
@@ -608,7 +604,7 @@ See also [`--no-samples`](#--no-samples), which omits the arrays from JSON outpu
 
 Forward the live per-sample observer stream out of an isolated worker.
 
-An attached observer's `OnSample` callback is the one event that does not cross the process boundary by default. Every other event - phase transitions, detector snapshots, results - is emitted a handful of times per benchmark, but samples arrive in the hundreds or thousands, and a frame each would put the cost of observing the run inside the run.
+An attached observer's `OnSample` callback is the one event that does not cross the process boundary by default. Every other event - phase transitions, detector snapshots, results - is emitted a handful of times per benchmark, but samples arrive in the hundreds or thousands.
 
 Pass this when an observer needs the samples *live* - a streaming histogram, a sample-level exporter:
 
@@ -616,9 +612,9 @@ Pass this when an observer needs the samples *live* - a streaming histogram, a s
 dotnet run -- --observer live --stream-samples
 ```
 
-It needs an observer to be attached; with nothing to replay into, the request is withdrawn and the flag costs nothing. It is also unrelated to [`--emit-raw`](#--emit-raw): that bounds the sample array carried on each *result*, this is the live stream, and the two are selected by different rules for different consumers. The complete array arrives with the result whether or not this is set.
+It needs an observer to be attached; with nothing to replay into, the request is withdrawn and the flag costs nothing. It is unrelated to [`--emit-raw`](#--emit-raw): that bounds the sample array carried on each *result*, this is the live stream. The complete array arrives with the result whether or not this is set.
 
-Programmatic equivalent: `WithOptions(o => o with { StreamSamples = true })`. Samples cross in batches - one frame per 128 samples or per 100 ms, whichever comes first - and your observer still sees one `OnSample` call per sample. Measured against a control across eight replicates on a 6.9 µs body, ~780 forwarded events moved neither wall-clock time nor the reported median outside the control's own spread. See [Measurement Observer](observers.md#--stream-samples) for the batching rule and its ordering guarantee.
+Programmatic equivalent: `WithOptions(o => o with { StreamSamples = true })`. Samples cross in batches - one frame per 128 samples or per 100 ms, whichever comes first - and your observer still sees one `OnSample` call per sample. See [Measurement Observer](observers.md#--stream-samples) for the batching rule and its ordering guarantee.
 
 ---
 

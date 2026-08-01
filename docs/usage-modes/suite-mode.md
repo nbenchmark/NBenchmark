@@ -187,7 +187,7 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-This matters because JIT tiering, dynamic PGO, ReadyToRun and GC flavour are fixed when a process starts and can never be changed afterwards - so they can only be chosen for a process that has not started yet. The whole suite shares one worker, which keeps every ratio between its benchmarks a paired, within-process comparison.
+The whole suite shares one worker, which keeps every ratio between its benchmarks a paired, within-process comparison. See [Isolated Runs](../features/isolated-runs.md) for the full model.
 
 `WithIsolation(false)` opts back into the host process, deliberately and silently.
 

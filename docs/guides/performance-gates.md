@@ -32,7 +32,7 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 
 Without a `ReferenceMethod`, the test runs a built-in CPU-bound calibration benchmark alongside your method. The ratio between your method and the calibration is stable across hardware for CPU-bound work - both scale with machine speed. The test fails only when the slowdown is **both** statistically significant (p < 0.05) **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
 
-**The calibration is measured wherever your method is.** When the test is measured in an isolated worker, the worker measures the calibration too, in the same process and under the same runtime configuration. That matters: the worker starts with JIT tiering and ReadyToRun disabled and the test host does not, and that configuration gap can move the reported number by ~3x on its own. A ratio spanning it would report the two process configurations rather than anything about your code. If the worker cannot produce a calibration, the gate falls back to the host's own and says so in the test output - treat that ratio as a rough hardware-scaled bound rather than a code comparison.
+**The calibration is measured wherever your method is.** When the test is measured in an isolated worker, the worker measures the calibration too, in the same process and under the same runtime configuration. If the worker cannot produce a calibration, the gate falls back to the host's own and says so in the test output - treat that ratio as a rough hardware-scaled bound rather than a code comparison.
 
 ### Relative threshold with a reference method (compare two implementations)
 
@@ -136,7 +136,7 @@ the preceding tests left behind. Make the test isolatable, or add
 [AllowInProcessGate] to gate on it anyway.
 ```
 
-The bottom row is refused outright: a ratio spanning a process boundary is dominated by the difference between the two runtime configurations, which can be ~3x on bodies of identical cost. Making both sides isolatable - usually by moving injected state into the method - is the fix.
+The bottom row is refused outright: a ratio spanning a process boundary is dominated by the difference between the two runtime configurations. Making both sides isolatable - usually by moving injected state into the method - is the fix.
 
 ### `[AllowInProcessGate]`
 

@@ -78,7 +78,7 @@ Both sides are measured in worker processes when they can be, and the ratio gate
 
 When you set `MaxSlowdownRatio` without `ReferenceMethod`, the test runs a built-in CPU-bound calibration benchmark alongside your method. The ratio between your method and the calibration is stable across hardware for CPU-bound work - both scale with machine speed. For allocation-heavy or I/O-bound benchmarks, the ratio to a CPU calibration loop is less stable across hardware; use `ReferenceMethod` to compare against a method with a similar resource profile, or use absolute thresholds with `MaxAbsoluteThresholdTolerance`.
 
-The calibration is measured in the same place as the method it divides into. When your test runs in an isolated worker the worker measures the calibration too, so both sides of the ratio share a runtime configuration - the worker's tiering and ReadyToRun settings differ from the test host's, and that difference alone can move the number by ~3x. When the worker cannot produce one, the gate falls back to a host-measured calibration and adds a note to the test output saying the ratio spans two configurations.
+The calibration is measured in the same place as the method it divides into. When your test runs in an isolated worker the worker measures the calibration too, so both sides of the ratio share a runtime configuration. When the worker cannot produce one, the gate falls back to a host-measured calibration and adds a note to the test output saying the ratio spans two configurations.
 
 ```csharp
 // xUnit
