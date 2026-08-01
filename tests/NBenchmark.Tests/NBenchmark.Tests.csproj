@@ -29,6 +29,14 @@
                      ReferenceOutputAssembly="false"/>
 
     <!--
+      A target that needs the ASP.NET Core shared framework. Same rationale again, plus one of its
+      own: referencing it would put this test assembly's own process under that framework, and the
+      point of the fixture is to be a *different* process's problem.
+    -->
+    <ProjectReference Include="..\NBenchmark.Tests.WebFixture\NBenchmark.Tests.WebFixture.csproj"
+                     ReferenceOutputAssembly="false"/>
+
+    <!--
       The measurement worker, for the tests that spawn a real one. Same rationale as the fixture:
       we never compile against it, we need it built, and we need its own output directory because
       that is where its runtimeconfig.json and deps.json live.
@@ -45,6 +53,9 @@
     -->
     <AssemblyMetadata Include="IsolationFixtureDirectory"
                       Value="$(MSBuildThisFileDirectory)..\NBenchmark.Tests.IsolationFixture\bin\$(Configuration)\$(TargetFramework)\"/>
+
+    <AssemblyMetadata Include="WebFixtureDirectory"
+                      Value="$(MSBuildThisFileDirectory)..\NBenchmark.Tests.WebFixture\bin\$(Configuration)\$(TargetFramework)\"/>
 
     <AssemblyMetadata Include="NBenchmarkWorkerDirectory"
                       Value="$(MSBuildThisFileDirectory)..\..\src\NBenchmark.Worker\bin\$(Configuration)\$(TargetFramework)\"/>

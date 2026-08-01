@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Channels;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
@@ -310,6 +311,26 @@ internal sealed class WorkerSession(FrameChannel channel)
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (Exception ex) when (ex is FileNotFoundException
+                                       or FileLoadException
+                                       or ReflectionTypeLoadException)
+        {
+            // The one failure shape that is about the worker's own process rather than the
+            // benchmark. It reads as an ordinary missing-file error, which sends the reader looking
+            // for a file that is not missing - it is present in a shared framework this process was
+            // not started with. The coordinator normally prevents that by extending the worker's
+            // framework set from the target's runtimeconfig.json, so if it happened, that file is
+            // the thing to look at.
+            Fault(
+                $"The group failed: {ex.Message} The worker is running on "
+                + $"{RuntimeInformation.FrameworkDescription} with frameworks "
+                + $"[{string.Join(", ", LoadedSharedFrameworks())}]. If the assembly under test "
+                + "targets a shared framework this list does not name - ASP.NET Core and Windows "
+                + "Desktop are the usual ones - its runtimeconfig.json is how the worker learns to "
+                + "ask for it, so check that the file is present and current beside the assembly, "
+                + "and rebuild if it is not.",
+                ex.ToString());
         }
         catch (Exception ex)
         {
@@ -1221,4 +1242,38 @@ internal sealed class WorkerSession(FrameChannel channel)
             Detail = detail,
             BenchmarkName = benchmarkName,
         }));
+
+    /// <summary>
+    ///     The shared frameworks this process was started with, for a diagnostic about an assembly
+    ///     that could not be found.
+    /// </summary>
+    /// <remarks>
+    ///     Read from the host's own record of which dependency manifests it merged into the
+    ///     trusted-platform-assembly list. A framework's manifest lives at
+    ///     <c>&lt;root&gt;/shared/&lt;framework&gt;/&lt;version&gt;/&lt;framework&gt;.deps.json</c>, so
+    ///     the shape of the path is what distinguishes it from the worker's own manifest sitting
+    ///     beside the worker.
+    /// </remarks>
+    private static IReadOnlyList<string> LoadedSharedFrameworks()
+    {
+        if (AppContext.GetData("APP_CONTEXT_DEPS_FILES") is not string depsFiles)
+            return ["unknown"];
+
+        var frameworks = new List<string>(2);
+
+        foreach (var deps in depsFiles.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (Path.GetDirectoryName(deps) is not { } versionDirectory
+                || Path.GetDirectoryName(versionDirectory) is not { } frameworkDirectory
+                || !string.Equals(
+                    Path.GetFileName(Path.GetDirectoryName(frameworkDirectory)),
+                    "shared",
+                    StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            frameworks.Add($"{Path.GetFileName(frameworkDirectory)} {Path.GetFileName(versionDirectory)}");
+        }
+
+        return frameworks.Count == 0 ? ["unknown"] : frameworks;
+    }
 }

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!--
+      An executable, not a library: only an application gets a runtimeconfig.json, and the
+      runtimeconfig.json is the entire point of this fixture.
+    -->
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NBenchmark.Tests.WebFixture</RootNamespace>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      The one line that reproduces the defect this fixture exists for. A Microsoft.NET.Sdk.Web
+      project adds exactly this, and the consequence is a runtimeconfig.json naming two frameworks
+      instead of one - which a worker started under Microsoft.NETCore.App alone cannot satisfy.
+      Deliberately not the Web SDK itself: the FrameworkReference *is* the difference that breaks
+      the worker, and the plain SDK leaves out static web assets, launch profiles and the rest,
+      none of which the worker ever sees.
+    -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+  </ItemGroup>
+</Project>
