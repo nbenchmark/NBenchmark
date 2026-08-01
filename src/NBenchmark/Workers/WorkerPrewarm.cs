@@ -33,7 +33,7 @@ namespace NBenchmark.Workers;
 ///     <para>
 ///         And by the synthesized runtimeconfig, for the same class of reason: a worker started
 ///         without <c>Microsoft.AspNetCore.App</c> cannot load a target that needs it (see
-///         <see cref="WorkerRuntimeConfig" />), and the framework set is fixed before the process
+///         <see cref="SharedFrameworkConfig" />), and the framework set is fixed before the process
 ///         starts. A parked worker is only interchangeable with one launched now if all three inputs
 ///         to its launch matched.
 ///     </para>

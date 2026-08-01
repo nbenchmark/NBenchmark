@@ -114,6 +114,12 @@ The tool itself never measures. It loads your assembly to discover benchmarks, t
 
 The worker it launches is the one deployed **beside the assembly under test**, not beside the tool. That matters because a worker is framework-dependent: only the net8.0 worker can load a net8.0 build, and it is your project's own `bin` that has it. If a run reports every benchmark as `in-process (no worker)`, the usual cause is that the target project was built without the worker — check that it references the `NBenchmark` package and has not set `NBenchmarkDeployWorker=false`.
 
+## ASP.NET Core and WPF projects
+
+Because the tool loads your assembly into its own process to discover benchmarks, a project that targets a shared framework — `Microsoft.NET.Sdk.Web`, WinForms, WPF — needs that framework present in the tool's process, and the tool is an ordinary console application. It handles this itself: it reads the `runtimeconfig.json` beside your assembly and, if that names a framework the tool was not started with, restarts once under the right set before reading anything. You will not see it happen, and there is nothing to configure.
+
+This needs the matching shared runtime installed, which it will be if the project builds and runs. It does not work for a **self-contained** target, whose framework lives in its own output directory rather than in a shared location — build the benchmark project framework-dependent, or pass `--in-process`. See [Troubleshooting](../troubleshooting.md#could-not-load-file-or-assembly-from-an-aspnet-core-or-wpf-project).
+
 ## Examples
 
 ### Quick check on a library

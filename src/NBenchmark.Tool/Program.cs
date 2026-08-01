@@ -3,6 +3,7 @@ using System.Reflection;
 using NBenchmark;
 using NBenchmark.Discovery;
 using NBenchmark.Reporters.Console;
+using NBenchmark.Tool;
 
 var (projectPaths, assemblyPaths, remainingArgs) = ParseArgs(args);
 
@@ -15,7 +16,9 @@ if (remainingArgs.Contains("--help") || remainingArgs.Contains("-h"))
     return;
 }
 
-var assemblies = new List<Assembly>();
+// Every target is resolved to a path before any of them is loaded, because the frameworks the
+// process needs are settled once, for all of them, and cannot be changed after the first load.
+var builtAssemblies = new List<string>();
 
 foreach (var path in projectPaths)
 {
@@ -24,19 +27,34 @@ foreach (var path in projectPaths)
     if (dllPath is null)
         return;
 
-    try
-    {
-        assemblies.Add(Assembly.LoadFrom(dllPath));
-    }
-    catch (Exception ex)
-    {
-        Console.Error.WriteLine($"Error loading built assembly '{dllPath}': {ex.Message}");
-        Environment.ExitCode = 1;
-        return;
-    }
+    builtAssemblies.Add(dllPath);
 }
 
-foreach (var path in assemblyPaths)
+var namedTargets = builtAssemblies.Concat(assemblyPaths).ToList();
+
+// With nothing named, the tool benchmarks whatever is in the working directory. Every application
+// there is a candidate; a dependency dll carries no runtimeconfig.json and so asks for nothing.
+var scanDirectory = namedTargets.Count == 0;
+
+var relaunchTargets = scanDirectory
+    ? Directory.EnumerateFiles(Environment.CurrentDirectory, "*.dll").ToList()
+    : namedTargets;
+
+// A built project is handed to the child as --assembly, so the build is not repeated. With nothing
+// named there is nothing to rewrite, and the child scans the same directory.
+var childArgs = scanDirectory
+    ? remainingArgs
+    : [.. namedTargets.SelectMany<string, string>(t => ["--assembly", t]), .. remainingArgs];
+
+if (FrameworkRelaunch.TryRelaunch(relaunchTargets, childArgs, out var relaunchExitCode))
+{
+    Environment.ExitCode = relaunchExitCode;
+    return;
+}
+
+var assemblies = new List<Assembly>();
+
+foreach (var path in namedTargets)
 {
     try
     {
@@ -44,17 +62,19 @@ foreach (var path in assemblyPaths)
     }
     catch (Exception ex)
     {
-        Console.Error.WriteLine($"Error loading assembly '{path}': {ex.Message}");
+        var origin = builtAssemblies.Contains(path) ? "built assembly" : "assembly";
+
+        Console.Error.WriteLine($"Error loading {origin} '{path}': {ex.Message}");
         Environment.ExitCode = 1;
         return;
     }
 }
 
-if (projectPaths.Count == 0 && assemblyPaths.Count == 0)
+if (scanDirectory)
 {
     var discoverer = new BenchmarkDiscoverer();
 
-    foreach (var dll in Directory.EnumerateFiles(Environment.CurrentDirectory, "*.dll"))
+    foreach (var dll in relaunchTargets)
     {
         try
         {

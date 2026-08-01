@@ -21,6 +21,14 @@
       Named for the assembly name, not the project name.
     -->
     <InternalsVisibleTo Include="nbworker"/>
+
+    <!--
+      The `dotnet benchmark` global tool. It loads the target assembly into its own process to
+      discover benchmarks, so it has the shared-framework problem SharedFrameworkConfig solves about
+      itself, and relaunching itself correctly means reaching the same resolver the worker launch
+      uses rather than keeping a second copy of the rules. Named for the assembly name.
+    -->
+    <InternalsVisibleTo Include="nbenchmark-tool"/>
   </ItemGroup>
 
   <ItemGroup>

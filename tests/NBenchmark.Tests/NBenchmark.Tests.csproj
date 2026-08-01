@@ -43,6 +43,14 @@
     -->
     <ProjectReference Include="..\..\src\NBenchmark.Worker\NBenchmark.Worker.csproj"
                      ReferenceOutputAssembly="false"/>
+
+    <!--
+      The `dotnet benchmark` tool, for the tests that run it as a process. Not referenced for
+      compilation: the tool is an entry point with top-level statements and nothing to call, and the
+      only interesting question about it is what happens when it is started.
+    -->
+    <ProjectReference Include="..\..\src\NBenchmark.Tool\NBenchmark.Tool.csproj"
+                     ReferenceOutputAssembly="false"/>
   </ItemGroup>
 
   <ItemGroup>
@@ -56,6 +64,9 @@
 
     <AssemblyMetadata Include="WebFixtureDirectory"
                       Value="$(MSBuildThisFileDirectory)..\NBenchmark.Tests.WebFixture\bin\$(Configuration)\$(TargetFramework)\"/>
+
+    <AssemblyMetadata Include="ToolDirectory"
+                      Value="$(MSBuildThisFileDirectory)..\..\src\NBenchmark.Tool\bin\$(Configuration)\$(TargetFramework)\"/>
 
     <AssemblyMetadata Include="NBenchmarkWorkerDirectory"
                       Value="$(MSBuildThisFileDirectory)..\..\src\NBenchmark.Worker\bin\$(Configuration)\$(TargetFramework)\"/>
