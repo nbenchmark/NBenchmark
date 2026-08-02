@@ -28,7 +28,7 @@ internal sealed class WarmupCurveRecorder
 {
     /// <summary>
     ///     Retained points. 512 renders a smooth decay curve at any sensible chart width and costs
-    ///     4 KB per benchmark.
+    ///     4 KiB per benchmark.
     /// </summary>
     internal const int Capacity = 512;
 

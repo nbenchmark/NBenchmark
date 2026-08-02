@@ -162,7 +162,7 @@ At `advanced` detail, the per-benchmark stats block (shown below each console ro
 ```
 Diagnostics:
   Gen0: 12   Gen1: 0   Gen2: 0
-  Heap: 1.2 MB (fragmented 80 KB)
+  Heap: 1.2 MiB (fragmented 80 KiB)
   CPU: 98% (1.2 µs/op)
   Exc/op: 0.0033
 ```

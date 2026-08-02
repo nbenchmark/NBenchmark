@@ -7,8 +7,8 @@ namespace NBenchmark.Workers;
 /// <remarks>
 ///     <para>
 ///         A worker measures up to <see cref="MeasurementOptions.MaxIterations" /> samples, so an
-///         untruncated array is 800 KB of JSON-encoded doubles per benchmark - which is why the frame
-///         ceiling had to be set at 64 MB to accommodate it. The full array is not what the
+///         untruncated array is 800 KiB of JSON-encoded doubles per benchmark - which is why the frame
+///         ceiling had to be set at 64 MiB to accommodate it. The full array is not what the
 ///         coordinator needs: the worker already computed every statistic from it locally, and what
 ///         crosses is only used for significance testing and the Console density sparkline. Both are
 ///         distribution properties, and a few thousand samples describe a distribution as well as a
@@ -72,7 +72,7 @@ internal static class SampleReservoir
     ///     <c>[0, count)</c>, by partial Fisher-Yates.
     /// </summary>
     /// <remarks>
-    ///     The scratch array costs one int per sample - 400 KB at the iteration ceiling - and is
+    ///     The scratch array costs one int per sample - 400 KiB at the iteration ceiling - and is
     ///     allocated only on the path that is about to discard far more than that from the wire.
     ///     Rejection sampling would avoid it but degrades badly as the capacity approaches the count,
     ///     which is precisely the boundary case.

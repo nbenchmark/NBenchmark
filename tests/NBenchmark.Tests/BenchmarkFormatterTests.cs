@@ -24,11 +24,11 @@ public class BenchmarkFormatterTests
     [InlineData(0, "0 B")]
     [InlineData(512, "512 B")]
     [InlineData(1023, "1023 B")]
-    [InlineData(1024, "1.0 KB")]
-    [InlineData(1536, "1.5 KB")]
-    [InlineData(1048575, "1024.0 KB")]
-    [InlineData(1048576, "1.0 MB")]
-    [InlineData(1572864, "1.5 MB")]
+    [InlineData(1024, "1.0 KiB")]
+    [InlineData(1536, "1.5 KiB")]
+    [InlineData(1048575, "1024.0 KiB")]
+    [InlineData(1048576, "1.0 MiB")]
+    [InlineData(1572864, "1.5 MiB")]
     public void FormatBytes_Formats_Correctly(long bytes, string expected)
     {
         var result = BenchmarkFormatter.FormatBytes(bytes);
