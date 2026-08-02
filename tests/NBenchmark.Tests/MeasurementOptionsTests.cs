@@ -441,6 +441,12 @@ public class MeasurementOptionsTests
         Assert.Equal(2_000, quick.MaxSamples);
         Assert.Equal(0.05, quick.CiTarget);
         Assert.Equal(TimeSpan.FromMilliseconds(50), quick.MinMeasurementTime);
+
+        // MaxTuningTime is 10s - half the Default cap. Warmup's share is WarmupBudgetFraction of
+        // that (4s), which is 8x the inherited MinWarmupTime floor (500ms) and 2x the JIT-quiescence
+        // gate's deactivation threshold (4 x MinWarmupTime). A tighter cap races the floor against
+        // the budget and warns on warmup exhaustion.
+        Assert.Equal(TimeSpan.FromSeconds(10), quick.MaxTuningTime);
     }
 
     [Fact]
