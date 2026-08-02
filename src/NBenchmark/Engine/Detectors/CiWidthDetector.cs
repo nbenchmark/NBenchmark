@@ -17,7 +17,7 @@ internal sealed class CiWidthDetector
 {
     // Pre-sized to avoid the first few backing-array reallocations during short runs. The
     // series grows at evaluation cadence (every BatchSize samples past MinSamples), not per
-    // sample, so even a pessimistic upper bound (MaxSamples / BatchSize = 12,500) is ~100 KB.
+    // sample, so even a pessimistic upper bound (MaxSamples / BatchSize = 12,500) is ~100 KiB.
     private readonly List<double> _halfWidthSeries = new(capacity: 128);
 
     private readonly int _cadence;

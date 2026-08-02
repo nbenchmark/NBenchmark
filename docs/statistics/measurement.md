@@ -135,7 +135,7 @@ Two behaviours are on for **both** profiles: the between-benchmark full GC (so o
 
 ### Worked example
 
-Consider a benchmark body that allocates 100 KB per call:
+Consider a benchmark body that allocates 100 KiB per call:
 
 ```csharp
 BenchmarkSuite.Create("AllocPressure")
@@ -145,7 +145,7 @@ BenchmarkSuite.Create("AllocPressure")
 
 Under the **Realistic** profile (the default), the variance (CV%) is high and some iterations show Gen0-GC stalls. The `Alloc/op` column is populated and shows the allocation pressure. The numbers reflect what this code would do in production.
 
-Under the **Independent** profile (`--profile independent`), the variance is low and the per-iteration numbers are tightly clustered. The `Alloc/op` column is still populated (allocation tracking is on for both profiles), so the 100 KB/op shows up even here. The numbers answer a narrower question: "how much CPU time does this take, ignoring GC and cache?"
+Under the **Independent** profile (`--profile independent`), the variance is low and the per-iteration numbers are tightly clustered. The `Alloc/op` column is still populated (allocation tracking is on for both profiles), so the 100 KiB/op shows up even here. The numbers answer a narrower question: "how much CPU time does this take, ignoring GC and cache?"
 
 ### Setting the profile
 
