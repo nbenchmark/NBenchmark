@@ -31,7 +31,7 @@ public sealed record AutoTuneOptions
         MinSamples = 15,
         MaxSamples = 2_000,
         CiTarget = 0.05,
-        MaxTuningTime = TimeSpan.FromSeconds(5),
+        MaxTuningTime = TimeSpan.FromSeconds(10),
         BatchSize = 4,
         PlateauPatience = 2,
         MinMeasurementTime = TimeSpan.FromMilliseconds(50),
