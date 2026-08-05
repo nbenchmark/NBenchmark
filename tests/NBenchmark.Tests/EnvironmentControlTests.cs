@@ -214,6 +214,79 @@ public class EnvironmentControlTests
     }
 
     [Fact]
+    public void Apply_DedicatedHostGuidance_Suggests_CpuAffinity_OnSuitableHost()
+    {
+        // On a host with >= 4 cores on Linux or Windows and no affinity set, the probe
+        // should actively suggest --cpu-affinity 2,3. Skipped on small hosts (where the
+        // shared-tenant warning fires instead) and on macOS (where affinity is a no-op
+        // and the macOS bullet already covers it).
+        if (Environment.ProcessorCount < 4)
+            return;
+
+        if (OperatingSystem.IsMacOS())
+            return;
+
+        var stderr = CaptureStderr(() =>
+        {
+            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { DedicatedHostGuidance = true });
+        });
+
+        Assert.Contains("Dedicated-host guidance", stderr);
+        Assert.Contains("--cpu-affinity 2,3", stderr);
+        Assert.Contains("WithHardwareAffinity", stderr);
+    }
+
+    [Fact]
+    public void Apply_DedicatedHostGuidance_NoAffinitySuggestion_WhenAffinityApplied()
+    {
+        // When affinity was successfully applied, the suggestion should not appear -
+        // the user already took the action. If the host refused the apply (common on
+        // locked-down CI and on macOS), the suggestion correctly fires and we skip the
+        // assertion rather than fail on an environment outcome.
+        if (Environment.ProcessorCount < 4)
+            return;
+
+        if (OperatingSystem.IsMacOS())
+            return;
+
+        var stderr = CaptureStderr(() =>
+        {
+            using var _ = EnvironmentControl.Apply(
+                new EnvironmentOptions
+                {
+                    DedicatedHostGuidance = true,
+                    CpuAffinity = [2, 3],
+                });
+        });
+
+        // A "could not set CPU affinity" warning means the host refused; the suggestion
+        // is correct in that case, so there is nothing to assert.
+        if (stderr.Contains("could not set CPU affinity", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Assert.DoesNotContain("--cpu-affinity 2,3", stderr);
+    }
+
+    [Fact]
+    public void Apply_DedicatedHostGuidance_NoAffinitySuggestion_OnMacOS()
+    {
+        // On macOS, affinity is not applied (the BCL does not expose setaffinity), so
+        // the probe must not suggest --cpu-affinity 2,3 - that would contradict the
+        // macOS-specific bullet that already explains the limitation. The macOS
+        // bullet itself is asserted by the platform-gated test above.
+        if (!OperatingSystem.IsMacOS())
+            return;
+
+        var stderr = CaptureStderr(() =>
+        {
+            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { DedicatedHostGuidance = true });
+        });
+
+        Assert.DoesNotContain("--cpu-affinity 2,3", stderr);
+        Assert.DoesNotContain("WithHardwareAffinity", stderr);
+    }
+
+    [Fact]
     public void Apply_DedicatedHostGuidance_Suggests_PriorityHigh_OnSuitableHost()
     {
         // On a host with >= 4 cores and no priority set, the probe should actively

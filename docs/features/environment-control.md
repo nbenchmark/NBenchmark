@@ -68,6 +68,7 @@ The probe checks for:
 
 - **Low CPU core count** (< 4 logical cores) - typical of shared-tenant CI runners. Inflates noise and makes baseline comparisons unreliable.
 - **macOS** - frequency scaling and thermal throttling are not directly observable from managed code. The probe suggests running on wall power and preferring a dedicated Linux or Windows host for CI gates.
+- **No CPU affinity pinned on a suitable host** (>= 4 cores, Linux or Windows, no `--cpu-affinity` set) - the probe suggests `--cpu-affinity 2,3` (or `WithHardwareAffinity(2, 3)`) to pin to cores away from core 0 and eliminate inter-core migration noise.
 - **Priority not raised on a suitable host** (>= 4 cores, no `--priority` set) - the probe actively suggests `--priority high` (or `WithProcessPriority`) to reduce preemption.
 
 The run still proceeds regardless of what the probe finds - this is guidance, not a gate.
