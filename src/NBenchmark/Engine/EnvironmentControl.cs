@@ -186,6 +186,14 @@ public static class EnvironmentControl
                 + "host for CI regression gates.");
         }
 
+        if (!affinityApplied && assessment.CoreCount >= 4 && !assessment.IsMacOS)
+        {
+            warnings.Add(
+                "CPU affinity was not pinned. Add --cpu-affinity 2,3 (or WithHardwareAffinity(2, 3)) "
+                + "to pin the process to cores away from core 0 (often used by the OS for driver "
+                + "interrupt handling) and eliminate inter-core migration noise.");
+        }
+
         if (!priorityApplied && assessment.CoreCount >= 4)
         {
             warnings.Add(
