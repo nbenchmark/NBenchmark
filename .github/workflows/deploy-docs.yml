@@ -34,7 +34,11 @@ jobs:
       - name: Deploy to nbenchmark.net
         run: |
           mkdir -p ./nbenchmark-net/docs
-          rm -rf ./nbenchmark-net/docs/*
+          # Clear the published docs tree, but keep docs/studio (owned by the
+          # NBenchmark.Studio repo's docs workflow) and any dotfiles such as
+          # docs/.vitepress, which holds the site's SSG config.
+          find ./nbenchmark-net/docs -mindepth 1 -maxdepth 1 \
+            ! -name studio ! -name '.*' -exec rm -rf {} +
           cp -r ./docs/* ./nbenchmark-net/docs/
 
           cd ./nbenchmark-net
