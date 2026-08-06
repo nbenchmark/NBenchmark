@@ -36,7 +36,7 @@ internal static class BenchmarkLifecycle
                   + "a public constructor and InternalsVisibleTo. To fix: (1) add a parameterless "
                   + "constructor, (2) install NBenchmark.Analyzers for compile-time detection, or "
                   + "(3) call WithInstanceFactory or WithServiceProvider on BenchmarkHarness. "
-                  + "See https://www.nbenchmark.net/features/dependency-injection for details. "
+                  + "See https://docs.nbenchmark.net/features/dependency-injection for details. "
                 : "the instance factory threw during resolution. ";
 
             Console.WriteLine($"[Error] Could not instantiate {type.Name} - "
