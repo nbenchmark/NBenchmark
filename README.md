@@ -144,4 +144,4 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 
 ---
 
-View the full documentation at [nbenchmark.net](https://www.nbenchmark.net).
+View the full documentation at [docs.nbenchmark.net](https://docs.nbenchmark.net).

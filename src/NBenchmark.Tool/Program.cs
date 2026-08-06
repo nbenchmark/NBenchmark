@@ -345,5 +345,5 @@ static void PrintToolHelp()
     Console.WriteLine("  --max-tuning-time, --list, --dry-run, --in-process, --order, --seed,");
     Console.WriteLine("  --detail, --threshold-pct, --profile, --force-gc, --no-allocations, --help");
     Console.WriteLine();
-    Console.WriteLine("See https://www.nbenchmark.net for the full CLI reference.");
+    Console.WriteLine("See https://docs.nbenchmark.net for the full CLI reference.");
 }
