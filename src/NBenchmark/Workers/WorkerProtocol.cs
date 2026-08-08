@@ -74,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 9;
+    public const int Version = 10;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -432,6 +432,24 @@ internal sealed record RunGroupPayload
     ///     is decided inside discovery in the worker.
     /// </summary>
     public InstanceLifetime DefaultInstanceLifetime { get; init; } = InstanceLifetime.PerMethod;
+
+    /// <summary>
+    ///     The lifetime the coordinator resolved for this group, which overrides <i>both</i> the
+    ///     class-level <c>[InstanceLifetime]</c> attribute and
+    ///     <see cref="DefaultInstanceLifetime" />. <c>null</c> leaves discovery's answer alone.
+    /// </summary>
+    /// <remarks>
+    ///     A decision, not a default, and that is why it cannot ride on
+    ///     <see cref="DefaultInstanceLifetime" />: the attribute beats a default, so a class carrying
+    ///     <c>[InstanceLifetime(PerClass)]</c> would go on sharing one container-resolved instance
+    ///     across its methods however the coordinator had resolved it. The rule lives on the
+    ///     coordinator (<c>InstanceIndependence.ResolveLifetime</c>) rather than being reimplemented
+    ///     in the worker, because a rule evaluated twice is a rule that can disagree with itself -
+    ///     and an isolated and an in-process number that differ by instance lifetime differ for a
+    ///     reason unrelated to the process boundary, which is the one comparison the whole design
+    ///     rests on.
+    /// </remarks>
+    public InstanceLifetime? InstanceLifetimeOverride { get; init; }
 
     /// <summary>
     ///     Total benchmarks across the whole run and this group's offset within it, so the

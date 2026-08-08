@@ -215,3 +215,30 @@ public class FactoryBuiltBenchmarks(int marker)
         return marker;
     }
 }
+
+/// <summary>
+///     A class whose second method fails if it can see what the first left behind, so the instance
+///     lifetime the worker ran under is readable from the results.
+/// </summary>
+/// <remarks>
+///     The coordinator decides the lifetime and sends it; the worker cannot be asked what it did,
+///     because it is a different process and it has already exited by the time anything is asserted.
+///     A fixture that throws on the sharing is the only way to observe from the outside which of the
+///     two lifetimes was actually in effect - and the throw is the contamination itself, not a proxy
+///     for it.
+/// </remarks>
+[InstanceLifetime(InstanceLifetime.PerClass)]
+public class InstanceSharingProbeBenchmarks
+{
+    private int _touched;
+
+    [Benchmark]
+    public int First() => ++_touched;
+
+    [Benchmark]
+    public int Second()
+        => _touched == 0
+            ? 0
+            : throw new InvalidOperationException(
+                "this instance had already run First, so both methods shared one instance");
+}

@@ -123,10 +123,110 @@ public class AutoIsolationFallbackTests
         Assert.Equal(WorkGroupKind.DiscoveredClass, request.Kind);
         Assert.Equal(2, request.BenchmarkNames.Count);
 
-        // The wire carries the *harness-level* default only - here PerMethod, since nothing called
-        // WithInstanceLifetime. This class's [InstanceLifetime(PerClass)] is resolved by discovery
-        // inside the worker, which is why none of that machinery has to cross the boundary.
+        // The wire carries the harness-level default - here PerMethod, since nothing called
+        // WithInstanceLifetime - and, separately, the lifetime the coordinator resolved for this
+        // class. The class asked for PerClass and its instances come from its own constructor, so it
+        // gets what it asked for.
         Assert.Equal(InstanceLifetime.PerMethod, request.DefaultInstanceLifetime);
+        Assert.Equal(InstanceLifetime.PerClass, request.InstanceLifetimeOverride);
+    }
+
+    /// <summary>
+    ///     W-21: a class whose instances come from a container keeps PerClass only if it says so.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The rule this replaces was written for the same case and was unreachable: it lived
+    ///         behind the global in-process guard in the one function that decided both lifetime and
+    ///         granularity, and its own condition was true only for harnesses that had no instance
+    ///         source at all. It therefore fired exactly where a shared instance is harmless and
+    ///         never where a container is handing out scopes.
+    ///     </para>
+    ///     <para>
+    ///         Asserted on the wire rather than through behaviour because the decision <em>is</em> the
+    ///         wire field: an isolated group is measured in a process that reads it and nothing else.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task PerClass_WithAnAddressableFactory_ResolvesToPerMethod()
+    {
+        var (results, requests) = await RunWithFactoryAsync("auto-iso-factory-perclass");
+        var request = Assert.Single(requests);
+
+        Assert.Equal(InstanceLifetime.PerMethod, request.InstanceLifetimeOverride);
+
+        // And the rows say why, because a lifetime the user did not ask for is a fact about their
+        // measurement rather than an implementation detail.
+        Assert.All(
+            results.Where(r => r.ClassName == "AddressableFactoryPerClassBenchmarks"),
+            r => Assert.Contains(r.Warnings, w => w.Contains("fresh instance per method", StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    ///     A class that resets itself keeps PerClass, and is not warned about.
+    /// </summary>
+    [Fact]
+    public async Task PerClass_WithAnAddressableFactory_And_IStateReset_KeepsPerClass()
+    {
+        var (results, requests) = await RunWithFactoryAsync("auto-iso-factory-reset");
+        var request = Assert.Single(requests);
+
+        Assert.Equal(InstanceLifetime.PerClass, request.InstanceLifetimeOverride);
+        Assert.All(results, r => Assert.DoesNotContain(r.Warnings, w => w.Contains("fresh instance per method", StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    ///     So does one that declares the carry-over deliberate. The two have to be separable: before
+    ///     <c>[SharedState]</c> existed, an empty <c>ResetAsync</c> was the only way to say this, and
+    ///     an empty <c>ResetAsync</c> is indistinguishable from a real one at runtime.
+    /// </summary>
+    [Fact]
+    public async Task PerClass_WithAnAddressableFactory_And_SharedState_KeepsPerClass()
+    {
+        var (_, requests) = await RunWithFactoryAsync("auto-iso-factory-shared");
+        var request = Assert.Single(requests);
+
+        Assert.Equal(InstanceLifetime.PerClass, request.InstanceLifetimeOverride);
+    }
+
+    /// <summary>
+    ///     The lifetime is resolved independently of whether a worker is available, which is the
+    ///     structural half of W-21. Under <c>--in-process</c> the old function returned before the
+    ///     rule could run at all.
+    /// </summary>
+    [Fact]
+    public async Task PerClass_WithAFactory_ResolvesToPerMethod_EvenInProcess()
+    {
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+
+        harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
+            .WithCategoryFilter(["auto-iso-factory-perclass"])
+            .WithInstanceFactory(AddressableFactoryPerClassBenchmarks.Create)
+            .WithLaunchCount(1)
+            .WithIsolation(false);
+
+        var results = await harness.RunAsync();
+
+        Assert.All(
+            results.Where(r => r.ClassName == "AddressableFactoryPerClassBenchmarks"),
+            r => Assert.Contains(r.Warnings, w => w.Contains("fresh instance per method", StringComparison.Ordinal)));
+    }
+
+    private static async Task<(IReadOnlyList<BenchmarkResult> Results, IReadOnlyList<RunGroupPayload> Requests)>
+        RunWithFactoryAsync(string category)
+    {
+        var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
+
+        harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
+            .WithCategoryFilter([category])
+            .WithInstanceFactory(AddressableFactoryPerClassBenchmarks.Create)
+            .WithLaunchCount(1)
+            .WithIsolation();
+
+        using var scope = FakeWorkerLauncher.Install(SimulateWorkerGroup);
+        var results = await harness.RunAsync();
+
+        return (results, scope.Launcher.Requests.ToList());
     }
 
     /// <summary>
@@ -352,6 +452,60 @@ public class MixedWorkerIsolationBenchmarks
 [BenchmarkCategory("auto-iso-nofactory")]
 [InstanceLifetime(InstanceLifetime.PerClass)]
 public class NoFactoryBenchmarks
+{
+    [Benchmark]
+    public void MethodA()
+    {
+    }
+
+    [Benchmark]
+    public void MethodB()
+    {
+    }
+}
+
+// PerClass + an addressable (static, non-capturing) factory: isolatable, and the one shape the
+// lifetime rule exists for - the instance carries a scope, so sharing the instance shares the scope.
+[BenchmarkCategory("auto-iso-factory-perclass")]
+[InstanceLifetime(InstanceLifetime.PerClass)]
+public class AddressableFactoryPerClassBenchmarks
+{
+    public static object Create(Type type) => Activator.CreateInstance(type)!;
+
+    [Benchmark]
+    public void MethodA()
+    {
+    }
+
+    [Benchmark]
+    public void MethodB()
+    {
+    }
+}
+
+// The same, with a class that resets between methods: PerClass is honoured.
+[BenchmarkCategory("auto-iso-factory-reset")]
+[InstanceLifetime(InstanceLifetime.PerClass)]
+public class AddressableFactoryResettingBenchmarks : IStateReset
+{
+    public Task ResetAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    [Benchmark]
+    public void MethodA()
+    {
+    }
+
+    [Benchmark]
+    public void MethodB()
+    {
+    }
+}
+
+// And with the carry-over declared deliberate: also honoured, by a different route.
+[BenchmarkCategory("auto-iso-factory-shared")]
+[InstanceLifetime(InstanceLifetime.PerClass)]
+[SharedState]
+public class AddressableFactorySharedStateBenchmarks
 {
     [Benchmark]
     public void MethodA()

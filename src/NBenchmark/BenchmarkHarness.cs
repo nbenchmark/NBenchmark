@@ -941,13 +941,20 @@ public sealed class BenchmarkHarness
 
             var runningIndex = 0;
 
-            foreach (var suite in filtered)
+            foreach (var declared in filtered)
             {
                 var suiteResultStart = allResults.Count;
                 var inProcess = new List<BenchmarkMethodDefinition>();
                 var perClass = new List<BenchmarkMethodDefinition>();
                 var perBenchmark = new List<BenchmarkMethodDefinition>();
-                var autoUpgradedResultNames = new HashSet<string>();
+
+                // How long an instance lives, decided before and independently of where it is
+                // measured. The two used to be one function, and this half was unreachable whenever
+                // the other half said "in-process" - see ResolveGranularity.
+                var lifetime = InstanceIndependence.ResolveLifetime(
+                    declared.Type, declared.Lifetime, _instanceSource is not null, out var lifetimeDowngrade);
+
+                var suite = declared with { Lifetime = lifetime };
 
                 // Whether a worker can measure this class at all. When it cannot, the benchmarks run
                 // in the host process and say so, rather than being quietly measured under whatever
@@ -964,10 +971,7 @@ public sealed class BenchmarkHarness
 
                 foreach (var benchmark in suite.Benchmarks)
                 {
-                    var decision = ResolveIsolation(benchmark, suite, forceInProcess, _instanceSource is not null, out var autoUpgraded);
-
-                    if (autoUpgraded)
-                        autoUpgradedResultNames.Add($"{suite.Type.Name}.{benchmark.DisplayName}");
+                    var decision = ResolveGranularity(benchmark, forceInProcess);
 
                     switch (decision)
                     {
@@ -1017,10 +1021,12 @@ public sealed class BenchmarkHarness
                     runningIndex++;
                 }
 
-                // Attach the auto-isolation upgrade warning to every result that was
-                // auto-upgraded from PerClass to PerBenchmark by the b-factory rule.
-                if (autoUpgradedResultNames.Count > 0)
-                    ApplyAutoIsolationUpgradeWarning(allResults, autoUpgradedResultNames, suiteResultStart);
+                // Attached to the whole class's rows, because the lifetime is a property of the class
+                // rather than of one method - unlike the granularity decision, which is per method.
+                if (lifetimeDowngrade is not null)
+                {
+                    ApplyClassWarning(allResults, suiteResultStart, suite.Type.Name, lifetimeDowngrade);
+                }
             }
 
             await progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
@@ -1126,6 +1132,25 @@ public sealed class BenchmarkHarness
         IReadOnlyList<RuntimeMoniker> runtimes,
         CancellationToken cancellationToken)
     {
+        // Refused before anything is built, because this path has no in-process fallback to refuse
+        // into: every group is measured in a worker by definition, and a worker handed no instance
+        // source falls back to constructing the type. For a DI-only class that is a clean
+        // instantiation failure, but a class that happens to have a parameterless constructor is
+        // measured with every dependency unwired and reported under its own name - a silent
+        // substitution, which is the one outcome the design refuses everywhere else. The
+        // single-runtime path answers this through WorkerRunPlan.ForDiscoveredClass; this one never
+        // consulted it.
+        if (_instanceSource?.Refusal() is { } sourceRefusal)
+        {
+            Console.Error.WriteLine(
+                $"A multi-runtime run cannot be measured because {sourceRefusal} Every runtime is "
+                + "measured in a worker, so there is no in-process fallback to decline into here.");
+
+            Environment.ExitCode = 1;
+
+            return [];
+        }
+
         Console.WriteLine($"Building for runtimes: {string.Join(", ", runtimes.Select(r => r.ToTargetFramework()))}");
 
         var builds = await MultiRuntimeOrchestrator
@@ -1336,6 +1361,13 @@ public sealed class BenchmarkHarness
 
             var displayNames = suite.Benchmarks.Select(b => b.DisplayName).ToList();
 
+            // Resolved here as well, and sent, so a container-resolved PerClass class is measured
+            // with the same instance lifetime under every runtime. This path does not call
+            // ResolveGranularity at all - there is only one granularity available to it - but the
+            // lifetime question is independent of that and has the same answer.
+            var lifetime = InstanceIndependence.ResolveLifetime(
+                suite.Type, suite.Lifetime, _instanceSource is not null, out _);
+
             var request = WorkerRunPlan.WithStrategies(new RunGroupPayload
             {
                 GroupId = $"{tfm}:{suite.Type.Name}",
@@ -1358,6 +1390,7 @@ public sealed class BenchmarkHarness
                 Order = _cliArgs.RunOrder ?? _runOrder,
                 Seed = _cliArgs.Seed,
                 DefaultInstanceLifetime = _defaultInstanceLifetime,
+                InstanceLifetimeOverride = lifetime,
                 TotalBenchmarks = displayNames.Count,
             }, options);
 
@@ -1592,6 +1625,19 @@ public sealed class BenchmarkHarness
         }
     }
 
+    /// <summary>
+    ///     Measures a whole class in this process, one instance shared by its methods.
+    /// </summary>
+    /// <remarks>
+    ///     The instance is built <i>inside</i> the launch loop. It used to be built once and reused
+    ///     by every launch, which quietly emptied the number the launch count exists to produce:
+    ///     <see cref="LaunchAggregator" /> derives the reported standard error and margin of error
+    ///     from the spread <i>between</i> launches, and three launches sharing one instance, one DI
+    ///     scope and one <c>[BenchmarkSetup]</c> are not three independent measurements of anything.
+    ///     Rebuilding also settles the reset question at the launch boundary by construction: there
+    ///     is no state to carry across, so there is nothing for <see cref="IStateReset" /> to be
+    ///     asked to do there.
+    /// </remarks>
     private async Task RunPerClassInProcessAsync(
         BenchmarkSuiteDefinition suite,
         MeasurementOptions suiteOptions,
@@ -1603,105 +1649,111 @@ public sealed class BenchmarkHarness
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
-        var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceSource?.Resolve, out var failure);
+        var effectiveClassLaunchCount = EffectiveLaunchCount;
 
-        if (created is null)
+        // Clamped, because an attribute argument is a compile-time constant nothing else validates -
+        // the fluent builders and the CLI parser reject an out-of-range count, and this is the one
+        // path where a typo could ask for ten thousand launches.
+        foreach (var b in suite.Benchmarks)
         {
-            // Errored rows rather than a silent return. Dropping them shrank the table instead of
-            // reporting a failure, so a class that could not be constructed simply went missing from
-            // every reporter - while the isolated path synthesises rows for exactly this case
-            // (WorkerGroupRunner.ToErroredResults). A shorter table is the one failure shape a reader
-            // has no way to notice.
-            allResults.AddRange(InstantiationFailures(suite, suiteOptions, failure));
+            if (b.Attribute.HasLaunchCountOverride)
+                effectiveClassLaunchCount = Math.Max(effectiveClassLaunchCount, LaunchCounts.Clamp(b.Attribute.LaunchCount));
+        }
+
+        var allLaunchResults = new List<IReadOnlyList<BenchmarkResult>>(effectiveClassLaunchCount);
+        var allLaunchSamples = new List<Dictionary<string, double[]>>(effectiveClassLaunchCount);
+        var dependenceWarning = InstanceIndependence.DependenceWarning(
+            suite.Type, suite.Lifetime, suite.Benchmarks.Count, suiteOptions);
+
+        for (var launchIdx = 0; launchIdx < effectiveClassLaunchCount; launchIdx++)
+        {
+            // Later launches measure the same benchmarks again, so their lifecycle events are
+            // dropped - forwarding them would make a progress bar run backwards.
+            var launchProgress = launchIdx == 0 ? progress : NullBenchmarkProgress.Instance;
+            var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
+            var lastLaunch = launchIdx == effectiveClassLaunchCount - 1;
+
+            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceSource?.Resolve, out var failure);
+
+            if (created is null)
+            {
+                // Errored rows rather than a silent return. Dropping them shrank the table instead of
+                // reporting a failure, so a class that could not be constructed simply went missing from
+                // every reporter - while the isolated path synthesises rows for exactly this case
+                // (WorkerGroupRunner.ToErroredResults). A shorter table is the one failure shape a reader
+                // has no way to notice.
+                allResults.AddRange(InstantiationFailures(suite, suiteOptions, failure));
+
+                return;
+            }
+
+            var (instance, instanceTeardown) = created.Value;
+            var instanceFromFactory = _instanceSource is not null;
+
+            try
+            {
+                var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(suite, instance, suiteOptions);
+
+                if (!setupSuccess)
+                {
+                    allResults.AddRange(setupErrors!);
+                    return;
+                }
+
+                var factory = () => instance;
+
+                var envelopes = suite.Benchmarks
+                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
+                    .ToList();
+
+                // When the class implements IStateReset, fire ResetAsync between benchmark methods
+                // to keep the shared instance's state clean across PerClass execution. Null otherwise.
+                Func<Task>? betweenBenchmarksReset = InstanceIndependence.ResetsItself(suite.Type)
+                    ? () => ((IStateReset)instance).ResetAsync(cancellationToken)
+                    : null;
+
+                var (results, samples) = await SuiteRunner.RunAsync(
+                    envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                    startIndex, totalBenchmarks, launchProgress, cancellationToken,
+                    betweenBenchmarksReset, launchObserver).ConfigureAwait(false);
+
+                allLaunchResults.Add(results);
+                allLaunchSamples.Add(samples);
+            }
+            finally
+            {
+                // Once for the class, not once per launch: the callback is named for the suite and
+                // the launches are repetitions of it.
+                await BenchmarkLifecycle.RunTeardown(
+                    suite, instance, instanceFromFactory, instanceTeardown,
+                    lastLaunch ? PostSuiteCleanup : null);
+            }
+        }
+
+        if (allLaunchResults.Count == 0)
+            return;
+
+        if (allLaunchResults.Count > 1)
+        {
+            var aggregated = AggregateInProcessLaunches(allLaunchResults, allLaunchSamples);
+            InstanceIndependence.Attach(aggregated.Results, dependenceWarning);
+            allResults.AddRange(aggregated.Results);
+
+            foreach (var kvp in aggregated.Samples)
+            {
+                rawSamples[kvp.Key] = kvp.Value;
+            }
 
             return;
         }
 
-        var (instance, instanceTeardown) = created.Value;
-        var instanceFromFactory = _instanceSource is not null;
+        var single = allLaunchResults[0].ToList();
+        InstanceIndependence.Attach(single, dependenceWarning);
+        allResults.AddRange(single);
 
-        try
+        foreach (var kvp in allLaunchSamples[0])
         {
-            var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(suite, instance, suiteOptions);
-
-            if (!setupSuccess)
-            {
-                allResults.AddRange(setupErrors!);
-                return;
-            }
-
-            var factory = () => instance;
-
-            var envelopes = suite.Benchmarks
-                .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
-                .ToList();
-
-            // When the class implements IStateReset, fire ResetAsync between benchmark methods
-            // to keep the shared instance's state clean across PerClass execution. Null otherwise.
-            Func<Task>? betweenBenchmarksReset = typeof(IStateReset).IsAssignableFrom(suite.Type)
-                ? () => ((IStateReset)instance).ResetAsync(cancellationToken)
-                : null;
-
-            var effectiveClassLaunchCount = EffectiveLaunchCount;
-
-            // Clamped, because an attribute argument is a compile-time constant nothing else validates -
-            // the fluent builders and the CLI parser reject an out-of-range count, and this is the one
-            // path where a typo could ask for ten thousand launches.
-            foreach (var b in suite.Benchmarks)
-            {
-                if (b.Attribute.HasLaunchCountOverride)
-                    effectiveClassLaunchCount = Math.Max(effectiveClassLaunchCount, LaunchCounts.Clamp(b.Attribute.LaunchCount));
-            }
-
-            if (effectiveClassLaunchCount > 1)
-            {
-                var allLaunchResults = new List<IReadOnlyList<BenchmarkResult>>();
-                var allLaunchSamples = new List<Dictionary<string, double[]>>();
-
-                for (var launchIdx = 0; launchIdx < effectiveClassLaunchCount; launchIdx++)
-                {
-                    // Later launches measure the same benchmarks again, so their lifecycle events are
-                    // dropped - forwarding them would make a progress bar run backwards. This local was
-                    // already here and computed correctly; the call below passed the unsuppressed
-                    // instance anyway, so only the observer was actually being quietened.
-                    var launchProgress = launchIdx == 0 ? progress : NullBenchmarkProgress.Instance;
-                    var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
-
-                    var (results, samples) = await SuiteRunner.RunAsync(
-                        envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, launchProgress, cancellationToken, betweenBenchmarksReset, launchObserver).ConfigureAwait(false);
-
-                    allLaunchResults.Add(results);
-                    allLaunchSamples.Add(samples);
-                }
-
-                var aggregated = AggregateInProcessLaunches(allLaunchResults, allLaunchSamples);
-                ApplyPerClassIndependenceWarning(aggregated.Results, suite, suiteOptions);
-                allResults.AddRange(aggregated.Results);
-
-                foreach (var kvp in aggregated.Samples)
-                {
-                    rawSamples[kvp.Key] = kvp.Value;
-                }
-            }
-            else
-            {
-                var (results, samples) = await SuiteRunner.RunAsync(
-                    envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                    startIndex, totalBenchmarks, progress, cancellationToken, betweenBenchmarksReset, observer).ConfigureAwait(false);
-
-                ApplyPerClassIndependenceWarning(results, suite, suiteOptions);
-                allResults.AddRange(results);
-
-                foreach (var kvp in samples)
-                {
-                    rawSamples[kvp.Key] = kvp.Value;
-                }
-            }
-        }
-        finally
-        {
-            await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, PostSuiteCleanup);
+            rawSamples[kvp.Key] = kvp.Value;
         }
     }
 
@@ -1720,89 +1772,98 @@ public sealed class BenchmarkHarness
 
         foreach (var benchmark in orderedBenchmarks)
         {
-            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceSource?.Resolve, out var failure);
+            var perMethodLaunchCount = benchmark.Attribute.HasLaunchCountOverride
+                ? LaunchCounts.Clamp(benchmark.Attribute.LaunchCount)
+                : EffectiveLaunchCount;
 
-            if (created is null)
+            var perLaunchResults = new List<BenchmarkResult>();
+            var perLaunchSamples = new List<Dictionary<string, double[]>>();
+            var faulted = false;
+
+            // Inside the launch loop, for the reason given on RunPerClassInProcessAsync: a launch
+            // count buys a between-launch spread, and launches sharing one instance and one
+            // [BenchmarkSetup] do not produce one.
+            for (var launchIdx = 0; launchIdx < perMethodLaunchCount && !faulted; launchIdx++)
             {
-                allResults.Add(InstantiationFailure(suite, benchmark, suiteOptions, failure));
+                // Suppressed for every launch after the first, so a progress bar does not run
+                // backwards over benchmarks it has already reported.
+                var launchProgress = launchIdx == 0 ? progress : NullBenchmarkProgress.Instance;
+                var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
+
+                var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceSource?.Resolve, out var failure);
+
+                if (created is null)
+                {
+                    allResults.Add(InstantiationFailure(suite, benchmark, suiteOptions, failure));
+                    faulted = true;
+
+                    break;
+                }
+
+                var (instance, instanceTeardown) = created.Value;
+                var instanceFromFactory = _instanceSource is not null;
+
+                try
+                {
+                    var singleBenchmarkSuite = suite with { Benchmarks = [benchmark] };
+                    var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(singleBenchmarkSuite, instance, suiteOptions);
+
+                    if (!setupSuccess)
+                    {
+                        allResults.AddRange(setupErrors!);
+                        faulted = true;
+
+                        continue;
+                    }
+
+                    var factory = () => instance;
+                    var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
+
+                    var (results, samples) = await SuiteRunner.RunAsync(
+                        [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                        startIndex, totalBenchmarks, launchProgress, cancellationToken, null, launchObserver).ConfigureAwait(false);
+
+                    perLaunchResults.AddRange(results);
+                    perLaunchSamples.Add(samples);
+                }
+                finally
+                {
+                    await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, null);
+                }
+            }
+
+            if (faulted || perLaunchResults.Count == 0)
+            {
                 startIndex++;
+
                 continue;
             }
 
-            var (instance, instanceTeardown) = created.Value;
-            var instanceFromFactory = _instanceSource is not null;
-
-            try
+            if (perLaunchResults.Count > 1)
             {
-                var singleBenchmarkSuite = suite with { Benchmarks = [benchmark] };
-                var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(singleBenchmarkSuite, instance, suiteOptions);
+                // Combine reads the representative launch's samples off the pairing, so the
+                // displayed trim marks still index the array they were computed against. The
+                // pooled samples below are what significance reads across every launch.
+                var launches = perLaunchResults
+                    .Select((r, i) => new LaunchAggregator.Launch(
+                        r, perLaunchSamples[i].GetValueOrDefault(r.Name, [])))
+                    .ToList();
 
-                if (!setupSuccess)
+                allResults.Add(LaunchAggregator.Combine(launches));
+
+                foreach (var kvp in PoolRawSamplesByName(perLaunchSamples))
                 {
-                    allResults.AddRange(setupErrors!);
-                    startIndex++;
-                    continue;
-                }
-
-                var factory = () => instance;
-                var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
-
-                var perMethodLaunchCount = benchmark.Attribute.HasLaunchCountOverride
-                    ? LaunchCounts.Clamp(benchmark.Attribute.LaunchCount)
-                    : EffectiveLaunchCount;
-
-                if (perMethodLaunchCount > 1)
-                {
-                    var perLaunchResults = new List<BenchmarkResult>();
-                    var perLaunchSamples = new List<Dictionary<string, double[]>>();
-
-                    for (var launchIdx = 0; launchIdx < perMethodLaunchCount; launchIdx++)
-                    {
-                        // See RunPerClassInProcessAsync: suppressed for every launch after the first,
-                        // and previously computed but not passed.
-                        var launchProgress = launchIdx == 0 ? progress : NullBenchmarkProgress.Instance;
-                        var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
-
-                        var (results, samples) = await SuiteRunner.RunAsync(
-                            [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                            startIndex, totalBenchmarks, launchProgress, cancellationToken, null, launchObserver).ConfigureAwait(false);
-
-                        perLaunchResults.AddRange(results);
-                        perLaunchSamples.Add(samples);
-                    }
-
-                    // Combine reads the representative launch's samples off the pairing, so the
-                    // displayed trim marks still index the array they were computed against. The
-                    // pooled samples below are what significance reads across every launch.
-                    var launches = perLaunchResults
-                        .Select((r, i) => new LaunchAggregator.Launch(
-                            r, perLaunchSamples[i].GetValueOrDefault(r.Name, [])))
-                        .ToList();
-
-                    allResults.Add(LaunchAggregator.Combine(launches));
-
-                    foreach (var kvp in PoolRawSamplesByName(perLaunchSamples))
-                    {
-                        rawSamples[kvp.Key] = kvp.Value;
-                    }
-                }
-                else
-                {
-                    var (results, samples) = await SuiteRunner.RunAsync(
-                        [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
-                        startIndex, totalBenchmarks, progress, cancellationToken, null, observer).ConfigureAwait(false);
-
-                    allResults.AddRange(results);
-
-                    foreach (var kvp in samples)
-                    {
-                        rawSamples[kvp.Key] = kvp.Value;
-                    }
+                    rawSamples[kvp.Key] = kvp.Value;
                 }
             }
-            finally
+            else
             {
-                await BenchmarkLifecycle.RunTeardown(suite, instance, instanceFromFactory, instanceTeardown, null);
+                allResults.AddRange(perLaunchResults);
+
+                foreach (var kvp in perLaunchSamples[0])
+                {
+                    rawSamples[kvp.Key] = kvp.Value;
+                }
             }
 
             startIndex++;
@@ -1880,52 +1941,29 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     Resolves how a single benchmark should run, layering the global in-process
-    ///     switch over the isolation intent declared by its attributes. When the declaring
-    ///     class uses <see cref="InstanceLifetime.PerClass" /> with a factory-resolved
-    ///     instance and does not implement <see cref="IStateReset" />, the decision is
-    ///     auto-upgraded to <see cref="IsolationDecision.PerBenchmark" /> to preserve the
-    ///     statistical-independence assumption of the significance engine. Explicit
-    ///     <c>[InProcess]</c> on the method or the <c>--in-process</c> global flag wins
-    ///     over the upgrade.
+    ///     Which process measures a single benchmark, layering the global in-process switch over the
+    ///     isolation intent its attributes declare.
     /// </summary>
-    /// <param name="autoUpgraded">
-    ///     Set to <c>true</c> when the PerClass default was upgraded to PerBenchmark
-    ///     because the class uses a factory and does not implement <see cref="IStateReset" />;
-    ///     <c>false</c> for every other decision (explicit <c>[IsolatedProcess]</c>,
-    ///     in-process, or genuine PerClass).
-    /// </param>
-    private static IsolationDecision ResolveIsolation(
+    /// <remarks>
+    ///     Granularity only. How long the instance lives is <see cref="InstanceIndependence" />'s
+    ///     question and is answered separately, because deciding both here meant the first answer
+    ///     swallowed the second: <c>--in-process</c> returned before the lifetime rule ran, so the
+    ///     rule was unreachable for every run that could not isolate - which is precisely the run
+    ///     where a shared instance is measured in a dirty host and nothing at all is said about it.
+    /// </remarks>
+    private static IsolationDecision ResolveGranularity(
         BenchmarkMethodDefinition benchmark,
-        BenchmarkSuiteDefinition suite,
-        bool inProcessGlobal,
-        bool usesFactory,
-        out bool autoUpgraded)
+        bool inProcessGlobal)
     {
-        autoUpgraded = false;
-
         if (inProcessGlobal)
             return IsolationDecision.InProcess;
 
         if (benchmark.Isolation == IsolationMode.InProcess)
             return IsolationDecision.InProcess;
 
-        if (benchmark.Isolation == IsolationMode.PerBenchmark)
-            return IsolationDecision.PerBenchmark;
-
-        // PerClass default. Auto-upgrade to PerBenchmark when the instance is
-        // factory-resolved and the class does not implement IStateReset, to
-        // preserve the statistical-independence assumption of the significance
-        // engine. Explicit [InProcess] on the method already returned above.
-        if (suite.Lifetime == InstanceLifetime.PerClass
-            && usesFactory
-            && !typeof(IStateReset).IsAssignableFrom(suite.Type))
-        {
-            autoUpgraded = true;
-            return IsolationDecision.PerBenchmark;
-        }
-
-        return IsolationDecision.PerClass;
+        return benchmark.Isolation == IsolationMode.PerBenchmark
+            ? IsolationDecision.PerBenchmark
+            : IsolationDecision.PerClass;
     }
 
     /// <summary>
@@ -1977,7 +2015,13 @@ public sealed class BenchmarkHarness
                 replicate,
                 startIndex,
                 totalBenchmarks,
-                _instanceSource?.ToPayload());
+                _instanceSource?.ToPayload(),
+
+                // The lifetime this class resolved to on the coordinator, sent so the worker measures
+                // the same object graph the in-process path would have. Without it a class carrying
+                // [InstanceLifetime(PerClass)] keeps its attribute in the worker and the resolution
+                // applies to exactly the half of the run that does not need it.
+                suite.Lifetime);
 
             allLaunchItems.Add(
                 await RunGroupInWorkerAsync(request, replicate, names, suite, timeout, progress, observer, cancellationToken)
@@ -2249,70 +2293,25 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     Warns on every result from a class that shares one instance across several benchmark
-    ///     methods, because the second method can observe state the first left behind - which breaks
-    ///     the independence assumption the significance test rests on.
+    ///     Attaches a class-level warning to every row this class produced in the current run,
+    ///     whichever path measured it.
     /// </summary>
-    private static void ApplyPerClassIndependenceWarning(
+    /// <remarks>
+    ///     Keyed by class name over the run's own slice rather than by benchmark name, because the
+    ///     fact being reported is about the class - and a per-name set could not describe a class
+    ///     whose rows were split across the in-process, per-class and per-benchmark paths without
+    ///     enumerating them three times.
+    /// </remarks>
+    private static void ApplyClassWarning(
         List<BenchmarkResult> results,
-        BenchmarkSuiteDefinition suite,
-        MeasurementOptions options)
+        int startIndex,
+        string className,
+        string warning)
     {
-        if (options.SuppressPerClassIndependenceWarning)
-            return;
-
-        if (suite.Lifetime != InstanceLifetime.PerClass)
-            return;
-
-        if (suite.Benchmarks.Count <= 1)
-            return;
-
-        var warning = $"Class '{suite.Type.Name}' uses InstanceLifetime.PerClass with "
-                      + $"{suite.Benchmarks.Count} [Benchmark] methods. Sharing a single instance "
-                      + "across methods can cause the second method to observe cached state from "
-                      + "the first, violating the statistical-independence assumption of the "
-                      + "significance test. To preserve independence: implement IStateReset on the "
-                      + "class (the engine will call it between methods), or add [IsolatedProcess] "
-                      + "to run each method in a clean process. Set SuppressPerClassIndependenceWarning "
-                      + "to true on MeasurementOptions only if sharing is intentional.";
-
-        for (var i = 0; i < results.Count; i++)
-        {
-            results[i] = results[i] with
-            {
-                Warnings = results[i].Warnings.Count > 0
-                    ? [.. results[i].Warnings, warning]
-                    : [warning],
-            };
-        }
-    }
-
-    /// <summary>
-    ///     Attaches the auto-isolation upgrade warning to every result whose benchmark
-    ///     was auto-upgraded from PerClass to PerBenchmark by the b-factory rule in
-    ///     <see cref="ResolveIsolation" />. The warning is attached in the parent process
-    ///     after the isolated child results are folded back in, so it appears on the
-    ///     results the user actually sees. Only the specific benchmarks that were
-    ///     upgraded carry the warning; benchmarks from the same class that kept their
-    ///     explicit isolation decision (e.g. <c>[InProcess]</c>) are left untouched.
-    /// </summary>
-    private static void ApplyAutoIsolationUpgradeWarning(
-        List<BenchmarkResult> results,
-        HashSet<string> autoUpgradedResultNames,
-        int startIndex)
-    {
-        if (autoUpgradedResultNames.Count == 0)
-            return;
-
         for (var i = startIndex; i < results.Count; i++)
         {
-            if (!autoUpgradedResultNames.Contains(results[i].Name))
+            if (!string.Equals(results[i].ClassName, className, StringComparison.Ordinal))
                 continue;
-
-            var warning = $"Class '{results[i].ClassName}' uses InstanceLifetime.PerClass with a "
-                          + "factory-resolved instance and does not implement IStateReset; upgrading to "
-                          + "per-benchmark isolated process to preserve statistical independence. Implement "
-                          + "IStateReset on the class to allow in-process PerClass execution.";
 
             results[i] = results[i] with
             {

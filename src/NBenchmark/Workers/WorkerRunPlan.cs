@@ -232,7 +232,8 @@ internal static class WorkerRunPlan
         int replicate,
         int startIndex,
         int totalBenchmarks,
-        InstanceSourcePayload? instanceSource = null)
+        InstanceSourcePayload? instanceSource = null,
+        InstanceLifetime? instanceLifetimeOverride = null)
     {
         ArgumentNullException.ThrowIfNull(declaringType);
 
@@ -250,6 +251,7 @@ internal static class WorkerRunPlan
                 Seed = DeriveSeed(sessionSeed, replicate),
                 DisplayPrefix = declaringType.Name,
                 DefaultInstanceLifetime = defaultInstanceLifetime,
+                InstanceLifetimeOverride = instanceLifetimeOverride,
                 StartIndex = startIndex,
                 TotalBenchmarks = totalBenchmarks,
                 InstanceSource = instanceSource,

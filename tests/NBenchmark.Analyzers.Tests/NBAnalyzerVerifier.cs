@@ -86,6 +86,11 @@ internal static class TestSources
                                         {
                                             public InstanceLifetimeAttribute(NBenchmark.InstanceLifetime lifetime) {}
                                         }
+                                        [System.AttributeUsage(System.AttributeTargets.Class)]
+                                        public sealed class SharedStateAttribute : System.Attribute
+                                        {
+                                            public bool Intentional { get; init; } = true;
+                                        }
                                     }
                                     namespace NBenchmark
                                     {
@@ -147,6 +152,14 @@ internal static class TestSources
                                         public BenchmarkSuite WithParameter<T>(string name, params T[] values) { return this; }
 
                                         public System.Threading.Tasks.Task<BenchmarkResult> RunAsync() { return System.Threading.Tasks.Task.FromResult(new BenchmarkResult()); }
+                                    }
+
+                                    /// The fluent instance-lifetime default is a whole-compilation fact - it applies to
+                                    /// every discovered class in the assembly - so NB0011 has to see the call to know
+                                    /// what a class carrying no [InstanceLifetime] attribute actually runs as.
+                                    public sealed class BenchmarkHarness
+                                    {
+                                        public BenchmarkHarness WithInstanceLifetime(NBenchmark.InstanceLifetime lifetime) { return this; }
                                     }
                                 }
                                     namespace NBenchmark.Lifecycle

@@ -1,6 +1,6 @@
 ---
 title: State Isolation
-description: Keep PerClass benchmark instances clean between methods with IStateReset, and understand the auto-isolation fallback for factory-resolved classes.
+description: Keep PerClass benchmark instances clean between methods with IStateReset, declare deliberate sharing with [SharedState], and understand how the lifetime is resolved for container-resolved classes.
 order: 8
 ---
 
@@ -8,7 +8,7 @@ order: 8
 
 When a benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]`, a single instance is shared across every `[Benchmark]` method in the class. This is useful when construction is expensive (a database connection, a large in-memory dataset) and you want to amortise that cost across multiple methods. The tradeoff is **state contamination**: method A can leave cached state behind that method B observes, so method B's timings depend on method A running first. That violates the statistical-independence assumption of the significance test and produces false-confidence p-values.
 
-NBenchmark offers two mechanisms to keep PerClass sharing safe: an explicit reset contract (`IStateReset`) and an automatic isolation fallback for classes that do not opt in.
+Three things keep PerClass sharing honest: an explicit reset contract (`IStateReset`), an explicit declaration that the carry-over is deliberate (`[SharedState]`), and - for a class whose instances come from a container - an automatic resolution to a fresh instance per method when neither is present.
 
 ## IStateReset - explicit reset between methods
 
@@ -38,55 +38,67 @@ public class OrderBenchmarks : IStateReset
 
 The class owns its reset semantics and fans the reset out to whatever it holds - a `DbContext` clears its change tracker, a cache drops its entries, a counter resets to zero. The engine checks `typeof(IStateReset).IsAssignableFrom(suite.Type)` at dispatch time (before instantiation), so the check is a pure reflection fact with no runtime introspection cost.
 
-### No-op IStateReset
+### A no-op IStateReset is not a way to declare sharing
 
-A no-op implementation is valid and declares that the shared state is intentionally carried across methods:
+`IStateReset` means one thing: *I reset between methods, so PerClass is safe*. An empty body claims that and does not do it:
 
 ```csharp
+// Wrong. NB0011 reports this.
 public Task ResetAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 ```
 
-This opts the class out of the auto-isolation fallback (below) and silences the auto-upgrade warning. The general PerClass independence warning can still be emitted unless it is explicitly suppressed in `MeasurementOptions`. Use a no-op reset only when the shared state is truly immutable or when cross-method coupling is intentional.
+The engine can only see that the interface is *present* - it cannot read a method body - so an empty implementation used to silence both the warning and the lifetime resolution while changing nothing about the shared state. If the carry-over is deliberate, say so with `[SharedState]` below, which claims nothing a body could contradict. Analyzer NB0011 reports an empty `ResetAsync` for exactly this reason.
 
-## Auto-isolation fallback
+## `[SharedState]` - the carry-over is the point
 
-> [!NOTE]
-> The auto-upgrade described below fires only when the harness resolves instances through an **addressable** factory. It is documented here as designed; the conditions under which it actually fires are narrower than this page has historically claimed, and are being corrected separately.
+Some benchmarks are *about* the warm state: measuring the second call into a populated cache is a legitimate thing to want. Declare it:
 
-When a PerClass class is resolved via a factory and does **not** implement `IStateReset`, the host automatically upgrades the isolation decision from PerClass to PerBenchmark. Each method runs in its own clean worker, preserving statistical independence at the cost of a process launch per method. The affected results carry a warning:
+```csharp
+[InstanceLifetime(InstanceLifetime.PerClass)]
+[SharedState]
+public class CacheBenchmarks
+{
+    [Benchmark] public int ColdishRead() => _cache.Get("k");
+    [Benchmark] public int WarmRead() => _cache.Get("k");
+}
+```
 
-> Class 'OrderBenchmarks' uses InstanceLifetime.PerClass with a factory-resolved instance and does not implement IStateReset; upgrading to per-benchmark isolated process to preserve statistical independence. Implement IStateReset on the class to allow in-process PerClass execution.
+This keeps the PerClass lifetime, suppresses the independence warning, and suppresses NB0011 for that class. It does not make the dependence go away - a significance test over two methods that share an instance is still comparing samples that are not independent. It says you know.
 
-This protects against silent false confidence: without the fallback, a scoped service (e.g. `DbContext`) shared across methods would warm the cache that the next method reads, producing dependent timings and invalid significance results. The fallback trades wall-clock cost for measurement cleanliness.
+## Lifetime resolution for container-resolved classes
 
-### Opting out of the fallback
+When a PerClass class's instances come from a factory or a service container - `WithInstanceFactory`, `WithServiceProvider`, `WithScopedServiceProvider`, `UseScopedDependencyInjection` - and the class implements neither `IStateReset` nor `[SharedState]`, the lifetime resolves to **PerMethod**: each `[Benchmark]` method gets a fresh instance and, under scoped DI, its own `IServiceScope`. The affected results carry a warning:
 
-Three ways to keep PerClass in-process execution:
+> Class 'OrderBenchmarks' declares InstanceLifetime.PerClass and its instances come from a factory or service container, so one instance - and, under scoped DI, one scope and everything it holds - would be shared by every [Benchmark] method. It is measured with a fresh instance per method instead, because the significance test assumes the methods are independent. Implement IStateReset to keep PerClass and reset between methods, or add [SharedState] to declare that the carry-over is deliberate.
 
-1. **Implement `IStateReset`** - the recommended path. The engine resets state between methods and the class stays in-process.
-2. **Add `[InProcess]` to a method** - explicit per-method intent wins. That method stays in-process regardless of the fallback rule.
-3. **Pass `--in-process` globally** - the global flag wins over the fallback for every benchmark in the run.
+This is the case the rule exists for: a scoped `DbContext` shared across methods warms the change tracker that the next method reads, producing dependent timings and a significance verdict computed on an assumption that does not hold.
 
-### What does not trigger the fallback
+**The resolution is independent of where the benchmark is measured.** It applies to an isolated worker, an in-process run, `--in-process`, and a cross-runtime run alike - the lifetime is a fact about the class, not about which process holds it. (It was previously entangled with the isolation decision, which meant `--in-process` and any refusal to isolate skipped it entirely.)
 
-- **PerClass without a factory** (parameterless constructor): the fallback only fires when `_instanceFactory` is set. A parameterless-ctor PerClass class that does not implement `IStateReset` keeps the runtime soft warning and stays PerClass - it is a rare misuse case already flagged by the NB0013 analyzer and `ApplyPerClassIndependenceWarning`.
-- **PerMethod** (the default): no shared instance, no contamination risk.
-- **`IStateReset` implemented**: the reset contract is in place, so in-process PerClass is safe.
+### What keeps PerClass
+
+- **`IStateReset`** - the reset contract is in place, so the shared instance is cleaned between methods.
+- **`[SharedState]`** - the sharing is declared deliberate.
+- **A parameterless constructor** - nothing was injected, so there is no scope to share. The class keeps PerClass and gets the runtime warning below; `[SharedState]` silences it.
 
 ## Runtime warning
 
-Even when the fallback does not fire (e.g. parameterless-ctor PerClass, or `IStateReset` implemented but state still shared), a runtime warning is attached to every result from a PerClass suite with more than one `[Benchmark]` method:
+Whenever a class actually runs PerClass with more than one `[Benchmark]` method and has declared neither `IStateReset` nor `[SharedState]`, a warning is attached to every result from it - from the isolated worker and the in-process path alike:
 
-> Class 'OrderBenchmarks' uses InstanceLifetime.PerClass with 2 [Benchmark] methods. Sharing a single instance across methods can cause the second method to observe cached state from the first, violating the statistical-independence assumption of the significance test. To preserve independence: implement IStateReset on the class (the engine will call it between methods), or add [IsolatedProcess] to run each method in a clean process. Set SuppressPerClassIndependenceWarning to true on MeasurementOptions only if sharing is intentional.
+> Class 'OrderBenchmarks' uses InstanceLifetime.PerClass with 2 [Benchmark] methods. Sharing a single instance across methods can cause the second method to observe cached state from the first, violating the statistical-independence assumption of the significance test. To preserve independence: implement IStateReset on the class (the engine will call it between methods), or use InstanceLifetime.PerMethod. If the carry-over is deliberate, say so with [SharedState] - or set SuppressPerClassIndependenceWarning on MeasurementOptions to silence it for the whole run.
 
-Suppress with `SuppressPerClassIndependenceWarning = true` on `MeasurementOptions` when sharing is intentional. The no-op `IStateReset` is usually a better choice because it documents the intent in code rather than in a configuration flag.
+`[SharedState]` is the better answer than `SuppressPerClassIndependenceWarning`, because it documents the intent on the class rather than turning the warning off for every class in the run.
+
+## Launches
+
+With `LaunchCount > 1` each launch builds a **new instance** and re-runs `[BenchmarkSetup]`, on every path. That is what makes the reported standard error and margin of error a between-launch reproducibility figure rather than three readings of the same warmed object. `IStateReset` is therefore not called at a launch boundary - there is no carried state left to reset - only in the gaps between methods within a launch.
 
 ## Compile-time diagnostic (NB0011)
 
-The `PerClassWithScopedServiceAnalyzer` (NB0011) flags at compile time when a PerClass class injects a constructor parameter that looks like a scoped service (any non-primitive, non-ambient reference type). The diagnostic is a suppressible warning. A code fix provider offers two fixes:
+The `PerClassWithScopedServiceAnalyzer` (NB0011) flags at compile time when a PerClass class with two or more `[Benchmark]` methods injects a constructor parameter that looks like a scoped service (any non-primitive, non-ambient reference type). PerClass is recognised from the class attribute *or* from a `WithInstanceLifetime(InstanceLifetime.PerClass)` call elsewhere in the same compilation. The diagnostic is a suppressible warning, and it also fires when `IStateReset` is implemented with an empty body. A code fix provider offers two fixes:
 
 1. **Use InstanceLifetime.PerMethod** - change the attribute to `[InstanceLifetime(InstanceLifetime.PerMethod)]`, giving each method a fresh instance.
-2. **Implement IStateReset** - add `IStateReset` to the class and generate a `ResetAsync` stub (available when the `NBenchmark.Lifecycle.IStateReset` type is resolvable in the compilation).
+2. **Implement IStateReset** - add `IStateReset` to the class and generate a `ResetAsync` stub (available when the `NBenchmark.Lifecycle.IStateReset` type is resolvable in the compilation). The generated body is a `TODO` and a `throw`, not a completed task: a body that compiles away quietly would silence the diagnostic without resetting anything.
 
 See the [analyzers reference](../reference/analyzers.md#nb0011---perclass-lifetime-with-scoped-service) for the full NB0011 description and suppression guidance.
 

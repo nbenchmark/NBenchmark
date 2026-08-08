@@ -112,7 +112,7 @@ internal static class DiscoveredGroupExecutor
                     .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
                     .ToList();
 
-                Func<Task>? betweenBenchmarksReset = typeof(IStateReset).IsAssignableFrom(suite.Type)
+                Func<Task>? betweenBenchmarksReset = InstanceIndependence.ResetsItself(suite.Type)
                     ? () => ((IStateReset)instance).ResetAsync(cancellationToken)
                     : null;
 
@@ -121,6 +121,15 @@ internal static class DiscoveredGroupExecutor
                         startIndex, totalBenchmarks, progress, cancellationToken,
                         betweenBenchmarksReset, observer)
                     .ConfigureAwait(false);
+
+                // Raised here rather than in the coordinator's in-process path, which is where it
+                // used to live and is the path a default Harness run never takes. Sharing an
+                // instance breaks the independence assumption identically in a worker; the worker
+                // was simply the one measuring process that never said so.
+                InstanceIndependence.Attach(
+                    results,
+                    InstanceIndependence.DependenceWarning(
+                        suite.Type, suite.Lifetime, selected.Count, options));
             }
         }
         finally

@@ -256,6 +256,25 @@ internal sealed record BodyRef
         ReceiverTable? receivers = null)
         => TryCreateCore(hook, displayName, out bodyRef, out refusal, null, null, receivers, true);
 
+    /// <summary>
+    ///     Addresses a factory the measuring process invokes with arguments of its own - an instance
+    ///     factory handed the benchmark class - so its parameters are neither encoded nor refused.
+    /// </summary>
+    /// <remarks>
+    ///     Same distinction as <see cref="TryCreateHook" />, reached from the other direction. The
+    ///     "every parameter needs a value" rule is a rule about <i>bodies</i>, where it is correct
+    ///     because a body with an unfilled parameter is unmeasurable. A <c>Func&lt;Type, object&gt;</c>
+    ///     is handed its argument at the moment an instance is wanted, so applying the body rule to it
+    ///     refused every static instance factory - and the coordinator then declined to isolate a run
+    ///     the worker was fully equipped to measure.
+    /// </remarks>
+    public static bool TryCreateInvokedFactory(
+        Delegate factory,
+        string displayName,
+        out BodyRef bodyRef,
+        out Refusal refusal)
+        => TryCreateCore(factory, displayName, out bodyRef, out refusal, null, null, null, true);
+
     private static bool TryCreateCore(
         Delegate body,
         string displayName,
@@ -264,7 +283,7 @@ internal sealed record BodyRef
         IReadOnlyList<object?>? arguments,
         IReadOnlyList<StateRecipe?>? recipes,
         ReceiverTable? receivers,
-        bool parametersFromBody)
+        bool parametersSuppliedAtInvocation)
     {
         ArgumentNullException.ThrowIfNull(body);
 
@@ -291,10 +310,11 @@ internal sealed record BodyRef
 
         IReadOnlyList<ArgumentSource> argumentSources = [];
 
-        if (parametersFromBody)
+        if (parametersSuppliedAtInvocation)
         {
             // The ceiling still applies - the worker binds through the same ArgumentBinder - but nothing
-            // is encoded, because the values come from the body at resolution time.
+            // is encoded, because the values arrive when the delegate is called: from the body's own
+            // slots for a hook, from the caller for a factory.
             if (method.GetParameters().Length > ArgumentBinder.MaxArity)
             {
                 refusal = new Refusal(

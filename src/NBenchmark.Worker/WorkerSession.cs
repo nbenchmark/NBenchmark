@@ -827,6 +827,13 @@ internal sealed class WorkerSession(FrameChannel channel)
             return;
         }
 
+        // The coordinator's resolution wins over the class attribute discovery just read. It is the
+        // side that knows where instances come from, and a lifetime decided twice is a lifetime the
+        // two processes can disagree about - which would make an isolated and an in-process number
+        // differ for a reason that has nothing to do with the process boundary.
+        if (request.InstanceLifetimeOverride is { } lifetime)
+            suite = suite with { Lifetime = lifetime };
+
         var requested = new HashSet<string>(request.BenchmarkNames, StringComparer.Ordinal);
 
         var selected = requested.Count == 0
