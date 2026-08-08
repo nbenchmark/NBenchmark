@@ -15,7 +15,9 @@ namespace NBenchmark.CodeFixes.CodeFixes;
 ///     the class declaration, which gives each [Benchmark] method a fresh instance; (2) implement
 ///     <c>IStateReset</c> on the class so the engine can reset shared state between methods and
 ///     keep the <c>PerClass</c> lifetime. Fix (2) is offered only when the
-///     <c>NBenchmark.Lifecycle.IStateReset</c> type is resolvable in the current compilation.
+///     <c>NBenchmark.Lifecycle.IStateReset</c> type is resolvable in the current compilation, and
+///     it emits a body that must be written rather than one that already compiles - see
+///     <see cref="ImplementIStateResetAsync" />.
 /// </summary>
 [ExportCodeFixProvider(LanguageNames.CSharp)]
 [Shared]
@@ -147,6 +149,12 @@ public sealed class PerClassWithScopedServiceCodeFixProvider : CodeFixProvider
 
         var fullIStateResetName = iStateReset.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
+        // A TODO plus a throw, not `return Task.CompletedTask;`. The generated body used to be the
+        // completed-task form, which meant accepting this fix and not editing it silenced the
+        // diagnostic and the engine's own PerClass safeguard while resetting nothing at all - the
+        // fastest available route to the contamination the diagnostic exists to report. A body that
+        // does not compile away quietly is the point: the author has to say what resetting means for
+        // their class, which is the one thing neither the engine nor this fix can know.
         var resetMethod = SyntaxFactory.MethodDeclaration(
                 SyntaxFactory.ParseTypeName("System.Threading.Tasks.Task"),
                 "ResetAsync")
@@ -156,7 +164,14 @@ public sealed class PerClassWithScopedServiceCodeFixProvider : CodeFixProvider
                     SyntaxFactory.Parameter(SyntaxFactory.Identifier("cancellationToken"))
                         .WithType(SyntaxFactory.ParseTypeName("System.Threading.CancellationToken")))))
             .WithBody(SyntaxFactory.Block(
-                SyntaxFactory.ParseStatement("return System.Threading.Tasks.Task.CompletedTask;")));
+                SyntaxFactory.ParseStatement(
+                        "throw new System.NotImplementedException(\"Reset the state this class shares "
+                        + "between [Benchmark] methods, or replace IStateReset with [SharedState] if "
+                        + "the carry-over is deliberate.\");")
+                    .WithLeadingTrivia(
+                        SyntaxFactory.Comment(
+                            "// TODO: reset the state shared between [Benchmark] methods."),
+                        SyntaxFactory.ElasticCarriageReturnLineFeed)));
 
         // Add the interface to the base list if not already present, plus a using directive.
         var baseTypes = typeDecl.BaseList?.Types ?? new SeparatedSyntaxList<BaseTypeSyntax>();

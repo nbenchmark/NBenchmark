@@ -9,11 +9,25 @@ namespace NBenchmark.Lifecycle;
 ///     statistical-independence assumption of the significance test is preserved.
 /// </summary>
 /// <remarks>
-///     The class owns its reset semantics and fans the reset out to whatever it holds - a
-///     <c>DbContext</c> clears its change tracker, a cache drops its entries, a counter resets to
-///     zero, etc. A no-op implementation (<c>return Task.CompletedTask;</c>) is valid and declares
-///     that the shared state is intentionally carried across methods; this also opts the class out
-///     of the auto-isolation fallback.
+///     <para>
+///         The class owns its reset semantics and fans the reset out to whatever it holds - a
+///         <c>DbContext</c> clears its change tracker, a cache drops its entries, a counter resets to
+///         zero, etc.
+///     </para>
+///     <para>
+///         This means one thing only: <i>I reset between methods, so PerClass is safe</i>. An empty
+///         body is not a way to say the sharing is deliberate - say that with
+///         <c>[SharedState]</c> instead, which claims nothing about resetting and so cannot be
+///         contradicted by its own body. The two used to be the same declaration, and because the
+///         engine can only see that the interface is present, <c>return Task.CompletedTask;</c>
+///         silenced every safeguard while changing nothing at all; analyzer NB0011 now reports that
+///         shape.
+///     </para>
+///     <para>
+///         Between <i>launches</i> nothing is asked of it: the instance is rebuilt and
+///         <c>[BenchmarkSetup]</c> runs again, which is strictly more than a reset. The callback
+///         covers the gaps between methods within one launch, and only those.
+///     </para>
 /// </remarks>
 public interface IStateReset
 {

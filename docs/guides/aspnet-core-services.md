@@ -58,7 +58,7 @@ public sealed class OrderBenchmarks(BenchDbContext db)
 - **`[BenchmarkCategory(...)]`** tags benchmarks for filtering. Run only the read path with `dotnet run -- --category Read`, or exclude writes with `dotnet run -- --exclude-category Write`. See [Categories](../features/categories.md).
 
 > [!WARNING] Shared state breaks statistical independence
-> If you pair `UseScopedDependencyInjection` with `[InstanceLifetime(InstanceLifetime.PerClass)]`, all `[Benchmark]` methods in the class share one instance and one `DbContext`. The cache warms across methods, method B's timings become linked to method A running first, and the significance test's independence assumption is violated. The **NB0011 analyzer** warns on this combination at build time. See [State isolation](../features/state-isolation.md) for the `IStateReset` contract.
+> If you pair `UseScopedDependencyInjection` with `[InstanceLifetime(InstanceLifetime.PerClass)]`, one instance and one `DbContext` would serve every `[Benchmark]` method in the class: the cache warms across methods, method B's timings become linked to method A running first, and the significance test's independence assumption is violated. The lifetime therefore resolves to `PerMethod` - a fresh instance and a fresh scope per method - and the results say so. Implement `IStateReset` to keep `PerClass`, or add `[SharedState]` if the carry-over is the thing you are measuring. The **NB0011 analyzer** reports the same combination at build time. See [State isolation](../features/state-isolation.md).
 
 ## Run it
 

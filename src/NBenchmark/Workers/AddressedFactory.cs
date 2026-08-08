@@ -147,13 +147,22 @@ internal sealed record AddressedFactory
     ///     <see cref="BodyRef" />, which already knows how to encode a body's arguments - a recipe is
     ///     just a body whose result is a parameter rather than a measurement.
     /// </param>
+    /// <param name="argumentsSuppliedAtInvocation">
+    ///     Whether the measuring process calls this factory with arguments of its own rather than with
+    ///     values carried alongside the address. True for an instance factory, which is handed the
+    ///     benchmark class each time an instance is wanted; false for every recipe that is simply run.
+    ///     Applying the body rule - "every parameter needs a value" - to the former refused every
+    ///     static <c>Func&lt;Type, object&gt;</c> at addressing time, so the coordinator declined to
+    ///     isolate runs the worker was already equipped to measure.
+    /// </param>
     public static bool TryCreate(
         Delegate factory,
         string role,
         out AddressedFactory addressed,
         out Refusal refusal,
         string? displayName = null,
-        IReadOnlyList<object?>? arguments = null)
+        IReadOnlyList<object?>? arguments = null,
+        bool argumentsSuppliedAtInvocation = false)
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentException.ThrowIfNullOrWhiteSpace(role);
@@ -167,11 +176,13 @@ internal sealed record AddressedFactory
         // would make the recipe depend on the process it was supposed to be independent of.
         // No receiver table, which is how "this may not transfer captures" is said: without one there
         // is nowhere to put them, so a capturing factory is refused.
-        if (!BodyRef.TryCreate(
-                factory, displayName ?? role, out var body, out refusal, arguments, receivers: null))
-        {
+        var addressable = argumentsSuppliedAtInvocation
+            ? BodyRef.TryCreateInvokedFactory(factory, displayName ?? role, out var body, out refusal)
+            : BodyRef.TryCreate(
+                factory, displayName ?? role, out body, out refusal, arguments, receivers: null);
+
+        if (!addressable)
             return false;
-        }
 
         addressed = new AddressedFactory { Role = role, Body = body };
 

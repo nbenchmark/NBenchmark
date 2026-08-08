@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark.Attributes;
+using NBenchmark.Lifecycle;
 using Xunit;
 
 namespace NBenchmark.DependencyInjection.Tests;
@@ -236,8 +237,19 @@ public class DependencyInjectionHarnessTests
         Assert.Equal(PerMethodScopeBenchmark.MethodCount, tracker.DisposeCount);
     }
 
+    /// <summary>
+    ///     PerClass plus scoped DI resolves to a scope per method, and the attribute does not stop it.
+    /// </summary>
+    /// <remarks>
+    ///     This assertion used to read <c>Assert.Equal(1, ...)</c>, and that was the defect rather
+    ///     than the contract: one scope for the whole class means every method after the first reads
+    ///     a container - and, in the case the package exists for, a <c>DbContext</c> with a warm
+    ///     change tracker - that the previous method left behind. The significance test then compares
+    ///     two samples it assumes are independent. The lifetime rule and the sharing it produces are
+    ///     the same fact, so this is the test that says which one the engine believes.
+    /// </remarks>
     [Fact]
-    public async Task WithScopedServiceProvider_PerClass_Disposes_One_Scope_Per_Suite()
+    public async Task WithScopedServiceProvider_PerClass_Scopes_Per_Method()
     {
         var services = new ServiceCollection()
             .AddSingleton(new DisposableTracker())
@@ -255,11 +267,11 @@ public class DependencyInjectionHarnessTests
         });
 
         var tracker = services.GetRequiredService<DisposableTracker>();
-        Assert.Equal(1, tracker.DisposeCount);
+        Assert.Equal(PerClassScopeBenchmark.MethodCount, tracker.DisposeCount);
     }
 
     [Fact]
-    public async Task WithScopedServiceProvider_And_WithInstanceLifetime_PerClass_Disposes_One_Scope_Per_Suite()
+    public async Task WithScopedServiceProvider_And_WithInstanceLifetime_PerClass_Scopes_Per_Method()
     {
         var services = new ServiceCollection()
             .AddSingleton(new DisposableTracker())
@@ -272,6 +284,59 @@ public class DependencyInjectionHarnessTests
                 .AddFromAssembly<HarnessPerClassScopeBenchmark>()
                 .WithScopedServiceProvider(services)
                 .WithInstanceLifetime(InstanceLifetime.PerClass)
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync();
+        });
+
+        var tracker = services.GetRequiredService<DisposableTracker>();
+        Assert.Equal(HarnessPerClassScopeBenchmark.MethodCount, tracker.DisposeCount);
+    }
+
+    /// <summary>
+    ///     A class that resets itself keeps PerClass - one scope for the whole class, as asked for.
+    /// </summary>
+    [Fact]
+    public async Task WithScopedServiceProvider_PerClass_With_IStateReset_Keeps_One_Scope()
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(new DisposableTracker())
+            .AddTransient<ResettingPerClassScopeBenchmark>()
+            .BuildServiceProvider();
+
+        await CaptureAndSuppressConsoleOutputAsync(async () =>
+        {
+            await BenchmarkHarness.Create(["--filter", "ResettingPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
+                .AddFromAssembly<ResettingPerClassScopeBenchmark>()
+                .WithScopedServiceProvider(services)
+                .WithRunOrder(RunOrder.Declaration)
+                .WithIsolation(false)
+                .RunAsync();
+        });
+
+        var tracker = services.GetRequiredService<DisposableTracker>();
+        Assert.Equal(1, tracker.DisposeCount);
+        Assert.True(ResettingPerClassScopeBenchmark.ResetCount > 0, "ResetAsync should have fired between methods.");
+    }
+
+    /// <summary>
+    ///     So does one that declares the carry-over deliberate. The two routes have to be tested
+    ///     apart, because before <c>[SharedState]</c> existed they were the same declaration and an
+    ///     empty <c>ResetAsync</c> was the only way to say this.
+    /// </summary>
+    [Fact]
+    public async Task WithScopedServiceProvider_PerClass_With_SharedState_Keeps_One_Scope()
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(new DisposableTracker())
+            .AddTransient<SharedStatePerClassScopeBenchmark>()
+            .BuildServiceProvider();
+
+        await CaptureAndSuppressConsoleOutputAsync(async () =>
+        {
+            await BenchmarkHarness.Create(["--filter", "SharedStatePerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
+                .AddFromAssembly<SharedStatePerClassScopeBenchmark>()
+                .WithScopedServiceProvider(services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -409,6 +474,8 @@ public sealed class PerMethodScopeBenchmark : IDisposable
 [InstanceLifetime(InstanceLifetime.PerClass)]
 public sealed class PerClassScopeBenchmark : IDisposable
 {
+    public const int MethodCount = 2;
+
     private readonly DisposableTracker _tracker;
 
     public PerClassScopeBenchmark(DisposableTracker tracker)
@@ -427,9 +494,59 @@ public sealed class PerClassScopeBenchmark : IDisposable
 
 public sealed class HarnessPerClassScopeBenchmark : IDisposable
 {
+    public const int MethodCount = 2;
+
     private readonly DisposableTracker _tracker;
 
     public HarnessPerClassScopeBenchmark(DisposableTracker tracker)
+    {
+        _tracker = tracker;
+    }
+
+    public void Dispose() => _tracker.DisposeCount++;
+
+    [Benchmark]
+    public int First() => 1;
+
+    [Benchmark]
+    public int Second() => 2;
+}
+
+[InstanceLifetime(InstanceLifetime.PerClass)]
+public sealed class ResettingPerClassScopeBenchmark : IDisposable, IStateReset
+{
+    public static int ResetCount;
+
+    private readonly DisposableTracker _tracker;
+
+    public ResettingPerClassScopeBenchmark(DisposableTracker tracker)
+    {
+        _tracker = tracker;
+    }
+
+    public void Dispose() => _tracker.DisposeCount++;
+
+    public Task ResetAsync(CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref ResetCount);
+
+        return Task.CompletedTask;
+    }
+
+    [Benchmark]
+    public int First() => 1;
+
+    [Benchmark]
+    public int Second() => 2;
+}
+
+[InstanceLifetime(InstanceLifetime.PerClass)]
+[SharedState]
+public sealed class SharedStatePerClassScopeBenchmark : IDisposable
+{
+    private readonly DisposableTracker _tracker;
+
+    public SharedStatePerClassScopeBenchmark(DisposableTracker tracker)
     {
         _tracker = tracker;
     }

@@ -86,6 +86,16 @@ public sealed class PerClassWithScopedServiceCodeFixTests
             .VerifyCodeFixAsync<PerClassWithScopedServiceCodeFixProvider>(source, fixedSource, "NB0011");
     }
 
+    /// <summary>
+    ///     The generated <c>ResetAsync</c> must not compile away quietly.
+    /// </summary>
+    /// <remarks>
+    ///     It used to emit <c>return Task.CompletedTask;</c>, which meant the shipped one-click fix
+    ///     for this diagnostic silenced the diagnostic <i>and</i> the engine's PerClass safeguard -
+    ///     both of which key on the interface being present, not on the body doing anything - while
+    ///     resetting nothing. Accepting the fix and moving on was the fastest route to the exact
+    ///     contamination the diagnostic reports.
+    /// </remarks>
     [Fact]
     public async Task CodeFix_Implements_IStateReset_When_Selected()
     {
@@ -121,7 +131,8 @@ public sealed class PerClassWithScopedServiceCodeFixTests
 
                               public System.Threading.Tasks.Task ResetAsync(System.Threading.CancellationToken cancellationToken)
                               {
-                                  return System.Threading.Tasks.Task.CompletedTask;
+                                  // TODO: reset the state shared between [Benchmark] methods.
+                                  throw new System.NotImplementedException("Reset the state this class shares between [Benchmark] methods, or replace IStateReset with [SharedState] if the carry-over is deliberate.");
                               }
                           }
 

@@ -109,6 +109,12 @@ internal static class SuiteRunner
             // N-1 fires for N envelopes (no fire after the last benchmark; the first method sees
             // a fresh instance with setup already run). Null in per-method, per-benchmark, and
             // suite-mode paths.
+            //
+            // The gap between launches is deliberately not this callback's problem, and the
+            // asymmetry is the contract rather than an omission: every caller builds a new instance
+            // per launch, so the launch boundary already carries a fresh object and a re-run
+            // [BenchmarkSetup]. Firing a reset there would ask a class to clean state that does not
+            // exist yet.
             if (index < ordered.Count - 1 && onBetweenBenchmarksAsync is not null)
                 await onBetweenBenchmarksAsync().ConfigureAwait(false);
         }

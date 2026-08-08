@@ -207,7 +207,7 @@ Value-returning overloads such as `Benchmark.Run<T>`, `Benchmark.RunAsync<T>`, `
 
 When a class uses `[InstanceLifetime(InstanceLifetime.PerClass)]`, all `[Benchmark]` methods in that class share one object instance. If the class constructor takes a dependency that may hold per-instance state, one method can warm caches that the next method reads, which distorts timing.
 
-The analyzer flags any non-primitive, non-ambient reference-type constructor parameter. Well-known stateless types (`ILogger<T>`, `IOptions<T>`) and ambient types (`HttpContext`, `IServiceProvider`, `CancellationToken`) are excluded.
+The analyzer flags any non-primitive, non-ambient reference-type constructor parameter, on a class with **two or more** `[Benchmark]` methods (one method cannot contaminate itself). Well-known stateless types (`ILogger`, `ILogger<T>`, `ILoggerFactory`, `IOptions<T>`) and ambient types (`HttpContext`, `IServiceProvider`, `CancellationToken`) are excluded. Non-public constructors are inspected, because a container resolves one perfectly well.
 
 ```csharp
 // Warning NB0011
@@ -219,13 +219,30 @@ public sealed class OrderBenchmarks(MyDbContext db)
 }
 ```
 
+**The fluent default counts too.** `BenchmarkHarness.WithInstanceLifetime(InstanceLifetime.PerClass)` makes every discovered class in the assembly PerClass, and produces exactly the same sharing as the attribute. A class carrying no `[InstanceLifetime]` attribute is therefore reported when that call appears anywhere in the same compilation - reported at the end of the compilation, because the call is usually in a different file from the class it decides for. A harness in a *separate project* is out of reach: no analyzer can see it.
+
+**An empty `IStateReset` is reported, not trusted.**
+
+```csharp
+// Still warning NB0011: resets nothing
+[InstanceLifetime(InstanceLifetime.PerClass)]
+public sealed class OrderBenchmarks(MyDbContext db) : IStateReset
+{
+    public Task ResetAsync(CancellationToken ct) => Task.CompletedTask;
+    ...
+}
+```
+
+The engine can only check that the interface is present, so an empty body silences the runtime safeguard while resetting nothing. A method body is the one thing an analyzer can read and a runtime check cannot, so this rule reads it. If the carry-over is deliberate, use `[SharedState]` - which claims nothing a body could contradict.
+
 **Why this matters.** The Mann-Whitney U test used for significance assumes samples are independent. When method A warms a shared cache that method B reads, method B's timings are artificially linked to method A running first. The shuffling math breaks and the significance verdict becomes unreliable. This is not a measurement-quality concern - it is a correctness concern for the statistical model.
 
 Typical fixes:
 
 1. Remove the attribute so the class uses `PerMethod`
 2. Keep `PerClass` and implement `IStateReset` so shared state is reset between benchmark methods
-3. Keep `PerClass` and suppress with `#pragma warning disable NB0011` when sharing state is intentional
+3. Keep `PerClass` and add `[SharedState]` when the carry-over is deliberate - preferred over a `#pragma`, since it also tells the engine
+4. Keep `PerClass` and suppress with `#pragma warning disable NB0011`
 
 > **CI note.** This is a compile-time warning, not a runtime error. In CI/CD pipelines the warning scrolls past in the build log and is easy to miss. If you suppress NB0011, verify that the shared state does not create a timing dependency between methods - for example, by running each method in isolation and comparing results.
 
@@ -331,12 +348,20 @@ dotnet_diagnostic.NB0014.severity = warning
 
 ## Runtime independence warning
 
-In addition to the compile-time analyzers above, NBenchmark emits a runtime warning on every `BenchmarkResult.Warnings` list when a class uses `InstanceLifetime.PerClass` and has more than one `[Benchmark]` method. This covers suite mode (where analyzers do not run) and cases where the analyzer package is not installed.
+In addition to the compile-time analyzers above, NBenchmark emits a runtime warning on every `BenchmarkResult.Warnings` list when a class actually runs under `InstanceLifetime.PerClass` with more than one `[Benchmark]` method and has declared neither `IStateReset` nor `[SharedState]`. This covers suite mode (where analyzers do not run) and cases where the analyzer package is not installed. It is raised by whichever process measured the group, so an isolated worker reports it too - which is the default Harness path.
 
-The runtime warning is opt-out: set `SuppressPerClassIndependenceWarning` to `true` on `MeasurementOptions` to silence it when sharing is intentional.
+Declaring the sharing on the class is the preferred opt-out, because it is scoped to the class that means it:
 
 ```csharp
-// Suppress the runtime warning
+[InstanceLifetime(InstanceLifetime.PerClass)]
+[SharedState] // measuring the warm-cache path is the point
+public class CacheBenchmarks { }
+```
+
+For a whole run, set `SuppressPerClassIndependenceWarning` to `true` on `MeasurementOptions`:
+
+```csharp
+// Suppress the runtime warning for every class in the run
 var host = BenchmarkHarness.Create(args)
     .WithOptions(new MeasurementOptions { SuppressPerClassIndependenceWarning = true });
 ```

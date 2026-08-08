@@ -84,9 +84,27 @@ internal sealed record InstanceSource
     ///     Addresses this source for the wire, or <c>null</c> when it has no recipe to address.
     /// </summary>
     public InstanceSourcePayload? ToPayload()
-        => Recipe is null || !AddressedFactory.TryCreate(Recipe, RoleFor(Kind), out var addressed, out _)
+        => Recipe is null || !TryAddress(out var addressed, out _)
             ? null
             : new InstanceSourcePayload { Kind = Kind, Factory = addressed };
+
+    /// <summary>
+    ///     Addresses the recipe, telling the addresser whether the measuring process supplies the
+    ///     factory's arguments itself.
+    /// </summary>
+    /// <remarks>
+    ///     An instance factory is a <c>Func&lt;Type, object&gt;</c> called once per instance with the
+    ///     benchmark class; every other kind is simply run. The distinction has to be made here rather
+    ///     than inferred from the delegate's shape, because "has a parameter nothing supplied a value
+    ///     for" is the addresser's refusal for a benchmark body and is exactly the wrong answer here.
+    /// </remarks>
+    private bool TryAddress(out AddressedFactory addressed, out Refusal refusal)
+        => AddressedFactory.TryCreate(
+            Recipe!,
+            RoleFor(Kind),
+            out addressed,
+            out refusal,
+            argumentsSuppliedAtInvocation: Kind == InstanceSourceKind.InstanceFactory);
 
     /// <summary>
     ///     Why this source cannot be reproduced in a worker, or <c>null</c> when it can.
@@ -112,7 +130,7 @@ internal sealed record InstanceSource
 
         // A recipe that captures is refused for the reason a capturing body is: it would have to run
         // here, and what it builds here is exactly the live object that cannot cross.
-        return AddressedFactory.TryCreate(Recipe, RoleFor(Kind), out _, out var refusal)
+        return TryAddress(out _, out var refusal)
             ? null
             : $"{RoleFor(Kind)} {refusal.Message} Make it a static method so a worker can locate and "
               + "run it.";
