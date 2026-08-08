@@ -72,6 +72,34 @@ public static class IsolationStatusExtensions
     public static bool IsIsolated(this IsolationStatus status) => status == IsolationStatus.Isolated;
 
     /// <summary>
+    ///     Whether isolation was <b>refused</b> - as opposed to not asked for.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The distinction <see cref="IsIsolated" /> cannot make, and the one every gate and
+    ///         warning actually wants. <see cref="IsolationStatus.InProcessRequested" /> is produced by
+    ///         <c>--dry-run</c>, <c>--in-process</c>, <c>WithIsolation(false)</c>, <c>[InProcess]</c>,
+    ///         <c>Benchmark.RunInProcess</c> and the <c>--verify-isolation</c> comparison pass - all of
+    ///         which are the user getting exactly what they asked for. Keying on <c>!IsIsolated()</c>
+    ///         treats those as failures, which is why <c>--strict-isolation --dry-run</c> fails a build
+    ///         over a run that never intended to isolate anything.
+    ///     </para>
+    ///     <para>
+    ///         The four refusals are the cases where the user asked for isolation, did not get it, and
+    ///         has something to act on - each one's <see cref="ToRemedy" /> is non-null for the same
+    ///         reason.
+    ///     </para>
+    /// </remarks>
+    public static bool IsRefusal(this IsolationStatus status) => status switch
+    {
+        IsolationStatus.InProcessCapturedState
+            or IsolationStatus.InProcessLiveFixture
+            or IsolationStatus.InProcessUnaddressablePlan
+            or IsolationStatus.InProcessNoWorker => true,
+        _ => false,
+    };
+
+    /// <summary>
     ///     A short column label. Kept to a few characters because it appears in a table alongside
     ///     numbers, where a sentence would push the measurements off the screen.
     /// </summary>

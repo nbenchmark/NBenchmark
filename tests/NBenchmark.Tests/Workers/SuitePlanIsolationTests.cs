@@ -192,6 +192,61 @@ public sealed class SuitePlanIsolationTests : IDisposable
     }
 
     /// <summary>
+    ///     A capturing factory whose <i>bodies</i> capture nothing is still isolated - as an inline
+    ///     suite - and says so.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The plan path falls back to <c>RunCoreAsync</c>, which addresses the bodies
+    ///         individually, and that succeeds whenever only the factory was the problem. The results
+    ///         used to be overwritten with the plan's refusal status regardless, so a run that had been
+    ///         fully isolated came back marked host-measured. Three things went wrong at once: the row
+    ///         was labelled with a refusal that had not applied to it, the reporters - invoked inside
+    ///         the isolated path - wrote <c>Isolated</c> while the returned list said otherwise, and
+    ///         <c>--strict-isolation</c> would have failed the build over it.
+    ///     </para>
+    ///     <para>
+    ///         The stderr line is checked for what it no longer claims. Announcing "was measured in
+    ///         this process" before attempting the inline path stated an outcome that had not happened
+    ///         yet, and was false in exactly this case.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task RunPlanAsync_CapturingFactory_WithAddressableBodies_IsStillIsolated()
+    {
+        var suiteName = $"plan-captures-{Guid.NewGuid():N}";
+
+        using var stderr = new StringWriter();
+        var priorError = Console.Error;
+        Console.SetError(stderr);
+
+        IReadOnlyList<BenchmarkResult> results;
+
+        try
+        {
+            // The factory captures `suiteName`, so it cannot be addressed. The body captures nothing,
+            // so it can.
+            results = await BenchmarkSuite.RunPlanAsync(
+                () => Fast(new BenchmarkSuite(suiteName).Add("only", () => Thread.SpinWait(200))));
+        }
+        finally
+        {
+            Console.SetError(priorError);
+        }
+
+        var result = Assert.Single(results);
+
+        Assert.False(result.Errored, result.ErrorMessage);
+        Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
+        Assert.Equal("steady-state", result.RuntimeProfileName);
+
+        var message = stderr.ToString();
+
+        Assert.Contains("could not be addressed", message);
+        Assert.DoesNotContain("was measured in this process", message);
+    }
+
+    /// <summary>
     ///     With no worker deployed the plan still runs, in this process, and explains itself.
     /// </summary>
     [Fact]

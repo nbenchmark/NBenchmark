@@ -62,13 +62,23 @@ internal static class IsolationAudit
         ArgumentNullException.ThrowIfNull(results);
         ArgumentNullException.ThrowIfNull(error);
 
-        var offenders = results.Where(r => !r.IsolationStatus.IsIsolated()).ToList();
+        // Errored rows are excluded on purpose. A benchmark that threw was not measured in this
+        // process - it was not measured anywhere - so counting it as an offender tells the user their
+        // numbers carry the host's configuration when there are no numbers. Its own error message is
+        // the thing to act on, and it is already on the row.
+        var offenders = results
+            .Where(r => !r.Errored && !r.IsolationStatus.IsIsolated())
+            .ToList();
 
         if (offenders.Count == 0)
             return true;
 
+        // Denominator matches the numerator's population: counting an errored row in "3 of 10" while
+        // excluding it from the three makes the two numbers describe different sets.
+        var measured = results.Count(r => !r.Errored);
+
         error.WriteLine(
-            $"--strict-isolation: {offenders.Count} of {results.Count} benchmark(s) were measured in "
+            $"--strict-isolation: {offenders.Count} of {measured} measured benchmark(s) ran in "
             + "this process rather than an isolated worker, so their numbers carry the host's JIT and "
             + "GC configuration.");
 

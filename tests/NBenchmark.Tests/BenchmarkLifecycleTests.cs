@@ -10,7 +10,7 @@ public class BenchmarkLifecycleTests
     [Fact]
     public void CreateInstance_Success_Activator()
     {
-        var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType), null);
+        var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType), null, out _);
         Assert.NotNull(created);
         Assert.IsType<SimpleType>(created!.Value.Instance);
     }
@@ -18,7 +18,7 @@ public class BenchmarkLifecycleTests
     [Fact]
     public void CreateInstance_Success_Factory()
     {
-        var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType), _ => InstanceHandle.NoTeardown(new SimpleType()));
+        var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType), _ => InstanceHandle.NoTeardown(new SimpleType()), out _);
         Assert.NotNull(created);
         Assert.IsType<SimpleType>(created!.Value.Instance);
     }
@@ -26,15 +26,26 @@ public class BenchmarkLifecycleTests
     [Fact]
     public void CreateInstance_ActivatorFailure_ReturnsNull()
     {
-        var created = BenchmarkLifecycle.CreateInstance(typeof(NoDefaultCtor), null);
+        var created = BenchmarkLifecycle.CreateInstance(typeof(NoDefaultCtor), null, out var failure);
+
         Assert.Null(created);
+
+        // The reason is returned, not only printed. It is what the errored row carries, and a row
+        // saying only "could not be instantiated" sends the reader nowhere.
+        Assert.NotNull(failure);
+        Assert.Contains(nameof(NoDefaultCtor), failure);
+        Assert.Contains("parameterless constructor", failure);
     }
 
     [Fact]
     public void CreateInstance_FactoryFailure_ReturnsNull()
     {
-        var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType), _ => throw new InvalidOperationException("factory failed"));
+        var created = BenchmarkLifecycle.CreateInstance(
+            typeof(SimpleType), _ => throw new InvalidOperationException("factory failed"), out var failure);
+
         Assert.Null(created);
+        Assert.NotNull(failure);
+        Assert.Contains("factory failed", failure);
     }
 
     [Fact]
@@ -43,7 +54,7 @@ public class BenchmarkLifecycleTests
         var teardownFired = false;
 
         var created = BenchmarkLifecycle.CreateInstance(typeof(SimpleType),
-            _ => new InstanceHandle(new SimpleType(), () => teardownFired = true));
+            _ => new InstanceHandle(new SimpleType(), () => teardownFired = true), out _);
 
         Assert.NotNull(created);
         created!.Value.InstanceTeardown();
@@ -215,7 +226,7 @@ public class BenchmarkLifecycleTests
     {
         Assert.Throws<OperationCanceledException>(() =>
             BenchmarkLifecycle.CreateInstance(typeof(SimpleType),
-                _ => throw new OperationCanceledException()));
+                _ => throw new OperationCanceledException(), out _));
     }
 
     [Fact]

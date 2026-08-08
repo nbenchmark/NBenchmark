@@ -29,7 +29,15 @@ internal static class DiscoveredGroupExecutor
         Dictionary<string, double[]> RawSamples,
         bool InstantiationFailed)
     {
-        public static GroupOutcome Failed() => new([], [], true);
+        /// <summary>
+        ///     Why construction failed, for the fault the worker reports. Carried rather than left on
+        ///     the worker's stdout: the coordinator turns this into the errored rows the user reads,
+        ///     and "could not be instantiated" without the reason sends them nowhere.
+        /// </summary>
+        public string? Failure { get; private init; }
+
+        public static GroupOutcome Failed(string? failure = null)
+            => new([], [], true) { Failure = failure };
     }
 
     public static async Task<GroupOutcome> RunAsync(
@@ -78,10 +86,10 @@ internal static class DiscoveredGroupExecutor
         Action? postSuiteCleanup,
         CancellationToken cancellationToken)
     {
-        var created = BenchmarkLifecycle.CreateInstance(suite.Type, instanceFactory);
+        var created = BenchmarkLifecycle.CreateInstance(suite.Type, instanceFactory, out var failure);
 
         if (created is null)
-            return GroupOutcome.Failed();
+            return GroupOutcome.Failed(failure);
 
         var (instance, instanceTeardown) = created.Value;
         var instanceFromFactory = instanceFactory is not null;
@@ -151,10 +159,10 @@ internal static class DiscoveredGroupExecutor
         for (var index = 0; index < ordered.Count; index++)
         {
             var benchmark = ordered[index];
-            var created = BenchmarkLifecycle.CreateInstance(suite.Type, instanceFactory);
+            var created = BenchmarkLifecycle.CreateInstance(suite.Type, instanceFactory, out var failure);
 
             if (created is null)
-                return GroupOutcome.Failed();
+                return GroupOutcome.Failed(failure);
 
             var (instance, instanceTeardown) = created.Value;
             var instanceFromFactory = instanceFactory is not null;

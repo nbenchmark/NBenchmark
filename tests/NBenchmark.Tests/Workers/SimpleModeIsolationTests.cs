@@ -162,11 +162,18 @@ public sealed class SimpleModeIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     The guidance is once per process per reason, not once per call. Simple mode is used in
-    ///     loops; a message on every call is a message people stop reading.
+    ///     The guidance names every offender, not just the first one to hit a given reason.
     /// </summary>
+    /// <remarks>
+    ///     It used to dedupe on the <see cref="IsolationStatus" /> alone, so a script with twenty
+    ///     <c>Benchmark.Run</c> calls - fifteen of them refused for the same reason - printed one line
+    ///     naming the first. A reader would fix the benchmark they were told about and have no reason
+    ///     to think the other fourteen were affected, because nothing else in the output says so:
+    ///     Simple mode returns a <see cref="BenchmarkResult" /> rather than rendering a table with an
+    ///     isolation column.
+    /// </remarks>
     [Fact]
-    public void CaptureGuidance_IsEmittedOnce_AndIsSuppressible()
+    public void CaptureGuidance_NamesEveryOffender()
     {
         var spins = 200;
 
@@ -186,7 +193,69 @@ public sealed class SimpleModeIsolationTests : IDisposable
             Console.SetError(priorError);
         }
 
+        var message = stderr.ToString();
+
+        Assert.Contains("captured-0", message);
+        Assert.Contains("captured-1", message);
+        Assert.Contains("captured-2", message);
+    }
+
+    /// <summary>
+    ///     Still once per offender, though - repeating the same benchmark in a loop says nothing new.
+    /// </summary>
+    [Fact]
+    public void CaptureGuidance_IsEmittedOncePerOffender()
+    {
+        var spins = 200;
+
+        using var stderr = new StringWriter();
+        var priorError = Console.Error;
+        Console.SetError(stderr);
+
+        try
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                Benchmark.Run(() => Thread.SpinWait(spins), FastOptions, name: "captured-same");
+            }
+        }
+        finally
+        {
+            Console.SetError(priorError);
+        }
+
         Assert.Equal(1, stderr.ToString().Split(SimpleModeGuidance.SuppressEnvVar).Length - 1);
+    }
+
+    /// <summary>
+    ///     A loop large enough to flood a terminal is bounded, and says that it was - silence past the
+    ///     cap would be indistinguishable from there being nothing more to report.
+    /// </summary>
+    [Fact]
+    public void CaptureGuidance_IsBounded_AndSaysSo()
+    {
+        var spins = 200;
+
+        using var stderr = new StringWriter();
+        var priorError = Console.Error;
+        Console.SetError(stderr);
+
+        try
+        {
+            for (var i = 0; i < 14; i++)
+            {
+                Benchmark.Run(() => Thread.SpinWait(spins), FastOptions, name: $"flood-{i}");
+            }
+        }
+        finally
+        {
+            Console.SetError(priorError);
+        }
+
+        var message = stderr.ToString();
+
+        Assert.Contains("further notes are suppressed", message);
+        Assert.DoesNotContain("flood-13", message);
     }
 
     /// <summary>

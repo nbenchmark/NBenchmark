@@ -1296,15 +1296,21 @@ public class BenchmarkSuite(string name)
 
         if (!outcome.WasIsolated)
         {
-            SimpleModeGuidance.EmitOnce(local.Name, outcome.Status, outcome.Refusal);
+            // The *plan* could not be addressed. That is not the same as the suite being
+            // unmeasurable in a worker: RunCoreAsync tries the inline path next, where the bodies are
+            // addressed individually, and that frequently succeeds where the factory did not - a
+            // factory capturing a local is refused while the non-capturing bodies it wires up are
+            // not. So this says what was refused and stops there, rather than announcing an outcome
+            // that has not happened yet.
+            SimpleModeGuidance.EmitPlanRefusal(local.Name, outcome.Status, outcome.Refusal);
 
-            // Measured here instead, and labelled. Returning nothing would be worse; returning
-            // something that claims to be isolated would be worse still.
-            var fallback = await local
-                .RunCoreAsync(cancellationToken)
-                .ConfigureAwait(false);
-
-            return [.. fallback.Select(r => r with { IsolationStatus = outcome.Status })];
+            // Whatever RunCoreAsync does - worker or host - it stamps its own results, so the label
+            // describes where the measurement actually happened. Overwriting them with the plan's
+            // refusal status was wrong in the case that matters: a suite the inline path isolated
+            // came back marked host-measured, the reporters (invoked inside the isolated path) said
+            // Isolated while the returned list said otherwise, and --strict-isolation failed a run
+            // that had been fully isolated.
+            return await local.RunCoreAsync(cancellationToken).ConfigureAwait(false);
         }
 
         var results = outcome.Results.ToList();
@@ -1608,6 +1614,19 @@ public class BenchmarkSuite(string name)
             // SuiteRunner keys raw samples by benchmark name; the significance path needs the
             // composite name+runtime key so multi-runtime results don't collide.
             rawSamples = RawSampleKey.ToComposite(results, rawSamples);
+
+            // Why these rows were measured here, on the rows themselves. Written last so it covers
+            // every path into this method, and before the reporters so the file and the returned list
+            // agree. Without it the fallback kept BenchmarkResult's default - InProcessRequested,
+            // "you asked for this" - so a suite refused for a captured local reported the status of
+            // one that had asked for the host, produced no remedy footer and no Iso column. The
+            // status was computed and assigned to a field nothing read.
+            for (var i = 0; i < results.Count; i++)
+            {
+                // An errored row was not measured anywhere, so it has no provenance to carry.
+                if (!results[i].Errored)
+                    results[i] = results[i] with { IsolationStatus = _inProcessStatus };
+            }
 
             if (applySignificance)
                 ApplyPerParameterSignificance(results, rawSamples);

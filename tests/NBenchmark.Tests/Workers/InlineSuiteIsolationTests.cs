@@ -250,7 +250,12 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         }
 
         Assert.Single(results);
-        Assert.All(results, r => Assert.NotEqual(IsolationStatus.Isolated, r.IsolationStatus));
+
+        // The reason, not merely "not isolated" - see the prepared-state case for why the weaker
+        // assertion passed against a status nothing had set.
+        Assert.All(
+            results,
+            r => Assert.Equal(IsolationStatus.InProcessCapturedState, r.IsolationStatus));
 
         var message = stderr.ToString();
         Assert.Contains("WithSuiteSetup", message);
@@ -478,7 +483,10 @@ public sealed class InlineSuiteIsolationTests : IDisposable
 
         var result = Assert.Single(results);
         Assert.False(result.Errored, result.ErrorMessage);
-        Assert.NotEqual(IsolationStatus.Isolated, result.IsolationStatus);
+
+        // The hook captures `setupCalls`, so the refusal is a capture and the row says so - which is
+        // what earns the reader the prepare-it-as-a-recipe remedy rather than the generic one.
+        Assert.Equal(IsolationStatus.InProcessCapturedState, result.IsolationStatus);
 
         Assert.True(setupCalls > 0, "the per-iteration setup must actually have run somewhere");
     }
@@ -608,7 +616,15 @@ public sealed class InlineSuiteIsolationTests : IDisposable
 
         Assert.Single(results);
         Assert.All(results, r => Assert.False(r.Errored, r.ErrorMessage));
-        Assert.All(results, r => Assert.NotEqual(IsolationStatus.Isolated, r.IsolationStatus));
+
+        // The specific reason, not merely "not isolated". The suite computed this status and assigned
+        // it to a field nothing read, so every fallback row kept BenchmarkResult's default -
+        // InProcessRequested, which means "you asked for the host". A reader saw a run they had asked
+        // to isolate reporting the status of one they had asked not to, with no remedy footer and no
+        // Iso column. The old assertion here - NotEqual(Isolated) - passed against that default.
+        Assert.All(
+            results,
+            r => Assert.Equal(IsolationStatus.InProcessCapturedState, r.IsolationStatus));
 
         var message = stderr.ToString();
         Assert.Contains("prepare delegate", message);

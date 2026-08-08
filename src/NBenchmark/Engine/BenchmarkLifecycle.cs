@@ -9,9 +9,16 @@ internal static class BenchmarkLifecycle
     /// </summary>
     private static readonly object StaticClassReceiver = new();
 
+    /// <param name="failure">
+    ///     Why the instance could not be created, or <c>null</c> on success. Returned as well as
+    ///     printed so a caller can put it on the errored row: the console line scrolls past and is
+    ///     absent entirely from every file reporter, which is where a CI reader looks.
+    /// </param>
     public static (object Instance, Action InstanceTeardown)? CreateInstance(
-        Type type, Func<Type, InstanceHandle>? instanceFactory)
+        Type type, Func<Type, InstanceHandle>? instanceFactory, out string? failure)
     {
+        failure = null;
+
         try
         {
             // A static class (abstract and sealed) has no instance and needs none: every delegate
@@ -39,9 +46,9 @@ internal static class BenchmarkLifecycle
                   + "See https://docs.nbenchmark.net/features/dependency-injection for details. "
                 : "the instance factory threw during resolution. ";
 
-            Console.WriteLine($"[Error] Could not instantiate {type.Name} - "
-                              + hint
-                              + $"Details: {ex.Message}");
+            failure = $"Could not instantiate {type.Name} - {hint}Details: {ex.Message}";
+
+            Console.WriteLine($"[Error] {failure}");
 
             return null;
         }

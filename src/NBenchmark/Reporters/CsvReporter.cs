@@ -48,21 +48,21 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
             baseHeaders += ",OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs");
+                $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Isolation");
         }
         else if (Detail == ReportDetail.Standard)
         {
             baseHeaders += ",Mean,OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Isolation");
         }
         else
         {
             baseHeaders += ",Mean,OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,AutoTuneSplitHalfDrift,AutoTuneRestarts,AutoTuneWarmupTimeFloorMet,AutoTuneWarmupJitMethods,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,AutoTuneSplitHalfDrift,AutoTuneRestarts,AutoTuneWarmupTimeFloorMet,AutoTuneWarmupJitMethods,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories,Isolation");
         }
 
         foreach (var table in tables)
@@ -80,6 +80,12 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
             var safeSig = sig.Replace("\"", "\"\"");
             var safeEffectMetric = (row.Effect?.Metric ?? string.Empty).Replace("\"", "\"\"");
             var safeMagnitude = (row.Effect?.Magnitude ?? string.Empty).Replace("\"", "\"\"");
+
+            // Where the row was measured. Present at every detail level, because a CSV-driven
+            // dashboard had no way at all to tell a clean-room row from a host one - JSON carries the
+            // whole record and Markdown renders a column, but CSV emitted neither, so the one format
+            // built for automated trend-tracking was the one that could silently plot the two together.
+            var safeIsolation = row.IsolationStatus.ToLabel().Replace("\"", "\"\"");
 
             var percentileValues = string.Join(",", percentileCols
                 .Select(p => row.GetPercentile(p)?.ToString("F1") ?? ""));
@@ -105,7 +111,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{ReportFormat.SchemaVersion},{ReportFormat.MeasurementEpoch}," +
                     $"{detail}," +
                     $"{profile}," +
-                    $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\"");
+                    $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\",\"{safeIsolation}\"");
             }
             else
             {
@@ -142,7 +148,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                                $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\"";
 
                 if (Detail == ReportDetail.Standard)
-                    sb.AppendLine(fullData);
+                    sb.AppendLine($"{fullData},\"{safeIsolation}\"");
                 else
                 {
                     var lowerFence = row.LowerFence?.ToString("F1") ?? "";
@@ -214,7 +220,8 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                         $"{cpuNs}," +
                         $"{cpuRatio}," +
                         $"\"{diagMode}\"," +
-                        $"\"{safeCategories}\"");
+                        $"\"{safeCategories}\"," +
+                        $"\"{safeIsolation}\"");
                 }
             }
         }
