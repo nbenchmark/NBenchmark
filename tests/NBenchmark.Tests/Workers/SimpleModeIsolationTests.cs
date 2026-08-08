@@ -124,15 +124,20 @@ public sealed class SimpleModeIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     A capturing body is measured here and <b>labelled</b>, never reconstructed. Reconstructing
-    ///     it was probed: it did not throw, it returned a plausible number for the wrong value. A
-    ///     mechanism that is right most of the time and silently wrong the rest is worse than one
-    ///     that declines.
+    ///     A capture the value of which cannot be sent is measured here and <b>labelled</b>, never
+    ///     reconstructed. Reconstructing it was probed: it did not throw, it returned a plausible
+    ///     number for the wrong value.
     /// </summary>
+    /// <remarks>
+    ///     A capture of ordinary data no longer lands here at all - the value is sent and the benchmark
+    ///     is isolated, which <c>CapturedStateTransferTests</c> covers. What reaches this path now is a
+    ///     capture whose behaviour is not determined by its contents, where sending it would be the
+    ///     silent substitution the design refuses.
+    /// </remarks>
     [Fact]
-    public void Run_CapturingLambda_FallsBackAndSaysSo()
+    public void Run_CapturingUnsendableState_FallsBackAndSaysSo()
     {
-        var spins = 200;
+        var stream = Stream.Null;
 
         using var stderr = new StringWriter();
         var priorError = Console.Error;
@@ -142,7 +147,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
 
         try
         {
-            result = Benchmark.Run(() => Thread.SpinWait(spins), FastOptions, name: "captured");
+            result = Benchmark.Run(() => stream.Length, FastOptions, name: "captured");
         }
         finally
         {
@@ -156,7 +161,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
         Assert.Equal("host", result.RuntimeProfileName);
 
         var message = stderr.ToString();
-        Assert.Contains("captures", message);
+        Assert.Contains("stream", message);
         Assert.Contains("captured", message);
         Assert.Contains(SimpleModeGuidance.SuppressEnvVar, message);
     }
@@ -325,7 +330,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
     ///     A benchmark over prepared data is isolated when the preparation is its own delegate.
     /// </summary>
     /// <remarks>
-    ///     The contrast with <see cref="Run_CapturingLambda_FallsBackAndSaysSo" /> is the whole point:
+    ///     The contrast with <see cref="Run_CapturingUnsendableState_FallsBackAndSaysSo" /> is the whole point:
     ///     the same benchmark, over the same data, isolated or not depending only on whether the data
     ///     arrives as a captured value or as a recipe the worker can follow.
     /// </remarks>

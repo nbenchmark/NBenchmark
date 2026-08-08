@@ -152,13 +152,20 @@ internal static class SingleBodyRunner
             return false;
         }
 
-        if (!BodyRef.TryCreate(body, name, out bodyRef, out refusal, arguments: null, stateFactory))
+        if (!BodyRef.TryCreate(
+                body,
+                name,
+                out bodyRef,
+                out var bodyRefusal,
+                arguments: null,
+                stateFactory,
+                options.MaxTransferredStateBytes))
         {
-            // A capturing body is by far the most common refusal here, and the one with a remedy the
-            // user can act on, so it is distinguished from the rest.
-            status = refusal is not null && refusal.Contains("captures", StringComparison.Ordinal)
-                ? IsolationStatus.InProcessCapturedState
-                : IsolationStatus.InProcessLiveFixture;
+            // The reason is carried, not recovered from the message. This used to search the text for
+            // the word "captures" to decide which remedy the user was shown, which made every refusal
+            // string load-bearing prose.
+            status = bodyRefusal.ToStatus(IsolationStatus.InProcessLiveFixture);
+            refusal = bodyRefusal.Message;
 
             return false;
         }

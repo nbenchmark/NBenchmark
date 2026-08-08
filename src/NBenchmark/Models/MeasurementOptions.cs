@@ -43,6 +43,12 @@ public record MeasurementOptions
     /// <summary><see cref="MaxRawSamples" /> value meaning "return every sample".</summary>
     public const int UnboundedRawSamples = 0;
 
+    /// <summary>
+    ///     Default ceiling on the encoded size of the values a benchmark's closure may send to a
+    ///     measurement worker. See <see cref="MaxTransferredStateBytes" />.
+    /// </summary>
+    public const int DefaultMaxTransferredStateBytes = 8 * 1024 * 1024;
+
     internal static readonly IReadOnlyList<double> DefaultReportedPercentiles =
         Array.AsReadOnly(new[] { 0.50, 0.95, 0.99, 0.999, 1.0 });
 
@@ -279,6 +285,26 @@ public record MeasurementOptions
             : throw new ArgumentOutOfRangeException(nameof(value), value,
                 $"HistogramBucketCount must be between {MinHistogramBucketCount} and {MaxHistogramBucketCount}.");
     }
+
+    /// <summary>
+    ///     Ceiling on the encoded size of the values a benchmark's closure may send to a measurement
+    ///     worker. Default <see cref="DefaultMaxTransferredStateBytes" /> (8 MiB).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A lambda that closes over data has that data sent to the process that measures it, so
+    ///         the benchmark can be isolated without the value being rebuilt from a guess. Past a
+    ///         certain size that trade stops being worth making: the frame ceiling is 64 MiB, and a
+    ///         value large enough to approach it is one a prepare delegate would build in the worker
+    ///         faster than this can ship it - and more faithfully, since it would then be built by the
+    ///         same code in the same process rather than reconstructed.
+    ///     </para>
+    ///     <para>
+    ///         Exceeding it is a refusal naming the prepare delegate, not a truncation. A truncated
+    ///         capture would measure a smaller input under the caller's name.
+    ///     </para>
+    /// </remarks>
+    public int MaxTransferredStateBytes { get; init; } = DefaultMaxTransferredStateBytes;
 
     /// <summary>
     ///     How many raw samples an isolated worker returns per benchmark.

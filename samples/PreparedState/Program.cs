@@ -10,17 +10,25 @@ using NBenchmark.Reporters.Console;
 //     var data = BuildData();
 //     Benchmark.Run(() => Sort(data));            // <- captures `data`
 //
-// That lambda captures, and a capture cannot be measured in another process. The captured value
-// exists in this process and nowhere else, and NBenchmark refuses to fabricate a replacement -
-// probing showed a fabricated closure does not throw, it returns plausible, silently wrong
-// numbers. So the capturing form is measured here instead, inheriting this process's JIT tiering
-// and GC configuration, and labelled 'host'.
+// Benchmarks are measured in a separate process, so that captured array has to get across a
+// boundary. NBenchmark sends it: an int[] is a value whose behaviour under measurement is fully
+// determined by its contents, so the worker can be given the bytes and rebuild an equivalent one.
+// The capturing form is isolated, and no rewrite is needed.
 //
-// The fix is to stop handing over a *value* and hand over a *recipe*. Split the preparation into
-// its own delegate and both halves capture nothing, so both can be addressed - the worker follows
-// the recipe in the process that does the measuring.
+// What it will *not* do is guess. Only a closed set of types is sent - primitives, strings, arrays,
+// the standard collections when they carry a default comparer, and types you mark [BenchmarkState].
+// A captured open connection, warmed cache or custom comparer is refused by name, because sending
+// it would arrive intact and measure differently. That is the one failure a benchmark must not
+// have, and probing confirmed it is silent: a fabricated replacement did not throw, it returned
+// plausible, wrong numbers.
 //
-// This sample runs the same work both ways and prints where each was measured.
+// So `prepare` is no longer the difference between isolated and not. It is still the better shape,
+// for two reasons this sample shows:
+//
+//   1. The value is *built* in the measuring process rather than shipped to it - no wire cost, no
+//      size ceiling, and nothing reconstructed.
+//   2. It runs once per benchmark. A body that mutates its input needs that: `d => Array.Sort(d)`
+//      over a captured array sorts an already-sorted array from the second sample onward.
 //
 // Run with: dotnet run --project samples/PreparedState
 // ---------------------------------------------------------------------------
@@ -34,9 +42,14 @@ var options = new MeasurementOptions
 Console.WriteLine("=== Single mode: the capturing shape, and the prepared-state shape ===");
 Console.WriteLine();
 
-// The shape people write first. Correct, and measured in this process.
+// The shape people write first. Correct, and isolated - the array is sent to the worker.
 var data = BuildData();
 var captured = Benchmark.Run(() => Sum(data), options, "captured");
+
+// A capture that cannot be sent. A Stream's behaviour is not determined by its contents, so this is
+// refused by name and measured here instead, labelled with the reason and the remedy.
+var handle = new MemoryStream(new byte[4096]);
+var unsendable = Benchmark.Run(() => handle.Length, options, "unsendable");
 
 // The same benchmark, prepared in two delegates. `prepare` runs once, before warmup, in the
 // worker - so the cost of building the array is never inside a reading.
@@ -48,19 +61,17 @@ var prepared = Benchmark.Run(
 
 Report(captured);
 Report(prepared);
+Report(unsendable);
 
 Console.WriteLine();
 Console.WriteLine("=== Suite mode: WithState shares one recipe across the comparison ===");
 Console.WriteLine();
 
-// WithState is the suite-shaped version. It matters more here than in Single mode: one worker
-// measures the whole suite, so a single capturing body takes every sibling benchmark in-process
-// with it. Naming the preparation keeps the entire comparison isolated - and keeps every ratio a
-// paired, within-process estimate.
-//
-// The recipe runs once per benchmark, not once per suite. That is deliberate: two sorts sharing
-// one array would have the second measure what the first already sorted, and under the default
-// random run order which one that is would change between runs.
+// WithState is the suite-shaped version, and this is where it earns its keep rather than merely
+// avoiding a fallback: both bodies *mutate* their input. The recipe runs once per benchmark, so each
+// one sorts an unsorted array. Capturing a single array instead would isolate perfectly well and
+// measure the wrong thing - the second body would sort what the first already sorted, and under the
+// default random run order which one that is would change between runs.
 var suite = await new BenchmarkSuite("sorting")
     .WithState(() => BuildData())
     .Add("array-sort", values => Array.Sort(values))
@@ -85,7 +96,9 @@ Console.WriteLine(
 Console.WriteLine(
     "compared against isolated ones - the ratio column shows n/a instead. On bodies of provably");
 Console.WriteLine(
-    "identical cost, the difference between the two configurations was worth roughly 3.3x.");
+    "identical cost, the difference between the two configurations was worth roughly 3.3x, which is");
+Console.WriteLine(
+    "why a capture is sent where it can be rather than quietly costing the run its isolation.");
 
 static void Report(BenchmarkResult result) => Console.WriteLine(
     $"  {result.Name,-14} {result.Median,9:F1} ns   {result.IsolationStatus} "

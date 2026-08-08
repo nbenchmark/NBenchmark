@@ -60,6 +60,18 @@ internal enum BodyShape
     ///     <b>every</b> non-capturing lambda. Bound to the cached singleton.
     /// </summary>
     CachedSingleton = 1,
+
+    /// <summary>
+    ///     An instance method whose receiver holds state, sent field by field alongside the address.
+    ///     The worker builds an equivalent receiver and binds the compiled method to it.
+    /// </summary>
+    /// <remarks>
+    ///     Covers both shapes that hold values: a Roslyn display class for a lambda that captured
+    ///     locals, and a user object a lambda captured <c>this</c> from or a method group was taken
+    ///     over. They are the same problem - a receiver with fields - so they take the same route, and
+    ///     the fields are admitted only by <see cref="StateTransfer.IsFaithful" />.
+    /// </remarks>
+    TransferredReceiver = 2,
 }
 
 /// <summary>
@@ -168,6 +180,17 @@ internal sealed record BodyRef
     public AddressedFactory? StateFactory { get; init; }
 
     /// <summary>
+    ///     The values the body's receiver holds, when it holds any - see
+    ///     <see cref="BodyShape.TransferredReceiver" />. Empty for every other shape.
+    /// </summary>
+    /// <remarks>
+    ///     Admitted only by <see cref="StateTransfer.IsFaithful" />, which is a narrower rule than
+    ///     "round-trips": what is sent is a value whose measured behaviour is fully determined by the
+    ///     bytes, not merely one that can be reconstructed to look the same.
+    /// </remarks>
+    public IReadOnlyList<CapturedField> Captures { get; init; } = [];
+
+    /// <summary>
     ///     How a prepared-state factory is named in a diagnostic, on both sides of the boundary.
     /// </summary>
     internal const string PrepareRole = "its prepare delegate";
@@ -197,14 +220,16 @@ internal sealed record BodyRef
         Delegate body,
         string displayName,
         out BodyRef bodyRef,
-        out string? refusal,
+        out Refusal refusal,
         IReadOnlyList<object?>? arguments = null,
-        Delegate? stateFactory = null)
+        Delegate? stateFactory = null,
+        int maxTransferredStateBytes = MeasurementOptions.DefaultMaxTransferredStateBytes,
+        bool allowStateTransfer = true)
     {
         ArgumentNullException.ThrowIfNull(body);
 
         bodyRef = null!;
-        refusal = null;
+        refusal = Refusal.None;
 
         var method = body.Method;
         var module = method.Module;
@@ -213,13 +238,19 @@ internal sealed record BodyRef
 
         if (string.IsNullOrEmpty(location))
         {
-            refusal = $"its defining assembly '{assembly.GetName().Name}' has no file on disk "
-                      + "(single-file, in-memory or dynamically emitted).";
+            refusal = new Refusal(
+                RefusalReason.NoAssemblyOnDisk,
+                $"its defining assembly '{assembly.GetName().Name}' has no file on disk "
+                + "(single-file, in-memory or dynamically emitted).");
+
             return false;
         }
 
-        if (!TryResolveShape(body, out var shape, out refusal))
+        if (!TryResolveShape(
+                body, allowStateTransfer, maxTransferredStateBytes, out var shape, out var captures, out refusal))
+        {
             return false;
+        }
 
         AddressedFactory? stateRef = null;
         IReadOnlyList<TestArgumentPayload> encodedArguments = [];
@@ -232,8 +263,10 @@ internal sealed record BodyRef
             // request that named a different one.
             if (arguments is { Count: > 0 })
             {
-                refusal = $"it was given both {arguments.Count} argument value(s) and a prepare "
-                          + "delegate, which are two different answers for the same parameter.";
+                refusal = new Refusal(
+                    RefusalReason.UnaddressableArguments,
+                    $"it was given both {arguments.Count} argument value(s) and a prepare "
+                    + "delegate, which are two different answers for the same parameter.");
 
                 return false;
             }
@@ -261,8 +294,11 @@ internal sealed record BodyRef
                 // an open generic context we cannot close in the worker.
                 if (argument.IsGenericParameter || argument.AssemblyQualifiedName is null)
                 {
-                    refusal = $"it was declared in a generic context whose type argument "
-                              + $"'{argument.Name}' cannot be named across a process boundary.";
+                    refusal = new Refusal(
+                        RefusalReason.OpenGenericContext,
+                        "it was declared in a generic context whose type argument "
+                        + $"'{argument.Name}' cannot be named across a process boundary.");
+
                     return false;
                 }
 
@@ -285,6 +321,7 @@ internal sealed record BodyRef
             DeclaringTypeFullName = declaringType?.FullName,
             Arguments = encodedArguments,
             StateFactory = stateRef,
+            Captures = captures,
         };
 
         return true;
@@ -304,25 +341,29 @@ internal sealed record BodyRef
         Delegate stateFactory,
         string displayName,
         out AddressedFactory? stateRef,
-        out string? refusal)
+        out Refusal refusal)
     {
         stateRef = null;
-        refusal = null;
+        refusal = Refusal.None;
 
         var parameters = bodyMethod.GetParameters();
 
         if (parameters.Length != 1)
         {
-            refusal = $"it takes {parameters.Length} parameter(s); a body measured over prepared state "
-                      + "must take exactly one, being the prepared value.";
+            refusal = new Refusal(
+                RefusalReason.PrepareDelegate,
+                $"it takes {parameters.Length} parameter(s); a body measured over prepared state "
+                + "must take exactly one, being the prepared value.");
 
             return false;
         }
 
         if (stateFactory.Method.GetParameters().Length != 0)
         {
-            refusal = "its prepare delegate takes parameters; it must be parameterless, because nothing "
-                      + "exists yet to pass it.";
+            refusal = new Refusal(
+                RefusalReason.PrepareDelegate,
+                "its prepare delegate takes parameters; it must be parameterless, because nothing "
+                + "exists yet to pass it.");
 
             return false;
         }
@@ -332,8 +373,10 @@ internal sealed record BodyRef
 
         if (!accepted.IsAssignableFrom(produced))
         {
-            refusal = $"its prepare delegate returns '{produced.Name}' but the body accepts "
-                      + $"'{accepted.Name}'.";
+            refusal = new Refusal(
+                RefusalReason.PrepareDelegate,
+                $"its prepare delegate returns '{produced.Name}' but the body accepts "
+                + $"'{accepted.Name}'.");
 
             return false;
         }
@@ -345,7 +388,12 @@ internal sealed record BodyRef
                 out var factoryRefusal,
                 displayName: $"{displayName} (prepare)"))
         {
-            refusal = $"{PrepareRole} {factoryRefusal}";
+            // The inner reason is kept, not replaced with PrepareDelegate. A prepare delegate that
+            // captures is a captured-state refusal and earns that remedy; only the shape mismatches
+            // above are about the prepare delegate itself. Flattening the two lost the remedy for the
+            // commonest case - a user who split the shape to remove a capture and captured in the
+            // split - which is the reader most in need of it.
+            refusal = factoryRefusal with { Message = $"{PrepareRole} {factoryRefusal.Message}" };
 
             return false;
         }
@@ -369,10 +417,10 @@ internal sealed record BodyRef
         MethodInfo method,
         IReadOnlyList<object?>? arguments,
         out IReadOnlyList<TestArgumentPayload> encoded,
-        out string? refusal)
+        out Refusal refusal)
     {
         encoded = [];
-        refusal = null;
+        refusal = Refusal.None;
 
         var parameters = method.GetParameters();
         var supplied = arguments ?? [];
@@ -382,8 +430,10 @@ internal sealed record BodyRef
             // Never truncate or pad. Binding a different number of arguments than the caller named
             // measures a different call and reports it under the right name, which is the exact
             // failure class this whole area exists to prevent.
-            refusal = $"it takes {parameters.Length} parameter(s) but {supplied.Count} argument "
-                      + "value(s) were supplied for it.";
+            refusal = new Refusal(
+                RefusalReason.UnaddressableArguments,
+                $"it takes {parameters.Length} parameter(s) but {supplied.Count} argument "
+                + "value(s) were supplied for it.");
 
             return false;
         }
@@ -397,8 +447,10 @@ internal sealed record BodyRef
         // declined - and would have said so about, in a message naming the fix.
         if (parameters.Length > ArgumentBinder.MaxArity)
         {
-            refusal = $"it takes {parameters.Length} parameters; a benchmark body may take at most "
-                      + $"{ArgumentBinder.MaxArity}.";
+            refusal = new Refusal(
+                RefusalReason.UnaddressableArguments,
+                $"it takes {parameters.Length} parameters; a benchmark body may take at most "
+                + $"{ArgumentBinder.MaxArity}.");
 
             return false;
         }
@@ -411,11 +463,13 @@ internal sealed record BodyRef
 
             if (!TestArgumentCodec.IsSupported(parameterType))
             {
-                refusal = $"its parameter '{parameters[i].Name}' has type '{parameterType.Name}', which "
-                          + "cannot cross a process boundary as a value. Parameter values must be "
-                          + "primitives, strings, enums, decimal, DateTime, DateTimeOffset, TimeSpan or "
-                          + "Guid; anything else has to be built in the measuring process, which is what "
-                          + "a static [BenchmarkPlan] factory is for.";
+                refusal = new Refusal(
+                    RefusalReason.UnaddressableArguments,
+                    $"its parameter '{parameters[i].Name}' has type '{parameterType.Name}', which "
+                    + "cannot cross a process boundary as a value. Parameter values must be "
+                    + "primitives, strings, enums, decimal, DateTime, DateTimeOffset, TimeSpan or "
+                    + "Guid; anything else has to be built in the measuring process, which is what "
+                    + "a static [BenchmarkPlan] factory is for.");
 
                 return false;
             }
@@ -444,19 +498,30 @@ internal sealed record BodyRef
     ///         no instance fields cannot be carrying captured state, whatever it is called.
     ///     </para>
     /// </summary>
-    private static bool TryResolveShape(Delegate body, out BodyShape shape, out string? refusal)
+    private static bool TryResolveShape(
+        Delegate body,
+        bool allowStateTransfer,
+        int maxTransferredStateBytes,
+        out BodyShape shape,
+        out IReadOnlyList<CapturedField> captures,
+        out Refusal refusal)
     {
         shape = BodyShape.StaticMethod;
-        refusal = null;
+        captures = [];
+        refusal = Refusal.None;
 
         if (body.Method.IsStatic)
         {
             if (body.Target is null)
                 return true;
 
-            // A static method with a receiver is an open-instance delegate; there is no way to
-            // recover the receiver, so this is a capture in everything but name.
-            refusal = "it is an open-instance delegate bound to a specific receiver.";
+            // A static method with a receiver is an open-instance delegate. Unlike every other shape
+            // here the receiver is not the delegate's state but its first *argument*, and there is no
+            // way to know what to pass - so there is nothing to transfer.
+            refusal = new Refusal(
+                RefusalReason.UnaddressableShape,
+                "it is an open-instance delegate bound to a specific receiver.");
+
             return false;
         }
 
@@ -464,51 +529,82 @@ internal sealed record BodyRef
 
         if (target is null)
         {
-            refusal = "it is an unbound instance-method delegate.";
+            refusal = new Refusal(
+                RefusalReason.UnaddressableShape,
+                "it is an unbound instance-method delegate.");
+
             return false;
         }
 
         var targetType = target.GetType();
+        var isClosure = StateTransfer.IsCompilerGeneratedScope(targetType);
+        var instanceFields = StateTransfer.InstanceFieldsOf(targetType);
 
-        if (!targetType.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
+        // A stateless closure keeps the cheapest route: nothing to send, and Roslyn's cached
+        // singleton is already the exact receiver the method was compiled against.
+        if (isClosure && instanceFields.Length == 0)
         {
-            // A method group over a live object, e.g. `Func<int> f = widget.Compute`. The
-            // receiver is user state that the worker has no way to reproduce.
-            refusal = $"it is bound to an instance of '{targetType.Name}', which is live state in "
-                      + "this process rather than a compiler-generated closure.";
+            if (FindSingletonField(targetType) is null)
+            {
+                refusal = new Refusal(
+                    RefusalReason.UnaddressableShape,
+                    $"its compiler-generated receiver '{targetType.Name}' has no cached "
+                    + "singleton to bind to.");
+
+                return false;
+            }
+
+            shape = BodyShape.CachedSingleton;
+
+            return true;
+        }
+
+        // Everything else is a receiver holding state, and there is only one rule for those: send it
+        // when every field can be sent faithfully, refuse and name the field when one cannot. A
+        // Roslyn display class and a user object the body captured `this` from are the same problem,
+        // and used to be two different refusals.
+        //
+        // Roslyn merges the captures of every *capturing* lambda in a lexical scope into one display
+        // class, so a body can be refused for a sibling's field. That is unchanged and still correct:
+        // the sibling's value is equally un-sendable, and a non-capturing sibling is hoisted to the
+        // field-less `<>c` singleton rather than joining this class, so it is never affected.
+        if (!allowStateTransfer)
+        {
+            // Not every delegate addressed through here is a benchmark body, and the two that are not
+            // must refuse rather than transfer. A *factory* exists to be run in the measuring process -
+            // it is the recipe, not the ingredient - so sending its captures would make the recipe
+            // depend on the process it was meant to be independent of. A *lifecycle hook* has to
+            // observe the same state as the body it belongs to, and independent transfer would give it
+            // a copy.
+            //
+            // The remedy differs between them, so the message stops at the fact and each caller adds
+            // its own advice.
+            refusal = new Refusal(
+                RefusalReason.CapturedState,
+                $"it captures state from its enclosing scope ({DescribeFields(instanceFields)}), which "
+                + "cannot be reproduced in the process that measures.");
+
             return false;
         }
 
-        var instanceFields = targetType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        var subject = isClosure ? "it captures" : $"it is bound to a live '{targetType.Name}', which holds";
 
-        if (instanceFields.Length > 0)
+        if (!StateTransfer.TryCapture(target, subject, maxTransferredStateBytes, out captures, out refusal))
         {
-            // A display class with fields. Roslyn merges the captures of every *capturing* lambda
-            // in a lexical scope into one display class, so the named fields may include captures
-            // belonging to a sibling rather than to this body - the message can therefore be
-            // broader than the lambda it describes. The decision is unaffected: a non-capturing
-            // sibling is hoisted to the field-less `<>c` singleton instead of joining this class,
-            // so it is never refused for a neighbour's capture. Both pinned in BodyRefCaptureTests.
-            var captured = string.Join(", ", instanceFields.Take(4).Select(f => f.Name));
-
-            refusal = $"it captures state from its enclosing scope ({captured}"
-                      + (instanceFields.Length > 4 ? ", ..." : "")
-                      + "). Captured values cannot be reproduced in another process, and "
-                      + "reconstructing them yields silently wrong measurements rather than errors.";
+            if (!isClosure)
+                refusal = refusal with { Reason = RefusalReason.LiveReceiver };
 
             return false;
         }
 
-        if (FindSingletonField(targetType) is null)
-        {
-            refusal = $"its compiler-generated receiver '{targetType.Name}' has no cached "
-                      + "singleton to bind to.";
-            return false;
-        }
+        shape = BodyShape.TransferredReceiver;
 
-        shape = BodyShape.CachedSingleton;
         return true;
     }
+
+
+    private static string DescribeFields(System.Reflection.FieldInfo[] fields)
+        => string.Join(", ", fields.Take(4).Select(f => f.Name)) + (fields.Length > 4 ? ", ..." : "");
 
     /// <summary>
     ///     Finds Roslyn's cached closure singleton - the <c>&lt;&gt;9</c> static field whose type

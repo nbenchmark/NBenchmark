@@ -27,8 +27,14 @@ public class BodyRefCaptureTests
 
     private readonly int[] _instanceData = [3, 1, 2];
 
-    private static bool CanAddress(Delegate body, out string? refusal)
-        => BodyRef.TryCreate(body, "test", out _, out refusal);
+    private static bool CanAddress(Delegate body, out string refusal)
+    {
+        var addressed = BodyRef.TryCreate(body, "test", out _, out var reason);
+
+        refusal = reason.Message;
+
+        return addressed;
+    }
 
     [Fact]
     public void A_Constant_Body_Is_Addressable()
@@ -74,13 +80,11 @@ public class BodyRefCaptureTests
     }
 
     [Fact]
-    public void A_Body_Capturing_A_Local_Is_Refused_And_Names_It()
+    public void A_Body_Capturing_A_Local_Is_Addressable_Because_The_Value_Is_Sent()
     {
         var data = new[] { 3, 1, 2 };
 
-        Assert.False(CanAddress(() => data.Length, out var refusal));
-        Assert.Contains("captures state", refusal);
-        Assert.Contains("data", refusal);
+        Assert.True(CanAddress(() => data.Length, out var refusal), refusal);
     }
 
     /// <summary>
@@ -95,8 +99,7 @@ public class BodyRefCaptureTests
         Func<int> body = () => _instanceData.Length;
 
         Assert.Same(this, body.Target);
-        Assert.False(CanAddress(body, out var refusal));
-        Assert.Contains("live state", refusal);
+        Assert.True(CanAddress(body, out var refusal), refusal);
     }
 
     /// <summary>
@@ -108,8 +111,7 @@ public class BodyRefCaptureTests
     {
         var extra = 5;
 
-        Assert.False(CanAddress(() => _instanceData.Length + extra, out var refusal));
-        Assert.Contains("captures state", refusal);
+        Assert.True(CanAddress(() => _instanceData.Length + extra, out var refusal), refusal);
     }
 
     /// <summary>
@@ -121,8 +123,7 @@ public class BodyRefCaptureTests
     {
         var widget = new Widget();
 
-        Assert.False(CanAddress(widget.Compute, out var refusal));
-        Assert.Contains(nameof(Widget), refusal);
+        Assert.True(CanAddress(widget.Compute, out var refusal), refusal);
     }
 
     [Fact]
@@ -149,7 +150,7 @@ public class BodyRefCaptureTests
         Func<int> capturing = () => captured;
         Func<int> selfContained = () => 43;
 
-        Assert.False(CanAddress(capturing, out _));
+        Assert.True(CanAddress(capturing, out _));
         Assert.True(CanAddress(selfContained, out _));
 
         // Kept live so the compiler cannot narrow the scope out from under the premise.
@@ -175,11 +176,8 @@ public class BodyRefCaptureTests
         Func<int> usesFirst = () => first;
         Func<int> usesSecond = () => second;
 
-        Assert.False(CanAddress(usesFirst, out var firstRefusal));
-        Assert.False(CanAddress(usesSecond, out var secondRefusal));
-
-        Assert.Contains("first", secondRefusal);
-        Assert.Contains("second", firstRefusal);
+        Assert.True(CanAddress(usesFirst, out _));
+        Assert.True(CanAddress(usesSecond, out _));
 
         Assert.Equal(5, usesFirst());
         Assert.Equal(7, usesSecond());
@@ -192,10 +190,13 @@ public class BodyRefCaptureTests
     [Fact]
     public void A_Refusal_Explains_Why_The_Capture_Is_Not_Reconstructed()
     {
-        var data = new[] { 3, 1, 2 };
+        var connection = new NonTransferable();
 
-        Assert.False(CanAddress(() => data.Length, out var refusal));
-        Assert.Contains("silently wrong", refusal);
+        Assert.False(CanAddress(() => connection.Use(), out var refusal));
+
+        Assert.Contains("connection", refusal);
+        Assert.Contains(nameof(NonTransferable), refusal);
+        Assert.Contains("prepare", refusal);
     }
 
     /// <summary>
@@ -217,8 +218,8 @@ public class BodyRefCaptureTests
         Assert.False(
             BodyRef.TryCreate(body, "test", out _, out var refusal, arguments: [1, 2, 3, 4]));
 
-        Assert.NotNull(refusal);
-        Assert.Contains("at most 3", refusal);
+        Assert.Equal(RefusalReason.UnaddressableArguments, refusal.Reason);
+        Assert.Contains("at most 3", refusal.Message);
     }
 
     /// <summary>
@@ -244,8 +245,8 @@ public class BodyRefCaptureTests
             arguments: [7],
             stateFactory: static () => 3));
 
-        Assert.NotNull(refusal);
-        Assert.Contains("two different answers", refusal);
+        Assert.Equal(RefusalReason.UnaddressableArguments, refusal.Reason);
+        Assert.Contains("two different answers", refusal.Message);
     }
 
     private sealed class Widget
@@ -253,5 +254,16 @@ public class BodyRefCaptureTests
         public int Compute() => 43;
 
         public static int ComputeStatic() => 43;
+    }
+
+    /// <summary>
+    ///     Holds something whose behaviour is not determined by its contents, so it is refused and
+    ///     the field is named.
+    /// </summary>
+    private sealed class NonTransferable
+    {
+        private readonly Stream _handle = Stream.Null;
+
+        public long Use() => _handle.Length;
     }
 }

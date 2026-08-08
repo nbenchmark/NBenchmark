@@ -114,7 +114,8 @@ internal sealed record InstanceSource
         // here, and what it builds here is exactly the live object that cannot cross.
         return AddressedFactory.TryCreate(Recipe, RoleFor(Kind), out _, out var refusal)
             ? null
-            : $"{RoleFor(Kind)} {refusal} Make it a static method so a worker can locate and run it.";
+            : $"{RoleFor(Kind)} {refusal.Message} Make it a static method so a worker can locate and "
+              + "run it.";
     }
 
     internal static string RoleFor(InstanceSourceKind kind) => kind switch
