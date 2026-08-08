@@ -307,6 +307,9 @@ public sealed class WorkerFrameContractTests
         if (type == typeof(int))
             return salt;
 
+        if (type == typeof(byte))
+            return (byte)(salt % 251);
+
         if (type == typeof(long))
             return (long)salt;
 
@@ -359,6 +362,16 @@ public sealed class WorkerFrameContractTests
     private static bool IsWireRecord(Type type)
         => type.Namespace == typeof(WorkerFrame).Namespace && !type.IsEnum;
 
+    /// <summary>
+    ///     Whether this member is a wire record or a collection of them - the two shapes that can
+    ///     recurse.
+    /// </summary>
+    private static bool ReachesWireRecord(Type type)
+        => IsWireRecord(type)
+           || (type.IsGenericType
+               && type.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
+               && IsWireRecord(type.GetGenericArguments()[0]));
+
     private static object PopulateRecord(Type type, int salt, int depth)
     {
         // Self-referential shapes exist on the wire - BodyRef carries its own setup, teardown and
@@ -387,7 +400,12 @@ public sealed class WorkerFrameContractTests
             var isOptionalLink = Nullable.GetUnderlyingType(property.PropertyType) is null
                                  && !property.PropertyType.IsValueType;
 
-            if (depth >= maxDepth && isOptionalLink && IsWireRecord(property.PropertyType))
+            // A *collection* of wire records is as self-referential as a direct link, and the guard
+            // used to miss it: CapturedField.Nested is IReadOnlyList<CapturedField>, whose own type
+            // lives in System.Collections.Generic, so IsWireRecord said no and each level populated two
+            // more children forever. That overflowed the stack, which aborts the whole run rather than
+            // failing one test - so the recursion bound has to see through the collection.
+            if (depth >= maxDepth && isOptionalLink && ReachesWireRecord(property.PropertyType))
                 continue;
 
             property.SetValue(instance, Populate(property.PropertyType, salt + property.Name.Length, depth + 1));

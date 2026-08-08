@@ -77,17 +77,23 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
     /// </summary>
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticIds.CapturingBody,
-        "Benchmark body captures state and cannot be isolated",
-        "The lambda passed to {0} captures {1} from its enclosing scope, so it will not be measured "
-        + "in an isolated worker. {2} In-process measurement inherits the host's JIT and GC state.",
+        "Benchmark body captures state, which may prevent isolation",
+        "The lambda passed to {0} captures {1} from its enclosing scope. {2} The captured value is sent "
+        + "to the measuring process when its behaviour is fully determined by its contents; otherwise "
+        + "the body is measured in this process and inherits the host's JIT and GC state.",
         "NBenchmark.Performance",
         DiagnosticSeverity.Info,
         true,
         description:
-        "A capturing lambda cannot be addressed across a process boundary, because its captured "
-        + "values exist only in the process that created them. NBenchmark refuses to reconstruct "
-        + "them - a fabricated closure returns plausible wrong measurements rather than failing - so "
-        + "the body is measured in the host process and labelled as such in the report.");
+        "A captured value has to reach the process that measures. NBenchmark sends a closed set of "
+        + "types whose behaviour is fully determined by their contents - primitives, strings, arrays, "
+        + "the standard collections with default comparers, and types marked [BenchmarkState] - and "
+        + "refuses anything else by name rather than reconstructing it, because a reconstruction that "
+        + "is usually right returns plausible wrong measurements instead of failing. Whether a "
+        + "particular capture crosses depends on facts only available at run time (a collection's "
+        + "comparer, whether two fields alias one object, the encoded size), so this rule reports the "
+        + "capture rather than predicting the outcome; the result's own IsolationStatus is "
+        + "authoritative.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Rule];
 

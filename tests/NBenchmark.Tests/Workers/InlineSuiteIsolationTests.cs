@@ -119,13 +119,18 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     A capturing body names itself in the refusal. A suite has several benchmarks and only one
-    ///     of them is usually the problem, so a message that does not say which is not actionable.
+    ///     A body whose capture cannot be sent names itself in the refusal. A suite has several
+    ///     benchmarks and only one of them is usually the problem, so a message that does not say which
+    ///     is not actionable.
     /// </summary>
+    /// <remarks>
+    ///     A capture of ordinary data is sent and the suite stays isolated; what reaches this path is a
+    ///     value whose behaviour is not determined by its contents.
+    /// </remarks>
     [Fact]
-    public async Task InlineSuite_CapturingBody_NamesTheBenchmarkAndSuggestsThePlan()
+    public async Task InlineSuite_UnsendableCapture_NamesTheBenchmarkAndSuggestsThePlan()
     {
-        var spins = 200;
+        var stream = Stream.Null;
 
         using var stderr = new StringWriter();
         var priorError = Console.Error;
@@ -137,7 +142,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         {
             results = await Fast(new BenchmarkSuite("captures")
                     .Add("clean", () => Thread.SpinWait(200))
-                    .Add("dirty", () => Thread.SpinWait(spins)))
+                    .Add("dirty", () => stream.Length))
                 .RunAsync();
         }
         finally

@@ -146,7 +146,7 @@ internal sealed record AddressedFactory
         Delegate factory,
         string role,
         out AddressedFactory addressed,
-        out string? refusal,
+        out Refusal refusal,
         string? displayName = null)
     {
         ArgumentNullException.ThrowIfNull(factory);
@@ -154,8 +154,16 @@ internal sealed record AddressedFactory
 
         addressed = null!;
 
-        if (!BodyRef.TryCreate(factory, displayName ?? role, out var body, out refusal))
+        // Captures are refused here rather than transferred, which is the one place this rule differs
+        // from a benchmark body's. A factory is the *recipe*: it exists to run in the measuring
+        // process and build something there. One that needs a value from this process has a different
+        // remedy - make it static, so the value is part of the recipe - and sending its captures
+        // would make the recipe depend on the process it was supposed to be independent of.
+        if (!BodyRef.TryCreate(
+                factory, displayName ?? role, out var body, out refusal, allowStateTransfer: false))
+        {
             return false;
+        }
 
         addressed = new AddressedFactory { Role = role, Body = body };
 

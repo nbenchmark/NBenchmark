@@ -268,11 +268,10 @@ internal static class SuitePlanRunner
             return false;
         }
 
-        if (!AddressedFactory.TryCreate(plan, PlanRole(plan), out planRef, out refusal))
+        if (!AddressedFactory.TryCreate(plan, PlanRole(plan), out planRef, out var planRefusal))
         {
-            status = refusal is not null && refusal.Contains("captures", StringComparison.Ordinal)
-                ? IsolationStatus.InProcessCapturedState
-                : IsolationStatus.InProcessUnaddressablePlan;
+            status = planRefusal.ToStatus(IsolationStatus.InProcessUnaddressablePlan);
+            refusal = planRefusal.Message;
 
             return false;
         }

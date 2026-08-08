@@ -44,8 +44,13 @@ public class AddressedFactoryTests
         Func<IOutlierDetector> factory = () => new TopPercentileOutlierDetector(configured);
 
         Assert.False(AddressedFactory.TryCreate(factory, Role, out _, out var refusal));
-        Assert.NotNull(refusal);
-        Assert.Contains("captures state", refusal);
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains("captures state", refusal.Message);
+
+        // The remedy is added by the caller, not carried here: the same refusal reaches a service
+        // provider factory, a plan factory and a lifecycle hook, and each has a different fix.
+        Assert.Contains("cannot be reproduced", refusal.Message);
     }
 
     /// <summary>

@@ -70,11 +70,11 @@ internal static class InlineSuitePlan
         // The suite's lifecycle is addressed rather than refused for existing. A setup that captures
         // still cannot cross - it would have to run here and prepare state the benchmarks never see -
         // but one that captures nothing is exactly as reproducible in the worker as the bodies are.
-        if (!TryAddressHook(suiteSetup, "WithSuiteSetup", out var setupRef, out var lifecycleRefusal))
-            return Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal!);
+        if (!TryAddressHook(suiteSetup, "WithSuiteSetup", options, out var setupRef, out var lifecycleRefusal))
+            return Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal.Message);
 
-        if (!TryAddressHook(suiteTeardown, "WithSuiteTeardown", out var teardownRef, out lifecycleRefusal))
-            return Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal!);
+        if (!TryAddressHook(suiteTeardown, "WithSuiteTeardown", options, out var teardownRef, out lifecycleRefusal))
+            return Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal.Message);
 
         var bodies = new List<BodyRef>(benchmarks.Count);
 
@@ -95,36 +95,36 @@ internal static class InlineSuitePlan
                     out var bodyRef,
                     out var refusal,
                     benchmark.Arguments,
-                    benchmark.StateFactory))
+                    benchmark.StateFactory,
+                    options.MaxTransferredStateBytes))
             {
-                // Overwhelmingly the common case: the lambda captures a local. Naming the benchmark
-                // matters, because a suite has several and only one of them is the problem.
-                var status = refusal is not null && refusal.Contains("captures", StringComparison.Ordinal)
-                    ? IsolationStatus.InProcessCapturedState
-                    : IsolationStatus.InProcessUnaddressablePlan;
-
+                // Naming the benchmark matters, because a suite has several and only one of them is
+                // the problem.
                 return Decision.Refuse(
-                    status,
-                    $"'{benchmark.Name}' {refusal} Either remove the capture, or move the suite into "
-                    + "a static [BenchmarkPlan] factory so the worker builds that state itself.");
+                    refusal.ToStatus(IsolationStatus.InProcessUnaddressablePlan),
+                    $"'{benchmark.Name}' {refusal.Message} Either build that state with a prepare "
+                    + "delegate, or move the suite into a static [BenchmarkPlan] factory so the worker "
+                    + "builds it itself.");
             }
 
             if (!TryAddressHook(
                     benchmark.IterationSetup,
                     $"'{benchmark.Name}' per-iteration setup",
+                    options,
                     out var iterationSetup,
                     out var hookRefusal))
             {
-                return Decision.Refuse(HookStatus(hookRefusal), hookRefusal!);
+                return Decision.Refuse(HookStatus(hookRefusal), hookRefusal.Message);
             }
 
             if (!TryAddressHook(
                     benchmark.IterationTeardown,
                     $"'{benchmark.Name}' per-iteration teardown",
+                    options,
                     out var iterationTeardown,
                     out hookRefusal))
             {
-                return Decision.Refuse(HookStatus(hookRefusal), hookRefusal!);
+                return Decision.Refuse(HookStatus(hookRefusal), hookRefusal.Message);
             }
 
             bodies.Add(bodyRef with
@@ -150,25 +150,46 @@ internal static class InlineSuitePlan
     private static bool TryAddressHook(
         Delegate? hook,
         string description,
+        MeasurementOptions options,
         out BodyRef? addressed,
-        out string? refusal)
+        out Refusal refusal)
     {
         addressed = null;
-        refusal = null;
+        refusal = Refusal.None;
 
         if (hook is null)
             return true;
 
-        if (BodyRef.TryCreate(hook, description, out var hookRef, out var hookRefusal))
+        // Captures are refused here rather than transferred, and this is a correctness rule rather
+        // than caution. A hook and the body it belongs to share one display class when they close over
+        // the same local, but they are addressed as two independent BodyRefs - so transferring each
+        // one's captures would rehydrate two receivers, and `setup: () => Array.Clear(buffer)` would
+        // clear a buffer the body never reads. That is silent and would look like a working benchmark.
+        //
+        // Letting them cross needs the wire to say "these three addresses share one receiver", so the
+        // worker rehydrates once and binds all of them to it. Until it does, refusing keeps the hook
+        // and the body looking at the same state.
+        if (BodyRef.TryCreate(
+                hook,
+                description,
+                out var hookRef,
+                out var hookRefusal,
+                arguments: null,
+                stateFactory: null,
+                allowStateTransfer: false))
         {
             addressed = hookRef;
+
             return true;
         }
 
-        refusal = $"{description} {hookRefusal} A lifecycle delegate runs in the process that measures, "
-                  + "so one holding state from here would prepare something the benchmarks never see. "
-                  + "Move the suite into a static [BenchmarkPlan] factory so the worker builds that "
-                  + "state itself.";
+        refusal = hookRefusal with
+        {
+            Message = $"{description} {hookRefusal.Message} A lifecycle delegate runs in the process "
+                      + "that measures, so one holding state from here would prepare something the "
+                      + "benchmarks never see. Move the suite into a static [BenchmarkPlan] factory so "
+                      + "the worker builds that state itself.",
+        };
 
         return false;
     }
@@ -177,10 +198,8 @@ internal static class InlineSuitePlan
     ///     Classifies a hook refusal the same way a body refusal is classified, so a captured local in a
     ///     setup delegate reports the remedy for a capture rather than the generic one.
     /// </summary>
-    private static IsolationStatus HookStatus(string? refusal)
-        => refusal is not null && refusal.Contains("captures", StringComparison.Ordinal)
-            ? IsolationStatus.InProcessCapturedState
-            : IsolationStatus.InProcessUnaddressablePlan;
+    private static IsolationStatus HookStatus(Refusal refusal)
+        => refusal.ToStatus(IsolationStatus.InProcessUnaddressablePlan);
 
     /// <summary>
     ///     Builds the request that measures all of an inline suite's bodies together in one worker.

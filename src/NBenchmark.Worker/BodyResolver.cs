@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using NBenchmark.Engine;
 using NBenchmark.Workers;
 
@@ -134,8 +136,17 @@ internal static class BodyResolver
             return false;
         }
 
-        return body.Shape != BodyShape.CachedSingleton
-               || TryResolveReceiver(ref method, body, out receiver, out error);
+        return body.Shape switch
+        {
+            BodyShape.CachedSingleton => TryResolveReceiver(ref method, body, out receiver, out error),
+            BodyShape.TransferredReceiver => TryTransferReceiver(ref method, body, out receiver, out error),
+
+            // A static method needs no receiver, and every other shape was refused before it could be
+            // addressed. Switched rather than tested for one shape, so a new one cannot silently take
+            // the null-receiver path - which is how a transferred receiver first arrived bound to
+            // nothing and failed inside the measurement rather than at bind time.
+            _ => true,
+        };
     }
 
     /// <summary>
@@ -279,7 +290,207 @@ internal static class BodyResolver
         receiver = null;
         error = null;
 
-        var declaringType = method.DeclaringType;
+        if (!TryCloseDeclaringType(ref method, body, out var declaringType, out error))
+            return false;
+
+        var singleton = BodyRef.FindSingletonField(declaringType!);
+
+        if (singleton is null)
+        {
+            error = $"no cached closure instance was found on '{declaringType!.Name}'.";
+            return false;
+        }
+
+        receiver = singleton.GetValue(null);
+
+        if (receiver is null)
+        {
+            // The field is initialized lazily on first use of the lambda in the defining process.
+            // In a fresh worker nothing has touched it, so construct the closure - which is safe
+            // precisely because addressing already proved it holds no state.
+            try
+            {
+                receiver = Activator.CreateInstance(declaringType!, nonPublic: true);
+            }
+            catch (Exception ex) when (ex is MissingMethodException or MemberAccessException or TargetInvocationException)
+            {
+                error = $"the stateless closure '{declaringType!.Name}' could not be constructed: {ex.Message}";
+                return false;
+            }
+        }
+
+        return receiver is not null;
+    }
+
+    /// <summary>
+    ///     Rebuilds a receiver that held values, and restores those values onto it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The object is allocated <b>uninitialized</b> rather than constructed. What is being
+    ///         restored is observed state, not a construction: running a constructor would overwrite
+    ///         the transferred fields with whatever it computes, and a display class has no meaningful
+    ///         constructor to run anyway. Every field is then set from the wire, so nothing is left at
+    ///         a default - which is precisely the failure of the fabricated-closure probe this
+    ///         mechanism replaces.
+    ///     </para>
+    ///     <para>
+    ///         Fields resolve by metadata token, which the module version id gate has already proved
+    ///         exact. The declared type name is re-checked against what the token resolved to: the
+    ///         gate makes that redundant in every case anyone has constructed, and it costs a string
+    ///         comparison to be sure a mismatched build cannot write a value of one type into a field
+    ///         of another.
+    ///     </para>
+    /// </remarks>
+    private static bool TryTransferReceiver(
+        ref MethodInfo method,
+        BodyRef body,
+        out object? receiver,
+        out string? error)
+    {
+        receiver = null;
+
+        if (!TryCloseDeclaringType(ref method, body, out var declaringType, out error))
+            return false;
+
+        return TryBuild(declaringType!, body.Captures, out receiver, out error);
+    }
+
+    private static bool TryBuild(
+        Type type,
+        IReadOnlyList<CapturedField> captures,
+        out object? built,
+        out string? error)
+    {
+        built = null;
+        error = null;
+
+        object instance;
+
+        try
+        {
+            instance = RuntimeHelpers.GetUninitializedObject(type);
+        }
+        catch (Exception ex) when (ex is MemberAccessException or ArgumentException or TypeLoadException)
+        {
+            error = $"the receiver '{type.Name}' could not be allocated in the worker: {ex.Message}";
+            return false;
+        }
+
+        foreach (var capture in captures)
+        {
+            if (!TryResolveField(type, capture, out var field, out error))
+                return false;
+
+            object? value;
+
+            if (capture.Kind == CapturedValueKind.Nested)
+            {
+                if (!TryBuild(field!.FieldType, capture.Nested ?? [], out value, out error))
+                    return false;
+            }
+            else if (!TryDecode(capture, field!.FieldType, out value, out error))
+            {
+                return false;
+            }
+
+            try
+            {
+                field!.SetValue(instance, value);
+            }
+            catch (Exception ex) when (ex is ArgumentException or FieldAccessException)
+            {
+                error = $"the captured value for '{capture.FieldName}' could not be assigned: {ex.Message}";
+                return false;
+            }
+        }
+
+        built = instance;
+
+        return true;
+    }
+
+    private static bool TryResolveField(
+        Type type,
+        CapturedField capture,
+        out FieldInfo? field,
+        out string? error)
+    {
+        field = null;
+        error = null;
+
+        try
+        {
+            if (type.Module.ResolveField(capture.FieldToken) is not { } resolved)
+            {
+                error = $"metadata token 0x{capture.FieldToken:X8} is not a field.";
+                return false;
+            }
+
+            // A generic display class - a lambda declared inside a generic method - resolves its
+            // fields against the open type, and those cannot be set on an instance of the closed one.
+            field = type.IsConstructedGenericType
+                ? FieldInfo.GetFieldFromHandle(resolved.FieldHandle, type.TypeHandle)
+                : resolved;
+        }
+        catch (Exception ex) when (ex is ArgumentException or BadImageFormatException)
+        {
+            error = $"metadata token 0x{capture.FieldToken:X8} could not be resolved as a field: {ex.Message}";
+            return false;
+        }
+
+        var actual = field!.FieldType.AssemblyQualifiedName ?? field.FieldType.FullName ?? field.FieldType.Name;
+
+        if (!string.Equals(actual, capture.DeclaredTypeName, StringComparison.Ordinal))
+        {
+            error = $"the field '{field.Name}' is declared '{field.FieldType.Name}' here but the "
+                    + $"address carries a value for '{capture.DeclaredTypeName}'.";
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryDecode(CapturedField capture, Type declared, out object? value, out string? error)
+    {
+        value = null;
+        error = null;
+
+        try
+        {
+            value = capture.Kind switch
+            {
+                CapturedValueKind.Binary => StateTransfer.FromBytes(declared, capture.Binary ?? []),
+                _ => JsonSerializer.Deserialize(capture.Json ?? "null", declared, StateTransfer.SerializerOptions),
+            };
+
+            return true;
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or ArgumentException)
+        {
+            error = $"the captured value for '{capture.FieldName}' could not be decoded as "
+                    + $"'{declared.Name}': {ex.Message}";
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Closes the receiver's declaring type over the carried type arguments, when the body was
+    ///     declared inside a generic method and Roslyn put its closure class on a generic type. A
+    ///     metadata token resolves to the method on the <i>open</i> type, so
+    ///     <paramref name="method" /> is re-resolved against the closed one - which is why it is taken
+    ///     by reference.
+    /// </summary>
+    private static bool TryCloseDeclaringType(
+        ref MethodInfo method,
+        BodyRef body,
+        out Type? declaringType,
+        out string? error)
+    {
+        error = null;
+        declaringType = method.DeclaringType;
 
         if (declaringType is null)
         {
@@ -323,33 +534,7 @@ internal static class BodyResolver
             }
         }
 
-        var singleton = BodyRef.FindSingletonField(declaringType);
-
-        if (singleton is null)
-        {
-            error = $"no cached closure instance was found on '{declaringType.Name}'.";
-            return false;
-        }
-
-        receiver = singleton.GetValue(null);
-
-        if (receiver is null)
-        {
-            // The field is initialized lazily on first use of the lambda in the defining process.
-            // In a fresh worker nothing has touched it, so construct the closure - which is safe
-            // precisely because addressing already proved it holds no state.
-            try
-            {
-                receiver = Activator.CreateInstance(declaringType, nonPublic: true);
-            }
-            catch (Exception ex) when (ex is MissingMethodException or MemberAccessException or TargetInvocationException)
-            {
-                error = $"the stateless closure '{declaringType.Name}' could not be constructed: {ex.Message}";
-                return false;
-            }
-        }
-
-        return receiver is not null;
+        return true;
     }
 
     /// <summary>
