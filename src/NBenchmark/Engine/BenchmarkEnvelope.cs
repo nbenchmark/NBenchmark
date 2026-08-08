@@ -40,16 +40,24 @@ internal sealed record BenchmarkEnvelope(
     public IReadOnlyList<object?> Arguments { get; init; } = [];
 
     /// <summary>
-    ///     A parameterless factory producing <see cref="Body" />'s single argument, when the benchmark
-    ///     is measured over prepared state.
+    ///     Factories producing <see cref="Body" />'s arguments, aligned with its parameters - a
+    ///     <c>null</c> entry means that parameter's value comes from <see cref="Arguments" /> instead.
+    ///     <c>null</c> for a benchmark with no prepared state at all.
     ///     <para>
-    ///         Invoked once per benchmark, immediately before that benchmark's warmup, in whichever
-    ///         process measures it. Per benchmark rather than per suite deliberately: a suite comparing
-    ///         two sorts over one shared array would have the second measure what the first already
-    ///         sorted, which is the order-dependence trap the run-order randomizer exists to expose.
+    ///         Each is invoked once per benchmark, immediately before that benchmark's warmup, in
+    ///         whichever process measures it. Per benchmark rather than per suite deliberately: a suite
+    ///         comparing two sorts over one shared array would have the second measure what the first
+    ///         already sorted, which is the order-dependence trap the run-order randomizer exists to
+    ///         expose.
+    ///     </para>
+    ///     <para>
+    ///         A list rather than one factory because a body may take more than one prepared value, and
+    ///         because a parameter sweep whose values are too complex to encode is the same thing - a
+    ///         slot filled by a recipe. Users hand-tupled two values into one to work around the single
+    ///         slot.
     ///     </para>
     /// </summary>
-    public Delegate? StateFactory { get; init; }
+    public IReadOnlyList<StateRecipe?>? StateRecipes { get; init; }
 
     /// <summary>
     ///     Per-iteration setup, if the caller supplied one. Kept as the delegate rather than as a flag

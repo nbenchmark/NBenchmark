@@ -57,11 +57,18 @@ public static class TestBodyIsolation
         if (method.DeclaringType is not { } declaringType)
             return Decision.Refuse(Unaddressable, "the method has no declaring type to locate it by.");
 
-        if (declaringType.IsGenericTypeDefinition || method.IsGenericMethodDefinition)
+        // Only *open* generics are refused. A closed one - a test on Fixture<int>, or Compare<string> -
+        // is addressed by carrying its type arguments alongside the token, exactly as a benchmark body
+        // is; refusing the whole shape cost every generic test class its isolation for a limitation
+        // that applies to the definition rather than the case being measured.
+        if (declaringType.IsGenericTypeDefinition
+            || method.IsGenericMethodDefinition
+            || declaringType.ContainsGenericParameters)
         {
             return Decision.Refuse(
                 Unaddressable,
-                "generic test methods and classes are not addressed across the process boundary yet.");
+                "it is declared in an open generic context, which has no single set of type arguments "
+                + "for another process to close it over.");
         }
 
         if (declaringType.Assembly.Location is not { Length: > 0 })

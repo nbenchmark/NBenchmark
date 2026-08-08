@@ -57,6 +57,16 @@ internal static class TestArgumentCodec
             Value = value switch
             {
                 null => null,
+
+                // The round-trip formats, named explicitly. The general IFormattable branch below
+                // selects the "G" format, which for these two drops sub-second precision and
+                // DateTimeKind entirely - and Decode already passes DateTimeStyles.RoundtripKind,
+                // which only means anything if the encoder wrote "O". The two agreed on the type and
+                // disagreed on the format, so a value encoded here decoded to a *different instant*:
+                // 2024-03-05T13:45:30.1230000Z arrived as 2024-03-05T13:45:30.0000000 Unspecified.
+                DateTime dateTime => dateTime.ToString("O", CultureInfo.InvariantCulture),
+                DateTimeOffset dateTimeOffset => dateTimeOffset.ToString("O", CultureInfo.InvariantCulture),
+
                 IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
                 _ => value.ToString(),
             },
@@ -102,6 +112,17 @@ internal static class TestArgumentCodec
 
         if (underlying == typeof(TimeSpan))
             return TimeSpan.Parse(payload.Value, CultureInfo.InvariantCulture);
+
+        // Both are IsPrimitive, so IsSupported accepts them - and Convert.ChangeType does not, because
+        // IntPtr's IConvertible implementation throws for a string source. The claim and the capability
+        // disagreed: a sweep or an [InlineData] over a native integer passed every check the coordinator
+        // makes and then faulted the group on arrival. Parsed explicitly instead, which is what the
+        // acceptance was always promising.
+        if (underlying == typeof(nint))
+            return nint.Parse(payload.Value, CultureInfo.InvariantCulture);
+
+        if (underlying == typeof(nuint))
+            return nuint.Parse(payload.Value, CultureInfo.InvariantCulture);
 
         return Convert.ChangeType(payload.Value, underlying, CultureInfo.InvariantCulture);
     }

@@ -114,11 +114,16 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var val = (T)values[0]!;
+                var slot = SlotValue<T>(values[0]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                    (spec, ct) =>
+                    {
+                        var val = slot();
+
+                        return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
+                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                    });
             },
             [typeof(T)],
             action,
@@ -139,12 +144,18 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var val = (T)values[0]!;
+                var slot = SlotValue<T>(values[0]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
-                        async () => await action(val).ConfigureAwait(false),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                    async (spec, ct) =>
+                    {
+                        var val = slot();
+
+                        return await BenchmarkRunner.Instance.RunAsync(displayName,
+                                async () => await action(val).ConfigureAwait(false),
+                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                            .ConfigureAwait(false);
+                    });
             },
             [typeof(T)],
             action,
@@ -165,11 +176,16 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var val = (T)values[0]!;
+                var slot = SlotValue<T>(values[0]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                    (spec, ct) =>
+                    {
+                        var val = slot();
+
+                        return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
+                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                    });
             },
             [typeof(T)],
             action,
@@ -190,12 +206,18 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var val = (T)values[0]!;
+                var slot = SlotValue<T>(values[0]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
-                        () => action(val),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                    async (spec, ct) =>
+                    {
+                        var val = slot();
+
+                        return await BenchmarkRunner.Instance.RunAsync(displayName,
+                                () => action(val),
+                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                            .ConfigureAwait(false);
+                    });
             },
             [typeof(T)],
             action,
@@ -218,12 +240,18 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var v1 = (T1)values[0]!;
-                var v2 = (T2)values[1]!;
+                var slot1 = SlotValue<T1>(values[0]);
+                var slot2 = SlotValue<T2>(values[1]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                    (spec, ct) =>
+                    {
+                        var v1 = slot1();
+                        var v2 = slot2();
+
+                        return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
+                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                    });
             },
             [typeof(T1), typeof(T2)],
             action,
@@ -244,13 +272,20 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var v1 = (T1)values[0]!;
-                var v2 = (T2)values[1]!;
+                var slot1 = SlotValue<T1>(values[0]);
+                var slot2 = SlotValue<T2>(values[1]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
-                        async () => await action(v1, v2).ConfigureAwait(false),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                    async (spec, ct) =>
+                    {
+                        var v1 = slot1();
+                        var v2 = slot2();
+
+                        return await BenchmarkRunner.Instance.RunAsync(displayName,
+                                async () => await action(v1, v2).ConfigureAwait(false),
+                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                            .ConfigureAwait(false);
+                    });
             },
             [typeof(T1), typeof(T2)],
             action,
@@ -271,12 +306,18 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var v1 = (T1)values[0]!;
-                var v2 = (T2)values[1]!;
+                var slot1 = SlotValue<T1>(values[0]);
+                var slot2 = SlotValue<T2>(values[1]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                    (spec, ct) =>
+                    {
+                        var v1 = slot1();
+                        var v2 = slot2();
+
+                        return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
+                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                    });
             },
             [typeof(T1), typeof(T2)],
             action,
@@ -297,13 +338,20 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var v1 = (T1)values[0]!;
-                var v2 = (T2)values[1]!;
+                var slot1 = SlotValue<T1>(values[0]);
+                var slot2 = SlotValue<T2>(values[1]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
-                        () => action(v1, v2),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                    async (spec, ct) =>
+                    {
+                        var v1 = slot1();
+                        var v2 = slot2();
+
+                        return await BenchmarkRunner.Instance.RunAsync(displayName,
+                                () => action(v1, v2),
+                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                            .ConfigureAwait(false);
+                    });
             },
             [typeof(T1), typeof(T2)],
             action,
@@ -326,13 +374,20 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var v1 = (T1)values[0]!;
-                var v2 = (T2)values[1]!;
-                var v3 = (T3)values[2]!;
+                var slot1 = SlotValue<T1>(values[0]);
+                var slot2 = SlotValue<T2>(values[1]);
+                var slot3 = SlotValue<T3>(values[2]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                    (spec, ct) =>
+                    {
+                        var v1 = slot1();
+                        var v2 = slot2();
+                        var v3 = slot3();
+
+                        return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
+                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                    });
             },
             [typeof(T1), typeof(T2), typeof(T3)],
             action,
@@ -353,14 +408,22 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var v1 = (T1)values[0]!;
-                var v2 = (T2)values[1]!;
-                var v3 = (T3)values[2]!;
+                var slot1 = SlotValue<T1>(values[0]);
+                var slot2 = SlotValue<T2>(values[1]);
+                var slot3 = SlotValue<T3>(values[2]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
-                        async () => await action(v1, v2, v3).ConfigureAwait(false),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                    async (spec, ct) =>
+                    {
+                        var v1 = slot1();
+                        var v2 = slot2();
+                        var v3 = slot3();
+
+                        return await BenchmarkRunner.Instance.RunAsync(displayName,
+                                async () => await action(v1, v2, v3).ConfigureAwait(false),
+                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                            .ConfigureAwait(false);
+                    });
             },
             [typeof(T1), typeof(T2), typeof(T3)],
             action,
@@ -381,13 +444,20 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var v1 = (T1)values[0]!;
-                var v2 = (T2)values[1]!;
-                var v3 = (T3)values[2]!;
+                var slot1 = SlotValue<T1>(values[0]);
+                var slot2 = SlotValue<T2>(values[1]);
+                var slot3 = SlotValue<T3>(values[2]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)));
+                    (spec, ct) =>
+                    {
+                        var v1 = slot1();
+                        var v2 = slot2();
+                        var v3 = slot3();
+
+                        return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
+                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                    });
             },
             [typeof(T1), typeof(T2), typeof(T3)],
             action,
@@ -408,14 +478,22 @@ public class BenchmarkSuite(string name)
             name, cat,
             (values, displayName) =>
             {
-                var v1 = (T1)values[0]!;
-                var v2 = (T2)values[1]!;
-                var v3 = (T3)values[2]!;
+                var slot1 = SlotValue<T1>(values[0]);
+                var slot2 = SlotValue<T2>(values[1]);
+                var slot3 = SlotValue<T3>(values[2]);
 
                 return new BenchmarkEnvelope(displayName, "", null, false, cat,
-                    async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(displayName,
-                        () => action(v1, v2, v3),
-                        spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false));
+                    async (spec, ct) =>
+                    {
+                        var v1 = slot1();
+                        var v2 = slot2();
+                        var v3 = slot3();
+
+                        return await BenchmarkRunner.Instance.RunAsync(displayName,
+                                () => action(v1, v2, v3),
+                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                            .ConfigureAwait(false);
+                    });
             },
             [typeof(T1), typeof(T2), typeof(T3)],
             action,
@@ -442,6 +520,65 @@ public class BenchmarkSuite(string name)
         ValidateParameterType(name2, values2);
         _parameterDefs.Add(new ParameterDef(name1, typeof(T1), values1.Cast<object?>().ToArray()));
         _parameterDefs.Add(new ParameterDef(name2, typeof(T2), values2.Cast<object?>().ToArray()));
+        return this;
+    }
+
+    /// <summary>
+    ///     Declares a sweep whose values are <b>built</b> in the measuring process rather than sent to
+    ///     it, each under the label that names it in the report.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The value overload can only carry what
+    ///         <see cref="Workers.TestArgumentCodec" /> carries, and a sweep over anything else - two
+    ///         payloads of different sizes, two pre-built trees, a small and a large document - was
+    ///         refused for its type. That is the shape a parameter sweep is <i>for</i>, so the answer
+    ///         cannot be "make the values simpler": it is to send the recipe instead of the value, which
+    ///         is what every other un-sendable thing in this library already does.
+    ///     </para>
+    ///     <para>
+    ///         Each recipe is invoked once, before that benchmark's warmup, in whichever process
+    ///         measures - so preparation is never inside a reading, and on an isolated run the value is
+    ///         never built here at all. Each must capture nothing, for the same reason a body must.
+    ///     </para>
+    ///     <para>
+    ///         The label is required rather than derived. A value's own <c>ToString</c> is what names a
+    ///         swept constant in the report, and a recipe has no value to ask until it runs - in the
+    ///         other process. Naming it here keeps the benchmark's identity decided before anything is
+    ///         measured, which is what lets a stored baseline match across runs.
+    ///     </para>
+    /// </remarks>
+    public BenchmarkSuite WithParameter<T>(string name, params (string Label, Func<T> Recipe)[] values)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(values);
+
+        if (values.Length == 0)
+            throw new ArgumentException($"Parameter '{name}' was declared with no values.", nameof(values));
+
+        var recipes = new object?[values.Length];
+
+        for (var i = 0; i < values.Length; i++)
+        {
+            var (label, recipe) = values[i];
+
+            if (recipe is null)
+                throw new ArgumentException($"Parameter '{name}' has a null recipe.", nameof(values));
+
+            if (string.IsNullOrWhiteSpace(label))
+            {
+                throw new ArgumentException(
+                    $"Parameter '{name}' has a recipe with no label. A recipe's value does not exist "
+                    + "until it runs in the measuring process, so the label is the only thing that can "
+                    + "name it in the report.",
+                    nameof(values));
+            }
+
+            recipes[i] = new ParameterRecipe(label, recipe);
+        }
+
+        _parameterDefs.Add(new ParameterDef(name, typeof(T), recipes));
+
         return this;
     }
 
@@ -561,7 +698,7 @@ public class BenchmarkSuite(string name)
             name, "", null, false, ResolveAddCategories(categories, _pendingCategories), runAsync)
         {
             Body = body,
-            StateFactory = prepare,
+            StateRecipes = [StateRecipe.For(prepare)],
             IterationSetup = setup,
             IterationTeardown = teardown,
         });
@@ -1857,7 +1994,11 @@ public class BenchmarkSuite(string name)
 
             for (var i = 0; i < combo.Length; i++)
             {
-                paramSet[i] = new BenchmarkParameter(_parameterDefs[i].Name, combo[i]);
+                // A recipe's label stands in for the value, which does not exist yet and may never
+                // exist in this process at all.
+                paramSet[i] = new BenchmarkParameter(
+                    _parameterDefs[i].Name,
+                    combo[i] is ParameterRecipe recipe ? recipe.Label : combo[i]);
             }
 
             foreach (var factory in compatibleFactories)
@@ -1871,8 +2012,28 @@ public class BenchmarkSuite(string name)
                         "Ensure parameter values produce unique display names.");
                 }
 
-                var arguments = combo.ToArray();
-                var envelope = factory.Factory(arguments, displayName);
+                var slots = combo.ToArray();
+                var envelope = factory.Factory(slots, displayName);
+
+                // Split for the wire: a swept constant is sent as a value, a recipe is sent as the
+                // address of the factory that builds it. Both lists are the body's full arity, so the
+                // two are aligned with each other and with the parameters, and a slot filled one way is
+                // null in the other list.
+                var arguments = new object?[slots.Length];
+                StateRecipe?[]? recipes = null;
+
+                for (var i = 0; i < slots.Length; i++)
+                {
+                    if (slots[i] is ParameterRecipe recipe)
+                    {
+                        recipes ??= new StateRecipe?[slots.Length];
+                        recipes[i] = StateRecipe.For(recipe.Factory);
+                    }
+                    else
+                    {
+                        arguments[i] = slots[i];
+                    }
+                }
 
                 expanded.Add(envelope with
                 {
@@ -1885,6 +2046,7 @@ public class BenchmarkSuite(string name)
                     // this expansion will call it with, so there is no second copy to drift.
                     Body = factory.Action,
                     Arguments = arguments,
+                    StateRecipes = recipes,
                     IterationSetup = factory.IterationSetup,
                     IterationTeardown = factory.IterationTeardown,
                 });
@@ -2033,30 +2195,40 @@ public class BenchmarkSuite(string name)
 
     // --- Validation ---
 
+    /// <summary>
+    ///     Refuses a parameter value that could not cross a process boundary intact.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The permitted set is <see cref="TestArgumentCodec.IsSupported" /> and nothing else. It used
+    ///         to be a second, hand-written list here that rejected <see cref="DateTime" />,
+    ///         <see cref="DateTimeOffset" />, <see cref="TimeSpan" />, <see cref="Guid" />,
+    ///         <see cref="nint" /> and <see cref="nuint" /> - all of which the codec carries - so a sweep
+    ///         over a <c>TimeSpan</c> was refused at registration for a limitation the wire does not have,
+    ///         and the two lists could drift in the other direction just as easily.
+    ///     </para>
+    ///     <para>
+    ///         Checked against the value's <b>runtime</b> type, which is the weaker of the two questions
+    ///         and deliberately so: the strong one - can the <i>declared</i> type be encoded - belongs to
+    ///         <see cref="BodyRef.TryCreate" />, which reads it from the body's own signature. A
+    ///         <c>WithParameter&lt;object&gt;</c> sweep over boxed ints passes here and is refused there,
+    ///         by name, because <c>object</c> is what the codec would have to produce.
+    ///     </para>
+    /// </remarks>
     private static void ValidateParameterType<T>(string name, T[] values)
     {
         foreach (var value in values)
         {
-            if (!IsSupportedParameterType(value))
+            if (value is not null && !TestArgumentCodec.IsSupported(value.GetType()))
             {
                 throw new ArgumentException(
-                    $"Parameter values must be primitives, enums, strings, or null. " +
-                    $"Value of type '{value?.GetType().FullName ?? "null"}' for parameter '{name}' is not supported.",
+                    "Parameter values must be primitives, enums, strings, decimal, DateTime, "
+                    + "DateTimeOffset, TimeSpan, Guid, or null. Value of type "
+                    + $"'{value.GetType().FullName}' for parameter '{name}' is not supported.",
                     name);
             }
         }
     }
-
-    private static bool IsSupportedParameterType(object? value) => value switch
-    {
-        null => true,
-        bool => true,
-        byte or sbyte or short or ushort or int or uint or long or ulong => true,
-        float or double or decimal => true,
-        char or string => true,
-        Enum => true,
-        _ => false,
-    };
 
     private IReadOnlyList<BenchmarkEnvelope> ApplyCategoryFilter(IReadOnlyList<BenchmarkEnvelope> benchmarks)
     {
@@ -2125,6 +2297,54 @@ public class BenchmarkSuite(string name)
     }
 
     private sealed record ParameterDef(string Name, Type Type, object?[] Values);
+
+    /// <summary>
+    ///     One value in a sweep that is built in the measuring process rather than sent to it.
+    /// </summary>
+    /// <remarks>
+    ///     Occupies a slot in <see cref="ParameterDef.Values" /> in place of the value itself, so
+    ///     combination-building and display-name formatting are unchanged - only the two places that
+    ///     turn a slot into something usable know the difference:
+    ///     <see cref="SlotValue{T}" /> for the in-process path and <see cref="ExpandEnvelopes" /> for
+    ///     the addressed one.
+    /// </remarks>
+    private sealed record ParameterRecipe(string Label, Delegate Factory);
+
+    /// <summary>
+    ///     Resolves one expansion slot to the value the in-process path should measure over, running a
+    ///     recipe if that is what the slot holds - once, and only if this benchmark is actually measured
+    ///     here.
+    /// </summary>
+    /// <remarks>
+    ///     Deferred rather than resolved during expansion, which happens before the isolation decision.
+    ///     Building it there would run every recipe in the coordinator on every run, including the
+    ///     isolated ones where the worker builds its own and this copy is measured by nobody - the same
+    ///     mistake the host-side service-provider resolvers made until they were made lazy. The
+    ///     resolution is outside the timed region either way; what runs inside the loop is still a
+    ///     delegate over a plain local.
+    /// </remarks>
+    private static Func<T> SlotValue<T>(object? slot)
+    {
+        if (slot is not ParameterRecipe recipe)
+            return () => (T)slot!;
+
+        var built = false;
+        T value = default!;
+
+        return () =>
+        {
+            if (built)
+                return value;
+
+            // Always a Func<T>: WithParameter<T> is the only thing that builds a ParameterRecipe and
+            // that is the shape it takes. Cast rather than DynamicInvoke so a failure names the type
+            // rather than arriving wrapped in a TargetInvocationException.
+            value = ((Func<T>)recipe.Factory)();
+            built = true;
+
+            return value;
+        };
+    }
 
     /// <param name="Action">
     ///     The user's own typed lambda, kept beside the factory that wraps it. The factory's own

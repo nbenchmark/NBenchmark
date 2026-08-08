@@ -30,9 +30,9 @@ internal static class SingleBodyRunner
     ///     The outcome, and the status describing where it ran. Never throws for an un-isolatable
     ///     body: falling back is the designed behaviour, not an error.
     /// </returns>
-    /// <param name="stateFactory">
-    ///     A parameterless factory producing the body's single argument, run in the worker before
-    ///     warmup. <c>null</c> for the ordinary parameterless body.
+    /// <param name="recipes">
+    ///     Factories producing the body's arguments, aligned with its parameters and run in the worker
+    ///     before warmup. <c>null</c> for the ordinary parameterless body.
     /// </param>
     public static async Task<(MeasurementOutcome Outcome, IsolationStatus Status)> RunAsync(
         string name,
@@ -41,13 +41,16 @@ internal static class SingleBodyRunner
         IBenchmarkProgress progress,
         Func<Task<MeasurementOutcome>> measureInProcess,
         CancellationToken cancellationToken,
-        Delegate? stateFactory = null)
+        IReadOnlyList<StateRecipe?>? recipes = null,
+        Delegate? iterationSetup = null,
+        Delegate? iterationTeardown = null)
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(measureInProcess);
 
         if (!TryPlan(
-                body, name, options, stateFactory, out var bodyRef, out var receivers, out var status, out var refusal))
+                body, name, options, recipes, iterationSetup, iterationTeardown,
+                out var bodyRef, out var receivers, out var status, out var refusal))
         {
             IsolationAudit.ThrowIfRequired(options, name, status, refusal);
             SimpleModeGuidance.EmitOnce(name, status, refusal);
@@ -126,7 +129,9 @@ internal static class SingleBodyRunner
         Delegate body,
         string name,
         MeasurementOptions options,
-        Delegate? stateFactory,
+        IReadOnlyList<StateRecipe?>? recipes,
+        Delegate? iterationSetup,
+        Delegate? iterationTeardown,
         out BodyRef bodyRef,
         out IReadOnlyList<TransferredReceiver> receiverTable,
         out IsolationStatus status,
@@ -141,6 +146,14 @@ internal static class SingleBodyRunner
 
             refusal = "the measurement worker (nbworker) is not deployed alongside this application. "
                       + $"Looked in {WorkerLocator.DescribeSearch()}.";
+
+            return false;
+        }
+
+        if (FrameChannel.TransportRefusal is { } transportRefusal)
+        {
+            status = IsolationStatus.InProcessNoWorker;
+            refusal = transportRefusal;
 
             return false;
         }
@@ -167,7 +180,7 @@ internal static class SingleBodyRunner
                 out bodyRef,
                 out var bodyRefusal,
                 arguments: null,
-                stateFactory,
+                recipes,
                 receivers))
         {
             // The reason is carried, not recovered from the message. This used to search the text for
@@ -179,11 +192,53 @@ internal static class SingleBodyRunner
             return false;
         }
 
+        // Addressed after the body and against the same receiver table, so a hook and the body it
+        // belongs to bind to one object rather than to a copy each. A hook that cannot cross costs the
+        // benchmark its isolation rather than being dropped: a body measured without its setup reports
+        // a plausible number for work that never happened.
+        if (!TryAddressHook(iterationSetup, name, "setup", receivers, out var setupRef, out status, out refusal)
+            || !TryAddressHook(
+                iterationTeardown, name, "teardown", receivers, out var teardownRef, out status, out refusal))
+        {
+            return false;
+        }
+
+        bodyRef = bodyRef with { IterationSetup = setupRef, IterationTeardown = teardownRef };
+
         receiverTable = receivers.Receivers;
         status = IsolationStatus.Isolated;
         refusal = null;
 
         return true;
+    }
+
+    private static bool TryAddressHook(
+        Delegate? hook,
+        string name,
+        string role,
+        ReceiverTable receivers,
+        out BodyRef? addressed,
+        out IsolationStatus status,
+        out string? refusal)
+    {
+        addressed = null;
+        status = IsolationStatus.Isolated;
+        refusal = null;
+
+        if (hook is null)
+            return true;
+
+        if (BodyRef.TryCreateHook(hook, $"{name} ({role})", out var hookRef, out var hookRefusal, receivers))
+        {
+            addressed = hookRef;
+
+            return true;
+        }
+
+        status = hookRefusal.ToStatus(IsolationStatus.InProcessLiveFixture);
+        refusal = $"its per-iteration {role} {hookRefusal.Message}";
+
+        return false;
     }
 }
 

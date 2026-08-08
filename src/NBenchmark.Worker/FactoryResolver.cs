@@ -99,6 +99,29 @@ internal static class FactoryResolver
         if (!TryBind(context, targetAssemblyPath, factory, expected, arguments.Length, out var invoke, out error))
             return false;
 
+        return Invoke(factory, expected, invoke, arguments, out produced, out error, out detail);
+    }
+
+    /// <summary>
+    ///     Runs a bound factory and checks what it produced.
+    /// </summary>
+    /// <remarks>
+    ///     Shared by both invoke paths so the four failure phrasings stay in one place - which is the
+    ///     reason this class exists. The second path differs only in where its arguments came from.
+    /// </remarks>
+    private static bool Invoke(
+        AddressedFactory factory,
+        Type expected,
+        Func<object?[], object?> invoke,
+        object?[] arguments,
+        out object? produced,
+        out string? error,
+        out string? detail)
+    {
+        produced = null;
+        error = null;
+        detail = null;
+
         try
         {
             produced = invoke(arguments);
@@ -129,6 +152,84 @@ internal static class FactoryResolver
     }
 
     /// <summary>
+    ///     Resolves and invokes a factory whose own argument values arrived encoded on the wire.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The values are decoded against the <b>resolved method's</b> declared parameter types,
+    ///         which is why this lives here rather than at the call site: this is the only place that
+    ///         has the method. The rule is the same one every other decode in the protocol follows - the
+    ///         signature on disk is a fact, and a type name on the wire is only a claim about it.
+    ///     </para>
+    ///     <para>
+    ///         This is what makes a prepare delegate able to take parameters at all, which is the answer
+    ///         to the refusal users hit after they have already done the rewrite the diagnostic asked
+    ///         for: <c>prepare: () =&gt; Build(size)</c> captures and can only be refused, while
+    ///         <c>prepare: (int size) =&gt; Build(size)</c> with the size sent alongside is a complete
+    ///         recipe.
+    ///     </para>
+    /// </remarks>
+    public static bool TryInvoke(
+        BenchmarkLoadContext context,
+        string targetAssemblyPath,
+        AddressedFactory factory,
+        Type expected,
+        out object? produced,
+        out string? error,
+        out string? detail)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        produced = null;
+        detail = null;
+
+        var encoded = factory.Body?.Arguments ?? [];
+
+        if (encoded.Count == 0)
+            return TryInvoke(context, targetAssemblyPath, factory, expected, [], out produced, out error, out detail);
+
+        if (!TryBind(
+                context, targetAssemblyPath, factory, expected, encoded.Count,
+                out var invoke, out var parameters, out error))
+        {
+            return false;
+        }
+
+        var arguments = new object?[encoded.Count];
+
+        for (var i = 0; i < encoded.Count; i++)
+        {
+            // A recipe's own arguments are values, never nested recipes: the thing a prepare delegate
+            // needs is the local the user would otherwise have captured, and anything not encodable as
+            // a value has its own prepare delegate one slot up rather than one level down.
+            if (encoded[i].Value is not { } value)
+            {
+                error = $"{factory.Role} carries a nested factory for parameter "
+                        + $"'{parameters[i].Name}', which is not something a recipe can take.";
+
+                return false;
+            }
+
+            try
+            {
+                arguments[i] = TestArgumentCodec.Decode(value, parameters[i].ParameterType);
+            }
+            catch (Exception ex) when (ex is FormatException
+                                          or OverflowException
+                                          or ArgumentException
+                                          or InvalidOperationException)
+            {
+                error = $"{factory.Role} could not be given its argument '{parameters[i].Name}' as "
+                        + $"{parameters[i].ParameterType.Name}: {ex.Message}";
+
+                return false;
+            }
+        }
+
+        return Invoke(factory, expected, invoke, arguments, out produced, out error, out detail);
+    }
+
+    /// <summary>
     ///     Resolves an address to an invocable method, by whichever of the two addressing modes the
     ///     coordinator chose, <b>without running it</b>.
     /// </summary>
@@ -146,8 +247,25 @@ internal static class FactoryResolver
         int arity,
         out Func<object?[], object?> invoke,
         out string? error)
+        => TryBind(context, targetAssemblyPath, factory, expected, arity, out invoke, out _, out error);
+
+    /// <inheritdoc cref="TryBind(BenchmarkLoadContext, string, AddressedFactory, Type, int, out Func{object?[], object?}, out string?)" />
+    /// <param name="parameters">
+    ///     The resolved method's own parameters, for a caller that has to decode values against them.
+    ///     They are read from the assembly on disk, never from the wire.
+    /// </param>
+    public static bool TryBind(
+        BenchmarkLoadContext context,
+        string targetAssemblyPath,
+        AddressedFactory factory,
+        Type expected,
+        int arity,
+        out Func<object?[], object?> invoke,
+        out ParameterInfo[] parameters,
+        out string? error)
     {
         invoke = null!;
+        parameters = [];
 
         if (!factory.IsWellFormed(out error))
             return false;
@@ -180,10 +298,14 @@ internal static class FactoryResolver
             return false;
         }
 
-        if (method.GetParameters().Length != arity)
+        parameters = method.GetParameters();
+
+        if (parameters.Length != arity)
         {
-            error = $"{factory.Role} takes {method.GetParameters().Length} parameter(s); "
+            error = $"{factory.Role} takes {parameters.Length} parameter(s); "
                     + $"{arity} were supplied for it.";
+
+            parameters = [];
 
             return false;
         }

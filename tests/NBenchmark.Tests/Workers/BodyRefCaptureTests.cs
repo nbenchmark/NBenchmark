@@ -35,7 +35,7 @@ public class BodyRefCaptureTests
             out _,
             out var reason,
             arguments: null,
-            stateFactory: null,
+            recipes: null,
             new ReceiverTable(MeasurementOptions.DefaultMaxTransferredStateBytes));
 
         refusal = reason.Message;
@@ -230,14 +230,15 @@ public class BodyRefCaptureTests
     }
 
     /// <summary>
-    ///     Argument values and a prepare delegate are two answers for the same parameter slot, so
-    ///     supplying both is refused.
+    ///     An argument value and a prepare delegate are two answers for the same parameter slot, so
+    ///     supplying both for one slot is refused.
     /// </summary>
     /// <remarks>
-    ///     Previously the arguments were silently dropped - the encoding branch is skipped whenever a
-    ///     factory is present - so the body measured the factory's value under a request that named a
-    ///     different one. The "mutually exclusive" claim on <c>BodyRef.StateFactory</c> held by
-    ///     construction only, which is an argument about today's callers rather than about the type.
+    ///     Previously the arguments were silently dropped - the encoding branch was skipped whenever a
+    ///     factory was present - so the body measured the factory's value under a request that named a
+    ///     different one. The claim held by construction only, which is an argument about today's
+    ///     callers rather than about the type. Now that a slot may be filled either way, the check is
+    ///     per slot rather than per body, and the drop is available again to anyone who removes it.
     /// </remarks>
     [Fact]
     public void A_Body_Given_Both_Arguments_And_A_Prepare_Delegate_Is_Refused()
@@ -250,10 +251,61 @@ public class BodyRefCaptureTests
             out _,
             out var refusal,
             arguments: [7],
-            stateFactory: static () => 3));
+            recipes: [StateRecipe.For(static () => 3)]));
 
         Assert.Equal(RefusalReason.UnaddressableArguments, refusal.Reason);
         Assert.Contains("two different answers", refusal.Message);
+    }
+
+    /// <summary>
+    ///     A prepare delegate may take parameters, with their values sent alongside it.
+    /// </summary>
+    /// <remarks>
+    ///     This is the answer to the refusal users hit <i>after</i> doing the rewrite the diagnostic
+    ///     asked for. <c>prepare: () =&gt; Build(size)</c> closes over <c>size</c> and can only be
+    ///     refused; naming the parameter and passing the value makes the recipe complete, so the worker
+    ///     can follow it without needing anything from this process.
+    /// </remarks>
+    [Fact]
+    public void A_Prepare_Delegate_Taking_Arguments_Is_Addressable()
+    {
+        var body = (int[] data) => data.Length;
+
+        Assert.True(BodyRef.TryCreate(
+            body,
+            "test",
+            out var bodyRef,
+            out var refusal,
+            arguments: null,
+            recipes: [StateRecipe.For(static (int size) => new int[size], 512)]), refusal.Message);
+
+        var slot = Assert.Single(bodyRef.Arguments);
+        Assert.NotNull(slot.Recipe);
+
+        var argument = Assert.Single(slot.Recipe.Body!.Arguments);
+
+        Assert.Equal("512", argument.Value!.Value);
+    }
+
+    /// <summary>
+    ///     A prepare delegate whose parameters are not all supplied is refused, rather than invoked
+    ///     with a default standing in for the missing one.
+    /// </summary>
+    [Fact]
+    public void A_Prepare_Delegate_Missing_Its_Arguments_Is_Refused()
+    {
+        var body = (int[] data) => data.Length;
+
+        Assert.False(BodyRef.TryCreate(
+            body,
+            "test",
+            out _,
+            out var refusal,
+            arguments: null,
+            recipes: [StateRecipe.For(static (int size) => new int[size])]));
+
+        Assert.Equal(RefusalReason.PrepareDelegate, refusal.Reason);
+        Assert.Contains("1 parameter(s) but 0 value(s)", refusal.Message);
     }
 
     private sealed class Widget

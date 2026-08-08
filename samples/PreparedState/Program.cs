@@ -56,8 +56,8 @@ var unsendable = Benchmark.Run(() => handle.Length, options, "unsendable");
 var prepared = Benchmark.Run(
     prepare: () => BuildData(),
     body: values => Sum(values),
-    options,
-    "prepared");
+    options: options,
+    name: "prepared");
 
 Report(captured);
 Report(prepared);

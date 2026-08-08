@@ -66,6 +66,17 @@ internal static class DelegateDispatch
                 .ConfigureAwait(false);
         }
 
+        // A ValueTask is neither Task nor Task<T>, so without this it fell through to the synchronous
+        // branch below with T = ValueTask: the struct went to the JIT-elision sink unawaited and the
+        // measurement covered only the body's synchronous prefix. Refused here, before the reflection
+        // call, so the message names the body rather than arriving as a TargetInvocationException
+        // wrapping the runner's own guard.
+        if (resultType == typeof(ValueTask)
+            || (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(ValueTask<>)))
+        {
+            throw new InvalidOperationException(AwaitableResult.Refusal(name, resultType));
+        }
+
         // Checked before the Func<Task> cast above would have matched it: Func<T> is covariant in
         // T, so a Func<Task<int>> *is* a Func<Task>. Taking that branch would await the body and
         // silently drop its result - the value would never reach the JIT-elision sink, which is the

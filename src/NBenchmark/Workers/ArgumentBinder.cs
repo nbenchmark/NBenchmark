@@ -103,6 +103,20 @@ internal static class ArgumentBinder
             return false;
         }
 
+        // The parameterless path refuses these in BodyResolver.TryDelegateType and this one did not,
+        // so a Func<TState, ValueTask> bound here as Func<ValueTask> and was dispatched down the
+        // *synchronous* branch with T = ValueTask - the task was never awaited and the benchmark
+        // measured only its synchronous prefix. Refused rather than converted, because the caller
+        // asked for a synchronous measurement of something that is not one.
+        if (returnType == typeof(ValueTask)
+            || (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>)))
+        {
+            error = $"'{method.Name}' returns {returnType.Name}. The engine measures Task-returning "
+                    + "bodies; wrap it as `() => Method().AsTask()`.";
+
+            return false;
+        }
+
         delegateType = OpenFuncTypes[parameters.Length - 1].MakeGenericType([.. parameterTypes, returnType]);
 
         return true;

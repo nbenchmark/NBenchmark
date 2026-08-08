@@ -101,6 +101,13 @@ public static class TestMethodRunner
             return false;
         }
 
+        if (FrameChannel.TransportRefusal is { } transportRefusal)
+        {
+            refusal = transportRefusal;
+
+            return false;
+        }
+
         foreach (var parameter in method.GetParameters())
         {
             if (TestArgumentCodec.IsSupported(parameter.ParameterType))
@@ -381,11 +388,20 @@ public static class TestMethodRunner
                 arguments[i] = TestArgumentCodec.Encode(parameters[i].ParameterType, subject.Arguments[i]);
             }
 
+            // A token names the open definition, so a closed generic test - a method on
+            // Fixture<int>, or Compare<string> - needs its arguments carried alongside it. Named
+            // rather than checked: TestBodyIsolation has already refused anything still open, so
+            // these always succeed by the time a subject reaches here.
+            GenericArguments.TryNameTypeArguments(subject.Method, out var typeArguments, out _);
+            GenericArguments.TryNameMethodArguments(subject.Method, out var methodArguments, out _);
+
             encoded[s] = new TestMethodPayload
             {
                 Token = subject.Method.MetadataToken,
                 DisplayName = subject.DisplayName,
                 Arguments = arguments,
+                TypeGenericArguments = typeArguments,
+                MethodGenericArguments = methodArguments,
             };
         }
 
