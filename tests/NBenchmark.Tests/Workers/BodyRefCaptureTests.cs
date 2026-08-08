@@ -198,6 +198,56 @@ public class BodyRefCaptureTests
         Assert.Contains("silently wrong", refusal);
     }
 
+    /// <summary>
+    ///     A body wider than <see cref="ArgumentBinder.MaxArity" /> is refused while planning, rather
+    ///     than sent and faulted on arrival.
+    /// </summary>
+    /// <remarks>
+    ///     The two sides used to disagree: encoding accepted any arity whose types crossed, and the
+    ///     ceiling was enforced only in the worker - so a four-parameter body passed planning, was
+    ///     sent, and cost the run a benchmark to a shape the coordinator could have declined and named
+    ///     the fix for. Unreachable through the public suite API, which caps parameter sweeps at three,
+    ///     which is exactly why it needs pinning here.
+    /// </remarks>
+    [Fact]
+    public void A_Body_Wider_Than_The_Arity_Ceiling_Is_Refused_While_Planning()
+    {
+        var body = (int a, int b, int c, int d) => a + b + c + d;
+
+        Assert.False(
+            BodyRef.TryCreate(body, "test", out _, out var refusal, arguments: [1, 2, 3, 4]));
+
+        Assert.NotNull(refusal);
+        Assert.Contains("at most 3", refusal);
+    }
+
+    /// <summary>
+    ///     Argument values and a prepare delegate are two answers for the same parameter slot, so
+    ///     supplying both is refused.
+    /// </summary>
+    /// <remarks>
+    ///     Previously the arguments were silently dropped - the encoding branch is skipped whenever a
+    ///     factory is present - so the body measured the factory's value under a request that named a
+    ///     different one. The "mutually exclusive" claim on <c>BodyRef.StateFactory</c> held by
+    ///     construction only, which is an argument about today's callers rather than about the type.
+    /// </remarks>
+    [Fact]
+    public void A_Body_Given_Both_Arguments_And_A_Prepare_Delegate_Is_Refused()
+    {
+        var body = (int value) => value * 2;
+
+        Assert.False(BodyRef.TryCreate(
+            body,
+            "test",
+            out _,
+            out var refusal,
+            arguments: [7],
+            stateFactory: static () => 3));
+
+        Assert.NotNull(refusal);
+        Assert.Contains("two different answers", refusal);
+    }
+
     private sealed class Widget
     {
         public int Compute() => 43;

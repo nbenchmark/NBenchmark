@@ -86,3 +86,41 @@ public class LongGroupBenchmarks
     [Benchmark]
     public void Tick() => Thread.Sleep(25);
 }
+
+/// <summary>
+///     A <c>[BenchmarkPlan]</c> factory reachable by <b>name</b>, for the addressing mode a
+///     multi-runtime run depends on.
+/// </summary>
+/// <remarks>
+///     Name addressing exists because each runtime's assembly is a separate build, in which a
+///     metadata token from the coordinator's build identifies nothing. Until this fixture existed the
+///     mode had no automated coverage at all - the only thing exercising it was
+///     <c>samples/MultiRuntimeSuite</c>, run by hand - so a change to the resolver could pass every
+///     test and break every multi-runtime run. Addressed here against the same build, which tests the
+///     resolution mechanism without paying for three <c>dotnet build</c> invocations.
+/// </remarks>
+public static class NamedPlanFixture
+{
+    public const string SuiteName = "named-plan";
+
+    public const string BenchmarkName = "only";
+
+    [BenchmarkPlan]
+    public static BenchmarkSuite BuildSuite() =>
+        new BenchmarkSuite(SuiteName)
+            .Add(BenchmarkName, () => Thread.SpinWait(200))
+            .WithIterations(8)
+            .WithWarmup(1)
+            .WithOpsPerSample(1)
+            .WithAutoTune(AutoTuneOptions.Default with
+            {
+                MaxTuningTime = TimeSpan.FromSeconds(5),
+                MinWarmupTime = TimeSpan.Zero,
+                MinMeasurementTime = TimeSpan.Zero,
+                RequireJitQuiescence = false,
+                EnableJitterCalibration = false,
+            });
+
+    /// <summary>Returns the wrong type, so the resolver's shape check has something to reject.</summary>
+    public static string NotASuite() => "not a suite";
+}

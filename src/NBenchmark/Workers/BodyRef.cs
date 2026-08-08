@@ -161,9 +161,16 @@ internal sealed record BodyRef
     ///         Mutually exclusive with <see cref="Arguments" />. A parameter sweep supplies its value as
     ///         a serialized constant and a prepared state supplies it by construction, and a body takes
     ///         one parameter either way - so carrying both would leave two claims about the same slot.
+    ///         Enforced in <see cref="TryCreate" /> rather than left to construction: an address that
+    ///         carried both would silently honour one of them.
     ///     </para>
     /// </summary>
-    public BodyRef? StateFactory { get; init; }
+    public AddressedFactory? StateFactory { get; init; }
+
+    /// <summary>
+    ///     How a prepared-state factory is named in a diagnostic, on both sides of the boundary.
+    /// </summary>
+    internal const string PrepareRole = "its prepare delegate";
 
     /// <summary>
     ///     Attempts to build an address for <paramref name="body" />.
@@ -214,11 +221,23 @@ internal sealed record BodyRef
         if (!TryResolveShape(body, out var shape, out refusal))
             return false;
 
-        BodyRef? stateRef = null;
+        AddressedFactory? stateRef = null;
         IReadOnlyList<TestArgumentPayload> encodedArguments = [];
 
         if (stateFactory is not null)
         {
+            // Both would be two claims about the body's one parameter slot, and the encoding branch
+            // below is skipped when a factory is present - so without this the arguments would be
+            // dropped rather than refused, and the body would measure the factory's value under a
+            // request that named a different one.
+            if (arguments is { Count: > 0 })
+            {
+                refusal = $"it was given both {arguments.Count} argument value(s) and a prepare "
+                          + "delegate, which are two different answers for the same parameter.";
+
+                return false;
+            }
+
             if (!TryAddressStateFactory(method, stateFactory, displayName, out stateRef, out refusal))
                 return false;
         }
@@ -284,7 +303,7 @@ internal sealed record BodyRef
         MethodInfo bodyMethod,
         Delegate stateFactory,
         string displayName,
-        out BodyRef? stateRef,
+        out AddressedFactory? stateRef,
         out string? refusal)
     {
         stateRef = null;
@@ -319,9 +338,14 @@ internal sealed record BodyRef
             return false;
         }
 
-        if (!TryCreate(stateFactory, $"{displayName} (prepare)", out var created, out var factoryRefusal))
+        if (!AddressedFactory.TryCreate(
+                stateFactory,
+                PrepareRole,
+                out var created,
+                out var factoryRefusal,
+                displayName: $"{displayName} (prepare)"))
         {
-            refusal = $"its prepare delegate {factoryRefusal}";
+            refusal = $"{PrepareRole} {factoryRefusal}";
 
             return false;
         }
@@ -366,6 +390,18 @@ internal sealed record BodyRef
 
         if (parameters.Length == 0)
             return true;
+
+        // Enforced here as well as in the worker, because the two sides disagreeing is the failure
+        // this area is otherwise careful to avoid: a four-parameter body passed planning, was sent,
+        // and faulted on arrival, so the run lost a benchmark to a shape the coordinator could have
+        // declined - and would have said so about, in a message naming the fix.
+        if (parameters.Length > ArgumentBinder.MaxArity)
+        {
+            refusal = $"it takes {parameters.Length} parameters; a benchmark body may take at most "
+                      + $"{ArgumentBinder.MaxArity}.";
+
+            return false;
+        }
 
         var payloads = new TestArgumentPayload[parameters.Length];
 
