@@ -1469,7 +1469,7 @@ public class BenchmarkSuite(string name)
             var request = InlineSuitePlan.Request(
                 Name, decision.Bodies, _options, _runOrder,
                 WorkerRunPlan.DeriveSeed(_seed, replicate), replicate,
-                decision.SuiteSetup, decision.SuiteTeardown);
+                decision.SuiteSetup, decision.SuiteTeardown, decision.Receivers);
 
             var group = await WorkerLauncher.Current.RunGroupAsync(
                     request,

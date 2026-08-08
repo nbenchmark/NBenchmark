@@ -74,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 7;
+    public const int Version = 8;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -265,6 +265,19 @@ internal sealed record RunGroupPayload
 
     /// <summary><see cref="WorkGroupKind.Lambdas" />: the addressed bodies, in declaration order.</summary>
     public IReadOnlyList<BodyRef> Bodies { get; init; } = [];
+
+    /// <summary>
+    ///     <see cref="WorkGroupKind.Lambdas" />: the distinct receivers this group's delegates close
+    ///     over, referenced by <see cref="BodyRef.ReceiverIndex" />.
+    /// </summary>
+    /// <remarks>
+    ///     On the group rather than on each address because the sharing is real: Roslyn merges the
+    ///     captures of every lambda in a lexical scope into one display class, so a suite's bodies and
+    ///     its lifecycle hooks routinely close over one object. Carrying a copy per address had the
+    ///     worker rebuild several where the coordinator has one, and two benchmarks over one array
+    ///     stopped seeing each other's writes the moment a worker was available.
+    /// </remarks>
+    public IReadOnlyList<TransferredReceiver> Receivers { get; init; } = [];
 
     /// <summary>
     ///     <see cref="WorkGroupKind.Lambdas" />: the suite's own setup, run once in the worker before

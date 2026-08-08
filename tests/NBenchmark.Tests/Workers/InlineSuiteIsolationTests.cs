@@ -222,19 +222,51 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     A suite setup that captures is still refused, and says so as a capture rather than as a
-    ///     generic lifecycle problem.
+    ///     A suite setup that captures is carried to the worker and shares the bodies' state.
     /// </summary>
     /// <remarks>
-    ///     This is the case the old blanket refusal was really about, and it is still right: a capturing
-    ///     setup can only run here, where its captured state exists, and would then be preparing
-    ///     something the benchmarks in the worker never see. The remedy is the plan factory, which
-    ///     builds that state on the measuring side.
+    ///     <para>
+    ///         The blanket refusal this replaces was right for as long as each address carried its own
+    ///         copy of its receiver: a setup given a private copy would have prepared state the
+    ///         benchmarks never see, which is silent and looks like a working suite. With the group's
+    ///         receivers shared, the setup and the body are bound to the one object they closed over
+    ///         here, so the preparation reaches the measurement.
+    ///     </para>
+    ///     <para>
+    ///         The body asserting on what the setup wrote is the evidence. Proving the setup <i>ran</i>
+    ///         would be satisfied by a private copy too.
+    ///     </para>
     /// </remarks>
     [Fact]
-    public async Task InlineSuite_WithCapturingSuiteSetup_RefusesAndPointsAtThePlan()
+    public async Task InlineSuite_WithCapturingSuiteSetup_IsIsolated_AndReachesTheBody()
     {
         var buffer = new int[16];
+
+        var results = await Fast(new BenchmarkSuite("captured-lifecycle")
+                .Add("a", () =>
+                {
+                    if (buffer[0] != 9)
+                        throw new InvalidOperationException($"suite setup did not reach this body: {buffer[0]}");
+                })
+                .WithSuiteSetup(() => buffer[0] = 9))
+            .RunAsync();
+
+        var result = Assert.Single(results);
+
+        Assert.False(result.Errored, result.ErrorMessage);
+        Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
+
+        // Untouched here: the setup ran in the worker, on the worker's copy of the shared state.
+        Assert.Equal(0, buffer[0]);
+    }
+
+    /// <summary>
+    ///     A suite setup holding something that cannot be sent is still refused, and points at the plan.
+    /// </summary>
+    [Fact]
+    public async Task InlineSuite_WithUnsendableSuiteSetup_RefusesAndPointsAtThePlan()
+    {
+        var stream = Stream.Null;
 
         using var stderr = new StringWriter();
         var priorError = Console.Error;
@@ -246,7 +278,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         {
             results = await Fast(new BenchmarkSuite("captured-lifecycle")
                     .Add("a", () => Thread.SpinWait(200))
-                    .WithSuiteSetup(() => Array.Clear(buffer)))
+                    .WithSuiteSetup(() => _ = stream.Length))
                 .RunAsync();
         }
         finally
@@ -256,8 +288,6 @@ public sealed class InlineSuiteIsolationTests : IDisposable
 
         Assert.Single(results);
 
-        // The reason, not merely "not isolated" - see the prepared-state case for why the weaker
-        // assertion passed against a status nothing had set.
         Assert.All(
             results,
             r => Assert.Equal(IsolationStatus.InProcessCapturedState, r.IsolationStatus));
@@ -465,8 +495,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     A parameterized body carrying per-iteration hooks is still refused, because the hooks are
-    ///     delegates in this process.
+    ///     A parameterized body carrying per-iteration hooks is isolated, and the hooks travel with it.
     /// </summary>
     /// <remarks>
     ///     This is the regression guard for the defect that making parameter sweeps addressable
@@ -474,26 +503,33 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     ///     <c>setup</c>/<c>teardown</c> - harmless while it carried no addressable body, because it was
     ///     refused for that first. Once the body became addressable, an unrecorded hook meant the suite
     ///     was measured in a worker with its setup silently dropped: the numbers would look fine and
-    ///     describe work that never happened.
+    ///     describe work that never happened. Asserted by having the body fail unless the setup reached
+    ///     it, which is the only form that would catch a dropped hook.
     /// </remarks>
     [Fact]
-    public async Task InlineSuite_ParameterizedWithIterationHooks_IsNotIsolated()
+    public async Task InlineSuite_ParameterizedWithIterationHooks_IsIsolated_AndKeepsTheHooks()
     {
-        var setupCalls = 0;
+        var flag = new int[1];
 
         var results = await Fast(new BenchmarkSuite("hooked")
                 .WithParameter("spins", 200)
-                .Add("spin", (int spins) => Thread.SpinWait(spins), setup: () => setupCalls++))
+                .Add(
+                    "spin",
+                    (int spins) =>
+                    {
+                        if (flag[0] != 1)
+                            throw new InvalidOperationException("the per-iteration setup did not run");
+
+                        Thread.SpinWait(spins);
+                    },
+                    setup: () => flag[0] = 1))
             .RunAsync();
 
         var result = Assert.Single(results);
+
         Assert.False(result.Errored, result.ErrorMessage);
-
-        // The hook captures `setupCalls`, so the refusal is a capture and the row says so - which is
-        // what earns the reader the prepare-it-as-a-recipe remedy rather than the generic one.
-        Assert.Equal(IsolationStatus.InProcessCapturedState, result.IsolationStatus);
-
-        Assert.True(setupCalls > 0, "the per-iteration setup must actually have run somewhere");
+        Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
+        Assert.Equal(0, flag[0]);
     }
 
     // ---------- Prepared state ----------

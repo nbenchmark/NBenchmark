@@ -160,7 +160,10 @@ internal static class FactoryResolver
             if (!TryResolveByName(context, targetAssemblyPath, factory, expected, arity, out method, out error))
                 return false;
         }
-        else if (!BodyResolver.TryBindMethod(context, factory.Body!, out method, out receiver, out var bindError))
+        // No receivers: a factory that closes over state is refused on the coordinator's side, so one
+        // reaching here can only have a static or stateless-closure receiver.
+        else if (!BodyResolver.TryBindMethod(
+                     context, factory.Body!, ResolvedReceivers.None, out method, out receiver, out var bindError))
         {
             error = $"{factory.Role} could not be resolved because {bindError}";
 

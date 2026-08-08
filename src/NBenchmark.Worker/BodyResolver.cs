@@ -24,12 +24,13 @@ internal static class BodyResolver
     public static bool TryResolve(
         BenchmarkLoadContext context,
         BodyRef body,
+        ResolvedReceivers receivers,
         out Delegate resolved,
         out string? error)
     {
         resolved = null!;
 
-        if (!TryBindMethod(context, body, out var method, out var receiver, out error))
+        if (!TryBindMethod(context, body, receivers, out var method, out var receiver, out error))
             return false;
 
         if (!TryDelegateType(method, body, out var delegateType, out error))
@@ -80,6 +81,7 @@ internal static class BodyResolver
     public static bool TryBindMethod(
         BenchmarkLoadContext context,
         BodyRef body,
+        ResolvedReceivers receivers,
         out MethodInfo method,
         out object? receiver,
         out string? error)
@@ -139,7 +141,7 @@ internal static class BodyResolver
         return body.Shape switch
         {
             BodyShape.CachedSingleton => TryResolveReceiver(ref method, body, out receiver, out error),
-            BodyShape.TransferredReceiver => TryTransferReceiver(ref method, body, out receiver, out error),
+            BodyShape.TransferredReceiver => TryTransferReceiver(ref method, body, receivers, out receiver, out error),
 
             // A static method needs no receiver, and every other shape was refused before it could be
             // addressed. Switched rather than tested for one shape, so a new one cannot silently take
@@ -345,6 +347,7 @@ internal static class BodyResolver
     private static bool TryTransferReceiver(
         ref MethodInfo method,
         BodyRef body,
+        ResolvedReceivers receivers,
         out object? receiver,
         out string? error)
     {
@@ -353,10 +356,17 @@ internal static class BodyResolver
         if (!TryCloseDeclaringType(ref method, body, out var declaringType, out error))
             return false;
 
-        return TryBuild(declaringType!, body.Captures, out receiver, out error);
+        if (body.ReceiverIndex is not { } index)
+        {
+            error = "its receiver holds state but the address names no entry in the group's receiver table.";
+
+            return false;
+        }
+
+        return receivers.TryGet(index, declaringType!, out receiver, out error);
     }
 
-    private static bool TryBuild(
+    internal static bool TryBuild(
         Type type,
         IReadOnlyList<CapturedField> captures,
         out object? built,

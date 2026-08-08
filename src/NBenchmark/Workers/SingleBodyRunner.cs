@@ -46,7 +46,8 @@ internal static class SingleBodyRunner
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(measureInProcess);
 
-        if (!TryPlan(body, name, options, stateFactory, out var bodyRef, out var status, out var refusal))
+        if (!TryPlan(
+                body, name, options, stateFactory, out var bodyRef, out var receivers, out var status, out var refusal))
         {
             IsolationAudit.ThrowIfRequired(options, name, status, refusal);
             SimpleModeGuidance.EmitOnce(name, status, refusal);
@@ -60,6 +61,7 @@ internal static class SingleBodyRunner
             Kind = WorkGroupKind.Lambdas,
             TargetAssemblyPath = bodyRef.AssemblyPath,
             Bodies = [bodyRef],
+            Receivers = receivers,
 
             Options = options,
             TotalBenchmarks = 1,
@@ -126,10 +128,12 @@ internal static class SingleBodyRunner
         MeasurementOptions options,
         Delegate? stateFactory,
         out BodyRef bodyRef,
+        out IReadOnlyList<TransferredReceiver> receiverTable,
         out IsolationStatus status,
         out string? refusal)
     {
         bodyRef = null!;
+        receiverTable = [];
 
         if (!WorkerLauncher.Current.IsAvailable)
         {
@@ -152,6 +156,11 @@ internal static class SingleBodyRunner
             return false;
         }
 
+        // One body, so the table can only ever hold one entry - but Single mode still goes through it,
+        // because a body and its receiver are addressed the same way in every mode and a second path
+        // is a second thing to keep in step.
+        var receivers = new ReceiverTable(options.MaxTransferredStateBytes);
+
         if (!BodyRef.TryCreate(
                 body,
                 name,
@@ -159,7 +168,7 @@ internal static class SingleBodyRunner
                 out var bodyRefusal,
                 arguments: null,
                 stateFactory,
-                options.MaxTransferredStateBytes))
+                receivers))
         {
             // The reason is carried, not recovered from the message. This used to search the text for
             // the word "captures" to decide which remedy the user was shown, which made every refusal
@@ -170,6 +179,7 @@ internal static class SingleBodyRunner
             return false;
         }
 
+        receiverTable = receivers.Receivers;
         status = IsolationStatus.Isolated;
         refusal = null;
 

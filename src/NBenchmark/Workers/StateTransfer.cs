@@ -66,6 +66,84 @@ internal sealed record CapturedField
 }
 
 /// <summary>
+///     One receiver a group's delegates bind to, with the values it holds.
+/// </summary>
+/// <remarks>
+///     No type address, deliberately. Every delegate sharing a receiver shares its runtime type by
+///     construction, so the worker takes the type from whichever delegate reaches it first - the
+///     receiver of a lambda <i>is</i> its method's declaring type - and one fewer thing on the wire is
+///     one fewer thing the two sides can disagree about.
+/// </remarks>
+internal sealed record TransferredReceiver
+{
+    public required IReadOnlyList<CapturedField> Captures { get; init; }
+}
+
+/// <summary>
+///     The distinct receivers a group's delegates close over, deduplicated by identity.
+/// </summary>
+/// <remarks>
+///     <para>
+///         Receivers belong to the <b>group</b> rather than to each delegate, and that is the whole
+///         point. Roslyn merges the captures of every lambda in a lexical scope into one display class,
+///         so a suite's bodies and its lifecycle hooks routinely close over one object - and giving
+///         each address its own copy of that object's fields meant the worker rebuilt several where
+///         this process has one. Measured: <c>.Add("bump", () =&gt; counter[0]++)</c> beside
+///         <c>.Add("observe", () =&gt; counter[0])</c> showed <c>observe</c> a <c>4</c> in-process and a
+///         <c>0</c> in a worker. Identical source, two different programs.
+///     </para>
+///     <para>
+///         Holding a table means the identity that exists here is reproduced there: one entry per
+///         distinct receiver, one rehydration per entry, every delegate that shared an object still
+///         sharing it. It is also what lets a lifecycle hook carry captures at all - a hook exists to
+///         act on the body's state, so a private copy would have it clearing a buffer the body never
+///         reads.
+///     </para>
+///     <para>
+///         The budget is the table's, not each delegate's, because the wire cost is the table's.
+///     </para>
+/// </remarks>
+internal sealed class ReceiverTable(int budgetBytes)
+{
+    private readonly Dictionary<object, int> _indices = new(ReferenceEqualityComparer.Instance);
+
+    private readonly List<TransferredReceiver> _receivers = [];
+
+    private int _spent;
+
+    /// <summary>The entries built so far, in index order.</summary>
+    public IReadOnlyList<TransferredReceiver> Receivers => _receivers;
+
+    /// <summary>
+    ///     Returns the index for <paramref name="receiver" />, capturing its fields the first time it
+    ///     is seen and reusing the entry every time after.
+    /// </summary>
+    public bool TryIndex(object receiver, string subject, out int index, out Refusal refusal)
+    {
+        ArgumentNullException.ThrowIfNull(receiver);
+
+        refusal = Refusal.None;
+
+        if (_indices.TryGetValue(receiver, out index))
+            return true;
+
+        if (!StateTransfer.TryCapture(receiver, subject, budgetBytes, ref _spent, out var captured, out refusal))
+        {
+            index = -1;
+
+            return false;
+        }
+
+        index = _receivers.Count;
+
+        _receivers.Add(new TransferredReceiver { Captures = captured });
+        _indices[receiver] = index;
+
+        return true;
+    }
+}
+
+/// <summary>
 ///     Decides whether the values a delegate closes over can be sent to another process, and encodes
 ///     them when they can.
 /// </summary>
@@ -138,6 +216,7 @@ internal static class StateTransfer
         object receiver,
         string subject,
         int budgetBytes,
+        ref int spent,
         out IReadOnlyList<CapturedField> captured,
         out Refusal refusal)
     {
@@ -151,9 +230,7 @@ internal static class StateTransfer
         // rebuilding them as two arrays would measure a program the user did not write.
         var seen = new HashSet<object>(ReferenceEqualityComparer.Instance);
 
-        var total = 0;
-
-        if (!TryCaptureInto(receiver, subject, seen, budgetBytes, depth: 0, ref total, out captured, out refusal))
+        if (!TryCaptureInto(receiver, subject, seen, budgetBytes, depth: 0, ref spent, out captured, out refusal))
         {
             captured = [];
 

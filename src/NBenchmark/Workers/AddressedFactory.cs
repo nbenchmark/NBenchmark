@@ -159,11 +159,10 @@ internal sealed record AddressedFactory
         // process and build something there. One that needs a value from this process has a different
         // remedy - make it static, so the value is part of the recipe - and sending its captures
         // would make the recipe depend on the process it was supposed to be independent of.
-        if (!BodyRef.TryCreate(
-                factory, displayName ?? role, out var body, out refusal, allowStateTransfer: false))
-        {
+        // No receiver table, which is how "this may not transfer captures" is said: without one there
+        // is nowhere to put them, so a capturing factory is refused.
+        if (!BodyRef.TryCreate(factory, displayName ?? role, out var body, out refusal, receivers: null))
             return false;
-        }
 
         addressed = new AddressedFactory { Role = role, Body = body };
 
