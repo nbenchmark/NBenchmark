@@ -571,11 +571,20 @@ internal sealed record BodyRef
         if (!allowStateTransfer)
         {
             // Not every delegate addressed through here is a benchmark body, and the two that are not
-            // must refuse rather than transfer. A *factory* exists to be run in the measuring process -
-            // it is the recipe, not the ingredient - so sending its captures would make the recipe
-            // depend on the process it was meant to be independent of. A *lifecycle hook* has to
-            // observe the same state as the body it belongs to, and independent transfer would give it
-            // a copy.
+            // refuse rather than transfer - for different reasons, and with different futures.
+            //
+            // A *lifecycle hook* must observe the same state as the body it belongs to, and hooks are
+            // addressed as independent BodyRefs, so transferring each one's captures would give it a
+            // private copy: `setup: () => Array.Clear(buffer)` would clear a buffer the body never
+            // reads. That is a correctness bar, and it lifts only when one receiver can be shared
+            // across a group.
+            //
+            // A *factory* is the recipe rather than the ingredient, and "make it static" is a rule that
+            // teaches the model. Transferring its captures would work - a factory closing over a string
+            // is still instructions, and anything genuinely live is refused by the faithfulness rule
+            // regardless - so this is a deliberate choice about what to teach, not a limit of the
+            // mechanism. Worth revisiting alongside W-07, which gives the prepared-state case a better
+            // answer by carrying arguments explicitly.
             //
             // The remedy differs between them, so the message stops at the fact and each caller adds
             // its own advice.

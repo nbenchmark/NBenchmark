@@ -225,6 +225,77 @@ public sealed class CapturedStateTransferTests : IDisposable
         Assert.Contains("prepare", refusal.Message);
     }
 
+    /// <summary>
+    ///     Two benchmarks closing over the same state are refused, because one worker cannot be given
+    ///     that state twice without them observing different copies of it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Measured, not reasoned about: with the transfer in place and no guard, this suite ran
+    ///         isolated and the second body saw <c>0</c> where the same source in this process showed
+    ///         it <c>4</c>. Identical code, two different programs, decided by whether a worker was
+    ///         available - which is the exact failure the addressing rules exist to prevent.
+    ///     </para>
+    ///     <para>
+    ///         Refusing is the interim answer. Sending one receiver that the whole group shares is the
+    ///         real one, and it is also what would let a lifecycle hook carry captures.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task Two_Benchmarks_Sharing_One_Capture_Are_Refused()
+    {
+        var counter = new int[1];
+
+        var results = await new BenchmarkSuite("shared")
+            .Add("bump", () => counter[0]++)
+            .Add("observe", () => _ = counter[0])
+            .WithIterations(4)
+            .WithWarmup(0)
+            .WithOpsPerSample(1)
+            .RunAsync();
+
+        Assert.All(results, r => Assert.Equal(IsolationStatus.InProcessCapturedState, r.IsolationStatus));
+    }
+
+    /// <summary>
+    ///     Distinct captures still cross. The guard is about <i>sharing</i>, not about a suite having
+    ///     captures at all.
+    /// </summary>
+    [Fact]
+    public async Task Benchmarks_With_Separate_Captures_Still_Isolate()
+    {
+        var results = await SuiteWithSeparateCaptures();
+
+        Assert.All(results, r => Assert.False(r.Errored, r.ErrorMessage));
+        Assert.All(results, r => Assert.Equal(IsolationStatus.Isolated, r.IsolationStatus));
+    }
+
+    /// <summary>
+    ///     Each body's capture is hoisted into its own scope, so the two do not share a display class.
+    /// </summary>
+    private static Task<IReadOnlyList<BenchmarkResult>> SuiteWithSeparateCaptures()
+    {
+        var suite = new BenchmarkSuite("separate");
+
+        {
+            var first = new[] { 1, 2, 3 };
+
+            suite.Add("a", () => _ = first.Length);
+        }
+
+        {
+            var second = new[] { 4, 5 };
+
+            suite.Add("b", () => _ = second.Length);
+        }
+
+        return suite
+            .WithIterations(4)
+            .WithWarmup(0)
+            .WithOpsPerSample(1)
+            .RunAsync();
+    }
+
     [BenchmarkState]
     private sealed record Query(string Text, int Limit, string[] Fields);
 
