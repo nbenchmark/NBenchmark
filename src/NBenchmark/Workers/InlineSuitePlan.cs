@@ -1,3 +1,4 @@
+using System.Collections;
 using NBenchmark.Engine;
 
 namespace NBenchmark.Workers;
@@ -78,6 +79,18 @@ internal static class InlineSuitePlan
 
         var bodies = new List<BodyRef>(benchmarks.Count);
 
+        // Which benchmark first closed over each receiver instance. Two bodies that capture the same
+        // local share one Roslyn display class, and each BodyRef would carry its own copy of that
+        // class's fields - so the worker would rehydrate two receivers where this process has one.
+        //
+        // That is a silent divergence between isolated and in-process for identical source, which is
+        // the failure this whole area exists to refuse: `.Add("a", () => Sort(data))` followed by
+        // `.Add("b", () => OrderBy(data))` measured `b` against an array `a` had already sorted here,
+        // and against an untouched one in a worker. Refusing keeps the two modes measuring the same
+        // program. Sending one receiver the whole group shares is the fix that would let it cross; see
+        // the note on this in plans/.
+        var receiverOwners = new Dictionary<object, string>(ReferenceEqualityComparer.Instance);
+
         foreach (var benchmark in benchmarks)
         {
             if (benchmark.Body is null)
@@ -125,6 +138,19 @@ internal static class InlineSuitePlan
                     out hookRefusal))
             {
                 return Decision.Refuse(HookStatus(hookRefusal), hookRefusal.Message);
+            }
+
+            if (bodyRef.Shape == BodyShape.TransferredReceiver
+                && benchmark.Body.Target is { } receiver
+                && !receiverOwners.TryAdd(receiver, benchmark.Name))
+            {
+                return Decision.Refuse(
+                    IsolationStatus.InProcessCapturedState,
+                    $"'{benchmark.Name}' and '{receiverOwners[receiver]}' close over the same state, "
+                    + "which one worker cannot be given twice without them observing different copies "
+                    + "of it. Give each benchmark its own state with a prepare delegate - "
+                    + ".WithState(() => Build()) runs once per benchmark - or move the suite into a "
+                    + "static [BenchmarkPlan] factory so the worker builds the shared state itself.");
             }
 
             bodies.Add(bodyRef with
