@@ -340,7 +340,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
         var result = Benchmark.Run(
             prepare: () => Enumerable.Range(0, 512).Reverse().ToArray(),
             body: data => data[^1],
-            FastOptions,
+            options: FastOptions,
             name: "prepared");
 
         Assert.False(result.Errored, result.ErrorMessage);
@@ -372,7 +372,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
         var result = Benchmark.Run(
             prepare: () => PreparedStateProbe.Build(),
             body: spins => Thread.SpinWait(spins),
-            FastOptions,
+            options: FastOptions,
             name: "prepared-once");
 
         Assert.False(result.Errored, result.ErrorMessage);
@@ -411,7 +411,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
             result = Benchmark.Run(
                 prepare: () => new int[size],
                 body: data => data.Length,
-                FastOptions,
+                options: FastOptions,
                 name: "captured-prepare");
         }
         finally
@@ -458,7 +458,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
                     return 200_000;
                 },
                 body: spins => Thread.SpinWait(spins),
-                FastOptions,
+                options: FastOptions,
                 name: "prepared-fallback");
         }
         finally
@@ -490,7 +490,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
                 return 512;
             },
             body: size => size + 1,
-            FastOptions,
+            options: FastOptions,
             name: "prepared-here");
 
         Assert.False(result.Errored, result.ErrorMessage);

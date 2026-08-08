@@ -44,11 +44,47 @@ public sealed class BenchmarkHarness
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
 
+    /// <summary>
+    ///     The one discovery pass this harness makes, and the configuration it was made under.
+    /// </summary>
+    /// <remarks>
+    ///     Memoised because discovery is not a pure read. It <i>invokes</i> every
+    ///     <c>[BenchmarkCases]</c> source it meets, and a default run made two passes - one to read
+    ///     <c>[Runtimes]</c> attributes, one to run - with a third for a multi-runtime dispatch. Each
+    ///     ran every case source again, with its side effects, and nothing said the three passes had to
+    ///     agree: a source yielding different values on a second call produced a run whose case names
+    ///     came from one pass and whose runtime decision came from another. Keyed on the default
+    ///     lifetime because that is the only input <see cref="BenchmarkDiscoverer" /> reads which this
+    ///     type can still change after a run.
+    /// </remarks>
+    private (InstanceLifetime Lifetime, bool FactoryResolved, IReadOnlyList<BenchmarkSuiteDefinition> Suites)?
+        _discovered;
+
     private BenchmarkHarness()
     {
     }
 
     internal Action? PostSuiteCleanup { get; set; }
+
+    /// <inheritdoc cref="_discovered" />
+    private IReadOnlyList<BenchmarkSuiteDefinition> DiscoverOnce()
+    {
+        var factoryResolved = _instanceSource is not null;
+
+        if (_discovered is { } cached
+            && cached.Lifetime == _defaultInstanceLifetime
+            && cached.FactoryResolved == factoryResolved)
+        {
+            return cached.Suites;
+        }
+
+        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime, factoryResolved);
+        var suites = _assemblies.SelectMany(discoverer.Discover).ToList();
+
+        _discovered = (_defaultInstanceLifetime, factoryResolved, suites);
+
+        return suites;
+    }
 
     /// <summary>
     ///     How many launches - that is, how many worker processes - each benchmark gets, before any
@@ -805,8 +841,7 @@ public sealed class BenchmarkHarness
             Console.WriteLine();
         }
 
-        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
-        var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
+        var allSuites = DiscoverOnce();
 
         if (allSuites.Count == 0)
         {
@@ -1112,8 +1147,7 @@ public sealed class BenchmarkHarness
             return [];
         }
 
-        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
-        var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
+        var allSuites = DiscoverOnce();
 
         var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude,
             _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);
@@ -2392,8 +2426,7 @@ public sealed class BenchmarkHarness
 
     private IReadOnlyList<RuntimeMoniker> DiscoverAttributeRuntimes()
     {
-        var discoverer = new BenchmarkDiscoverer(_defaultInstanceLifetime);
-        var allSuites = _assemblies.SelectMany(discoverer.Discover).ToList();
+        var allSuites = DiscoverOnce();
 
         var filtered = FilterSuites(allSuites, _cliArgs.Filter, _cliArgs.CategoryFilterInclude,
             _cliArgs.CategoryFilterExclude, _categoryFilterInclude, _categoryFilterExclude);

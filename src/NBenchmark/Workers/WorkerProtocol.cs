@@ -74,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 8;
+    public const int Version = 9;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -613,6 +613,21 @@ internal sealed record TestMethodPayload
 
     /// <summary>The name the caller wants results reported under.</summary>
     public required string DisplayName { get; init; }
+
+    /// <summary>
+    ///     Assembly-qualified type arguments of the declaring type, when the test class is a closed
+    ///     generic; and of the method, when the test method is. <c>null</c> for the non-generic case.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="Token" /> names the <b>open</b> definition, so without these a test on
+    ///     <c>Fixture&lt;int&gt;</c> resolved to a method on <c>Fixture&lt;T&gt;</c> and could not be
+    ///     invoked. The coordinator's own path never noticed, because there the closed
+    ///     <see cref="System.Reflection.MethodInfo" /> is the thing it already has.
+    /// </remarks>
+    public IReadOnlyList<string>? TypeGenericArguments { get; init; }
+
+    /// <inheritdoc cref="TypeGenericArguments" />
+    public IReadOnlyList<string>? MethodGenericArguments { get; init; }
 
     /// <summary>
     ///     The test case's argument values, in declaration order.

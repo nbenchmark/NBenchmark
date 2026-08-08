@@ -114,6 +114,13 @@ internal static class WorkerRunPlan
                 + $"{WorkerLocator.DescribeSearch(declaringAssemblyLocation)}.");
         }
 
+        // A worker exists but this process cannot talk to it. Grouped with "not deployed" because the
+        // consequence is identical - no child process is available - and answered before launching
+        // rather than after, since the alternative is one dead worker per group with a fault the
+        // coordinator cannot connect to its cause.
+        if (FrameChannel.TransportRefusal is { } transportRefusal)
+            return new Decision(Refusal.WorkerNotDeployed, transportRefusal);
+
         if (string.IsNullOrEmpty(declaringAssemblyLocation))
         {
             return new Decision(

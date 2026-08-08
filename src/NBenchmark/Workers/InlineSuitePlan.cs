@@ -62,6 +62,9 @@ internal static class InlineSuitePlan
                 + $"Looked in {WorkerLocator.DescribeSearch()}.");
         }
 
+        if (FrameChannel.TransportRefusal is { } transportRefusal)
+            return Decision.Refuse(IsolationStatus.InProcessNoWorker, transportRefusal);
+
         if (WorkerRunPlan.UnrebuildableStrategy(options) is { } strategyRefusal)
         {
             return Decision.Refuse(
@@ -103,7 +106,7 @@ internal static class InlineSuitePlan
                     out var bodyRef,
                     out var refusal,
                     benchmark.Arguments,
-                    benchmark.StateFactory,
+                    benchmark.StateRecipes,
                     receivers))
             {
                 // Naming the benchmark matters, because a suite has several and only one of them is
@@ -174,14 +177,7 @@ internal static class InlineSuitePlan
         // gives: they closed over one display class here, so they get one entry and one rehydration
         // there. Addressed against a private copy, `setup: () => Array.Clear(buffer)` would have
         // cleared a buffer the body never reads.
-        if (BodyRef.TryCreate(
-                hook,
-                description,
-                out var hookRef,
-                out var hookRefusal,
-                arguments: null,
-                stateFactory: null,
-                receivers))
+        if (BodyRef.TryCreateHook(hook, description, out var hookRef, out var hookRefusal, receivers))
         {
             addressed = hookRef;
 

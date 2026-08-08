@@ -36,17 +36,26 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     ///     to the shared state - a body like <c>d =&gt; Array.Sort(d)</c> otherwise measures an
     ///     already-sorted array from the second sample onward.
     /// </param>
+    /// <param name="prepare">
+    ///     This benchmark's own state recipe, in place of the suite's. For the suite whose members
+    ///     measure the same operation over <i>different</i> inputs - the ordinary reason to write a
+    ///     comparison - where the alternative was one suite per input, or a <c>TState</c> holding every
+    ///     input at once with each body reaching for its own.
+    /// </param>
     public BenchmarkSuite<TState> Add(string name, Action<TState> action,
         Action? setup = null, Action? teardown = null,
-        IReadOnlyList<string>? categories = null)
+        IReadOnlyList<string>? categories = null,
+        Func<TState>? prepare = null)
     {
         ArgumentNullException.ThrowIfNull(action);
+
+        var recipe = prepare ?? _prepare;
 
         // The state is bound lazily and cached, so preparation happens once per benchmark and outside
         // the timed region - matching what the worker does when this body is isolated instead.
-        var state = Deferred();
+        var state = Deferred(recipe);
 
-        AddWithState(name, _prepare, action,
+        AddWithState(name, recipe, action,
             (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(name, () => action(state()),
                 spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
             setup, teardown, categories);
@@ -54,16 +63,18 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         return this;
     }
 
-    /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?)" />
+    /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?, Func{TState}?)" />
     public BenchmarkSuite<TState> Add<TResult>(string name, Func<TState, TResult> action,
         Action? setup = null, Action? teardown = null,
-        IReadOnlyList<string>? categories = null)
+        IReadOnlyList<string>? categories = null,
+        Func<TState>? prepare = null)
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        var state = Deferred();
+        var recipe = prepare ?? _prepare;
+        var state = Deferred(recipe);
 
-        AddWithState(name, _prepare, action,
+        AddWithState(name, recipe, action,
             (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(name, () => action(state()),
                 spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
             setup, teardown, categories);
@@ -71,16 +82,18 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         return this;
     }
 
-    /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?)" />
+    /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?, Func{TState}?)" />
     public BenchmarkSuite<TState> AddAsync(string name, Func<TState, Task> action,
         Action? setup = null, Action? teardown = null,
-        IReadOnlyList<string>? categories = null)
+        IReadOnlyList<string>? categories = null,
+        Func<TState>? prepare = null)
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        var state = Deferred();
+        var recipe = prepare ?? _prepare;
+        var state = Deferred(recipe);
 
-        AddWithState(name, _prepare, action,
+        AddWithState(name, recipe, action,
             async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(name, () => action(state()),
                 spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
             setup, teardown, categories);
@@ -88,16 +101,18 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         return this;
     }
 
-    /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?)" />
+    /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?, Func{TState}?)" />
     public BenchmarkSuite<TState> AddAsync<TResult>(string name, Func<TState, Task<TResult>> action,
         Action? setup = null, Action? teardown = null,
-        IReadOnlyList<string>? categories = null)
+        IReadOnlyList<string>? categories = null,
+        Func<TState>? prepare = null)
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        var state = Deferred();
+        var recipe = prepare ?? _prepare;
+        var state = Deferred(recipe);
 
-        AddWithState(name, _prepare, action,
+        AddWithState(name, recipe, action,
             async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(name, () => action(state()),
                 spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
             setup, teardown, categories);
@@ -114,7 +129,7 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     ///     worker invokes the factory once per body. Deferred rather than eager so an isolated run, which
     ///     prepares in the worker, does not also prepare here for a delegate nothing measures.
     /// </remarks>
-    private Func<TState> Deferred()
+    private static Func<TState> Deferred(Func<TState> prepare)
     {
         var built = false;
         TState value = default!;
@@ -124,7 +139,7 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
             if (built)
                 return value;
 
-            value = _prepare();
+            value = prepare();
             built = true;
 
             return value;

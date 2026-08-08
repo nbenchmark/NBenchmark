@@ -27,8 +27,29 @@ internal static class BodyResolver
         ResolvedReceivers receivers,
         out Delegate resolved,
         out string? error)
+        => TryResolve(context, body, receivers, out resolved, out _, out error);
+
+    /// <inheritdoc cref="TryResolve(BenchmarkLoadContext, BodyRef, ResolvedReceivers, out Delegate, out string?)" />
+    /// <param name="boundArguments">
+    ///     The values this body's parameters were filled with, in declaration order. Empty for a
+    ///     parameterless body.
+    ///     <para>
+    ///         Handed back so a lifecycle hook can be bound to the <b>same</b> values rather than to
+    ///         fresh ones. A <c>setup</c> that resets prepared state has to act on the array the body
+    ///         reads; re-running the recipe for the hook would build a second array and reset that one,
+    ///         which is the private-copy failure shared receivers exist to prevent.
+    ///     </para>
+    /// </param>
+    public static bool TryResolve(
+        BenchmarkLoadContext context,
+        BodyRef body,
+        ResolvedReceivers receivers,
+        out Delegate resolved,
+        out IReadOnlyList<object?> boundArguments,
+        out string? error)
     {
         resolved = null!;
+        boundArguments = [];
 
         if (!TryBindMethod(context, body, receivers, out var method, out var receiver, out error))
             return false;
@@ -48,16 +69,107 @@ internal static class BodyResolver
             return false;
         }
 
-        if (body.StateFactory is not null)
-            return TryBindPreparedState(context, created, body, out resolved, out error);
-
         if (body.Arguments.Count == 0)
         {
             resolved = created;
             return true;
         }
 
-        return TryBindArguments(created, body, out resolved, out error);
+        return TryBindArguments(context, created, body, out resolved, out boundArguments, out error);
+    }
+
+    /// <summary>
+    ///     Resolves a per-iteration hook, binding it to the body's own prepared values when it asks for
+    ///     them.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A hook that takes no parameters is bound as-is. One whose arity matches the body's is
+    ///         bound to the <i>already-resolved</i> values, which is what makes
+    ///         <c>setup: (int[] d) =&gt; Shuffle(d)</c> shuffle the array the body then sorts. Without
+    ///         it the canonical sort benchmark cannot be written correctly at all: the recipe runs once,
+    ///         so from the second sample onward the body sorts an already-sorted array and reports the
+    ///         cost of doing nothing.
+    ///     </para>
+    ///     <para>
+    ///         An arity that is neither is refused rather than partially bound. The hook is not the
+    ///         benchmark, but a benchmark measured with its setup silently dropped produces a plausible
+    ///         number for work that never happened.
+    ///     </para>
+    /// </remarks>
+    public static bool TryResolveHook(
+        BenchmarkLoadContext context,
+        BodyRef hook,
+        ResolvedReceivers receivers,
+        IReadOnlyList<object?> boundArguments,
+        out Action resolved,
+        out string? error)
+    {
+        ArgumentNullException.ThrowIfNull(hook);
+        ArgumentNullException.ThrowIfNull(boundArguments);
+
+        resolved = null!;
+
+        if (!TryBindMethod(context, hook, receivers, out var method, out var receiver, out error))
+            return false;
+
+        if (method.ReturnType != typeof(void))
+        {
+            error = $"the resolved hook '{method.Name}' returns {method.ReturnType.Name}; a per-iteration "
+                    + "hook must return void.";
+
+            return false;
+        }
+
+        var parameters = method.GetParameters();
+
+        if (parameters.Length != 0 && parameters.Length != boundArguments.Count)
+        {
+            error = $"the resolved hook '{method.Name}' takes {parameters.Length} parameter(s), which is "
+                    + $"neither none nor the {boundArguments.Count} the body takes, so there is nothing to "
+                    + "call it with.";
+
+            return false;
+        }
+
+        Delegate created;
+
+        try
+        {
+            var delegateType = typeof(Action);
+
+            if (parameters.Length != 0 && !ArgumentBinder.TryDelegateTypeFor(method, out delegateType, out error))
+                return false;
+
+            created = method.CreateDelegate(delegateType, receiver);
+        }
+        catch (Exception ex) when (ex is ArgumentException or MissingMethodException)
+        {
+            error = $"the resolved hook '{method.Name}' could not be bound: {ex.Message}";
+
+            return false;
+        }
+
+        if (parameters.Length != 0)
+        {
+            if (!ArgumentBinder.TryBind(created, boundArguments, out created, out var bindError))
+            {
+                error = bindError;
+
+                return false;
+            }
+        }
+
+        if (created is not Action action)
+        {
+            error = $"the resolved hook '{method.Name}' bound to {created.GetType().Name} rather than an Action.";
+
+            return false;
+        }
+
+        resolved = action;
+
+        return true;
     }
 
     /// <summary>
@@ -138,10 +250,11 @@ internal static class BodyResolver
             return false;
         }
 
-        return body.Shape switch
+        var bound = body.Shape switch
         {
-            BodyShape.CachedSingleton => TryResolveReceiver(ref method, body, out receiver, out error),
-            BodyShape.TransferredReceiver => TryTransferReceiver(ref method, body, receivers, out receiver, out error),
+            BodyShape.CachedSingleton => TryResolveReceiver(context, ref method, body, out receiver, out error),
+            BodyShape.TransferredReceiver =>
+                TryTransferReceiver(context, ref method, body, receivers, out receiver, out error),
 
             // A static method needs no receiver, and every other shape was refused before it could be
             // addressed. Switched rather than tested for one shape, so a new one cannot silently take
@@ -149,65 +262,55 @@ internal static class BodyResolver
             // nothing and failed inside the measurement rather than at bind time.
             _ => true,
         };
+
+        // After the declaring type, never before: closing the type re-resolves the method from its
+        // handle against the closed type, which would discard a closure applied here. Applied to every
+        // shape, including a plain static generic method, which has no receiver and so never reached
+        // the type-closing step at all.
+        return bound && TryCloseMethod(context, ref method, body, out error);
     }
 
     /// <summary>
-    ///     Runs the state factory in this process and binds what it produced as the body's argument.
+    ///     Closes a generic method over the type arguments the address carried.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         Invoked <b>here</b>, once, before the body is ever measured - which is the entire point.
-    ///         The value never crosses the boundary; only the recipe for it does. That is what lets a
-    ///         benchmark over a prepared array, an open connection or a warmed cache be isolated at all,
-    ///         where serializing the prepared value would either fail or, worse, succeed at producing
-    ///         something subtly different.
-    ///     </para>
-    ///     <para>
-    ///         The factory's own exceptions are reported as this benchmark's failure. It is user code
-    ///         running before measurement, so a throw here means the benchmark never had valid input -
-    ///         which is worth saying plainly rather than surfacing as a dead worker.
-    ///     </para>
+    ///     A metadata token names the open definition, so <c>Sort&lt;int&gt;</c> resolves to
+    ///     <c>Sort&lt;T&gt;</c> - which cannot be invoked. Carrying the arguments is what makes a
+    ///     generic body measurable instead of refused.
     /// </remarks>
-    private static bool TryBindPreparedState(
+    private static bool TryCloseMethod(
         BenchmarkLoadContext context,
-        Delegate created,
+        ref MethodInfo method,
         BodyRef body,
-        out Delegate resolved,
         out string? error)
     {
-        resolved = created;
         error = null;
 
-        var parameters = created.Method.GetParameters();
+        if (!method.IsGenericMethodDefinition)
+            return true;
 
-        if (parameters.Length != 1)
+        if (body.MethodGenericArguments is not { Count: > 0 } names)
         {
-            error = $"'{created.Method.Name}' takes {parameters.Length} parameter(s); a body measured "
-                    + "over prepared state must take exactly one.";
+            error = $"'{method.Name}' is a generic method but the address carries no type arguments for it.";
 
             return false;
         }
 
-        // The expected type is the body's own parameter type, read from the method resolved here
-        // rather than trusted from the plan: both delegates came from metadata tokens, and a
-        // disagreement means the address no longer describes the code on disk. FactoryResolver
-        // checks it against the factory's declared return type before running any user code.
-        if (!FactoryResolver.TryInvoke(
-                context,
-                body.AssemblyPath,
-                body.StateFactory!,
-                parameters[0].ParameterType,
-                arguments: [],
-                out var state,
-                out error,
-                out _))
+        if (!GenericArguments.TryResolve(names, name => TypeNames.Resolve(name, context), out var arguments,
+                out var unresolved))
         {
+            error = $"type argument '{unresolved}' could not be resolved in the worker.";
+
             return false;
         }
 
-        if (!ArgumentBinder.TryBind(created, [state], out resolved, out var bindError))
+        try
         {
-            error = bindError;
+            method = method.MakeGenericMethod(arguments);
+        }
+        catch (Exception ex) when (ex is ArgumentException or TypeLoadException)
+        {
+            error = $"'{method.Name}' could not be closed over the carried type arguments: {ex.Message}";
 
             return false;
         }
@@ -216,22 +319,40 @@ internal static class BodyResolver
     }
 
     /// <summary>
-    ///     Supplies a parameterized body's argument values, leaving the parameterless delegate the
-    ///     engine measures.
+    ///     Supplies a body's argument values, leaving the parameterless delegate the engine measures.
     /// </summary>
     /// <remarks>
-    ///     The declared parameter types are read from the <b>resolved method</b> rather than trusted
-    ///     from the payload, which is the same rule the test-method path follows. A payload's type name
-    ///     is a claim about the far side; the method's own signature is the fact. Decoding against the
-    ///     claim would let a stale or mismatched request bind a plausible value of the wrong type.
+    ///     <para>
+    ///         One walk over the address's argument slots, each either an encoded constant to decode or
+    ///         a recipe to run <b>here</b>, once, before the body is ever measured - which is the entire
+    ///         point of a recipe. The value never crosses the boundary; only the instructions for it do.
+    ///         That is what lets a benchmark over a prepared array, an open connection or a warmed cache
+    ///         be isolated at all, where serializing the prepared value would either fail or, worse,
+    ///         succeed at producing something subtly different.
+    ///     </para>
+    ///     <para>
+    ///         The declared parameter types are read from the <b>resolved method</b> rather than trusted
+    ///         from the payload, which is the same rule the test-method path follows. A payload's type
+    ///         name is a claim about the far side; the method's own signature is the fact. Decoding
+    ///         against the claim would let a stale or mismatched request bind a plausible value of the
+    ///         wrong type.
+    ///     </para>
+    ///     <para>
+    ///         A recipe's own exceptions are reported as this benchmark's failure. It is user code
+    ///         running before measurement, so a throw there means the benchmark never had valid input -
+    ///         which is worth saying plainly rather than surfacing as a dead worker.
+    ///     </para>
     /// </remarks>
     private static bool TryBindArguments(
+        BenchmarkLoadContext context,
         Delegate created,
         BodyRef body,
         out Delegate resolved,
+        out IReadOnlyList<object?> boundArguments,
         out string? error)
     {
         resolved = created;
+        boundArguments = [];
         error = null;
 
         var parameters = created.Method.GetParameters();
@@ -244,13 +365,43 @@ internal static class BodyResolver
             return false;
         }
 
-        var decoded = new object?[parameters.Length];
+        var bound = new object?[parameters.Length];
 
         for (var i = 0; i < parameters.Length; i++)
         {
+            var source = body.Arguments[i];
+
+            if (!source.IsWellFormed(out var problem))
+            {
+                error = $"the address for parameter '{parameters[i].Name}' {problem}";
+
+                return false;
+            }
+
+            if (source.Recipe is { } recipe)
+            {
+                // The expected type is the body's own parameter type, read from the method resolved
+                // here rather than trusted from the plan: both delegates came from metadata tokens, and
+                // a disagreement means the address no longer describes the code on disk. FactoryResolver
+                // checks it against the factory's declared return type before running any user code.
+                if (!FactoryResolver.TryInvoke(
+                        context,
+                        body.AssemblyPath,
+                        recipe,
+                        parameters[i].ParameterType,
+                        out bound[i],
+                        out error,
+                        out _))
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
             try
             {
-                decoded[i] = TestArgumentCodec.Decode(body.Arguments[i], parameters[i].ParameterType);
+                bound[i] = TestArgumentCodec.Decode(source.Value!, parameters[i].ParameterType);
             }
             catch (Exception ex) when (ex is FormatException
                                           or OverflowException
@@ -264,11 +415,14 @@ internal static class BodyResolver
             }
         }
 
-        if (!ArgumentBinder.TryBind(created, decoded, out resolved, out var bindError))
+        if (!ArgumentBinder.TryBind(created, bound, out resolved, out var bindError))
         {
             error = bindError;
+
             return false;
         }
+
+        boundArguments = bound;
 
         return true;
     }
@@ -284,6 +438,7 @@ internal static class BodyResolver
     ///     </para>
     /// </summary>
     private static bool TryResolveReceiver(
+        BenchmarkLoadContext context,
         ref MethodInfo method,
         BodyRef body,
         out object? receiver,
@@ -292,7 +447,7 @@ internal static class BodyResolver
         receiver = null;
         error = null;
 
-        if (!TryCloseDeclaringType(ref method, body, out var declaringType, out error))
+        if (!TryCloseDeclaringType(context, ref method, body, out var declaringType, out error))
             return false;
 
         var singleton = BodyRef.FindSingletonField(declaringType!);
@@ -345,6 +500,7 @@ internal static class BodyResolver
     ///     </para>
     /// </remarks>
     private static bool TryTransferReceiver(
+        BenchmarkLoadContext context,
         ref MethodInfo method,
         BodyRef body,
         ResolvedReceivers receivers,
@@ -353,7 +509,7 @@ internal static class BodyResolver
     {
         receiver = null;
 
-        if (!TryCloseDeclaringType(ref method, body, out var declaringType, out error))
+        if (!TryCloseDeclaringType(context, ref method, body, out var declaringType, out error))
             return false;
 
         if (body.ReceiverIndex is not { } index)
@@ -494,6 +650,7 @@ internal static class BodyResolver
     ///     by reference.
     /// </summary>
     private static bool TryCloseDeclaringType(
+        BenchmarkLoadContext context,
         ref MethodInfo method,
         BodyRef body,
         out Type? declaringType,
@@ -516,19 +673,15 @@ internal static class BodyResolver
                 return false;
             }
 
-            var arguments = new Type[names.Count];
-
-            for (var i = 0; i < names.Count; i++)
+            // Resolved through the target's own graph, not the worker's default context: a user's type
+            // argument is never in the latter, and a lookup there fails for a type that is certainly
+            // present.
+            if (!GenericArguments.TryResolve(names, name => TypeNames.Resolve(name, context), out var arguments,
+                    out var unresolved))
             {
-                var argument = Type.GetType(names[i], throwOnError: false);
+                error = $"type argument '{unresolved}' could not be resolved in the worker.";
 
-                if (argument is null)
-                {
-                    error = $"type argument '{names[i]}' could not be resolved in the worker.";
-                    return false;
-                }
-
-                arguments[i] = argument;
+                return false;
             }
 
             try
@@ -570,7 +723,7 @@ internal static class BodyResolver
             // those values come from - serialized constants for a parameter sweep, or a factory to run
             // for prepared state. A body with parameters and neither is not addressable, because there
             // is nothing to call it with.
-            if (body.Arguments.Count == 0 && body.StateFactory is null)
+            if (body.Arguments.Count == 0)
             {
                 error = $"'{method.Name}' takes {method.GetParameters().Length} parameter(s) but the "
                         + "address carries neither argument values nor a prepare delegate to supply "

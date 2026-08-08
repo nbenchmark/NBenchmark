@@ -218,7 +218,7 @@ public sealed class CapturedStateTransferTests : IDisposable
             out _,
             out var refusal,
             arguments: null,
-            stateFactory: null,
+            recipes: null,
             new ReceiverTable(budgetBytes: 1024)));
 
         Assert.Equal(RefusalReason.CapturedState, refusal.Reason);

@@ -66,6 +66,39 @@ internal sealed class FrameChannel : IDisposable
         NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 
+    /// <summary>
+    ///     Why this process cannot use the frame transport at all, or <c>null</c> when it can.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The remark above - that trimming is "unreachable by construction" - is true of the
+    ///         <i>worker</i> and not of the <i>coordinator</i>. The coordinator is the user's own
+    ///         application, and a user is free to publish it trimmed or with reflection-based
+    ///         serialization switched off. <see cref="SerializerOptions" /> carries no
+    ///         <c>TypeInfoResolver</c>, so in that build the very first frame write throws - after the
+    ///         worker has been spawned and handed a pipe - and the coordinator sees a process that
+    ///         started and then went silent. The symptom is a dead worker; the cause is a publish
+    ///         setting, and nothing connects the two.
+    ///     </para>
+    ///     <para>
+    ///         Answered once, before anything is launched, and treated as "no worker is available":
+    ///         that is exactly what it means, and the run then measures in-process with the reason
+    ///         stamped on every row instead of losing a worker per group to a fault it cannot explain.
+    ///         The message names the property because the property is the fix.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="JsonSerializer.IsReflectionEnabledByDefault" /> is the switch this can
+    ///         actually observe. A build that leaves it on and merely trims the frame graph away is not
+    ///         detectable from here, which is why the message names <c>PublishTrimmed</c> too.
+    ///     </para>
+    /// </remarks>
+    internal static string? TransportRefusal { get; } = JsonSerializer.IsReflectionEnabledByDefault
+        ? null
+        : "reflection-based JSON serialization is disabled in this process, so the coordinator cannot "
+          + "write a frame to a worker. This is a publish setting rather than anything about the "
+          + "benchmark: set <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault> "
+          + "in the benchmark host project, or run it from a build without PublishTrimmed.";
+
     private readonly Stream _inbound;
     private readonly Stream _outbound;
     private readonly SemaphoreSlim _writeLock = new(1, 1);

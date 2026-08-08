@@ -442,7 +442,7 @@ internal sealed class WorkerSession(FrameChannel channel)
 
         foreach (var requested in request.TestMethods)
         {
-            if (!TryResolveTestMethod(module, requested, out var method, out var arguments))
+            if (!TryResolveTestMethod(module, context, requested, out var method, out var arguments))
                 return;
 
             resolvedMethods.Add((method!, arguments!, requested.DisplayName));
@@ -504,11 +504,91 @@ internal sealed class WorkerSession(FrameChannel channel)
     }
 
     /// <summary>
+    ///     Closes a resolved test method over the type arguments the request carried.
+    /// </summary>
+    /// <remarks>
+    ///     The declaring type first, then the method: closing the type re-resolves the method from its
+    ///     handle against the closed type, so a method closure applied earlier would be discarded. Both
+    ///     steps are no-ops for the non-generic case, which is nearly every test.
+    /// </remarks>
+    private static bool TryCloseTestMethod(
+        BenchmarkLoadContext context,
+        TestMethodPayload requested,
+        ref MethodInfo method,
+        out string? error)
+    {
+        error = null;
+
+        if (method.DeclaringType is { IsGenericTypeDefinition: true } definition)
+        {
+            if (requested.TypeGenericArguments is not { Count: > 0 } typeNames)
+            {
+                error = $"'{definition.Name}' is generic but the request carries no type arguments for it.";
+
+                return false;
+            }
+
+            if (!GenericArguments.TryResolve(
+                    typeNames, name => TypeNames.Resolve(name, context), out var typeArguments, out var unresolved))
+            {
+                error = $"Type argument '{unresolved}' could not be resolved in this worker.";
+
+                return false;
+            }
+
+            try
+            {
+                var closed = definition.MakeGenericType(typeArguments);
+
+                method = (MethodInfo)MethodBase.GetMethodFromHandle(method.MethodHandle, closed.TypeHandle)!;
+            }
+            catch (Exception ex) when (ex is ArgumentException or TypeLoadException)
+            {
+                error = $"'{definition.Name}' could not be closed over the carried type arguments: {ex.Message}";
+
+                return false;
+            }
+        }
+
+        if (!method.IsGenericMethodDefinition)
+            return true;
+
+        if (requested.MethodGenericArguments is not { Count: > 0 } methodNames)
+        {
+            error = $"'{method.Name}' is a generic method but the request carries no type arguments for it.";
+
+            return false;
+        }
+
+        if (!GenericArguments.TryResolve(
+                methodNames, name => TypeNames.Resolve(name, context), out var methodArguments, out var missing))
+        {
+            error = $"Type argument '{missing}' could not be resolved in this worker.";
+
+            return false;
+        }
+
+        try
+        {
+            method = method.MakeGenericMethod(methodArguments);
+        }
+        catch (Exception ex) when (ex is ArgumentException or TypeLoadException)
+        {
+            error = $"'{method.Name}' could not be closed over the carried type arguments: {ex.Message}";
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     ///     Resolves one addressed test method and rebuilds its arguments, faulting the group when
     ///     either cannot be done.
     /// </summary>
     private bool TryResolveTestMethod(
         Module module,
+        BenchmarkLoadContext context,
         TestMethodPayload requested,
         out MethodInfo? method,
         out object?[]? arguments)
@@ -530,6 +610,16 @@ internal sealed class WorkerSession(FrameChannel channel)
         catch (Exception ex) when (ex is ArgumentException or BadImageFormatException)
         {
             Fault($"Token 0x{requested.Token:X8} could not be resolved: {ex.Message}");
+
+            return false;
+        }
+
+        // A token names the open definition, so a test on a closed generic class or a closed generic
+        // method arrives here as something that cannot be invoked. The declaring type is closed first,
+        // because doing so re-resolves the method against it.
+        if (!TryCloseTestMethod(context, requested, ref method, out var closeError))
+        {
+            Fault(closeError!);
 
             return false;
         }
@@ -691,8 +781,39 @@ internal sealed class WorkerSession(FrameChannel channel)
     {
         var target = context.LoadFromAssemblyPath(Path.GetFullPath(request.TargetAssemblyPath));
 
-        var discoverer = new BenchmarkDiscoverer(request.DefaultInstanceLifetime);
-        var suites = discoverer.Discover(target);
+        // A container built here, from the caller's own registrations, rather than a live one sent
+        // across - which is impossible - or a parameterless constructor substituted for it, which would
+        // measure a differently-configured object under the right name. Absent a factory this stays
+        // null and the group was never routed here in the first place.
+        //
+        // Ahead of discovery, not after it: discovery invokes [BenchmarkCases] sources, and whether
+        // instances come from a factory decides whether an *instance* source may be invoked at all.
+        if (!TryBuildInstanceFactory(request, context, out var instanceFactory))
+            return;
+
+        // Restricted to the class this group is about. A whole-assembly pass invokes every class's
+        // [BenchmarkCases] source, so an N-class assembly measured one class per group ran all N
+        // sources - and their side effects - N times over, to use one of them.
+        var discoverer = new BenchmarkDiscoverer(
+            request.DefaultInstanceLifetime,
+            factoryResolvedInstances: request.InstanceSource is not null);
+
+        IReadOnlyList<BenchmarkSuiteDefinition> suites;
+
+        try
+        {
+            suites = discoverer.Discover(target, request.DeclaringTypeFullName);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or TargetInvocationException)
+        {
+            // Discovery throws for a malformed benchmark - a case source that cannot be invoked, an
+            // arity mismatch, an instance source on a factory-resolved class. Reported as this group's
+            // fault, because the alternative is an unhandled exception in the worker and a coordinator
+            // that sees only a process that vanished.
+            Fault(ex.Message);
+
+            return;
+        }
 
         var suite = suites.FirstOrDefault(s => s.Type.FullName == request.DeclaringTypeFullName);
 
@@ -718,13 +839,6 @@ internal sealed class WorkerSession(FrameChannel channel)
 
             return;
         }
-
-        // A container built here, from the caller's own registrations, rather than a live one sent
-        // across - which is impossible - or a parameterless constructor substituted for it, which would
-        // measure a differently-configured object under the right name. Absent a factory this stays
-        // null and the group was never routed here in the first place.
-        if (!TryBuildInstanceFactory(request, context, out var instanceFactory))
-            return;
 
         var outcome = await DiscoveredGroupExecutor.RunAsync(
                 suite,
@@ -835,7 +949,8 @@ internal sealed class WorkerSession(FrameChannel channel)
                     .OnBenchmarkStarting(body.DisplayName, request.StartIndex + index + 1, request.TotalBenchmarks)
                     .ConfigureAwait(false);
 
-                if (!BodyResolver.TryResolve(context, body, receivers, out var resolved, out var error))
+                if (!BodyResolver.TryResolve(
+                        context, body, receivers, out var resolved, out var boundArguments, out var error))
                 {
                     Fault(
                         $"'{body.DisplayName}' could not be measured because {error}",
@@ -845,8 +960,8 @@ internal sealed class WorkerSession(FrameChannel channel)
                     continue;
                 }
 
-                if (!TryResolveIterationHooks(context, body, receivers, out var iterationSetup, out var iterationTeardown,
-                        out var hookError))
+                if (!TryResolveIterationHooks(context, body, receivers, boundArguments, out var iterationSetup,
+                        out var iterationTeardown, out var hookError))
                 {
                     // Reported as this benchmark's own failure rather than measured without its hooks.
                     // A body measured with its setup silently dropped produces a plausible number for
@@ -929,10 +1044,15 @@ internal sealed class WorkerSession(FrameChannel channel)
     /// <summary>
     ///     Resolves a body's per-iteration hooks, which the engine invokes outside the timed region.
     /// </summary>
+    /// <param name="boundArguments">
+    ///     The values the body's parameters were filled with, so a hook that takes them acts on the
+    ///     same prepared state the body reads rather than on a second copy of it.
+    /// </param>
     private static bool TryResolveIterationHooks(
         BenchmarkLoadContext context,
         BodyRef body,
         ResolvedReceivers receivers,
+        IReadOnlyList<object?> boundArguments,
         out Action? setup,
         out Action? teardown,
         out string? error)
@@ -941,17 +1061,22 @@ internal sealed class WorkerSession(FrameChannel channel)
         teardown = null;
         error = null;
 
-        if (!TryResolveHook(context, body.IterationSetup, receivers, "per-iteration setup", out setup, out error))
+        if (!TryResolveHook(
+                context, body.IterationSetup, receivers, boundArguments, "per-iteration setup", out setup, out error))
+        {
             return false;
+        }
 
         return TryResolveHook(
-            context, body.IterationTeardown, receivers, "per-iteration teardown", out teardown, out error);
+            context, body.IterationTeardown, receivers, boundArguments, "per-iteration teardown", out teardown,
+            out error);
     }
 
     private static bool TryResolveHook(
         BenchmarkLoadContext context,
         BodyRef? hook,
         ResolvedReceivers receivers,
+        IReadOnlyList<object?> boundArguments,
         string role,
         out Action? action,
         out string? error)
@@ -962,21 +1087,14 @@ internal sealed class WorkerSession(FrameChannel channel)
         if (hook is null)
             return true;
 
-        if (!BodyResolver.TryResolve(context, hook, receivers, out var resolved, out var resolveError))
+        if (!BodyResolver.TryResolveHook(context, hook, receivers, boundArguments, out var resolved, out var resolveError))
         {
             error = $"its {role} could not be resolved: {resolveError}";
 
             return false;
         }
 
-        if (resolved is not Action typed)
-        {
-            error = $"its {role} resolved to {resolved.GetType().Name} rather than an Action.";
-
-            return false;
-        }
-
-        action = typed;
+        action = resolved;
 
         return true;
     }

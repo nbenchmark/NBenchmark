@@ -118,17 +118,30 @@ internal sealed record BodyRef
 
     /// <summary>
     ///     Assembly-qualified type arguments of the declaring type, when the body was declared
-    ///     inside a generic method (Roslyn puts its closure class on a generic type). Needed to
-    ///     close the type before the method can be bound.
+    ///     inside a generic method (Roslyn puts its closure class on a generic type) or on a closed
+    ///     generic class. Needed to close the type before the method can be bound.
     /// </summary>
     public IReadOnlyList<string>? TypeGenericArguments { get; init; }
+
+    /// <summary>
+    ///     Assembly-qualified type arguments of the <b>method</b>, when the body is a closed generic
+    ///     method. <c>null</c> for the non-generic methods that are the common case.
+    /// </summary>
+    /// <remarks>
+    ///     Separate from <see cref="TypeGenericArguments" /> because the two close different things and
+    ///     one does not imply the other: <c>Box&lt;int&gt;.Compare&lt;string&gt;</c> needs both, and a
+    ///     token names neither. Without this a generic body resolved to its open definition and could
+    ///     not be invoked at all - which is why generic contexts were refused rather than measured.
+    /// </remarks>
+    public IReadOnlyList<string>? MethodGenericArguments { get; init; }
 
     /// <summary>Diagnostics only: where the body came from, for error messages.</summary>
     public string? DeclaringTypeFullName { get; init; }
 
     /// <summary>
-    ///     Values to supply to the body's own parameters, in declaration order. Empty for the
-    ///     parameterless bodies that are the common case.
+    ///     Where each of the body's own parameters gets its value, in declaration order. Empty for the
+    ///     parameterless bodies that are the common case; otherwise exactly as long as the body's
+    ///     parameter list.
     ///     <para>
     ///         This is what lets a parameterized suite be isolated. The suite's typed lambda -
     ///         <c>(int size) =&gt; …</c> - captures nothing and was always addressable; what could not
@@ -137,12 +150,19 @@ internal sealed record BodyRef
     ///         process that measures it.
     ///     </para>
     ///     <para>
-    ///         Deliberately the same closed value set the test-integration path uses, via
+    ///         A slot carries <b>either</b> an encoded value or a recipe to run - see
+    ///         <see cref="ArgumentSource" />. Per slot rather than per body, which is what lets a body
+    ///         take two prepared values, or one prepared value beside one swept constant, without a
+    ///         wire field per combination.
+    ///     </para>
+    ///     <para>
+    ///         Encoded values are the same closed set the test-integration path uses, via
     ///         <see cref="TestArgumentCodec" />. Widening it to "whatever happens to round-trip" is
-    ///         the mechanism that is right most of the time and silently wrong the rest.
+    ///         the mechanism that is right most of the time and silently wrong the rest; a value
+    ///         outside it is carried as a recipe instead, which is exact.
     ///     </para>
     /// </summary>
-    public IReadOnlyList<TestArgumentPayload> Arguments { get; init; } = [];
+    public IReadOnlyList<ArgumentSource> Arguments { get; init; } = [];
 
     /// <summary>
     ///     Address of this benchmark's per-iteration setup, when it has one that can be addressed.
@@ -158,26 +178,6 @@ internal sealed record BodyRef
 
     /// <inheritdoc cref="IterationSetup" />
     public BodyRef? IterationTeardown { get; init; }
-
-    /// <summary>
-    ///     Address of a factory producing the value to pass as the body's single parameter, invoked once
-    ///     in the worker before warmup.
-    ///     <para>
-    ///         This is what makes a benchmark over prepared data isolatable. The shape people actually
-    ///         write - <c>var data = Build(); Run(() =&gt; Sort(data));</c> - captures, and a capture can
-    ///         only ever be refused. Splitting it into two non-capturing delegates,
-    ///         <c>Run(() =&gt; Build(), d =&gt; Sort(d))</c>, makes both addressable: the data is no longer
-    ///         a value trapped in this process but a <i>recipe</i> the worker can follow itself.
-    ///     </para>
-    ///     <para>
-    ///         Mutually exclusive with <see cref="Arguments" />. A parameter sweep supplies its value as
-    ///         a serialized constant and a prepared state supplies it by construction, and a body takes
-    ///         one parameter either way - so carrying both would leave two claims about the same slot.
-    ///         Enforced in <see cref="TryCreate" /> rather than left to construction: an address that
-    ///         carried both would silently honour one of them.
-    ///     </para>
-    /// </summary>
-    public AddressedFactory? StateFactory { get; init; }
 
     /// <summary>
     ///     Which of the group's receivers this body binds to, when its receiver holds state - see
@@ -213,10 +213,12 @@ internal sealed record BodyRef
     ///     arity: a mismatch is a refusal rather than a truncation, because binding the wrong number
     ///     of arguments would measure a different call than the caller described.
     /// </param>
-    /// <param name="stateFactory">
-    ///     A parameterless factory producing the body's single argument, to be invoked in the worker.
-    ///     Addressed by the same rule as the body, so a factory that captures is refused too - the
-    ///     capture is exactly what splitting the shape was supposed to remove.
+    /// <param name="recipes">
+    ///     Factories producing the body's arguments, aligned with its parameters - a <c>null</c> entry
+    ///     means that parameter's value comes from <paramref name="arguments" /> instead. Each is
+    ///     addressed by the same rule as the body, so a factory that captures is refused too: the
+    ///     capture is exactly what splitting the shape was supposed to remove, and a factory may carry
+    ///     its own argument values for the thing it would otherwise have captured.
     /// </param>
     public static bool TryCreate(
         Delegate body,
@@ -224,8 +226,45 @@ internal sealed record BodyRef
         out BodyRef bodyRef,
         out Refusal refusal,
         IReadOnlyList<object?>? arguments = null,
-        Delegate? stateFactory = null,
+        IReadOnlyList<StateRecipe?>? recipes = null,
         ReceiverTable? receivers = null)
+        => TryCreateCore(body, displayName, out bodyRef, out refusal, arguments, recipes, receivers, false);
+
+    /// <summary>
+    ///     Addresses a per-iteration hook, whose own parameters - when it has any - are filled in the
+    ///     measuring process from the values the <b>body's</b> slots resolved to.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A hook exists to act on the body's state, so it cannot carry argument values of its own:
+    ///         doing so would build a second value and reset that one, leaving the body's untouched. The
+    ///         worker binds it to what the body was bound to, which is what makes
+    ///         <c>setup: d =&gt; Shuffle(d)</c> shuffle the array the body then sorts.
+    ///     </para>
+    ///     <para>
+    ///         So the argument slots stay empty here, deliberately. Routing a hook through
+    ///         <see cref="TryCreate" /> refused it for taking parameters nothing had supplied - a rule
+    ///         written about bodies, where it is correct, since a body with unfilled parameters is
+    ///         unmeasurable.
+    ///     </para>
+    /// </remarks>
+    public static bool TryCreateHook(
+        Delegate hook,
+        string displayName,
+        out BodyRef bodyRef,
+        out Refusal refusal,
+        ReceiverTable? receivers = null)
+        => TryCreateCore(hook, displayName, out bodyRef, out refusal, null, null, receivers, true);
+
+    private static bool TryCreateCore(
+        Delegate body,
+        string displayName,
+        out BodyRef bodyRef,
+        out Refusal refusal,
+        IReadOnlyList<object?>? arguments,
+        IReadOnlyList<StateRecipe?>? recipes,
+        ReceiverTable? receivers,
+        bool parametersFromBody)
     {
         ArgumentNullException.ThrowIfNull(body);
 
@@ -250,60 +289,41 @@ internal sealed record BodyRef
         if (!TryResolveShape(body, receivers, out var shape, out var receiverIndex, out refusal))
             return false;
 
-        AddressedFactory? stateRef = null;
-        IReadOnlyList<TestArgumentPayload> encodedArguments = [];
+        IReadOnlyList<ArgumentSource> argumentSources = [];
 
-        if (stateFactory is not null)
+        if (parametersFromBody)
         {
-            // Both would be two claims about the body's one parameter slot, and the encoding branch
-            // below is skipped when a factory is present - so without this the arguments would be
-            // dropped rather than refused, and the body would measure the factory's value under a
-            // request that named a different one.
-            if (arguments is { Count: > 0 })
+            // The ceiling still applies - the worker binds through the same ArgumentBinder - but nothing
+            // is encoded, because the values come from the body at resolution time.
+            if (method.GetParameters().Length > ArgumentBinder.MaxArity)
             {
                 refusal = new Refusal(
                     RefusalReason.UnaddressableArguments,
-                    $"it was given both {arguments.Count} argument value(s) and a prepare "
-                    + "delegate, which are two different answers for the same parameter.");
+                    $"it takes {method.GetParameters().Length} parameters; a benchmark body may take at "
+                    + $"most {ArgumentBinder.MaxArity}, and a hook takes the body's own.");
 
                 return false;
             }
-
-            if (!TryAddressStateFactory(method, stateFactory, displayName, out stateRef, out refusal))
-                return false;
         }
-        else if (!TryEncodeArguments(method, arguments, out encodedArguments, out refusal))
+        else if (!TryBuildArgumentSources(method, displayName, arguments, recipes, out argumentSources, out refusal))
         {
             return false;
         }
 
         var declaringType = method.DeclaringType;
 
-        IReadOnlyList<string>? genericArguments = null;
-
-        if (declaringType is { IsGenericType: true })
+        // A generic argument that is still a type parameter means the delegate came from an open
+        // generic context, which has no single answer to close it with in the worker. A *closed* one
+        // is named and carried, so `Sort<int>` is measured rather than refused for being generic.
+        if (!GenericArguments.TryNameTypeArguments(method, out var genericArguments, out var unnameable)
+            || !GenericArguments.TryNameMethodArguments(method, out var methodGenericArguments, out unnameable))
         {
-            var typeArguments = declaringType.GetGenericArguments();
-            var names = new List<string>(typeArguments.Length);
+            refusal = new Refusal(
+                RefusalReason.OpenGenericContext,
+                "it was declared in a generic context whose type argument "
+                + $"'{unnameable}' cannot be named across a process boundary.");
 
-            foreach (var argument in typeArguments)
-            {
-                // A generic argument that is itself a type parameter means the delegate came from
-                // an open generic context we cannot close in the worker.
-                if (argument.IsGenericParameter || argument.AssemblyQualifiedName is null)
-                {
-                    refusal = new Refusal(
-                        RefusalReason.OpenGenericContext,
-                        "it was declared in a generic context whose type argument "
-                        + $"'{argument.Name}' cannot be named across a process boundary.");
-
-                    return false;
-                }
-
-                names.Add(argument.AssemblyQualifiedName);
-            }
-
-            genericArguments = names;
+            return false;
         }
 
         bodyRef = new BodyRef
@@ -316,9 +336,9 @@ internal sealed record BodyRef
             MethodToken = method.MetadataToken,
             Shape = shape,
             TypeGenericArguments = genericArguments,
+            MethodGenericArguments = methodGenericArguments,
             DeclaringTypeFullName = declaringType?.FullName,
-            Arguments = encodedArguments,
-            StateFactory = stateRef,
+            Arguments = argumentSources,
             ReceiverIndex = receiverIndex,
         };
 
@@ -326,118 +346,54 @@ internal sealed record BodyRef
     }
 
     /// <summary>
-    ///     Addresses the state factory and checks that what it produces is what the body accepts.
+    ///     Resolves where each of the body's parameters gets its value, or explains the first slot that
+    ///     cannot be answered.
     /// </summary>
     /// <remarks>
-    ///     The generic <c>Run&lt;TState&gt;(Func&lt;TState&gt;, Action&lt;TState&gt;)</c> signature already
-    ///     makes the two agree at compile time, so the type check here is not for the caller's benefit -
-    ///     it is for the worker's. Both delegates are re-resolved there from metadata tokens, and a check
-    ///     that costs nothing at plan time is worth more than a cast failure inside a measurement.
+    ///     <para>
+    ///         One walk over the parameter list, deciding per slot between an encoded value and a
+    ///         recipe. This used to be two mutually-exclusive branches - all values, or one prepared
+    ///         value - and the exclusivity was a limit of the wire rather than anything about
+    ///         benchmarks: a body taking two prepared values, or a prepared value beside a swept
+    ///         constant, was refused for a shape that is perfectly ordinary to write.
+    ///     </para>
+    ///     <para>
+    ///         Values are encoded against the <b>declared</b> parameter type rather than the runtime
+    ///         type of the value, for the reason <see cref="TestArgumentCodec.Encode" /> documents: a
+    ///         <c>long</c> parameter given the literal <c>1</c> arrives as a boxed <c>int</c>, and
+    ///         sending <c>Int32</c> would bind the wrong shape on the far side.
+    ///     </para>
     /// </remarks>
-    private static bool TryAddressStateFactory(
-        MethodInfo bodyMethod,
-        Delegate stateFactory,
-        string displayName,
-        out AddressedFactory? stateRef,
-        out Refusal refusal)
-    {
-        stateRef = null;
-        refusal = Refusal.None;
-
-        var parameters = bodyMethod.GetParameters();
-
-        if (parameters.Length != 1)
-        {
-            refusal = new Refusal(
-                RefusalReason.PrepareDelegate,
-                $"it takes {parameters.Length} parameter(s); a body measured over prepared state "
-                + "must take exactly one, being the prepared value.");
-
-            return false;
-        }
-
-        if (stateFactory.Method.GetParameters().Length != 0)
-        {
-            refusal = new Refusal(
-                RefusalReason.PrepareDelegate,
-                "its prepare delegate takes parameters; it must be parameterless, because nothing "
-                + "exists yet to pass it.");
-
-            return false;
-        }
-
-        var produced = stateFactory.Method.ReturnType;
-        var accepted = parameters[0].ParameterType;
-
-        if (!accepted.IsAssignableFrom(produced))
-        {
-            refusal = new Refusal(
-                RefusalReason.PrepareDelegate,
-                $"its prepare delegate returns '{produced.Name}' but the body accepts "
-                + $"'{accepted.Name}'.");
-
-            return false;
-        }
-
-        if (!AddressedFactory.TryCreate(
-                stateFactory,
-                PrepareRole,
-                out var created,
-                out var factoryRefusal,
-                displayName: $"{displayName} (prepare)"))
-        {
-            // The inner reason is kept, not replaced with PrepareDelegate. A prepare delegate that
-            // captures is a captured-state refusal and earns that remedy; only the shape mismatches
-            // above are about the prepare delegate itself. Flattening the two lost the remedy for the
-            // commonest case - a user who split the shape to remove a capture and captured in the
-            // split - which is the reader most in need of it.
-            refusal = factoryRefusal with { Message = $"{PrepareRole} {factoryRefusal.Message}" };
-
-            return false;
-        }
-
-        stateRef = created;
-
-        return true;
-    }
-
-    /// <summary>
-    ///     Encodes the body's argument values against its <b>declared</b> parameter types, or explains
-    ///     why they cannot cross.
-    /// </summary>
-    /// <remarks>
-    ///     Encoding against the declared type rather than the runtime type of the value is load-bearing,
-    ///     for the reason <see cref="TestArgumentCodec.Encode" /> documents: a <c>long</c> parameter
-    ///     given the literal <c>1</c> arrives as a boxed <c>int</c>, and sending <c>Int32</c> would bind
-    ///     the wrong shape on the far side.
-    /// </remarks>
-    private static bool TryEncodeArguments(
+    private static bool TryBuildArgumentSources(
         MethodInfo method,
+        string displayName,
         IReadOnlyList<object?>? arguments,
-        out IReadOnlyList<TestArgumentPayload> encoded,
+        IReadOnlyList<StateRecipe?>? recipes,
+        out IReadOnlyList<ArgumentSource> sources,
         out Refusal refusal)
     {
-        encoded = [];
+        sources = [];
         refusal = Refusal.None;
 
         var parameters = method.GetParameters();
-        var supplied = arguments ?? [];
+        var suppliedValues = arguments ?? [];
+        var suppliedRecipes = recipes ?? [];
 
-        if (parameters.Length != supplied.Count)
+        if (parameters.Length == 0)
         {
+            if (suppliedValues.Count == 0 && suppliedRecipes.Count == 0)
+                return true;
+
             // Never truncate or pad. Binding a different number of arguments than the caller named
             // measures a different call and reports it under the right name, which is the exact
             // failure class this whole area exists to prevent.
             refusal = new Refusal(
                 RefusalReason.UnaddressableArguments,
-                $"it takes {parameters.Length} parameter(s) but {supplied.Count} argument "
+                $"it takes no parameters but {suppliedValues.Count + suppliedRecipes.Count} argument "
                 + "value(s) were supplied for it.");
 
             return false;
         }
-
-        if (parameters.Length == 0)
-            return true;
 
         // Enforced here as well as in the worker, because the two sides disagreeing is the failure
         // this area is otherwise careful to avoid: a four-parameter body passed planning, was sent,
@@ -453,10 +409,65 @@ internal sealed record BodyRef
             return false;
         }
 
-        var payloads = new TestArgumentPayload[parameters.Length];
+        if (suppliedRecipes.Count > 0 && suppliedRecipes.Count != parameters.Length)
+        {
+            refusal = new Refusal(
+                RefusalReason.PrepareDelegate,
+                $"it takes {parameters.Length} parameter(s) but {suppliedRecipes.Count} prepare "
+                + "delegate(s) were supplied for it; there must be one slot per parameter.");
+
+            return false;
+        }
+
+        if (suppliedValues.Count > 0 && suppliedValues.Count != parameters.Length)
+        {
+            refusal = new Refusal(
+                RefusalReason.UnaddressableArguments,
+                $"it takes {parameters.Length} parameter(s) but {suppliedValues.Count} argument "
+                + "value(s) were supplied for it.");
+
+            return false;
+        }
+
+        var built = new ArgumentSource[parameters.Length];
 
         for (var i = 0; i < parameters.Length; i++)
         {
+            var recipe = i < suppliedRecipes.Count ? suppliedRecipes[i] : null;
+
+            if (recipe is not null)
+            {
+                // Both would be two claims about one parameter. The recipe branch skips the encoding
+                // branch, so without this the value would be silently dropped rather than refused, and
+                // the body would measure what the factory built under a request that named a constant.
+                if (i < suppliedValues.Count && suppliedValues[i] is not null)
+                {
+                    refusal = new Refusal(
+                        RefusalReason.UnaddressableArguments,
+                        $"its parameter '{parameters[i].Name}' was given both an argument value and a "
+                        + "prepare delegate, which are two different answers for the same parameter.");
+
+                    return false;
+                }
+
+                if (!TryAddressRecipe(parameters[i], recipe, displayName, out var addressed, out refusal))
+                    return false;
+
+                built[i] = ArgumentSource.FromRecipe(addressed!);
+
+                continue;
+            }
+
+            if (suppliedValues.Count == 0)
+            {
+                refusal = new Refusal(
+                    RefusalReason.PrepareDelegate,
+                    $"its parameter '{parameters[i].Name}' has neither an argument value nor a prepare "
+                    + "delegate, so there is nothing to call the body with.");
+
+                return false;
+            }
+
             var parameterType = parameters[i].ParameterType;
 
             if (!TestArgumentCodec.IsSupported(parameterType))
@@ -467,15 +478,85 @@ internal sealed record BodyRef
                     + "cannot cross a process boundary as a value. Parameter values must be "
                     + "primitives, strings, enums, decimal, DateTime, DateTimeOffset, TimeSpan or "
                     + "Guid; anything else has to be built in the measuring process, which is what "
-                    + "a static [BenchmarkPlan] factory is for.");
+                    + "a WithParameter recipe or a static [BenchmarkPlan] factory is for.");
 
                 return false;
             }
 
-            payloads[i] = TestArgumentCodec.Encode(parameterType, supplied[i]);
+            built[i] = ArgumentSource.FromValue(TestArgumentCodec.Encode(parameterType, suppliedValues[i]));
         }
 
-        encoded = payloads;
+        sources = built;
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Addresses one recipe and checks that what it produces is what the parameter accepts.
+    /// </summary>
+    /// <remarks>
+    ///     The generic <c>Run&lt;TState&gt;(Func&lt;TState&gt;, Action&lt;TState&gt;)</c> signature already
+    ///     makes the two agree at compile time, so the type check here is not for the caller's benefit -
+    ///     it is for the worker's. Both delegates are re-resolved there from metadata tokens, and a check
+    ///     that costs nothing at plan time is worth more than a cast failure inside a measurement.
+    /// </remarks>
+    private static bool TryAddressRecipe(
+        ParameterInfo parameter,
+        StateRecipe recipe,
+        string displayName,
+        out AddressedFactory? addressed,
+        out Refusal refusal)
+    {
+        addressed = null;
+        refusal = Refusal.None;
+
+        var factoryParameters = recipe.Factory.Method.GetParameters().Length;
+
+        if (factoryParameters != recipe.Arguments.Count)
+        {
+            // A prepare delegate may take parameters - that is how the value it would otherwise have
+            // captured reaches it - but every one of them needs a value, because nothing else in the
+            // worker knows what to pass.
+            refusal = new Refusal(
+                RefusalReason.PrepareDelegate,
+                $"its prepare delegate takes {factoryParameters} parameter(s) but "
+                + $"{recipe.Arguments.Count} value(s) were supplied for it.");
+
+            return false;
+        }
+
+        var produced = recipe.Factory.Method.ReturnType;
+        var accepted = parameter.ParameterType;
+
+        if (!accepted.IsAssignableFrom(produced))
+        {
+            refusal = new Refusal(
+                RefusalReason.PrepareDelegate,
+                $"its prepare delegate returns '{produced.Name}' but the body accepts "
+                + $"'{accepted.Name}'.");
+
+            return false;
+        }
+
+        if (!AddressedFactory.TryCreate(
+                recipe.Factory,
+                PrepareRole,
+                out var created,
+                out var factoryRefusal,
+                displayName: $"{displayName} (prepare)",
+                arguments: recipe.Arguments))
+        {
+            // The inner reason is kept, not replaced with PrepareDelegate. A prepare delegate that
+            // captures is a captured-state refusal and earns that remedy; only the shape mismatches
+            // above are about the prepare delegate itself. Flattening the two lost the remedy for the
+            // commonest case - a user who split the shape to remove a capture and captured in the
+            // split - which is the reader most in need of it.
+            refusal = factoryRefusal with { Message = $"{PrepareRole} {factoryRefusal.Message}" };
+
+            return false;
+        }
+
+        addressed = created;
 
         return true;
     }

@@ -268,6 +268,14 @@ internal static class SuitePlanRunner
             return false;
         }
 
+        if (FrameChannel.TransportRefusal is { } transportRefusal)
+        {
+            status = IsolationStatus.InProcessNoWorker;
+            refusal = transportRefusal;
+
+            return false;
+        }
+
         if (!AddressedFactory.TryCreate(plan, PlanRole(plan), out planRef, out var planRefusal))
         {
             status = planRefusal.ToStatus(IsolationStatus.InProcessUnaddressablePlan);

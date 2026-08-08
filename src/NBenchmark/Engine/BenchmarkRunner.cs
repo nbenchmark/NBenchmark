@@ -32,8 +32,21 @@ public sealed class BenchmarkRunner
     public MeasurementOutcome Run(string name, Action body, RunSpec spec, CancellationToken ct = default)
         => RunSyncCore(name, spec, ct, body);
 
+    /// <exception cref="ArgumentException">
+    ///     <typeparamref name="T" /> is a <c>Task</c> or <c>ValueTask</c>. See
+    ///     <see cref="AwaitableResult" />: this path never awaits, so it would time the body's
+    ///     synchronous prefix and report it as the whole benchmark.
+    /// </exception>
     public MeasurementOutcome Run<T>(string name, Func<T> body, RunSpec spec, CancellationToken ct = default)
-        => RunSyncCore(name, spec, ct, () => Consume(body()));
+    {
+        // The single funnel for every synchronous value-returning measurement in every mode, which is
+        // why the check belongs here rather than on each of the dozen Add/Run overloads that infer
+        // their result type from a lambda - one of which would inevitably have been missed.
+        if (AwaitableResult.IsAwaitable(typeof(T)))
+            throw new ArgumentException(AwaitableResult.Refusal(name, typeof(T)), nameof(body));
+
+        return RunSyncCore(name, spec, ct, () => Consume(body()));
+    }
 
     public Task<MeasurementOutcome> RunAsync(string name, Func<Task> body, RunSpec spec, CancellationToken ct = default)
         => RunAsyncCore(name, spec, ct, body);

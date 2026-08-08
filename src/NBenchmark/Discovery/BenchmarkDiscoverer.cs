@@ -10,18 +10,44 @@ namespace NBenchmark.Discovery;
 public sealed class BenchmarkDiscoverer
 {
     private readonly InstanceLifetime _defaultInstanceLifetime;
+    private readonly bool _factoryResolvedInstances;
 
     public BenchmarkDiscoverer()
         : this(InstanceLifetime.PerMethod)
     {
     }
 
-    public BenchmarkDiscoverer(InstanceLifetime defaultInstanceLifetime)
+    /// <param name="defaultInstanceLifetime">
+    ///     The lifetime a class with no <c>[InstanceLifetime]</c> attribute gets.
+    /// </param>
+    /// <param name="factoryResolvedInstances">
+    ///     Whether benchmark instances come from a user factory or service provider rather than from
+    ///     the type's own constructor. Discovery cannot use such a factory - in the coordinator it is
+    ///     deliberately not built yet, and building one to enumerate case values would open a database
+    ///     in a process that may never measure - so it reaches
+    ///     <see cref="MaterialiseCaseTuples" /> only to explain a receiver it could not construct.
+    /// </param>
+    public BenchmarkDiscoverer(InstanceLifetime defaultInstanceLifetime, bool factoryResolvedInstances = false)
     {
         _defaultInstanceLifetime = defaultInstanceLifetime;
+        _factoryResolvedInstances = factoryResolvedInstances;
     }
 
     public IReadOnlyList<BenchmarkSuiteDefinition> Discover(Assembly assembly)
+        => Discover(assembly, typeFullName: null);
+
+    /// <summary>
+    ///     Discovers benchmark classes in <paramref name="assembly" />, restricted to the one named
+    ///     <paramref name="typeFullName" /> when that is supplied.
+    /// </summary>
+    /// <remarks>
+    ///     The restriction is not an optimisation. Discovery <i>invokes</i> every
+    ///     <c>[BenchmarkCases]</c> source it meets, so a whole-assembly pass runs every class's case
+    ///     source - with whatever side effects it has - and a worker measuring one class per group ran
+    ///     all N of them, N times over. Filtering before <see cref="DiscoverType" /> means a class's
+    ///     case source runs when something needs its cases and not otherwise.
+    /// </remarks>
+    public IReadOnlyList<BenchmarkSuiteDefinition> Discover(Assembly assembly, string? typeFullName)
     {
         ArgumentNullException.ThrowIfNull(assembly);
 
@@ -29,6 +55,7 @@ public sealed class BenchmarkDiscoverer
 
         var types = assembly.GetTypes()
             .Where(t => !t.IsAbstract
+                        && (typeFullName is null || string.Equals(t.FullName, typeFullName, StringComparison.Ordinal))
                         && t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                             .Any(m => m.GetCustomAttribute<BenchmarkAttribute>() is not null));
 
@@ -75,7 +102,8 @@ public sealed class BenchmarkDiscoverer
 
         var benchmarks = methods
             .Where(m => m.GetCustomAttribute<BenchmarkAttribute>() is not null)
-            .SelectMany(m => BuildBenchmarkDefinitions(m, iterSetupDel, iterTeardownDel, classCategories))
+            .SelectMany(m => BuildBenchmarkDefinitions(
+                m, iterSetupDel, iterTeardownDel, classCategories, _factoryResolvedInstances))
             .ToList();
 
         if (benchmarks.Count == 0)
@@ -100,7 +128,8 @@ public sealed class BenchmarkDiscoverer
         MethodInfo method,
         Action<object>? iterSetupDel,
         Action<object>? iterTeardownDel,
-        IReadOnlyList<string> classCategories)
+        IReadOnlyList<string> classCategories,
+        bool factoryResolvedInstances)
     {
         var attribute = method.GetCustomAttribute<BenchmarkAttribute>()!;
         var caseAttributes = method.GetCustomAttributes<BenchmarkCaseAttribute>().ToArray();
@@ -139,7 +168,7 @@ public sealed class BenchmarkDiscoverer
         if (casesAttribute is not null)
         {
             foreach (var definition in ExpandFromBenchmarkCases(method, casesAttribute, attribute,
-                         iterSetupDel, iterTeardownDel, classCategories, parameters))
+                         iterSetupDel, iterTeardownDel, classCategories, parameters, factoryResolvedInstances))
             {
                 yield return definition;
             }
@@ -196,10 +225,11 @@ public sealed class BenchmarkDiscoverer
         Action<object>? iterSetupDel,
         Action<object>? iterTeardownDel,
         IReadOnlyList<string> classCategories,
-        ParameterInfo[] parameters)
+        ParameterInfo[] parameters,
+        bool factoryResolvedInstances)
     {
         var source = ResolveCaseSource(method, casesAttribute);
-        var tuples = MaterialiseCaseTuples(method, source, parameters);
+        var tuples = MaterialiseCaseTuples(method, source, parameters, factoryResolvedInstances);
         var methodIsBaseline = benchmarkAttr.Baseline;
 
         foreach (var (rawValues, paramNames) in tuples)
@@ -315,8 +345,17 @@ public sealed class BenchmarkDiscoverer
         return typeArgs.Length;
     }
 
+    /// <summary>
+    ///     Invokes the <c>[BenchmarkCases]</c> source and flattens what it yielded into argument sets.
+    /// </summary>
+    /// <param name="factoryResolvedInstances">
+    ///     Whether benchmark instances come from a factory or service provider rather than from the
+    ///     type's own constructor. It changes nothing about what is invoked - only what is <i>said</i>
+    ///     when the receiver cannot be built, because that is the case where the answer is about
+    ///     dependency injection and the bare reflection error names neither DI nor the remedy.
+    /// </param>
     private static List<(object?[] RawValues, string[]? ParamNames)> MaterialiseCaseTuples(
-        MethodInfo method, MethodInfo source, ParameterInfo[] benchmarkParams)
+        MethodInfo method, MethodInfo source, ParameterInfo[] benchmarkParams, bool factoryResolvedInstances)
     {
         var declaringType = source.DeclaringType!;
         object? instance = null;
@@ -325,13 +364,25 @@ public sealed class BenchmarkDiscoverer
         {
             try
             {
+                // The type's own constructor, never the instance factory, and deliberately so. Case
+                // values decide how many benchmarks there are, so they are needed before any instance
+                // exists - and the coordinator does not build its container until something is about to
+                // be measured, so resolving one here would open a database in a process that then hands
+                // the whole run to a worker. A static source needs no receiver, which is why it is the
+                // remedy rather than a workaround.
                 instance = Activator.CreateInstance(declaringType);
             }
             catch (Exception ex)
             {
                 throw new InvalidOperationException(
                     $"Cannot create an instance of '{declaringType.Name}' to invoke the "
-                    + $"[BenchmarkCases] source method '{source.Name}': {ex.Message}", ex);
+                    + $"[BenchmarkCases] source method '{source.Name}': {ex.Message}. "
+                    + (factoryResolvedInstances
+                        ? $"Instances of '{declaringType.Name}' come from a factory or service provider, "
+                          + "but case values are needed before any instance exists, so discovery has "
+                          + $"only the type's own constructor to work with. Make '{source.Name}' static, "
+                          + "or supply the cases with [BenchmarkCase] attributes."
+                        : $"Make '{source.Name}' static if it does not need one."), ex);
             }
         }
 

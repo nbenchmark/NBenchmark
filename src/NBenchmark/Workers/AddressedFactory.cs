@@ -142,12 +142,18 @@ internal sealed record AddressedFactory
     ///     role - a prepared-state factory is "its prepare delegate" to the reader but is addressed
     ///     under the benchmark's own name.
     /// </param>
+    /// <param name="arguments">
+    ///     Values for the factory's own parameters, in declaration order. They ride on the underlying
+    ///     <see cref="BodyRef" />, which already knows how to encode a body's arguments - a recipe is
+    ///     just a body whose result is a parameter rather than a measurement.
+    /// </param>
     public static bool TryCreate(
         Delegate factory,
         string role,
         out AddressedFactory addressed,
         out Refusal refusal,
-        string? displayName = null)
+        string? displayName = null,
+        IReadOnlyList<object?>? arguments = null)
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentException.ThrowIfNullOrWhiteSpace(role);
@@ -161,8 +167,11 @@ internal sealed record AddressedFactory
         // would make the recipe depend on the process it was supposed to be independent of.
         // No receiver table, which is how "this may not transfer captures" is said: without one there
         // is nowhere to put them, so a capturing factory is refused.
-        if (!BodyRef.TryCreate(factory, displayName ?? role, out var body, out refusal, receivers: null))
+        if (!BodyRef.TryCreate(
+                factory, displayName ?? role, out var body, out refusal, arguments, receivers: null))
+        {
             return false;
+        }
 
         addressed = new AddressedFactory { Role = role, Body = body };
 
