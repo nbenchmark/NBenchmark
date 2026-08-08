@@ -194,7 +194,7 @@ What to look at:
 
 - The benchmark class takes an `OrderRepository` in its primary constructor - no parameterless constructor anywhere.
 - `UseDependencyInjection<T>` combines assembly discovery and DI wiring in one call.
-- A scoped variant (`UseScopedDependencyInjection<T>`) is also available for `DbContext`-style lifetimes.
+- A scoped variant (`UseScopedDependencyInjection<T>(BuildServices)`) is also available for `DbContext`-style lifetimes. Like the unscoped one, pass the factory rather than a built container so the worker can rebuild it.
 
 ---
 

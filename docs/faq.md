@@ -228,7 +228,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per suite and disposed after teardown. See the [Dependency Injection guide](./features/dependency-injection.md) for the full API and lifetime semantics.
+The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per instance and disposed after teardown. Pass a `Func<IServiceProvider>` rather than a built container so the run stays isolated. See the [Dependency Injection guide](./features/dependency-injection.md) for the full API and lifetime semantics.
 
 ### Can I use a DI container other than `Microsoft.Extensions.DependencyInjection`?
 

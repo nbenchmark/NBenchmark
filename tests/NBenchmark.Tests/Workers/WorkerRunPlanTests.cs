@@ -72,7 +72,7 @@ public sealed class WorkerRunPlanTests
         var options = MeasurementOptions.Default with { OutlierDetector = new NeedsArguments(5) };
 
         var decision = WorkerRunPlan.ForDiscoveredClass(
-            typeof(WorkerRunPlanTests).Assembly.Location, usesInstanceFactory: false, options);
+            typeof(WorkerRunPlanTests).Assembly.Location, instanceSource: null, options);
 
         Assert.False(decision.CanIsolate);
         Assert.Equal(WorkerRunPlan.Refusal.UnrebuildableStrategy, decision.Refusal);
@@ -93,7 +93,7 @@ public sealed class WorkerRunPlanTests
         Assert.Null(WorkerRunPlan.UnrebuildableStrategy(options));
 
         Assert.True(WorkerRunPlan
-            .ForDiscoveredClass(typeof(WorkerRunPlanTests).Assembly.Location, false, options)
+            .ForDiscoveredClass(typeof(WorkerRunPlanTests).Assembly.Location, null, options)
             .CanIsolate);
     }
 

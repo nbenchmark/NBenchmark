@@ -584,15 +584,39 @@ internal sealed class WorkerSession(FrameChannel channel)
     {
         instanceFactory = null;
 
-        if (request.ServiceProviderFactory is not { } factory)
+        if (request.InstanceSource is not { } source)
             return true;
 
+        if (source.Kind == InstanceSourceKind.InstanceFactory)
+            return TryBuildFromInstanceFactory(request, context, source, out instanceFactory);
+
         if (!FactoryResolver.TryInvoke<IServiceProvider>(
-                context, request.TargetAssemblyPath, factory, out var provider, out var error, out var detail))
+                context,
+                request.TargetAssemblyPath,
+                source.Factory,
+                out var provider,
+                out var error,
+                out var detail))
         {
             Fault(Capitalize(error!), detail);
 
             return false;
+        }
+
+        if (source.Kind == InstanceSourceKind.ScopedServiceProvider)
+        {
+            // Scoped registrations resolved off the root are the failure this kind exists to prevent:
+            // under ValidateScopes the container throws, and without it every benchmark method shares
+            // one DbContext - and its warmed change tracker - which is exactly the dependence the
+            // significance test assumes is absent.
+            if (!ServiceScopes.TryCreateScopedResolver(context, provider, out instanceFactory, out var scopeError))
+            {
+                Fault($"{Capitalize(source.Factory.Role)} produced a container, but {scopeError}");
+
+                return false;
+            }
+
+            return true;
         }
 
         instanceFactory = type =>
@@ -602,6 +626,55 @@ internal sealed class WorkerSession(FrameChannel channel)
                                $"No service of type '{type.FullName}' is registered in the service "
                                + "provider built by the factory. The worker builds its own container "
                                + "from your factory, so a registration added outside it is not present.");
+
+            return InstanceHandle.NoTeardown(instance);
+        };
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Builds the instance factory by invoking the user's own addressed
+    ///     <c>Func&lt;Type, object&gt;</c>, once per instance, with the benchmark class as argument.
+    /// </summary>
+    /// <remarks>
+    ///     Resolution is deferred to the moment an instance is wanted rather than done once here,
+    ///     because unlike a container the factory has nothing to build up front - and a failure to
+    ///     address it must fault the group before any measuring starts, which is what the eager check
+    ///     below is for.
+    /// </remarks>
+    private bool TryBuildFromInstanceFactory(
+        RunGroupPayload request,
+        BenchmarkLoadContext context,
+        InstanceSourcePayload source,
+        out Func<Type, InstanceHandle>? instanceFactory)
+    {
+        instanceFactory = null;
+
+        // Bound once, up front, so an unusable address faults the group before any measuring starts -
+        // and without invoking the factory, which would build an object nobody asked for.
+        if (!FactoryResolver.TryBind(
+                context,
+                request.TargetAssemblyPath,
+                source.Factory,
+                typeof(object),
+                arity: 1,
+                out var invoke,
+                out var error))
+        {
+            Fault(Capitalize(error!));
+
+            return false;
+        }
+
+        instanceFactory = type =>
+        {
+            // Left to throw. BenchmarkLifecycle.CreateInstance catches it and turns it into the
+            // errored rows the user reads, and the factory's own exception is more useful there than
+            // anything this could wrap it in.
+            var instance = invoke([type])
+                           ?? throw new InvalidOperationException(
+                               $"{source.Factory.Role} returned null for '{type.FullName}'.");
 
             return InstanceHandle.NoTeardown(instance);
         };
@@ -990,10 +1063,17 @@ internal sealed class WorkerSession(FrameChannel channel)
         {
             var context = new BenchmarkLoadContext(targetAssemblyPath);
 
+            // Resolved *from* the assembly the resolver loaded. Discarding it and calling the plain
+            // Type.GetType searches the worker's default context instead, where a user's own strategy
+            // never is - so the lookup failed, the worker fell back to the built-in detector, and the
+            // result was scored under a statistical method nobody chose. The stderr line said so, which
+            // is the only reason it was not silent.
             type = Type.GetType(
                 typeName,
                 name => context.LoadFromAssemblyName(name),
-                (_, name, ignoreCase) => Type.GetType(name, throwOnError: false, ignoreCase),
+                (assembly, name, ignoreCase) => assembly is null
+                    ? Type.GetType(name, throwOnError: false, ignoreCase)
+                    : assembly.GetType(name, throwOnError: false, ignoreCase),
                 throwOnError: false);
         }
 

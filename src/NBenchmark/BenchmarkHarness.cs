@@ -22,14 +22,13 @@ public sealed class BenchmarkHarness
     private bool _crossClass;
     private InstanceLifetime _defaultInstanceLifetime = InstanceLifetime.PerMethod;
     private ReportDetail _detail;
-    private Func<Type, InstanceHandle>? _instanceFactory;
-
     /// <summary>
-    ///     The addressable recipe for the service provider, when one was supplied. Its presence is what
-    ///     lets a DI-backed run stay isolated: the instance factory itself is live code the worker cannot
-    ///     be handed, but a factory for the container is something it can run.
+    ///     Where benchmark instances come from, when they do not simply come from the type's own
+    ///     constructor. Carries both the host-side resolver and the recipe a worker can follow, so the
+    ///     harness can tell "live code, cannot isolate" from "addressable, can" - a distinction the two
+    ///     unrelated fields this replaced could not express.
     /// </summary>
-    private Func<IServiceProvider>? _serviceProviderFactory;
+    private InstanceSource? _instanceSource;
     private bool _isolationEnabled = true;
 
     /// <summary>
@@ -282,15 +281,48 @@ public sealed class BenchmarkHarness
     /// <summary>
     public BenchmarkHarness WithInstanceFactory(Func<Type, object> factory)
     {
-        _instanceFactory = type => InstanceHandle.NoTeardown(factory(type));
-        return this;
+        ArgumentNullException.ThrowIfNull(factory);
+
+        // The user's own delegate is kept as the recipe rather than only the wrapper built around it.
+        // A static, non-capturing factory is addressable, so the worker can run it and resolve
+        // instances in the process that measures - which is what stops WithInstanceFactory from
+        // costing every run its isolation regardless of how the factory was written.
+        return WithInstanceSource(new InstanceSource
+        {
+            Kind = InstanceSourceKind.InstanceFactory,
+            Recipe = factory,
+            Resolve = type => InstanceHandle.NoTeardown(factory(type)),
+        });
     }
 
     internal BenchmarkHarness WithInstanceFactory(Func<Type, InstanceHandle> factory)
     {
-        _instanceFactory = factory;
+        ArgumentNullException.ThrowIfNull(factory);
+
+        return WithInstanceSource(new InstanceSource
+        {
+            Kind = InstanceSourceKind.InstanceFactory,
+            Resolve = factory,
+        });
+    }
+
+    /// <summary>
+    ///     Records how instances are obtained. Internal so <c>NBenchmark.DependencyInjection</c> can
+    ///     declare a scoped source, which core has no way to build without a container dependency.
+    /// </summary>
+    internal BenchmarkHarness WithInstanceSource(InstanceSource source)
+    {
+        _instanceSource = source ?? throw new ArgumentNullException(nameof(source));
+
         return this;
     }
+
+    /// <summary>
+    ///     Why the configured instance source cannot be reproduced in a worker, or <c>null</c> when it
+    ///     can. A test seam for the DI package, whose own tests have no worker deployed beside them and
+    ///     so cannot ask the whole isolation question.
+    /// </summary>
+    internal string? InstanceSourceRefusalForTesting() => _instanceSource?.Refusal();
 
     /// <summary>
     ///     Configures the harness to resolve benchmark instances from the specified
@@ -311,7 +343,11 @@ public sealed class BenchmarkHarness
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
 
-        return WithInstanceFactory(ResolverFor(serviceProvider));
+        return WithInstanceSource(new InstanceSource
+        {
+            Kind = InstanceSourceKind.ServiceProvider,
+            Resolve = ResolverFor(() => serviceProvider),
+        });
     }
 
     /// <summary>
@@ -348,27 +384,42 @@ public sealed class BenchmarkHarness
     {
         ArgumentNullException.ThrowIfNull(factory);
 
-        var provider = factory() ?? throw new ArgumentException(
-            "The service provider factory returned null.", nameof(factory));
-
-        _serviceProviderFactory = factory;
-
-        return WithInstanceFactory(ResolverFor(provider));
+        // Deliberately not invoked here. The host-side container is only wanted if this process ends
+        // up measuring, and on a fully isolated run - the default, and the whole point of passing a
+        // factory - it never does. Building it eagerly opened a database and constructed an EF model
+        // in a process with no benchmark in it, which the doc above says is exactly what a factory
+        // exists to avoid.
+        return WithInstanceSource(new InstanceSource
+        {
+            Kind = InstanceSourceKind.ServiceProvider,
+            Recipe = factory,
+            Resolve = ResolverFor(factory),
+        });
     }
 
     /// <summary>
     ///     The instance resolver for a provider, shared by both <c>WithServiceProvider</c> overloads so
     ///     the host-side behaviour cannot differ between them.
     /// </summary>
-    private static Func<Type, InstanceHandle> ResolverFor(IServiceProvider serviceProvider)
-        => type =>
+    private static Func<Type, InstanceHandle> ResolverFor(Func<IServiceProvider> factory)
+    {
+        // One container per harness, built on first use rather than at configuration time. Lazy
+        // rather than eager is the whole of W-17; Lazy<T> rather than a null check because a run can
+        // resolve instances from several threads and building the container twice would give two
+        // sets of singletons.
+        var provider = new Lazy<IServiceProvider>(
+            () => factory() ?? throw new InvalidOperationException(
+                "The service provider factory returned null."));
+
+        return type =>
         {
-            var instance = serviceProvider.GetService(type)
+            var instance = provider.Value.GetService(type)
                            ?? throw new InvalidOperationException(
                                $"No service of type '{type.FullName}' is registered in the service provider.");
 
             return InstanceHandle.NoTeardown(instance);
         };
+    }
 
     /// <summary>
     ///     Requires a minimum strategy-defined practical effect in [0, 1] for a candidate
@@ -869,8 +920,7 @@ public sealed class BenchmarkHarness
                 var workerDecision = inProcessGlobal
                     ? new WorkerRunPlan.Decision(WorkerRunPlan.Refusal.RequestedInProcess, null)
                     : WorkerRunPlan.ForDiscoveredClass(
-                        suite.Type.Assembly.Location, _instanceFactory is not null, suiteOptions,
-                        _serviceProviderFactory);
+                        suite.Type.Assembly.Location, _instanceSource, suiteOptions);
 
                 if (workerDecision is { CanIsolate: false, Explanation: { } explanation })
                     EmitIsolationRefusal(refusalsReported, suite.Type.Name, explanation);
@@ -879,7 +929,7 @@ public sealed class BenchmarkHarness
 
                 foreach (var benchmark in suite.Benchmarks)
                 {
-                    var decision = ResolveIsolation(benchmark, suite, forceInProcess, _instanceFactory is not null, out var autoUpgraded);
+                    var decision = ResolveIsolation(benchmark, suite, forceInProcess, _instanceSource is not null, out var autoUpgraded);
 
                     if (autoUpgraded)
                         autoUpgradedResultNames.Add($"{suite.Type.Name}.{benchmark.DisplayName}");
@@ -1270,7 +1320,7 @@ public sealed class BenchmarkHarness
                 // launch count multiplied by the runtime count would be a different, longer run than
                 // the one asked for.
                 Options = options,
-                ServiceProviderFactory = WorkerRunPlan.ServiceProviderFactoryRef(_serviceProviderFactory),
+                InstanceSource = _instanceSource?.ToPayload(),
                 Order = _cliArgs.RunOrder ?? _runOrder,
                 Seed = _cliArgs.Seed,
                 DefaultInstanceLifetime = _defaultInstanceLifetime,
@@ -1519,7 +1569,7 @@ public sealed class BenchmarkHarness
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
-        var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory, out var failure);
+        var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceSource?.Resolve, out var failure);
 
         if (created is null)
         {
@@ -1534,7 +1584,7 @@ public sealed class BenchmarkHarness
         }
 
         var (instance, instanceTeardown) = created.Value;
-        var instanceFromFactory = _instanceFactory is not null;
+        var instanceFromFactory = _instanceSource is not null;
 
         try
         {
@@ -1636,7 +1686,7 @@ public sealed class BenchmarkHarness
 
         foreach (var benchmark in orderedBenchmarks)
         {
-            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory, out var failure);
+            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceSource?.Resolve, out var failure);
 
             if (created is null)
             {
@@ -1646,7 +1696,7 @@ public sealed class BenchmarkHarness
             }
 
             var (instance, instanceTeardown) = created.Value;
-            var instanceFromFactory = _instanceFactory is not null;
+            var instanceFromFactory = _instanceSource is not null;
 
             try
             {
@@ -1893,7 +1943,7 @@ public sealed class BenchmarkHarness
                 replicate,
                 startIndex,
                 totalBenchmarks,
-                WorkerRunPlan.ServiceProviderFactoryRef(_serviceProviderFactory));
+                _instanceSource?.ToPayload());
 
             allLaunchItems.Add(
                 await RunGroupInWorkerAsync(request, replicate, names, suite, timeout, progress, observer, cancellationToken)

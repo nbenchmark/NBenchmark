@@ -26,15 +26,17 @@ using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 using NBenchmark.DependencyInjection;
 
-var services = new ServiceCollection()
+await BenchmarkHarness.Create(args)
+    .UseDependencyInjection<OrderBenchmarks>(BuildServices)   // one call: discovery + DI
+    .WithReporter(new ConsoleReporter())
+    .RunAsync();
+
+// A static factory, not a built container. The worker runs this in its own process, so the run
+// stays isolated - see "Lifetime and disposal semantics" below.
+static IServiceProvider BuildServices() => new ServiceCollection()
     .AddSingleton<IOrderRepository, SqlOrderRepository>()
     .AddTransient<OrderBenchmarks>()
     .BuildServiceProvider();
-
-await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<OrderBenchmarks>(services)   // one call: discovery + DI
-    .WithReporter(new ConsoleReporter())
-    .RunAsync();
 
 public interface IOrderRepository
 {
@@ -62,57 +64,65 @@ Pick the granularity that matches your needs:
 | Method | When to use it |
 | --- | --- |
 | `UseDependencyInjection<T>(sp)` | The common case. Discovers `T`'s assembly and resolves from the root provider. One line. |
-| `UseScopedDependencyInjection<T>(sp)` | Like above but creates a fresh DI scope per suite, disposing it after teardown. Good for `DbContext`, EF Core, and any other scoped service. |
+| `UseScopedDependencyInjection<T>(BuildServices)` | Like above but creates a fresh DI scope per instance, disposing it after teardown. Good for `DbContext`, EF Core, and any other scoped service. **Isolated** - the worker builds its own container and its own scopes. |
 | `WithServiceProvider(sp)` | You already called `AddFromAssembly` yourself (perhaps with multiple assemblies) and want to plug in the root provider. |
-| `WithScopedServiceProvider(sp)` | Same as above but with a fresh scope per suite. |
+| `WithScopedServiceProvider(BuildServices)` | Same as above but with a fresh scope per instance. **Isolated.** |
+| `WithScopedServiceProvider(sp)` | Takes a live container, so the run is measured in this process and stamped `host`. Pass the factory instead. |
 
 Example: multiple assemblies, scoped lifetime:
 
 ```csharp
-var services = new ServiceCollection()
+await BenchmarkHarness.Create(args)
+    .AddFromAssembly<OrderBenchmarks>()
+    .AddFromAssembly<InventoryBenchmarks>()
+    .UseScopedDependencyInjection<OrderBenchmarks>(BuildServices)
+    .RunAsync();
+
+static IServiceProvider BuildServices() => new ServiceCollection()
     .AddSingleton<IClock, SystemClock>()
     .AddDbContext<MyDbContext>(opts => opts.UseInMemoryDatabase("benchmarks"))
     .AddTransient<OrderBenchmarks>()
     .AddTransient<InventoryBenchmarks>()
     .BuildServiceProvider();
-
-await BenchmarkHarness.Create(args)
-    .AddFromAssembly<OrderBenchmarks>()
-    .AddFromAssembly<InventoryBenchmarks>()
-    .UseScopedDependencyInjection<OrderBenchmarks>(services)
-    .RunAsync();
 ```
 
 ## Lifetime and disposal semantics
 
 The DI integration matches how `BenchmarkHarness` manages benchmark instances: **a fresh instance per `[Benchmark]` method**. This is the same lifetime the host uses for plain parameterless classes, so DI users get a one-to-one mapping between methods and instances.
 
-| Method | Instance lifetime | Scope lifetime |
-| --- | --- | --- |
-| `WithServiceProvider` | One fresh instance per `[Benchmark]` method, resolved from the root provider. | None. The root provider lives as long as your application. |
-| `WithScopedServiceProvider` | One fresh instance per `[Benchmark]` method. | One fresh scope per method, disposed in per-method teardown. |
-| `WithServiceProvider` + `[InstanceLifetime(PerClass)]` | Resolved from the root provider. Re-used across all `[Benchmark]` methods. | None. |
-| `WithScopedServiceProvider` + `[InstanceLifetime(PerClass)]` | Resolved from a fresh scope. The scope is disposed **after** the suite's teardown runs, so any `IDisposable` / `IAsyncDisposable` services (e.g. `DbContext`) are cleaned up. | One scope per suite. Disposed in the `finally` block. |
+| Method | Instance lifetime | Scope lifetime | Isolated? |
+| --- | --- | --- | --- |
+| `WithServiceProvider(BuildServices)` | One fresh instance per `[Benchmark]` method, resolved from the root container. | None. | Yes - the worker builds its own container. |
+| `WithScopedServiceProvider(BuildServices)` | One fresh instance per `[Benchmark]` method. | One fresh scope per instance, disposed in per-method teardown. | Yes - the worker builds its own container and its own scopes. |
+| `WithServiceProvider(BuildServices)` + `[InstanceLifetime(PerClass)]` | Resolved from the root container. Re-used across all `[Benchmark]` methods. | None. | Yes. |
+| `WithScopedServiceProvider(BuildServices)` + `[InstanceLifetime(PerClass)]` | Resolved from a fresh scope. The scope is disposed **after** the suite's teardown runs, so any `IDisposable` / `IAsyncDisposable` services (e.g. `DbContext`) are cleaned up. | One scope per class instance. Disposed in the `finally` block. | Yes. |
+| Either, given a built `IServiceProvider` instead of a factory | As above. | As above. | **No.** A live container cannot cross a process boundary, so the run is measured here and stamped `host`. |
+
+> [!IMPORTANT]
+> Pass the factory, not the container. Every row above is isolated only because the worker can run
+> `BuildServices` itself. Handing over a built `IServiceProvider` is the single most common reason a
+> DI-backed run silently loses its isolation - and on bodies of provably identical cost, the
+> configuration difference between an isolated worker and this process was worth roughly 3.3x.
 
 The host **does not** auto-dispose the benchmark instance when a service provider is configured - the scope's disposal already handles that. This avoids double-disposal of `IDisposable` benchmarks that come from a scope.
 
 ### Worked example: EF Core with per-method instances
 
 ```csharp
-var services = new ServiceCollection()
+await BenchmarkHarness.Create(args)
+    .AddFromAssembly<OrderBenchmarks>()
+    .UseScopedDependencyInjection<OrderBenchmarks>(BuildServices)
+    .RunAsync();
+
+static IServiceProvider BuildServices() => new ServiceCollection()
     .AddDbContext<MyDbContext>(opts => opts.UseInMemoryDatabase("benchmarks"))
     .AddTransient<OrderBenchmarks>()
     .BuildServiceProvider();
-
-await BenchmarkHarness.Create(args)
-    .AddFromAssembly<OrderBenchmarks>()
-    .UseScopedDependencyInjection<OrderBenchmarks>(services)
-    .RunAsync();
 ```
 
 `UseScopedDependencyInjection` is `WithScopedServiceProvider` under the hood. With `PerMethod`, each `[Benchmark]` method gets a fresh `MyDbContext` - no shared state, no cache contamination between methods.
 
-> **Warning: shared state breaks statistical independence.** If you pair `WithScopedServiceProvider` with `[InstanceLifetime(InstanceLifetime.PerClass)]`, all `[Benchmark]` methods in the class share one instance. A scoped service like `DbContext` caches entities and queries in memory, so method A can warm the cache that method B reads. Method B's timings become artificially linked to method A running first, which violates the independence assumption of the Mann-Whitney U test used for significance. The NB0011 analyzer warns on this combination at compile time, but the warning is soft and can scroll past unnoticed in CI. See the [state isolation guide](./state-isolation.md) for the `IStateReset` contract and the auto-isolation fallback that enforce independence at runtime, and the [NB0011 reference](../reference/analyzers.md#nb0011---perclass-lifetime-with-scoped-service) for suppression guidance if sharing state is intentional.
+> **Warning: shared state breaks statistical independence.** If you pair `WithScopedServiceProvider` with `[InstanceLifetime(InstanceLifetime.PerClass)]`, all `[Benchmark]` methods in the class share one instance. A scoped service like `DbContext` caches entities and queries in memory, so method A can warm the cache that method B reads. Method B's timings become artificially linked to method A running first, which violates the independence assumption of the Mann-Whitney U test used for significance. The NB0011 analyzer warns on this combination at compile time, but the warning is soft and can scroll past unnoticed in CI. See the [state isolation guide](./state-isolation.md) for the `IStateReset` contract, and the [NB0011 reference](../reference/analyzers.md#nb0011---perclass-lifetime-with-scoped-service) for suppression guidance if sharing state is intentional.
 
 ## Constructor injection
 

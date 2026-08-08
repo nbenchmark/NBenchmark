@@ -25,10 +25,68 @@ internal static class BodyResolver
         out Delegate resolved,
         out string? error)
     {
+        resolved = null!;
+
+        if (!TryBindMethod(context, body, out var method, out var receiver, out error))
+            return false;
+
+        if (!TryDelegateType(method, body, out var delegateType, out error))
+            return false;
+
+        Delegate created;
+
+        try
+        {
+            created = method.CreateDelegate(delegateType, receiver);
+        }
+        catch (Exception ex) when (ex is ArgumentException or MissingMethodException)
+        {
+            error = $"the resolved method '{method.Name}' could not be bound as {delegateType.Name}: {ex.Message}";
+            return false;
+        }
+
+        if (body.StateFactory is not null)
+            return TryBindPreparedState(context, created, body, out resolved, out error);
+
+        if (body.Arguments.Count == 0)
+        {
+            resolved = created;
+            return true;
+        }
+
+        return TryBindArguments(created, body, out resolved, out error);
+    }
+
+    /// <summary>
+    ///     Locates the method an address names, and recovers the receiver it must be bound to.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The half of resolution that is about <i>finding</i> code rather than about shaping it
+    ///         into a benchmark: load the defining assembly, check the module version id, resolve the
+    ///         token, recover the closure receiver. Every enforcement point that makes cross-process
+    ///         addressing safe lives here.
+    ///     </para>
+    ///     <para>
+    ///         Separate from <see cref="TryResolve" /> because a factory and a benchmark body need the
+    ///         same locating and different shaping. A body with parameters and no argument values is
+    ///         unmeasurable and is refused; a <c>Func&lt;Type, object&gt;</c> instance factory has
+    ///         parameters by definition and is supplied its argument at invocation. Routing the second
+    ///         through the first rejected it for a rule that was written about the first.
+    ///     </para>
+    /// </remarks>
+    public static bool TryBindMethod(
+        BenchmarkLoadContext context,
+        BodyRef body,
+        out MethodInfo method,
+        out object? receiver,
+        out string? error)
+    {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(body);
 
-        resolved = null!;
+        method = null!;
+        receiver = null;
         error = null;
 
         Assembly defining;
@@ -58,8 +116,6 @@ internal static class BodyResolver
             return false;
         }
 
-        MethodInfo method;
-
         try
         {
             if (module.ResolveMethod(body.MethodToken) is not MethodInfo resolvedMethod)
@@ -78,37 +134,8 @@ internal static class BodyResolver
             return false;
         }
 
-        object? receiver = null;
-
-        if (body.Shape == BodyShape.CachedSingleton
-            && !TryResolveReceiver(ref method, body, out receiver, out error))
-            return false;
-
-        if (!TryDelegateType(method, body, out var delegateType, out error))
-            return false;
-
-        Delegate created;
-
-        try
-        {
-            created = method.CreateDelegate(delegateType, receiver);
-        }
-        catch (Exception ex) when (ex is ArgumentException or MissingMethodException)
-        {
-            error = $"the resolved method '{method.Name}' could not be bound as {delegateType.Name}: {ex.Message}";
-            return false;
-        }
-
-        if (body.StateFactory is not null)
-            return TryBindPreparedState(context, created, body, out resolved, out error);
-
-        if (body.Arguments.Count == 0)
-        {
-            resolved = created;
-            return true;
-        }
-
-        return TryBindArguments(created, body, out resolved, out error);
+        return body.Shape != BodyShape.CachedSingleton
+               || TryResolveReceiver(ref method, body, out receiver, out error);
     }
 
     /// <summary>
@@ -157,6 +184,7 @@ internal static class BodyResolver
                 body.AssemblyPath,
                 body.StateFactory!,
                 parameters[0].ParameterType,
+                arguments: [],
                 out var state,
                 out error,
                 out _))
