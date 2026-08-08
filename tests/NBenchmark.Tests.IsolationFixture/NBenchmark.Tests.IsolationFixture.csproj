@@ -6,6 +6,11 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <!-- For the scoped-DI fixtures. The worker resolves IServiceScopeFactory through *this*
+         assembly's dependency graph, so the container's assemblies must be reachable from here. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
   </ItemGroup>
 </Project>

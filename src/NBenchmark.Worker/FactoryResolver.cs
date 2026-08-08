@@ -47,7 +47,7 @@ internal static class FactoryResolver
     {
         produced = null!;
 
-        if (!TryInvoke(context, targetAssemblyPath, factory, typeof(T), out var value, out error, out detail))
+        if (!TryInvoke(context, targetAssemblyPath, factory, typeof(T), [], out var value, out error, out detail))
             return false;
 
         if (value is null)
@@ -72,11 +72,17 @@ internal static class FactoryResolver
     ///     <b>declared return type</b> before invoking, so a mismatch is reported without running user
     ///     code, and against the produced object afterwards, which catches a covariant return.
     /// </param>
+    /// <param name="arguments">
+    ///     Values for the factory's own parameters, in declaration order. Empty for the parameterless
+    ///     factories that are the common case; an instance factory is <c>Func&lt;Type, object&gt;</c>
+    ///     and is handed the benchmark class here.
+    /// </param>
     public static bool TryInvoke(
         BenchmarkLoadContext context,
         string targetAssemblyPath,
         AddressedFactory factory,
         Type expected,
+        object?[] arguments,
         out object? produced,
         out string? error,
         out string? detail)
@@ -84,17 +90,18 @@ internal static class FactoryResolver
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(expected);
+        ArgumentNullException.ThrowIfNull(arguments);
 
         produced = null;
         error = null;
         detail = null;
 
-        if (!TryResolve(context, targetAssemblyPath, factory, expected, out var invoke, out error))
+        if (!TryBind(context, targetAssemblyPath, factory, expected, arguments.Length, out var invoke, out error))
             return false;
 
         try
         {
-            produced = invoke();
+            produced = invoke(arguments);
         }
         catch (Exception ex)
         {
@@ -122,15 +129,22 @@ internal static class FactoryResolver
     }
 
     /// <summary>
-    ///     Turns an address into a nullary invocation, by whichever of the two addressing modes the
-    ///     coordinator chose.
+    ///     Resolves an address to an invocable method, by whichever of the two addressing modes the
+    ///     coordinator chose, <b>without running it</b>.
     /// </summary>
-    private static bool TryResolve(
+    /// <remarks>
+    ///     Public so a caller that will invoke the factory repeatedly - an instance factory runs once
+    ///     per benchmark instance - can pay for resolution once, and can establish up front that the
+    ///     address is usable. Checking that by invoking would mean building an object nobody asked for
+    ///     and then telling a real failure apart from a probe's by reading the message.
+    /// </remarks>
+    public static bool TryBind(
         BenchmarkLoadContext context,
         string targetAssemblyPath,
         AddressedFactory factory,
         Type expected,
-        out Func<object?> invoke,
+        int arity,
+        out Func<object?[], object?> invoke,
         out string? error)
     {
         invoke = null!;
@@ -138,35 +152,46 @@ internal static class FactoryResolver
         if (!factory.IsWellFormed(out error))
             return false;
 
+        MethodInfo method;
+        object? receiver = null;
+
         if (factory.IsByName)
         {
-            if (!TryResolveByName(context, targetAssemblyPath, factory, expected, out var method, out error))
+            if (!TryResolveByName(context, targetAssemblyPath, factory, expected, arity, out method, out error))
                 return false;
-
-            invoke = () => method.Invoke(null, null);
-
-            return true;
         }
-
-        if (!BodyResolver.TryResolve(context, factory.Body!, out var resolved, out var resolveError))
+        else if (!BodyResolver.TryBindMethod(context, factory.Body!, out method, out receiver, out var bindError))
         {
-            error = $"{factory.Role} could not be resolved because {resolveError}";
+            error = $"{factory.Role} could not be resolved because {bindError}";
 
             return false;
         }
 
         // Checked before invoking, so a shape mismatch costs nothing and cannot half-run user code.
-        // BodyResolver has already bound the delegate against the method's real signature, so this is
-        // the assembly on disk disagreeing with what the caller expects rather than a claim on the wire.
-        if (!expected.IsAssignableFrom(resolved.Method.ReturnType))
+        // The resolved method's own signature is the fact here; a type name on the wire would only be
+        // a claim about the far side.
+        if (!expected.IsAssignableFrom(method.ReturnType))
         {
-            error = $"{factory.Role} returns {resolved.Method.ReturnType.Name} rather than "
-                    + $"{expected.Name}.";
+            error = $"{factory.Role} returns {method.ReturnType.Name} rather than {expected.Name}.";
 
             return false;
         }
 
-        invoke = () => resolved.DynamicInvoke();
+        if (method.GetParameters().Length != arity)
+        {
+            error = $"{factory.Role} takes {method.GetParameters().Length} parameter(s); "
+                    + $"{arity} were supplied for it.";
+
+            return false;
+        }
+
+        var bound = method;
+        var target = receiver;
+
+        // MethodInfo.Invoke rather than a delegate: a factory runs once per instance, never in a
+        // measured loop, so there is nothing for the delegate's speed to buy - and building one would
+        // mean reconstructing the exact Func<> shape for an arity the caller already knows.
+        invoke = args => bound.Invoke(target, args.Length == 0 ? null : args);
 
         return true;
     }
@@ -185,6 +210,7 @@ internal static class FactoryResolver
         string targetAssemblyPath,
         AddressedFactory factory,
         Type expected,
+        int arity,
         out MethodInfo method,
         out string? error)
     {
@@ -214,29 +240,37 @@ internal static class FactoryResolver
             return false;
         }
 
-        var found = type.GetMethod(
-            factory.MethodName!,
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
-            binder: null,
-            types: Type.EmptyTypes,
-            modifiers: null);
+        // Selected by name and arity rather than by an exact parameter-type list, because the caller
+        // knows how many arguments it will supply but not what the far build declares them as - and
+        // the return-type check the caller then applies is the one that matters.
+        var found = type
+            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+            .Where(m => m.Name == factory.MethodName && m.GetParameters().Length == arity)
+            .ToList();
 
-        if (found is null)
+        if (found.Count == 0)
         {
+            var shape = arity == 0 ? "parameterless" : $"{arity}-parameter";
+
             error = $"{factory.Role} could not be located: '{factory.DeclaringTypeFullName}' has no "
-                    + $"static parameterless method named '{factory.MethodName}'.";
+                    + $"static {shape} method named '{factory.MethodName}'.";
 
             return false;
         }
 
-        if (!expected.IsAssignableFrom(found.ReturnType))
+        if (found.Count > 1)
         {
-            error = $"{factory.Role} returns {found.ReturnType.Name} rather than {expected.Name}.";
+            // Refused rather than resolved by declaration order. Two overloads of the same arity are
+            // two different methods, and picking one would measure whichever the reflection order
+            // happened to return - a choice that could change between builds.
+            error = $"{factory.Role} is ambiguous: '{factory.DeclaringTypeFullName}' declares "
+                    + $"{found.Count} static methods named '{factory.MethodName}' taking {arity} "
+                    + "parameter(s).";
 
             return false;
         }
 
-        method = found;
+        method = found[0];
 
         return true;
     }

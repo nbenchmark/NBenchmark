@@ -23,10 +23,9 @@ internal static class WorkerRunPlan
     /// <remarks>
     ///     Constants rather than literals repeated at the addressing site and the refusal site,
     ///     because the worker phrases its diagnostics from the role and a coordinator that named the
-    ///     same factory two ways would produce two vocabularies for one failure.
+    ///     same factory two ways would produce two vocabularies for one failure. The instance-source
+    ///     roles live on <see cref="InstanceSource" />, beside the kinds they name.
     /// </remarks>
-    public const string ServiceProviderRole = "the service provider factory";
-
     public const string OutlierDetectorRole = "the outlier detector factory";
 
     public const string SignificanceTestRole = "the significance test factory";
@@ -87,24 +86,19 @@ internal static class WorkerRunPlan
     /// <param name="declaringAssemblyLocation">
     ///     File path of the assembly declaring the benchmarks, or empty when it has none.
     /// </param>
-    /// <param name="usesInstanceFactory">
-    ///     Whether the harness resolves instances through <c>WithInstanceFactory</c> or
-    ///     <c>WithServiceProvider</c>.
+    /// <param name="instanceSource">
+    ///     How the harness resolves benchmark instances, or <c>null</c> when it constructs them
+    ///     directly. A source carrying an addressable recipe is no obstacle to isolation - the worker
+    ///     runs the recipe and builds an equivalent container or factory in the process that measures.
     /// </param>
     /// <param name="options">
     ///     The measurement configuration, so a strategy object that cannot be rebuilt in a worker is
     ///     caught here rather than silently downgraded. <c>null</c> skips the check.
     /// </param>
-    /// <param name="serviceProviderFactory">
-    ///     An addressable factory for the service provider, when the caller supplied one. Its presence
-    ///     lifts the instance-factory refusal: the worker can build an equivalent container itself, so
-    ///     there is no live object it would have to be handed.
-    /// </param>
     public static Decision ForDiscoveredClass(
         string? declaringAssemblyLocation,
-        bool usesInstanceFactory,
-        MeasurementOptions? options = null,
-        Delegate? serviceProviderFactory = null)
+        InstanceSource? instanceSource = null,
+        MeasurementOptions? options = null)
     {
         // Asked about the assembly under test, not about this application. Those differ under
         // `dotnet benchmark --assembly`, where the target build has its own worker beside it and the
@@ -128,31 +122,10 @@ internal static class WorkerRunPlan
                 + "in-memory build), so a worker has nothing to load.");
         }
 
-        if (usesInstanceFactory)
-        {
-            if (serviceProviderFactory is null)
-            {
-                return new Decision(
-                    Refusal.LiveInstanceFactory,
-                    "benchmark instances come from an instance factory or service provider, which is live "
-                    + "code in this process and cannot be reproduced in a worker. Constructing the type "
-                    + "directly instead would measure a differently-configured object and report it as "
-                    + "though nothing had changed. Pass a factory instead - "
-                    + "WithServiceProvider(BuildServices) with a static BuildServices - and the worker "
-                    + "builds an equivalent container in the process that measures.");
-            }
-
-            // A factory that captures is refused for the same reason a capturing body is: it would have
-            // to run here, and a container built here is exactly the live object that cannot cross.
-            if (!AddressedFactory.TryCreate(
-                    serviceProviderFactory, ServiceProviderRole, out _, out var refusal))
-            {
-                return new Decision(
-                    Refusal.LiveInstanceFactory,
-                    $"the service provider factory {refusal} Make it a static method so a worker can "
-                    + "locate and run it.");
-            }
-        }
+        // The source answers for itself: it knows whether it holds a live object or an addressable
+        // recipe, which the two unrelated fields this replaced could not express between them.
+        if (instanceSource?.Refusal() is { } sourceRefusal)
+            return new Decision(Refusal.LiveInstanceFactory, sourceRefusal);
 
         if (options is not null && UnrebuildableStrategy(options) is { } strategyRefusal)
             return new Decision(Refusal.UnrebuildableStrategy, strategyRefusal);
@@ -210,17 +183,6 @@ internal static class WorkerRunPlan
     }
 
     /// <summary>
-    ///     Addresses the service-provider factory so a worker can build its own container, or
-    ///     <c>null</c> when there is none.
-    /// </summary>
-    /// <remarks>
-    ///     Refusals are not reported here: <see cref="ForDiscoveredClass" /> has already decided whether
-    ///     the group can be isolated, so an un-addressable factory never reaches request building.
-    /// </remarks>
-    public static AddressedFactory? ServiceProviderFactoryRef(Delegate? factory)
-        => AddressedFactory.OrNull(factory, ServiceProviderRole);
-
-    /// <summary>
     ///     Fills in every way a custom statistical strategy can reach a worker - type name or factory
     ///     address - on a request being built.
     /// </summary>
@@ -263,7 +225,7 @@ internal static class WorkerRunPlan
         int replicate,
         int startIndex,
         int totalBenchmarks,
-        AddressedFactory? serviceProviderFactory = null)
+        InstanceSourcePayload? instanceSource = null)
     {
         ArgumentNullException.ThrowIfNull(declaringType);
 
@@ -283,7 +245,7 @@ internal static class WorkerRunPlan
                 DefaultInstanceLifetime = defaultInstanceLifetime,
                 StartIndex = startIndex,
                 TotalBenchmarks = totalBenchmarks,
-                ServiceProviderFactory = serviceProviderFactory,
+                InstanceSource = instanceSource,
             },
             options);
     }

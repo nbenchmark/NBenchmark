@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
 using NBenchmark.Attributes;
 
@@ -123,4 +124,94 @@ public static class NamedPlanFixture
 
     /// <summary>Returns the wrong type, so the resolver's shape check has something to reject.</summary>
     public static string NotASuite() => "not a suite";
+}
+
+/// <summary>
+///     Benchmark classes resolved from a container the worker builds itself, for the scoped and
+///     unscoped dependency-injection paths.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The signal is deliberately a <b>throw</b> rather than a counter, because the assertion has
+///         to be made in the worker: the coordinator is a different process and cannot see how many
+///         scopes were created. <see cref="ScopedClaim" /> is registered <c>AddScoped</c> and can be
+///         claimed once, so a run that gives each benchmark instance its own scope succeeds and one
+///         that resolves from the root - where a scoped registration behaves like a singleton - fails
+///         the second benchmark and says why.
+///     </para>
+///     <para>
+///         The claim is taken in <c>[BenchmarkSetup]</c>, which runs once per instance. Taking it in
+///         the body would throw on the second iteration of the first benchmark, which measures
+///         nothing about scoping.
+///     </para>
+/// </remarks>
+public static class ScopedDiFixture
+{
+    public const string BenchmarkClassName = "ScopedDiBenchmarks";
+
+    public static IServiceProvider BuildServices() => new ServiceCollection()
+        .AddScoped<ScopedClaim>()
+        .AddTransient<ScopedDiBenchmarks>()
+        .BuildServiceProvider();
+}
+
+/// <summary>A scoped service that can be claimed exactly once.</summary>
+public sealed class ScopedClaim
+{
+    private bool _claimed;
+
+    public void Claim()
+    {
+        if (_claimed)
+        {
+            throw new InvalidOperationException(
+                "this scoped service had already been claimed by another benchmark, so both were "
+                + "resolved from the same scope");
+        }
+
+        _claimed = true;
+    }
+}
+
+public class ScopedDiBenchmarks(ScopedClaim claim)
+{
+    [BenchmarkSetup]
+    public void Setup() => claim.Claim();
+
+    [Benchmark]
+    public void First() => Thread.SpinWait(50);
+
+    [Benchmark]
+    public void Second() => Thread.SpinWait(50);
+}
+
+/// <summary>
+///     A benchmark class with no parameterless constructor, built by an addressed instance factory.
+/// </summary>
+/// <remarks>
+///     The constructor argument is the assertion. If the worker fell back to
+///     <c>Activator.CreateInstance</c> - the substitution the whole instance-source design exists to
+///     refuse - instantiation would fail and the group would fault, so a successful measurement is
+///     proof the user's own factory ran in the measuring process.
+/// </remarks>
+public static class InstanceFactoryFixture
+{
+    public const string BenchmarkClassName = "FactoryBuiltBenchmarks";
+
+    public static object Create(Type type) =>
+        type == typeof(FactoryBuiltBenchmarks)
+            ? new FactoryBuiltBenchmarks(marker: 42)
+            : throw new InvalidOperationException($"unexpected type '{type.FullName}'");
+}
+
+public class FactoryBuiltBenchmarks(int marker)
+{
+    [Benchmark]
+    public int Measure()
+    {
+        if (marker != 42)
+            throw new InvalidOperationException("the instance was not built by the addressed factory");
+
+        return marker;
+    }
 }

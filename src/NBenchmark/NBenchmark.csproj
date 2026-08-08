@@ -12,6 +12,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="NBenchmark.Tests"/>
     <InternalsVisibleTo Include="NBenchmark.DependencyInjection"/>
+    <InternalsVisibleTo Include="NBenchmark.DependencyInjection.Tests"/>
 
     <!--
       The measurement worker. It is a separate process but not a separate design: it runs the

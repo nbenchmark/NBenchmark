@@ -74,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 6;
+    public const int Version = 7;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -383,18 +383,21 @@ internal sealed record RunGroupPayload
     public AddressedFactory? SignificanceTestFactory { get; init; }
 
     /// <summary>
-    ///     Address of a factory producing the <see cref="IServiceProvider" /> that resolves benchmark
-    ///     instances, for <see cref="WorkGroupKind.DiscoveredClass" /> groups using dependency
-    ///     injection.
+    ///     How the worker should obtain benchmark instances, for
+    ///     <see cref="WorkGroupKind.DiscoveredClass" /> groups that do not simply construct the type.
     ///     <para>
-    ///         A service provider is live code and cannot be sent. But the <i>recipe</i> for one can be:
-    ///         a static factory that registers the services and builds the container is addressable, so
-    ///         the worker constructs an equivalent container in its own process. Without it, every
-    ///         DI-backed benchmark was measured in the host - the case
+    ///         A container or an instance factory is live code and cannot be sent. The <i>recipe</i>
+    ///         for one can be: a static factory that registers the services and builds the container is
+    ///         addressable, so the worker constructs an equivalent one in its own process. Without this,
+    ///         every DI-backed benchmark was measured in the host - the case
     ///         <see cref="Refusal.LiveInstanceFactory" /> exists for.
     ///     </para>
+    ///     <para>
+    ///         The kind travels with the address because two of them return the same type and differ
+    ///         only in what the worker does afterwards - see <see cref="InstanceSourceKind" />.
+    ///     </para>
     /// </summary>
-    public AddressedFactory? ServiceProviderFactory { get; init; }
+    public InstanceSourcePayload? InstanceSource { get; init; }
 
     public RunOrder Order { get; init; } = RunOrder.Declaration;
 
