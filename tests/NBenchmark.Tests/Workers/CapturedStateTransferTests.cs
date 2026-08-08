@@ -180,7 +180,7 @@ public sealed class CapturedStateTransferTests : IDisposable
         var caseInsensitive = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["a"] = 1 };
 
         Assert.False(
-            BodyRef.TryCreate(() => caseInsensitive.Count, "test", out _, out var refusal));
+            BodyRef.TryCreate(() => caseInsensitive.Count, "test", out _, out var refusal, receivers: Table()));
 
         Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
         Assert.Contains("comparer", refusal.Message);
@@ -197,7 +197,7 @@ public sealed class CapturedStateTransferTests : IDisposable
         var alias = data;
 
         Assert.False(
-            BodyRef.TryCreate(() => data.Length + alias.Length, "test", out _, out var refusal));
+            BodyRef.TryCreate(() => data.Length + alias.Length, "test", out _, out var refusal, receivers: Table()));
 
         Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
         Assert.Contains("same object", refusal.Message);
@@ -219,42 +219,94 @@ public sealed class CapturedStateTransferTests : IDisposable
             out var refusal,
             arguments: null,
             stateFactory: null,
-            maxTransferredStateBytes: 1024));
+            new ReceiverTable(budgetBytes: 1024)));
 
         Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
         Assert.Contains("prepare", refusal.Message);
     }
 
     /// <summary>
-    ///     Two benchmarks closing over the same state are refused, because one worker cannot be given
-    ///     that state twice without them observing different copies of it.
+    ///     Two benchmarks closing over the same state share it in the worker, exactly as they do here.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Measured, not reasoned about: with the transfer in place and no guard, this suite ran
-    ///         isolated and the second body saw <c>0</c> where the same source in this process showed
-    ///         it <c>4</c>. Identical code, two different programs, decided by whether a worker was
-    ///         available - which is the exact failure the addressing rules exist to prevent.
+    ///         The regression this pins was measured rather than reasoned about. With a copy of the
+    ///         captures on each address, this suite ran isolated and <c>observe</c> saw <c>0</c> where
+    ///         the same source in this process showed it a non-zero count - identical code, two
+    ///         different programs, decided by whether a worker was available.
     ///     </para>
     ///     <para>
-    ///         Refusing is the interim answer. Sending one receiver that the whole group shares is the
-    ///         real one, and it is also what would let a lifecycle hook carry captures.
+    ///         <c>observe</c> throwing is the evidence: it only throws when it can see what <c>bump</c>
+    ///         wrote, which requires both to be bound to one receiver. Declaration order pins which
+    ///         runs first.
     ///     </para>
     /// </remarks>
     [Fact]
-    public async Task Two_Benchmarks_Sharing_One_Capture_Are_Refused()
+    public async Task Two_Benchmarks_Sharing_One_Capture_Share_It_In_The_Worker()
     {
         var counter = new int[1];
 
         var results = await new BenchmarkSuite("shared")
             .Add("bump", () => counter[0]++)
-            .Add("observe", () => _ = counter[0])
+            .Add("observe", () =>
+            {
+                if (counter[0] > 0)
+                    throw new InvalidOperationException($"SHARED:{counter[0]}");
+            })
+            .WithRunOrder(RunOrder.Declaration)
             .WithIterations(4)
             .WithWarmup(0)
             .WithOpsPerSample(1)
             .RunAsync();
 
-        Assert.All(results, r => Assert.Equal(IsolationStatus.InProcessCapturedState, r.IsolationStatus));
+        Assert.All(results, r => Assert.Equal(IsolationStatus.Isolated, r.IsolationStatus));
+
+        var observe = results.Single(r => r.Name == "observe");
+
+        Assert.True(observe.Errored, "observe did not see bump's writes, so the receiver was not shared");
+        Assert.Contains("SHARED:", observe.ErrorMessage);
+
+        // And the counter in *this* process is untouched: the worker measured its own copy of the
+        // shared state, which is the whole point of measuring elsewhere.
+        Assert.Equal(0, counter[0]);
+    }
+
+    /// <summary>
+    ///     A lifecycle hook and the body it belongs to share one receiver, so the hook acts on the
+    ///     state the body reads.
+    /// </summary>
+    /// <remarks>
+    ///     Hooks used to refuse captures outright, because addressing them independently would have
+    ///     given each a private copy - <c>setup: () =&gt; Array.Clear(buffer)</c> clearing a buffer the
+    ///     body never reads is silent and looks like a working benchmark. A shared table is what makes
+    ///     them safe to carry.
+    /// </remarks>
+    [Fact]
+    public async Task A_Hook_And_Its_Body_Share_One_Receiver()
+    {
+        var buffer = new int[1];
+
+        var results = await new BenchmarkSuite("hooked")
+            .Add(
+                "body",
+                () =>
+                {
+                    if (buffer[0] != 7)
+                        throw new InvalidOperationException($"setup did not reach this body: saw {buffer[0]}");
+                },
+                setup: () => buffer[0] = 7)
+            .WithIterations(4)
+            .WithWarmup(0)
+            .WithOpsPerSample(1)
+            .RunAsync();
+
+        var result = Assert.Single(results);
+
+        Assert.False(result.Errored, result.ErrorMessage);
+        Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
+
+        // Untouched here: the hook ran in the worker, on the worker's copy.
+        Assert.Equal(0, buffer[0]);
     }
 
     /// <summary>
@@ -295,6 +347,9 @@ public sealed class CapturedStateTransferTests : IDisposable
             .WithOpsPerSample(1)
             .RunAsync();
     }
+
+    /// <summary>A table with the default budget, for the addressing-level cases below.</summary>
+    private static ReceiverTable Table() => new(MeasurementOptions.DefaultMaxTransferredStateBytes);
 
     [BenchmarkState]
     private sealed record Query(string Text, int Limit, string[] Fields);

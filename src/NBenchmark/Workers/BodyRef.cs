@@ -180,15 +180,17 @@ internal sealed record BodyRef
     public AddressedFactory? StateFactory { get; init; }
 
     /// <summary>
-    ///     The values the body's receiver holds, when it holds any - see
-    ///     <see cref="BodyShape.TransferredReceiver" />. Empty for every other shape.
+    ///     Which of the group's receivers this body binds to, when its receiver holds state - see
+    ///     <see cref="BodyShape.TransferredReceiver" />. <c>null</c> for every other shape.
     /// </summary>
     /// <remarks>
-    ///     Admitted only by <see cref="StateTransfer.IsFaithful" />, which is a narrower rule than
-    ///     "round-trips": what is sent is a value whose measured behaviour is fully determined by the
-    ///     bytes, not merely one that can be reconstructed to look the same.
+    ///     An index rather than the values themselves, because receivers are shared. Several bodies and
+    ///     their lifecycle hooks routinely close over one Roslyn display class, and carrying a copy per
+    ///     address had the worker rebuild several objects where this process has one - so two
+    ///     benchmarks over one array stopped seeing each other's writes the moment a worker was
+    ///     available. See <see cref="ReceiverTable" />.
     /// </remarks>
-    public IReadOnlyList<CapturedField> Captures { get; init; } = [];
+    public int? ReceiverIndex { get; init; }
 
     /// <summary>
     ///     How a prepared-state factory is named in a diagnostic, on both sides of the boundary.
@@ -223,8 +225,7 @@ internal sealed record BodyRef
         out Refusal refusal,
         IReadOnlyList<object?>? arguments = null,
         Delegate? stateFactory = null,
-        int maxTransferredStateBytes = MeasurementOptions.DefaultMaxTransferredStateBytes,
-        bool allowStateTransfer = true)
+        ReceiverTable? receivers = null)
     {
         ArgumentNullException.ThrowIfNull(body);
 
@@ -246,11 +247,8 @@ internal sealed record BodyRef
             return false;
         }
 
-        if (!TryResolveShape(
-                body, allowStateTransfer, maxTransferredStateBytes, out var shape, out var captures, out refusal))
-        {
+        if (!TryResolveShape(body, receivers, out var shape, out var receiverIndex, out refusal))
             return false;
-        }
 
         AddressedFactory? stateRef = null;
         IReadOnlyList<TestArgumentPayload> encodedArguments = [];
@@ -321,7 +319,7 @@ internal sealed record BodyRef
             DeclaringTypeFullName = declaringType?.FullName,
             Arguments = encodedArguments,
             StateFactory = stateRef,
-            Captures = captures,
+            ReceiverIndex = receiverIndex,
         };
 
         return true;
@@ -500,14 +498,13 @@ internal sealed record BodyRef
     /// </summary>
     private static bool TryResolveShape(
         Delegate body,
-        bool allowStateTransfer,
-        int maxTransferredStateBytes,
+        ReceiverTable? receivers,
         out BodyShape shape,
-        out IReadOnlyList<CapturedField> captures,
+        out int? receiverIndex,
         out Refusal refusal)
     {
         shape = BodyShape.StaticMethod;
-        captures = [];
+        receiverIndex = null;
         refusal = Refusal.None;
 
         if (body.Method.IsStatic)
@@ -568,7 +565,7 @@ internal sealed record BodyRef
         // class, so a body can be refused for a sibling's field. That is unchanged and still correct:
         // the sibling's value is equally un-sendable, and a non-capturing sibling is hoisted to the
         // field-less `<>c` singleton rather than joining this class, so it is never affected.
-        if (!allowStateTransfer)
+        if (receivers is null)
         {
             // Not every delegate addressed through here is a benchmark body, and the two that are not
             // refuse rather than transfer - for different reasons, and with different futures.
@@ -598,7 +595,7 @@ internal sealed record BodyRef
 
         var subject = isClosure ? "it captures" : $"it is bound to a live '{targetType.Name}', which holds";
 
-        if (!StateTransfer.TryCapture(target, subject, maxTransferredStateBytes, out captures, out refusal))
+        if (!receivers.TryIndex(target, subject, out var index, out refusal))
         {
             if (!isClosure)
                 refusal = refusal with { Reason = RefusalReason.LiveReceiver };
@@ -606,6 +603,7 @@ internal sealed record BodyRef
             return false;
         }
 
+        receiverIndex = index;
         shape = BodyShape.TransferredReceiver;
 
         return true;

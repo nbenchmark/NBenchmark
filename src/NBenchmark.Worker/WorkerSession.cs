@@ -817,7 +817,9 @@ internal sealed class WorkerSession(FrameChannel channel)
         // The suite's own setup runs here, once, before any body is measured - which is the whole
         // reason it travels rather than running in the coordinator, where it would prepare state in a
         // process that goes on to measure nothing.
-        if (!TryRunSuiteHook(context, request.SuiteSetup, "setup"))
+        var receivers = new ResolvedReceivers(request.Receivers);
+
+        if (!TryRunSuiteHook(context, request.SuiteSetup, receivers, "setup"))
             return;
 
         try
@@ -833,7 +835,7 @@ internal sealed class WorkerSession(FrameChannel channel)
                     .OnBenchmarkStarting(body.DisplayName, request.StartIndex + index + 1, request.TotalBenchmarks)
                     .ConfigureAwait(false);
 
-                if (!BodyResolver.TryResolve(context, body, out var resolved, out var error))
+                if (!BodyResolver.TryResolve(context, body, receivers, out var resolved, out var error))
                 {
                     Fault(
                         $"'{body.DisplayName}' could not be measured because {error}",
@@ -843,7 +845,7 @@ internal sealed class WorkerSession(FrameChannel channel)
                     continue;
                 }
 
-                if (!TryResolveIterationHooks(context, body, out var iterationSetup, out var iterationTeardown,
+                if (!TryResolveIterationHooks(context, body, receivers, out var iterationSetup, out var iterationTeardown,
                         out var hookError))
                 {
                     // Reported as this benchmark's own failure rather than measured without its hooks.
@@ -879,7 +881,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         {
             // In a finally so a cancelled or faulted group still releases whatever the setup acquired.
             // Its own failure is reported but cannot mask the group's results, which are already sent.
-            TryRunSuiteHook(context, request.SuiteTeardown, "teardown");
+            TryRunSuiteHook(context, request.SuiteTeardown, receivers, "teardown");
         }
     }
 
@@ -887,12 +889,16 @@ internal sealed class WorkerSession(FrameChannel channel)
     ///     Resolves and invokes one suite-level lifecycle delegate. Returns <c>false</c> when it could
     ///     not be resolved or threw, having already reported the fault.
     /// </summary>
-    private bool TryRunSuiteHook(BenchmarkLoadContext context, BodyRef? hook, string role)
+    private bool TryRunSuiteHook(
+        BenchmarkLoadContext context,
+        BodyRef? hook,
+        ResolvedReceivers receivers,
+        string role)
     {
         if (hook is null)
             return true;
 
-        if (!BodyResolver.TryResolve(context, hook, out var resolved, out var error))
+        if (!BodyResolver.TryResolve(context, hook, receivers, out var resolved, out var error))
         {
             Fault($"The suite's {role} could not be resolved because {error}");
 
@@ -926,6 +932,7 @@ internal sealed class WorkerSession(FrameChannel channel)
     private static bool TryResolveIterationHooks(
         BenchmarkLoadContext context,
         BodyRef body,
+        ResolvedReceivers receivers,
         out Action? setup,
         out Action? teardown,
         out string? error)
@@ -934,15 +941,17 @@ internal sealed class WorkerSession(FrameChannel channel)
         teardown = null;
         error = null;
 
-        if (!TryResolveHook(context, body.IterationSetup, "per-iteration setup", out setup, out error))
+        if (!TryResolveHook(context, body.IterationSetup, receivers, "per-iteration setup", out setup, out error))
             return false;
 
-        return TryResolveHook(context, body.IterationTeardown, "per-iteration teardown", out teardown, out error);
+        return TryResolveHook(
+            context, body.IterationTeardown, receivers, "per-iteration teardown", out teardown, out error);
     }
 
     private static bool TryResolveHook(
         BenchmarkLoadContext context,
         BodyRef? hook,
+        ResolvedReceivers receivers,
         string role,
         out Action? action,
         out string? error)
@@ -953,7 +962,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         if (hook is null)
             return true;
 
-        if (!BodyResolver.TryResolve(context, hook, out var resolved, out var resolveError))
+        if (!BodyResolver.TryResolve(context, hook, receivers, out var resolved, out var resolveError))
         {
             error = $"its {role} could not be resolved: {resolveError}";
 

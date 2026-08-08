@@ -29,7 +29,14 @@ public class BodyRefCaptureTests
 
     private static bool CanAddress(Delegate body, out string refusal)
     {
-        var addressed = BodyRef.TryCreate(body, "test", out _, out var reason);
+        var addressed = BodyRef.TryCreate(
+            body,
+            "test",
+            out _,
+            out var reason,
+            arguments: null,
+            stateFactory: null,
+            new ReceiverTable(MeasurementOptions.DefaultMaxTransferredStateBytes));
 
         refusal = reason.Message;
 

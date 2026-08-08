@@ -1,4 +1,3 @@
-using System.Collections;
 using NBenchmark.Engine;
 
 namespace NBenchmark.Workers;
@@ -39,6 +38,9 @@ internal static class InlineSuitePlan
         /// <inheritdoc cref="SuiteSetup" />
         public BodyRef? SuiteTeardown { get; init; }
 
+        /// <summary>The receivers the addressed delegates share, referenced by index.</summary>
+        public IReadOnlyList<TransferredReceiver> Receivers { get; init; } = [];
+
         public static Decision Refuse(IsolationStatus status, string explanation) => new(status, explanation, []);
     }
 
@@ -71,25 +73,18 @@ internal static class InlineSuitePlan
         // The suite's lifecycle is addressed rather than refused for existing. A setup that captures
         // still cannot cross - it would have to run here and prepare state the benchmarks never see -
         // but one that captures nothing is exactly as reproducible in the worker as the bodies are.
-        if (!TryAddressHook(suiteSetup, "WithSuiteSetup", options, out var setupRef, out var lifecycleRefusal))
+        // One table for the whole group, so a body and a hook that closed over the same local land on
+        // one entry and the worker rehydrates it once. Anything sharing an object here shares it there.
+        var receivers = new ReceiverTable(options.MaxTransferredStateBytes);
+
+        if (!TryAddressHook(suiteSetup, "WithSuiteSetup", receivers, out var setupRef, out var lifecycleRefusal))
             return Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal.Message);
 
-        if (!TryAddressHook(suiteTeardown, "WithSuiteTeardown", options, out var teardownRef, out lifecycleRefusal))
+        if (!TryAddressHook(suiteTeardown, "WithSuiteTeardown", receivers, out var teardownRef, out lifecycleRefusal))
             return Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal.Message);
 
         var bodies = new List<BodyRef>(benchmarks.Count);
 
-        // Which benchmark first closed over each receiver instance. Two bodies that capture the same
-        // local share one Roslyn display class, and each BodyRef would carry its own copy of that
-        // class's fields - so the worker would rehydrate two receivers where this process has one.
-        //
-        // That is a silent divergence between isolated and in-process for identical source, which is
-        // the failure this whole area exists to refuse: `.Add("a", () => Sort(data))` followed by
-        // `.Add("b", () => OrderBy(data))` measured `b` against an array `a` had already sorted here,
-        // and against an untouched one in a worker. Refusing keeps the two modes measuring the same
-        // program. Sending one receiver the whole group shares is the fix that would let it cross; see
-        // the note on this in plans/.
-        var receiverOwners = new Dictionary<object, string>(ReferenceEqualityComparer.Instance);
 
         foreach (var benchmark in benchmarks)
         {
@@ -109,7 +104,7 @@ internal static class InlineSuitePlan
                     out var refusal,
                     benchmark.Arguments,
                     benchmark.StateFactory,
-                    options.MaxTransferredStateBytes))
+                    receivers))
             {
                 // Naming the benchmark matters, because a suite has several and only one of them is
                 // the problem.
@@ -123,7 +118,7 @@ internal static class InlineSuitePlan
             if (!TryAddressHook(
                     benchmark.IterationSetup,
                     $"'{benchmark.Name}' per-iteration setup",
-                    options,
+                    receivers,
                     out var iterationSetup,
                     out var hookRefusal))
             {
@@ -133,24 +128,11 @@ internal static class InlineSuitePlan
             if (!TryAddressHook(
                     benchmark.IterationTeardown,
                     $"'{benchmark.Name}' per-iteration teardown",
-                    options,
+                    receivers,
                     out var iterationTeardown,
                     out hookRefusal))
             {
                 return Decision.Refuse(HookStatus(hookRefusal), hookRefusal.Message);
-            }
-
-            if (bodyRef.Shape == BodyShape.TransferredReceiver
-                && benchmark.Body.Target is { } receiver
-                && !receiverOwners.TryAdd(receiver, benchmark.Name))
-            {
-                return Decision.Refuse(
-                    IsolationStatus.InProcessCapturedState,
-                    $"'{benchmark.Name}' and '{receiverOwners[receiver]}' close over the same state, "
-                    + "which one worker cannot be given twice without them observing different copies "
-                    + "of it. Give each benchmark its own state with a prepare delegate - "
-                    + ".WithState(() => Build()) runs once per benchmark - or move the suite into a "
-                    + "static [BenchmarkPlan] factory so the worker builds the shared state itself.");
             }
 
             bodies.Add(bodyRef with
@@ -166,6 +148,7 @@ internal static class InlineSuitePlan
             {
                 SuiteSetup = setupRef,
                 SuiteTeardown = teardownRef,
+                Receivers = receivers.Receivers,
             };
     }
 
@@ -176,7 +159,7 @@ internal static class InlineSuitePlan
     private static bool TryAddressHook(
         Delegate? hook,
         string description,
-        MeasurementOptions options,
+        ReceiverTable receivers,
         out BodyRef? addressed,
         out Refusal refusal)
     {
@@ -186,15 +169,11 @@ internal static class InlineSuitePlan
         if (hook is null)
             return true;
 
-        // Captures are refused here rather than transferred, and this is a correctness rule rather
-        // than caution. A hook and the body it belongs to share one display class when they close over
-        // the same local, but they are addressed as two independent BodyRefs - so transferring each
-        // one's captures would rehydrate two receivers, and `setup: () => Array.Clear(buffer)` would
-        // clear a buffer the body never reads. That is silent and would look like a working benchmark.
-        //
-        // Letting them cross needs the wire to say "these three addresses share one receiver", so the
-        // worker rehydrates once and binds all of them to it. Until it does, refusing keeps the hook
-        // and the body looking at the same state.
+        // The same table the bodies use. A hook exists to act on the body's state, so it has to end up
+        // bound to the body's receiver rather than a copy of it - which is exactly what a shared table
+        // gives: they closed over one display class here, so they get one entry and one rehydration
+        // there. Addressed against a private copy, `setup: () => Array.Clear(buffer)` would have
+        // cleared a buffer the body never reads.
         if (BodyRef.TryCreate(
                 hook,
                 description,
@@ -202,7 +181,7 @@ internal static class InlineSuitePlan
                 out var hookRefusal,
                 arguments: null,
                 stateFactory: null,
-                allowStateTransfer: false))
+                receivers))
         {
             addressed = hookRef;
 
@@ -244,7 +223,8 @@ internal static class InlineSuitePlan
         int? seed,
         int replicate,
         BodyRef? suiteSetup = null,
-        BodyRef? suiteTeardown = null)
+        BodyRef? suiteTeardown = null,
+        IReadOnlyList<TransferredReceiver>? receivers = null)
         => WorkerRunPlan.WithStrategies(new RunGroupPayload
         {
             GroupId = $"suite:{suiteName}#{replicate}",
@@ -257,6 +237,7 @@ internal static class InlineSuitePlan
             // still works, because the worker's resolver follows the target's dependency graph.
             TargetAssemblyPath = bodies[0].AssemblyPath,
             Bodies = bodies,
+            Receivers = receivers ?? [],
 
             Options = options,
             Order = order,
