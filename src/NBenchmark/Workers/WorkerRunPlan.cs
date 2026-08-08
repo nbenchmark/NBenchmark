@@ -17,6 +17,20 @@ namespace NBenchmark.Workers;
 /// </summary>
 internal static class WorkerRunPlan
 {
+    /// <summary>
+    ///     The role names carried on every <see cref="AddressedFactory" /> this class builds.
+    /// </summary>
+    /// <remarks>
+    ///     Constants rather than literals repeated at the addressing site and the refusal site,
+    ///     because the worker phrases its diagnostics from the role and a coordinator that named the
+    ///     same factory two ways would produce two vocabularies for one failure.
+    /// </remarks>
+    public const string ServiceProviderRole = "the service provider factory";
+
+    public const string OutlierDetectorRole = "the outlier detector factory";
+
+    public const string SignificanceTestRole = "the significance test factory";
+
     /// <summary>Why a group is being measured in the host process instead of a worker.</summary>
     internal enum Refusal
     {
@@ -130,7 +144,8 @@ internal static class WorkerRunPlan
 
             // A factory that captures is refused for the same reason a capturing body is: it would have
             // to run here, and a container built here is exactly the live object that cannot cross.
-            if (!BodyRef.TryCreate(serviceProviderFactory, "service provider factory", out _, out var refusal))
+            if (!AddressedFactory.TryCreate(
+                    serviceProviderFactory, ServiceProviderRole, out _, out var refusal))
             {
                 return new Decision(
                     Refusal.LiveInstanceFactory,
@@ -163,20 +178,20 @@ internal static class WorkerRunPlan
 
         // A factory answers the question outright: the worker runs it and gets the caller's own object,
         // arguments and all, so there is nothing about the strategy left to refuse.
-        var candidates = new (object? Strategy, Delegate? Factory)[]
+        var candidates = new (object? Strategy, Delegate? Factory, string Role)[]
         {
-            (options.OutlierDetector, options.OutlierDetectorFactory),
-            (options.SignificanceTest, options.SignificanceTestFactory),
+            (options.OutlierDetector, options.OutlierDetectorFactory, OutlierDetectorRole),
+            (options.SignificanceTest, options.SignificanceTestFactory, SignificanceTestRole),
         };
 
-        foreach (var (strategy, factory) in candidates)
+        foreach (var (strategy, factory, role) in candidates)
         {
             if (factory is not null)
             {
                 // The factory itself still has to be addressable. One that captures is refused for the
                 // same reason a capturing body is - and saying so names the actionable fix, which is to
                 // make the factory static.
-                if (!BodyRef.TryCreate(factory, "strategy factory", out _, out var factoryRefusal))
+                if (!AddressedFactory.TryCreate(factory, role, out _, out var factoryRefusal))
                 {
                     return $"the factory supplied for '{strategy?.GetType().Name ?? "a custom strategy"}' "
                            + $"{factoryRefusal}";
@@ -195,19 +210,6 @@ internal static class WorkerRunPlan
     }
 
     /// <summary>
-    ///     Addresses a strategy factory so a worker can run it, or <c>null</c> when there is none.
-    /// </summary>
-    /// <remarks>
-    ///     Refusals are not reported here - <see cref="UnrebuildableStrategy" /> has already decided
-    ///     whether the group can be isolated at all, so by the time a request is being built an
-    ///     un-addressable factory cannot be present.
-    /// </remarks>
-    private static BodyRef? StrategyFactoryRef(Delegate? factory, string description)
-        => factory is not null && BodyRef.TryCreate(factory, description, out var bodyRef, out _)
-            ? bodyRef
-            : null;
-
-    /// <summary>
     ///     Addresses the service-provider factory so a worker can build its own container, or
     ///     <c>null</c> when there is none.
     /// </summary>
@@ -215,10 +217,8 @@ internal static class WorkerRunPlan
     ///     Refusals are not reported here: <see cref="ForDiscoveredClass" /> has already decided whether
     ///     the group can be isolated, so an un-addressable factory never reaches request building.
     /// </remarks>
-    public static BodyRef? ServiceProviderFactoryRef(Delegate? factory)
-        => factory is not null && BodyRef.TryCreate(factory, "service provider factory", out var bodyRef, out _)
-            ? bodyRef
-            : null;
+    public static AddressedFactory? ServiceProviderFactoryRef(Delegate? factory)
+        => AddressedFactory.OrNull(factory, ServiceProviderRole);
 
     /// <summary>
     ///     Fills in every way a custom statistical strategy can reach a worker - type name or factory
@@ -239,8 +239,8 @@ internal static class WorkerRunPlan
         {
             OutlierDetectorTypeName = StrategyTypeName(options.OutlierDetector, out _),
             SignificanceTestTypeName = StrategyTypeName(options.SignificanceTest, out _),
-            OutlierDetectorFactory = StrategyFactoryRef(options.OutlierDetectorFactory, "outlier detector factory"),
-            SignificanceTestFactory = StrategyFactoryRef(options.SignificanceTestFactory, "significance test factory"),
+            OutlierDetectorFactory = AddressedFactory.OrNull(options.OutlierDetectorFactory, OutlierDetectorRole),
+            SignificanceTestFactory = AddressedFactory.OrNull(options.SignificanceTestFactory, SignificanceTestRole),
         };
     }
 
@@ -263,7 +263,7 @@ internal static class WorkerRunPlan
         int replicate,
         int startIndex,
         int totalBenchmarks,
-        BodyRef? serviceProviderFactory = null)
+        AddressedFactory? serviceProviderFactory = null)
     {
         ArgumentNullException.ThrowIfNull(declaringType);
 

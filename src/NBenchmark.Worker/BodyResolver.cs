@@ -138,13 +138,6 @@ internal static class BodyResolver
         resolved = created;
         error = null;
 
-        if (!TryResolve(context, body.StateFactory!, out var factory, out var factoryError))
-        {
-            error = $"its prepare delegate could not be resolved: {factoryError}";
-
-            return false;
-        }
-
         var parameters = created.Method.GetParameters();
 
         if (parameters.Length != 1)
@@ -155,28 +148,19 @@ internal static class BodyResolver
             return false;
         }
 
-        // Re-checked on this side rather than trusted from the plan: both delegates were resolved from
-        // metadata tokens, and a mismatch here means the address no longer describes the code on disk.
-        if (!parameters[0].ParameterType.IsAssignableFrom(factory.Method.ReturnType))
+        // The expected type is the body's own parameter type, read from the method resolved here
+        // rather than trusted from the plan: both delegates came from metadata tokens, and a
+        // disagreement means the address no longer describes the code on disk. FactoryResolver
+        // checks it against the factory's declared return type before running any user code.
+        if (!FactoryResolver.TryInvoke(
+                context,
+                body.AssemblyPath,
+                body.StateFactory!,
+                parameters[0].ParameterType,
+                out var state,
+                out error,
+                out _))
         {
-            error = $"its prepare delegate returns '{factory.Method.ReturnType.Name}' but the body "
-                    + $"accepts '{parameters[0].ParameterType.Name}'.";
-
-            return false;
-        }
-
-        object? state;
-
-        try
-        {
-            state = factory.DynamicInvoke();
-        }
-        catch (Exception ex)
-        {
-            var inner = (ex as TargetInvocationException)?.InnerException ?? ex;
-
-            error = $"its prepare delegate threw {inner.GetType().Name}: {inner.Message}";
-
             return false;
         }
 

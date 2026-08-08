@@ -74,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 5;
+    public const int Version = 6;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -248,8 +248,13 @@ internal sealed record RunGroupPayload
 
     /// <summary>
     ///     <see cref="WorkGroupKind.DiscoveredClass" />: the class to discover benchmarks on.
-    ///     <see cref="WorkGroupKind.Plan" />: the type declaring the <c>[BenchmarkPlan]</c> factory.
     /// </summary>
+    /// <remarks>
+    ///     One meaning only. It used to double as the type declaring a <c>[BenchmarkPlan]</c> factory,
+    ///     which put two unrelated facts in one field and left the worker reading it under a condition
+    ///     rather than under a kind; the plan's declaring type now travels on <see cref="Plan" />,
+    ///     where it belongs to the address that needs it.
+    /// </remarks>
     public string? DeclaringTypeFullName { get; init; }
 
     /// <summary>
@@ -280,21 +285,16 @@ internal sealed record RunGroupPayload
     public BodyRef? SuiteTeardown { get; init; }
 
     /// <summary>
-    ///     <see cref="WorkGroupKind.Plan" />: the factory method's name, resolved against
-    ///     <see cref="DeclaringTypeFullName" /> rather than by metadata token.
-    ///     <para>
-    ///         Name resolution exists for multi-runtime runs, where the assembly under test is a
-    ///         <i>different build</i> of the same source. A metadata token is only meaningful within
-    ///         the build that produced it - and the module version id that guards against a stale
-    ///         token differs between two target frameworks' builds by construction, so token
-    ///         addressing cannot be made safe across them. A fully-qualified name is stable.
-    ///     </para>
-    ///     <para>
-    ///         <c>null</c> for same-build runs, which address by token and get the stronger guarantee
-    ///         that the method is precisely the one the caller passed.
-    ///     </para>
+    ///     <see cref="WorkGroupKind.Plan" />: the <c>[BenchmarkPlan]</c> factory the worker invokes to
+    ///     build the suite in its own process.
     /// </summary>
-    public string? PlanMethodName { get; init; }
+    /// <remarks>
+    ///     Its own slot rather than <see cref="Bodies" /><c>[0]</c> plus a sibling name field. The plan
+    ///     is a recipe, not a benchmark body, and carrying it as one meant the worker had to check the
+    ///     list held exactly one element and then decide between two addressing modes from the presence
+    ///     of an unrelated field. <see cref="AddressedFactory" /> models both modes directly.
+    /// </remarks>
+    public AddressedFactory? Plan { get; init; }
 
     /// <summary>
     ///     <see cref="WorkGroupKind.TestMethod" />: the methods under test, in the order the caller
@@ -374,13 +374,13 @@ internal sealed record RunGroupPayload
     ///         method is worse than measuring in the host and saying so.
     ///     </para>
     /// </summary>
-    public BodyRef? OutlierDetectorFactory { get; init; }
+    public AddressedFactory? OutlierDetectorFactory { get; init; }
 
     /// <summary>
     ///     Address of a factory producing the custom <see cref="Stats.ISignificanceTest" />, for the
     ///     reason given on <see cref="OutlierDetectorFactory" />.
     /// </summary>
-    public BodyRef? SignificanceTestFactory { get; init; }
+    public AddressedFactory? SignificanceTestFactory { get; init; }
 
     /// <summary>
     ///     Address of a factory producing the <see cref="IServiceProvider" /> that resolves benchmark
@@ -394,7 +394,7 @@ internal sealed record RunGroupPayload
     ///         <see cref="Refusal.LiveInstanceFactory" /> exists for.
     ///     </para>
     /// </summary>
-    public BodyRef? ServiceProviderFactory { get; init; }
+    public AddressedFactory? ServiceProviderFactory { get; init; }
 
     public RunOrder Order { get; init; } = RunOrder.Declaration;
 

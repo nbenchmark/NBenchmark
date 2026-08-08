@@ -583,36 +583,13 @@ internal sealed class WorkerSession(FrameChannel channel)
     {
         instanceFactory = null;
 
-        if (request.ServiceProviderFactory is null)
+        if (request.ServiceProviderFactory is not { } factory)
             return true;
 
-        if (!BodyResolver.TryResolve(context, request.ServiceProviderFactory, out var resolved, out var error))
+        if (!FactoryResolver.TryInvoke<IServiceProvider>(
+                context, request.TargetAssemblyPath, factory, out var provider, out var error, out var detail))
         {
-            Fault($"The service provider factory could not be resolved because {error}");
-
-            return false;
-        }
-
-        IServiceProvider? provider;
-
-        try
-        {
-            provider = resolved.DynamicInvoke() as IServiceProvider;
-        }
-        catch (Exception ex)
-        {
-            var inner = (ex as TargetInvocationException)?.InnerException ?? ex;
-
-            Fault(
-                $"The service provider factory threw {inner.GetType().Name}: {inner.Message}",
-                inner.ToString());
-
-            return false;
-        }
-
-        if (provider is null)
-        {
-            Fault("The service provider factory returned null, or something that is not an IServiceProvider.");
+            Fault(Capitalize(error!), detail);
 
             return false;
         }
@@ -723,76 +700,19 @@ internal sealed class WorkerSession(FrameChannel channel)
         StreamingProgress progress,
         CancellationToken cancellationToken)
     {
-        Func<BenchmarkSuite>? factory;
-        string description;
-
-        if (request.PlanMethodName is { Length: > 0 } planMethodName)
+        if (request.Plan is not { } plan)
         {
-            // Name resolution: the assembly is a different build of the same source, so tokens from
-            // the coordinator's build mean nothing here.
-            description = $"{request.DeclaringTypeFullName}.{planMethodName}";
-
-            if (!TryResolvePlanByName(context, request, out factory, out var nameError))
-            {
-                Fault($"The benchmark plan '{description}' could not be resolved because {nameError}");
-                return;
-            }
-        }
-        else
-        {
-            if (request.Bodies.Count != 1)
-            {
-                Fault($"A plan group must carry exactly one factory address; got {request.Bodies.Count}.");
-                return;
-            }
-
-            var planRef = request.Bodies[0];
-            description = planRef.DisplayName;
-
-            if (!BodyResolver.TryResolve(context, planRef, out var resolved, out var error))
-            {
-                Fault($"The benchmark plan '{description}' could not be resolved because {error}");
-                return;
-            }
-
-            factory = resolved as Func<BenchmarkSuite>;
-
-            if (factory is null)
-            {
-                Fault(
-                    $"'{description}' resolved to {resolved.GetType().Name} rather than a "
-                    + $"{nameof(Func<BenchmarkSuite>)}. A benchmark plan must be a parameterless method "
-                    + $"returning {nameof(BenchmarkSuite)}.");
-
-                return;
-            }
-        }
-
-        if (factory is null)
-        {
-            Fault($"The benchmark plan '{description}' could not be bound to a factory.");
+            Fault("A plan group carries no benchmark plan address.");
             return;
         }
 
-        BenchmarkSuite suite;
-
-        try
+        // Both addressing modes, the invocation, the null check and the return-type check are one
+        // call: a plan is a recipe like any other, and the only thing particular to it is that what
+        // it produces is a BenchmarkSuite.
+        if (!FactoryResolver.TryInvoke<BenchmarkSuite>(
+                context, request.TargetAssemblyPath, plan, out var suite, out var error, out var detail))
         {
-            suite = factory();
-        }
-        catch (Exception ex)
-        {
-            // The factory is user code and can fail for any reason. Reporting it as the group's
-            // fault is far more useful than letting it surface as a dead worker.
-            Fault($"The benchmark plan '{description}' threw while building the suite: {ex.Message}",
-                ex.ToString());
-
-            return;
-        }
-
-        if (suite is null)
-        {
-            Fault($"The benchmark plan '{description}' returned null.");
+            Fault(Capitalize(error!), detail);
             return;
         }
 
@@ -807,63 +727,6 @@ internal sealed class WorkerSession(FrameChannel channel)
             .ConfigureAwait(false);
 
         SendResults(outcome.Results, r => outcome.RawSamples.GetValueOrDefault(r.Name, []));
-    }
-
-    /// <summary>
-    ///     Binds a plan factory by fully-qualified name from the assembly under test.
-    /// </summary>
-    /// <remarks>
-    ///     The shape checks mirror <c>BenchmarkPlanDiscovery</c>'s, because a plan that the
-    ///     coordinator accepted must not be rejected here for a different reason - and because the
-    ///     assembly here is a <i>different build</i>, where the method genuinely might have changed
-    ///     shape under a different target framework's conditional compilation.
-    /// </remarks>
-    private static bool TryResolvePlanByName(
-        BenchmarkLoadContext context,
-        RunGroupPayload request,
-        out Func<BenchmarkSuite>? factory,
-        out string? error)
-    {
-        factory = null;
-        error = null;
-
-        var target = context.LoadFromAssemblyPath(Path.GetFullPath(request.TargetAssemblyPath));
-        var type = target.GetType(request.DeclaringTypeFullName!, throwOnError: false);
-
-        if (type is null)
-        {
-            error = $"the type '{request.DeclaringTypeFullName}' was not found in "
-                    + $"'{Path.GetFileName(request.TargetAssemblyPath)}'.";
-
-            return false;
-        }
-
-        var method = type.GetMethod(
-            request.PlanMethodName!,
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
-            binder: null,
-            types: Type.EmptyTypes,
-            modifiers: null);
-
-        if (method is null)
-        {
-            error = $"'{request.DeclaringTypeFullName}' has no static parameterless method named "
-                    + $"'{request.PlanMethodName}'.";
-
-            return false;
-        }
-
-        if (!typeof(BenchmarkSuite).IsAssignableFrom(method.ReturnType))
-        {
-            error = $"'{request.PlanMethodName}' returns {method.ReturnType.Name} rather than "
-                    + $"{nameof(BenchmarkSuite)}.";
-
-            return false;
-        }
-
-        factory = method.CreateDelegate<Func<BenchmarkSuite>>();
-
-        return true;
     }
 
     private async Task RunLambdasAsync(
@@ -1046,7 +909,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         // A factory wins over a type name. It is the stronger mechanism - it reproduces the caller's own
         // object with its own constructor arguments, where a type name can only reach a parameterless
         // constructor - so where both are present the type name is the weaker fallback, not a conflict.
-        if (RunFactory<IOutlierDetector>(context, request.OutlierDetectorFactory, "outlier detector") is
+        if (RunStrategyFactory<IOutlierDetector>(context, request, request.OutlierDetectorFactory) is
             { } detector)
         {
             options = options with { OutlierDetector = detector };
@@ -1059,7 +922,7 @@ internal sealed class WorkerSession(FrameChannel channel)
             };
         }
 
-        if (RunFactory<ISignificanceTest>(context, request.SignificanceTestFactory, "significance test") is
+        if (RunStrategyFactory<ISignificanceTest>(context, request, request.SignificanceTestFactory) is
             { } test)
         {
             options = options with { SignificanceTest = test };
@@ -1084,35 +947,34 @@ internal sealed class WorkerSession(FrameChannel channel)
     ///     measurable, and losing a custom scoring method is worth a loud line rather than a dead group -
     ///     but it must be loud, because the alternative is a result scored under a method nobody chose.
     /// </remarks>
-    private static T? RunFactory<T>(BenchmarkLoadContext context, BodyRef? factory, string role) where T : class
+    private static T? RunStrategyFactory<T>(
+        BenchmarkLoadContext context,
+        RunGroupPayload request,
+        AddressedFactory? factory)
+        where T : class
     {
         if (factory is null)
             return null;
 
-        if (!BodyResolver.TryResolve(context, factory, out var resolved, out var error))
+        if (FactoryResolver.TryInvoke<T>(
+                context, request.TargetAssemblyPath, factory, out var produced, out var error, out _))
         {
-            Console.Error.WriteLine(
-                $"nbworker: the {role} factory could not be resolved ({error}); "
-                + $"using the built-in {typeof(T).Name} instead.");
-
-            return null;
+            return produced;
         }
 
-        try
-        {
-            return resolved.DynamicInvoke() as T;
-        }
-        catch (Exception ex)
-        {
-            var inner = (ex as TargetInvocationException)?.InnerException ?? ex;
+        Console.Error.WriteLine($"nbworker: {error} Using the built-in {typeof(T).Name} instead.");
 
-            Console.Error.WriteLine(
-                $"nbworker: the {role} factory threw {inner.GetType().Name} ({inner.Message}); "
-                + $"using the built-in {typeof(T).Name} instead.");
-
-            return null;
-        }
+        return null;
     }
+
+    /// <summary>
+    ///     Upper-cases the first character of a resolver message, which is phrased to sit mid-sentence
+    ///     after a role, so it can start a fault of its own.
+    /// </summary>
+    private static string Capitalize(string message)
+        => message.Length == 0 || char.IsUpper(message[0])
+            ? message
+            : char.ToUpperInvariant(message[0]) + message[1..];
 
     private static T? Construct<T>(string typeName, string targetAssemblyPath) where T : class
     {

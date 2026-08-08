@@ -56,10 +56,10 @@ internal static class SuitePlanRunner
         {
             var request = new RunGroupPayload
             {
-                GroupId = $"plan:{planRef.DisplayName}#{replicate}",
+                GroupId = $"plan:{plan.Method.Name}#{replicate}",
                 Kind = WorkGroupKind.Plan,
-                TargetAssemblyPath = planRef.AssemblyPath,
-                Bodies = [planRef],
+                TargetAssemblyPath = planRef.Body!.AssemblyPath,
+                Plan = planRef,
 
                 // Sent so the coordinator and worker agree on the runtime profile to launch under.
                 // The worker measures with the options its own factory produced, which is the point
@@ -144,14 +144,11 @@ internal static class SuitePlanRunner
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(localSuite);
 
-        var declaringType = plan.Method.DeclaringType?.FullName;
-
-        if (!plan.Method.IsStatic || declaringType is null)
+        if (!AddressedFactory.TryCreateByName(plan, PlanRole(plan), out var planRef, out var refusal))
         {
             throw new InvalidOperationException(
-                $"The benchmark plan '{plan.Method.Name}' must be a static method on a named type to "
-                + "run across runtimes, because each runtime's worker locates it by name in that "
-                + "runtime's own build.");
+                $"The benchmark plan cannot run across runtimes: {refusal} Each runtime's worker "
+                + "locates it by name in that runtime's own build.");
         }
 
         var runtimes = localSuite.RequestedRuntimes;
@@ -199,8 +196,7 @@ internal static class SuitePlanRunner
                     Kind = WorkGroupKind.Plan,
                     TargetAssemblyPath = build.DllPath!,
                     WorkerAssemblyPath = workerPath,
-                    DeclaringTypeFullName = declaringType,
-                    PlanMethodName = plan.Method.Name,
+                    Plan = planRef,
                     Options = options,
                     TotalBenchmarks = names.Count,
                 };
@@ -256,7 +252,7 @@ internal static class SuitePlanRunner
     /// </summary>
     private static bool TryPlan(
         Func<BenchmarkSuite> plan,
-        out BodyRef planRef,
+        out AddressedFactory planRef,
         out IsolationStatus status,
         out string? refusal)
     {
@@ -272,7 +268,7 @@ internal static class SuitePlanRunner
             return false;
         }
 
-        if (!BodyRef.TryCreate(plan, plan.Method.Name, out planRef, out refusal))
+        if (!AddressedFactory.TryCreate(plan, PlanRole(plan), out planRef, out refusal))
         {
             status = refusal is not null && refusal.Contains("captures", StringComparison.Ordinal)
                 ? IsolationStatus.InProcessCapturedState
@@ -286,6 +282,12 @@ internal static class SuitePlanRunner
 
         return true;
     }
+
+    /// <summary>
+    ///     How the worker names this plan in a diagnostic. Includes the method name because a program
+    ///     may declare several plans and "the benchmark plan" alone would not say which one failed.
+    /// </summary>
+    private static string PlanRole(Func<BenchmarkSuite> plan) => $"the benchmark plan '{plan.Method.Name}'";
 
     /// <summary>
     ///     Combines the replicates. With one replicate the results pass through unchanged; with
