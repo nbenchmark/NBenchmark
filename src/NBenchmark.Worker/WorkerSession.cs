@@ -472,7 +472,8 @@ internal sealed class WorkerSession(FrameChannel channel)
             // silent fallback would measure nothing and report a gap.
             Fault(
                 $"'{suite.Type.FullName}' could not be instantiated in the worker, even "
-                + "though it appeared to have a usable parameterless constructor.");
+                + "though it appeared to have a usable parameterless constructor."
+                + (outcome.Failure is { Length: > 0 } why ? $" {why}" : ""));
 
             return;
         }
@@ -669,7 +670,9 @@ internal sealed class WorkerSession(FrameChannel channel)
 
         if (outcome.InstantiationFailed)
         {
-            Fault($"'{request.DeclaringTypeFullName}' could not be instantiated in the worker.");
+            Fault(
+                $"'{request.DeclaringTypeFullName}' could not be instantiated in the worker."
+                + (outcome.Failure is { Length: > 0 } why ? $" {why}" : ""));
 
             return;
         }

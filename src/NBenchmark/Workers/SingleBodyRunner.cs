@@ -174,16 +174,34 @@ internal static class SingleBodyRunner
 ///     The once-per-process note explaining why a Simple-mode benchmark was not isolated.
 /// </summary>
 /// <remarks>
-///     Once per process, and per distinct reason, rather than once per call. Simple mode is used in
-///     loops and scripts; a message on every <c>Benchmark.Run</c> would be noise, and noise is how a
-///     warning stops being read. The per-result <see cref="BenchmarkResult.IsolationStatus" /> stamp
-///     carries the same information without competing for attention.
+///     <para>
+///         Once per <i>offender</i> and per distinct reason, rather than once per call. Simple mode is
+///         used in loops and scripts; a message on every <c>Benchmark.Run</c> would be noise, and
+///         noise is how a warning stops being read.
+///     </para>
+///     <para>
+///         Keyed on the name as well as the status, because keying on the status alone made a script
+///         with twenty <c>Benchmark.Run</c> calls - fifteen of them refused - print one line naming
+///         the first offender and leave the other fourteen invisible outside
+///         <see cref="BenchmarkResult.IsolationStatus" />. A reader would fix the one benchmark they
+///         were told about and have no reason to think the rest were affected. Bounded by
+///         <see cref="MaxReported" /> so a genuinely large loop still cannot flood stderr.
+///     </para>
 /// </remarks>
 internal static class SimpleModeGuidance
 {
     internal const string SuppressEnvVar = "NBENCHMARK_SUPPRESS_ISOLATION_WARNING";
 
-    private static readonly HashSet<IsolationStatus> Reported = [];
+    /// <summary>
+    ///     How many distinct offenders are named before the note falls back to counting them. High
+    ///     enough to cover a hand-written suite, low enough that a generated loop cannot fill a
+    ///     terminal.
+    /// </summary>
+    private const int MaxReported = 10;
+
+    private static readonly HashSet<(string Name, IsolationStatus Status)> Reported = [];
+
+    private static int _suppressedCount;
 
     public static void EmitOnce(string name, IsolationStatus status, string? explanation)
     {
@@ -192,8 +210,24 @@ internal static class SimpleModeGuidance
 
         lock (Reported)
         {
-            if (!Reported.Add(status))
+            if (!Reported.Add((name, status)))
                 return;
+
+            if (Reported.Count > MaxReported)
+            {
+                // Said once, at the boundary, so the reader knows the list they are looking at is
+                // not the whole list. Silence here would be indistinguishable from there being
+                // nothing more to report.
+                if (++_suppressedCount == 1)
+                {
+                    Console.Error.WriteLine(
+                        $"Isolation: more than {MaxReported} benchmarks were not isolated; further "
+                        + $"notes are suppressed. Every result carries its own status - set "
+                        + $"{SuppressEnvVar}=1 to silence these entirely.");
+                }
+
+                return;
+            }
         }
 
         Console.Error.WriteLine(
@@ -209,11 +243,43 @@ internal static class SimpleModeGuidance
             + "to silence this, or RuntimeProfile.Host to accept it deliberately.");
     }
 
+    /// <summary>
+    ///     Reports that a <c>[BenchmarkPlan]</c> factory could not be addressed, without claiming
+    ///     anything about where the suite ends up being measured.
+    /// </summary>
+    /// <remarks>
+    ///     The plan path falls back to measuring the suite as an inline one, where the bodies are
+    ///     addressed individually - and that routinely succeeds where the factory did not, because a
+    ///     factory capturing a local is refused while the non-capturing bodies it wires up are not.
+    ///     <see cref="EmitOnce" />'s wording ("was measured in this process") would be false in
+    ///     exactly that case, which is the case the plan API exists to serve.
+    /// </remarks>
+    public static void EmitPlanRefusal(string name, IsolationStatus status, string? explanation)
+    {
+        if (status.IsIsolated() || IsSuppressed())
+            return;
+
+        lock (Reported)
+        {
+            if (!Reported.Add((name, status)))
+                return;
+        }
+
+        Console.Error.WriteLine(
+            $"Isolation: the benchmark plan for '{name}' could not be addressed because "
+            + (explanation ?? "it could not be addressed across a process boundary.")
+            + " Measuring the suite as an inline suite instead; each result says where it ran.");
+
+        if (status.ToRemedy() is { } remedy)
+            Console.Error.WriteLine($"  To isolate the plan itself: {remedy}.");
+    }
+
     internal static void ResetForTesting()
     {
         lock (Reported)
         {
             Reported.Clear();
+            _suppressedCount = 0;
         }
     }
 

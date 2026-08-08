@@ -93,6 +93,21 @@ public static class BenchmarkResultExtensions
             }
         }
 
+        // Where the number came from, on the one output path that showed no provenance at all.
+        // Print() is what the README leads with and what Simple mode returns you to, so a benchmark
+        // that quietly fell back to this process reported a tight interval with nothing anywhere
+        // saying it was measured under the host's JIT tiering rather than a chosen configuration.
+        Console.WriteLine("  │");
+
+        Console.WriteLine(
+            result.IsolationStatus.IsIsolated()
+                ? $"  │  Measured in an isolated worker under '{result.RuntimeProfileName}'."
+                : $"  │  Measured in this process ({result.IsolationStatus.ToLabel()}) under "
+                  + $"'{result.RuntimeProfileName}'.");
+
+        if (result.IsolationStatus.ToRemedy() is { } isolationRemedy)
+            Console.WriteLine($"  │  To isolate it: {isolationRemedy}.");
+
         Console.WriteLine("  │");
         Console.WriteLine("  └─────────────────────────────────────────────────");
         Console.WriteLine();

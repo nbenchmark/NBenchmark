@@ -782,6 +782,81 @@ public class ReporterTests
         }
     }
 
+    /// <summary>
+    ///     CSV carries where each row was measured, at every detail level.
+    /// </summary>
+    /// <remarks>
+    ///     It carried none at all, while JSON serialized the whole record and Markdown rendered a
+    ///     column - so the one format built for automated trend-tracking was the one that could
+    ///     silently plot a host row against a clean-room one. On bodies of provably identical cost the
+    ///     configuration difference alone was worth ~3.3x.
+    /// </remarks>
+    [Theory]
+    [InlineData(ReportDetail.Simple)]
+    [InlineData(ReportDetail.Standard)]
+    [InlineData(ReportDetail.Advanced)]
+    public async Task CsvReporter_Includes_Isolation_Column(ReportDetail detail)
+    {
+        var tempDir = MakeSubDir("nb-csv-isolation");
+
+        try
+        {
+            var reporter = new CsvReporter(tempDir, detail: detail);
+
+            var result = MakeResult("alpha", 100) with
+            {
+                IsolationStatus = IsolationStatus.InProcessCapturedState,
+            };
+
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "*.csv");
+            var lines = await File.ReadAllLinesAsync(files[0]);
+
+            Assert.Contains("Isolation", lines[0]);
+            Assert.Contains(IsolationStatus.InProcessCapturedState.ToLabel(), lines[1]);
+
+            // The column count must match the header count, or every consumer reading by index is
+            // silently off by one from here on.
+            Assert.Equal(
+                lines[0].Split(',').Length,
+                SplitCsv(lines[1]).Count);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    /// <summary>
+    ///     Splits a CSV line on commas that are outside quotes, so a quoted field containing a comma
+    ///     counts as one column.
+    /// </summary>
+    private static List<string> SplitCsv(string line)
+    {
+        var fields = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var inQuotes = false;
+
+        foreach (var c in line)
+        {
+            if (c == '"')
+                inQuotes = !inQuotes;
+            else if (c == ',' && !inQuotes)
+            {
+                fields.Add(current.ToString());
+                current.Clear();
+                continue;
+            }
+
+            current.Append(c);
+        }
+
+        fields.Add(current.ToString());
+
+        return fields;
+    }
+
     [Fact]
     public async Task MarkdownReporter_Advanced_Includes_Categories_Column_When_Present()
     {

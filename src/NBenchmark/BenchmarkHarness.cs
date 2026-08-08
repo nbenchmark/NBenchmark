@@ -1519,10 +1519,19 @@ public sealed class BenchmarkHarness
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
-        var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
+        var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory, out var failure);
 
         if (created is null)
+        {
+            // Errored rows rather than a silent return. Dropping them shrank the table instead of
+            // reporting a failure, so a class that could not be constructed simply went missing from
+            // every reporter - while the isolated path synthesises rows for exactly this case
+            // (WorkerGroupRunner.ToErroredResults). A shorter table is the one failure shape a reader
+            // has no way to notice.
+            allResults.AddRange(InstantiationFailures(suite, suiteOptions, failure));
+
             return;
+        }
 
         var (instance, instanceTeardown) = created.Value;
         var instanceFromFactory = _instanceFactory is not null;
@@ -1627,17 +1636,11 @@ public sealed class BenchmarkHarness
 
         foreach (var benchmark in orderedBenchmarks)
         {
-            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory);
+            var created = BenchmarkLifecycle.CreateInstance(suite.Type, _instanceFactory, out var failure);
 
             if (created is null)
             {
-                var errored = OutcomeBuilder.Build(
-                    new RunOutcome.Errored(new InvalidOperationException("Could not instantiate benchmark class"), "Instance creation failed"),
-                    $"{suite.Type.Name}.{benchmark.DisplayName}", suite.Type.Name, benchmark.Attribute.Description, benchmark.IsBaseline,
-                    suiteOptions, TimeSpan.Zero, TimeSpan.Zero, 0, null,
-                    benchmark.Categories).Result;
-
-                allResults.Add(errored);
+                allResults.Add(InstantiationFailure(suite, benchmark, suiteOptions, failure));
                 startIndex++;
                 continue;
             }
@@ -1974,6 +1977,39 @@ public sealed class BenchmarkHarness
                     : status,
             };
         }
+    }
+
+    /// <summary>
+    ///     One errored row per benchmark in a class that could not be constructed, so the failure
+    ///     appears in the table rather than shortening it.
+    /// </summary>
+    private static IEnumerable<BenchmarkResult> InstantiationFailures(
+        BenchmarkSuiteDefinition suite,
+        MeasurementOptions suiteOptions,
+        string? failure)
+        => suite.Benchmarks.Select(b => InstantiationFailure(suite, b, suiteOptions, failure));
+
+    /// <inheritdoc cref="InstantiationFailures" />
+    private static BenchmarkResult InstantiationFailure(
+        BenchmarkSuiteDefinition suite,
+        BenchmarkMethodDefinition benchmark,
+        MeasurementOptions suiteOptions,
+        string? failure)
+    {
+        var message = failure ?? $"Could not instantiate {suite.Type.Name}.";
+
+        return OutcomeBuilder.Build(
+            new RunOutcome.Errored(new InvalidOperationException(message), message),
+            $"{suite.Type.Name}.{benchmark.DisplayName}",
+            suite.Type.Name,
+            benchmark.Attribute.Description,
+            benchmark.IsBaseline,
+            suiteOptions,
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            0,
+            null,
+            benchmark.Categories).Result;
     }
 
     /// <summary>Strips the class prefix from a <c>Class.Method</c> result name.</summary>

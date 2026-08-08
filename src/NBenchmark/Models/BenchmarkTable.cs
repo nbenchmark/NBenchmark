@@ -64,11 +64,22 @@ public sealed record BenchmarkTable
     public IReadOnlyList<IsolationStatus> InProcessReasons { get; init; } = [];
 
     /// <summary>
-    ///     <c>true</c> when the rows carry more than one <see cref="IsolationStatus" />. Reporters
-    ///     add a per-row status column when this is set, because a single table-wide footer cannot
-    ///     say <i>which</i> rows were isolated, and that is exactly what a reader needs to know
-    ///     before trusting any comparison between them.
+    ///     <c>true</c> when reporters should add a per-row isolation column: either the rows disagree
+    ///     about where they ran, or isolation was <b>refused</b> for at least one of them.
     /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Mixed statuses alone is not the right rule, and it failed in the direction that matters
+    ///         most: a table where <i>every</i> row fell back has one distinct status, so the column
+    ///         was suppressed for exactly the run a reader is most likely to misread as isolated.
+    ///     </para>
+    ///     <para>
+    ///         Refusal rather than "not isolated", because a run under <c>--in-process</c> or
+    ///         <c>--dry-run</c> is uniformly host-measured on purpose. Adding a column that reads "no"
+    ///         on every row there says nothing the footer does not, and it costs the bar column, which
+    ///         reporters trade against it.
+    ///     </para>
+    /// </remarks>
     public bool MixedIsolationStatuses { get; init; }
 
     /// <summary>
@@ -303,16 +314,23 @@ public sealed record BenchmarkTable
                 .Select(r => r.RuntimeProfileName)
                 .Distinct(StringComparer.Ordinal)
                 .Count() > 1,
+            // Errored rows are excluded from both: a benchmark that threw was not measured anywhere,
+            // so it has no provenance to report. Including them meant a single errored row in an
+            // otherwise fully-isolated run flipped MixedIsolationStatuses - adding a spurious column
+            // and, because reporters trade the two, removing the bar column.
             InProcessReasons = results
-                .Where(r => !r.IsolationStatus.IsIsolated())
+                .Where(r => !r.Errored && !r.IsolationStatus.IsIsolated())
                 .Select(r => r.IsolationStatus)
                 .Distinct()
                 .OrderBy(s => s)
                 .ToList(),
-            MixedIsolationStatuses = results
-                .Select(r => r.IsolationStatus)
-                .Distinct()
-                .Count() > 1,
+            MixedIsolationStatuses =
+                results.Any(r => !r.Errored && r.IsolationStatus.IsRefusal())
+                || results
+                    .Where(r => !r.Errored)
+                    .Select(r => r.IsolationStatus)
+                    .Distinct()
+                    .Count() > 1,
             Omnibus = results.FirstOrDefault(r => r.Omnibus is not null)?.Omnibus,
         };
     }
