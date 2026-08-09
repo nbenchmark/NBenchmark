@@ -192,7 +192,10 @@ public sealed class StateGapIsolationTests : IDisposable
                 prepare: static () => new int[8],
                 body: static data => data.Length,
                 setup: data => marker.Position = data.Length % 4,
-                options: FastOptions,
+
+                // The labelled fallback, not the hard error: this test is about the hook being named
+                // in the guidance, which only the fallback path prints.
+                options: FastOptions with { RequireIsolation = false },
                 name: "capturing-setup");
         }
         finally

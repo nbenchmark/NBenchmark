@@ -53,6 +53,14 @@ public sealed class SuitePlanIsolationTests : IDisposable
             .Add("slow", () => Thread.SpinWait(2_000))
             .WithBaseline("fast"));
 
+    /// <summary>
+    ///     The same suite with the hard-error gate down, for the tests about what the labelled fallback
+    ///     does. A separate factory rather than a flag on <see cref="BuildComparison" />, because a plan
+    ///     factory is addressed by token and the isolated tests must keep measuring the unmodified one.
+    /// </summary>
+    private static BenchmarkSuite BuildComparisonAcceptingFallback() =>
+        BuildComparison().WithRequireIsolation(false);
+
     /// <summary>A factory whose suite carries a custom strategy object that could never be serialized.</summary>
     private static BenchmarkSuite BuildWithLiveStrategy() =>
         Fast(new BenchmarkSuite("plan-live-strategy")
@@ -176,8 +184,11 @@ public sealed class SuitePlanIsolationTests : IDisposable
 
         try
         {
+            // RequireIsolation off: this is about what the labelled fallback says, and the fallback is
+            // only reachable with the gate down. The gate itself is covered by RequiredIsolationTests.
             results = await BenchmarkSuite.RunPlanAsync(
-                () => Fast(new BenchmarkSuite("captured").Add("only", () => Thread.SpinWait(spins))));
+                () => Fast(new BenchmarkSuite("captured").Add("only", () => Thread.SpinWait(spins)))
+                    .WithRequireIsolation(false));
         }
         finally
         {
@@ -263,7 +274,7 @@ public sealed class SuitePlanIsolationTests : IDisposable
 
         try
         {
-            results = await BenchmarkSuite.RunPlanAsync(BuildComparison);
+            results = await BenchmarkSuite.RunPlanAsync(BuildComparisonAcceptingFallback);
         }
         finally
         {

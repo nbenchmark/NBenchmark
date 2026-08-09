@@ -107,6 +107,12 @@ internal static class SingleBodyRunner
         var fault = group.Faults.FirstOrDefault()?.Message
                     ?? "the measurement worker returned no result.";
 
+        // Gated like every other refusal. This one was missed because it is not an addressing decision
+        // - the body crossed fine and the process on the other end died - but the outcome the caller
+        // gets is identical to the ones that are gated, so leaving it open meant RequireIsolation held
+        // for the failures that can be predicted and not for the ones that cannot.
+        IsolationAudit.ThrowIfRequired(options, name, IsolationStatus.InProcessNoWorker, fault);
+
         SimpleModeGuidance.EmitOnce(name, IsolationStatus.InProcessNoWorker, fault);
 
         var fallback = await measureInProcess().ConfigureAwait(false);

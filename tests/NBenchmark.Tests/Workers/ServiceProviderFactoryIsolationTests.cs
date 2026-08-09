@@ -105,6 +105,7 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
         {
             results = await Harness()
                 .WithServiceProvider(BuildProvider())
+                .WithRequireIsolation(false)
                 .RunAsync();
         }
         finally
@@ -139,6 +140,7 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
         {
             results = await Harness()
                 .WithServiceProvider(() => new SingleServiceProvider(new Probe(spins)))
+                .WithRequireIsolation(false)
                 .RunAsync();
         }
         finally

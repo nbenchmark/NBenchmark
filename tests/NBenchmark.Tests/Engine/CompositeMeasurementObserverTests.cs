@@ -124,7 +124,7 @@ public class CompositeMeasurementObserverTests
         var a = new RecordingObserver();
         var b = new RecordingObserver();
 
-        await new BenchmarkSuite("additive-observers")
+        await new BenchmarkSuite("additive-observers").WithRequireIsolation(false)
             .Add("bench", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -152,7 +152,7 @@ public class CompositeMeasurementObserverTests
         // Passing null should not clear previously-attached observers (additive contract).
         var a = new RecordingObserver();
 
-        await new BenchmarkSuite("null-after-attach")
+        await new BenchmarkSuite("null-after-attach").WithRequireIsolation(false)
             .Add("bench", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -171,7 +171,7 @@ public class CompositeMeasurementObserverTests
         // recording observer passed to the suite (but not attached) should see no events.
         var outside = new RecordingObserver();
 
-        await new BenchmarkSuite("no-observer")
+        await new BenchmarkSuite("no-observer").WithRequireIsolation(false)
             .Add("bench", () => { })
             .WithWarmup(0)
             .WithIterations(1)

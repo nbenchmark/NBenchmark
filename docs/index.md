@@ -147,5 +147,5 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 - **[Features](./features/)** - parameterized benchmarks, categories, isolation, multi-runtime, launches, DI
 - **[Guides](./guides/)** - real-world workflow recipes that combine features (ASP.NET services, CI/CD tuning, refactors, parameter sweeps, cross-runtime, test-suite gates, custom statistics)
 - **[Configuration](./reference/configuration.md)** - task-based guides and the full options reference
-- **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0014)
+- **[Analyzers](./reference/analyzers.md)** - compile-time diagnostics (NB0001-NB0015)
 - **[Statistics](./statistics/)** - how the numbers are calculated

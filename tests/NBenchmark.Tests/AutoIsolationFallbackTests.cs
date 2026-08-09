@@ -35,7 +35,11 @@ public class AutoIsolationFallbackTests
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
-            .WithIsolation();
+            .WithIsolation()
+
+            // The labelled fallback rather than the hard error: these tests are about what the refusal
+            // says, and the throw is covered by RequiredIsolationTests.
+            .WithRequireIsolation(false);
 
         using var scope = FakeWorkerLauncher.Install(SimulateWorkerGroup);
         using var stderr = new StringWriter();
@@ -80,7 +84,11 @@ public class AutoIsolationFallbackTests
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
-            .WithIsolation();
+            .WithIsolation()
+
+            // The labelled fallback rather than the hard error: these tests are about what the refusal
+            // says, and the throw is covered by RequiredIsolationTests.
+            .WithRequireIsolation(false);
 
         using var scope = FakeWorkerLauncher.Install(SimulateWorkerGroup);
         using var stderr = new StringWriter();
@@ -298,7 +306,8 @@ public class AutoIsolationFallbackTests
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-nofactory"])
             .WithLaunchCount(1)
-            .WithIsolation();
+            .WithIsolation()
+            .WithRequireIsolation(false);
 
         using var _ = FakeWorkerLauncher.InstallUnavailable();
         using var stderr = new StringWriter();

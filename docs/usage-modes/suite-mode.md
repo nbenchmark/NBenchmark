@@ -203,7 +203,22 @@ await new BenchmarkSuite("sorting")
 
 Custom strategies needing constructor arguments take a factory rather than an instance, for the same reason - `.WithOutlierDetector(static () => new KeepFastest(0.9))`.
 
-Anything genuinely un-addressable is measured in the host process, with the reason named per benchmark, and `WithRequireIsolation()` turns that into a failure instead. For a suite holding something no factory can describe, move it into a static `[BenchmarkPlan]` factory and use `BenchmarkSuite.RunPlanAsync(BuildSuite)`; the worker runs your factory in its own process. See [Isolated Runs](../features/isolated-runs.md) for the full model.
+Anything genuinely un-addressable is **refused**, and a refusal fails the run: `RequireIsolation` defaults to `true`, so the suite does not quietly become a host-process measurement. Three answers, in the order you should reach for them:
+
+1. **`AddInProcess(name, body)`** - measure that one benchmark here on purpose, and keep the rest of the suite in a worker. This is the answer when one body holds something that genuinely cannot cross: a live handle, a mock, a warm cache the benchmark is *about*.
+2. **A static `[BenchmarkPlan]` factory** with `BenchmarkSuite.RunPlanAsync(BuildSuite)` - the worker runs your factory in its own process, so nothing has to be described to it.
+3. **`WithRequireIsolation(false)`** - accept a labelled host-process measurement for the whole suite. Right for scratchpad use; wrong for anything comparative.
+
+```csharp
+await new BenchmarkSuite("cache")
+    .Add("cold", () => Parse(Payload))
+    .AddInProcess("warm", () => connection.Query())   // in the host, by request
+    .RunAsync();
+```
+
+An `AddInProcess` row is a *request*, not a refusal: it is stamped `InProcessRequested`, does not trip the gate, and is not counted by `--strict-isolation`. It is still never given a ratio against an isolated row - the configuration difference between the two processes does not go away because it was asked for. Before it existed, `WithIsolation(false)` was the only lever, and it is all-or-nothing: one un-addressable body took every other benchmark in the suite into the host process with it.
+
+See [Isolated Runs](../features/isolated-runs.md) for the full model.
 
 ## Multiple launches
 

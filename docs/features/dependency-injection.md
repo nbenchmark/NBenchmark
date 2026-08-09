@@ -67,7 +67,7 @@ Pick the granularity that matches your needs:
 | `UseScopedDependencyInjection<T>(BuildServices)` | Like above but creates a fresh DI scope per instance, disposing it after teardown. Good for `DbContext`, EF Core, and any other scoped service. **Isolated** - the worker builds its own container and its own scopes. |
 | `WithServiceProvider(sp)` | You already called `AddFromAssembly` yourself (perhaps with multiple assemblies) and want to plug in the root provider. |
 | `WithScopedServiceProvider(BuildServices)` | Same as above but with a fresh scope per instance. **Isolated.** |
-| `WithScopedServiceProvider(sp)` | Takes a live container, so the run is measured in this process and stamped `host`. Pass the factory instead. |
+| `WithScopedServiceProvider(sp)` | Takes a live container, which no worker can reproduce - so the run is **refused** and fails. Pass the factory instead. |
 
 Example: multiple assemblies, scoped lifetime:
 

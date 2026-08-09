@@ -101,6 +101,7 @@ public sealed class StrategyFactoryIsolationTests : IDisposable
             results = await Fast(new BenchmarkSuite("detector-instance")
                     .Add("a", () => Thread.SpinWait(2_000))
                     .WithOutlierDetector(new TrimFractionDetector(0.25)))
+                .WithRequireIsolation(false)
                 .RunAsync();
         }
         finally
@@ -131,6 +132,7 @@ public sealed class StrategyFactoryIsolationTests : IDisposable
             results = await Fast(new BenchmarkSuite("captured-detector")
                     .Add("a", () => Thread.SpinWait(2_000))
                     .WithOutlierDetector(() => new TrimFractionDetector(fraction)))
+                .WithRequireIsolation(false)
                 .RunAsync();
         }
         finally

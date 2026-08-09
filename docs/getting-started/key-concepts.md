@@ -28,7 +28,7 @@ By default NBenchmark **auto-detects** how much warmup each benchmark needs: it 
 
 By default, NBenchmark measures your benchmarks in a **freshly spawned worker process** rather than in the process that launched them. This is on in every mode and needs no configuration. The worker starts with a known runtime configuration (JIT tiering, PGO, and GC flavour) so your numbers are consistent across runs.
 
-Some benchmarks cannot be isolated - a body that captures a local variable, for example. NBenchmark measures those in the host process, stamps the result with the reason, and never compares a host measurement against an isolated one. The `Iso` column in your output is where that shows up.
+Some benchmarks cannot be isolated - a body closing over a live handle, or instances that come from a container this process owns. Those are **refused**, and a refusal fails the run rather than quietly becoming a host-process measurement. Measuring here is still available when you want it - `[InProcess]`, `Benchmark.RunInProcess`, `BenchmarkSuite.AddInProcess`, `--in-process` - and those rows are labelled in the `Iso` column and never compared against an isolated one.
 
 See [Isolated runs](../features/isolated-runs.md) for the full model.
 

@@ -34,7 +34,12 @@ public sealed class IsolatedRunOrderTests
     private static BenchmarkSuite Fast(BenchmarkSuite suite) => suite
         .WithIterations(2)
         .WithWarmup(0)
-        .WithOpsPerSample(1);
+        .WithOpsPerSample(1)
+
+        // The fake launcher deliberately returns nothing, which is a worker fault and therefore a
+        // refusal. These tests are about the request that was sent, not about what happens after it
+        // fails, so they accept the fallback rather than the throw it would otherwise produce.
+        .WithRequireIsolation(false);
 
     /// <summary>
     ///     An inline suite's configured order reaches the worker. The suite default is

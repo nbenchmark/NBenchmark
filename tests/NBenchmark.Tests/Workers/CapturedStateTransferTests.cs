@@ -164,7 +164,8 @@ public sealed class CapturedStateTransferTests : IDisposable
     {
         var opaque = new Opaque();
 
-        var result = Benchmark.Run(() => opaque.Use(), FastOptions, name: "opaque");
+        var result = Benchmark.Run(
+            () => opaque.Use(), FastOptions with { RequireIsolation = false }, name: "opaque");
 
         Assert.Equal(IsolationStatus.InProcessCapturedState, result.IsolationStatus);
     }

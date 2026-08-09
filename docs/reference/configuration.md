@@ -757,6 +757,25 @@ Additional suppression knobs: `.WithSuppressBuildConfigurationWarning()` (suite/
 
 This is the proactive counterpart to the statistical noise handling in [Outlier Trimming](../statistics/outliers.md): trimming reacts to noise after the fact; environment control reduces it at the source. See [Environment control](../features/environment-control.md) for the full model, platform notes, and isolated-process propagation.
 
+### RequireIsolation
+
+```csharp
+RequireIsolation = true   // default
+```
+
+Whether an isolation **refusal** fails the run instead of falling back to a labelled host-process measurement.
+
+A refusal is one of the four `IsolationStatus` values that mean "you asked for a worker and could not have one": a capture whose behaviour is not determined by its contents, instances that come from live code in this process, an inline suite with no addressable entry point, or no deployed `nbworker`. The exception names the benchmark, the reason, the remedy, and how to ask for the host process deliberately. In Harness mode it is raised at *discovery* time, before anything is measured, and reports every un-isolatable class at once.
+
+It never gates a deliberate in-process run. `--dry-run`, `--in-process`, `[InProcess]`, `Benchmark.RunInProcess`, `WithIsolation(false)` and `BenchmarkSuite.AddInProcess` all stamp `InProcessRequested`, which is not a refusal.
+
+Set it to `false` to accept labelled fallbacks everywhere - the right setting for scratchpad use, where a number measured here and clearly stamped beats no number at all.
+
+Fluent methods: `.WithRequireIsolation(bool)` on both `BenchmarkSuite` and `BenchmarkHarness`  
+CLI flag: `--strict-isolation` turns it on regardless of what the program configured, and audits the results afterwards as well.
+
+See [When isolation is refused](../features/isolated-runs.md#when-isolation-is-refused).
+
 ## Applying options per-method (Harness mode)
 
 In Harness mode, the `[Benchmark]` attribute accepts per-method overrides that take priority over the host-level options:
