@@ -278,4 +278,94 @@ public class CiWidthDetectorTests
         var detector = new CiWidthDetector(0.95, AutoTuneOptions.Default);
         Assert.True(double.IsNaN(detector.CoefficientOfVariation));
     }
+
+    /// <summary>
+    ///     The stop rule evaluates the half-width on a cadence and stops at the first crossing -
+    ///     optional stopping. Each evaluation is a "look" at the accumulating data, and a CI
+    ///     computed at the nominal level at the stopping look no longer has its nominal coverage,
+    ///     because the loop stopped precisely when the interval happened to be narrow. The post-hoc
+    ///     <see cref="CiWidthDetector.ReportedHalfWidth" /> recomputes the interval on the final
+    ///     array with a Bonferroni-widened critical value over the actual number of looks
+    ///     (<c>t_eff = t_{1 - α/looks, df}</c>), so it is at least as wide as the naive
+    ///     single-look interval. A deterministic moderate-spread stream that resolves after several
+    ///     cadence checks exercises the multi-look case.
+    /// </summary>
+    [Fact]
+    public void ReportedHalfWidth_BonferroniWidensBeyondNaive_AfterMultipleLooks()
+    {
+        var options = AutoTuneOptions.Default with
+        {
+            MinSamples = 10,
+            BatchSize = 2,
+            MaxSamples = 2_000,
+            CiTarget = 0.01,
+        };
+        var detector = new CiWidthDetector(0.95, options);
+
+        var samples = new List<double>();
+        for (var i = 1; i <= 2_000; i++)
+        {
+            var s = 100.0 + 5.0 * Math.Sin(i);
+            samples.Add(s);
+            if (detector.Feed(s, stopAllowed: true))
+                break;
+        }
+
+        Assert.True(detector.Resolved);
+        Assert.True(detector.LookCount >= 2, $"expected multiple looks, got {detector.LookCount}");
+
+        var arr = samples.ToArray();
+        var n = arr.Length;
+        var mean = arr.Average();
+        var stddev = Math.Sqrt(arr.Sum(d => (d - mean) * (d - mean)) / (n - 1));
+        var naive = StudentT.CriticalValue(0.95, n - 1) * stddev / Math.Sqrt(n);
+
+        var postHoc = detector.ReportedHalfWidth(arr);
+
+        Assert.True(double.IsFinite(postHoc));
+        // Bonferroni over >= 2 looks widens the critical value, so the post-hoc interval is at
+        // least the naive one - and strictly wider here, not merely tied.
+        Assert.True(postHoc >= naive, $"post-hoc {postHoc} should be >= naive {naive}");
+        Assert.True(postHoc > naive * 1.05, $"post-hoc {postHoc} should widen beyond naive {naive}");
+    }
+
+    /// <summary>
+    ///     With a single look there is no optional stopping - the loop stopped on the first
+    ///     evaluation, so no repeated-looks bias inflates the family-wise error rate. The post-hoc
+    ///     interval therefore equals the naive nominal one (the Bonferroni factor over one look is
+    ///     the identity), confirming the correction is opt-in to the multi-look case rather than
+    ///     always widening.
+    /// </summary>
+    [Fact]
+    public void ReportedHalfWidth_EqualsNaive_WhenSingleLook()
+    {
+        // A loose target and the first two samples spread apart just enough to have non-zero
+        // variance, but whose relative half-width still falls under the target, resolves on the
+        // very first evaluation (n = 2) - one look.
+        var options = AutoTuneOptions.Default with
+        {
+            MinSamples = 2,
+            BatchSize = 1,
+            MaxSamples = 2_000,
+            CiTarget = 2.0,
+        };
+        var detector = new CiWidthDetector(0.95, options);
+
+        var samples = new List<double> { 90.0, 110.0 };
+        // The first sample (n = 1) is below MinSamples and cannot evaluate; the second (n = 2)
+        // is the first cadence check and resolves immediately - one look.
+        Assert.False(detector.Feed(90.0, stopAllowed: true));
+        Assert.True(detector.Feed(110.0, stopAllowed: true));
+        Assert.Equal(1, detector.LookCount);
+
+        var arr = samples.ToArray();
+        var n = arr.Length;
+        var mean = arr.Average();
+        var stddev = Math.Sqrt(arr.Sum(d => (d - mean) * (d - mean)) / (n - 1));
+        var naive = StudentT.CriticalValue(0.95, n - 1) * stddev / Math.Sqrt(n);
+
+        var postHoc = detector.ReportedHalfWidth(arr);
+
+        Assert.Equal(naive, postHoc, 9);
+    }
 }

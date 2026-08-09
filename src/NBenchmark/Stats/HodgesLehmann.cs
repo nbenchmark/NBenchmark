@@ -18,16 +18,17 @@ public readonly record struct ShiftEstimate(double Value, double Lower, double U
 ///     the candidate is slower, this says <em>by how much</em>, in time units, with an interval.
 /// </summary>
 /// <remarks>
-///     The pairwise-difference set is O(n₁·n₂); to bound cost each group is deterministically
-///     stride-subsampled to at most <see cref="MaxPerGroup" /> values before the differences are
-///     materialised, so a large auto-tuned run stays well under a million differences while the
-///     estimate stays representative.
+///     The pairwise-difference set is O(n₁·n₂) in time and memory, materialised in full on the
+///     same arrays the Mann-Whitney U test sees. Sharing n is what makes the interval's
+///     zero-exclusion agree with the U test's rejection: an earlier stride-subsample to a fixed
+///     cap let the two statistics see different sample sizes, so a wide subsample interval could
+///     cross zero exactly when the higher-power full-n U test rejected - a significant verdict
+///     beside a confidence interval that contradicted it. At the multi-thousand sample counts
+///     auto-tune produces the materialisation is still well under a second; if an extreme n ever
+///     bites, raise a cap on both statistics together rather than reintroducing the split.
 /// </remarks>
 public static class HodgesLehmann
 {
-    /// <summary>The per-group cap applied by deterministic stride subsampling before pairing.</summary>
-    public const int MaxPerGroup = 512;
-
     /// <summary>Minimum samples required in each group.</summary>
     private const int MinPerGroup = 2;
 
@@ -50,8 +51,10 @@ public static class HodgesLehmann
             return null;
         }
 
-        var a = Subsample(baseline, MaxPerGroup);
-        var b = Subsample(candidate, MaxPerGroup);
+        // The full arrays, unchanged: the interval must share n with the Mann-Whitney U test so
+        // its zero-exclusion tracks the U test's rejection (see the class remarks).
+        var a = baseline;
+        var b = candidate;
         var n1 = a.Length;
         var n2 = b.Length;
 
@@ -77,7 +80,8 @@ public static class HodgesLehmann
         // Lehmann large-sample interval: k = floor(mn/2 - z * sigma_U), with sigma_U the
         // tie-corrected Mann-Whitney standard deviation. The interval spans the k-th smallest
         // to the k-th largest difference, so it is symmetric about the median of differences and
-        // excludes zero exactly when the U test rejects at alpha = 1 - confidenceLevel.
+        // excludes zero exactly when the U test rejects at alpha = 1 - confidenceLevel - a
+        // property that holds because both statistics run on the same full arrays above.
         var z = StudentT.NormalQuantile((1.0 + confidenceLevel) / 2.0);
         var sigma = Math.Sqrt(TieCorrectedVariance(a, b));
         var k = (int)Math.Floor(m / 2.0 - z * sigma);
@@ -87,27 +91,6 @@ public static class HodgesLehmann
         var upper = diffs[m - k];
 
         return new ShiftEstimate(hl, lower, upper, confidenceLevel);
-    }
-
-    /// <summary>
-    ///     Deterministically reduces <paramref name="values" /> to at most <paramref name="max" />
-    ///     entries by even striding over arrival order. Returns the input unchanged when it is
-    ///     already within the cap.
-    /// </summary>
-    private static double[] Subsample(double[] values, int max)
-    {
-        if (values.Length <= max)
-            return values;
-
-        var stride = (double)values.Length / max;
-        var result = new double[max];
-
-        for (var i = 0; i < max; i++)
-        {
-            result[i] = values[(int)(i * stride)];
-        }
-
-        return result;
     }
 
     /// <summary>The mid-averaged median of a sorted array (mean of the two central values for even length).</summary>

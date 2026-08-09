@@ -38,7 +38,7 @@ public class UnconstructableClassReportingTests
     {
         var results = await Harness("unconstructable-perclass").RunAsync();
 
-        var rows = results.Where(r => r.ClassName == nameof(UnconstructablePerClassBenchmarks)).ToList();
+        var rows = results.Where(r => r.ClassName == typeof(UnconstructablePerClassBenchmarks).FullName!).ToList();
 
         Assert.Equal(2, rows.Count);
         Assert.All(rows, r => Assert.True(r.Errored, $"'{r.Name}' should be errored"));
@@ -57,7 +57,7 @@ public class UnconstructableClassReportingTests
     {
         var results = await Harness("unconstructable-permethod").RunAsync();
 
-        var rows = results.Where(r => r.ClassName == nameof(UnconstructablePerMethodBenchmarks)).ToList();
+        var rows = results.Where(r => r.ClassName == typeof(UnconstructablePerMethodBenchmarks).FullName!).ToList();
 
         Assert.Equal(2, rows.Count);
         Assert.All(rows, r => Assert.True(r.Errored, $"'{r.Name}' should be errored"));
@@ -73,7 +73,7 @@ public class UnconstructableClassReportingTests
     {
         var results = await Harness("unconstructable-perclass").RunAsync();
 
-        var rows = results.Where(r => r.ClassName == nameof(UnconstructablePerClassBenchmarks)).ToList();
+        var rows = results.Where(r => r.ClassName == typeof(UnconstructablePerClassBenchmarks).FullName!).ToList();
 
         using var error = new StringWriter();
 

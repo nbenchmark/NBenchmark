@@ -382,6 +382,7 @@ public sealed record BenchmarkTable
             ConfidenceIntervalLower = result.ConfidenceIntervalLower,
             ConfidenceIntervalUpper = result.ConfidenceIntervalUpper,
             SignificanceLabel = ComputeSignificanceLabel(result, multiBenchmark),
+            LaunchBlockedVerdict = result.LaunchBlockedVerdict,
             Effect = result.Effect,
             Warnings = result.Warnings,
             Q1 = result.Q1,
@@ -493,9 +494,18 @@ public sealed record BenchmarkTable
 
         if (row.MedianCiLower is { } medianLower && row.MedianCiUpper is { } medianUpper)
         {
+            // With more than one launch this interval is the between-launch reproducibility
+            // interval (the Student-t band over the k launch medians); with one launch it is the
+            // within-launch distribution-free interval the single process measured. The label
+            // says which, so the number is not read as one kind of interval when it is the other.
+            var betweenLaunch = row.LaunchStatistics is { LaunchCount: > 1 };
+            var source = betweenLaunch
+                ? $"between-launch over {row.LaunchStatistics!.LaunchCount} launches"
+                : "distribution-free";
+
             lines.Add(
                 $"Median CI: [{BenchmarkFormatter.FormatNs(medianLower)}; {BenchmarkFormatter.FormatNs(medianUpper)}] "
-                + $"(distribution-free, CI {row.ConfidenceLevel * 100:F1}%)");
+                + $"({source}, CI {row.ConfidenceLevel * 100:F1}%)");
         }
 
         lines.Add($"Margin: ±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}% of Mean)");
@@ -513,6 +523,17 @@ public sealed record BenchmarkTable
             lines.Add(
                 $"Ratio: {ratio.Value:0.00}x [{ratio.FormatInterval()}] "
                 + $"(paired across {ratio.Replicates} launches, CI {ratio.ConfidenceLevel * 100:F1}%){verdict}");
+        }
+
+        if (row.LaunchBlockedVerdict != SignificanceVerdict.NotTested)
+        {
+            // The formal significance companion to the ratio line above: the paired per-launch
+            // Student-t at the run's significance level, reported beside the pooled verdict so a
+            // reproducibility-only difference is named as such rather than read as a code change.
+            // A ✓ here means the launches reproduce the difference; a ✗ means they do not, however
+            // significant the pooled test called it.
+            var label = row.LaunchBlockedVerdict == SignificanceVerdict.Significant ? "✓" : "✗";
+            lines.Add($"Launch verdict: {label} (paired per-launch Student-t)");
         }
 
         lines.Add($"CV: {row.CoefficientOfVariation:F4} ({row.CoefficientOfVariationPercent:F2}%)");
@@ -741,6 +762,14 @@ public record BenchmarkRow
     public required double ConfidenceIntervalUpper { get; init; }
     public long? MeanAllocatedBytes { get; init; }
     public string SignificanceLabel { get; init; } = "";
+
+    /// <summary>
+    ///     The launch-blocked verdict (paired per-launch Student-t) reported alongside the pooled
+    ///     <see cref="SignificanceLabel" />. <see cref="SignificanceVerdict.NotTested" /> for the
+    ///     baseline, single-benchmark tables, single-launch runs, or when significance did not run.
+    /// </summary>
+    public SignificanceVerdict LaunchBlockedVerdict { get; init; } = SignificanceVerdict.NotTested;
+
     public EffectSize? Effect { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
 

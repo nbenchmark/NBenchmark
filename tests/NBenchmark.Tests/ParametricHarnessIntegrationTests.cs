@@ -6,6 +6,8 @@ namespace NBenchmark.Tests;
 [Collection("ConsoleCapture")]
 public class ParametricHarnessIntegrationTests
 {
+    private static readonly string ParametricClassName = typeof(ParametricHarnessBenchmarks).FullName!;
+
     [Fact]
     public async Task RunAsync_Produces_One_Result_Per_BenchmarkCase()
     {
@@ -19,8 +21,8 @@ public class ParametricHarnessIntegrationTests
 
         Assert.Equal(5, results.Count);
 
-        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Compute(n=100)");
-        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Compute(n=1000)");
+        Assert.Contains(results, r => r.Name == $"{ParametricClassName}.Compute(n=100)");
+        Assert.Contains(results, r => r.Name == $"{ParametricClassName}.Compute(n=1000)");
     }
 
     [Fact]
@@ -34,9 +36,9 @@ public class ParametricHarnessIntegrationTests
                 .RunAsync()
         );
 
-        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Multiply(a=2, b=3)");
-        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Multiply(a=5, b=7)");
-        Assert.Contains(results, r => r.Name == "ParametricHarnessBenchmarks.Multiply(a=10, b=20)");
+        Assert.Contains(results, r => r.Name == $"{ParametricClassName}.Multiply(a=2, b=3)");
+        Assert.Contains(results, r => r.Name == $"{ParametricClassName}.Multiply(a=5, b=7)");
+        Assert.Contains(results, r => r.Name == $"{ParametricClassName}.Multiply(a=10, b=20)");
     }
 
     [Fact]
@@ -52,7 +54,7 @@ public class ParametricHarnessIntegrationTests
         );
 
         Assert.Single(results);
-        Assert.Equal("ParametricHarnessBenchmarks.Compute(n=100)", results[0].Name);
+        Assert.Equal($"{ParametricClassName}.Compute(n=100)", results[0].Name);
     }
 
     [Fact]
@@ -69,7 +71,7 @@ public class ParametricHarnessIntegrationTests
         );
 
         Assert.Single(results);
-        Assert.Equal("ParametricHarnessBenchmarks.Multiply(a=10, b=20)", results[0].Name);
+        Assert.Equal($"{ParametricClassName}.Multiply(a=10, b=20)", results[0].Name);
     }
 
     [Fact]
@@ -102,17 +104,17 @@ public class ParametricHarnessIntegrationTests
                 .RunAsync()
         );
 
-        var compute100 = results.First(r => r.Name == "ParametricHarnessBenchmarks.Compute(n=100)");
+        var compute100 = results.First(r => r.Name == $"{ParametricClassName}.Compute(n=100)");
         Assert.Single(compute100.ParameterSet);
         Assert.Equal("n", compute100.ParameterSet[0].Name);
         Assert.Equal(100, compute100.ParameterSet[0].Value);
 
-        var compute1000 = results.First(r => r.Name == "ParametricHarnessBenchmarks.Compute(n=1000)");
+        var compute1000 = results.First(r => r.Name == $"{ParametricClassName}.Compute(n=1000)");
         Assert.Single(compute1000.ParameterSet);
         Assert.Equal("n", compute1000.ParameterSet[0].Name);
         Assert.Equal(1000, compute1000.ParameterSet[0].Value);
 
-        var multiply = results.First(r => r.Name == "ParametricHarnessBenchmarks.Multiply(a=2, b=3)");
+        var multiply = results.First(r => r.Name == $"{ParametricClassName}.Multiply(a=2, b=3)");
         Assert.Equal(2, multiply.ParameterSet.Count);
         Assert.Equal("a", multiply.ParameterSet[0].Name);
         Assert.Equal(2, multiply.ParameterSet[0].Value);

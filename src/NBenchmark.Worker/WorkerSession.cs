@@ -485,16 +485,28 @@ internal sealed class WorkerSession(FrameChannel channel)
         // would then own a second copy of.
         var renamed = new List<BenchmarkResult>(outcome.Results.Count);
         var samplesByName = new Dictionary<string, double[]>(StringComparer.Ordinal);
+        var simplePrefix = suite.Type.Name;
+        var qualifiedPrefix = suite.Type.FullName ?? suite.Type.Name;
+
+        var requestedNameByMeasuredName = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var (_, _, displayName) in resolvedMethods)
+        {
+            // Discovery historically emitted "<TypeName>.<DisplayName>" and now emits
+            // "<TypeFullName>.<DisplayName>" for discovered paths. Test-method callers own the
+            // display name, so map either form back to the caller-provided name.
+            requestedNameByMeasuredName[$"{simplePrefix}.{displayName}"] = displayName;
+            requestedNameByMeasuredName[$"{qualifiedPrefix}.{displayName}"] = displayName;
+            requestedNameByMeasuredName[displayName] = displayName;
+        }
 
         foreach (var result in outcome.Results)
         {
             var samples = outcome.RawSamples.GetValueOrDefault(result.Name, []);
 
-            var requestedName = resolvedMethods
-                .Select(m => m.DisplayName)
-                .FirstOrDefault(name => result.Name == $"{suite.Type.Name}.{name}");
-
-            var final = requestedName is null ? result : result with { Name = requestedName };
+            var final = requestedNameByMeasuredName.TryGetValue(result.Name, out var requestedName)
+                ? result with { Name = requestedName }
+                : result;
 
             renamed.Add(final);
             samplesByName[final.Name] = samples;

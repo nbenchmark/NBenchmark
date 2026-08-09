@@ -59,7 +59,7 @@ public class AutoIsolationFallbackTests
 
         Assert.Empty(scope.Launcher.Requests);
 
-        var classResults = results.Where(r => r.ClassName == "FactoryNoResetBenchmarks").ToList();
+        var classResults = results.Where(r => r.ClassName == typeof(FactoryNoResetBenchmarks).FullName!).ToList();
         Assert.Equal(2, classResults.Count);
 
         // The provenance is on every result, so it survives even if the console message scrolls by.
@@ -166,7 +166,7 @@ public class AutoIsolationFallbackTests
         // And the rows say why, because a lifetime the user did not ask for is a fact about their
         // measurement rather than an implementation detail.
         Assert.All(
-            results.Where(r => r.ClassName == "AddressableFactoryPerClassBenchmarks"),
+            results.Where(r => r.ClassName == typeof(AddressableFactoryPerClassBenchmarks).FullName!),
             r => Assert.Contains(r.Warnings, w => w.Contains("fresh instance per method", StringComparison.Ordinal)));
     }
 
@@ -216,7 +216,7 @@ public class AutoIsolationFallbackTests
         var results = await harness.RunAsync();
 
         Assert.All(
-            results.Where(r => r.ClassName == "AddressableFactoryPerClassBenchmarks"),
+            results.Where(r => r.ClassName == typeof(AddressableFactoryPerClassBenchmarks).FullName!),
             r => Assert.Contains(r.Warnings, w => w.Contains("fresh instance per method", StringComparison.Ordinal)));
     }
 

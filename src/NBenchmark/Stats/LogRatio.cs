@@ -98,6 +98,16 @@ public static class LogRatio
     ///     third and report the difference between two processes as a property of the code.
     /// </remarks>
     public static RatioEstimate? Estimate(BenchmarkResult candidate, BenchmarkResult baseline)
+        => Estimate(candidate, baseline, candidate.ConfidenceLevel);
+
+    /// <summary>
+    ///     The paired ratio between two results, taken from the per-launch detail they carry, at a
+    ///     caller-chosen confidence level - the run's significance level (<c>1 - alpha</c>) for the
+    ///     launch-blocked verdict, rather than the measurement confidence level the display ratio
+    ///     uses. See <see cref="Estimate(NBenchmark.BenchmarkResult,NBenchmark.BenchmarkResult)" />
+    ///     for the matching semantics; this overload only replaces the level.
+    /// </summary>
+    public static RatioEstimate? Estimate(BenchmarkResult candidate, BenchmarkResult baseline, double confidenceLevel)
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(baseline);
@@ -118,7 +128,7 @@ public static class LogRatio
         return Estimate(
             paired.Select(l => l.Median).ToList(),
             paired.Select(l => baselineByIndex[l.LaunchIndex]).ToList(),
-            candidate.ConfidenceLevel);
+            confidenceLevel);
     }
 
     /// <summary>

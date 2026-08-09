@@ -29,17 +29,19 @@ public class HarnessModePerClassSignificanceTests
         using (FakeWorkerLauncher.Install(SimulateWorkerGroup))
         {
             var results = await harness.RunAsync();
+            var alphaClassName = typeof(AlphaBenchmarks).FullName!;
+            var betaClassName = typeof(BetaBenchmarks).FullName!;
 
             Assert.Equal(5, results.Count);
 
-            var alphaResults = results.Where(r => r.ClassName == "AlphaBenchmarks").ToList();
-            var betaResults = results.Where(r => r.ClassName == "BetaBenchmarks").ToList();
+            var alphaResults = results.Where(r => r.ClassName == alphaClassName).ToList();
+            var betaResults = results.Where(r => r.ClassName == betaClassName).ToList();
 
             Assert.Equal(2, alphaResults.Count);
             Assert.Equal(3, betaResults.Count);
 
             var alphaBaseline = alphaResults.Single(r => r.IsBaseline);
-            Assert.Equal("AlphaBenchmarks.AlphaFast", alphaBaseline.Name);
+            Assert.Equal($"{alphaClassName}.AlphaFast", alphaBaseline.Name);
 
             var alphaSlow = alphaResults.Single(r => !r.IsBaseline);
 
@@ -49,7 +51,7 @@ public class HarnessModePerClassSignificanceTests
             Assert.NotNull(alphaSlow.Effect);
 
             var betaBaseline = betaResults.Single(r => r.IsBaseline);
-            Assert.Equal("BetaBenchmarks.BetaSmall", betaBaseline.Name);
+            Assert.Equal($"{betaClassName}.BetaSmall", betaBaseline.Name);
 
             foreach (var candidate in betaResults.Where(r => !r.IsBaseline))
             {
@@ -83,6 +85,8 @@ public class HarnessModePerClassSignificanceTests
         using (FakeWorkerLauncher.Install(SimulateWorkerGroup))
         {
             var results = await harness.RunAsync();
+            var alphaFastName = $"{typeof(AlphaBenchmarks).FullName!}.AlphaFast";
+            var betaSmallName = $"{typeof(BetaBenchmarks).FullName!}.BetaSmall";
 
             Assert.Equal(5, results.Count);
 
@@ -92,13 +96,13 @@ public class HarnessModePerClassSignificanceTests
             // candidate compared against AlphaFast rather than its own class baseline.
             var baselines = results.Where(r => r.IsBaseline).ToList();
             Assert.Equal(2, baselines.Count);
-            Assert.Contains(baselines, r => r.Name == "AlphaBenchmarks.AlphaFast");
-            Assert.Contains(baselines, r => r.Name == "BetaBenchmarks.BetaSmall");
+            Assert.Contains(baselines, r => r.Name == alphaFastName);
+            Assert.Contains(baselines, r => r.Name == betaSmallName);
 
             // BetaSmall was a per-class baseline (median 100, same as AlphaFast). In
             // cross-class mode it is compared against AlphaFast and should be NotSignificant
             // (identical distributions).
-            var betaSmall = results.Single(r => r.Name == "BetaBenchmarks.BetaSmall");
+            var betaSmall = results.Single(r => r.Name == betaSmallName);
             Assert.Equal(SignificanceVerdict.NotSignificant, betaSmall.SignificanceVerdict);
 
             // The genuinely slower benchmarks should be significant versus the global baseline.
@@ -170,7 +174,7 @@ public class HarnessModePerClassSignificanceTests
         string prefix,
         string displayName)
     {
-        if (prefix == "AlphaBenchmarks")
+        if (prefix == typeof(AlphaBenchmarks).FullName)
         {
             return displayName switch
             {

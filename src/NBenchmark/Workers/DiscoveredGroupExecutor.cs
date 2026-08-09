@@ -107,9 +107,10 @@ internal static class DiscoveredGroupExecutor
             else
             {
                 var factory = () => instance;
+                var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
 
                 var envelopes = selected
-                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
+                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, qualifiedClassName, factory))
                     .ToList();
 
                 Func<Task>? betweenBenchmarksReset = InstanceIndependence.ResetsItself(suite.Type)
@@ -164,6 +165,7 @@ internal static class DiscoveredGroupExecutor
         var results = new List<BenchmarkResult>();
         var samples = new Dictionary<string, double[]>();
         var ordered = RunOrdering.Apply(selected, order, seed);
+        var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
 
         for (var index = 0; index < ordered.Count; index++)
         {
@@ -188,7 +190,7 @@ internal static class DiscoveredGroupExecutor
                 }
 
                 var factory = () => instance;
-                var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
+                var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, qualifiedClassName, factory);
 
                 var (batchResults, batchSamples) = await SuiteRunner.RunAsync(
                         [envelope], RunOrder.Declaration, null, options,

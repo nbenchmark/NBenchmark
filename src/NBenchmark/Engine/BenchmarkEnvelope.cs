@@ -92,6 +92,32 @@ internal sealed record BenchmarkEnvelope(
     /// </summary>
     public bool HasIterationHooks => IterationSetup is not null || IterationTeardown is not null;
 
+    /// <summary>
+    ///     The class identifier used for discovered-benchmark result rows.
+    /// </summary>
+    /// <remarks>
+    ///     A simple type name collides for classes with the same name in different namespaces,
+    ///     which then aliases significance/sample keys and class-level partitions. FullName keeps
+    ///     those rows distinct while preserving a fallback for the rare runtime type whose
+    ///     FullName is null.
+    /// </remarks>
+    internal static string QualifiedDiscoveredClassName(Type declaringType)
+    {
+        ArgumentNullException.ThrowIfNull(declaringType);
+        return declaringType.FullName ?? declaringType.Name;
+    }
+
+    /// <summary>
+    ///     The discovered benchmark identifier used for result and sample keys.
+    /// </summary>
+    internal static string QualifiedDiscoveredBenchmarkName(Type declaringType, string displayName)
+    {
+        ArgumentNullException.ThrowIfNull(declaringType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+
+        return $"{QualifiedDiscoveredClassName(declaringType)}.{displayName}";
+    }
+
     public static BenchmarkEnvelope FromDiscovered(
         BenchmarkMethodDefinition method,
         string className,

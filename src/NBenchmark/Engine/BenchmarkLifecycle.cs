@@ -65,12 +65,16 @@ internal static class BenchmarkLifecycle
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Console.WriteLine($"[Error] Setup failed for {suite.Type.Name}: {ex.Message}");
+            var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
 
             var errored = suite.Benchmarks
                 .Select(b =>
                     OutcomeBuilder.Build(
                         new RunOutcome.Errored(ex, $"Suite setup failed: {ex.Message}"),
-                        $"{suite.Type.Name}.{b.DisplayName}", suite.Type.Name, b.Attribute.Description, b.IsBaseline,
+                        BenchmarkEnvelope.QualifiedDiscoveredBenchmarkName(suite.Type, b.DisplayName),
+                        qualifiedClassName,
+                        b.Attribute.Description,
+                        b.IsBaseline,
                         suiteOptions, TimeSpan.Zero, TimeSpan.Zero).Result)
                 .ToList();
 

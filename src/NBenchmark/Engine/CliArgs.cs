@@ -90,6 +90,14 @@ internal sealed record CliArgs
     /// </summary>
     public double? MinPracticalEffect { get; init; }
 
+    /// <summary>
+    ///     The minimum relative median shift [0, 1] a change must reach to keep a significant
+    ///     verdict, gated alongside <see cref="MinPracticalEffect" />. <c>null</c> uses the
+    ///     <see cref="MeasurementOptions" /> default (0.01); <c>0</c> disables the relative-shift
+    ///     gate.
+    /// </summary>
+    public double? MinRelativeShift { get; init; }
+
     public int? OpsPerSample { get; init; }
 
     public AutoTunePreset? AutoTunePreset { get; init; }
@@ -289,6 +297,7 @@ internal sealed record CliArgs
         bool? noAllocations = null;
         var noGcBetweenBenchmarks = false;
         double? minPracticalEffect = null;
+        double? minRelativeShift = null;
         DiagnosticsMode? diagnostics = null;
         int? opsPerSample = null;
         AutoTunePreset? autoTunePreset = null;
@@ -496,6 +505,13 @@ internal sealed record CliArgs
                         minPracticalEffect = mpe;
                     else
                         errors.Add($"Invalid --min-practical-effect value '{args[i]}'. Must be a fraction in [0, 1] (0 restores p-value-only verdicts).");
+
+                    break;
+                case "--min-relative-shift" when i + 1 < args.Length:
+                    if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var mrs) && mrs is >= 0 and <= 1)
+                        minRelativeShift = mrs;
+                    else
+                        errors.Add($"Invalid --min-relative-shift value '{args[i]}'. Must be a fraction in [0, 1] (0 disables the relative-shift gate).");
 
                     break;
                 case "--diagnostics" when i + 1 < args.Length:
@@ -752,6 +768,7 @@ internal sealed record CliArgs
                     or "--jit-quiet-period" or "--min-measurement-time" or "--drift-tolerance"
                     or "--max-drift-restarts"
                     or "--launch-count" or "--percentiles" or "--runtimes" or "--min-practical-effect"
+                    or "--min-relative-shift"
                     or "--cpu-affinity" or "--priority" or "--otlp-endpoint" or "--diagnostics":
                     // Every flag whose case above is guarded by `when i + 1 < args.Length` belongs
                     // here, or it falls through to `default` and a user who simply forgot the value is
@@ -796,6 +813,7 @@ internal sealed record CliArgs
             NoAllocations = noAllocations,
             NoGcBetweenBenchmarks = noGcBetweenBenchmarks,
             MinPracticalEffect = minPracticalEffect,
+            MinRelativeShift = minRelativeShift,
             Diagnostics = diagnostics,
             OpsPerSample = opsPerSample,
             AutoTunePreset = autoTunePreset,
@@ -980,7 +998,7 @@ internal sealed record CliArgs
         "--emit-raw", "--exclude-category", "--filter", "--force-gc", "--help", "--in-process",
         "--iterations", "--jit-quiet-period", "--launch-count", "--list", "--max-drift-restarts",
         "--max-samples", "--max-tuning-time", "--max-warmup", "--min-measurement-time",
-        "--min-practical-effect", "--min-samples", "--min-warmup", "--min-warmup-time",
+        "--min-practical-effect", "--min-relative-shift", "--min-samples", "--min-warmup", "--min-warmup-time",
         "--no-allocations", "--no-gc-between-benchmarks", "--no-histogram", "--no-jit-quiescence",
         "--no-samples", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint", "--outlier",
         "--output", "--percentiles", "--priority", "--profile", "--reporter", "--runtime-profile",
@@ -1051,6 +1069,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --no-allocations       Disable allocation tracking (overrides profile)");
         Console.WriteLine("  --no-gc-between-benchmarks  Disable the full GC between benchmarks (on by default for both profiles)");
         Console.WriteLine("  --min-practical-effect <0-1>  Min practical effect for a significant verdict (default: 0.147; 0 = p-value only)");
+        Console.WriteLine("  --min-relative-shift <0-1>   Min relative median shift for a significant verdict (default: 0.01; 0 = off)");
         Console.WriteLine("  --diagnostics <mode>   Runtime diagnostics: none, gc, gcandcpu, all (default: gc)");
         Console.WriteLine("  --cpu-affinity <list>  Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)");
         Console.WriteLine("  --priority <level>     Process priority: normal, idle, belownormal, abovenormal, high, realtime");

@@ -27,6 +27,49 @@ public static class ThresholdCheck
     }
 
     /// <summary>
+    ///     Returns the regressed benchmark names across a run that may mix comparison groups
+    ///     and classes, evaluating the gate once per <see cref="ComparisonGroup" /> partition
+    ///     <i>and</i> per benchmark class. A candidate is only ever flagged against a baseline
+    ///     measured under the same runtime and runtime profile in the same class.
+    ///     <para>
+    ///         This is the entry point the engine's <c>--threshold-pct</c> exit-code gate uses,
+    ///         because a run's <c>allResults</c> is the union of every class and (under
+    ///         <c>--runtime-profile host</c> or a mixed isolated/in-process run) every
+    ///         configuration. Feeding that list to <see cref="HasRegression" /> directly picks
+    ///         the fastest row overall as the implicit baseline: an in-process row is typically
+    ///         ~3.3x faster than an isolated one purely from configuration, and an unrelated
+    ///         benchmark in a different class is not this class's reference, so both fabricate
+    ///         regressions. Partitioning prevents either comparison from being formed.
+    ///     </para>
+    /// </summary>
+    public static (bool HasRegression, IReadOnlyList<string> RegressedNames) HasRegressionAcrossGroups(
+        IReadOnlyList<BenchmarkResult> results, int thresholdPct)
+    {
+        if (thresholdPct <= 0)
+            throw new ArgumentOutOfRangeException(nameof(thresholdPct), "Must be a positive integer (1 or greater).");
+
+        var regressed = new List<string>();
+        foreach (var partition in results.GroupBy(PartitionKey))
+        {
+            if (Check(partition.ToList(), thresholdPct) is { HasRegression: true } verdict)
+                regressed.AddRange(verdict.RegressedNames);
+        }
+
+        regressed.Sort(StringComparer.Ordinal);
+        return (regressed.Count > 0, regressed);
+    }
+
+    /// <summary>
+    ///     The partition a result belongs to for the threshold gate: its comparison group
+    ///     (runtime moniker + runtime profile, via <see cref="ComparisonGroup.KeyFor" />) and
+    ///     its declaring class. Results with equal partition keys are comparable; results that
+    ///     differ on either dimension are never compared.
+    /// </summary>
+    private static ((string RuntimeMoniker, string RuntimeProfileName, bool Isolated), string ClassName) PartitionKey(
+        BenchmarkResult result)
+        => (ComparisonGroup.KeyFor(result), result.ClassName);
+
+    /// <summary>
     ///     Returns a <see cref="RegressionVerdict" /> carrying the baseline, the regressed
     ///     candidates with their ratio and delta against the baseline, and the sorted
     ///     regressed names. Use this overload when the caller needs the structured per-benchmark
@@ -43,9 +86,9 @@ public static class ThresholdCheck
             return RegressionVerdict.None;
 
         var baseline = successful.FirstOrDefault(r => r.IsBaseline)
-                       ?? successful.MinBy(ComparisonMedian)!;
+                       ?? successful.MinBy(ComparisonGroup.ComparisonMedian)!;
 
-        var baselineMedian = ComparisonMedian(baseline);
+        var baselineMedian = ComparisonGroup.ComparisonMedian(baseline);
 
         var regressedCandidates = new List<RegressionCandidate>();
         var regressedNames = new List<string>();
@@ -56,7 +99,7 @@ public static class ThresholdCheck
             for (var i = 0; i < successful.Count; i++)
             {
                 var result = successful[i];
-                var candidateMedian = ComparisonMedian(result);
+                var candidateMedian = ComparisonGroup.ComparisonMedian(result);
 
                 if (ReferenceEquals(result, baseline))
                     continue;
@@ -75,7 +118,7 @@ public static class ThresholdCheck
             for (var i = 0; i < successful.Count; i++)
             {
                 var result = successful[i];
-                var candidateMedian = ComparisonMedian(result);
+                var candidateMedian = ComparisonGroup.ComparisonMedian(result);
 
                 if (ReferenceEquals(result, baseline))
                     continue;
@@ -114,9 +157,6 @@ public static class ThresholdCheck
             regressedCandidates,
             regressedNames);
     }
-
-    private static double ComparisonMedian(BenchmarkResult result)
-        => result.LaunchStatistics?.LaunchMedian ?? result.Median;
 }
 
 /// <summary>

@@ -236,11 +236,12 @@ internal static class WorkerRunPlan
         InstanceLifetime? instanceLifetimeOverride = null)
     {
         ArgumentNullException.ThrowIfNull(declaringType);
+        var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(declaringType);
 
         return WithStrategies(
             new RunGroupPayload
             {
-                GroupId = $"{declaringType.FullName}#{replicate}",
+                GroupId = $"{qualifiedClassName}#{replicate}",
                 Kind = WorkGroupKind.DiscoveredClass,
                 TargetAssemblyPath = declaringType.Assembly.Location,
                 DeclaringTypeFullName = declaringType.FullName,
@@ -249,7 +250,7 @@ internal static class WorkerRunPlan
                 Options = options,
                 Order = order,
                 Seed = DeriveSeed(sessionSeed, replicate),
-                DisplayPrefix = declaringType.Name,
+                DisplayPrefix = qualifiedClassName,
                 DefaultInstanceLifetime = defaultInstanceLifetime,
                 InstanceLifetimeOverride = instanceLifetimeOverride,
                 StartIndex = startIndex,

@@ -44,6 +44,57 @@ public class SignificanceTests
         Assert.Equal(SignificanceVerdict.Significant, results[1].SignificanceVerdict);
     }
 
+    /// <summary>
+    ///     <see cref="Significance.ComputeSignificance" /> is public, so a caller can hand it a list
+    ///     with two successful results sharing a <see cref="BenchmarkResult.Name" />. The sample
+    ///     lookup, group construction and write-back all key on <c>Name</c>, so a collision either
+    ///     collapses two benchmarks onto one sample set (silent corruption) or surfaces later as an
+    ///     opaque <c>"An item with the same key has already been added"</c> from the write-back
+    ///     dictionary. The entry point must refuse the input with a message that names the duplicate
+    ///     and points at the remedy, rather than corrupting the comparison or throwing opaquely.
+    /// </summary>
+    [Fact]
+    public void ComputeSignificance_Throws_On_Duplicate_Names()
+    {
+        var firstSamples = Enumerable.Range(0, 50).Select(_ => (double)100).ToArray();
+        var secondSamples = Enumerable.Range(0, 50).Select(_ => (double)80).ToArray();
+
+        // Two successful results share the name "Dupe" - the collision the guard must catch.
+        var results = new List<BenchmarkResult>
+        {
+            new()
+            {
+                Name = "Dupe", Mean = 100, Median = 100, Percentiles = [],
+                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+            },
+            new()
+            {
+                Name = "Dupe", Mean = 80, Median = 80, Percentiles = [],
+                Min = 70, Max = 100, StandardDeviation = 5, IsBaseline = false,
+                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
+                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+            },
+        };
+
+        var rawSamples = new Dictionary<string, double[]>
+        {
+            ["Dupe"] = firstSamples,
+            // A caller that has already collapsed the two benchmarks into one keyed entry is the
+            // corruption case; the guard must fire before the sample lookup can paper over it.
+            ["Dupe#2"] = secondSamples,
+        };
+
+        var ex = Assert.Throws<ArgumentException>(
+            () => Significance.ComputeSignificance(results, rawSamples));
+
+        // The message must name the colliding benchmark and steer the user at the remedy, rather
+        // than the framework's generic duplicate-key text.
+        Assert.Contains("Dupe", ex.Message);
+        Assert.Contains("unique", ex.Message);
+    }
+
     [Fact]
     public void ComputeSignificance_Populates_Median_Shift_On_Candidate()
     {

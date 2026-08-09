@@ -12,6 +12,19 @@ namespace NBenchmark.Engine.Detectors;
 ///     The half-width is computed on the raw (untrimmed) stream, which is a conservative signal -
 ///     raw variance is at least trimmed variance - so the loop may take a few extra samples but
 ///     never stops too early. The reported interval is computed separately on the trimmed samples.
+///     <para>
+///         <b>Optional stopping.</b> The stop rule evaluates the half-width on a cadence and stops
+///         at the first crossing, so each evaluation is a "look" at the accumulating data. A CI
+///         computed at the nominal confidence level at the stopping look no longer has its nominal
+///         coverage, because the loop stopped precisely when the interval happened to be narrow -
+///         the classic optional-stopping bias. The stop rule itself is unchanged (it remains the
+///         cheap online gate); <see cref="ReportedHalfWidth" /> recomputes the reported interval
+///         post-hoc on the final trimmed array with a Bonferroni-widened critical value over the
+///         actual number of looks (<c>t_eff = t_{1 - α/looks, df}</c>), restoring conservative
+///         coverage. Bonferroni over the per-cadence look count is deliberately conservative; a
+///         Pocock or O'Brien-Fleming boundary is a lighter-touch alternative when it proves too
+///         wide in practice.
+///     </para>
 /// </remarks>
 internal sealed class CiWidthDetector
 {
@@ -54,6 +67,15 @@ internal sealed class CiWidthDetector
     ///     post-loop scalar is computed from the complete trimmed-or-untrimmed array.
     /// </summary>
     public IReadOnlyList<double> HalfWidthSeries => _halfWidthSeries;
+
+    /// <summary>
+    ///     The number of half-width evaluations performed - the "looks" at the accumulating data
+    ///     that drive the optional-stopping bias. Each successful evaluation appends one entry to
+    ///     <see cref="HalfWidthSeries" />, so this is the count of cadence/ceiling checks that
+    ///     produced a finite half-width. <see cref="ReportedHalfWidth" /> widens its critical value
+    ///     over this count.
+    /// </summary>
+    public int LookCount => _halfWidthSeries.Count;
 
     /// <summary>The number of measured samples fed so far.</summary>
     public long Count { get; private set; }
@@ -145,5 +167,50 @@ internal sealed class CiWidthDetector
         AchievedRelativeHalfWidth = t * standardError / Mean;
         _halfWidthSeries.Add(AchievedRelativeHalfWidth);
         return true;
+    }
+
+    /// <summary>
+    ///     The post-hoc reported half-width on the final (trimmed) sample array, widened for the
+    ///     optional-stopping bias introduced by evaluating the half-width on a cadence and stopping
+    ///     at the first crossing. Recomputes the interval on <paramref name="trimmedSamples" /> with
+    ///     a Bonferroni-widened critical value over <see cref="LookCount" />
+    ///     (<c>t_eff = t_{1 - α/looks, df}</c>), so it is at least as wide as the naive nominal
+    ///     interval at the stopping look. The stop rule itself is unchanged; only the reported
+    ///     interval is corrected. With one look there is no optional stopping and the result equals
+    ///     the naive interval.
+    /// </summary>
+    /// <param name="trimmedSamples">
+    ///     The final post-trim sample array. Statistics are recomputed on it (not read from the
+    ///     Welford accumulator, which runs on the raw stream) so the corrected interval describes
+    ///     the same population the reported median and mean do.
+    /// </param>
+    /// <returns>
+    ///     The Bonferroni-widened absolute half-width (margin of error), or <see cref="double.NaN" />
+    ///     when fewer than two samples are supplied, the mean is non-positive, or the critical value
+    ///     is undefined at the requested degrees of freedom.
+    /// </returns>
+    public double ReportedHalfWidth(double[] trimmedSamples)
+    {
+        ArgumentNullException.ThrowIfNull(trimmedSamples);
+
+        var n = trimmedSamples.Length;
+        if (n < 2)
+            return double.NaN;
+
+        var mean = trimmedSamples.Average();
+        if (mean <= 0)
+            return double.NaN;
+
+        var variance = trimmedSamples.Sum(d => (d - mean) * (d - mean)) / (n - 1);
+        var standardError = Math.Sqrt(variance / n);
+
+        // Bonferroni over the look count: split the family-wise error rate across the looks so the
+        // per-look α becomes α/looks, i.e. the effective confidence level rises to 1 - α/looks.
+        // Max(1, _) makes the single-look case the identity (no widening, no optional stopping).
+        var looks = Math.Max(1, LookCount);
+        var effectiveConfidenceLevel = 1.0 - (1.0 - _confidenceLevel) / looks;
+        var t = StudentT.CriticalValue(effectiveConfidenceLevel, n - 1);
+
+        return double.IsNaN(t) ? double.NaN : t * standardError;
     }
 }

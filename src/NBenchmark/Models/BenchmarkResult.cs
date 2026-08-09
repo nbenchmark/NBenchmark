@@ -135,6 +135,22 @@ public record BenchmarkResult
     public SignificanceVerdict SignificanceVerdict { get; init; }
 
     /// <summary>
+    ///     The verdict of the <b>launch-blocked</b> paired test on the per-launch medians, reported
+    ///     alongside the pooled <see cref="SignificanceVerdict" />.
+    ///     <para>
+    ///         The pooled verdict runs on every raw sample concatenated across launches, so it
+    ///         inherits the power of the pooled count and flags a between-launch location offset at
+    ///         full n regardless of whether the code differs. The launch-blocked verdict reuses
+    ///         <see cref="LogRatio.Estimate(NBenchmark.BenchmarkResult,NBenchmark.BenchmarkResult)" />
+    ///         - a one-sample Student-t on the per-launch log-ratios over the k paired launches - so
+    ///         it answers the question a reader is actually asking: does the difference reproduce
+    ///         across launches, or is it a single process draw read as a code change?
+    ///         <c>NotTested</c> when fewer than two launches can be paired (single-launch runs).
+    ///     </para>
+    /// </summary>
+    public SignificanceVerdict LaunchBlockedVerdict { get; init; }
+
+    /// <summary>
     ///     Optional effect-size payload produced by the active significance strategy.
     ///     Built-in Mann-Whitney strategies populate this with Cliff's delta and a
     ///     Romano magnitude label.

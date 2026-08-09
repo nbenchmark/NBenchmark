@@ -369,7 +369,7 @@ internal static class WorkerGroupRunner
             var name = Qualify(displayPrefix, fault.BenchmarkName!);
 
             if (reported.Add(name))
-                errored.Add(ErroredResult(name, fault.Message));
+                errored.Add(ErroredResult(name, displayPrefix, fault.Message));
         }
 
         // An unnamed fault is the group's, so every benchmark the worker never reported gets it.
@@ -382,7 +382,7 @@ internal static class WorkerGroupRunner
                 var name = Qualify(displayPrefix, expected);
 
                 if (reported.Add(name))
-                    errored.Add(ErroredResult(name, groupFault.Message));
+                    errored.Add(ErroredResult(name, displayPrefix, groupFault.Message));
             }
         }
 
@@ -396,9 +396,13 @@ internal static class WorkerGroupRunner
     ///     A placeholder row for a benchmark that could not be measured, carrying the reason. Shared
     ///     so every path reports a failure the same way rather than silently dropping the line.
     /// </summary>
-    internal static BenchmarkResult ErroredResult(string name, string message) => new()
+    internal static BenchmarkResult ErroredResult(string name, string message)
+        => ErroredResult(name, ClassNameFrom(name), message);
+
+    internal static BenchmarkResult ErroredResult(string name, string className, string message) => new()
     {
         Name = name,
+        ClassName = className,
         Mean = 0,
         Median = 0,
         Percentiles = [],
@@ -419,4 +423,10 @@ internal static class WorkerGroupRunner
         Errored = true,
         ErrorMessage = message,
     };
+
+    private static string ClassNameFrom(string name)
+    {
+        var separator = name.LastIndexOf('.');
+        return separator <= 0 ? "" : name[..separator];
+    }
 }

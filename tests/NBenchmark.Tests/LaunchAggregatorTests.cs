@@ -256,6 +256,44 @@ public class LaunchAggregatorTests
     }
 
     /// <summary>
+    ///     With more than one launch the row's median confidence interval must describe
+    ///     reproducibility <i>between</i> launches - the Student-t interval over the k launch
+    ///     medians, the same machinery the margin uses - not the average of each launch's own
+    ///     within-launch (distribution-free) interval. Averaging the within-launch intervals
+    ///     printed a narrow band around the mean that described precision inside one process while
+    ///     saying nothing about run-to-run spread, beside a margin line that already described the
+    ///     spread: two intervals about the same number with no label to tell them apart.
+    /// </summary>
+    [Fact]
+    public void Combine_MedianIntervalIsBetweenLaunch_WhenMultipleLaunches()
+    {
+        // Three launches with medians 100, 200, 300. Each carries its own narrow within-launch
+        // median CI of [median - 1, median + 1]; averaging those would yield [199, 201], a
+        // within-process band that hides the 200 ns run-to-run spread entirely.
+        var launches = new[]
+        {
+            Launch(CreateResult("test", 100, 100, 0.1, 100) with { MedianCiLower = 99, MedianCiUpper = 101 }),
+            Launch(CreateResult("test", 200, 200, 0.1, 100) with { MedianCiLower = 199, MedianCiUpper = 201 }),
+            Launch(CreateResult("test", 300, 300, 0.1, 100) with { MedianCiLower = 299, MedianCiUpper = 301 }),
+        };
+
+        var combined = LaunchAggregator.Combine(launches);
+
+        // The interval is the between-launch one: median +/- the between-launch margin, not the
+        // averaged within-launch [199, 201].
+        Assert.NotNull(combined.MedianCiLower);
+        Assert.NotNull(combined.MedianCiUpper);
+        Assert.Equal(combined.Median - combined.MarginOfError, combined.MedianCiLower!.Value, 6);
+        Assert.Equal(combined.Median + combined.MarginOfError, combined.MedianCiUpper!.Value, 6);
+
+        // And it is wide - it must span the run-to-run spread, not the 2 ns within-launch band
+        // the averaging would have produced.
+        Assert.True(
+            combined.MedianCiUpper!.Value - combined.MedianCiLower!.Value > 100,
+            $"expected a between-launch interval spanning the spread, got [{combined.MedianCiLower}, {combined.MedianCiUpper}]");
+    }
+
+    /// <summary>
     ///     The combined interval is computed at the confidence level the launches were measured at,
     ///     not at a hardcoded 95%.
     /// </summary>

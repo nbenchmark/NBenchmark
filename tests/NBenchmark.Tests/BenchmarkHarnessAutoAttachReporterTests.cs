@@ -6,6 +6,8 @@ namespace NBenchmark.Tests;
 [Collection("ConsoleCapture")]
 public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
 {
+    private static readonly string TestBenchmarksClassName = typeof(TestBenchmarks).FullName!;
+
     public BenchmarkHarnessAutoAttachReporterTests()
     {
         ReporterRegistry.Reset();
@@ -30,8 +32,8 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
 
         var names = capturing.Results.Select(r => r.Name).ToList();
         Assert.NotEmpty(names);
-        Assert.Contains("TestBenchmarks.Fast", names);
-        Assert.Contains("TestBenchmarks.FastBaseline", names);
+        Assert.Contains($"{TestBenchmarksClassName}.Fast", names);
+        Assert.Contains($"{TestBenchmarksClassName}.FastBaseline", names);
     }
 
     [Fact]

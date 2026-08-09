@@ -490,7 +490,84 @@ public class ThresholdCheckTests
         Assert.Throws<ArgumentOutOfRangeException>(() => ThresholdCheck.Check(results, 0));
     }
 
+    // --- W-34: the threshold gate must partition by comparison group and class ----------
+
+    [Fact]
+    public void HasRegression_Unpartitioned_MixedProfile_FlagsIsolatedAgainstInProcessBaseline()
+    {
+        // The bug, pinned as a contrast: with no partitioning the in-process row (profile
+        // "host", faster purely from configuration) becomes the implicit baseline and every
+        // isolated row is a fabricated regression.
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("in_process", 30, false, RuntimeProfile.Host.Name, "ClassA"),
+            MakeResult("isolated", 100, false, "SteadyState", "ClassA", IsolationStatus.Isolated),
+        };
+
+        var (hasRegression, regressed) = ThresholdCheck.HasRegression(results, 10);
+
+        Assert.True(hasRegression);
+        Assert.Equal("isolated", Assert.Single(regressed));
+    }
+
+    [Fact]
+    public void HasRegressionAcrossGroups_MixedProfile_DoesNotFlagIsolatedAgainstInProcess()
+    {
+        // Same inputs as above; partitioning by comparison group puts the in-process row
+        // ("host") and the isolated row ("SteadyState") in different partitions, so neither
+        // is the other's baseline and no regression is fabricated.
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("in_process", 30, false, RuntimeProfile.Host.Name, "ClassA"),
+            MakeResult("isolated", 100, false, "SteadyState", "ClassA", IsolationStatus.Isolated),
+        };
+
+        var (hasRegression, regressed) = ThresholdCheck.HasRegressionAcrossGroups(results, 10);
+
+        Assert.False(hasRegression);
+        Assert.Empty(regressed);
+    }
+
+    [Fact]
+    public void HasRegressionAcrossGroups_DifferentClasses_DoesNotCrossClassBaseline()
+    {
+        // An unrelated benchmark in a different class must not become this class's implicit
+        // baseline. Unpartitioned, class A's slow row is "regressed" against class B's fast
+        // row; partitioned by class, each class is evaluated on its own.
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("a_slow", 200, false, "SteadyState", "ClassA"),
+            MakeResult("b_fast", 50, false, "SteadyState", "ClassB"),
+        };
+
+        var (hasRegression, regressed) = ThresholdCheck.HasRegressionAcrossGroups(results, 10);
+
+        Assert.False(hasRegression);
+        Assert.Empty(regressed);
+    }
+
+    [Fact]
+    public void HasRegressionAcrossGroups_SameGroup_StillDetectsRealRegression()
+    {
+        // A genuine regression within one comparison group and one class is still flagged.
+        var results = new List<BenchmarkResult>
+        {
+            MakeResult("baseline", 100, true, "SteadyState", "ClassA"),
+            MakeResult("slow", 150, false, "SteadyState", "ClassA"),
+        };
+
+        var (hasRegression, regressed) = ThresholdCheck.HasRegressionAcrossGroups(results, 10);
+
+        Assert.True(hasRegression);
+        Assert.Equal("slow", Assert.Single(regressed));
+    }
+
     private static BenchmarkResult MakeResult(string name, double median, bool isBaseline)
+        => MakeResult(name, median, isBaseline, RuntimeProfile.Host.Name, "");
+
+    private static BenchmarkResult MakeResult(
+        string name, double median, bool isBaseline, string runtimeProfileName, string className,
+        IsolationStatus isolationStatus = IsolationStatus.InProcessRequested)
     {
         return new BenchmarkResult
         {
@@ -502,6 +579,9 @@ public class ThresholdCheckTests
             Max = median * 1.2,
             StandardDeviation = median * 0.05,
             IsBaseline = isBaseline,
+            RuntimeProfileName = runtimeProfileName,
+            ClassName = className,
+            IsolationStatus = isolationStatus,
             Q1 = 0,
             Q3 = 0,
             InterquartileRange = 0,

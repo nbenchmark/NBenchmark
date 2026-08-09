@@ -188,6 +188,88 @@ public class RuntimeProfileTests
         Assert.Equal(ComparisonGroup.KeyFor(isolated), ComparisonGroup.KeyFor(Result("D", "steady-state")));
     }
 
+    /// <summary>
+    ///     Under <c>--runtime-profile host</c> an isolated worker reports the same profile name
+    ///     as an in-process row, so the profile-name proxy cannot tell a fresh configured process
+    ///     from a dirty host one. The isolation fact must be part of the key, or clean-room and
+    ///     dirty-host results land in the same significance group and ratio column.
+    /// </summary>
+    [Fact]
+    public void ComparisonGroup_SeparatesIsolatedFromInProcessUnderHostProfile()
+    {
+        var isolated = Result("A", profileName: "host", isolationStatus: IsolationStatus.Isolated);
+        var inProcess = Result("B", profileName: "host", isolationStatus: IsolationStatus.InProcessRequested);
+        var refused = Result("C", profileName: "host", isolationStatus: IsolationStatus.InProcessCapturedState);
+        var refusedOtherReason = Result("D", profileName: "host", isolationStatus: IsolationStatus.InProcessLiveFixture);
+
+        // Isolated vs anything that ran in the host: different keys, even with the same profile.
+        Assert.NotEqual(ComparisonGroup.KeyFor(isolated), ComparisonGroup.KeyFor(inProcess));
+        Assert.NotEqual(ComparisonGroup.KeyFor(isolated), ComparisonGroup.KeyFor(refused));
+
+        // Two host rows refused for different reasons are still comparable with each other: both
+        // ran in this process under this configuration, so the ratio between them is sound.
+        Assert.Equal(ComparisonGroup.KeyFor(refused), ComparisonGroup.KeyFor(refusedOtherReason));
+        // A requested in-process row and a refused row both ran in the host: comparable.
+        Assert.Equal(ComparisonGroup.KeyFor(inProcess), ComparisonGroup.KeyFor(refused));
+    }
+
+    /// <summary>
+    ///     After <c>LaunchAggregator.Combine</c>, <see cref="BenchmarkResult.Median" /> is the mean of
+    ///     per-launch medians and <see cref="LaunchStatistics.LaunchMedian" /> is the median of them;
+    ///     with a skewed launch they disagree. The table baseline (<see cref="ComparisonGroup.PickBaseline" />)
+    ///     must rank by the same selector the significance baseline uses
+    ///     (<c>LaunchStatistics?.LaunchMedian ?? Median</c>), or a mixed table shows a verdict scored
+    ///     against a baseline the table never names.
+    /// </summary>
+    [Fact]
+    public void PickBaseline_RanksByLaunchMedian_WhenLaunchesAreSkewed()
+    {
+        // By Median alone, plain (95) beats skewed_low (100). By LaunchMedian, skewed_low (90)
+        // beats plain (95). The two selectors pick different baselines; the unified one is
+        // skewed_low, matching what Significance picks.
+        var skewedLow = ResultWithLaunches("skewed_low", median: 100, launchMedian: 90);
+        var plain = ResultWithLaunches("plain", median: 95, launchMedian: 95);
+
+        var baseline = ComparisonGroup.PickBaseline(new[] { skewedLow, plain });
+
+        Assert.NotNull(baseline);
+        Assert.Equal("skewed_low", baseline!.Name);
+    }
+
+    private static BenchmarkResult ResultWithLaunches(
+        string name, double median, double launchMedian, string profileName = "steady-state")
+        => new()
+        {
+            Name = name,
+            ClassName = "Fixture",
+            Mean = median,
+            Median = median,
+            Min = median * 0.9,
+            Max = median * 1.1,
+            Percentiles = [],
+            StandardDeviation = 1,
+            Q1 = 0,
+            Q3 = 0,
+            InterquartileRange = 0,
+            OutliersRemoved = 0,
+            N = 10,
+            Skewness = 0,
+            Kurtosis = 0,
+            Mad = 0,
+            AllocMedian = 0,
+            AllocP95 = 0,
+            AllocMax = 0,
+            RuntimeMoniker = "",
+            RuntimeProfileName = profileName,
+            LaunchStatistics = new LaunchStatistics
+            {
+                LaunchCount = 3,
+                LaunchMean = median,
+                LaunchStandardDeviation = 1,
+                LaunchMedian = launchMedian,
+            },
+        };
+
     [Fact]
     public void BenchmarkTable_FlagsMixedRuntimeProfiles()
     {
@@ -394,7 +476,8 @@ public class RuntimeProfileTests
     private static BenchmarkResult Result(
         string name,
         string profileName,
-        string moniker = "") => new()
+        string moniker = "",
+        IsolationStatus isolationStatus = IsolationStatus.InProcessRequested) => new()
     {
         Name = name,
         ClassName = "Fixture",
@@ -417,5 +500,6 @@ public class RuntimeProfileTests
         AllocMax = 0,
         RuntimeMoniker = moniker,
         RuntimeProfileName = profileName,
+        IsolationStatus = isolationStatus,
     };
 }

@@ -67,6 +67,7 @@ internal sealed record MeasurementOverrides
     public bool? RequireIsolation { get; init; }
     public bool? NoGcBetweenBenchmarks { get; init; }
     public double? MinPracticalEffect { get; init; }
+    public double? MinRelativeShift { get; init; }
 
     // Auto-tune scalar overrides, layered onto whichever AutoTuneOptions the caller configured
     // (or onto Preset when one was named) rather than replacing it wholesale.
@@ -137,6 +138,7 @@ internal sealed record MeasurementOverrides
         RequireIsolation = cliArgs.StrictIsolation ? true : null,
         NoGcBetweenBenchmarks = cliArgs.NoGcBetweenBenchmarks ? true : null,
         MinPracticalEffect = cliArgs.MinPracticalEffect,
+        MinRelativeShift = cliArgs.MinRelativeShift,
         Preset = cliArgs.AutoTunePreset,
         CiTarget = cliArgs.CiTarget,
         MinSamples = cliArgs.MinSamples,
@@ -203,6 +205,9 @@ internal sealed record MeasurementOverrides
 
         if (MinPracticalEffect.HasValue)
             result = result with { MinimumPracticalEffect = MinPracticalEffect.Value };
+
+        if (MinRelativeShift.HasValue)
+            result = result with { MinimumRelativeShift = MinRelativeShift.Value };
 
         // Layer auto-tune scalars: start from the preset when given, else the current knobs.
         var autoTune = Preset.HasValue ? AutoTuneOptions.FromPreset(Preset.Value) : result.AutoTune;

@@ -12,6 +12,10 @@ public class BenchmarkHarnessCliTests
     private const string OtlpEndpointEnvVar = "OTEL_EXPORTER_OTLP_ENDPOINT";
     private const string NBenchmarkOtelEndpointEnvVar = "NBENCHMARK_OTEL_ENDPOINT";
 
+    private static readonly string TestBenchmarksClassName = typeof(TestBenchmarks).FullName!;
+    private static readonly string CategoryBenchmarksClassName = typeof(CategoryBenchmarks).FullName!;
+    private static readonly string HarnessOrderBenchmarksClassName = typeof(HarnessOrderBenchmarks).FullName!;
+
     private static readonly string[] ManagedTelemetryEnvVars =
     [
         OtlpEndpointEnvVar,
@@ -273,8 +277,8 @@ public class BenchmarkHarnessCliTests
 
             // TestBenchmarks has two methods; the registry-built observer receives both results.
             Assert.Equal(2, observer.Results.Count);
-            Assert.Contains(observer.Results, r => r.Name == "TestBenchmarks.Fast");
-            Assert.Contains(observer.Results, r => r.Name == "TestBenchmarks.FastBaseline");
+            Assert.Contains(observer.Results, r => r.Name == $"{TestBenchmarksClassName}.Fast");
+            Assert.Contains(observer.Results, r => r.Name == $"{TestBenchmarksClassName}.FastBaseline");
         }
         finally
         {
@@ -359,8 +363,8 @@ public class BenchmarkHarnessCliTests
 
         Assert.Equal(2, results.Count);
         Assert.All(results, r => Assert.False(r.Errored));
-        Assert.Contains(results, r => r.Name == "CategoryBenchmarks.Concat");
-        Assert.Contains(results, r => r.Name == "CategoryBenchmarks.ManyConcat");
+        Assert.Contains(results, r => r.Name == $"{CategoryBenchmarksClassName}.Concat");
+        Assert.Contains(results, r => r.Name == $"{CategoryBenchmarksClassName}.ManyConcat");
     }
 
     [Fact]
@@ -378,8 +382,8 @@ public class BenchmarkHarnessCliTests
 
         Assert.Equal(2, results.Count);
         Assert.All(results, r => Assert.False(r.Errored));
-        Assert.DoesNotContain(results, r => r.Name == "CategoryBenchmarks.ManyConcat");
-        Assert.Contains(results, r => r.Name == "CategoryBenchmarks.Compute");
+        Assert.DoesNotContain(results, r => r.Name == $"{CategoryBenchmarksClassName}.ManyConcat");
+        Assert.Contains(results, r => r.Name == $"{CategoryBenchmarksClassName}.Compute");
     }
 
     [Fact]
@@ -397,7 +401,7 @@ public class BenchmarkHarnessCliTests
         );
 
         Assert.Single(results);
-        Assert.Equal("CategoryBenchmarks.Concat", results[0].Name);
+        Assert.Equal($"{CategoryBenchmarksClassName}.Concat", results[0].Name);
     }
 
     [Fact]
@@ -415,7 +419,7 @@ public class BenchmarkHarnessCliTests
         );
 
         Assert.Single(results);
-        Assert.Equal("CategoryBenchmarks.Concat", results[0].Name);
+        Assert.Equal($"{CategoryBenchmarksClassName}.Concat", results[0].Name);
     }
 
     [Fact]
@@ -478,10 +482,10 @@ public class BenchmarkHarnessCliTests
 
         Assert.Equal(2, ordered.Count);
         Assert.Equal(2, randomized.Count);
-        Assert.Equal("HarnessOrderBenchmarks.A", ordered[0].Name);
-        Assert.Equal("HarnessOrderBenchmarks.B", ordered[1].Name);
-        Assert.Equal("HarnessOrderBenchmarks.B", randomized[0].Name);
-        Assert.Equal("HarnessOrderBenchmarks.A", randomized[1].Name);
+        Assert.Equal($"{HarnessOrderBenchmarksClassName}.A", ordered[0].Name);
+        Assert.Equal($"{HarnessOrderBenchmarksClassName}.B", ordered[1].Name);
+        Assert.Equal($"{HarnessOrderBenchmarksClassName}.B", randomized[0].Name);
+        Assert.Equal($"{HarnessOrderBenchmarksClassName}.A", randomized[1].Name);
     }
 
     [Fact]

@@ -886,6 +886,45 @@ public class CliArgsTests
         Assert.Equal(0.0, applied.MinimumPracticalEffect);
     }
 
+    [Theory]
+    [InlineData("0", 0.0)]
+    [InlineData("0.01", 0.01)]
+    [InlineData("0.05", 0.05)]
+    [InlineData("1", 1.0)]
+    public void ParseCore_MinRelativeShift_Parses_Valid(string value, double expected)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--min-relative-shift", value]);
+        Assert.Empty(errors);
+        Assert.Equal(expected, result.MinRelativeShift);
+    }
+
+    [Theory]
+    [InlineData("-0.1")]
+    [InlineData("1.1")]
+    [InlineData("abc")]
+    public void ParseCore_MinRelativeShift_Rejects_Invalid(string value)
+    {
+        var (result, errors) = CliArgs.ParseCore(["--min-relative-shift", value]);
+        Assert.Null(result.MinRelativeShift);
+        Assert.NotEmpty(errors);
+    }
+
+    [Fact]
+    public void ParseCore_MinRelativeShift_Default_IsNull()
+    {
+        var (result, _) = CliArgs.ParseCore([]);
+        Assert.Null(result.MinRelativeShift);
+    }
+
+    [Fact]
+    public void MinRelativeShift_Override_Zero_DisablesGate()
+    {
+        var (args, _) = CliArgs.ParseCore(["--min-relative-shift", "0"]);
+        var applied = MeasurementOverrides.FromCliArgs(args).Apply(MeasurementOptions.Default);
+
+        Assert.Equal(0.0, applied.MinimumRelativeShift);
+    }
+
     [Fact]
     public void Parse_WritesErrorsToStderr()
     {

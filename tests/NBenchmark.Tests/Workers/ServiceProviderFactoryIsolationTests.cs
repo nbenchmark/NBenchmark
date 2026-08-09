@@ -76,7 +76,7 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
             .WithServiceProvider(BuildProvider)
             .RunAsync();
 
-        var result = Assert.Single(results, r => r.ClassName == nameof(InjectedBenchmarks));
+        var result = Assert.Single(results, r => r.ClassName == typeof(InjectedBenchmarks).FullName);
 
         Assert.False(result.Errored, result.ErrorMessage);
         Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
@@ -113,7 +113,7 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
             Console.SetError(priorError);
         }
 
-        var result = Assert.Single(results, r => r.ClassName == nameof(InjectedBenchmarks));
+        var result = Assert.Single(results, r => r.ClassName == typeof(InjectedBenchmarks).FullName);
 
         Assert.NotEqual(IsolationStatus.Isolated, result.IsolationStatus);
 
@@ -148,7 +148,7 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
             Console.SetError(priorError);
         }
 
-        var result = Assert.Single(results, r => r.ClassName == nameof(InjectedBenchmarks));
+        var result = Assert.Single(results, r => r.ClassName == typeof(InjectedBenchmarks).FullName);
 
         Assert.NotEqual(IsolationStatus.Isolated, result.IsolationStatus);
 

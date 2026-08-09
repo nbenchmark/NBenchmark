@@ -1,3 +1,4 @@
+using NBenchmark.Reporters;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -919,6 +920,57 @@ public class BenchmarkTableTests
         var parameter = Assert.Single(row.ParameterSet);
         Assert.Equal("size", parameter.Name);
         Assert.Equal(10, parameter.Value);
+    }
+
+    /// <summary>
+    ///     The Advanced block's "Median CI" line must say which kind of interval it is. With more
+    ///     than one launch the interval is the between-launch reproducibility interval; labelling
+    ///     it "distribution-free" (the within-launch label) would describe precision inside one
+    ///     process for a number that actually describes run-to-run spread.
+    /// </summary>
+    [Fact]
+    public void RenderStatsBlock_LabelsMedianCiBetweenLaunch_WhenMultipleLaunches()
+    {
+        var result = R("C", "C.M", 200, baseline: true) with
+        {
+            MedianCiLower = 190,
+            MedianCiUpper = 210,
+            LaunchStatistics = new LaunchStatistics
+            {
+                LaunchCount = 3,
+                LaunchMean = 200,
+                LaunchStandardDeviation = 5,
+                LaunchMedian = 200,
+            },
+        };
+
+        var row = Assert.Single(Assert.Single(BenchmarkTable.BuildPerClass([result])).Rows);
+        var block = BenchmarkTable.RenderStatsBlock(row, ReportDetail.Advanced);
+
+        Assert.Contains("Median CI:", block);
+        Assert.Contains("between-launch", block);
+        Assert.DoesNotContain("distribution-free", block);
+    }
+
+    /// <summary>
+    ///     With a single launch there is no between-launch spread to describe, so the line keeps the
+    ///     within-launch distribution-free label and the interval the one launch measured.
+    /// </summary>
+    [Fact]
+    public void RenderStatsBlock_LabelsMedianCiDistributionFree_WhenSingleLaunch()
+    {
+        var result = R("C", "C.M", 200, baseline: true) with
+        {
+            MedianCiLower = 190,
+            MedianCiUpper = 210,
+        };
+
+        var row = Assert.Single(Assert.Single(BenchmarkTable.BuildPerClass([result])).Rows);
+        var block = BenchmarkTable.RenderStatsBlock(row, ReportDetail.Advanced);
+
+        Assert.Contains("Median CI:", block);
+        Assert.Contains("distribution-free", block);
+        Assert.DoesNotContain("between-launch", block);
     }
 
     private static BenchmarkRow Row(BenchmarkTable table, string baseName, int size)

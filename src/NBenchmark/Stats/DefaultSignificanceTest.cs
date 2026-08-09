@@ -88,7 +88,12 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
             var shift = HodgesLehmann.Estimate(
                 baseline.Samples, candidateSamples[i], 1.0 - context.SignificanceLevel);
 
-            pairwise.Add(new PairwiseComparison(order[i], p, verdict, effect, shift));
+            // Report the p the verdict was decided from. The verdict above uses the Holm-adjusted
+            // p, so the value stored on the comparison (and written onto BenchmarkResult.PValue)
+            // must be the adjusted p too; storing the raw p lets a row show a p below the
+            // significance level beside a NotSignificant verdict, or simply a p the verdict was
+            // never based on. The two-group path has no adjustment, so raw == adjusted there.
+            pairwise.Add(new PairwiseComparison(order[i], adjusted[i], verdict, effect, shift));
         }
 
         return new SignificanceReport { Pairwise = pairwise, Omnibus = omnibus };

@@ -469,6 +469,17 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
+    ///     Sets the minimum relative median shift (|candidate − baseline| / baseline median) a
+    ///     change must reach to keep a Significant verdict, gated alongside the practical-effect
+    ///     gate. Pass <c>0</c> to disable the relative-shift gate.
+    /// </summary>
+    public BenchmarkHarness WithMinimumRelativeShift(double minimumRelativeShift)
+    {
+        _options = _options with { MinimumRelativeShift = minimumRelativeShift };
+        return this;
+    }
+
+    /// <summary>
     ///     Pins the benchmark process to the specified logical CPU cores for the duration
     ///     of the run, removing inter-core migration noise. Cores are zero-based and
     ///     logical (as reported by the OS). The prior affinity is restored when the run
@@ -1043,7 +1054,11 @@ public sealed class BenchmarkHarness
                 // rather than of one method - unlike the granularity decision, which is per method.
                 if (lifetimeDowngrade is not null)
                 {
-                    ApplyClassWarning(allResults, suiteResultStart, suite.Type.Name, lifetimeDowngrade);
+                    ApplyClassWarning(
+                        allResults,
+                        suiteResultStart,
+                        BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type),
+                        lifetimeDowngrade);
                 }
             }
 
@@ -1092,7 +1107,7 @@ public sealed class BenchmarkHarness
         if (pass.Publishes)
         {
             if (_cliArgs.ThresholdPct.HasValue
-                && ThresholdCheck.HasRegression(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
+                && ThresholdCheck.HasRegressionAcrossGroups(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
             {
                 Console.Error.WriteLine(
                     $"Regression threshold exceeded ({_cliArgs.ThresholdPct.Value}%). "
@@ -1251,17 +1266,12 @@ public sealed class BenchmarkHarness
             if (_cliArgs.ThresholdPct.HasValue)
             {
                 var threshold = _cliArgs.ThresholdPct.Value;
-                var regressedNames = new List<string>();
 
-                // Threshold comparisons only make sense within the same runtime - net8 will
-                // always look "slower" than net10, which would false-positive every net8 row.
-                foreach (var runtimeGroup in allResults.GroupBy(ComparisonGroup.KeyFor))
-                {
-                    if (ThresholdCheck.HasRegression(runtimeGroup.ToList(), threshold) is (true, var names))
-                        regressedNames.AddRange(names);
-                }
-
-                if (regressedNames.Count > 0)
+                // Threshold comparisons only make sense within the same runtime and the same
+                // class - net8 will always look "slower" than net10, which would false-positive
+                // every net8 row, and an unrelated benchmark in another class is not this
+                // class's baseline. HasRegressionAcrossGroups partitions on both.
+                if (ThresholdCheck.HasRegressionAcrossGroups(allResults, threshold) is (true, var regressedNames))
                 {
                     Console.Error.WriteLine(
                         $"Regression threshold exceeded ({threshold}%). "
@@ -1385,10 +1395,11 @@ public sealed class BenchmarkHarness
             // lifetime question is independent of that and has the same answer.
             var lifetime = InstanceIndependence.ResolveLifetime(
                 suite.Type, suite.Lifetime, _instanceSource is not null, out _);
+            var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
 
             var request = WorkerRunPlan.WithStrategies(new RunGroupPayload
             {
-                GroupId = $"{tfm}:{suite.Type.Name}",
+                GroupId = $"{tfm}:{qualifiedClassName}",
                 Kind = WorkGroupKind.DiscoveredClass,
 
                 // The class under test lives in the build for this framework, not in the assembly
@@ -1396,7 +1407,7 @@ public sealed class BenchmarkHarness
                 TargetAssemblyPath = build.DllPath!,
                 WorkerAssemblyPath = workerPath,
                 DeclaringTypeFullName = suite.Type.FullName,
-                DisplayPrefix = suite.Type.Name,
+                DisplayPrefix = qualifiedClassName,
                 BenchmarkNames = displayNames,
 
                 // One worker per (runtime x class), so this worker measures once. A multi-runtime run
@@ -1668,6 +1679,7 @@ public sealed class BenchmarkHarness
         CancellationToken cancellationToken)
     {
         var effectiveClassLaunchCount = EffectiveLaunchCount;
+        var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
 
         // Clamped, because an attribute argument is a compile-time constant nothing else validates -
         // the fluent builders and the CLI parser reject an out-of-range count, and this is the one
@@ -1721,7 +1733,7 @@ public sealed class BenchmarkHarness
                 var factory = () => instance;
 
                 var envelopes = suite.Benchmarks
-                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, suite.Type.Name, factory))
+                    .Select(b => BenchmarkEnvelope.FromDiscovered(b, qualifiedClassName, factory))
                     .ToList();
 
                 // When the class implements IStateReset, fire ResetAsync between benchmark methods
@@ -1786,6 +1798,7 @@ public sealed class BenchmarkHarness
         IMeasurementObserver observer,
         CancellationToken cancellationToken)
     {
+        var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
         var orderedBenchmarks = OrderBenchmarksForRun(suite.Benchmarks, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed);
 
         foreach (var benchmark in orderedBenchmarks)
@@ -1835,7 +1848,7 @@ public sealed class BenchmarkHarness
                     }
 
                     var factory = () => instance;
-                    var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, suite.Type.Name, factory);
+                    var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, qualifiedClassName, factory);
 
                     var (results, samples) = await SuiteRunner.RunAsync(
                         [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
@@ -2012,6 +2025,7 @@ public sealed class BenchmarkHarness
 
         var options = ChildLaunchOptions;
         var names = benchmarks.Select(b => b.DisplayName).ToList();
+        var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
         var timeout = MeasurementBudget.For(options, benchmarks.Count);
 
         // Each replicate is its own worker, so LaunchCount buys a between-process variance estimate
@@ -2054,7 +2068,7 @@ public sealed class BenchmarkHarness
 
         foreach (var benchmark in benchmarks)
         {
-            var name = $"{suite.Type.Name}.{benchmark.DisplayName}";
+            var name = BenchmarkEnvelope.QualifiedDiscoveredBenchmarkName(suite.Type, benchmark.DisplayName);
 
             BenchmarkResult result;
             double[] raw;
@@ -2073,7 +2087,7 @@ public sealed class BenchmarkHarness
 
                 result = OutcomeBuilder.Build(
                     new RunOutcome.Errored(new InvalidOperationException(message), message),
-                    name, suite.Type.Name, benchmark.Attribute.Description, benchmark.IsBaseline,
+                    name, qualifiedClassName, benchmark.Attribute.Description, benchmark.IsBaseline,
                     _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
                     benchmark.Categories).Result;
 
@@ -2162,11 +2176,12 @@ public sealed class BenchmarkHarness
         string? failure)
     {
         var message = failure ?? $"Could not instantiate {suite.Type.Name}.";
+        var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
 
         return OutcomeBuilder.Build(
             new RunOutcome.Errored(new InvalidOperationException(message), message),
-            $"{suite.Type.Name}.{benchmark.DisplayName}",
-            suite.Type.Name,
+            BenchmarkEnvelope.QualifiedDiscoveredBenchmarkName(suite.Type, benchmark.DisplayName),
+            qualifiedClassName,
             benchmark.Attribute.Description,
             benchmark.IsBaseline,
             suiteOptions,
@@ -2346,7 +2361,10 @@ public sealed class BenchmarkHarness
 
         // Benchmarks the worker never reported become errored rows naming the reason, so a failure
         // is visible in the table rather than a silently missing line.
-        foreach (var errored in WorkerGroupRunner.ToErroredResults(group, benchmarkNames, suite.Type.Name))
+        foreach (var errored in WorkerGroupRunner.ToErroredResults(
+                     group,
+                     benchmarkNames,
+                     BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type)))
         {
             items.Add(new IsolatedResultItem { Result = errored, RawSamples = [] });
         }
@@ -2363,10 +2381,11 @@ public sealed class BenchmarkHarness
             return [];
 
         var aggregated = new List<IsolatedResultItem>();
+        var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
 
         foreach (var benchmark in benchmarks)
         {
-            var name = $"{suite.Type.Name}.{benchmark.DisplayName}";
+            var name = BenchmarkEnvelope.QualifiedDiscoveredBenchmarkName(suite.Type, benchmark.DisplayName);
             var perLaunchResults = new List<LaunchAggregator.Launch>();
 
             foreach (var launchItems in allLaunchItems)
@@ -2385,7 +2404,7 @@ public sealed class BenchmarkHarness
                 {
                     Result = OutcomeBuilder.Build(
                         new RunOutcome.Errored(new InvalidOperationException(message), message),
-                        name, suite.Type.Name, benchmark.Attribute.Description, benchmark.IsBaseline,
+                        name, qualifiedClassName, benchmark.Attribute.Description, benchmark.IsBaseline,
                         new MeasurementOptions(), TimeSpan.Zero, TimeSpan.Zero, 0, null,
                         benchmark.Categories).Result,
                     RawSamples = [],

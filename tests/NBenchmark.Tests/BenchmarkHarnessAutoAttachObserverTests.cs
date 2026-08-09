@@ -7,6 +7,8 @@ namespace NBenchmark.Tests;
 [Collection("ConsoleCapture")]
 public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 {
+    private static readonly string TestBenchmarksClassName = typeof(TestBenchmarks).FullName!;
+
     public BenchmarkHarnessAutoAttachObserverTests()
     {
         ObserverRegistry.Reset();
@@ -30,8 +32,8 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         // TestBenchmarks has two methods (Fast, FastBaseline); the observer sees both results.
         Assert.Equal(2, capturing.Results.Count);
-        Assert.Contains(capturing.Results, r => r.Name == "TestBenchmarks.Fast");
-        Assert.Contains(capturing.Results, r => r.Name == "TestBenchmarks.FastBaseline");
+        Assert.Contains(capturing.Results, r => r.Name == $"{TestBenchmarksClassName}.Fast");
+        Assert.Contains(capturing.Results, r => r.Name == $"{TestBenchmarksClassName}.FastBaseline");
 
         // The observer receives sample events (one measured iteration each).
         Assert.NotEmpty(capturing.Samples);

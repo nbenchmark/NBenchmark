@@ -295,8 +295,18 @@ internal static class LaunchAggregator
             // launch reported one, since averaging over a subset would describe a different rule.
             LowerFence = AverageOrNull(successful, r => r.LowerFence),
             UpperFence = AverageOrNull(successful, r => r.UpperFence),
-            MedianCiLower = AverageOrNull(successful, r => r.MedianCiLower),
-            MedianCiUpper = AverageOrNull(successful, r => r.MedianCiUpper),
+
+            // The median confidence interval describes reproducibility *between* launches, not
+            // precision within one: the Student-t interval over the k launch medians, centred on
+            // the combined median and using the same between-launch margin as MarginOfError above.
+            // Averaging each launch's own within-launch (distribution-free) interval instead
+            // printed a narrow band around the mean that described spread inside a single process
+            // while saying nothing about run-to-run variation - a second interval about the same
+            // number with no label to distinguish it from the margin line. The within-launch
+            // distribution-free interval is kept only on the single-launch path (see Combine),
+            // where there is no between-launch spread to describe.
+            MedianCiLower = median - marginOfError,
+            MedianCiUpper = median + marginOfError,
 
             // Counts and durations are totals: the run really did take this long and really did
             // measure this many iterations.

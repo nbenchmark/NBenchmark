@@ -1074,6 +1074,17 @@ public class BenchmarkSuite(string name)
     }
 
     /// <summary>
+    ///     Sets the minimum relative median shift (|candidate − baseline| / baseline median) a
+    ///     change must reach to keep a Significant verdict, gated alongside the practical-effect
+    ///     gate. Pass <c>0</c> to disable the relative-shift gate.
+    /// </summary>
+    public BenchmarkSuite WithMinimumRelativeShift(double minimumRelativeShift)
+    {
+        _options = _options with { MinimumRelativeShift = minimumRelativeShift };
+        return this;
+    }
+
+    /// <summary>
     ///     Pins the benchmark process to the specified logical CPU cores for the duration
     ///     of the run, removing inter-core migration noise. Cores are zero-based and
     ///     logical (as reported by the OS). The prior affinity is restored when the run

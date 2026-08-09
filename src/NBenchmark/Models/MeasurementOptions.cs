@@ -58,6 +58,7 @@ public record MeasurementOptions
     private readonly int _maxRawSamples = DefaultMaxRawSamples;
     private readonly int? _iterations;
     private readonly double? _minimumPracticalEffect = DefaultMinimumPracticalEffect;
+    private readonly double? _minimumRelativeShift = DefaultMinimumRelativeShift;
 
     /// <summary>
     ///     The default <see cref="MinimumPracticalEffect" />: 0.147, the Romano boundary between a
@@ -66,6 +67,14 @@ public record MeasurementOptions
     ///     to <c>0</c> to restore p-value-only verdicts.
     /// </summary>
     public const double DefaultMinimumPracticalEffect = 0.147;
+
+    /// <summary>
+    ///     The default <see cref="MinimumRelativeShift" />: 0.01 (1%). Conservative - it kills the
+    ///     false positive of a sub-percent shift measured with near-zero spread (which the U test
+    ///     rejects and Cliff's delta scores as a large effect) without being opinionated about what
+    ///     a real effect size is. Set to <c>0</c> to restore practical-effect-only gating.
+    /// </summary>
+    public const double DefaultMinimumRelativeShift = 0.01;
     private readonly int? _opsPerSample;
     private readonly IReadOnlyList<double> _reportedPercentiles = DefaultReportedPercentiles;
     private readonly double _significanceLevel = 0.05;
@@ -433,6 +442,40 @@ public record MeasurementOptions
             }
 
             _minimumPracticalEffect = delta;
+        }
+    }
+
+    /// <summary>
+    ///     The minimum relative median shift (|candidate − baseline| / baseline median) in [0, 1]
+    ///     required for a benchmark to be considered meaningfully different, gated <em>in addition
+    ///     to</em> <see cref="MinimumPracticalEffect" />. The practical-effect gate catches a
+    ///     consistent-but-tiny effect that Cliff's delta still scores as large; this gate catches the
+    ///     same case on the shift itself, so a ✓ means "real, at least a small effect, and at least a
+    ///     <see cref="DefaultMinimumRelativeShift" /> relative shift". When the relative shift is
+    ///     below this threshold the Sig verdict is downgraded to NotSignificant and a warning records
+    ///     the downgrade. Defaults to <see cref="DefaultMinimumRelativeShift" /> (0.01); set to
+    ///     <c>0</c> to restore practical-effect-only gating, or <c>null</c> to disable the gate.
+    /// </summary>
+    public double? MinimumRelativeShift
+    {
+        get => _minimumRelativeShift;
+        init
+        {
+            if (!value.HasValue)
+            {
+                _minimumRelativeShift = null;
+                return;
+            }
+
+            var shift = value.Value;
+
+            if (double.IsNaN(shift) || double.IsInfinity(shift) || shift < 0 || shift > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    "MinimumRelativeShift must be between 0 and 1 inclusive.");
+            }
+
+            _minimumRelativeShift = shift;
         }
     }
 
