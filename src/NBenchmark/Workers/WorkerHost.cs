@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.IO;
 using System.IO.Pipes;
 using System.Text;
+using System.Text.Json;
 using NBenchmark.Engine;
 
 namespace NBenchmark.Workers;
@@ -19,28 +21,39 @@ internal sealed class WorkerHost : IAsyncDisposable
     /// </summary>
     internal static readonly TimeSpan HandshakeTimeout = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    ///     How many lines of stderr to keep from the <i>start</i> of the worker's output. A .NET crash
+    ///     dump puts its diagnostic header - "Stack overflow.", "Repeated N times:" - first, so a
+    ///     tail-only window loses exactly the line that says what happened.
+    /// </summary>
+    private const int StderrHeadLines = 20;
+
+    /// <summary>
+    ///     How many lines of stderr to keep from the <i>end</i>: the bottom of the stack dump, where the
+    ///     repeating frames and the "Process is terminating" footer land.
+    /// </summary>
     private const int StderrTailLines = 20;
 
     private readonly Process _process;
 
     // The channel owns both pipe streams and disposes them, so they are not held separately here.
     private readonly FrameChannel _channel;
-    private readonly Queue<string> _stderrTail;
+    private readonly StderrBuffer _stderr;
     private readonly int _processId;
     private bool _disposed;
 
-    private WorkerHost(Process process, FrameChannel channel, ReadyPayload ready, Queue<string> stderrTail)
+    private WorkerHost(Process process, FrameChannel channel, ReadyPayload ready, StderrBuffer stderr)
     {
         _process = process;
         _channel = channel;
         _processId = process.Id;
         Ready = ready;
 
-        // The live queue the stderr handler writes into, not a copy of it. Copying at construction
+        // The live buffer the stderr handler writes into, not a copy of it. Copying at construction
         // time - which is what this did first - captured only what the worker said before its
         // handshake, so anything it reported while dying was silently discarded. That is the exact
         // moment the output matters most.
-        _stderrTail = stderrTail;
+        _stderr = stderr;
     }
 
     /// <summary>What the worker reported about the process it is - not what it was asked to be.</summary>
@@ -50,14 +63,17 @@ internal sealed class WorkerHost : IAsyncDisposable
 
     public int ProcessId => _processId;
 
-    /// <summary>The tail of the worker's stderr, for diagnosing a worker that died.</summary>
+    /// <summary>
+    ///     The worker's stderr as a first-N + last-N window, for diagnosing a worker that died. A
+    ///     tail-only window loses the diagnostic header a .NET crash dump prints first.
+    /// </summary>
     public string StderrTail
     {
         get
         {
-            lock (_stderrTail)
+            lock (_stderr)
             {
-                return string.Join(Environment.NewLine, _stderrTail);
+                return _stderr.ToString();
             }
         }
     }
@@ -78,10 +94,10 @@ internal sealed class WorkerHost : IAsyncDisposable
 
                 var code = _process.ExitCode;
 
-                // A negative code on Unix is a signal: the process did not choose to exit.
-                return code < 0
-                    ? $"killed by signal {-code}"
-                    : $"exit code {code}";
+                // The common crash exits are a closed set per platform; naming them turns an
+                // undiagnosable vanishing process into an actionable message. See ExitCodeDescription
+                // for why the old "killed by signal {-code}" branch was inverted on both platforms.
+                return ExitCodeDescription.Describe(code);
             }
             catch (Exception ex) when (ex is InvalidOperationException or SystemException)
             {
@@ -182,19 +198,16 @@ internal sealed class WorkerHost : IAsyncDisposable
 
             process = new Process { StartInfo = startInfo };
 
-            var stderrTail = new Queue<string>(StderrTailLines + 1);
+            var stderr = new StderrBuffer(StderrHeadLines, StderrTailLines);
 
             process.ErrorDataReceived += (_, e) =>
             {
                 if (e.Data is null)
                     return;
 
-                lock (stderrTail)
+                lock (stderr)
                 {
-                    stderrTail.Enqueue(e.Data);
-
-                    if (stderrTail.Count > StderrTailLines)
-                        stderrTail.Dequeue();
+                    stderr.Add(e.Data);
                 }
             };
 
@@ -208,9 +221,9 @@ internal sealed class WorkerHost : IAsyncDisposable
             fromWorker.DisposeLocalCopyOfClientHandle();
 
             var channel = new FrameChannel(fromWorker, toWorker);
-            var ready = await HandshakeAsync(channel, process, stderrTail, cancellationToken).ConfigureAwait(false);
+            var ready = await HandshakeAsync(channel, process, stderr, cancellationToken).ConfigureAwait(false);
 
-            return new WorkerHost(process, channel, ready, stderrTail);
+            return new WorkerHost(process, channel, ready, stderr);
         }
         catch
         {
@@ -231,7 +244,7 @@ internal sealed class WorkerHost : IAsyncDisposable
     private static async Task<ReadyPayload> HandshakeAsync(
         FrameChannel channel,
         Process process,
-        Queue<string> stderrTail,
+        StderrBuffer stderr,
         CancellationToken cancellationToken)
     {
         using var timeoutCts = new CancellationTokenSource(HandshakeTimeout);
@@ -258,18 +271,41 @@ internal sealed class WorkerHost : IAsyncDisposable
         {
             throw new WorkerStartException(
                 $"The measurement worker did not answer the handshake within "
-                + $"{HandshakeTimeout.TotalSeconds:0.#}s.{DescribeStderr(stderrTail)}");
+                + $"{HandshakeTimeout.TotalSeconds:0.#}s.{DescribeStderr(stderr)}");
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        {
+            // A torn or unreadable Ready frame: the worker began answering the handshake and then
+            // died, or wrote a frame the stream could not parse. <see cref="FrameChannel.ReadAsync" />
+            // throws <see cref="EndOfStreamException" /> (an <see cref="IOException" />) when the pipe
+            // dies mid-frame, <see cref="InvalidDataException" /> on a bad length prefix, and
+            // <see cref="JsonException" /> on a corrupt payload. Without this catch the exception
+            // escapes <see cref="StartAsync" /> as something other than a
+            // <see cref="WorkerStartException" />, so <c>ProcessWorkerLauncher</c> - which catches only
+            // <c>WorkerStartException</c> - lets it take down the whole benchmark program. A worker
+            // that hard-crashes during startup is the reachable case: a static initializer or a
+            // <c>[GlobalSetup]</c> that stack-overflows dies before the Ready frame is fully written.
+            var cause = process.HasExited
+                ? ExitCodeDescription.Describe(process.ExitCode)
+                : "the process is still running";
+
+            throw new WorkerStartException(
+                $"The measurement worker died while answering the handshake ({cause}): "
+                + $"{ex.GetType().Name}.{DescribeStderr(stderr)}");
         }
 
         if (frame is null)
         {
             // End-of-stream before a handshake means the worker died on startup. Its exit code and
-            // stderr are the only evidence, so both go into the message.
-            var exitCode = process.HasExited ? process.ExitCode.ToString() : "still running";
+            // stderr are the only evidence, so both go into the message - the cause named (W-47)
+            // rather than a bare number, the same way the torn-frame branch above names it.
+            var cause = process.HasExited
+                ? ExitCodeDescription.Describe(process.ExitCode)
+                : "still running";
 
             throw new WorkerStartException(
-                $"The measurement worker exited before answering the handshake (exit code "
-                + $"{exitCode}).{DescribeStderr(stderrTail)}");
+                $"The measurement worker exited before answering the handshake ({cause})"
+                + $".{DescribeStderr(stderr)}");
         }
 
         if (frame.Kind == WorkerFrameKind.Fault && frame.Fault is not null)
@@ -308,13 +344,15 @@ internal sealed class WorkerHost : IAsyncDisposable
         return ready;
     }
 
-    private static string DescribeStderr(Queue<string> stderrTail)
+    private static string DescribeStderr(StderrBuffer stderr)
     {
-        lock (stderrTail)
+        lock (stderr)
         {
-            return stderrTail.Count == 0
+            var window = stderr.ToString();
+
+            return window.Length == 0
                 ? ""
-                : $" Worker stderr: {string.Join(" | ", stderrTail).Trim()}";
+                : $" Worker stderr: {window.Replace(Environment.NewLine, " | ").Trim()}";
         }
     }
 

@@ -192,6 +192,15 @@ internal sealed class FrameChannel : IDisposable
     ///     stream ended cleanly before any byte arrived. A pipe hands over whatever is available,
     ///     so a partial read is normal and must be looped rather than treated as a short frame.
     /// </summary>
+    /// <remarks>
+    ///     The distinction between "no byte yet" and "some bytes, then nothing" is what separates a
+    ///     clean end from a torn frame. A read that returns zero <i>after</i> bytes have already
+    ///     filled part of the buffer means the peer was mid-frame when it vanished; returning
+    ///     <c>false</c> there would let a torn length prefix read as a clean <c>null</c>, and a
+    ///     worker that crashed while writing would look exactly like one that had finished. So the
+    ///     zero read throws once any byte has arrived, and <c>false</c> means only "the stream ended
+    ///     cleanly before any byte of this read."
+    /// </remarks>
     private async Task<bool> ReadExactlyAsync(byte[] buffer, CancellationToken cancellationToken)
     {
         var offset = 0;
@@ -203,7 +212,19 @@ internal sealed class FrameChannel : IDisposable
                 .ConfigureAwait(false);
 
             if (read == 0)
+            {
+                // Clean end before any byte of this read: the caller treats false as end-of-stream.
+                // Mid-frame: some bytes arrived and then the stream died - a torn frame, not a
+                // clean end, and the caller must surface it rather than swallow it as null.
+                if (offset > 0)
+                {
+                    throw new EndOfStreamException(
+                        $"Stream ended mid-frame: expected {buffer.Length} bytes, "
+                        + $"received {offset} before end of stream.");
+                }
+
                 return false;
+            }
 
             offset += read;
         }

@@ -242,3 +242,86 @@ public class InstanceSharingProbeBenchmarks
             : throw new InvalidOperationException(
                 "this instance had already run First, so both methods shared one instance");
 }
+
+/// <summary>
+///     A benchmark whose body hard-exits the worker process mid-group, so the crash-resilience
+///     path can be exercised against a genuinely dead child rather than a mock.
+/// </summary>
+/// <remarks>
+///     <para>
+///         Two methods, in declaration order. <c>Safe</c> completes and (once results are sent
+///         incrementally per benchmark) has its result on the wire before <c>Crash</c> runs, so a
+///         test can assert that an already-sent result survives a later benchmark's crash - the
+///         property the plan calls out as the real amplifier. The group request must set
+///         <see cref="RunOrder.Declaration" /> so <c>Safe</c> is measured first.
+///     </para>
+///     <para>
+///         <c>Crash</c> writes a marker line to stderr and then exits with a fixed code, so a test
+///         can assert both that the exit cause is named and that the stderr the worker produced
+///         actually reaches the user. <c>Environment.Exit</c> is used rather than
+///         <c>Environment.FailFast</c> because the exit code is the thing being asserted, and
+///         <c>FailFast</c>'s code is runtime- and platform-specific. The stderr line is flushed
+///         before the exit so the coordinator's async read is not racing the process death.
+///     </para>
+///     <para>
+///         Its own class, and only ever reached when a test names it explicitly in a worker run
+///         request. Any end-to-end run of this fixture must exclude it with
+///         <c>--filter IsolationFixtureBenchmarks.*</c>.
+///     </para>
+/// </remarks>
+public class HardExitBenchmarks
+{
+    public const string StderrMarker = "hard-exit fixture: crashing the worker with exit code 70";
+
+    [Benchmark]
+    public void Safe() => Thread.SpinWait(200);
+
+    [Benchmark]
+    public void Crash()
+    {
+        Console.Error.WriteLine(StderrMarker);
+        Console.Error.Flush();
+
+        // Exit code 70 is the worker's own "crashed" code. Hard-coded here because
+        // WorkerExitCode is internal to NBenchmark and this fixture is a separate assembly.
+        Environment.Exit(70);
+    }
+}
+
+/// <summary>
+///     A benchmark whose body stack-overflows, so the torn-frame and crash-cause paths can be
+///     exercised against a worker that dies hard while writing, not a worker that exits politely.
+/// </summary>
+/// <remarks>
+///     <para>
+///         A stack overflow is the reachable torn-frame case the plan calls out: the worker dies
+///         without finishing any in-flight frame, and the coordinator's read lands on a truncated
+///         payload. Whether the death reads as a torn frame (<c>EndOfStreamException</c>) or a clean
+///         end (<c>null</c>) depends on timing, so the test that uses this fixture asserts only that
+///         the run <i>does not terminate with an unhandled exception</i> either way - both the
+///         torn-frame catch and the clean-end path must produce a fault.
+///     </para>
+///     <para>
+///         The recursion deliberately allocates on each frame so the stack exhausts in a bounded
+///         number of calls rather than spinning for an unbounded time against a tiny per-frame cost.
+///         The result is ignored so the JIT cannot tail-call it away.
+///     </para>
+///     <para>
+///         Its own class, and only ever reached when a test names it explicitly in a worker run
+///         request. Any end-to-end run of this fixture must exclude it with
+///         <c>--filter IsolationFixtureBenchmarks.*</c>.
+///     </para>
+/// </remarks>
+public class StackOverflowBenchmarks
+{
+    [Benchmark]
+    public void Overflow() => Recurse(0);
+
+    private static int Recurse(int depth)
+    {
+        // A per-frame allocation so the stack exhausts quickly and deterministically, and a use
+        // of the result so the call is not tail-call-eliminated.
+        var pad = new byte[512];
+        return pad.Length == 0 || depth == int.MaxValue ? 0 : Recurse(depth + 1) + pad[0];
+    }
+}

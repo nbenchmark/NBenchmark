@@ -25,8 +25,8 @@ internal sealed class WorkerSession(FrameChannel channel)
 
     /// <summary>
     ///     The sample budget and seed for the group in flight, held here because every path that
-    ///     produces results funnels through <see cref="SendResults" /> and none of them carry the
-    ///     request that far.
+    ///     produces results forwards them through <see cref="StreamingProgress.OnBenchmarkCompleted" />
+    /// and none of the call sites carry the request that far.
     /// </summary>
     private int _maxRawSamples = MeasurementOptions.DefaultMaxRawSamples;
 
@@ -276,7 +276,12 @@ internal sealed class WorkerSession(FrameChannel channel)
             // the inbound half break, this sees the outbound half. Either one means there is no
             // coordinator left to measure for.
             _queue = new FrameQueue(_channel, cancellationToken, OnTransportFailure);
-            progress = new StreamingProgress(_queue, cancellationToken, options.StreamSamples);
+            progress = new StreamingProgress(
+                _queue,
+                cancellationToken,
+                options.StreamSamples,
+                _maxRawSamples,
+                _sampleSeed);
 
             switch (request.Kind)
             {
@@ -450,6 +455,32 @@ internal sealed class WorkerSession(FrameChannel channel)
 
         var suite = BenchmarkDiscoverer.DefineExplicit(resolvedMethods);
 
+        // Discovery names a result '<Class>.<DisplayName>', which is the right convention for a
+        // benchmark class and the wrong one here - the caller's display name is already qualified
+        // however its test framework qualifies names. The rename is set on the progress sink before
+        // the group runs, so each result is renamed as it completes and is sent over the wire with
+        // the caller's name - there is no later list to walk, because W-44 sends incrementally as
+        // each benchmark finishes rather than batching to group end.
+        var simplePrefix = suite.Type.Name;
+        var qualifiedPrefix = suite.Type.FullName ?? suite.Type.Name;
+
+        var requestedNameByMeasuredName = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var (_, _, displayName) in resolvedMethods)
+        {
+            // Discovery historically emitted "<TypeName>.<DisplayName>" and now emits
+            // "<TypeFullName>.<DisplayName>" for discovered paths. Test-method callers own the
+            // display name, so map either form back to the caller-provided name.
+            requestedNameByMeasuredName[$"{simplePrefix}.{displayName}"] = displayName;
+            requestedNameByMeasuredName[$"{qualifiedPrefix}.{displayName}"] = displayName;
+            requestedNameByMeasuredName[displayName] = displayName;
+        }
+
+        progress.SetResultRename(
+            name => requestedNameByMeasuredName.TryGetValue(name, out var requestedName)
+                ? requestedName
+                : name);
+
         var outcome = await DiscoveredGroupExecutor.RunAsync(
                 suite,
                 suite.Benchmarks,
@@ -478,41 +509,8 @@ internal sealed class WorkerSession(FrameChannel channel)
             return;
         }
 
-        // Discovery names a result '<Class>.<DisplayName>', which is the right convention for a
-        // benchmark class and the wrong one here - the caller's display name is already qualified
-        // however its test framework qualifies names. Renamed on this side, where the convention that
-        // produced the name is known, rather than reconstructed by the coordinator from a rule it
-        // would then own a second copy of.
-        var renamed = new List<BenchmarkResult>(outcome.Results.Count);
-        var samplesByName = new Dictionary<string, double[]>(StringComparer.Ordinal);
-        var simplePrefix = suite.Type.Name;
-        var qualifiedPrefix = suite.Type.FullName ?? suite.Type.Name;
-
-        var requestedNameByMeasuredName = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        foreach (var (_, _, displayName) in resolvedMethods)
-        {
-            // Discovery historically emitted "<TypeName>.<DisplayName>" and now emits
-            // "<TypeFullName>.<DisplayName>" for discovered paths. Test-method callers own the
-            // display name, so map either form back to the caller-provided name.
-            requestedNameByMeasuredName[$"{simplePrefix}.{displayName}"] = displayName;
-            requestedNameByMeasuredName[$"{qualifiedPrefix}.{displayName}"] = displayName;
-            requestedNameByMeasuredName[displayName] = displayName;
-        }
-
-        foreach (var result in outcome.Results)
-        {
-            var samples = outcome.RawSamples.GetValueOrDefault(result.Name, []);
-
-            var final = requestedNameByMeasuredName.TryGetValue(result.Name, out var requestedName)
-                ? result with { Name = requestedName }
-                : result;
-
-            renamed.Add(final);
-            samplesByName[final.Name] = samples;
-        }
-
-        SendResults(renamed, r => samplesByName.GetValueOrDefault(r.Name, []));
+        // Results were sent incrementally as each benchmark completed (above, via
+        // progress.OnBenchmarkCompleted), so there is nothing to batch here.
     }
 
     /// <summary>
@@ -883,7 +881,8 @@ internal sealed class WorkerSession(FrameChannel channel)
             return;
         }
 
-        SendResults(outcome.Results, r => outcome.RawSamples.GetValueOrDefault(r.Name, []));
+        // Results were sent incrementally as each benchmark completed (above, via
+        // progress.OnBenchmarkCompleted), so there is nothing to batch here.
     }
 
     /// <summary>
@@ -925,7 +924,10 @@ internal sealed class WorkerSession(FrameChannel channel)
             return;
         }
 
-        var outcome = await suite
+        // The suite measures itself and forwards each result as it completes (above, via
+        // progress.OnBenchmarkCompleted), so the returned outcome is not needed here - nothing is
+        // batched to group end.
+        await suite
             .MeasureInWorkerAsync(
                 progress,
                 progress.AsObserver(),
@@ -934,8 +936,6 @@ internal sealed class WorkerSession(FrameChannel channel)
                 request.TotalBenchmarks,
                 cancellationToken)
             .ConfigureAwait(false);
-
-        SendResults(outcome.Results, r => outcome.RawSamples.GetValueOrDefault(r.Name, []));
     }
 
     private async Task RunLambdasAsync(
@@ -1006,7 +1006,12 @@ internal sealed class WorkerSession(FrameChannel channel)
                     .MeasureAsync(body.DisplayName, resolved, spec, cancellationToken)
                     .ConfigureAwait(false);
 
-                SendResults([outcome.Result], _ => outcome.RawSamples);
+                // The lambda path does not flow through SuiteRunner, so OnBenchmarkCompleted is not
+                // raised for it automatically the way it is for the discovered, plan, and test-method
+                // paths. Sending here - one result, as soon as it is measured - is the same contract:
+                // the result is on the wire before the next body starts, so a crash on a later body can
+                // no longer lose this one.
+                await progress.OnBenchmarkCompleted(outcome.Result).ConfigureAwait(false);
 
                 index++;
             }
@@ -1244,46 +1249,6 @@ internal sealed class WorkerSession(FrameChannel channel)
                 + $"using the built-in {typeof(T).Name} instead.");
 
             return null;
-        }
-    }
-
-    /// <summary>
-    ///     Ships each result with its own samples.
-    ///     <para>
-    ///         Names are left exactly as the engine produced them. A discovered benchmark is already
-    ///         named <c>Class.Method</c> by its envelope, so applying
-    ///         <see cref="RunGroupPayload.DisplayPrefix" /> here would double the class name. The
-    ///         prefix exists for naming benchmarks that produced <i>no</i> result, which is the
-    ///         coordinator's job - see <see cref="WorkerGroupRunner.ToErroredResults" />.
-    ///     </para>
-    /// </summary>
-    private void SendResults(
-        IReadOnlyList<BenchmarkResult> results,
-        Func<BenchmarkResult, double[]> resolveSamples)
-    {
-        // Varied per result so two benchmarks in one group do not keep the same sample positions.
-        // Identical positions would not bias any single benchmark, but it would make a shared
-        // periodic artifact - a GC cadence, a timer - land identically in both and look like a
-        // property of the code rather than of the selection.
-        var index = 0;
-
-        foreach (var result in results)
-        {
-            var (samples, trimmed) = SampleReservoir.Reduce(
-                resolveSamples(result) ?? [],
-                result.TrimmedOrdinals,
-                _maxRawSamples,
-                unchecked(_sampleSeed + index++));
-
-            Enqueue(WorkerFrame.Of(new BenchmarkCompletedPayload
-            {
-                // RawSamples travel in the sibling property, so the copy inside the result is
-                // cleared rather than duplicated on the wire. The ordinals go with the result
-                // because that is where they are declared, and they must be the remapped ones -
-                // the originals index into an array that is no longer what is being sent.
-                Result = result with { RawSamples = [], TrimmedOrdinals = trimmed },
-                RawSamples = samples,
-            }));
         }
     }
 

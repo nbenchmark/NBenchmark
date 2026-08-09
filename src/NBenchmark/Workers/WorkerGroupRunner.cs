@@ -1,3 +1,5 @@
+using System.IO;
+using System.Text.Json;
 using NBenchmark.Engine;
 
 namespace NBenchmark.Workers;
@@ -95,7 +97,7 @@ internal static class WorkerGroupRunner
 
                     return new GroupResult
                     {
-                        Results = results,
+                        Results = WithDeathWarning(results),
                         RawSamples = samples,
                         Faults = faults,
                         WorkerDied = true,
@@ -120,7 +122,7 @@ internal static class WorkerGroupRunner
 
                     return new GroupResult
                     {
-                        Results = results,
+                        Results = WithDeathWarning(results),
                         RawSamples = samples,
                         Faults = faults,
                         WorkerDied = true,
@@ -219,7 +221,44 @@ internal static class WorkerGroupRunner
 
             return new GroupResult
             {
-                Results = results,
+                Results = WithDeathWarning(results),
+                RawSamples = samples,
+                Faults = faults,
+                WorkerDied = true,
+            };
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        {
+            // A torn or unreadable frame: the worker died while writing, or the stream desynchronized.
+            // <see cref="FrameChannel.ReadAsync" /> throws <see cref="EndOfStreamException" /> (an
+            // <see cref="IOException" />) when the pipe dies mid-frame, <see cref="InvalidDataException" />
+            // on a bad length prefix, and <see cref="JsonException" /> on a corrupt payload. None of these
+            // is the user's fault or something a retry of this group would fix, and none should take down
+            // the whole benchmark program - which is what happened before this catch, because every
+            // caller was a bare await and <c>ProcessWorkerLauncher</c> caught only
+            // <c>WorkerStartException</c>. A worker that hard-crashes mid-payload-write is the reachable
+            // case: a <c>BenchmarkCompleted</c> frame carrying thousands of samples is far larger than the
+            // pipe buffer, so the prefix and payload cross as separate writes and the process can die
+            // between them.
+            //
+            // Results already received survive in the local <c>results</c> list; the benchmarks the
+            // worker never reported are filled in downstream by <see cref="ToErroredResults" />.
+            // Settling the exit first means <see cref="WorkerHost.ExitDescription" /> names the cause
+            // (an OOM kill, a stack overflow) and the stderr tail has drained, rather than racing both
+            // into a useless "it vanished" message.
+            await host.WaitForExitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+
+            faults.Add(new FaultPayload
+            {
+                Message = $"The measurement worker died mid-frame and the stream became unreadable "
+                          + $"({host.ExitDescription}): {ex.GetType().Name}. Results it had already sent "
+                          + "were kept; any benchmark it never reported is shown as an error."
+                          + (host.StderrTail.Length == 0 ? "" : $" Worker stderr: {host.StderrTail}"),
+            });
+
+            return new GroupResult
+            {
+                Results = WithDeathWarning(results),
                 RawSamples = samples,
                 Faults = faults,
                 WorkerDied = true,
@@ -347,6 +386,40 @@ internal static class WorkerGroupRunner
             payload.StdDev,
             payload.CiHalfWidth,
             payload.CurrentK));
+
+    /// <summary>
+    ///     The warning stamped on every result a worker had already sent when the worker then died
+    ///     before the group finished, so a consumer's report can tell a measured row from a row
+    ///     measured by a process that then vanished.
+    /// </summary>
+    /// <remarks>
+    ///     Coordinator-side because only this side observes the death. The worker's own contract for
+    ///     <see cref="GroupResult.WorkerDied" /> is that nothing it sent can be assumed complete, and a
+    ///     row that carries a result but no warning would read as fully trustworthy - directly
+    ///     contradicting that contract. <see cref="ToErroredResults" /> only fills in benchmarks the
+    ///     worker never reported, so it does not cover the rows that <i>did</i> arrive.
+    /// </remarks>
+    internal const string DeathWarning =
+        "The measurement worker died before this group finished, so this result was already on the "
+        + "wire but cannot be assumed complete.";
+
+    /// <summary>
+    ///     Returns a copy of <paramref name="results" /> with <see cref="DeathWarning" /> appended to
+    ///     each row's warnings, preserving any warnings the row already carried. Called at every
+    ///     <see cref="GroupResult.WorkerDied" /> return path.
+    /// </summary>
+    internal static List<BenchmarkResult> WithDeathWarning(List<BenchmarkResult> results)
+    {
+        if (results.Count == 0)
+            return results;
+
+        var stamped = new List<BenchmarkResult>(results.Count);
+
+        foreach (var result in results)
+            stamped.Add(result with { Warnings = [..result.Warnings, DeathWarning] });
+
+        return stamped;
+    }
 
     /// <summary>
     ///     Turns the group's faults into errored results, so a benchmark that could not be measured

@@ -22,7 +22,9 @@ namespace NBenchmark.Worker;
 internal sealed class StreamingProgress(
     FrameQueue queue,
     CancellationToken cancellationToken,
-    bool streamSamples = false)
+    bool streamSamples = false,
+    int maxRawSamples = MeasurementOptions.DefaultMaxRawSamples,
+    int sampleSeed = 0)
     : IBenchmarkProgress, IMeasurementObserver
 {
     /// <summary>
@@ -84,6 +86,30 @@ internal sealed class StreamingProgress(
     private long _lastSampleFlushTick;
 
     /// <summary>
+    ///     Per-result offset into the sample-reservoir seed, so two benchmarks in one group keep
+    ///     different sample positions - the same property the old batched
+    ///     <c>WorkerSession.SendResults</c> relied on, now applied one result at a time as each
+    ///     finishes (W-44).
+    /// </summary>
+    private int _sendIndex;
+
+    /// <summary>
+    ///     Optional rename of a result's measured name to the name the caller asked for, set by
+    ///     <see cref="WorkerSession" /> for the test-method path. Discovery names a result
+    ///     <c>"&lt;TypeFullName&gt;.&lt;DisplayName&gt;"</c>, which is correct for a benchmark class and
+    ///     wrong for a test method whose caller already qualifies the display name its own way. Applied
+    ///     here - where the result is sent, one at a time - rather than by renaming a list after the
+    ///     group, because the incremental send means there is no list to rename.
+    /// </summary>
+    private Func<string, string>? _renameResult;
+
+    /// <summary>
+    ///     Sets the per-group result-name rename. <c>null</c> (the default) leaves measured names as
+    ///     they are; the test-method path passes a map from measured name to the caller's display name.
+    /// </summary>
+    internal void SetResultRename(Func<string, string>? rename) => _renameResult = rename;
+
+    /// <summary>
     ///     This type is both the progress sink and the observer sink. They are separate interfaces
     ///     with separate contracts, but one object can satisfy both, and sharing it keeps a single
     ///     ordered queue behind them.
@@ -129,10 +155,62 @@ internal sealed class StreamingProgress(
     }
 
     /// <summary>
-    ///     The coordinator raises this itself from the benchmark's completion frame, which carries
-    ///     the authoritative result. Forwarding it here as well would fire the callback twice.
+    ///     Ships the result the moment it is complete, ahead of any later benchmark in the group, so a
+    ///     worker that dies measuring a later benchmark has already delivered this one over the wire.
+    ///     <para>
+    ///         This is the whole of W-44. The previous design held every result until the group finished
+    ///         and shipped them in one batch at the end, so a crash on the second benchmark annihilated
+    ///         the first benchmark's result - it was measured, fully computed, and sitting in a local
+    ///         list that died with the process. Sending here, as each benchmark completes, means the
+    ///         result is already on the coordinator's side before the next benchmark starts; a death
+    ///         can still lose the benchmark in flight, but it can no longer lose the ones before it.
+    ///     </para>
+    ///     <para>
+    ///         The coordinator accumulates <c>BenchmarkCompleted</c> frames as they arrive - it does not
+    ///         wait for a group-complete sentinel to collect them - so moving the send forward in time
+    ///         is the only change; nothing on the receiving side moves.
+    ///     </para>
     /// </summary>
-    public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
+    /// <remarks>
+    ///     Sample reduction and the per-result seed offset are the same work <c>SendResults</c> did at
+    ///     group end; they move here unchanged. <see cref="BenchmarkResult.RawSamples" /> is
+    ///     <see cref="IReadOnlyList{T}" /> at the type level but is always a <see cref="double" /> array
+    ///     at runtime (<see cref="OutcomeBuilder" /> shares one array between the outcome and the
+    ///     result), so the cast avoids a copy in the common case.
+    /// </remarks>
+    public Task OnBenchmarkCompleted(BenchmarkResult result)
+    {
+        // The measured name is the engine's convention; the test-method path renames it to what the
+        // caller asked for. Applied here, on the single result, because the incremental send means
+        // there is no later list to walk and rename.
+        var final = _renameResult is { } rename
+            ? result with { Name = rename(result.Name) }
+            : result;
+
+        // Varied per result so two benchmarks in one group do not keep the same sample positions.
+        // Identical positions would not bias any single benchmark, but it would make a shared
+        // periodic artifact - a GC cadence, a timer - land identically in both and look like a
+        // property of the code rather than of the selection.
+        var source = final.RawSamples as double[] ?? final.RawSamples.ToArray();
+
+        var (samples, trimmed) = SampleReservoir.Reduce(
+            source,
+            final.TrimmedOrdinals,
+            maxRawSamples,
+            unchecked(sampleSeed + _sendIndex++));
+
+        queue.Enqueue(WorkerFrame.Of(new BenchmarkCompletedPayload
+        {
+            // RawSamples travel in the sibling property, so the copy inside the result is cleared
+            // rather than duplicated on the wire. The ordinals go with the result because that is
+            // where they are declared, and they must be the remapped ones - the originals index into
+            // an array that is no longer what is being sent.
+            Result = final with { RawSamples = [], TrimmedOrdinals = trimmed },
+            RawSamples = samples,
+        }));
+
+        return Task.CompletedTask;
+    }
 
     public void OnPhase(in MeasurementPhaseEvent e)
     {

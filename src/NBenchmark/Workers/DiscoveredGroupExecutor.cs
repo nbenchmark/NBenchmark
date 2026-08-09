@@ -102,8 +102,38 @@ internal static class DiscoveredGroupExecutor
             var selectedSuite = suite with { Benchmarks = selected };
             var (setupSuccess, setupErrors) = BenchmarkLifecycle.TryRunSetup(selectedSuite, instance, options);
 
+            // The shared-instance independence warning is a property of the suite, not of any one
+            // result, so it is known before the first benchmark starts. Computing it here - before
+            // the run, rather than after - is what gets it onto the wire. W-44 sends each result as it
+            // completes (via StreamingProgress.OnBenchmarkCompleted), so a warning attached to the
+            // local results list after the run would land on objects that had already crossed the
+            // process boundary without it. The decorator below stamps it on each result ahead of the
+            // inner sink, which is the moment a worker puts it on the wire. The post-run Attach
+            // (kept) does the same for the returned list, for any caller that reads the outcome's
+            // results directly; the wire copy and the list copy are independent objects, so the
+            // warning appears once on each.
+            //
+            // Computed before the setup check so both branches - setup failed, or the run produced
+            // results - send through the same decorated sink, and a setup failure carries the warning
+            // too.
+            var dependenceWarning = InstanceIndependence.DependenceWarning(
+                suite.Type, suite.Lifetime, selected.Count, options);
+
+            var reported = dependenceWarning is null
+                ? progress
+                : new IndependenceWarningProgress(progress, dependenceWarning);
+
             if (!setupSuccess)
+            {
                 results = setupErrors!.ToList();
+
+                // Setup threw before any benchmark ran, so SuiteRunner never raised
+                // OnBenchmarkCompleted for these errored rows. Send them through the same sink so
+                // they reach the coordinator the way measured results do - without this, the only
+                // copy lived in the local list the worker no longer batches and ships at group end.
+                foreach (var error in results)
+                    await reported.OnBenchmarkCompleted(error).ConfigureAwait(false);
+            }
             else
             {
                 var factory = () => instance;
@@ -119,7 +149,7 @@ internal static class DiscoveredGroupExecutor
 
                 (results, samples) = await SuiteRunner.RunAsync(
                         envelopes, order, seed, options,
-                        startIndex, totalBenchmarks, progress, cancellationToken,
+                        startIndex, totalBenchmarks, reported, cancellationToken,
                         betweenBenchmarksReset, observer)
                     .ConfigureAwait(false);
 
@@ -127,10 +157,7 @@ internal static class DiscoveredGroupExecutor
                 // used to live and is the path a default Harness run never takes. Sharing an
                 // instance breaks the independence assumption identically in a worker; the worker
                 // was simply the one measuring process that never said so.
-                InstanceIndependence.Attach(
-                    results,
-                    InstanceIndependence.DependenceWarning(
-                        suite.Type, suite.Lifetime, selected.Count, options));
+                InstanceIndependence.Attach(results, dependenceWarning);
             }
         }
         finally
@@ -185,7 +212,16 @@ internal static class DiscoveredGroupExecutor
 
                 if (!setupSuccess)
                 {
-                    results.AddRange(setupErrors!);
+                    // Setup threw, so SuiteRunner never ran and never raised OnBenchmarkCompleted for
+                    // these errored rows. Send them through the same sink so they reach the
+                    // coordinator the way measured results do - without this, the only copy lived in
+                    // the local list the worker no longer batches and ships at group end.
+                    foreach (var error in setupErrors!)
+                    {
+                        results.Add(error);
+                        await progress.OnBenchmarkCompleted(error).ConfigureAwait(false);
+                    }
+
                     continue;
                 }
 
@@ -216,4 +252,58 @@ internal static class DiscoveredGroupExecutor
         return new GroupOutcome(results, samples, false);
     }
 
+    /// <summary>
+    ///     Wraps an <see cref="IBenchmarkProgress" /> so each completed result carries the
+    ///     shared-instance independence warning before the inner sink reports it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A worker sends each result the moment it completes (W-44), not in a batch at group end,
+    ///         so a warning attached to the local results list <i>after</i> the run would never reach
+    ///         the coordinator - the result it should have been stamped on is already gone. This
+    ///         decorator stamps it on the result inside <see cref="OnBenchmarkCompleted" />, ahead of
+    ///         the inner sink, which is the exact moment a worker puts the result on the wire.
+    ///     </para>
+    ///     <para>
+    ///         Only the PerClass path carries this warning, so only that path wraps; PerMethod has
+    ///         nothing to warn about and runs unwrapped. The observer facet
+    ///         (<see cref="IMeasurementObserver" />) is the inner sink's own and is passed separately,
+    ///         so wrapping the progress facet does not touch it.
+    ///     </para>
+    /// </remarks>
+    private sealed class IndependenceWarningProgress(IBenchmarkProgress inner, string warning)
+        : IBenchmarkProgress
+    {
+        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
+            => inner.OnSuiteStarting(benchmarkNames, total);
+
+        public Task OnWarmupStarting(string name, int totalWarmupIterations)
+            => inner.OnWarmupStarting(name, totalWarmupIterations);
+
+        public Task OnWarmupCompleted(string name)
+            => inner.OnWarmupCompleted(name);
+
+        public Task OnBenchmarkStarting(string name, int index, int total)
+            => inner.OnBenchmarkStarting(name, index, total);
+
+        public Task OnIterationCompleted(string name, int iteration, int totalIterations)
+            => inner.OnIterationCompleted(name, iteration, totalIterations);
+
+        public Task OnBenchmarkCompleted(BenchmarkResult result)
+        {
+            // The same attachment InstanceIndependence.Attach applies to a list, applied to one
+            // result: append the warning, preserving anything already there.
+            var warned = result with
+            {
+                Warnings = result.Warnings.Count > 0
+                    ? [.. result.Warnings, warning]
+                    : [warning],
+            };
+
+            return inner.OnBenchmarkCompleted(warned);
+        }
+
+        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
+            => inner.OnSuiteCompleted(results);
+    }
 }

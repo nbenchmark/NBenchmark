@@ -699,6 +699,71 @@ public sealed class FrameChannelTests
         Assert.Null(await right.ReadAsync(CancellationToken.None));
     }
 
+    /// <summary>
+    ///     A stream that is empty <i>before</i> any byte of a frame arrives is a clean end: the peer
+    ///     closed the pipe between frames, and <c>null</c> is the signal the dispatch loops branch on
+    ///     to exit quietly. Driven through a <see cref="MemoryStream" /> so the byte count is exact;
+    ///     the real pipe is exercised by <see cref="ClosedPeer_ReadsAsEndOfStream" />.
+    /// </summary>
+    [Fact]
+    public async Task EmptyStream_BeforeAnyByte_ReadsAsNull()
+    {
+        using var channel = new FrameChannel(new MemoryStream(), new MemoryStream());
+
+        Assert.Null(await channel.ReadAsync(CancellationToken.None));
+    }
+
+    /// <summary>
+    ///     A stream that dies <i>mid length-prefix</i> is not a clean end - two of the four framing
+    ///     bytes arrived, so the peer was writing a frame and then vanished. <see cref="ReadAsync" />
+    ///     must surface that as a torn frame, not swallow it as <c>null</c>.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This is the defect <see cref="ReadExactlyAsync" /> carried: it returned <c>false</c>
+    ///         whenever a read returned zero, <i>at any offset</i>, so a torn length prefix was
+    ///         indistinguishable from a clean end. The length-prefix branch in <see cref="ReadAsync" />
+    ///         then turned that <c>false</c> into <c>null</c>, and a worker that had started writing a
+    ///         frame and then crashed looked to the coordinator exactly like a worker that had
+    ///         finished and exited - a silent <c>null</c> instead of a fault.
+    ///     </para>
+    ///     <para>
+    ///         The fix: <see cref="ReadExactlyAsync" /> returns <c>false</c> only when the stream ended
+    ///         cleanly before <i>any</i> byte arrived; once it has begun filling the buffer, a
+    ///         subsequent zero read is a torn frame and throws. The length-prefix branch's
+    ///         <c>null</c> then means only "clean end between frames".
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task TornLengthPrefix_ThrowsEndOfStream_NotReadsAsNull()
+    {
+        // Two of the four length-prefix bytes, then EOF.
+        using var channel = new FrameChannel(
+            new MemoryStream([0x78, 0x56]),
+            new MemoryStream());
+
+        await Assert.ThrowsAsync<EndOfStreamException>(
+            () => channel.ReadAsync(CancellationToken.None));
+    }
+
+    /// <summary>
+    ///     A stream that dies <i>mid payload</i> - the length prefix arrived in full, but fewer than
+    ///     the promised payload bytes did - is the other half of a torn frame. This already threw
+    ///     before the <see cref="ReadExactlyAsync" /> fix (the payload branch checks the return
+    ///     value); the test pins it so a later "simplify" pass cannot quietly turn a torn payload
+    ///     back into a <c>null</c>.
+    /// </summary>
+    [Fact]
+    public async Task TornPayload_ThrowsEndOfStream()
+    {
+        // A length prefix promising 10 bytes, then only 3, then EOF.
+        var torn = new MemoryStream([0x0A, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03]);
+        using var channel = new FrameChannel(torn, new MemoryStream());
+
+        await Assert.ThrowsAsync<EndOfStreamException>(
+            () => channel.ReadAsync(CancellationToken.None));
+    }
+
     private static BenchmarkResult ResultNamed(string name) => new()
     {
         Name = name,
