@@ -50,6 +50,21 @@ internal sealed record MeasurementOverrides
     public RuntimeProfile? RuntimeProfile { get; init; }
     public bool? ForceGc { get; init; }
     public bool? NoAllocations { get; init; }
+
+    /// <summary>
+    ///     Set by <c>--strict-isolation</c>, which asks for the same thing
+    ///     <see cref="MeasurementOptions.RequireIsolation" /> does and had no way to say so.
+    /// </summary>
+    /// <remarks>
+    ///     One-way, like <c>--emit-raw</c>: the flag turns the requirement on and its absence leaves
+    ///     whatever was configured alone. Without this mapping the flag could only ever take the
+    ///     expensive path - measure everything, audit the results, set an exit code - even though the
+    ///     early-throw mechanism it wanted already existed and the two are the same request phrased at
+    ///     different times. Both still run: the throw catches a refusal before any work, and
+    ///     <see cref="Workers.IsolationAudit.Enforce" /> remains the backstop for anything that reaches
+    ///     the results without having passed a gate.
+    /// </remarks>
+    public bool? RequireIsolation { get; init; }
     public bool? NoGcBetweenBenchmarks { get; init; }
     public double? MinPracticalEffect { get; init; }
 
@@ -119,6 +134,7 @@ internal sealed record MeasurementOverrides
         RuntimeProfile = cliArgs.RuntimeProfile,
         ForceGc = cliArgs.ForceGc,
         NoAllocations = cliArgs.NoAllocations,
+        RequireIsolation = cliArgs.StrictIsolation ? true : null,
         NoGcBetweenBenchmarks = cliArgs.NoGcBetweenBenchmarks ? true : null,
         MinPracticalEffect = cliArgs.MinPracticalEffect,
         Preset = cliArgs.AutoTunePreset,
@@ -181,6 +197,9 @@ internal sealed record MeasurementOverrides
 
         if (NoGcBetweenBenchmarks is true)
             result = result with { ForceGcBetweenBenchmarksOverride = false };
+
+        if (RequireIsolation is true)
+            result = result with { RequireIsolation = true };
 
         if (MinPracticalEffect.HasValue)
             result = result with { MinimumPracticalEffect = MinPracticalEffect.Value };

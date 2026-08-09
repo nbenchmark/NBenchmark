@@ -40,6 +40,19 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         });
 
     /// <summary>
+    ///     The same, with the hard-error gate turned off, for the tests that are about what the
+    ///     <i>fallback</i> does and says.
+    /// </summary>
+    /// <remarks>
+    ///     A refusal throws by default, so the labelled-fallback path and its stderr guidance are only
+    ///     reachable this way - which is the setting a caller who prefers a labelled number to an
+    ///     exception would use. The gate itself is asserted by
+    ///     <see cref="RequireIsolation_OnRefusal_ThrowsWithTheReason" />, so both sides are covered
+    ///     rather than one being avoided.
+    /// </remarks>
+    private static BenchmarkSuite Fallback(BenchmarkSuite suite) => Fast(suite).WithRequireIsolation(false);
+
+    /// <summary>
     ///     The plain shape people already write is now isolated. Nothing about the call moved.
     /// </summary>
     [Fact]
@@ -140,7 +153,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
 
         try
         {
-            results = await Fast(new BenchmarkSuite("captures")
+            results = await Fallback(new BenchmarkSuite("captures")
                     .Add("clean", () => Thread.SpinWait(200))
                     .Add("dirty", () => stream.Length))
                 .RunAsync();
@@ -276,7 +289,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
 
         try
         {
-            results = await Fast(new BenchmarkSuite("captured-lifecycle")
+            results = await Fallback(new BenchmarkSuite("captured-lifecycle")
                     .Add("a", () => Thread.SpinWait(200))
                     .WithSuiteSetup(() => _ = stream.Length))
                 .RunAsync();
@@ -475,7 +488,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
 
         try
         {
-            results = await Fast(new BenchmarkSuite("opaque")
+            results = await Fallback(new BenchmarkSuite("opaque")
                     .WithParameter<object>("payload", 200)
                     .Add("consume", (object payload) => Thread.SpinWait((int)payload)))
                 .RunAsync();
@@ -645,7 +658,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
 
         try
         {
-            results = await Fast(new BenchmarkSuite("captured-state")
+            results = await Fallback(new BenchmarkSuite("captured-state")
                     .WithState(() => new int[size])
                     .Add("a", buffer => buffer.Length))
                 .RunAsync();
@@ -691,7 +704,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
                 .WithRequireIsolation()
                 .RunAsync());
 
-        Assert.Contains("RequireIsolation is set", ex.Message);
+        Assert.Contains("isolation is required", ex.Message);
         Assert.Contains("captures", ex.Message);
         Assert.Contains("prepare", ex.Message);
     }
@@ -710,6 +723,63 @@ public sealed class InlineSuiteIsolationTests : IDisposable
 
         var result = Assert.Single(results);
         Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
+    }
+
+    /// <summary>
+    ///     W-26: <c>AddInProcess</c> keeps one benchmark in the host while the rest of the suite is
+    ///     measured in a worker.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The all-or-nothing behaviour this replaces is the reason it exists: one body holding
+    ///         something that cannot cross took every other benchmark in the suite into the host process
+    ///         with it, and <c>WithIsolation(false)</c> was the only lever. The price of measuring one
+    ///         un-isolatable thing was every comparison it was part of.
+    ///     </para>
+    ///     <para>
+    ///         The suite runs under the default hard-error gate, which is half the assertion: an
+    ///         <c>AddInProcess</c> row is a <i>request</i>, so it must not be counted as a refusal.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task AddInProcess_KeepsOnlyThatBenchmarkInTheHost()
+    {
+        var stream = Stream.Null;
+
+        var results = await Fast(new BenchmarkSuite("split")
+                .Add("isolated", () => Thread.SpinWait(200))
+                .AddInProcess("host", () => stream.Length)
+                .Add("also-isolated", () => Thread.SpinWait(400)))
+            .RunAsync();
+
+        Assert.Equal(3, results.Count);
+        Assert.All(results, r => Assert.False(r.Errored, r.ErrorMessage));
+
+        Assert.Equal(IsolationStatus.Isolated, results.Single(r => r.Name == "isolated").IsolationStatus);
+        Assert.Equal(IsolationStatus.Isolated, results.Single(r => r.Name == "also-isolated").IsolationStatus);
+        Assert.Equal(IsolationStatus.InProcessRequested, results.Single(r => r.Name == "host").IsolationStatus);
+
+        // Declaration order survives the two-pass measurement. Appending the host rows would put every
+        // AddInProcess row at the bottom of the table regardless of where it was written.
+        Assert.Equal(["isolated", "host", "also-isolated"], results.Select(r => r.Name));
+    }
+
+    /// <summary>
+    ///     A suite made entirely of <c>AddInProcess</c> members is measured here, with nothing refused.
+    /// </summary>
+    [Fact]
+    public async Task AddInProcess_ForEveryBenchmark_MeasuresHereWithoutRefusing()
+    {
+        var stream = Stream.Null;
+
+        var results = await Fast(new BenchmarkSuite("all-host")
+                .AddInProcess("a", () => stream.Length)
+                .AddInProcess("b", () => stream.CanRead))
+            .RunAsync();
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.False(r.Errored, r.ErrorMessage));
+        Assert.All(results, r => Assert.Equal(IsolationStatus.InProcessRequested, r.IsolationStatus));
     }
 
     /// <summary>Counts worker groups so a test can assert how the work was partitioned.</summary>

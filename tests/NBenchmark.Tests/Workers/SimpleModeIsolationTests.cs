@@ -56,6 +56,36 @@ public sealed class SimpleModeIsolationTests : IDisposable
     };
 
     /// <summary>
+    ///     The same options with the hard-error gate turned off, for the tests that are about what the
+    ///     <i>fallback</i> does.
+    /// </summary>
+    /// <remarks>
+    ///     A refusal throws by default now, so the labelled-fallback path and the guidance it prints are
+    ///     only reachable with <c>RequireIsolation = false</c> - which is exactly the setting a caller
+    ///     who wants a labelled number instead of an exception would use. The gate itself is asserted
+    ///     separately, in <see cref="Run_CapturingUnsendableState_ByDefault_Throws" /> and
+    ///     <see cref="RequiredIsolationTests" />; without the pair, turning the gate off here would look
+    ///     like the tests avoiding the change rather than covering both sides of it.
+    /// </remarks>
+    private static MeasurementOptions FallbackOptions => FastOptions with { RequireIsolation = false };
+
+    /// <summary>
+    ///     The default: a capture that cannot be sent is an error, not a quietly-labelled host
+    ///     measurement.
+    /// </summary>
+    [Fact]
+    public void Run_CapturingUnsendableState_ByDefault_Throws()
+    {
+        var stream = Stream.Null;
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => Benchmark.Run(() => stream.Length, FastOptions, name: "captured-strict"));
+
+        Assert.Contains("captured-strict", error.Message, StringComparison.Ordinal);
+        Assert.Contains("RunInProcess", error.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     A non-capturing lambda is measured in a worker under the default profile. This is the
     ///     behaviour change that makes Simple mode trustworthy: nothing about the call site moved.
     /// </summary>
@@ -147,7 +177,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
 
         try
         {
-            result = Benchmark.Run(() => stream.Length, FastOptions, name: "captured");
+            result = Benchmark.Run(() => stream.Length, FallbackOptions, name: "captured");
         }
         finally
         {
@@ -190,7 +220,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
         {
             for (var i = 0; i < 3; i++)
             {
-                Benchmark.Run(() => Thread.SpinWait(spins), FastOptions, name: $"captured-{i}");
+                Benchmark.Run(() => Thread.SpinWait(spins), FallbackOptions, name: $"captured-{i}");
             }
         }
         finally
@@ -221,7 +251,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
         {
             for (var i = 0; i < 3; i++)
             {
-                Benchmark.Run(() => Thread.SpinWait(spins), FastOptions, name: "captured-same");
+                Benchmark.Run(() => Thread.SpinWait(spins), FallbackOptions, name: "captured-same");
             }
         }
         finally
@@ -249,7 +279,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
         {
             for (var i = 0; i < 14; i++)
             {
-                Benchmark.Run(() => Thread.SpinWait(spins), FastOptions, name: $"flood-{i}");
+                Benchmark.Run(() => Thread.SpinWait(spins), FallbackOptions, name: $"flood-{i}");
             }
         }
         finally
@@ -312,7 +342,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
 
         try
         {
-            result = Benchmark.Run(() => Thread.SpinWait(200), FastOptions, name: "no-worker");
+            result = Benchmark.Run(() => Thread.SpinWait(200), FallbackOptions, name: "no-worker");
         }
         finally
         {
@@ -411,7 +441,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
             result = Benchmark.Run(
                 prepare: () => new int[size],
                 body: data => data.Length,
-                options: FastOptions,
+                options: FallbackOptions,
                 name: "captured-prepare");
         }
         finally
@@ -458,7 +488,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
                     return 200_000;
                 },
                 body: spins => Thread.SpinWait(spins),
-                options: FastOptions,
+                options: FallbackOptions,
                 name: "prepared-fallback");
         }
         finally

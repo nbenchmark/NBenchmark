@@ -33,7 +33,8 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that may hold per-instance state (any non-primitive, non-ambient reference type), which can leak warmed state across benchmark methods. |
 | NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method has both `[BenchmarkCase]` and `[BenchmarkCases]`. Use one or the other. |
 | NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a mutable instance field that is read or written by at least two `[Benchmark]` methods, which can leak warmed state across methods. |
-| NB0014 | Benchmark body captures state and cannot be isolated | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, `Benchmark.RunRawAsync()` or `BenchmarkSuite.Add()` captures a local, a parameter, or `this`. Captured state cannot cross a process boundary, so the body is measured in the host process instead of an isolated worker - and for a suite, so is every other benchmark in it. |
+| NB0014 | Benchmark body captures state | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, `Benchmark.RunRawAsync()` or `BenchmarkSuite.Add()` captures a local, a parameter, or `this`. Ordinary data is sent to the worker and the body is still isolated; a value whose behaviour is not determined by its contents is refused, which fails the run. `IsolationStatus` on the result is the authority. |
+| NB0015 | Conflicting isolation attributes | Error | One member carries both `[InProcess]` and `[IsolatedProcess]`. The two ask for opposite things, and the conflict used to resolve silently in favour of `[InProcess]`. Remove one. |
 
 ### NB0001 - Missing parameterless constructor
 
@@ -272,16 +273,16 @@ Typical fixes:
 
 NBenchmark measures a benchmark body in a separate worker process, because the runtime configuration a process starts under is the dominant term in a small measurement. It gets the body there by resolving the method the compiler already emitted; it never serializes or regenerates it.
 
-A lambda that captures state cannot be addressed that way. Its captured values live in your process, and there is no honest way to reproduce them elsewhere - a fabricated closure does not throw, it returns plausible wrong numbers. So a capturing body is measured in the test host instead, correctly labelled but less precise.
+A lambda that captures state cannot be addressed that way, so the captured *values* are sent instead - but only when the value's measured behaviour is fully determined by the bytes sent. Most ordinary data qualifies and the benchmark is isolated; a value whose behaviour is not determined by its contents (a `Stream`, a collection with a custom comparer, a user type that has not opted in) is refused, and a refusal fails the run.
 
 ```csharp
 var data = BuildInput();
 
-// Info NB0014: captures 'data' - measured in this process
+// Info NB0014: captures 'data'
 Benchmark.Run(() => Process(data));
 ```
 
-The runtime already reports this after the fact, in the `Iso` column and the isolation status. NB0014 moves the news to where you can still act on it, and names the symbols responsible - which the runtime cannot do as precisely, because by then they are fields on a compiler-generated class.
+Whether a given capture crosses depends on run-time facts a rule cannot see - a collection's comparer, whether two fields alias, the encoded size - so NB0014 reports the capture and points at `IsolationStatus` as the authority. It moves the news to where you can still act on it, and names the symbols responsible, which the runtime cannot do as precisely because by then they are fields on a compiler-generated class.
 
 **It is `Info`, not a warning**, because capturing is the idiomatic way to benchmark over prepared data. Warning on it would push you towards contorted code to silence a build. What it costs is fidelity, not correctness.
 
@@ -293,10 +294,10 @@ A few shapes are worth knowing because they do not read the way they lower:
 | --- | --- | --- |
 | `() => 43` | yes | Nothing to carry. Roslyn still emits it as an instance method on a cached singleton, so a `Target is null` test would get this wrong. |
 | `static () => 43` | yes | Same as above - `static` documents the intent, it does not change the lowering. |
-| `() => Work(local)` | no | Captures `local`. |
-| `() => Work(_field)` | no | Captures `this` - naming an instance member without a receiver carries the whole object. |
+| `() => Work(local)` | if `local` can be sent faithfully | An `int`, a `string`, an `int[]` or a record of those is sent by value. A `Stream` is not. |
+| `() => Work(_field)` | if the whole object can be sent faithfully | Captures `this` - naming an instance member without a receiver carries the whole object, so every field of it has to qualify. |
 | `() => Work(StaticField)` | yes | A static needs no receiver. |
-| `widget.Compute` | no | A method group over a live object; the receiver is state this process owns. |
+| `widget.Compute` | if `widget` can be sent faithfully | A method group over a live object; the receiver is walked field by field like any other. |
 | `() => 43` beside `() => local` | yes | A non-capturing lambda keeps its isolation even when a sibling in the same scope captures. |
 
 `Add` is where capture reads as most idiomatic, and where it costs most. A suite is addressed as a *set* - one worker measures all of its bodies - so the first body that cannot be addressed takes every sibling in-process with it, including the ones that would have isolated fine on their own. The message says so:
@@ -387,11 +388,39 @@ Or set the severity in `.editorconfig`:
 dotnet_diagnostic.NB0004.severity = none
 ```
 
+### NB0015 - Conflicting isolation attributes
+
+`[InProcess]` asks for the host process and `[IsolatedProcess]` asks for a dedicated worker. On one member they cannot both be honoured, and the runtime used to resolve the conflict silently in favour of `[InProcess]` - so a request for a clean-room reading was read and discarded with nothing said.
+
+```csharp
+public class MyBenchmarks
+{
+    // Error NB0015
+    [Benchmark, InProcess, IsolatedProcess]
+    public void Both() { }
+}
+```
+
+A **method-level** attribute overriding a **class-level** one is a different thing and is not reported - it is the documented way to force one benchmark out of a mostly-in-process class:
+
+```csharp
+[InProcess]
+public class MostlyHere
+{
+    [Benchmark] public void Here() { }
+
+    // Fine: the method wins over the class.
+    [Benchmark, IsolatedProcess] public void There() { }
+}
+```
+
+Discovery refuses the same combination at runtime, with the same message, for assemblies no analyzer ever saw.
+
 ## Severity
 
 Diagnostics use the default severity listed in the table above. The default is chosen by where the problem sits on the invalid-to-suspicious spectrum:
 
-- **Errors** mean the benchmark cannot run or will produce meaningless results. NB0002, NB0003, NB0004, NB0005, NB0006, NB0007, NB0008, and NB0009 are errors.
+- **Errors** mean the benchmark cannot run or will produce meaningless results. NB0002, NB0003, NB0004, NB0005, NB0006, NB0007, NB0008, NB0009 and NB0015 are errors.
 - **Warnings** mean the code can run but the measurements may be invalid. NB0001, NB0010, NB0011, and NB0013 are warnings.
 - **Info** means the code and the measurement are both fine, but something about how the measurement was taken is worth knowing. NB0014 is informational.
 

@@ -22,6 +22,9 @@ using NBenchmark.Reporters.Console;
 // have, and probing confirmed it is silent: a fabricated replacement did not throw, it returned
 // plausible, wrong numbers.
 //
+// A refusal is an *error*, not a labelled fallback - in-process measurement is something you ask
+// for rather than something that happens to you. Benchmark.RunInProcess is how you ask.
+//
 // So `prepare` is no longer the difference between isolated and not. It is still the better shape,
 // for two reasons this sample shows:
 //
@@ -46,10 +49,12 @@ Console.WriteLine();
 var data = BuildData();
 var captured = Benchmark.Run(() => Sum(data), options, "captured");
 
-// A capture that cannot be sent. A Stream's behaviour is not determined by its contents, so this is
-// refused by name and measured here instead, labelled with the reason and the remedy.
+// A capture that cannot be sent. A Stream's behaviour is not determined by its contents, so it is
+// refused by name - and a refusal is now an error, not a labelled fallback. RunInProcess is how you
+// say "measure it here anyway": the row is stamped as a request rather than a refusal, and it is
+// still never given a ratio against an isolated row.
 var handle = new MemoryStream(new byte[4096]);
-var unsendable = Benchmark.Run(() => handle.Length, options, "unsendable");
+var unsendable = Benchmark.RunInProcess(() => handle.Length, options, "unsendable");
 
 // The same benchmark, prepared in two delegates. `prepare` runs once, before warmup, in the
 // worker - so the cost of building the array is never inside a reading.

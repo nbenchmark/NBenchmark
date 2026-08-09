@@ -265,23 +265,23 @@ dotnet run -- --in-process
 
 ### `--strict-isolation`
 
-Fail the run if any benchmark was **not** measured in an isolated worker.
+Fail the run if isolation was **refused** for any benchmark.
 
 ```bash
 dotnet run -- --strict-isolation
 ```
 
-Every non-isolated result is already labelled in the table and explained on the console, but neither survives CI: a label scrolls past, and a warning in a log nobody reads is indistinguishable from no warning. This turns the label into exit code 1.
-
-The failure names each benchmark, grouped by cause, with the remedy for each:
+Two things at once: it turns `MeasurementOptions.RequireIsolation` on for the run - so a refusal throws at discovery time, before anything is measured - and it audits the results afterwards as a backstop, setting exit code 1 and naming every offender grouped by cause:
 
 ```
---strict-isolation: 1 of 4 benchmark(s) were measured in this process rather than an
+--strict-isolation: 1 of 4 measured benchmark(s) ran in this process rather than an
 isolated worker, so their numbers carry the host's JIT and GC configuration.
-  in-process: HarnessBenchmarks.InHarness
+  in-process (captures): HarnessBenchmarks.InHarness
 ```
 
-Use it on any pipeline that gates on benchmark numbers. A benchmark that quietly fell back to the host process - because the worker was not deployed on the build agent, or because a body captures state - produces numbers that cannot be compared against a stored baseline measured under a different runtime configuration.
+It keys on *refusal*, not on "was not isolated". A deliberate `--in-process` or `--dry-run` run passes, because there is nothing to act on - the flag used to fail those, which made it unusable in a pipeline that also ran a dry-run check.
+
+Since `RequireIsolation` now defaults to `true`, the flag is mostly a way to re-assert the requirement over a program that turned it off, and to get the after-the-fact report. See [When isolation is refused](../features/isolated-runs.md#when-isolation-is-refused).
 
 ---
 

@@ -25,7 +25,7 @@ public sealed class DiagnosticsIntegrationTests
         listener.SetMeasurementEventCallback<long>((_, _, _, _) => { });
         listener.Start();
 
-        await new BenchmarkSuite("diag-smoke")
+        await new BenchmarkSuite("diag-smoke").WithRequireIsolation(false)
             .Add("work", () => { })
             .WithWarmup(0)
             .WithIterations(3)

@@ -38,6 +38,11 @@ public sealed class VerifyIsolationPassTests
             .WithLaunchCount(1)
             .WithOptions(MeasurementOptions.Default with
             {
+                // No worker is deployed beside the test host, so every class here is refused. These
+                // tests are about the shape of the --verify-isolation pass - one suite stream, one
+                // regression gate, reporters on the measured run only - not about the gate that would
+                // otherwise stop the run before any of it happened.
+                RequireIsolation = false,
                 Iterations = 1,
                 WarmupIterations = 0,
                 OpsPerSample = 1,

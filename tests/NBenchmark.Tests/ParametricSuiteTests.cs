@@ -7,7 +7,7 @@ public class ParametricSuiteTests
     [Fact]
     public async Task WithParameter_Expands_Benchmarks_Per_Value()
     {
-        var results = await new BenchmarkSuite("parametric")
+        var results = await new BenchmarkSuite("parametric").WithRequireIsolation(false)
             .WithParameter("size", 10, 100)
             .Add("constant", (int size) => size)
             .WithWarmup(0)
@@ -24,7 +24,7 @@ public class ParametricSuiteTests
     [Fact]
     public async Task WithParameter_Result_Contains_ParameterSet()
     {
-        var results = await new BenchmarkSuite("parametric")
+        var results = await new BenchmarkSuite("parametric").WithRequireIsolation(false)
             .WithParameter("size", 10)
             .Add("constant", (int size) => size)
             .WithWarmup(0)
@@ -41,7 +41,7 @@ public class ParametricSuiteTests
     [Fact]
     public async Task WithParameter_Multiple_Parameters_Expands_Combinatorially()
     {
-        var results = await new BenchmarkSuite("parametric")
+        var results = await new BenchmarkSuite("parametric").WithRequireIsolation(false)
             .WithParameter("a", 1, 2)
             .WithParameter("b", 10, 20)
             .Add("sum", (int a, int b) => a + b)
@@ -61,7 +61,7 @@ public class ParametricSuiteTests
     [Fact]
     public async Task WithParameter_Mixed_Parameterized_And_Non_Parameterized()
     {
-        var results = await new BenchmarkSuite("mixed")
+        var results = await new BenchmarkSuite("mixed").WithRequireIsolation(false)
             .Add("plain", () => { })
             .WithParameter("size", 10)
             .Add("param", (int size) => size)
@@ -79,7 +79,7 @@ public class ParametricSuiteTests
     [Fact]
     public async Task WithParameter_Per_Parameter_Baseline_Applies_To_Each_Group()
     {
-        var results = await new BenchmarkSuite("per-param-baseline")
+        var results = await new BenchmarkSuite("per-param-baseline").WithRequireIsolation(false)
             .WithParameter("size", 10, 100)
             .Add("baseline", (int size) => Thread.SpinWait(500))
             .Add("faster", (int size) => Thread.SpinWait(100))
@@ -102,7 +102,7 @@ public class ParametricSuiteTests
     [Fact]
     public async Task WithParameter_Significance_Computed_Per_Parameter_Group()
     {
-        var results = await new BenchmarkSuite("per-param-sig")
+        var results = await new BenchmarkSuite("per-param-sig").WithRequireIsolation(false)
             .WithParameter("size", 10, 100)
             .Add("slow", (int size) => Thread.SpinWait(1000))
             .Add("fast", (int size) => Thread.SpinWait(100))
@@ -124,7 +124,7 @@ public class ParametricSuiteTests
     {
         var progress = new CapturingProgress();
 
-        var results = await new BenchmarkSuite("progress")
+        var results = await new BenchmarkSuite("progress").WithRequireIsolation(false)
             .WithParameter("size", 10, 100)
             .Add("work", (int size) => size)
             .WithWarmup(0)
@@ -152,7 +152,7 @@ public class ParametricSuiteTests
     [Fact]
     public void WithParameter_Duplicate_Names_After_Expansion_Throws()
     {
-        var suite = new BenchmarkSuite("duplicate")
+        var suite = new BenchmarkSuite("duplicate").WithRequireIsolation(false)
             .WithParameter("x", 1, 1)
             .Add("bench", (int x) => x);
 
@@ -162,7 +162,7 @@ public class ParametricSuiteTests
     [Fact]
     public void WithParameter_Missing_WithoutParameter_Throws()
     {
-        var suite = new BenchmarkSuite("missing")
+        var suite = new BenchmarkSuite("missing").WithRequireIsolation(false)
             .Add("bench", (int size) => size);
 
         Assert.Throws<InvalidOperationException>(() => suite.RunAsync().GetAwaiter().GetResult());
@@ -171,7 +171,7 @@ public class ParametricSuiteTests
     [Fact]
     public void WithParameter_No_Parameterized_Benchmarks_Throws()
     {
-        var suite = new BenchmarkSuite("no-benches")
+        var suite = new BenchmarkSuite("no-benches").WithRequireIsolation(false)
             .Add("plain", () => { })
             .WithParameter("size", 10);
 
@@ -181,14 +181,14 @@ public class ParametricSuiteTests
     [Fact]
     public void WithParameter_Unsupported_Type_Throws()
     {
-        var suite = new BenchmarkSuite("unsupported");
+        var suite = new BenchmarkSuite("unsupported").WithRequireIsolation(false);
         Assert.Throws<ArgumentException>(() => suite.WithParameter("x", new UnsupportedParameter()));
     }
 
     [Fact]
     public void WithParameter_Type_Mismatch_Throws()
     {
-        var suite = new BenchmarkSuite("mismatch")
+        var suite = new BenchmarkSuite("mismatch").WithRequireIsolation(false)
             .WithParameter("x", 1)
             .Add("bench", (string x) => x.Length);
 
@@ -198,7 +198,7 @@ public class ParametricSuiteTests
     [Fact]
     public async Task WithParameter_Null_Value_Is_Supported()
     {
-        var results = await new BenchmarkSuite("nullable")
+        var results = await new BenchmarkSuite("nullable").WithRequireIsolation(false)
             .WithParameter("value", (string?)null)
             .Add("work", (string? value) => value?.Length ?? 0)
             .WithWarmup(0)
@@ -214,7 +214,7 @@ public class ParametricSuiteTests
     [Fact]
     public async Task WithParameter_Enum_Value_Is_Supported()
     {
-        var results = await new BenchmarkSuite("enum")
+        var results = await new BenchmarkSuite("enum").WithRequireIsolation(false)
             .WithParameter("mode", TestMode.A, TestMode.B)
             .Add("work", (TestMode mode) => (int)mode)
             .WithWarmup(0)

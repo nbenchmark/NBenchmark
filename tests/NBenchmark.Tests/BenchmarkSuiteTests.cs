@@ -7,7 +7,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public void Add_Rejects_Duplicate_Names()
     {
-        var suite = new BenchmarkSuite("dup");
+        var suite = new BenchmarkSuite("dup").WithRequireIsolation(false);
         suite.Add("foo", () => { });
 
         Assert.Throws<ArgumentException>(() => suite.Add("foo", () => { }));
@@ -16,7 +16,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public async Task RunAsync_Executes_All_Added_Benchmarks()
     {
-        var results = await new BenchmarkSuite("capture")
+        var results = await new BenchmarkSuite("capture").WithRequireIsolation(false)
             .Add("a", () => { })
             .Add("b", () => { })
             .WithWarmup(1)
@@ -30,7 +30,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public async Task RunAsync_WithBaseline_Significance_Sets_SignificanceVerdict()
     {
-        var results = await new BenchmarkSuite("sig")
+        var results = await new BenchmarkSuite("sig").WithRequireIsolation(false)
             .Add("baseline", () => Thread.SpinWait(1000))
             .Add("faster", () => Thread.SpinWait(500))
             .WithBaseline("baseline")
@@ -47,7 +47,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public async Task WithBaseline_Not_In_Suite_Throws()
     {
-        var suite = new BenchmarkSuite("bad")
+        var suite = new BenchmarkSuite("bad").WithRequireIsolation(false)
             .Add("a", () => { })
             .WithBaseline("missing");
 
@@ -57,7 +57,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public async Task RunAsync_Captures_Exception_As_Errored_Result()
     {
-        var results = await new BenchmarkSuite("boom")
+        var results = await new BenchmarkSuite("boom").WithRequireIsolation(false)
             .Add("explodes", () => throw new InvalidOperationException("nope"))
             .Add("calm", () => { })
             .WithWarmup(1)
@@ -79,7 +79,7 @@ public class BenchmarkSuiteTests
         var teardownRan = false;
         using var cts = new CancellationTokenSource();
 
-        var suite = new BenchmarkSuite("cancel-teardown")
+        var suite = new BenchmarkSuite("cancel-teardown").WithRequireIsolation(false)
             .Add("self-cancelling", () => cts.Cancel())
             .WithWarmup(0)
             .WithIterations(5)
@@ -96,7 +96,7 @@ public class BenchmarkSuiteTests
     {
         var progress = new CapturingProgress();
 
-        await new BenchmarkSuite("progress")
+        await new BenchmarkSuite("progress").WithRequireIsolation(false)
             .Add("a", () => { })
             .Add("b", () => { })
             .WithWarmup(0)
@@ -126,7 +126,7 @@ public class BenchmarkSuiteTests
     {
         var events = new List<string>();
 
-        var suite = new BenchmarkSuite("ordering")
+        var suite = new BenchmarkSuite("ordering").WithRequireIsolation(false)
             .Add("work", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -145,7 +145,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public async Task Add_WithCategories_Carries_Categories_Through_To_Result()
     {
-        var results = await new BenchmarkSuite("tagged")
+        var results = await new BenchmarkSuite("tagged").WithRequireIsolation(false)
             .Add("fast", () => { }, categories: ["Fast"])
             .Add("slow", () => { }, categories: ["Slow"])
             .WithWarmup(0)
@@ -163,7 +163,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public async Task WithCategories_Applies_To_Subsequent_Adds()
     {
-        var results = await new BenchmarkSuite("batch")
+        var results = await new BenchmarkSuite("batch").WithRequireIsolation(false)
             .WithCategories("Shared")
             .Add("a", () => { })
             .Add("b", () => { }, categories: ["Extra"])
@@ -182,7 +182,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public async Task WithCategories_Trims_And_Deduplicates_CaseInsensitive()
     {
-        var results = await new BenchmarkSuite("normalized")
+        var results = await new BenchmarkSuite("normalized").WithRequireIsolation(false)
             .WithCategories(" Fast ", "fast")
             .Add("x", () => { })
             .WithWarmup(0)
@@ -196,21 +196,21 @@ public class BenchmarkSuiteTests
     [Fact]
     public void Add_WithBlankCategory_Throws()
     {
-        var suite = new BenchmarkSuite("bad-categories");
+        var suite = new BenchmarkSuite("bad-categories").WithRequireIsolation(false);
         Assert.Throws<ArgumentException>(() => suite.Add("x", () => { }, categories: [" "]));
     }
 
     [Fact]
     public void WithCategoryFilter_WithBlankCategory_Throws()
     {
-        var suite = new BenchmarkSuite("bad-filter");
+        var suite = new BenchmarkSuite("bad-filter").WithRequireIsolation(false);
         Assert.Throws<ArgumentException>(() => suite.WithCategoryFilter([" "]));
     }
 
     [Fact]
     public async Task WithCategoryFilter_Include_Excludes_Untagged_And_NonMatching()
     {
-        var results = await new BenchmarkSuite("filter")
+        var results = await new BenchmarkSuite("filter").WithRequireIsolation(false)
             .Add("fast", () => { }, categories: ["Fast"])
             .Add("slow", () => { }, categories: ["Slow"])
             .Add("untagged", () => { })
@@ -227,7 +227,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public async Task WithCategoryFilter_Exclude_Removes_Matching()
     {
-        var results = await new BenchmarkSuite("filter")
+        var results = await new BenchmarkSuite("filter").WithRequireIsolation(false)
             .Add("fast", () => { }, categories: ["Fast"])
             .Add("slow", () => { }, categories: ["Slow"])
             .Add("untagged", () => { })
@@ -244,7 +244,7 @@ public class BenchmarkSuiteTests
     [Fact]
     public async Task WithCategoryFilter_Multiple_Includes_Are_OR()
     {
-        var results = await new BenchmarkSuite("filter")
+        var results = await new BenchmarkSuite("filter").WithRequireIsolation(false)
             .Add("a", () => { }, categories: ["A"])
             .Add("b", () => { }, categories: ["B"])
             .Add("c", () => { }, categories: ["C"])
@@ -264,7 +264,7 @@ public class BenchmarkSuiteTests
     {
         var progress = new CapturingProgress();
 
-        var results = await new BenchmarkSuite("shuffle")
+        var results = await new BenchmarkSuite("shuffle").WithRequireIsolation(false)
             .Add("a", () => { })
             .Add("b", () => { })
             .Add("c", () => { })

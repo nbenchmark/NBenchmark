@@ -634,6 +634,30 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
+    ///     Whether an isolation <b>refusal</b> fails the run instead of falling back to the host
+    ///     process. On by default; <c>--strict-isolation</c> turns it on regardless.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The opposite of <see cref="WithIsolation" />, which says whether to <i>try</i>. This says
+    ///         what happens when trying does not work. Turning isolation off is therefore not affected by
+    ///         this at all - <c>WithIsolation(false)</c> asks for the host process and gets it, which is
+    ///         not a refusal.
+    ///     </para>
+    ///     <para>
+    ///         Exists because <c>MeasurementOptions.RequireIsolation</c> was unreachable from here:
+    ///         <c>WithOptions(new MeasurementOptions { RequireIsolation = true })</c> set a field the
+    ///         harness never read, so the one mode with a fully-fledged isolation pipeline was the one
+    ///         mode that could not ask for it.
+    ///     </para>
+    /// </remarks>
+    public BenchmarkHarness WithRequireIsolation(bool required = true)
+    {
+        _options = _options with { RequireIsolation = required };
+        return this;
+    }
+
+    /// <summary>
     ///     When enabled, significance is computed across all classes in a single comparison
     ///     table instead of per class. The baseline is chosen from the whole group. Use this
     ///     when comparing implementations that live in separate classes (e.g. a legacy version
@@ -878,17 +902,24 @@ public sealed class BenchmarkHarness
         // be left behind.
         var progress = ResolveProgress(pass);
 
-        // Per-run rather than a field, so a refusal is reported once per run and not once per process.
-        // As a field it was never cleared, which meant a second RunAsync() on the same harness printed
-        // no refusals at all - and the comparison pass inherited the first pass's set.
-        var refusalsReported = new HashSet<string>(StringComparer.Ordinal);
-
         var allResults = new List<BenchmarkResult>();
         var rawSamples = new Dictionary<string, double[]>();
 
         var suiteOptions = _cliArgs.DryRun
             ? _options with { Iterations = 0, WarmupIterations = 0 }
             : MergeCliOptions(_options, _cliArgs);
+
+        // Under --dry-run, --in-process, or WithIsolation(false), nothing is spawned. A dry run never
+        // invokes a body, so isolation would only add process overhead.
+        var inProcessGlobal = pass.ForceInProcess
+                              || _cliArgs.InProcess
+                              || !_isolationEnabled
+                              || _cliArgs.DryRun;
+
+        // Every class's isolatability, answered here rather than one class at a time inside the run
+        // loop. See ResolveIsolationPlan: this is what makes a refusal a fact about the run instead of
+        // something classes 1..N-1 have already been measured past.
+        var isolationPlan = ResolveIsolationPlan(filtered, inProcessGlobal, suiteOptions);
 
         // Apply opt-in hardware/OS controls (CPU affinity, process priority, dedicated-host
         // guidance) for the duration of the run. The scope restores the prior process state on
@@ -932,13 +963,6 @@ public sealed class BenchmarkHarness
         {
             await progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
 
-            // Under --dry-run, --in-process, or WithIsolation(false), nothing is spawned. A
-            // dry run never invokes a body, so isolation would only add process overhead.
-            var inProcessGlobal = pass.ForceInProcess
-                                  || _cliArgs.InProcess
-                                  || !_isolationEnabled
-                                  || _cliArgs.DryRun;
-
             var runningIndex = 0;
 
             foreach (var declared in filtered)
@@ -956,16 +980,10 @@ public sealed class BenchmarkHarness
 
                 var suite = declared with { Lifetime = lifetime };
 
-                // Whether a worker can measure this class at all. When it cannot, the benchmarks run
-                // in the host process and say so, rather than being quietly measured under whatever
-                // configuration the host happened to start with.
-                var workerDecision = inProcessGlobal
-                    ? new WorkerRunPlan.Decision(WorkerRunPlan.Refusal.RequestedInProcess, null)
-                    : WorkerRunPlan.ForDiscoveredClass(
-                        suite.Type.Assembly.Location, _instanceSource, suiteOptions);
-
-                if (workerDecision is { CanIsolate: false, Explanation: { } explanation })
-                    EmitIsolationRefusal(refusalsReported, suite.Type.Name, explanation);
+                // Decided and reported before this loop started - see ResolveIsolationPlan. Looked up
+                // rather than recomputed, so the answer the user was given up front is the answer the
+                // run acts on.
+                var workerDecision = isolationPlan[suite.Type];
 
                 var forceInProcess = inProcessGlobal || !workerDecision.CanIsolate;
 
@@ -2078,6 +2096,12 @@ public sealed class BenchmarkHarness
     ///         explanation, and reporting a refusal the user never hit would send them chasing a
     ///         problem they do not have.
     ///     </para>
+    ///     <para>
+    ///         The mirror case is stamped too. A benchmark carrying <c>[IsolatedProcess]</c> that ends up
+    ///         here asked for a worker and was denied one, which the status alone cannot say - it reads
+    ///         identically to a benchmark that never asked - so the row carries a warning naming the
+    ///         denied request.
+    ///     </para>
     /// </summary>
     private static void StampIsolationStatus(
         List<BenchmarkResult> results,
@@ -2090,20 +2114,33 @@ public sealed class BenchmarkHarness
             .Select(b => b.DisplayName)
             .ToHashSet(StringComparer.Ordinal);
 
+        var explicitlyIsolated = benchmarks
+            .Where(b => b.Isolation == IsolationMode.PerBenchmark)
+            .Select(b => b.DisplayName)
+            .ToHashSet(StringComparer.Ordinal);
+
         for (var i = startIndex; i < results.Count; i++)
         {
             var result = results[i];
+            var methodName = MethodNameOf(result.Name);
 
-            var status = explicitlyInProcess.Contains(MethodNameOf(result.Name))
+            var status = explicitlyInProcess.Contains(methodName)
                 ? IsolationStatus.InProcessRequested
                 : classStatus;
 
-            results[i] = result with
-            {
-                IsolationStatus = status == IsolationStatus.Isolated
-                    ? IsolationStatus.InProcessRequested
-                    : status,
-            };
+            if (status == IsolationStatus.Isolated)
+                status = IsolationStatus.InProcessRequested;
+
+            var warnings = status.IsRefusal() && explicitlyIsolated.Contains(methodName)
+                ? (IReadOnlyList<string>)
+                [
+                    .. result.Warnings,
+                    $"[IsolatedProcess] was requested for '{methodName}' and refused: "
+                    + $"{status.ToLabel()}. The measurement ran in this process anyway.",
+                ]
+                : result.Warnings;
+
+            results[i] = result with { IsolationStatus = status, Warnings = warnings };
         }
     }
 
@@ -2149,7 +2186,78 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     Reports, once per class, that isolation was declined and why.
+    ///     Answers "can a worker measure this?" for every discovered class at once, before the first
+    ///     benchmark runs - reporting every refusal in one message, and failing the run here when
+    ///     isolation is required.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Hoisted out of the run loop, where the same call was made per class immediately before
+    ///         that class launched. Every input except the assembly path is run-global - worker
+    ///         availability, the instance source, the resolved options - so a per-class question was
+    ///         being asked N times to get at most one distinct answer per assembly, and asking it late
+    ///         meant class N's refusal was discovered after classes 1..N-1 had already been measured.
+    ///         Under a hard error that is the difference between failing in a second and failing after
+    ///         the run.
+    ///     </para>
+    ///     <para>
+    ///         The refusal is reported per class rather than per assembly even though the decision is
+    ///         per assembly: the reader is looking for the name they wrote, and "your assembly cannot be
+    ///         isolated" is not something they can act on.
+    ///     </para>
+    /// </remarks>
+    private Dictionary<Type, WorkerRunPlan.Decision> ResolveIsolationPlan(
+        IReadOnlyList<BenchmarkSuiteDefinition> filtered,
+        bool inProcessGlobal,
+        MeasurementOptions suiteOptions)
+    {
+        var plan = new Dictionary<Type, WorkerRunPlan.Decision>();
+
+        if (inProcessGlobal)
+        {
+            var requested = new WorkerRunPlan.Decision(WorkerRunPlan.Refusal.RequestedInProcess, null);
+
+            foreach (var suite in filtered)
+            {
+                plan[suite.Type] = requested;
+            }
+
+            return plan;
+        }
+
+        // One answer per assembly, reused by every class declared in it. The path is the only per-class
+        // input the decision has, and in the overwhelmingly common single-assembly run that makes this
+        // a single evaluation for the whole set.
+        var byAssembly = new Dictionary<string, WorkerRunPlan.Decision>(StringComparer.Ordinal);
+        var refusals = new List<IsolationRefusal>();
+
+        foreach (var suite in filtered)
+        {
+            var location = suite.Type.Assembly.Location;
+
+            if (!byAssembly.TryGetValue(location, out var decision))
+            {
+                decision = WorkerRunPlan.ForDiscoveredClass(location, _instanceSource, suiteOptions);
+                byAssembly[location] = decision;
+            }
+
+            plan[suite.Type] = decision;
+
+            if (decision.CanIsolate)
+                continue;
+
+            EmitIsolationRefusal(suite, decision.Explanation);
+            refusals.Add(new IsolationRefusal(suite.Type.Name, decision.Status, decision.Explanation));
+        }
+
+        // Every refusal in the run, in one exception, before anything has been measured.
+        IsolationAudit.ThrowIfRequired(suiteOptions, refusals);
+
+        return plan;
+    }
+
+    /// <summary>
+    ///     Reports that isolation was declined for one class, and why.
     ///     <para>
     ///         This is the visible half of "refuse rather than guess". A silent fallback to
     ///         in-process would be the worst outcome available: on bodies of provably identical cost,
@@ -2158,22 +2266,40 @@ public sealed class BenchmarkHarness
     ///         stamped <c>host</c>, so the provenance survives even if this message is scrolled past.
     ///     </para>
     /// </summary>
-    private static void EmitIsolationRefusal(
-        HashSet<string> reported,
-        string className,
-        string explanation)
+    private static void EmitIsolationRefusal(BenchmarkSuiteDefinition suite, string? explanation)
     {
-        if (!reported.Add(className))
-            return;
-
         Console.Error.WriteLine(
-            $"Isolation: '{className}' is being measured in this process because {explanation}");
+            $"Isolation: '{suite.Type.Name}' is being measured in this process because "
+            + (explanation ?? "it could not be addressed across a process boundary."));
+
+        // An explicit [IsolatedProcess] being denied is strictly more interesting than a default being
+        // denied - the user said what they wanted and is not getting it - and used to be indis-
+        // tinguishable from it in both the message and the row label.
+        var explicitlyRequested = ExplicitIsolationRequests(suite.Benchmarks);
+
+        if (explicitlyRequested.Count > 0)
+        {
+            Console.Error.WriteLine(
+                $"  {string.Join(", ", explicitlyRequested)} asked for this explicitly with "
+                + "[IsolatedProcess], so the request is being denied rather than defaulted away.");
+        }
 
         Console.Error.WriteLine(
             "  In-process measurements cannot control JIT tiering, PGO, ReadyToRun or GC flavour, "
             + "because the runtime fixes those at startup. They are stamped 'host' and are never "
             + "compared against isolated results.");
     }
+
+    /// <summary>
+    ///     The benchmarks that carry <c>[IsolatedProcess]</c>, i.e. asked for a worker by name rather
+    ///     than getting one by default.
+    /// </summary>
+    private static IReadOnlyList<string> ExplicitIsolationRequests(
+        IReadOnlyList<BenchmarkMethodDefinition> benchmarks)
+        => benchmarks
+            .Where(b => b.Isolation == IsolationMode.PerBenchmark)
+            .Select(b => $"'{b.DisplayName}'")
+            .ToList();
 
     /// <summary>
     ///     Spawns one worker, measures one replicate of a group in it, and shuts it down.

@@ -72,6 +72,19 @@ internal sealed record BenchmarkEnvelope(
     public Delegate? IterationTeardown { get; init; }
 
     /// <summary>
+    ///     Set by <c>BenchmarkSuite.AddInProcess</c>: this benchmark is measured in the coordinator on
+    ///     purpose, and the rest of the suite is isolated around it.
+    /// </summary>
+    /// <remarks>
+    ///     A request, not a refusal - so it stamps <see cref="IsolationStatus.InProcessRequested" /> and
+    ///     never trips <see cref="MeasurementOptions.RequireIsolation" />. It exists because
+    ///     <c>WithIsolation(false)</c> was the only lever and it is all-or-nothing: one body holding a
+    ///     live object took every other benchmark in the suite into the host process with it, so the
+    ///     price of measuring one un-isolatable thing was every comparison it was part of.
+    /// </remarks>
+    public bool RunsInProcess { get; init; }
+
+    /// <summary>
     ///     Whether this benchmark carries per-iteration hooks. Derived rather than stored: a stored
     ///     flag can disagree with the delegates it describes, and it did - the parameterized
     ///     registrations never set it, which was invisible only because they carried no addressable

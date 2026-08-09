@@ -1,17 +1,29 @@
 using System.Globalization;
+using System.Text;
 
 namespace NBenchmark.Workers;
 
 /// <summary>
-///     The two commands that make isolation checkable rather than merely claimed:
-///     <c>--strict-isolation</c> turns a label into an exit code, and <c>--verify-isolation</c> turns
-///     the argument for isolating into a measurement on the user's own code.
+///     One refused benchmark, class or suite: what it was called, how it was refused, and the
+///     explanation to quote back.
+/// </summary>
+internal readonly record struct IsolationRefusal(string Name, IsolationStatus Status, string? Explanation);
+
+/// <summary>
+///     What happens when isolation was refused, and the two commands that make isolation checkable
+///     rather than merely claimed.
+///     <para>
+///         <see cref="ThrowIfRequired(MeasurementOptions, string, IsolationStatus, string?)" /> is the
+///         gate itself, on by default. <c>--strict-isolation</c> turns a label into an exit code, and
+///         <c>--verify-isolation</c> turns the argument for isolating into a measurement on the user's
+///         own code.
+///     </para>
 /// </summary>
 internal static class IsolationAudit
 {
     /// <summary>
     ///     Throws when <see cref="MeasurementOptions.RequireIsolation" /> is set and isolation was
-    ///     refused.
+    ///     <b>refused</b>.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -21,6 +33,14 @@ internal static class IsolationAudit
     ///         A library caller has no exit code, so waiting until the run finished would mean measuring
     ///         everything first and then discarding it. This throws at the point of refusal instead,
     ///         before any work is done.
+    ///     </para>
+    ///     <para>
+    ///         Keyed on <see cref="IsolationStatusExtensions.IsRefusal" />, never on
+    ///         <c>!IsIsolated()</c>. <c>--dry-run</c>, <c>--in-process</c>, <c>[InProcess]</c>,
+    ///         <c>Benchmark.RunInProcess</c>, <c>WithIsolation(false)</c> and
+    ///         <c>BenchmarkSuite.AddInProcess</c> all produce
+    ///         <see cref="IsolationStatus.InProcessRequested" /> and must stay legal - the whole point of
+    ///         the default being on is that asking for the host process is still a thing you can do.
     ///     </para>
     ///     <para>
     ///         The message carries the refusal verbatim. A "strict isolation was required" exception with
@@ -35,28 +55,108 @@ internal static class IsolationAudit
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        if (!options.RequireIsolation || status.IsIsolated())
+        if (!options.RequireIsolation || !status.IsRefusal())
             return;
 
-        var remedy = status.ToRemedy() is { } text ? $" To isolate it: {text}." : "";
-
-        throw new InvalidOperationException(
-            $"'{name}' could not be measured in an isolated worker, and RequireIsolation is set. "
-            + $"It was refused because {refusal ?? "it could not be addressed across a process boundary."}"
-            + remedy);
+        throw new InvalidOperationException(Explain(name, status, refusal));
     }
 
     /// <summary>
-    ///     Fails the run when any result was not measured in a worker, naming each one and what to do
+    ///     The text of a hard isolation failure: what was refused, why, the remedy, and - see
+    ///     <see cref="OptOut" /> - the deliberate opt-out.
+    /// </summary>
+    internal static string Explain(string name, IsolationStatus status, string? refusal)
+    {
+        var remedy = status.ToRemedy() is { } text ? $" To isolate it: {text}." : "";
+
+        return $"'{name}' could not be measured in an isolated worker, and isolation is required. "
+               + $"It was refused because {refusal ?? UnaddressableFallback}"
+               + remedy
+               + OptOut;
+    }
+
+    /// <summary>
+    ///     Throws when <see cref="MeasurementOptions.RequireIsolation" /> is set and anything in
+    ///     <paramref name="refusals" /> was refused - reporting all of them in one message.
+    /// </summary>
+    /// <remarks>
+    ///     Harness mode's form of the gate, and the reason it is a list rather than a loop over the
+    ///     single-name overload. Isolatability is decided for every discovered class in one pass before
+    ///     the first benchmark runs, so a run with three un-isolatable classes can say so once. Throwing
+    ///     on the first would report class 1 and leave classes 2 and 3 to be discovered on the next run,
+    ///     one per attempt.
+    /// </remarks>
+    public static void ThrowIfRequired(MeasurementOptions options, IReadOnlyList<IsolationRefusal> refusals)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(refusals);
+
+        if (!options.RequireIsolation)
+            return;
+
+        var offenders = refusals.Where(r => r.Status.IsRefusal()).ToList();
+
+        if (offenders.Count == 0)
+            return;
+
+        if (offenders.Count == 1)
+            throw new InvalidOperationException(Explain(offenders[0].Name, offenders[0].Status, offenders[0].Explanation));
+
+        var message = new StringBuilder();
+
+        message.AppendLine(CultureInfo.InvariantCulture,
+            $"{offenders.Count} benchmark groups could not be measured in an isolated worker, and "
+            + $"isolation is required. Nothing has been measured.");
+
+        foreach (var offender in offenders)
+        {
+            message.AppendLine(CultureInfo.InvariantCulture,
+                $"  '{offender.Name}': {offender.Explanation ?? UnaddressableFallback}");
+
+            if (offender.Status.ToRemedy() is { } remedy)
+                message.AppendLine(CultureInfo.InvariantCulture, $"    To isolate it: {remedy}.");
+        }
+
+        message.Append(OptOut.TrimStart());
+
+        throw new InvalidOperationException(message.ToString());
+    }
+
+    private const string UnaddressableFallback = "it could not be addressed across a process boundary.";
+
+    /// <summary>
+    ///     Named in the message rather than left to the docs, because this gate is now the default: the
+    ///     first time most users meet it is as a thrown exception on a run that used to produce numbers.
+    ///     A message that only says "no" turns a labelled fallback into a dead end; naming the opt-outs
+    ///     keeps the fallback available to anyone who wants it, which is the whole shape of the decision
+    ///     - in-process becomes something you ask for rather than something that happens to you.
+    /// </summary>
+    private const string OptOut =
+        " To measure in this process deliberately, use [InProcess] (Harness mode), "
+        + "Benchmark.RunInProcess (Simple mode), or BenchmarkSuite.AddInProcess / WithIsolation(false) "
+        + "(Suite mode) - or set MeasurementOptions.RequireIsolation = false to accept labelled "
+        + "fallbacks everywhere.";
+
+    /// <summary>
+    ///     Fails the run when isolation was refused for any result, naming each one and what to do
     ///     about it.
     /// </summary>
     /// <remarks>
-    ///     Every non-isolated result is already labelled on the row and explained on the console. This
-    ///     exists because neither survives CI: a label scrolls past, and an advisory warning in a log
-    ///     nobody reads is indistinguishable from no warning at all. A build that must not accept
-    ///     host-process numbers needs them to be an error.
+    ///     <para>
+    ///         Every refused result is already labelled on the row and explained on the console. This
+    ///         exists because neither survives CI: a label scrolls past, and an advisory warning in a log
+    ///         nobody reads is indistinguishable from no warning at all. A build that must not accept
+    ///         host-process numbers needs them to be an error.
+    ///     </para>
+    ///     <para>
+    ///         Keyed on <see cref="IsolationStatusExtensions.IsRefusal" /> rather than
+    ///         <c>!IsIsolated()</c>. The old rule failed <c>--strict-isolation --dry-run</c>, and every
+    ///         other combination where the user asked for the host process and got it - the flag is
+    ///         "fail if isolation was refused", not "fail if you did not isolate", and a run that never
+    ///         intended to isolate anything has nothing to act on.
+    ///     </para>
     /// </remarks>
-    /// <returns><c>true</c> when every result was isolated.</returns>
+    /// <returns><c>true</c> when nothing was refused.</returns>
     public static bool Enforce(IReadOnlyList<BenchmarkResult> results, TextWriter error)
     {
         ArgumentNullException.ThrowIfNull(results);
@@ -67,7 +167,7 @@ internal static class IsolationAudit
         // numbers carry the host's configuration when there are no numbers. Its own error message is
         // the thing to act on, and it is already on the row.
         var offenders = results
-            .Where(r => !r.Errored && !r.IsolationStatus.IsIsolated())
+            .Where(r => !r.Errored && r.IsolationStatus.IsRefusal())
             .ToList();
 
         if (offenders.Count == 0)

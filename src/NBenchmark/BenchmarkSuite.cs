@@ -101,6 +101,64 @@ public class BenchmarkSuite(string name)
                     spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
             action, setup, teardown);
 
+    // --- Deliberately in-process Add overloads ---
+
+    /// <summary>
+    ///     Adds a benchmark that is measured in <b>this</b> process on purpose, while the rest of the
+    ///     suite is still measured in a worker.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The per-benchmark counterpart of <c>[InProcess]</c>, and the one opt-out the suite surface
+    ///         was missing. <see cref="WithIsolation" /><c>(false)</c> is all-or-nothing: a single body
+    ///         holding something that cannot cross - a live handle, a mock, an object graph the
+    ///         faithfulness rule refuses - took every other benchmark in the suite into the host process
+    ///         with it, so the price of measuring one such thing was every comparison it was part of.
+    ///         Naming it here keeps the rest of the suite isolated.
+    ///     </para>
+    ///     <para>
+    ///         The result is stamped <see cref="IsolationStatus.InProcessRequested" />, so it is not a
+    ///         refusal: it does not trip <see cref="MeasurementOptions.RequireIsolation" /> and it is not
+    ///         counted by <c>--strict-isolation</c>. It is still labelled in the table, and it is still
+    ///         never given a ratio against an isolated row - the ~3.3x configuration term between the two
+    ///         processes does not go away because the difference was asked for.
+    ///     </para>
+    /// </remarks>
+    public BenchmarkSuite AddInProcess(string name, Action action,
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+        => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
+                Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+            body: null, setup, teardown, runsInProcess: true);
+
+    /// <inheritdoc cref="AddInProcess(string, Action, Action?, Action?, IReadOnlyList{string}?)" />
+    public BenchmarkSuite AddInProcess(string name, Func<Task> action,
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+        => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
+                await BenchmarkRunner.Instance.RunAsync(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+            body: null, setup, teardown, runsInProcess: true);
+
+    /// <inheritdoc cref="AddInProcess(string, Action, Action?, Action?, IReadOnlyList{string}?)" />
+    public BenchmarkSuite AddInProcess<T>(string name, Func<T> action,
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+        => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
+                Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+            body: null, setup, teardown, runsInProcess: true);
+
+    /// <inheritdoc cref="AddInProcess(string, Action, Action?, Action?, IReadOnlyList{string}?)" />
+    public BenchmarkSuite AddInProcess<T>(string name, Func<Task<T>> action,
+        Action? setup = null, Action? teardown = null,
+        IReadOnlyList<string>? categories = null)
+        => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
+                await BenchmarkRunner.Instance.RunAsync(name, action,
+                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+            body: null, setup, teardown, runsInProcess: true);
+
     // --- Parameterized Add overloads: arity 1 ---
 
     public BenchmarkSuite Add<T>(string name, Action<T> action,
@@ -721,7 +779,8 @@ public class BenchmarkSuite(string name)
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync,
         Delegate? body = null,
         Action? iterationSetup = null,
-        Action? iterationTeardown = null)
+        Action? iterationTeardown = null,
+        bool runsInProcess = false)
     {
         EnsureUniqueName(name);
 
@@ -733,6 +792,7 @@ public class BenchmarkSuite(string name)
             // carry them to the worker instead of giving up on the whole suite for having them.
             IterationSetup = iterationSetup,
             IterationTeardown = iterationTeardown,
+            RunsInProcess = runsInProcess,
         });
 
         return this;
@@ -1441,6 +1501,12 @@ public class BenchmarkSuite(string name)
             // that has not happened yet.
             SimpleModeGuidance.EmitPlanRefusal(local.Name, outcome.Status, outcome.Refusal);
 
+            // Deliberately not gated on RequireIsolation, unlike every other refusal site. The plan
+            // being unaddressable does not mean the suite is: RunCoreAsync addresses the bodies
+            // individually next and that routinely succeeds where the factory did not, so throwing
+            // here would fail runs that go on to be fully isolated. The gate is applied inside
+            // RunCoreAsync, on the outcome that actually happens.
+
             // Whatever RunCoreAsync does - worker or host - it stamps its own results, so the label
             // describes where the measurement actually happened. Overwriting them with the plan's
             // refusal status was wrong in the case that matters: a suite the inline path isolated
@@ -1582,7 +1648,18 @@ public class BenchmarkSuite(string name)
         var expanded = ExpandEnvelopes();
         var benchmarks = ApplyCategoryFilter(ApplyExecutionOrder(expanded, RunOrder.Declaration));
 
-        var decision = InlineSuitePlan.TryAddress(benchmarks, _options, _suiteSetup, _suiteTeardown);
+        // Split before addressing, not after. An AddInProcess body was never going to be addressed, so
+        // handing it to TryAddress would refuse the whole suite for a benchmark that had already said it
+        // did not want a worker - which is the all-or-nothing behaviour AddInProcess exists to end.
+        var hostBound = benchmarks.Where(b => b.RunsInProcess).ToList();
+        var candidates = benchmarks.Where(b => !b.RunsInProcess).ToList();
+
+        // Nothing left to isolate. Falling through measures the lot in this process, where the suite's
+        // own status - InProcessRequested - is already the right label for every row.
+        if (candidates.Count == 0)
+            return null;
+
+        var decision = InlineSuitePlan.TryAddress(candidates, _options, _suiteSetup, _suiteTeardown);
 
         if (!decision.CanIsolate)
         {
@@ -1629,10 +1706,14 @@ public class BenchmarkSuite(string name)
         {
             // Nothing came back. Measuring here is better than returning nothing, and the caller is
             // told it is not getting what it asked for.
-            SimpleModeGuidance.EmitOnce(
-                Name,
-                IsolationStatus.InProcessNoWorker,
-                faults.FirstOrDefault()?.Message ?? "no measurement worker produced a result.");
+            var fault = faults.FirstOrDefault()?.Message ?? "no measurement worker produced a result.";
+
+            // Gated like the addressing refusal above. The suite was addressable and the worker died,
+            // which from the caller's side is the same outcome - host-configuration numbers under a
+            // request for isolated ones - so it has to reach the same gate.
+            IsolationAudit.ThrowIfRequired(_options, Name, IsolationStatus.InProcessNoWorker, fault);
+
+            SimpleModeGuidance.EmitOnce(Name, IsolationStatus.InProcessNoWorker, fault);
 
             _inProcessStatus = IsolationStatus.InProcessNoWorker;
 
@@ -1650,6 +1731,39 @@ public class BenchmarkSuite(string name)
                 ClassName = "",
                 IsBaseline = _baselineName is not null && results[i].Name == _baselineName,
             };
+        }
+
+        if (hostBound.Count > 0)
+        {
+            // The suite lifecycle runs again here, in this process. That is deliberate rather than a
+            // duplication: a suite setup exists to prepare the process that measures, and a split run
+            // has two of them. The addressed copy prepared the worker for the bodies it measured; this
+            // one prepares the coordinator for the bodies it is about to.
+            var (hostResults, hostSamples) = await MeasureHereAsync(
+                    hostBound, _runOrder, _progress, observer,
+                    decision.Bodies.Count, benchmarks.Count, cancellationToken)
+                .ConfigureAwait(false);
+
+            // Stamped as a request rather than left at the default, for the same reason the fallback
+            // path stamps its rows: the two produce the same enum value today, and relying on that is
+            // how a label comes to be right by accident.
+            for (var i = 0; i < hostResults.Count; i++)
+            {
+                if (!hostResults[i].Errored)
+                    hostResults[i] = hostResults[i] with { IsolationStatus = IsolationStatus.InProcessRequested };
+            }
+
+            results.AddRange(hostResults);
+
+            foreach (var (key, samples) in hostSamples)
+            {
+                rawSamples[key] = samples;
+            }
+
+            // Back into declaration order. The two halves were measured in two passes, so appending
+            // would put every AddInProcess row at the bottom of the table regardless of where the
+            // author wrote it - and a table's order is the one thing the author fully controls.
+            results = ReorderByDeclaration(results, benchmarks);
         }
 
         await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
@@ -1686,55 +1800,11 @@ public class BenchmarkSuite(string name)
         {
             await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
 
-            // Apply opt-in hardware/OS controls for the duration of the in-process run. The scope
-            // restores the prior process state on dispose. A worker measuring this suite applies the
-            // same settings to itself - see MeasureInWorkerAsync.
-            using var _ = EnvironmentControl.Apply(_options.Environment);
-
-            _suiteSetup?.Invoke();
-
-            var envelopes = filteredBenchmarks
-                .Select(b => b with { IsBaseline = _baselineName is not null && b.OriginalName == _baselineName })
-                .ToList();
-
             Dictionary<string, double[]> rawSamples;
 
-            try
-            {
-                var effectiveOrder = _parameterDefs.Count > 0 ? RunOrder.Declaration : order;
-
-                if (_launchCount > 1)
-                {
-                    var allLaunchResults = new List<IReadOnlyList<BenchmarkResult>>();
-                    var allLaunchSamples = new List<Dictionary<string, double[]>>();
-
-                    for (var launchIdx = 0; launchIdx < _launchCount; launchIdx++)
-                    {
-                        var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
-
-                        var (launchResults, launchSamples) = await SuiteRunner.RunAsync(
-                            envelopes, effectiveOrder, null, _options, 0,
-                            filteredBenchmarks.Count, NullBenchmarkProgress.Instance, cancellationToken,
-                            null, launchObserver).ConfigureAwait(false);
-
-                        allLaunchResults.Add(launchResults);
-                        allLaunchSamples.Add(launchSamples);
-                    }
-
-                    (results, rawSamples) = AggregateSuiteLaunches(allLaunchResults, allLaunchSamples);
-                }
-                else
-                {
-                    (results, rawSamples) = await SuiteRunner.RunAsync(
-                        envelopes, effectiveOrder, null, _options, 0,
-                        filteredBenchmarks.Count, progress, cancellationToken,
-                        null, observer).ConfigureAwait(false);
-                }
-            }
-            finally
-            {
-                _suiteTeardown?.Invoke();
-            }
+            (results, rawSamples) = await MeasureHereAsync(
+                    filteredBenchmarks, order, progress, observer, 0, filteredBenchmarks.Count, cancellationToken)
+                .ConfigureAwait(false);
 
             await progress.OnSuiteCompleted(results).ConfigureAwait(false);
 
@@ -1789,6 +1859,100 @@ public class BenchmarkSuite(string name)
             }
 
             NBenchmarkDiagnostics.OnSuiteCompleted(results);
+        }
+    }
+
+    /// <summary>
+    ///     Puts a split run's rows back into the order the suite declared them, leaving anything the
+    ///     declaration does not name (an errored row a worker invented, say) at the end in arrival order.
+    /// </summary>
+    private static List<BenchmarkResult> ReorderByDeclaration(
+        IReadOnlyList<BenchmarkResult> results,
+        IReadOnlyList<BenchmarkEnvelope> declaration)
+    {
+        var position = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        for (var i = 0; i < declaration.Count; i++)
+        {
+            position.TryAdd(declaration[i].Name, i);
+        }
+
+        return results
+            .Select((result, arrival) => (result, arrival))
+            .OrderBy(entry => position.TryGetValue(entry.result.Name, out var index) ? index : int.MaxValue)
+            .ThenBy(entry => entry.arrival)
+            .Select(entry => entry.result)
+            .ToList();
+    }
+
+    /// <summary>
+    ///     Measures a set of this suite's envelopes in <b>this</b> process, honouring the launch count,
+    ///     the environment controls and the suite lifecycle.
+    /// </summary>
+    /// <remarks>
+    ///     Extracted so the two callers cannot drift. One is the whole-suite fallback; the other is the
+    ///     <see cref="AddInProcess(string, Action, Action?, Action?, IReadOnlyList{string}?)" /> subset of
+    ///     a suite whose other benchmarks are being measured in a worker. A second copy of the
+    ///     launch-count loop is exactly the kind of duplication that has already cost this repo a
+    ///     silently-empty sample array.
+    /// </remarks>
+    private async Task<(List<BenchmarkResult> Results, Dictionary<string, double[]> RawSamples)>
+        MeasureHereAsync(
+            IReadOnlyList<BenchmarkEnvelope> benchmarks,
+            RunOrder order,
+            IBenchmarkProgress progress,
+            IMeasurementObserver observer,
+            int startIndex,
+            int totalBenchmarks,
+            CancellationToken cancellationToken)
+    {
+        // Apply opt-in hardware/OS controls for the duration of the in-process run. The scope restores
+        // the prior process state on dispose. A worker measuring this suite applies the same settings to
+        // itself - see MeasureInWorkerAsync.
+        using var _ = EnvironmentControl.Apply(_options.Environment);
+
+        _suiteSetup?.Invoke();
+
+        var envelopes = benchmarks
+            .Select(b => b with { IsBaseline = _baselineName is not null && b.OriginalName == _baselineName })
+            .ToList();
+
+        try
+        {
+            // Parameterized suites pin declaration order so a parameter sweep reads in the order it was
+            // declared; everything else honours the caller's order.
+            var effectiveOrder = _parameterDefs.Count > 0 ? RunOrder.Declaration : order;
+
+            if (_launchCount <= 1)
+            {
+                return await SuiteRunner.RunAsync(
+                        envelopes, effectiveOrder, null, _options, startIndex,
+                        totalBenchmarks, progress, cancellationToken, null, observer)
+                    .ConfigureAwait(false);
+            }
+
+            var allLaunchResults = new List<IReadOnlyList<BenchmarkResult>>();
+            var allLaunchSamples = new List<Dictionary<string, double[]>>();
+
+            for (var launchIdx = 0; launchIdx < _launchCount; launchIdx++)
+            {
+                var launchObserver = launchIdx == 0 ? observer : NullMeasurementObserver.Instance;
+
+                var (launchResults, launchSamples) = await SuiteRunner.RunAsync(
+                        envelopes, effectiveOrder, null, _options, startIndex,
+                        totalBenchmarks, NullBenchmarkProgress.Instance, cancellationToken,
+                        null, launchObserver)
+                    .ConfigureAwait(false);
+
+                allLaunchResults.Add(launchResults);
+                allLaunchSamples.Add(launchSamples);
+            }
+
+            return AggregateSuiteLaunches(allLaunchResults, allLaunchSamples);
+        }
+        finally
+        {
+            _suiteTeardown?.Invoke();
         }
     }
 

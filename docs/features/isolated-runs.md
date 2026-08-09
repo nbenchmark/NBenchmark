@@ -197,6 +197,8 @@ You can tune the granularity:
 - **`[InProcess]`** on a method (or class) opts that benchmark back into the host process.
 - **`--in-process`** on the command line, or **`WithIsolation(false)`** in code, disables isolation for the whole run.
 
+A method-level attribute beats a class-level one, which is how a mostly-in-process class forces one benchmark into a worker. Both on the *same* member is an error (analyzer NB0015, and discovery refuses it too): they ask for opposite things, and the conflict used to resolve silently in favour of `[InProcess]`.
+
 ```csharp
 public sealed class MixedBenchmarks
 {
@@ -227,11 +229,11 @@ A worker loads the assembly declaring your benchmarks into its own load context,
 - **Progress is live.** Warmup and measurement phases, detector snapshots and results stream from the worker into your own `IBenchmarkProgress` and `IMeasurementObserver` as they happen. Per-*sample* observer events are the exception: they stop at the process boundary unless `--stream-samples` asks for them, because a benchmark emits them in the thousands and forwarding all of them would add measurable time to the run. The full raw samples arrive with each result either way. See [Measurement Observer](../reference/observers.md#what-an-isolated-run-delivers) for the per-callback table.
 - **Results and their samples arrive together.** A worker computes every statistic over the full sample array and ships the samples on the completion frame, so `BenchmarkResult.RawSamples` is complete and significance testing reads them.
 
-If the worker is missing - an incomplete restore, or `NBenchmarkDeployWorker=false` - benchmarks are measured in the host process, the reason is printed, and the results are stamped `host`. Set `NBENCHMARK_WORKER_PATH` to point at a specific `nbworker.dll` if you need to override discovery.
+If the worker is missing - an incomplete restore, or `NBenchmarkDeployWorker=false` - the run fails with a message naming the directories that were searched. Set `NBENCHMARK_WORKER_PATH` to point at a specific `nbworker.dll` if you need to override discovery, or `RequireIsolation = false` to accept a labelled host-process measurement instead.
 
 ### What cannot be isolated
 
-A worker does not re-run your entry point, so anything NBenchmark holds as *live code in the coordinator* has no counterpart there. These fall back to in-process measurement, with the reason printed and the results stamped `host`:
+A worker does not re-run your entry point, so anything NBenchmark holds as *live code in the coordinator* has no counterpart there. These are **refused**, and a refusal fails the run - see [When isolation is refused](#when-isolation-is-refused):
 
 - **Instance factories and service providers** (`WithInstanceFactory`, `WithServiceProvider`). A worker can construct a type, but it cannot reproduce a factory that exists only in your process. Building the type directly instead would measure a differently-configured object while reporting it as though nothing had changed.
 - **Benchmarks declared in an assembly with no file on disk** - a single-file or in-memory build.
@@ -239,11 +241,46 @@ A worker does not re-run your entry point, so anything NBenchmark holds as *live
 
 The rule throughout is to refuse rather than guess. Reconstructing captured state was tried and did not fail loudly: it returned plausible, *wrong* numbers - a body over a captured `5` measured as though it were `1`, with no error and a tight confidence interval.
 
+## When isolation is refused
+
+**A refusal is an error.** `MeasurementOptions.RequireIsolation` defaults to `true`, so a benchmark that asked for a worker and cannot have one fails the run rather than being measured in the host process and labelled. In Harness mode the check runs at *discovery* time, before the first benchmark is measured, and reports every un-isolatable class in one message.
+
+The default is deliberate and recent. It was off while there was a great deal left to refuse - a captured local, a prepared value, a scoped container and a parameter sweep over a non-scalar each cost a run its isolation - and in that world a hard error would have been a wall rather than a signal. Those shapes now cross, so what remains under the gate is a small set, and every member of it has a one-line remedy.
+
+**In-process measurement is something you ask for.** Every deliberate route to the host process is still legal and is *not* a refusal - the gate keys on the four refusal statuses, never on "was not isolated":
+
+| Mode | How to ask |
+|---|---|
+| Harness | `[InProcess]` on a method or class, `--in-process`, `WithIsolation(false)` |
+| Simple | `Benchmark.RunInProcess(...)` and its `RunInProcessAsync` / prepared-state overloads |
+| Suite | `BenchmarkSuite.AddInProcess(...)` for one benchmark, `WithIsolation(false)` for the whole suite |
+| Any | `--dry-run`, which never invokes a body and so never spawns a worker |
+
+All of these stamp `IsolationStatus.InProcessRequested`, are excluded from `--strict-isolation`, and are still never given a ratio against an isolated row - the configuration difference between the two processes does not go away because it was asked for.
+
+```csharp
+// One benchmark holds a live handle; the rest of the suite is still measured in a worker.
+await new BenchmarkSuite("cache")
+    .Add("cold", () => Parse(Payload))
+    .AddInProcess("warm", () => connection.Query())   // stamped in-process, by request
+    .RunAsync();
+```
+
+`AddInProcess` exists because `WithIsolation(false)` is all-or-nothing: before it, a single un-addressable body took every other benchmark in the suite into the host process with it, so the price of measuring one such thing was every comparison it was part of.
+
+To accept labelled fallbacks everywhere instead - the right setting for scratchpad use, where a number measured here and clearly stamped beats no number at all - turn the requirement off:
+
+```csharp
+Benchmark.Run(body, new MeasurementOptions { RequireIsolation = false });
+new BenchmarkSuite("s").WithRequireIsolation(false);
+BenchmarkHarness.Create(args).WithRequireIsolation(false);
+```
+
 ## Checking isolation rather than trusting it
 
 Two flags make the claim verifiable on your own code:
 
-- **`--strict-isolation`** fails the run if any benchmark was measured in the host process, naming each one and its remedy. Use it wherever a pipeline gates on benchmark numbers: a benchmark that quietly fell back - a build agent without the worker deployed, or a body that captures state - cannot be compared against a baseline measured under a different runtime configuration.
+- **`--strict-isolation`** turns `RequireIsolation` on for the run and audits the results as well, naming every refused benchmark and its remedy. It is a backstop rather than the primary gate now that the requirement is on by default, and it keys on *refusal*: a deliberate `--in-process` or `--dry-run` run passes it, because there is nothing to act on. Use it wherever a pipeline gates on benchmark numbers: a benchmark that quietly fell back - a build agent without the worker deployed, or a body that captures state - cannot be compared against a baseline measured under a different runtime configuration.
 - **`--verify-isolation`** measures everything a second time in the host process and prints the per-benchmark difference, so you can see what your own numbers would have been. It reports a ratio per benchmark rather than an aggregate, because the finding is that host measurement is *unpredictable* rather than uniformly wrong. The comparison pass publishes nothing - no reporters, no output files, no exit code - so a diagnostic command cannot change the build's outcome.
 
   It is skipped, with a reason, on a run that used `--runtimes`. This process is one runtime, so there is no in-process counterpart for the other builds; comparing every runtime against the same host row would print a table that looks like a finding and is not one.

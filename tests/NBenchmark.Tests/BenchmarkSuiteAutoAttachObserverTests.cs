@@ -18,7 +18,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         var capturing = new CapturingAutoObserver("capture");
         ObserverRegistry.RegisterAutoAttach("capture", "Captures events", () => capturing);
 
-        await new BenchmarkSuite("suite")
+        await new BenchmarkSuite("suite").WithRequireIsolation(false)
             .Add("a", () => { })
             .Add("b", () => { })
             .WithWarmup(0)
@@ -40,7 +40,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         ObserverRegistry.RegisterAutoAttach("throws", "Throws", () => thrown);
         ObserverRegistry.RegisterAutoAttach("after", "After", () => captureAfter);
 
-        var results = await new BenchmarkSuite("suite")
+        var results = await new BenchmarkSuite("suite").WithRequireIsolation(false)
             .Add("a", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -59,7 +59,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         ObserverRegistry.RegisterAutoAttach("second", "2", () => new OrderTrackingObserver("second", phaseOrder));
         ObserverRegistry.RegisterAutoAttach("third", "3", () => new OrderTrackingObserver("third", phaseOrder));
 
-        await new BenchmarkSuite("suite")
+        await new BenchmarkSuite("suite").WithRequireIsolation(false)
             .Add("a", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -88,7 +88,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
                 return new CapturingAutoObserver("auto");
             });
 
-        await new BenchmarkSuite("suite")
+        await new BenchmarkSuite("suite").WithRequireIsolation(false)
             .Add("a", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -117,7 +117,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
                 return new CapturingAutoObserver("studio");
             });
 
-        await new BenchmarkSuite("suite")
+        await new BenchmarkSuite("suite").WithRequireIsolation(false)
             .Add("a", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -136,7 +136,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         var auto = new CapturingAutoObserver("auto");
         ObserverRegistry.RegisterAutoAttach("auto", "auto", () => auto);
 
-        await new BenchmarkSuite("suite")
+        await new BenchmarkSuite("suite").WithRequireIsolation(false)
             .Add("a", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -156,7 +156,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         var auto = new CapturingAutoObserver("auto");
         ObserverRegistry.RegisterAutoAttach("auto", "auto", () => auto);
 
-        await new BenchmarkSuite("suite")
+        await new BenchmarkSuite("suite").WithRequireIsolation(false)
             .Add("a", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -175,7 +175,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         var auto = new CountingAutoObserver("disposable");
         ObserverRegistry.RegisterAutoAttach("disposable", "Disposable", () => auto);
 
-        await new BenchmarkSuite("suite")
+        await new BenchmarkSuite("suite").WithRequireIsolation(false)
             .Add("a", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -191,7 +191,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         var capturing = new CapturingAutoObserver("capture");
         ObserverRegistry.RegisterAutoAttach("capture", "Captures events", () => capturing);
 
-        await new BenchmarkSuite("suite")
+        await new BenchmarkSuite("suite").WithRequireIsolation(false)
             .Add("a", () => { })
             .Add("b", () => { })
             .WithWarmup(0)
@@ -217,7 +217,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await new BenchmarkSuite("crashing-suite")
+            await new BenchmarkSuite("crashing-suite").WithRequireIsolation(false)
                 .WithSuiteSetup(() => throw new InvalidOperationException("setup boom"))
                 .Add("a", () => { })
                 .WithWarmup(0)
@@ -244,7 +244,7 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await new BenchmarkSuite("crashing-suite")
+            await new BenchmarkSuite("crashing-suite").WithRequireIsolation(false)
                 .WithSuiteSetup(() => throw new InvalidOperationException("setup boom"))
                 .Add("a", () => { })
                 .WithWarmup(0)

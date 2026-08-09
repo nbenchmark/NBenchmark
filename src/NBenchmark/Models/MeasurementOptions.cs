@@ -481,20 +481,32 @@ public record MeasurementOptions
     public bool SuppressRuntimeProfileWarning { get; init; }
 
     /// <summary>
-    ///     Turns an isolation refusal into a thrown exception rather than a labelled fallback.
+    ///     Turns an isolation <b>refusal</b> into a thrown exception rather than a labelled fallback.
+    ///     On by default.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Off by default, because falling back is the right behaviour for the scratchpad use Simple
-    ///         mode exists for: a number measured in this process, clearly labelled, beats no number at
-    ///         all. A run whose whole point is a trustworthy comparison wants the opposite, and until now
-    ///         only Harness mode could ask for it - <c>--strict-isolation</c> inspects results after the
-    ///         fact and sets an exit code, which a library caller has no access to.
+    ///         The default is <c>true</c> because the in-process fallback should be something a user asks
+    ///         for, never something that happens to them. It was off while there was a great deal left to
+    ///         refuse - a captured local, a prepared value, a scoped container and a parameter sweep over
+    ///         a non-scalar each cost a run its isolation - and in that world a hard error would have been
+    ///         a wall rather than a signal. Those shapes now cross, so what remains under this gate is a
+    ///         genuinely small set, and every member of it has a remedy that fits on one line.
     ///     </para>
     ///     <para>
-    ///         Set this and a refusal throws, carrying the refusal text, at the point of refusal - before
-    ///         anything has been measured. That is the earliest a caller can act on it and the cheapest
-    ///         place to fail.
+    ///         A refusal throws, carrying the refusal text, at the point of refusal - and in Harness mode
+    ///         before <i>anything</i> has been measured, because the isolatability of every discovered
+    ///         class is decided in one pass up front. That is the earliest a caller can act on it and the
+    ///         cheapest place to fail.
+    ///     </para>
+    ///     <para>
+    ///         It gates the four refusal statuses only, never <c>!IsIsolated()</c>: <c>--dry-run</c>,
+    ///         <c>--in-process</c>, <c>[InProcess]</c>, <c>Benchmark.RunInProcess</c>,
+    ///         <c>WithIsolation(false)</c> and <c>BenchmarkSuite.AddInProcess</c> all remain legal and
+    ///         produce <see cref="IsolationStatus.InProcessRequested" />. Set this to <c>false</c> to go
+    ///         back to a labelled fallback everywhere - which is still the right setting for the
+    ///         scratchpad use Simple mode exists for, where a number measured in this process and clearly
+    ///         stamped beats no number at all.
     ///     </para>
     ///     <para>
     ///         Excluded from serialization: this is a decision the coordinator makes before a worker
@@ -504,7 +516,7 @@ public record MeasurementOptions
     ///     </para>
     /// </remarks>
     [JsonIgnore]
-    public bool RequireIsolation { get; init; }
+    public bool RequireIsolation { get; init; } = true;
 
     /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
     public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };
