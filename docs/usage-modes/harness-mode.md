@@ -247,14 +247,14 @@ If you want benchmark classes to have **constructor dependencies** (a repository
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark.DependencyInjection;
 
-var services = new ServiceCollection()
+await BenchmarkHarness.Create(args)
+    .UseDependencyInjection<OrderBenchmarks>(BuildServices)
+    .RunAsync();
+
+static IServiceProvider BuildServices() => new ServiceCollection()
     .AddSingleton<IOrderRepository, SqlOrderRepository>()
     .AddTransient<OrderBenchmarks>()
     .BuildServiceProvider();
-
-await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<OrderBenchmarks>(services)
-    .RunAsync();
 
 public sealed class OrderBenchmarks(IOrderRepository repository)
 {
@@ -263,7 +263,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-See the [Dependency Injection guide](../features/dependency-injection.md) for the full API, lifetime semantics, scoped variants, and how to plug in containers other than `Microsoft.Extensions.DependencyInjection`.
+Pass the factory, not a built container, so the worker can rebuild it and the run stays isolated. See the [Dependency Injection guide](../features/dependency-injection.md) for the full API, lifetime semantics, scoped variants, and how to plug in containers other than `Microsoft.Extensions.DependencyInjection`.
 
 ## Scanning multiple assemblies
 

@@ -89,7 +89,7 @@ internal static class WorkerGroupRunner
                     {
                         Message = $"The measurement worker sent nothing for {idleTimeout.TotalSeconds:0.#}s and "
                                   + $"was stopped. The last thing it reported was that {lastActivity}. A worker "
-                                  + "goes quiet this long only when a benchmark body, a [GlobalSetup] or a "
+                                  + "goes quiet this long only when a benchmark body, a [BenchmarkSetup] or a "
                                   + "static initializer is blocked - on a lock, on I/O, or on an await that "
                                   + "never completes."
                                   + (host.StderrTail.Length == 0 ? "" : $" Worker stderr: {host.StderrTail}"),

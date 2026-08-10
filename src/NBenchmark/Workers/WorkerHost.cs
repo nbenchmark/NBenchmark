@@ -284,7 +284,7 @@ internal sealed class WorkerHost : IAsyncDisposable
             // <see cref="WorkerStartException" />, so <c>ProcessWorkerLauncher</c> - which catches only
             // <c>WorkerStartException</c> - lets it take down the whole benchmark program. A worker
             // that hard-crashes during startup is the reachable case: a static initializer or a
-            // <c>[GlobalSetup]</c> that stack-overflows dies before the Ready frame is fully written.
+            // <c>[BenchmarkSetup]</c> that stack-overflows dies before the Ready frame is fully written.
             var cause = process.HasExited
                 ? ExitCodeDescription.Describe(process.ExitCode)
                 : "the process is still running";

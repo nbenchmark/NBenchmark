@@ -153,16 +153,20 @@ The container resolves all constructor parameters from registered services. If a
 
 ## Using a non-Microsoft container
 
-The package is built around the `IServiceProvider` interface from the BCL, so any container that exposes one is supported. For Autofac, DryIoc, SimpleInjector, Lamar, etc., build your container, get its `IServiceProvider`, and pass it in:
+The package is built around the `IServiceProvider` interface from the BCL, so any container that exposes one is supported. For Autofac, DryIoc, SimpleInjector, Lamar, etc., build the container inside a static factory and pass that, so the worker can rebuild it:
 
 ```csharp
-var container = new ContainerBuilder()
-    .RegisterType<SqlOrderRepository>().As<IOrderRepository>()
-    .Build();
-
 await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<OrderBenchmarks>(container.Resolve<IServiceProvider>())
+    .UseDependencyInjection<OrderBenchmarks>(BuildServices)
     .RunAsync();
+
+static IServiceProvider BuildServices()
+{
+    var container = new ContainerBuilder()
+        .RegisterType<SqlOrderRepository>().As<IOrderRepository>()
+        .Build();
+    return container.Resolve<IServiceProvider>();
+}
 ```
 
 ## Escape hatch: `WithInstanceFactory`

@@ -13,7 +13,7 @@ Benchmarking code sounds simple - run it, time it, compare. In practice the numb
 NBenchmark takes care of the statistical analysis. One line of code gives you a calibrated, warmed-up, outlier-trimmed result with a confidence interval.
 
 ```csharp
-var result = Benchmark.Run(() => MandelbrotCalculation(name: "Mandelbrot calculation"));
+var result = Benchmark.Run(() => MandelbrotCalculation(), name: "Mandelbrot calculation");
 result.Print();
 ```
 

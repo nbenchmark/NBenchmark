@@ -45,9 +45,4 @@ namespace NBenchmark.Attributes;
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class BenchmarkPlanAttribute : Attribute
 {
-    /// <summary>
-    ///     Optional display name for the plan. Defaults to the suite's own name, which the factory
-    ///     sets - so this is only needed to distinguish two plans that build similarly-named suites.
-    /// </summary>
-    public string? Name { get; set; }
 }

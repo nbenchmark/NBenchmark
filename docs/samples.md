@@ -173,17 +173,19 @@ using NBenchmark;
 using NBenchmark.Reporters.Console;
 using NBenchmark.DependencyInjection;
 
-var services = new ServiceCollection()
+// Pass the container as a factory, not a built provider, so the worker can rebuild it
+// and the run stays isolated.
+await BenchmarkHarness.Create(args)
+    .UseDependencyInjection<DependencyInjectionBenchmarks>(BuildServices)
+    .WithReporter(new ConsoleReporter())
+    .WithProgress(new ConsoleBenchmarkProgress())
+    .RunAsync();
+
+static IServiceProvider BuildServices() => new ServiceCollection()
     .AddSingleton<IDataStore, InMemoryDataStore>()
     .AddTransient<OrderRepository>()
     .AddTransient<DependencyInjectionBenchmarks>()
     .BuildServiceProvider();
-
-await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<DependencyInjectionBenchmarks>(services)
-    .WithReporter(new ConsoleReporter())
-    .WithProgress(new ConsoleBenchmarkProgress())
-    .RunAsync();
 
 public sealed class DependencyInjectionBenchmarks(OrderRepository repository)
 {
@@ -196,7 +198,8 @@ What to look at:
 
 - The benchmark class takes an `OrderRepository` in its primary constructor - no parameterless constructor anywhere.
 - `UseDependencyInjection<T>` combines assembly discovery and DI wiring in one call.
-- A scoped variant (`UseScopedDependencyInjection<T>(BuildServices)`) is also available for `DbContext`-style lifetimes. Like the unscoped one, pass the factory rather than a built container so the worker can rebuild it.
+- `BuildServices` is a static factory; the worker runs it in its own process, so the run is isolated.
+- A scoped variant (`UseScopedDependencyInjection<T>(BuildServices)`) is also available for `DbContext`-style lifetimes.
 
 ---
 

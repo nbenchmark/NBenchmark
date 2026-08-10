@@ -11,7 +11,7 @@ internal enum WorkGroupKind
     /// <summary>
     ///     Harness mode. The worker runs the normal attribute discovery pass over the target
     ///     assembly and keeps the named benchmarks. Discovery - not the coordinator - owns
-    ///     <c>[GlobalSetup]</c>, <c>[Params]</c>, <c>[InstanceLifetime]</c> and the rest, so
+    ///     <c>[BenchmarkSetup]</c>, <c>[BenchmarkCase]</c>/<c>[BenchmarkCases]</c>, <c>[InstanceLifetime]</c> and the rest, so
     ///     nothing about that machinery has to cross the process boundary.
     /// </summary>
     DiscoveredClass = 0,

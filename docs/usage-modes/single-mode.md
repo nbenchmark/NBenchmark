@@ -22,6 +22,34 @@ var result = Benchmark.Run(() =>
 
 `Benchmark.Run` warms up until the timings plateau, collects measured samples until the confidence interval is tight enough, trims outliers using the IQR fence rule, and returns a `BenchmarkResult`.
 
+## Isolation
+
+`Benchmark.Run` measures the body in a dedicated worker process by default, not in the process that called it. The same body measured both ways can differ by more than 20× until the host's JIT happens to promote it, and nothing in the reported confidence interval hints at that. A worker starts under a controlled runtime profile, so the number reflects the body rather than whatever the host was doing beforehand.
+
+A body that **captures a local** is the one shape that cannot cross that boundary: the captured value exists in this process and nowhere else, and a fabricated replacement returns plausible, silently wrong numbers rather than throwing. Such a body is measured in this process, stamped `IsolationStatus.InProcessCapturedState`, and reported with the reason. To isolate it, split the preparation into its own delegate so both halves capture nothing and the worker builds the data itself:
+
+```csharp
+var data = BuildData();
+
+// Captures `data` -> measured in this process and labelled
+var result = Benchmark.Run(() => Sort(data));
+
+// Both halves capture nothing -> measured in a worker
+var result = Benchmark.Run(
+    prepare: () => BuildData(),
+    body:    d => Sort(d));
+```
+
+`Benchmark.RunInProcess` is the opposite choice - not a fallback, but the correct one when the current process *is* the subject: cold-start and first-call cost, or a body that must observe host state such as a warm cache or an open connection. It measures here deliberately, with no warning, and stamps `IsolationStatus.InProcessRequested`:
+
+```csharp
+var cold = Benchmark.RunInProcess(() => ColdStartSensitivePath(), name: "cold path");
+```
+
+`Benchmark.Warmup()` optionally starts a worker in the background so the first measured call does not pay the roughly 70 ms launch.
+
+See [Isolated runs](../features/isolated-runs.md) for the full mechanism, the `Iso` column, and what else cannot cross.
+
 ## Overloads
 
 ### Synchronous
@@ -31,7 +59,7 @@ var result = Benchmark.Run(() =>
 var result = Benchmark.Run(() => DoWork());
 
 // Func<T> - returns a value so the runner can prevent dead-code elimination
-var result = Benchmark.Run(() => ComputeHash(data));
+var result = Benchmark.Run(() => Fibonacci(20));
 ```
 
 ### Async
@@ -43,6 +71,27 @@ var result = await Benchmark.RunAsync(async () => await FetchDataAsync());
 // Func<Task<T>>
 var result = await Benchmark.RunAsync(async () => await ComputeAsync(input));
 ```
+
+### Prepared state
+
+For a benchmark over data that must be built once, pass the preparation as its own delegate. `prepare` runs once before warmup - in the worker, on an isolated run - and the body receives its result:
+
+```csharp
+var result = Benchmark.Run(
+    prepare: () => BuildData(),
+    body:    d => Sort(d));
+```
+
+The same shape is available as `RunAsync` (for a `Task`-returning body) and as `RunRaw` / `RunRawAsync` (to keep the raw sample array). Optional `setup:` and `teardown:` hooks receive the state and run outside the timed window - per iteration, before and after the body - so a body that mutates its state can be reset between iterations:
+
+```csharp
+var result = Benchmark.Run(
+    prepare: () => BuildData(),
+    body:    d => Sort(d),
+    setup:   d => Shuffle(d));
+```
+
+A `prepare` delegate that itself captures a local is measured in this process for the same reason a body is, and stamped `IsolationStatus.InProcessCapturedState`. Pass the captured value as an argument instead: `Run(prepare: (int size) => Build(size), prepareArgument: 100_000, body: d => Sort(d))`.
 
 ### Raw outcome
 

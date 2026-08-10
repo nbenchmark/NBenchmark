@@ -196,31 +196,36 @@ Use `--list` to check what NBenchmark finds before running.
 
 1. **Add a parameterless constructor** that initialises dependencies itself (simplest, but couples the benchmark class to the dependency).
 2. **Use `[BenchmarkSetup]`** to populate fields on a parameterless-constructed instance.
-3. **Use the `NBenchmark.DependencyInjection` companion package** to resolve the class from an `IServiceProvider`:
+3. **Use the `NBenchmark.DependencyInjection` companion package** to resolve the class from a container built by a factory:
 
    ```csharp
     await BenchmarkHarness.Create(args)
-        .UseDependencyInjection<MyBenchmarks>(services)
+        .UseDependencyInjection<MyBenchmarks>(BuildServices)
         .RunAsync();
+
+    static IServiceProvider BuildServices() => new ServiceCollection()
+        .AddTransient<MyBenchmarks>()
+        .BuildServiceProvider();   // register the class's dependencies here
    ```
 
-   This is the cleanest approach when you already have a DI container in your application. See the [Dependency Injection guide](./features/dependency-injection.md) for full details.
+   Pass the factory, not a built container, so the worker can rebuild it and the run stays isolated. See the [Dependency Injection guide](./features/dependency-injection.md) for full details.
 
 ### My benchmark class needs dependencies. How do I inject them?
 
-Add the optional `NBenchmark.DependencyInjection` package and pass an `IServiceProvider` to the host:
+Add the optional `NBenchmark.DependencyInjection` package and pass a container *factory* to the host:
 
 ```csharp
+using Microsoft.Extensions.DependencyInjection;
 using NBenchmark.DependencyInjection;
 
-var services = new ServiceCollection()
+await BenchmarkHarness.Create(args)
+    .UseDependencyInjection<OrderBenchmarks>(BuildServices)
+    .RunAsync();
+
+static IServiceProvider BuildServices() => new ServiceCollection()
     .AddSingleton<IOrderRepository, SqlOrderRepository>()
     .AddTransient<OrderBenchmarks>()
     .BuildServiceProvider();
-
-await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<OrderBenchmarks>(services)
-    .RunAsync();
 
 public sealed class OrderBenchmarks(IOrderRepository repository)
 {
@@ -228,18 +233,22 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-The container resolves all constructor parameters. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per instance and disposed after teardown. Pass a `Func<IServiceProvider>` rather than a built container so the run stays isolated. See the [Dependency Injection guide](./features/dependency-injection.md) for the full API and lifetime semantics.
+The worker runs `BuildServices` in its own process and resolves the class from the container it builds there, so the run stays isolated. Passing a built `IServiceProvider` instead works, but a live container cannot cross a process boundary, so the run is measured in this process and every result is stamped `host`. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per instance and disposed after teardown. See the [Dependency Injection guide](./features/dependency-injection.md) for the full API and lifetime semantics.
 
 ### Can I use a DI container other than `Microsoft.Extensions.DependencyInjection`?
 
-Yes. The companion package only depends on `IServiceProvider` from the BCL. Any container that exposes one - Autofac, DryIoc, SimpleInjector, Lamar, etc. - works:
+Yes. The companion package only depends on `IServiceProvider` from the BCL. Any container that exposes one - Autofac, DryIoc, SimpleInjector, Lamar, etc. - works. Build the container inside a static factory and pass that, so the worker can rebuild it:
 
 ```csharp
-var container = new ContainerBuilder()
-    .RegisterType<SqlOrderRepository>().As<IOrderRepository>()
-    .Build();
-
 await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<OrderBenchmarks>(container.Resolve<IServiceProvider>())
+    .UseDependencyInjection<OrderBenchmarks>(BuildServices)
     .RunAsync();
+
+static IServiceProvider BuildServices()
+{
+    var container = new ContainerBuilder()
+        .RegisterType<SqlOrderRepository>().As<IOrderRepository>()
+        .Build();
+    return container.Resolve<IServiceProvider>();
+}
 ```

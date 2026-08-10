@@ -143,7 +143,6 @@ A few things a worker must be *given* rather than able to *build*. NBenchmark sa
 - a body or lifecycle delegate that **captures a local**, and the same for a `prepare` delegate - the remedy is the split above
 - a lambda capturing **`this`**, an `IClassFixture`, a mock or a `[MemberData]` graph: there is no address for a live object. In a test, use `[PerformanceFact]` / `[Performance]`, which address the test method itself
 - a **parameter value** outside the marshallable set (primitives, strings, enums, `decimal`, `DateTime`, `DateTimeOffset`, `TimeSpan`, `Guid`)
-- a suite carrying **both** `WithState` and `WithParameter`
 - an assembly with **no file on disk** - single-file, in-memory or dynamically emitted
 
 A custom `IOutlierDetector` or `ISignificanceTest` needing constructor arguments, and a DI container, are no longer on this list: pass a static factory instead of an instance and the worker builds its own.
@@ -175,7 +174,7 @@ static BenchmarkSuite BuildSuite()
 }
 ```
 
-The factory must be `static` and capture nothing itself, so a worker can locate it by metadata token. `RunPlansAsync(typeof(Plans))` runs every `[BenchmarkPlan]` on a type, each in its own worker. A method marked `[BenchmarkPlan]` but shaped wrongly throws rather than being skipped - a silently skipped suite gives its author nothing to go on.
+The factory must be `static` and capture nothing itself, so a worker can locate it by metadata token. It is invoked once in the coordinator - to read the baseline, reporters and runtime profile the worker launches under - and once per replicate in each worker that measures it, so it must only wire delegates together and never do the work itself. Build the suite's real state in `WithSuiteSetup` or a `prepare` delegate; a factory that builds real state runs that work once per launch on top of the measurement. `RunPlansAsync(typeof(Plans))` runs every `[BenchmarkPlan]` on a type, each in its own worker. A method marked `[BenchmarkPlan]` but shaped wrongly throws rather than being skipped - a silently skipped suite gives its author nothing to go on.
 
 ## Harness mode
 

@@ -144,7 +144,7 @@ See [Harness mode: listing benchmarks without running](./usage-modes/harness-mod
 > [!CAUTION] Pick one
 > **Add a public parameterless constructor** to the benchmark class (simplest fix if the class has no real dependencies)
 > **Install `NBenchmark.Analyzers`** for compile-time detection of NB0001 (missing parameterless constructor)
-> **Use dependency injection:** add the `NBenchmark.DependencyInjection` package and `UseDependencyInjection<T>(services)` to resolve constructor dependencies from a container
+> **Use dependency injection:** add the `NBenchmark.DependencyInjection` package and `UseDependencyInjection<T>(BuildServices)` with a static `IServiceProvider BuildServices()` factory, so the worker rebuilds the container and the run stays isolated
 
 The host uses `Activator.CreateInstance`, which requires a public parameterless constructor. Benchmark classes with real dependencies (a repository, a logger, an `HttpClient`, a `DbContext`) need the DI companion package.
 

@@ -327,7 +327,7 @@ To isolate the body, move the state inside it:
 Benchmark.Run(() => Process(BuildInput()));
 ```
 
-That measures the setup too, so it is not always what you want. When it is not, use a `[Benchmark]` class - discovery runs inside the worker, so `[GlobalSetup]` and fields are built there and nothing has to cross:
+That measures the setup too, so it is not always what you want. When it is not, use a `[Benchmark]` class - discovery runs inside the worker, so `[BenchmarkSetup]` and fields are built there and nothing has to cross:
 
 ```csharp
 public class ProcessBenchmarks
