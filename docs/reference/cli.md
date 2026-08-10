@@ -279,9 +279,9 @@ isolated worker, so their numbers carry the host's JIT and GC configuration.
   in-process (captures): HarnessBenchmarks.InHarness
 ```
 
-It keys on *refusal*, not on "was not isolated". A deliberate `--in-process` or `--dry-run` run passes, because there is nothing to act on - the flag used to fail those, which made it unusable in a pipeline that also ran a dry-run check.
+It keys on *refusal*, not on "was not isolated". A deliberate `--in-process` or `--dry-run` run passes, because there is nothing to act on.
 
-Since `RequireIsolation` now defaults to `true`, the flag is mostly a way to re-assert the requirement over a program that turned it off, and to get the after-the-fact report. See [When isolation is refused](../features/isolated-runs.md#when-isolation-is-refused).
+Since `RequireIsolation` defaults to `true`, the flag is mostly a way to re-assert the requirement over a program that turned it off, and to get the after-the-fact report. See [When isolation is refused](../features/isolated-runs.md#when-isolation-is-refused).
 
 ---
 

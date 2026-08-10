@@ -23,7 +23,7 @@ result.Print();
 
 - **No setup required.** `Benchmark.Run(() => ...)` - no attributes, no class structure, no dedicated project. Drop it into a console app, a test, or a scratchpad.
 
-- **Measured in a clean process, by default.** Each benchmark runs in its own process with a controlled runtime, so the numbers reflect your code rather than the state of whatever was running before it. A body that closes over a local is the one shape that cannot cross that boundary - split it into a `prepare` delegate the worker builds itself, or measure it in this process on purpose with `Benchmark.RunInProcess`.
+- **Measured in a clean process, by default.** Each benchmark runs in its own process with a controlled runtime, so the numbers reflect your code rather than the state of whatever was running before it.
 
 - **Adaptive measurement.** No iteration counts to guess. The engine calibrates ops-per-sample for fast methods so timer overhead doesn't dominate, and detects when warmup has plateaued so the JIT has settled. Pin any dimension when you want a fixed, reproducible run.
 

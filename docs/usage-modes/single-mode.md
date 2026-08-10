@@ -26,12 +26,12 @@ var result = Benchmark.Run(() =>
 
 `Benchmark.Run` measures the body in a dedicated worker process by default, not in the process that called it. The same body measured both ways can differ by more than 20× until the host's JIT happens to promote it, and nothing in the reported confidence interval hints at that. A worker starts under a controlled runtime profile, so the number reflects the body rather than whatever the host was doing beforehand.
 
-A body that **captures a local** is the one shape that cannot cross that boundary: the captured value exists in this process and nowhere else, and a fabricated replacement returns plausible, silently wrong numbers rather than throwing. Such a body is measured in this process, stamped `IsolationStatus.InProcessCapturedState`, and reported with the reason. To isolate it, split the preparation into its own delegate so both halves capture nothing and the worker builds the data itself:
+A body that **captures a value the worker cannot rebuild** is the one shape that cannot cross that boundary: the value exists in this process and nowhere else, and a fabricated replacement returns plausible, silently wrong numbers rather than throwing. Such a body is **refused**, and a refusal fails the run by default rather than producing a labelled in-process measurement. Use `Benchmark.RunInProcess` (below) to measure it here on purpose, or set `RequireIsolation = false` to accept a measurement stamped `IsolationStatus.InProcessCapturedState` instead. Ordinary data - an `int`, a string, an `int[]`, a record of those - is sent to the worker by value, so a body that captures it is isolated with no rewrite. To keep the build out of the measured body entirely, split the preparation into its own delegate so the worker builds the data itself:
 
 ```csharp
 var data = BuildData();
 
-// Captures `data` -> measured in this process and labelled
+// Captures `data` -> the array is sent to the worker, so this is isolated too
 var result = Benchmark.Run(() => Sort(data));
 
 // Both halves capture nothing -> measured in a worker
@@ -91,7 +91,7 @@ var result = Benchmark.Run(
     setup:   d => Shuffle(d));
 ```
 
-A `prepare` delegate that itself captures a local is measured in this process for the same reason a body is, and stamped `IsolationStatus.InProcessCapturedState`. Pass the captured value as an argument instead: `Run(prepare: (int size) => Build(size), prepareArgument: 100_000, body: d => Sort(d))`.
+A `prepare` delegate that itself captures a local is refused - and a refusal fails the run by default - rather than measured in this process. Pass the captured value as an argument instead: `Run(prepare: (int size) => Build(size), prepareArgument: 100_000, body: d => Sort(d))`.
 
 ### Raw outcome
 

@@ -216,7 +216,7 @@ await new BenchmarkSuite("cache")
     .RunAsync();
 ```
 
-An `AddInProcess` row is a *request*, not a refusal: it is stamped `InProcessRequested`, does not trip the gate, and is not counted by `--strict-isolation`. It is still never given a ratio against an isolated row - the configuration difference between the two processes does not go away because it was asked for. Before it existed, `WithIsolation(false)` was the only lever, and it is all-or-nothing: one un-addressable body took every other benchmark in the suite into the host process with it.
+An `AddInProcess` row is a *request*, not a refusal: it is stamped `InProcessRequested`, does not trip the gate, and is not counted by `--strict-isolation`. It is never given a ratio against an isolated row - the configuration difference between the two processes does not go away because it was asked for. `AddInProcess` exists because `WithIsolation(false)` is all-or-nothing: one un-addressable body takes every other benchmark in the suite into the host process with it.
 
 See [Isolated Runs](../features/isolated-runs.md) for the full model.
 

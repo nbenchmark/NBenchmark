@@ -196,7 +196,7 @@ You can tune the granularity:
 - **`[InProcess]`** on a method (or class) opts that benchmark back into the host process.
 - **`--in-process`** on the command line, or **`WithIsolation(false)`** in code, disables isolation for the whole run.
 
-A method-level attribute beats a class-level one, which is how a mostly-in-process class forces one benchmark into a worker. Both on the *same* member is an error (analyzer NB0015, and discovery refuses it too): they ask for opposite things, and the conflict used to resolve silently in favour of `[InProcess]`.
+A method-level attribute beats a class-level one, which is how a mostly-in-process class forces one benchmark into a worker. Both on the *same* member is an error (analyzer NB0015, and discovery refuses it too): the two ask for opposite things, so the combination is refused rather than silently resolved.
 
 ```csharp
 public sealed class MixedBenchmarks
@@ -244,9 +244,9 @@ The rule throughout is to refuse rather than guess. Reconstructing captured stat
 
 **A refusal is an error.** `MeasurementOptions.RequireIsolation` defaults to `true`, so a benchmark that asked for a worker and cannot have one fails the run rather than being measured in the host process and labelled. In Harness mode the check runs at *discovery* time, before the first benchmark is measured, and reports every un-isolatable class in one message.
 
-The default is deliberate and recent. It was off while there was a great deal left to refuse - a captured local, a prepared value, a scoped container and a parameter sweep over a non-scalar each cost a run its isolation - and in that world a hard error would have been a wall rather than a signal. Those shapes now cross, so what remains under the gate is a small set, and every member of it has a one-line remedy.
+What remains under the gate is the small set in *What cannot be isolated* above, and each member of it has a one-line remedy.
 
-**In-process measurement is something you ask for.** Every deliberate route to the host process is still legal and is *not* a refusal - the gate keys on the four refusal statuses, never on "was not isolated":
+**In-process measurement is something you ask for.** Every deliberate route to the host process is legal and is *not* a refusal - the gate keys on the four refusal statuses, never on "was not isolated":
 
 | Mode | How to ask |
 |---|---|
@@ -255,7 +255,7 @@ The default is deliberate and recent. It was off while there was a great deal le
 | Suite | `BenchmarkSuite.AddInProcess(...)` for one benchmark, `WithIsolation(false)` for the whole suite |
 | Any | `--dry-run`, which never invokes a body and so never spawns a worker |
 
-All of these stamp `IsolationStatus.InProcessRequested`, are excluded from `--strict-isolation`, and are still never given a ratio against an isolated row - the configuration difference between the two processes does not go away because it was asked for.
+All of these stamp `IsolationStatus.InProcessRequested`, are excluded from `--strict-isolation`, and are never given a ratio against an isolated row - the configuration difference between the two processes does not go away because it was asked for.
 
 ```csharp
 // One benchmark holds a live handle; the rest of the suite is still measured in a worker.
@@ -265,7 +265,7 @@ await new BenchmarkSuite("cache")
     .RunAsync();
 ```
 
-`AddInProcess` exists because `WithIsolation(false)` is all-or-nothing: before it, a single un-addressable body took every other benchmark in the suite into the host process with it, so the price of measuring one such thing was every comparison it was part of.
+`AddInProcess` exists because `WithIsolation(false)` is all-or-nothing: with it, a single un-addressable body takes every other benchmark in the suite into the host process with it.
 
 To accept labelled fallbacks everywhere instead - the right setting for scratchpad use, where a number measured here and clearly stamped beats no number at all - turn the requirement off:
 
@@ -279,7 +279,7 @@ BenchmarkHarness.Create(args).WithRequireIsolation(false);
 
 Two flags make the claim verifiable on your own code:
 
-- **`--strict-isolation`** turns `RequireIsolation` on for the run and audits the results as well, naming every refused benchmark and its remedy. It is a backstop rather than the primary gate now that the requirement is on by default, and it keys on *refusal*: a deliberate `--in-process` or `--dry-run` run passes it, because there is nothing to act on. Use it wherever a pipeline gates on benchmark numbers: a benchmark that quietly fell back - a build agent without the worker deployed, or a body that captures state - cannot be compared against a baseline measured under a different runtime configuration.
+- **`--strict-isolation`** turns `RequireIsolation` on for the run and audits the results as well, naming every refused benchmark and its remedy. It is a backstop rather than the primary gate - the requirement is on by default - and it keys on *refusal*: a deliberate `--in-process` or `--dry-run` run passes it, because there is nothing to act on. Use it wherever a pipeline gates on benchmark numbers: a benchmark that quietly fell back - a build agent without the worker deployed, or a body that captures state - cannot be compared against a baseline measured under a different runtime configuration.
 - **`--verify-isolation`** measures everything a second time in the host process and prints the per-benchmark difference, so you can see what your own numbers would have been. It reports a ratio per benchmark rather than an aggregate, because the finding is that host measurement is *unpredictable* rather than uniformly wrong. The comparison pass publishes nothing - no reporters, no output files, no exit code - so a diagnostic command cannot change the build's outcome.
 
   It is skipped, with a reason, on a run that used `--runtimes`. This process is one runtime, so there is no in-process counterpart for the other builds; comparing every runtime against the same host row would print a table that looks like a finding and is not one.

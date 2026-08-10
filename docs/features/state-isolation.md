@@ -47,7 +47,7 @@ The class owns its reset semantics and fans the reset out to whatever it holds -
 public Task ResetAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 ```
 
-The engine can only see that the interface is *present* - it cannot read a method body - so an empty implementation used to silence both the warning and the lifetime resolution while changing nothing about the shared state. If the carry-over is deliberate, say so with `[SharedState]` below, which claims nothing a body could contradict. Analyzer NB0011 reports an empty `ResetAsync` for exactly this reason.
+The engine can only see that the interface is *present* - it cannot read a method body - so an empty implementation keeps PerClass while resetting nothing. Analyzer NB0011 reports an empty `ResetAsync` for exactly this reason. If the carry-over is deliberate, say so with `[SharedState]` below, which claims nothing a body could contradict.
 
 ## `[SharedState]` - the carry-over is the point
 
@@ -73,7 +73,7 @@ When a PerClass class's instances come from a factory or a service container - `
 
 This is the case the rule exists for: a scoped `DbContext` shared across methods warms the change tracker that the next method reads, producing dependent timings and a significance verdict computed on an assumption that does not hold.
 
-**The resolution is independent of where the benchmark is measured.** It applies to an isolated worker, an in-process run, `--in-process`, and a cross-runtime run alike - the lifetime is a fact about the class, not about which process holds it. (It was previously entangled with the isolation decision, which meant `--in-process` and any refusal to isolate skipped it entirely.)
+**The resolution is independent of where the benchmark is measured.** It applies to an isolated worker, an in-process run, `--in-process`, and a cross-runtime run alike - the lifetime is a fact about the class, not about which process holds it.
 
 ### What keeps PerClass
 

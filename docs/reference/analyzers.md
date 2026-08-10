@@ -34,7 +34,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method has both `[BenchmarkCase]` and `[BenchmarkCases]`. Use one or the other. |
 | NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a mutable instance field that is read or written by at least two `[Benchmark]` methods, which can leak warmed state across methods. |
 | NB0014 | Benchmark body captures state | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, `Benchmark.RunRawAsync()` or `BenchmarkSuite.Add()` captures a local, a parameter, or `this`. Ordinary data is sent to the worker and the body is still isolated; a value whose behaviour is not determined by its contents is refused, which fails the run. `IsolationStatus` on the result is the authority. |
-| NB0015 | Conflicting isolation attributes | Error | One member carries both `[InProcess]` and `[IsolatedProcess]`. The two ask for opposite things, and the conflict used to resolve silently in favour of `[InProcess]`. Remove one. |
+| NB0015 | Conflicting isolation attributes | Error | One member carries both `[InProcess]` and `[IsolatedProcess]`. The two ask for opposite things. Remove one. |
 
 ### NB0001 - Missing parameterless constructor
 
@@ -390,7 +390,7 @@ dotnet_diagnostic.NB0004.severity = none
 
 ### NB0015 - Conflicting isolation attributes
 
-`[InProcess]` asks for the host process and `[IsolatedProcess]` asks for a dedicated worker. On one member they cannot both be honoured, and the runtime used to resolve the conflict silently in favour of `[InProcess]` - so a request for a clean-room reading was read and discarded with nothing said.
+`[InProcess]` asks for the host process and `[IsolatedProcess]` asks for a dedicated worker. On one member they cannot both be honoured, so the combination is an error rather than silently resolved.
 
 ```csharp
 public class MyBenchmarks
@@ -414,7 +414,7 @@ public class MostlyHere
 }
 ```
 
-Discovery refuses the same combination at runtime, with the same message, for assemblies no analyzer ever saw.
+Discovery refuses the same combination at runtime, with the same message, for assemblies that do not run the analyzer.
 
 ## Severity
 
