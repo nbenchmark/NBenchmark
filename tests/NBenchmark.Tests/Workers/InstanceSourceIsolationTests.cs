@@ -140,10 +140,19 @@ public sealed class InstanceSourceIsolationTests : IDisposable
     ///     W-05: an addressed <c>Func&lt;Type, object&gt;</c> is run in the worker.
     /// </summary>
     /// <remarks>
-    ///     The benchmark class has no parameterless constructor, so a worker that had fallen back to
-    ///     <c>Activator.CreateInstance</c> - the silent substitution the design refuses - would fault
-    ///     the group instead of measuring. A successful row is proof the caller's own factory ran in
-    ///     the process that measured.
+    ///     <para>
+    ///         The benchmark class has no parameterless constructor, so a worker that had fallen back to
+    ///         <c>Activator.CreateInstance</c> - the silent substitution the design refuses - would fault
+    ///         the group instead of measuring. A successful row is proof the caller's own factory ran in
+    ///         the process that measured.
+    ///     </para>
+    ///     <para>
+    ///         <c>FactoryBuiltBenchmarks.Measure</c> spins deliberately. The sample count is asserted
+    ///         separately from the median because the median is the clock-dependent half: at
+    ///         <c>OpsPerSample = 1</c> a body faster than one timer step reports zero legitimately, so a
+    ///         bare <c>Median &gt; 0</c> would be asserting the host's timer granularity rather than
+    ///         anything about the factory.
+    ///     </para>
     /// </remarks>
     [Fact]
     public async Task InstanceFactory_Isolates_AndBuildsTheInstanceInTheWorker()
@@ -159,7 +168,14 @@ public sealed class InstanceSourceIsolationTests : IDisposable
         var result = Assert.Single(group.Results);
 
         Assert.False(result.Errored, result.ErrorMessage);
-        Assert.True(result.Median > 0);
+
+        // The measurement ran to completion - independent of what the timer could resolve. Read from
+        // the pre-trim collected count rather than MeasuredIterations, which is the post-trim inlier
+        // count and would move if the outlier fence removed a sample.
+        Assert.Equal(FastOptions.Iterations, result.AutoTune?.ResolvedSamples);
+
+        // And it recorded real time, which the fixture's spin makes safe to assert on any host.
+        Assert.True(result.Median > 0, $"median was {result.Median} ns");
     }
 
     /// <summary>

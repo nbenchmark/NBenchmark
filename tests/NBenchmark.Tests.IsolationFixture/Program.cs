@@ -212,6 +212,20 @@ public class FactoryBuiltBenchmarks(int marker)
         if (marker != 42)
             throw new InvalidOperationException("the instance was not built by the addressed factory");
 
+        // Spin so one sample spans measurably more than a single clock step, matching every other
+        // fixture body in this file that is measured with OpsPerSample pinned to 1
+        // (NamedPlanFixture spins 200, ScopedDiBenchmarks spins 50). Without it this body is an int
+        // comparison and a return - a couple of nanoseconds - and on a host whose timer steps in
+        // coarse units (41.667 ns on Apple Silicon, 100 ns on Windows QPC) a single-invocation sample
+        // reads either zero or one whole step depending on where the tick boundary happens to fall.
+        // The test asserts Median > 0, and with four such samples the median is zero whenever three
+        // of them miss a tick, which made it fail on roughly one run in six.
+        //
+        // The spin is the fix rather than a larger OpsPerSample because the options are shared with
+        // the sibling tests in InstanceSourceIsolationTests, and rather than dropping the assertion
+        // because "it measured real time" is part of what a successful row is meant to prove.
+        Thread.SpinWait(200);
+
         return marker;
     }
 }
