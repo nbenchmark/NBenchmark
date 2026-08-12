@@ -67,6 +67,15 @@ internal static class AdaptiveLoop
         long totalBodyInvocations = 0;
         var attached = observer != NullMeasurementObserver.Instance;
 
+        // The clock's effective resolution, measured once per process, and the sample-duration target
+        // derived from it. A hard-coded target in nanoseconds means wildly different things across
+        // hosts - 10 µs is ~100,000 steps of a 1 ns clock but only ~100 steps of Windows QPC's 100 ns
+        // tick - so the target is raised until a sample spans MinQuantaPerSample steps. Resolved before
+        // Phase A because calibration resolves K against it, and again feeds post-warmup recalibration.
+        var clockResolutionNs = ClockResolutionProbe.ResolutionNs(clock);
+        var targetSampleDurationNs = ClockResolutionProbe.ResolveTargetSampleDurationNs(
+            autoTune.TargetSampleDurationNs, clockResolutionNs, autoTune.MinQuantaPerSample);
+
         // Start the tuning-wall-clock span here, after the runner's pre-loop progress callback, so
         // the reported time covers only the adaptive loop's own work.
         var tuningStartTimestamp = clock.GetTimestamp();
@@ -131,7 +140,7 @@ internal static class AdaptiveLoop
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Calibration, PhaseTransition.Starting));
 
             var calibrator = new OpCountCalibrator(
-                autoTune.TargetSampleDurationNs,
+                targetSampleDurationNs,
                 Math.Min(autoTune.MaxOpsPerSample, MeasurementOptions.MaxOpsPerSampleLimit));
 
             while (true)
@@ -168,7 +177,7 @@ internal static class AdaptiveLoop
                     // sample duration cannot resolve to K > 1 (the doubling search would settle on
                     // the very first candidate anyway), and the remaining probes would just burn the
                     // tuning budget. Feed the single reading and move on.
-                    if (probe == 0 && elapsed >= autoTune.TargetSampleDurationNs * SlowBodyShortCircuitFactor)
+                    if (probe == 0 && elapsed >= targetSampleDurationNs * SlowBodyShortCircuitFactor)
                         break;
                 }
 
@@ -325,7 +334,7 @@ internal static class AdaptiveLoop
             {
                 var maxOps = Math.Min(autoTune.MaxOpsPerSample, MeasurementOptions.MaxOpsPerSampleLimit);
                 var recalibratedK = WarmupRecalibration.Resolve(
-                    k, detector.LastBatchMeanPerOp, autoTune.TargetSampleDurationNs, maxOps, PostWarmupTriggerFraction);
+                    k, detector.LastBatchMeanPerOp, targetSampleDurationNs, maxOps, PostWarmupTriggerFraction);
 
                 if (recalibratedK != k)
                 {
@@ -594,7 +603,9 @@ internal static class AdaptiveLoop
             // pinned-count, wall-clock-cap, and ceiling stops - none of which consult the gate.
             splitHalfDrift: MeasurementGates.SplitHalfDrift(tracker.FirstHalfMean, tracker.SecondHalfMean),
             coefficientOfVariation: ci?.CoefficientOfVariation ?? double.NaN,
-            hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null);
+            hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null,
+            clockResolutionNs: clockResolutionNs,
+            targetSampleDurationNs: targetSampleDurationNs);
     }
 
     public static async Task<AdaptiveResult> RunAsync(
@@ -622,6 +633,15 @@ internal static class AdaptiveLoop
         double bestCalibrationElapsed = 0;
         long totalBodyInvocations = 0;
         var attached = observer != NullMeasurementObserver.Instance;
+
+        // The clock's effective resolution, measured once per process, and the sample-duration target
+        // derived from it. A hard-coded target in nanoseconds means wildly different things across
+        // hosts - 10 µs is ~100,000 steps of a 1 ns clock but only ~100 steps of Windows QPC's 100 ns
+        // tick - so the target is raised until a sample spans MinQuantaPerSample steps. Resolved before
+        // Phase A because calibration resolves K against it, and again feeds post-warmup recalibration.
+        var clockResolutionNs = ClockResolutionProbe.ResolutionNs(clock);
+        var targetSampleDurationNs = ClockResolutionProbe.ResolveTargetSampleDurationNs(
+            autoTune.TargetSampleDurationNs, clockResolutionNs, autoTune.MinQuantaPerSample);
 
         // Start the tuning-wall-clock span here, after the runner's pre-loop progress callback, so
         // the reported time covers only the adaptive loop's own work.
@@ -687,7 +707,7 @@ internal static class AdaptiveLoop
                 observer.OnPhase(new MeasurementPhaseEvent(name, MeasurementPhase.Calibration, PhaseTransition.Starting));
 
             var calibrator = new OpCountCalibrator(
-                autoTune.TargetSampleDurationNs,
+                targetSampleDurationNs,
                 Math.Min(autoTune.MaxOpsPerSample, MeasurementOptions.MaxOpsPerSampleLimit));
 
             while (true)
@@ -726,7 +746,7 @@ internal static class AdaptiveLoop
                     // sample duration cannot resolve to K > 1 (the doubling search would settle on
                     // the very first candidate anyway), and the remaining probes would just burn the
                     // tuning budget. Feed the single reading and move on.
-                    if (probe == 0 && elapsed >= autoTune.TargetSampleDurationNs * SlowBodyShortCircuitFactor)
+                    if (probe == 0 && elapsed >= targetSampleDurationNs * SlowBodyShortCircuitFactor)
                         break;
                 }
 
@@ -883,7 +903,7 @@ internal static class AdaptiveLoop
             {
                 var maxOps = Math.Min(autoTune.MaxOpsPerSample, MeasurementOptions.MaxOpsPerSampleLimit);
                 var recalibratedK = WarmupRecalibration.Resolve(
-                    k, detector.LastBatchMeanPerOp, autoTune.TargetSampleDurationNs, maxOps, PostWarmupTriggerFraction);
+                    k, detector.LastBatchMeanPerOp, targetSampleDurationNs, maxOps, PostWarmupTriggerFraction);
 
                 if (recalibratedK != k)
                 {
@@ -1155,7 +1175,9 @@ internal static class AdaptiveLoop
             // pinned-count, wall-clock-cap, and ceiling stops - none of which consult the gate.
             splitHalfDrift: MeasurementGates.SplitHalfDrift(tracker.FirstHalfMean, tracker.SecondHalfMean),
             coefficientOfVariation: ci?.CoefficientOfVariation ?? double.NaN,
-            hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null);
+            hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null,
+            clockResolutionNs: clockResolutionNs,
+            targetSampleDurationNs: targetSampleDurationNs);
     }
 
     // Per-iteration setup/teardown make a K-batch semantically wrong (each op must be paired with
@@ -1198,7 +1220,9 @@ internal static class AdaptiveLoop
         int measurementRestarts,
         double splitHalfDrift,
         double coefficientOfVariation,
-        bool hasIterationHooks)
+        bool hasIterationHooks,
+        double clockResolutionNs,
+        double targetSampleDurationNs)
     {
         var timingsArray = timings.ToArray();
 
@@ -1206,6 +1230,14 @@ internal static class AdaptiveLoop
         // diagnostic is consistent. The reported interval is computed separately on trimmed samples.
         var rawStats = StatsSummary.Compute(timingsArray, confidenceLevel);
         var achievedCi = rawStats.Mean > 0 ? rawStats.MarginOfError / rawStats.Mean : 0.0;
+
+        // What one timed sample actually spanned, from the achieved per-op mean rather than the target:
+        // K is a power of two and the body is whatever speed it is, so the realised duration overshoots
+        // the target, and post-warmup recalibration may have moved K again. Quantization has to be
+        // computed against the duration that was really measured.
+        var achievedSampleDurationNs = rawStats.Mean * opsPerSample;
+        var quantizationFraction = ClockResolutionProbe.QuantizationFraction(
+            clockResolutionNs, achievedSampleDurationNs);
 
         var diagnostic = new AutoTuneDiagnostic
         {
@@ -1232,6 +1264,10 @@ internal static class AdaptiveLoop
             WarmupSampleInterval = warmup.CurveSampleInterval,
             MeasurementRestarts = measurementRestarts,
             SplitHalfDrift = splitHalfDrift,
+            ClockResolutionNs = clockResolutionNs,
+            TargetSampleDurationNs = targetSampleDurationNs,
+            SampleDurationNs = achievedSampleDurationNs,
+            SampleQuantizationFraction = quantizationFraction,
         };
 
         var warnings = BuildStopWarnings(
@@ -1245,6 +1281,10 @@ internal static class AdaptiveLoop
             var switchWarning = BuildJitterSwitchWarning(jitterMetric);
             warnings = warnings.Count == 0 ? switchWarning : [..warnings, ..switchWarning];
         }
+
+        if (BuildClockResolutionWarning(achievedCi, quantizationFraction, clockResolutionNs, achievedSampleDurationNs)
+            is { } resolutionWarning)
+            warnings = warnings.Count == 0 ? [resolutionWarning] : [..warnings, resolutionWarning];
 
         // The effective detector is non-null only when the loop auto-switched it; the caller
         // (BenchmarkRunner) inspects this to build an effective options record for the stats
@@ -1300,6 +1340,58 @@ internal static class AdaptiveLoop
             return false;
 
         return o.OutlierMode == OutlierMode.IqrFence;
+    }
+
+    /// <summary>
+    ///     How many times finer than the clock's quantization step the reported error margin has to be
+    ///     before it is called out. The margin describing a smaller interval than the clock can resolve
+    ///     is not wrong arithmetic - it is an honest summary of the collected samples - but it is
+    ///     describing the step grid rather than the code, so the digits past that point carry no
+    ///     information about the body.
+    ///     <para>
+    ///         Two rather than one: at parity the margin and the step are the same size and the interval
+    ///         is still a fair account of the measurement. The warning is for the case where the margin
+    ///         has collapsed well inside a single step, which is what produces a number stable to four
+    ///         significant figures within a run and a whole step different on the next run.
+    ///     </para>
+    /// </summary>
+    private const double ClockResolutionWarningFactor = 2.0;
+
+    /// <summary>
+    ///     A warning when the reported error margin is finer than the clock's quantization step, or
+    ///     <c>null</c> when the margin is within the clock's ability to resolve.
+    /// </summary>
+    /// <remarks>
+    ///     This is the counterpart to the warmup time-floor warning. Both catch a tight interval around
+    ///     a number that will not reproduce; they differ in what pins the number to the wrong value -
+    ///     unfinished tiered compilation there, the timer's step grid here. Neither is visible in the
+    ///     interval itself, which is precisely why each needs its own check.
+    /// </remarks>
+    private static string? BuildClockResolutionWarning(
+        double achievedCi,
+        double quantizationFraction,
+        double clockResolutionNs,
+        double sampleDurationNs)
+    {
+        if (quantizationFraction <= 0 || achievedCi <= 0 || !double.IsFinite(achievedCi))
+            return null;
+
+        if (achievedCi * ClockResolutionWarningFactor >= quantizationFraction)
+            return null;
+
+        // achievedCi is the half-width the loop measured on the raw stream, not the margin the report
+        // finally prints - that one is recomputed downstream on trimmed samples with the
+        // optional-stopping correction. They are the same order of magnitude, which is all this
+        // comparison needs, but the message must not claim to be quoting the printed figure.
+        return $"The measured confidence interval (±{achievedCi:P3}) is finer than this host's clock "
+               + $"can resolve: one timer step is {clockResolutionNs:F1} ns against a "
+               + $"{sampleDurationNs / 1000.0:F1} µs sample, so quantization alone is ±"
+               + $"{quantizationFraction:P3} of the measurement. Within a run every sample lands on the "
+               + "same step, which is why the margin collapses; between runs a shift far smaller than "
+               + "one step moves every sample to the next one and takes the median with it. Expect this "
+               + "benchmark to move by about a step when re-run, and read the between-launch interval "
+               + "(--launch-count) rather than this margin. Raising AutoTuneOptions.MinQuantaPerSample "
+               + "lengthens each sample and lowers the quantization floor.";
     }
 
     private static IReadOnlyList<string> BuildJitterSwitchWarning(double? jitterMetric)

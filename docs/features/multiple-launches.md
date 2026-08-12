@@ -6,7 +6,9 @@ order: 6
 
 # Multiple launches
 
-By default each benchmark runs once. Use multiple launches to run each benchmark `N` times as independent launches. Each launch includes its own warmup and GC cycle, so variance across launches reflects real run-to-run differences (process state, ASLR, scheduler placement), not just intra-run noise.
+**Harness mode launches each benchmark 5 times by default**; `Benchmark.Run` and `BenchmarkSuite` run once unless you raise the count. Each launch includes its own warmup and GC cycle, so variance across launches reflects real run-to-run differences (process state, ASLR, scheduler placement, clock granularity), not just intra-run noise.
+
+Harness mode defaults above one because a single launch cannot estimate the thing most readers assume the interval describes. Five because the between-launch interval is a Student-t half-width on `k - 1` degrees of freedom, and the critical value drops steeply over the first few replicates - 12.71 at `k = 2`, 4.30 at 3, 3.18 at 4, 2.78 at 5, then only slowly. Below five the interval is too wide for a real regression to clear; five is where the curve flattens.
 
 The primary result fields (median, mean, percentiles, etc.) are the **average across launches**, and the reported confidence interval comes from the spread **between** launches rather than from within any one of them. Cross-launch statistics are also computed in full and displayed in a "Launch Aggregation" table below the main results when `LaunchCount > 1`.
 
@@ -61,11 +63,11 @@ The launch count is **not** a field on `MeasurementOptions`, so `WithOptions` ca
 Each `[Benchmark]` can specify its own launch count via the `LaunchCount` property (Harness mode):
 
 ```csharp
-// 3 independent launches for this method only
-[Benchmark(LaunchCount = 3)]
+// 10 independent launches for this method only
+[Benchmark(LaunchCount = 10)]
 public int NoisyMethod() => Compute();
 
-// Default launch count (1) - no aggregation
+// The harness default (5 launches, aggregated)
 [Benchmark]
 public int StableMethod() => Compute();
 ```
@@ -78,15 +80,55 @@ public class MyBenchmarks
     [Benchmark(Baseline = true)]
     public int Baseline() => 1;
 
-    // This method runs 5 launches on its own;
-    // Baseline and Fast keep the default (1).
-    [Benchmark(LaunchCount = 5)]
+    // This method runs 20 launches on its own;
+    // Baseline and Fast keep the harness default (5).
+    [Benchmark(LaunchCount = 20)]
     public int NoisyWork() => ExpensiveJob();
 
     [Benchmark]
     public int Fast() => QuickJob();
 }
 ```
+
+> [!NOTE] An isolated group takes the maximum
+> The coordinator spawns one set of workers per isolated group, using the highest launch count any
+> member asked for — so raising it on one method above raises it for every benchmark measured
+> alongside it. Give a method its own `[IsolatedProcess]` if you want the extra launches to stay
+> confined to it.
+
+## Reading the reproducibility warning
+
+Two fields on `LaunchStatistics` answer "should I trust the interval on this row?", and they are worth reading together:
+
+| Field | What it is |
+| --- | --- |
+| `LaunchStandardDeviation` | How much the median moves between launches — the reproducibility of the number. |
+| `WithinLaunchStandardError` | How precisely a single launch measured its own median — the precision it claimed. |
+| `ProcessVarianceRatio` | The first divided by the second. |
+| `BetweenLaunchDispersion` | The between-launch spread as a fraction of the measurement. |
+
+When the ratio passes 4, NBenchmark adds a warning:
+
+```text
+⚠ Run-to-run variation across 5 launches is 61x the precision any single launch reported, so
+  this benchmark measures far more precisely than it reproduces. Run-to-run spread is 1.4% of
+  the measurement. The Error on this row is the between-launch interval and already accounts
+  for that, but the significance verdict does not - it pools samples across launches, so it
+  inherits the power of the pooled count rather than the reproducibility of the measurement.
+```
+
+**Expect large ratios on nanosecond-scale bodies.** A ratio of 30-60 there is ordinary, not a defect: a cheap body collects thousands of samples, which drives its standard error toward zero while leaving real machine variance — code and heap layout, scheduler placement, clock granularity — completely untouched. The warning is a statement about *which interval to trust*, not a sign the benchmark is broken.
+
+What it is telling you is narrow and specific. The `Error` column already carries this variance, because a multi-launch row reports the between-launch half-width. The **significance verdict** does not: it pools raw samples across every launch, so its power grows with the pooled sample count regardless of whether the difference reproduces. At a high ratio, treat `Sig` as provisional and compare the per-launch medians in the Launch Aggregation table.
+
+Raising `--launch-count` sharpens the estimate of the spread; it does not narrow the spread itself. Nothing configurable inside a single process will, either — more samples and longer warmup both leave the between-process component untouched by construction. If the spread is too wide to gate on, reduce it at the source with [environment controls](./environment-control.md) or a quieter host.
+
+> [!NOTE] The ratio divides by the standard error, not the standard deviation
+> A within-process interval is `t × s / √n`, so comparing between-process spread against the
+> per-sample `s` understates the problem by `√n` — and `n` reaches the thousands on exactly the
+> cheap bodies where this matters. Dividing by `s` instead would put the ratio at 0.5-0.7
+> against a threshold of 4 and leave the warning silent on a benchmark whose single-launch
+> interval is 21× narrower than its true run-to-run spread.
 
 ## Dry-run interaction
 

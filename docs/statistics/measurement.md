@@ -22,9 +22,17 @@ The probe is on by default (`AutoTune.EnableJitterCalibration`). Pinning `Outlie
 
 ### Phase 1 - Ops-per-sample calibration (K)
 
-If `OpsPerSample` is `null` (the default) and the body is eligible, NBenchmark times a single invocation, then doubles K - timing 1, 2, 4, 8, … invocations as one batch - until a batch spans at least `AutoTune.TargetSampleDurationNs` (**10 µs** by default). The resolved K is reused for warmup and measurement, and every reported timing divides the batch time by K to give a per-operation number.
+If `OpsPerSample` is `null` (the default) and the body is eligible, NBenchmark times a single invocation, then doubles K - timing 1, 2, 4, 8, … invocations as one batch - until a batch spans at least the resolved sample-duration target. The resolved K is reused for warmup and measurement, and every reported timing divides the batch time by K to give a per-operation number.
 
-The 10 µs target keeps two per-sample error sources negligible: timer **quantization** (Windows QPC ticks at 100 ns, so a 10 µs sample resolves to ~0.1% rather than the ~±10% a 1 µs sample would suffer) and the fixed **timestamp-read overhead** (~10-30 ns, ~0.2% of 10 µs rather than ~1-3% of 1 µs). Both would otherwise leak into the ±2.5% CI target. Bodies already spanning ≥ 10 µs keep K = 1, so their per-op tail visibility is unchanged.
+The target comes from two things. `AutoTune.TargetSampleDurationNs` (**10 µs** by default) covers the fixed **timestamp-read overhead** (~10-30 ns, ~0.2% of 10 µs rather than ~1-3% of 1 µs), which would otherwise leak into the ±2.5% CI target. `AutoTune.MinQuantaPerSample` (**512** by default) then covers timer **quantization**, which no fixed nanosecond figure can: 10 µs is ~100,000 steps of a 1 ns clock but only ~240 of Apple Silicon's 41.667 ns timebase and ~100 of Windows QPC's 100 ns tick. NBenchmark measures the clock's effective resolution once per process and raises the target to `resolution × MinQuantaPerSample` when the configured value falls short, so quantization lands under 0.2% of a sample on every host instead of varying a thousand-fold between them.
+
+| Host | Measured resolution | Resolved target | Quantization per sample |
+| --- | --- | --- | --- |
+| TSC-backed Linux | ~1-5 ns | 10 µs (unchanged) | <0.05% |
+| Apple Silicon | ~41.7 ns | ~21 µs | ~0.19% |
+| Windows QPC | ~100 ns | ~51 µs | ~0.19% |
+
+The target is only ever raised, so a preset asking for more (`Thorough` uses 50 µs) is left alone. Bodies already spanning the resolved target keep K = 1, so their per-op tail visibility is unchanged. See [Timer resolution](#timer-resolution) for why quantization is worth this much trouble.
 
 > [!NOTE] K > 1 batches change what percentiles mean
 > When K > 1, each recorded sample is the mean of K back-to-back operations, so P95/P99/Max and the histogram describe **batch means**, not individual-operation tails - a slow individual op is averaged with its K-1 neighbours. For a sub-10 µs body the trade is deliberate (per-op timing at that scale is dominated by timer noise anyway); when you need per-op tail latency, pin `OpsPerSample = 1` and read the caveats in [Descriptive Statistics](./descriptive.md).
@@ -48,7 +56,7 @@ The plateau rule alone measures warmup in *iterations*, but a fast body plateaus
 
 Both gates only *delay* settling past the plateau; `MaxWarmup` and the calibration+warmup budget share (below) still bound warmup from above, so a genuinely slow body is not held open by them.
 
-Because a fast body needs roughly 50,000 samples to accumulate 500 ms at the 10 µs sample target, `AutoTune.MaxWarmup` defaults to **100,000** — not the 10,000 that bounds a *pinned* `WarmupIterations`. A count ceiling that binds before the time floor would silently defeat it, so hitting the ceiling below the floor raises a prominent warning and `BenchmarkResult.AutoTune.WarmupTimeFloorMet` records it. A body that cannot reach the floor within the ceiling at all — typically `OpsPerSample` pinned to 1 on a nanosecond body — is told to raise `--ops-per-sample` so each sample spans more work.
+Because a fast body needs tens of thousands of samples to accumulate 500 ms — roughly 50,000 at a 10 µs sample, or ~24,000 at the ~21 µs a coarse-clocked host resolves to — `AutoTune.MaxWarmup` defaults to **100,000**, not the 10,000 that bounds a *pinned* `WarmupIterations`. A count ceiling that binds before the time floor would silently defeat it, so hitting the ceiling below the floor raises a prominent warning and `BenchmarkResult.AutoTune.WarmupTimeFloorMet` records it. A body that cannot reach the floor within the ceiling at all — typically `OpsPerSample` pinned to 1 on a nanosecond body — is told to raise `--ops-per-sample` so each sample spans more work.
 
 For slow bodies the configured `BatchSize` is shrunk based on the per-sample estimate from calibration: a body that takes seconds per sample warms in batches of 1 so the plateau rule can settle after `PlateauPatience + 1` samples instead of `(PlateauPatience + 1) × BatchSize` (subject to the `MinWarmup` floor, which with the default `MinWarmup = 8` is then the binding constraint). Without this shrink a 2 s body with the default `BatchSize = 8` would need `(PlateauPatience + 1) × BatchSize = 32` samples — 64 s of warmup — just to clear the plateau requirement.
 
@@ -105,9 +113,11 @@ The two are usually close, but they can diverge by two orders of magnitude, and 
 
 ### What the loop decided
 
-Every measured result carries an `AutoTune` diagnostic (`BenchmarkResult.AutoTune`) recording the resolved K, warmup length, sample count, why each phase stopped, the achieved CI half-width and its convergence trace, the wall-clock time spent tuning, the pre-flight jitter metric, whether the outlier detector was auto-switched, and the drift and restart counters. Reporters surface it as an `auto-tuned: …` line (console, Markdown), dedicated columns (CSV advanced), or an `autoTune` object (JSON). It is `null` on dry-run and errored results.
+Every measured result carries an `AutoTune` diagnostic (`BenchmarkResult.AutoTune`) recording the resolved K, warmup length, sample count, why each phase stopped, the achieved CI half-width and its convergence trace, the wall-clock time spent tuning, the pre-flight jitter metric, whether the outlier detector was auto-switched, the drift and restart counters, and the measured clock resolution with the sample duration and quantization floor derived from it. Reporters surface it as an `auto-tuned: …` line (console, Markdown), dedicated columns (CSV advanced), or an `autoTune` object (JSON). It is `null` on dry-run and errored results.
 
 It also records what warmup observed about tiered compilation - see [the warmup curve](#the-warmup-curve).
+
+Two of its fields exist specifically to catch a tight interval around a number that will not reproduce, which is the hardest failure in benchmarking to see from the interval alone. **`WarmupTimeFloorMet`** covers a body measured before tiered compilation finished; **`SampleQuantizationFraction`** covers a body measured more finely than the timer can resolve. Neither is visible in the margin of error, which is exactly why each is reported separately. A third cause - genuine between-process variance - is not a property of one measurement at all and needs [multiple launches](../features/multiple-launches.md#reading-the-reproducibility-warning) to see.
 
 ### The warmup curve
 
@@ -193,15 +203,39 @@ dotnet run -- --no-gc-between-benchmarks
 
 ### Timer resolution
 
-NBenchmark uses `System.Diagnostics.Stopwatch`, which wraps the platform's high-resolution performance counter. The resolution is printed at the start of each `BenchmarkHarness` run:
+NBenchmark uses `System.Diagnostics.Stopwatch`, which wraps the platform's high-resolution performance counter. The **advertised** resolution is printed at the start of each `BenchmarkHarness` run:
 
-```
+```text
 Timer resolution: 1,000,000,000 ticks/s (1.00 ns per tick)
 ```
 
-On most modern hardware the resolution is 1 ns. On some virtual machines it may be coarser; on Windows the counter typically runs at 10 MHz (100 ns per tick).
+That figure is `Stopwatch.Frequency`, and it can be badly wrong. It is what the runtime says the counter *converts to*, not the granularity at which the counter actually advances. On Apple Silicon `Stopwatch.Frequency` reports 1 GHz while the underlying `mach_absolute_time` timebase runs at 24 MHz, so the counter only ever moves in steps of **41.667 ns** — the printed "1.00 ns per tick" is out by more than forty-fold. Spinning on the clock until it advances shows the truth directly; the smallest non-zero deltas observed on an M1 Max are 41, 42, 83, 84, 125, 166, 167, 208 ns — multiples of one 41.667 ns step, and nothing in between.
 
-Per-iteration timings are computed directly from raw `Stopwatch` ticks - deliberately **not** via `TimeSpan`, whose ticks are always 100 ns. On a 1 GHz timer this preserves the full 1 ns sample resolution; round-tripping through `TimeSpan` would quantize every sample to a multiple of 100 ns and record sub-100 ns operations as zero.
+So NBenchmark does not trust the advertised rate. It **measures** the clock's effective resolution once per process (`Engine/Detectors/ClockResolutionProbe`) by spinning until the reported elapsed time first becomes non-zero, and takes the minimum over several attempts. The result lands on `AutoTune.ClockResolutionNs` and drives the sample-duration floor described in [Phase 1](#phase-1---ops-per-sample-calibration-k).
+
+"Effective" is the honest word: when reading the clock costs more than one hardware step — routine, since a counter read is tens of nanoseconds — the smallest observable delta is bounded by the read, not the timebase. That bound is the right number here, because it is the finest interval a timed sample can actually distinguish, whatever sets it.
+
+Per-iteration timings are computed directly from raw `Stopwatch` ticks - deliberately **not** via `TimeSpan`, whose ticks are always 100 ns. That preserves whatever resolution the platform genuinely offers; round-tripping through `TimeSpan` would quantize every sample to a multiple of 100 ns and record sub-100 ns operations as zero.
+
+#### Why quantization is worse than it looks
+
+Quantization presents asymmetrically, and that asymmetry is what makes it dangerous rather than merely imprecise.
+
+*Within* a run, consecutive samples of a stable body land on the **same** step. The spread between them collapses, so the standard deviation is small, and the margin of error — which divides that by √n — becomes very small indeed. *Between* runs, a shift far smaller than one step is enough to push every sample to the next step, taking the median with it in one discrete jump.
+
+The result is a benchmark that looks precise to four significant figures and moves by a whole step when you run it again. Measured on this repository's own calibration sample: a 2.53 ns body at K = 4096 spanned ~10.4 µs, or ~250 steps of the 41.667 ns clock, and reported a margin of **±0.027%** — while eight isolated runs of the same benchmark produced medians of 10209, 10250, 10291, 10375, 10416, 10458, 10500 and 10542 ns. Every one of those is a whole step from its neighbour, and the true run-to-run spread was **21× the reported margin**.
+
+NBenchmark reports the floor rather than leaving it implicit. `AutoTune.SampleQuantizationFraction` is one step as a fraction of one sample, and a warning fires when the measured interval is finer than the clock can resolve:
+
+```text
+⚠ The measured confidence interval (±0.209%) is finer than this host's clock can resolve:
+  one timer step is 41.0 ns against a 0.2 µs sample, so quantization alone is ±24.203% of
+  the measurement. Within a run every sample lands on the same step, which is why the
+  margin collapses; between runs a shift far smaller than one step moves every sample to
+  the next one and takes the median with it.
+```
+
+With the default `MinQuantaPerSample` floor in place this warning is rare — it exists for configurations that bypass the floor, chiefly a small pinned `OpsPerSample` on a fast body. Alongside `AutoTune.WarmupTimeFloorMet`, it is the field to reach for when a benchmark reports a tight margin and will not reproduce: that one covers a body measured before tiered compilation finished, this one covers a body measured finer than the timer can see.
 
 > [!NOTE] Timer-call overhead
 > Each sample includes the cost of one timestamp read (typically ~10-30 ns).

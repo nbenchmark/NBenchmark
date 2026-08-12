@@ -96,6 +96,119 @@ public class LaunchAggregatorTests
         Assert.Null(stats.LaunchConfidenceIntervalUpper);
     }
 
+    /// <summary>
+    ///     The ratio must divide by the within-launch standard <em>error</em>, not by the standard
+    ///     deviation of individual samples. A within-process interval is <c>t * s / sqrt(n)</c>, so a
+    ///     ratio built on <c>s</c> carries a spurious <c>1/sqrt(n)</c> and understates the problem by
+    ///     that factor - which on a cheap body, where <c>n</c> reaches the thousands, is 50-70x.
+    /// </summary>
+    [Fact]
+    public void Aggregate_ProcessVarianceRatio_DividesByStandardErrorNotStandardDeviation()
+    {
+        // Three launches whose medians spread by 10 ns, each having measured 10,000 samples with a
+        // per-sample stddev of 20 ns. SE = 20 / sqrt(10000) = 0.2 ns.
+        var results = new List<BenchmarkResult>
+        {
+            CreateResult("test", 100, 100, 20, 10_000) with { StandardError = 0.2 },
+            CreateResult("test", 110, 110, 20, 10_000) with { StandardError = 0.2 },
+            CreateResult("test", 120, 120, 20, 10_000) with { StandardError = 0.2 },
+        };
+
+        var stats = LaunchAggregator.Aggregate(results);
+
+        Assert.Equal(0.2, stats.WithinLaunchStandardError!.Value, precision: 6);
+
+        // sigma_b over the three medians is 10; against SE = 0.2 that is 50.
+        Assert.Equal(10.0, stats.LaunchStandardDeviation, precision: 6);
+        Assert.Equal(50.0, stats.ProcessVarianceRatio!.Value, precision: 6);
+
+        // Against the old denominator (the per-sample stddev of 20) the ratio would have been 0.5 -
+        // comfortably below the threshold of 4, so the warning stayed silent on a benchmark whose
+        // between-process spread was fifty times the precision it claimed.
+        Assert.NotNull(LaunchAggregator.DescribeReproducibility(stats));
+    }
+
+    /// <summary>
+    ///     The corrected ratio must stay quiet on an expensive body. Few samples keep the standard error
+    ///     comparable to the between-launch spread, so a within-process interval is a fair guide and
+    ///     there is nothing to warn about. This is what makes the metric discriminate by body cost
+    ///     rather than fire on everything.
+    /// </summary>
+    [Fact]
+    public void Aggregate_ProcessVarianceRatio_StaysQuietWhenSampleCountIsSmall()
+    {
+        // A 100 ms body: 30 samples, per-sample stddev 2 ns, so SE = 2 / sqrt(30) = 0.365 ns.
+        const double standardError = 2.0 / 5.477225575051661;
+
+        var results = new List<BenchmarkResult>
+        {
+            CreateResult("test", 100.0, 100.0, 2, 30) with { StandardError = standardError },
+            CreateResult("test", 100.4, 100.4, 2, 30) with { StandardError = standardError },
+            CreateResult("test", 100.8, 100.8, 2, 30) with { StandardError = standardError },
+        };
+
+        var stats = LaunchAggregator.Aggregate(results);
+
+        // sigma_b = 0.4 against SE = 0.365 -> ~1.1: the two agree, as they should.
+        Assert.True(stats.ProcessVarianceRatio < LaunchAggregator.ProcessVarianceWarningThreshold,
+            $"expected a quiet ratio, got {stats.ProcessVarianceRatio}");
+        Assert.Null(LaunchAggregator.DescribeReproducibility(stats));
+    }
+
+    [Fact]
+    public void Aggregate_ProcessVarianceRatio_IsNullWhenNoLaunchReportedAStandardError()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            CreateResult("test", 100, 100, 20, 10_000),
+            CreateResult("test", 110, 110, 20, 10_000),
+        };
+
+        var stats = LaunchAggregator.Aggregate(results);
+
+        Assert.Null(stats.ProcessVarianceRatio);
+        Assert.Null(stats.WithinLaunchStandardError);
+        Assert.Null(LaunchAggregator.DescribeReproducibility(stats));
+    }
+
+    [Fact]
+    public void Aggregate_ProcessVarianceRatio_IsNullForASingleLaunch()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            CreateResult("test", 100, 100, 20, 10_000) with { StandardError = 0.2 },
+        };
+
+        var stats = LaunchAggregator.Aggregate(results);
+
+        Assert.Null(stats.ProcessVarianceRatio);
+        Assert.Null(stats.WithinLaunchStandardError);
+    }
+
+    /// <summary>
+    ///     The message must not claim the row's interval is a within-process one. Since the multi-launch
+    ///     overhaul, <c>Average</c> replaces it with the between-launch half-width, so the interval
+    ///     already carries this variance; what does not is the significance verdict, which pools raw
+    ///     samples across launches.
+    /// </summary>
+    [Fact]
+    public void DescribeReproducibility_AttributesTheProblemToTheSignificanceVerdict()
+    {
+        var results = new List<BenchmarkResult>
+        {
+            CreateResult("test", 100, 100, 20, 10_000) with { StandardError = 0.2 },
+            CreateResult("test", 110, 110, 20, 10_000) with { StandardError = 0.2 },
+            CreateResult("test", 120, 120, 20, 10_000) with { StandardError = 0.2 },
+        };
+
+        var warning = LaunchAggregator.DescribeReproducibility(LaunchAggregator.Aggregate(results));
+
+        Assert.NotNull(warning);
+        Assert.Contains("significance verdict", warning);
+        Assert.Contains("between-launch interval", warning);
+        Assert.DoesNotContain("describes precision within a single process", warning);
+    }
+
     [Fact]
     public void Aggregate_TwoLaunches_ComputesCI()
     {

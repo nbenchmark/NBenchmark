@@ -32,13 +32,21 @@ See [Configuration: AutoTune](./reference/configuration.md#autotune) for the `Th
 ### Same benchmark, a different median each run, and every run reports a tight Error
 
 > [!CAUTION] Quick fix
-> Raise the warmup floor: `--min-warmup-time <ms>` (default 500) and `--max-warmup <n>` if the ceiling is what cut warmup short. For a nanosecond body with `--ops-per-sample 1`, raise the ops-per-sample so each sample spans more work.
+> Run with `--launch-count 5` or higher (the Harness default) and read the `Error` column, which then describes reproducibility rather than one process's precision. Do **not** reach for more samples or longer warmup first — neither addresses the usual cause.
 
-Warmup ended before the JIT finished tiering the body up, so the run measured pre-tier-1 (unoptimized) code. This is **not** noise: each run is internally consistent, which is why the error margin looks trustworthy. A body can read several times slow this way.
+Three different things produce this symptom, and they need different fixes. Diagnose before treating, in this order — the first two are the ones you can fix, and both are rare with default settings.
 
-Confirm the cause before fixing it. Check `autoTune.warmupTimeFloorMet` in the JSON (or `warmup cut short` on the console summary), `autoTune.jitQuiescenceAchieved`, and `autoTune.splitHalfDrift`. `autoTune.warmupCurve` shows whether the body was still speeding up when warmup ended, and `autoTune.jitLastChangeAtNs` against `warmupElapsedNs` shows how much quiet time followed the last compilation.
+**1. Warmup ended before the JIT finished tiering up.** The run measured pre-tier-1 (unoptimized) code, which can read several times slow. Each run is internally consistent, which is why the margin looks trustworthy.
 
-See [Measurement: Warmup](./statistics/measurement.md#phase-2---warmup-plateau-detection) and [the warmup curve](./statistics/measurement.md#the-warmup-curve) for the full mechanism.
+Check `autoTune.warmupTimeFloorMet` in the JSON (or `warmup cut short` on the console summary), plus `autoTune.jitQuiescenceAchieved` and `autoTune.splitHalfDrift`. `autoTune.warmupCurve` shows whether the body was still speeding up when warmup ended, and `autoTune.jitLastChangeAtNs` against `warmupElapsedNs` shows how much quiet time followed the last compilation. Fix by raising `--min-warmup-time <ms>` (default 500) and `--max-warmup <n>` if the ceiling is what cut warmup short.
+
+**2. The measurement is finer than the clock can resolve.** Check `autoTune.sampleQuantizationFraction` against the reported margin. If one timer step is a larger fraction of the sample than the margin is, the digits are describing the clock's step grid rather than your code — within a run every sample lands on the same step, and between runs a tiny shift moves them all to the next one. NBenchmark warns when it detects this. The default `MinQuantaPerSample` floor prevents it, so it generally only appears with a small pinned `--ops-per-sample` on a fast body; raise it so each sample spans hundreds of steps. See [Timer resolution](./statistics/measurement.md#timer-resolution).
+
+**3. Neither — the number genuinely does not reproduce that precisely.** This is the common case on a healthy run, and there is nothing to fix in the measurement. A single process cannot see it: within-run sampling estimates how precisely *that process* measured, and drives the margin toward zero as `1/√n`, while the between-process component — code and heap layout, scheduler placement, CPU frequency and thermal state — is fixed inside a process and completely untouched by it. **More samples make the margin narrower without making it more honest, and longer warmup does not change it at all.**
+
+Only replication across processes can measure it. Run `--launch-count 5` (or more) and read `launchStatistics`: `betweenLaunchDispersion` is the run-to-run spread, and `processVarianceRatio` is how far the single-process margin was understating it. On a nanosecond-scale body a ratio of 30-60 is ordinary. See [Reading the reproducibility warning](./features/multiple-launches.md#reading-the-reproducibility-warning).
+
+To actually *reduce* that spread you have to work outside the statistics — [environment controls](./features/environment-control.md) for CPU affinity and process priority, or a quieter, less thermally constrained host. Note that CPU affinity is unavailable on macOS, so an Apple Silicon laptop with performance and efficiency cores will show more run-to-run spread than a pinned Linux box, and there is no in-process remedy for it.
 
 ### Tight Error next to a `maxCeiling` stop, or next to a Max hundreds of times the median
 
@@ -117,7 +125,9 @@ Dry-run mode is active (`--dry-run`, or `Iterations=0` and `WarmupIterations=0`)
 > [!CAUTION] Quick fix
 > Unpin `Iterations` to use auto mode (collects at least `AutoTune.MinSamples`), or pin a larger count.
 
-Either only one sample was collected (`n < 2`, from a pinned `Iterations = 1`) or all measurements were identical (timer resolution coarser than the benchmark duration). For a fast body, auto ops-per-sample calibration amortises a coarse timer - note that calibration is skipped when setup/teardown is set.
+Either only one sample was collected (`n < 2`, from a pinned `Iterations = 1`) or all measurements were identical (timer resolution coarser than the benchmark duration). For a fast body, auto ops-per-sample calibration amortises a coarse timer - note that calibration is skipped when setup/teardown is set, and bypassed when `OpsPerSample` is pinned.
+
+Identical measurements are the extreme of the quantization case above: every sample landed on the same clock step. Compare `autoTune.clockResolutionNs` against `autoTune.sampleDurationNs` - if a sample spans only a step or two, the timer cannot distinguish your samples from each other. See [Timer resolution](./statistics/measurement.md#timer-resolution).
 
 ### `Sig` column is blank
 
@@ -157,7 +167,7 @@ See [Dependency Injection](./features/dependency-injection.md) for the full API 
 
 Benchmarks that live in a `Microsoft.NET.Sdk.Web` (or WinForms/WPF) project run in an assembly whose dependency graph reaches a shared framework — `Microsoft.AspNetCore.App` or `Microsoft.WindowsDesktop.App`. Those assemblies ship with the framework rather than in your output directory, so they are absent from your project's `deps.json` and are expected to be supplied by the process. The measurement worker is a plain console application, so on its own it supplies only `Microsoft.NETCore.App`, and the load fails with a message naming an assembly that is not actually missing from disk — `Microsoft.Extensions.Hosting.Abstractions` is the usual one.
 
-The framework set is now extended automatically: before launching the worker, NBenchmark reads the `runtimeconfig.json` beside the assembly under test and adds any framework the worker does not already declare. `dotnet benchmark` does the same thing for itself — unlike every other mode it loads the target into its own process to discover benchmarks, so it restarts once under the right framework set before reading anything. Nothing needs configuring, and nothing changes for an ordinary console benchmark project.
+The framework set is extended automatically: before launching the worker, NBenchmark reads the `runtimeconfig.json` beside the assembly under test and adds any framework the worker does not already declare. `dotnet benchmark` does the same thing for itself — unlike every other mode it loads the target into its own process to discover benchmarks, so it restarts once under the right framework set before reading anything. Nothing needs configuring, and nothing changes for an ordinary console benchmark project.
 
 Two cases remain:
 

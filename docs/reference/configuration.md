@@ -178,6 +178,7 @@ dotnet run -- --profile independent
 | `Diagnostics = DiagnosticsOptions.All` | Enables GC collection counts, heap info, exception tracking, and CPU time. Lets you correlate timing spikes with GC pauses or CPU throttling. |
 | `OutlierMode = MedianAbsoluteDeviation` | More robust to heavy-tailed distributions. If the default IQR fence is being distorted by a long tail, MAD gives a clearer picture. |
 | `Detail = Advanced` | Shows the auto-tune diagnostic line (K, warmup, samples, CI half-width, jitter metric) and the outlier fence values. |
+| `.WithLaunchCount(5)` or higher | The only setting that distinguishes "noisy measurement" from "number that does not reproduce". Without replicates across processes the interval describes one process's precision, and no other knob changes that. |
 
 **Fluent API:**
 
@@ -186,13 +187,14 @@ await new BenchmarkSuite("debug")
     .Add("myBenchmark", () => MyMethod())
     .WithDiagnostics(DiagnosticsMode.All)
     .WithOutlierMode(OutlierMode.MedianAbsoluteDeviation)
+    .WithLaunchCount(5)
     .RunAsync();
 ```
 
 **CLI:**
 
 ```bash
-dotnet run -- --diagnostics all --outlier mad --detail advanced
+dotnet run -- --diagnostics all --outlier mad --detail advanced --launch-count 5
 ```
 
 **What to look for:**
@@ -201,12 +203,19 @@ dotnet run -- --diagnostics all --outlier mad --detail advanced
 - GC collection counts that correlate with slow samples: GC pressure is affecting your timings. Try `--profile independent`.
 - A bimodal-distribution warning: investigate the cause (lock contention, cache misses, GC pauses) rather than silencing it.
 
+If each individual run reports a *tight* interval and only the runs disagree with each other, the cause is not noise and none of the above will find it. Three separate things produce that, each with its own field:
+
+- `autoTune.warmupTimeFloorMet` is `false` — warmup ended before tiered compilation finished, so the body was measured on unoptimized code.
+- `autoTune.sampleQuantizationFraction` exceeds the reported margin — the measurement is finer than the timer can resolve, so the digits describe the clock's step grid. See [Timer resolution](../statistics/measurement.md#timer-resolution).
+- Neither, and `launchStatistics.processVarianceRatio` is high — the number genuinely does not reproduce that precisely. Nothing inside one process can fix this; see [Reading the reproducibility warning](../features/multiple-launches.md#reading-the-reproducibility-warning).
+
 **See also:**
 
 - [Diagnostics](#diagnostics)
 - [OutlierMode](#outliermode)
+- [LaunchCount](#launchcount)
 - [Reading Your Results](../output/reading-your-results.md)
-- [Troubleshooting](../troubleshooting.md)
+- [Troubleshooting](../troubleshooting.md#same-benchmark-a-different-median-each-run-and-every-run-reports-a-tight-error)
 
 ---
 
@@ -307,7 +316,7 @@ The number of back-to-back body invocations timed together as one sample, called
 
 | Value | Behaviour |
 |---|---|
-| `null` **(default)** | Auto-calibrated. NBenchmark doubles K until one sample spans roughly `AutoTune.TargetSampleDurationNs` (1 µs by default), so a single timer read covers enough work to be meaningful. Reported per-op timings divide the batch time by K. |
+| `null` **(default)** | Auto-calibrated. NBenchmark doubles K until one sample spans roughly the resolved sample-duration target — `AutoTune.TargetSampleDurationNs` (10 µs by default), raised per host so the sample also spans `AutoTune.MinQuantaPerSample` steps of the measured clock resolution — so a single timer read covers enough work to be meaningful. Reported per-op timings divide the batch time by K. |
 | `> 0` | Pins an exact K (always honoured). Valid range: `1` to `16 777 216`. |
 
 Calibration matters for **fast bodies**: a method that runs in a few nanoseconds is dominated by the cost of reading the timer. Timing K invocations as a batch amortises that fixed overhead, then NBenchmark divides back down to a per-operation number.
@@ -315,7 +324,10 @@ Calibration matters for **fast bodies**: a method that runs in a few nanoseconds
 Auto-calibration is skipped (K stays `1`) when per-iteration `IterationSetup`/`IterationTeardown` is configured, since that makes a K-batch unrepresentative of a single call. It is **not** skipped under the `Independent` profile: the forced Gen0 GC runs once per sample (K-batch), before the timestamp and outside the timed window — the same semantics a pinned `OpsPerSample` already gets — so a nano-scale CPU body still amortises timer overhead. (When `Independent` bodies allocate and `K > 1`, a warning notes a GC may land inside a timed batch; pin `--ops-per-sample 1` to avoid it.) An explicit `OpsPerSample` is always honoured.
 
 BenchmarkSuite/BenchmarkHarness fluent method: `.WithOpsPerSample(64)`  
-CLI flag: `--ops-per-sample <n>` (pins K). The calibration target is `AutoTune.TargetSampleDurationNs`.
+CLI flag: `--ops-per-sample <n>` (pins K). The calibration target is `AutoTune.TargetSampleDurationNs`, raised to clear `AutoTune.MinQuantaPerSample` clock-resolution steps.
+
+> [!WARNING] Pinning a small K on a fast body can fall below the clock's resolution
+> Pinning `OpsPerSample` skips calibration entirely, including the clock-resolution floor. On a host with a coarse clock — 41.667 ns on Apple Silicon, 100 ns on Windows QPC — a nanosecond-scale body at `K = 1` produces samples the clock cannot resolve at all: most read zero and the rest read one whole step. NBenchmark warns when the measured interval is finer than one step, but the honest fix is to pin a K large enough that a sample spans hundreds of steps, or to leave K auto-calibrated. See [Timer resolution](../statistics/measurement.md#timer-resolution).
 
 Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per method via `[Benchmark]` - it is set suite- or harness-wide only (`.WithOpsPerSample(n)` or `--ops-per-sample n`).
 
@@ -327,7 +339,9 @@ Unlike `Iterations` and `WarmupIterations`, `OpsPerSample` cannot be pinned per 
 
 The number of times to repeat each benchmark as a separate launch, typed as `int`. Set it through the fluent builders, the attributes, or the CLI flag.
 
-The default is `1`; Harness mode applies `3` by default when the launch count is not explicitly pinned via `WithLaunchCount`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`. Pass `WithLaunchCount(1)` to opt out of the harness default.
+The default is `1`; Harness mode applies `5` by default when the launch count is not explicitly pinned via `WithLaunchCount`, `--launch-count`, or `[Benchmark(LaunchCount = ...)]`. Pass `WithLaunchCount(1)` to opt out of the harness default.
+
+Five because the between-launch interval is a Student-t half-width on `k - 1` degrees of freedom, and the critical value falls steeply over the first few replicates - 12.71 at `k = 2`, 4.30 at 3, 3.18 at 4, 2.78 at 5, then only slowly (2.57 at 6, 2.26 at 10). Below five the interval is too wide for a real regression to clear; five is where the curve flattens, and past it replicates cost linearly and buy little.
 
 | Value | Behaviour |
 |---|---|
@@ -373,18 +387,19 @@ Pick a preset with `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `
 
 | Knob | Default | Meaning |
 | --- | --- | --- |
-| `MinWarmup` / `MaxWarmup` | `8` / `100 000` | Floor and ceiling for auto-detected warmup length, as sample counts. `MaxWarmup` is deliberately far above what any body needs so that the *time* bounds bind instead: a fast body needs ~25 000 samples to accumulate `MinWarmupTime` at the 10 µs sample target, and a count ceiling binding first would silently defeat that floor. (The tighter `10 000` limit still applies to a *pinned* `WarmupIterations`.) |
+| `MinWarmup` / `MaxWarmup` | `8` / `100 000` | Floor and ceiling for auto-detected warmup length, as sample counts. `MaxWarmup` is deliberately far above what any body needs so that the *time* bounds bind instead: a fast body needs tens of thousands of samples to accumulate `MinWarmupTime` (~24 000 at the ~21 µs sample a coarse-clocked host resolves to, ~50 000 at 10 µs), and a count ceiling binding first would silently defeat that floor. (The tighter `10 000` limit still applies to a *pinned* `WarmupIterations`.) |
 | `WarmupEpsilon` | `0.02` | Minimum relative improvement a warmup batch must show to count as "still warming up". |
 | `PlateauPatience` | `3` | Consecutive non-improving batches that end warmup. |
 | `MinWarmupTime` | `500 ms` | Minimum in-body time auto-warmup must accumulate before it may settle, so background tiered JIT (tier-0 → tier-1 → dynamic PGO) lands before measurement rather than mid-run. 5× the runtime's `TieredCompilation.CallCountingDelayMs` (100 ms) — that delay restarts while tier-0 methods are still being first-called and tier-1 is only *queued* when it expires, so a floor at or below 100 ms reliably lands the tier-up inside measurement. In practice this is the binding constraint on warmup length for almost every body. Bounded above by the calibration+warmup budget share and `MaxWarmup`. `0` disables the floor (and the JIT-quiescence gate). `Thorough` uses 1 s; `Quick` inherits 500 ms. Chosen empirically: at 250 ms a `StringBuilder`-append loop still landed in either its tier-0 or its ~4.5× faster steady state depending on the run (4.8× run-to-run spread); 500 ms cost 55% more wall-clock and made it consistent, while 1 s cost a further 76% for one more benchmark. |
 | `RequireJitQuiescence` | `true` | Whether auto-warmup also refuses to settle until the JIT has been quiet for `JitQuietPeriod`, read from `System.Runtime.JitInfo` at each batch boundary. Deactivates once warmup has run 4 × `MinWarmupTime` so a busy in-process host cannot block warmup forever; inactive when `MinWarmupTime = 0`. |
 | `JitQuietPeriod` | `50 ms` | How long the JIT compiled-method count must stay unchanged before the quiescence gate opens. A *sustained* interval is required because a per-batch check cannot work: one batch of a fast body spans tens of microseconds, so a background compilation almost never lands inside it and a per-batch delta reads zero essentially always. Clamped down to `MinWarmupTime` so it never becomes the binding floor. `0` disables the gate. `Thorough` uses 100 ms. |
-| `MinSamples` / `MaxSamples` | `30` / `5 000` | Floor and ceiling for the auto-resolved measured-sample count. `MinSamples` is the *validity* floor (below it the interval is untrustworthy however narrow) and is also what the `CapGraceFactor` grace budget chases. `MaxSamples` was formerly 100 000: at 5 000 the CI rule still reaches ±2.5% for a coefficient of variation up to ~90%, and past that the required count grows as `(t × CV / target)²` and runs away — a CV of 580% needs ~50 000 samples for ±5% — where the variance *is* the finding rather than something more samples fix. |
+| `MinSamples` / `MaxSamples` | `30` / `5 000` | Floor and ceiling for the auto-resolved measured-sample count. `MinSamples` is the *validity* floor (below it the interval is untrustworthy however narrow) and is also what the `CapGraceFactor` grace budget chases. `MaxSamples` is 5 000, not a higher number: at 5 000 the CI rule still reaches ±2.5% for a coefficient of variation up to ~90%, and past that the required count grows as `(t × CV / target)²` and runs away — a CV of 580% needs ~50 000 samples for ±5% — where the variance *is* the finding rather than something more samples fix. |
 | `CiTarget` | `0.025` | Target relative half-width of the confidence interval; sampling stops once it is met. |
 | `MinMeasurementTime` | `100 ms` | Minimum in-body time the measurement phase must span before it may stop on the CI target — the measurement analogue of `MinWarmupTime`, and what makes the sample count scale with body speed instead of being a flat number. A cheap body collects hundreds or thousands of samples for milliseconds of extra work, which is what makes its percentiles and significance test meaningful (at n ≈ 16 the reported P95/P99/P99.9 all collapse onto the maximum). The rule is: measurement spans at least this long, or reaches `MaxSamples` samples, whichever comes first — so worst-case added cost is `MinMeasurementTime` per benchmark and **zero** for any body already slower than `MinMeasurementTime / MinSamples` (≈3.3 ms by default). `0` disables the floor. `Quick` uses 50 ms, `Thorough` 500 ms. |
 | `MeasurementDriftTolerance` | `0.10` | How far the first-half and second-half means of the measured samples may disagree (as a fraction of the smaller half-mean) before the CI stop is refused. Guards the failure mode that is hardest to spot: a JIT tier-up landing inside the measurement window is a step change, and the CI-on-the-mean rule will report a tight interval straight across it — a 10× wrong number with a ±0.9% error bar. The gap must also exceed 4 standard errors, so a heavy-tailed body whose half-means differ by pure noise is not flagged. `0` disables the gate; either way `AutoTune.SplitHalfDrift` records the gap. |
 | `MeasurementRestartLimit` | `2` | How many times the drift gate may discard the collected samples and restart measurement — one for tier-0 → tier-1, one for instrumented → optimized under dynamic PGO. Restarts draw on the same `MaxTuningTime` budget as ordinary sampling, so they can never make a benchmark run longer. A body still drifting after the limit reports `SampleStopReason.DriftUnresolved` with a warning, which is a finding rather than something more restarts fix. `Thorough` uses 3. |
-| `TargetSampleDurationNs` | `10 000` | Per-sample duration that ops-per-sample calibration aims for. 10 µs keeps timer quantization (~0.1% vs ~±10% at 1 µs on a 100 ns timer) and timestamp-read overhead (~0.2% vs ~1-3%) negligible against the CI target. Bodies ≥ 10 µs keep K = 1; sub-10 µs bodies are batched, so their percentiles describe batch means. `Thorough` preset uses 50 µs. |
+| `TargetSampleDurationNs` | `10 000` | Per-sample duration that ops-per-sample calibration aims for, and a floor **request** rather than the final target — see `MinQuantaPerSample`. 10 µs keeps timestamp-read overhead negligible (~0.2% vs ~1-3% at 1 µs). Bodies ≥ the resolved target keep K = 1; faster bodies are batched, so their percentiles describe batch means. `Thorough` preset uses 50 µs. |
+| `MinQuantaPerSample` | `512` | Clock-resolution steps one timed sample must span. The loop measures the clock's *effective* resolution once per process and raises `TargetSampleDurationNs` to `resolution × MinQuantaPerSample` when the configured target would not clear it; the target is only ever raised. This exists because a fixed nanosecond target means wildly different things per host: 10 µs is ~100 000 steps of a 1 ns clock, ~240 of Apple Silicon's 41.667 ns timebase, and ~100 of Windows QPC's 100 ns tick. 512 steps puts quantization under 0.2% of a sample — about a twelfth of the default `CiTarget` — while keeping samples short enough that a cheap body still collects thousands within `MinMeasurementTime`. Resolves to ~21 µs on Apple Silicon and ~51 µs on Windows QPC; a TSC-backed Linux host already clears it and is unaffected. `0` disables the floor. Raising it much past 512 buys little further resolution and lengthens samples until genuine machine noise starts landing inside the timed window. See [Timer resolution](../statistics/measurement.md#timer-resolution). |
 | `MaxOpsPerSample` | `1 048 576` | Ceiling on auto-calibrated K. |
 | `BatchSize` | `8` | Warmup batch size and the cadence on which the CI-width rule is evaluated. |
 | `MaxTuningTime` | `20 s` | Per-benchmark safety cap on cumulative in-body sample time (calibration + warmup + measurement). Setup, teardown, and GC are excluded, so real wall-clock can exceed it. |

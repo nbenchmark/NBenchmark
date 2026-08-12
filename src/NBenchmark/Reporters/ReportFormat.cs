@@ -127,7 +127,43 @@ public static class ReportFormat
     ///                 </para>
     ///             </description>
     ///         </item>
+    ///         <item>
+    ///             <term>4</term>
+    ///             <description>
+    ///                 Clock-resolution-derived sample sizing, and a higher Harness launch default.
+    ///                 <list type="bullet">
+    ///                     <item>
+    ///                         <description>
+    ///                             Ops-per-sample calibration now resolves against a target raised to span
+    ///                             at least <c>AutoTuneOptions.MinQuantaPerSample</c> steps of the clock's
+    ///                             <i>measured</i> resolution, rather than a fixed 10 µs. On a host whose
+    ///                             clock is coarse relative to that target - Apple Silicon at 41.667 ns,
+    ///                             Windows QPC at 100 ns - <c>K</c> rises and each sample spans more work,
+    ///                             which changes reported per-op numbers slightly (fixed timer overhead is
+    ///                             amortised over more operations, so the figure generally improves) and
+    ///                             changes the sample count that reaches the statistics. A TSC-backed Linux
+    ///                             host already cleared the floor and is unaffected.
+    ///                         </description>
+    ///                     </item>
+    ///                     <item>
+    ///                         <description>
+    ///                             <c>LaunchCounts.HarnessDefault</c> is 5 rather than 3. Since epoch 2 a
+    ///                             multi-launch row reports the average of its launches with a
+    ///                             between-launch interval, so changing the replicate count changes both
+    ///                             the reported median (a mean over five draws rather than three) and the
+    ///                             interval width (Student-t on 4 degrees of freedom rather than 2, a 35%
+    ///                             narrower critical value on the same spread).
+    ///                         </description>
+    ///                     </item>
+    ///                 </list>
+    ///                 <para>
+    ///                     Neither change alters what a statistic <i>means</i>, but both move stored
+    ///                     numbers on most hosts, and the second moves the interval a
+    ///                     <c>--threshold-pct</c> gate reads.
+    ///                 </para>
+    ///             </description>
+    ///         </item>
     ///     </list>
     /// </remarks>
-    public const int MeasurementEpoch = 3;
+    public const int MeasurementEpoch = 4;
 }

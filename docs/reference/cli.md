@@ -93,7 +93,7 @@ In auto mode NBenchmark resolves warmup length, measured-sample count, and ops-p
 | `--min-samples <n>` | `30` | Floor on auto-resolved measured samples. |
 | `--max-samples <n>` | `5000` | Ceiling on auto-resolved measured samples. Past a coefficient of variation of ~90% the CI rule needs samples growing as `(t × CV / target)²` and cannot converge, so the ceiling stops the chase and the warning names the CV. |
 | `--min-warmup <n>` | `8` | Floor on auto-detected warmup samples. |
-| `--max-warmup <n>` | `100000` | Ceiling on auto-detected warmup samples. Deliberately far above what any body needs so the *time* bounds bind instead - a fast body needs ~25,000 samples to accumulate `--min-warmup-time`. (A *pinned* `--warmup` is still limited to 10,000.) |
+| `--max-warmup <n>` | `100000` | Ceiling on auto-detected warmup samples. Deliberately far above what any body needs so the *time* bounds bind instead - a fast body needs tens of thousands of samples to accumulate `--min-warmup-time` (~24,000 at the ~21 µs sample a coarse-clocked host resolves to, ~50,000 at 10 µs). (A *pinned* `--warmup` is still limited to 10,000.) |
 | `--max-tuning-time <s>` | `20` | Per-benchmark wall-clock safety cap, in seconds, for the whole adaptive loop. |
 | `--autotune-cap-behavior <mode>` | `warn` | What happens when the wall-clock cap is hit before the CI target or warmup plateau is reached: `warn` emits a warning; `error` marks the benchmark as errored. |
 | `--warmup-budget-fraction <0-1>` | `0.4` | Max share of `--max-tuning-time` that calibration and warmup may consume together; the remainder is reserved for measurement. Must be in `(0, 1]`. |
@@ -517,11 +517,13 @@ dotnet run -- --help
 
 ### `--launch-count <n>`
 
-Repeat each benchmark N times, each in its own worker process. The primary result is the **average across those launches**, and its confidence interval is derived from the spread between them - so it describes how well the number reproduces rather than how precisely one process measured it. An aggregation table with the per-launch detail appears below the main results when `n > 1`. Valid range: `1` to `100`. Harness-mode default: `3` when the user has not explicitly pinned launch count. See [Multiple launches](../features/multiple-launches.md).
+Repeat each benchmark N times, each in its own worker process. The primary result is the **average across those launches**, and its confidence interval is derived from the spread between them - so it describes how well the number reproduces rather than how precisely one process measured it. An aggregation table with the per-launch detail appears below the main results when `n > 1`. Valid range: `1` to `100`. Harness-mode default: `5` when the user has not explicitly pinned launch count. See [Multiple launches](../features/multiple-launches.md).
 
 ```bash
-dotnet run -- --launch-count 3
+dotnet run -- --launch-count 10
 ```
+
+This is the only knob that improves an interval's *honesty* rather than its width. Nothing inside a single process can: more samples drive the within-process standard error toward zero as `1/√n` while leaving the between-process component - code and heap layout, scheduler placement, CPU frequency - completely untouched. On a nanosecond-scale body the single-process margin can understate run-to-run spread by 20-50×.
 
 When combined with `--dry-run`, exactly one dry launch is performed regardless of the count. When combined with process isolation, the host spawns N workers per isolated group.
 

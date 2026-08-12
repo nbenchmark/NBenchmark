@@ -62,6 +62,7 @@ public sealed record AutoTuneOptions
     private readonly TimeSpan _minMeasurementTime = TimeSpan.FromMilliseconds(100);
     private readonly double _measurementDriftTolerance = 0.10;
     private readonly int _measurementRestartLimit = 2;
+    private readonly int _minQuantaPerSample = 512;
 
     // ----- Warmup plateau -----
 
@@ -329,16 +330,60 @@ public sealed record AutoTuneOptions
     ///     the ops-per-sample count until a sample spans at least this long, amortising fixed
     ///     timer overhead. Default 10,000 (10 µs).
     ///     <para>
-    ///         10 µs keeps two per-sample error sources negligible: timer <em>quantization</em>
-    ///         (Windows QPC ticks at 100 ns, so a 10 µs sample resolves to ~0.1% rather than the
-    ///         ~±10% a 1 µs sample suffers) and the fixed <em>timestamp-read overhead</em> (~10-30 ns
-    ///         per sample, ~0.2% of 10 µs rather than ~1-3% of 1 µs). Both would otherwise leak into
-    ///         the ±2.5% CI target the calibration feeds. Bodies already spanning ≥ 10 µs keep
-    ///         <c>K = 1</c>, so their per-op tail visibility is unchanged; only sub-10 µs bodies are
-    ///         batched (and for those, percentiles describe batch means - see the docs).
+    ///         10 µs keeps the fixed <em>timestamp-read overhead</em> negligible (~10-30 ns per sample,
+    ///         ~0.2% of 10 µs rather than ~1-3% of 1 µs), which would otherwise leak into the ±2.5% CI
+    ///         target the calibration feeds. Bodies already spanning ≥ 10 µs keep <c>K = 1</c>, so their
+    ///         per-op tail visibility is unchanged; only sub-10 µs bodies are batched (and for those,
+    ///         percentiles describe batch means - see the docs).
+    ///     </para>
+    ///     <para>
+    ///         This value is a <em>floor request</em>, not the final target. Clock <em>quantization</em>
+    ///         is host-specific and cannot be covered by any single constant: 10 µs spans ~100,000 steps
+    ///         of a 1 ns clock, ~240 steps of Apple Silicon's 41.667 ns timebase, and only ~100 steps of
+    ///         Windows QPC's 100 ns tick. <see cref="MinQuantaPerSample" /> raises the effective target
+    ///         per host from the clock's measured resolution, so quantization lands at a known fraction
+    ///         of a sample everywhere instead of varying 1,000-fold across platforms.
     ///     </para>
     /// </summary>
     public double TargetSampleDurationNs { get; init; } = 10_000;
+
+    /// <summary>
+    ///     The minimum number of clock-resolution steps a single timed sample must span. The loop
+    ///     measures the clock's effective resolution once per process
+    ///     (<c>Engine/Detectors/ClockResolutionProbe</c>) and raises
+    ///     <see cref="TargetSampleDurationNs" /> to <c>resolution × MinQuantaPerSample</c> when the
+    ///     configured target would not clear it. The target is only ever raised. Default 512.
+    ///     <para>
+    ///         512 steps puts one step at under 0.2% of a sample, which is roughly a twelfth of the
+    ///         default ±2.5% <see cref="CiTarget" /> - small enough not to contaminate the interval,
+    ///         while keeping samples short enough that a cheap body still collects thousands of them
+    ///         within <see cref="MinMeasurementTime" />. On Apple Silicon this resolves to ~21 µs
+    ///         (up from the configured 10 µs); on Windows QPC to ~51 µs; on a TSC-backed Linux host the
+    ///         configured 10 µs already clears it and nothing changes.
+    ///     </para>
+    ///     <para>
+    ///         Quantization matters because of how asymmetrically it presents. Within one run, a stable
+    ///         body's samples land on the same step, so the spread looks tiny and the reported margin
+    ///         collapses toward zero. Between runs, a shift far smaller than one step moves every sample
+    ///         to the next step and takes the median with it. The result is a measurement that appears
+    ///         precise to three decimal places and moves by a whole step when re-run - which is exactly
+    ///         the pattern this floor exists to prevent, and why raising it cannot be traded off against
+    ///         speed the way <see cref="CiTarget" /> can.
+    ///     </para>
+    ///     <para>
+    ///         Set to <c>0</c> to disable the floor and make <see cref="TargetSampleDurationNs" />
+    ///         authoritative on every host. Raising it much past 512 is usually counterproductive: it
+    ///         buys little further resolution and lengthens samples until genuine machine noise
+    ///         (preemption, frequency shifts) starts landing inside the timed window.
+    ///     </para>
+    /// </summary>
+    public int MinQuantaPerSample
+    {
+        get => _minQuantaPerSample;
+        init => _minQuantaPerSample = value >= 0
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value, "MinQuantaPerSample must be zero or positive.");
+    }
 
     /// <summary>The ceiling on auto-calibrated ops per sample. Must be at least 1. Default 2^20.</summary>
     public int MaxOpsPerSample

@@ -138,7 +138,11 @@ The envelope opens with `schemaVersion` and `measurementEpoch` - see
         "jitLastChangeAtNs": 481309320.0,
         "jitQuiescenceAchieved": true,
         "measurementRestarts": 0,
-        "splitHalfDrift": 0.0042
+        "splitHalfDrift": 0.0042,
+        "clockResolutionNs": 41.0,
+        "targetSampleDurationNs": 20992.0,
+        "sampleDurationNs": 20777.2,
+        "sampleQuantizationFraction": 0.00197
       }
     }
   ]
@@ -147,7 +151,7 @@ The envelope opens with `schemaVersion` and `measurementEpoch` - see
 
 All timing values are in **nanoseconds**. Property names use camelCase.
 
-Percentile values are now emitted in a `percentiles` array of `{ percentile, value }` objects (replacing the old `p95`/`p99` scalar properties). The set of reported percentiles is controlled by `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. When `EnableHistogram` is `true` (default), a `histogram` object with `min`, `max`, `sampleCount`, and `buckets` (array of `{ lower, upper, count }`) is also included.
+Percentile values are emitted in a `percentiles` array of `{ percentile, value }` objects. The set of reported percentiles is controlled by `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. When `EnableHistogram` is `true` (default), a `histogram` object with `min`, `max`, `sampleCount`, and `buckets` (array of `{ lower, upper, count }`) is also included.
 
 ### Which sample set each statistic describes
 
@@ -164,10 +168,15 @@ The result carries **two populations**, and `tailMetricsBasis` says which basis 
 | **How well it converged** | `achievedRelativeCiWidth` (on the **raw** stream — see the caveat below), `ciWidthSeries` (the convergence trace, one entry per cadence check), `tuningWallClock` |
 | **Host and stability** | `jitterMetric`, `outlierDetectorSwitched`, `measurementRestarts`, `splitHalfDrift` |
 | **Warmup and tiered compilation** | `warmupTimeFloorMet`, `warmupElapsedNs`, `warmupCurve`, `warmupSampleInterval`, `warmupJitCompiledMethods`, `warmupJitCompilationTime`, `warmupJitCompiledIlBytes`, `jitLastChangeAtNs`, `jitQuiescenceAchieved` |
+| **Clock resolution** | `clockResolutionNs`, `targetSampleDurationNs`, `sampleDurationNs`, `sampleQuantizationFraction` |
 
 > **`achievedRelativeCiWidth` and `marginOfError` measure different things.** The former is the CI half-width the loop achieved on the **raw** stream at its stop decision; the latter is recomputed on the **trimmed** set. When the outliers carry most of the variance the two diverge sharply — a benchmark can report `marginOfError` at ±1% of the mean next to an `achievedRelativeCiWidth` of `1.05`. That is not a contradiction, but treat the trimmed margin as optimistic whenever `sampleStop` is not `ciTargetMet`.
 
 `warmupCurve` is the mean per-op time of each warmup batch, oldest first — the shape of tiered compilation landing, since a body promoted from tier-0 to tier-1 (and re-optimized again under dynamic PGO) gets faster in steps. `warmupSampleInterval` gives the warmup iterations between consecutive points, so the array can be plotted against a real iteration axis. The array is bounded at 512 points: longer warmups are decimated by a doubling stride, keeping the points evenly spaced and the shape intact at coarser resolution. It is empty for pinned `warmupIterations` (which runs no plateau detection) and when `IncludeSamples` is off.
+
+`clockResolutionNs` is the **measured** effective resolution of the timer, not `Stopwatch.Frequency` — that figure is an advertised conversion rate and reports 1 ns on Apple Silicon, where the counter actually steps in 41.667 ns units. `targetSampleDurationNs` is the sample-duration target calibration resolved against, after the measured resolution raised it to span `AutoTune.MinQuantaPerSample` steps; `sampleDurationNs` is what one sample really spanned (K is a power of two, so it overshoots).
+
+`sampleQuantizationFraction` is one clock step as a fraction of one sample — the granularity floor on how finely this measurement could be resolved, whatever `marginOfError` says. **Read the two together.** A margin well below this fraction is describing the clock's step grid rather than the code: within a run consecutive samples of a stable body land on the same step so the spread looks tiny, while between runs a shift far smaller than one step moves every sample to the next step and the median with it. A margin of ±0.03% next to a median that moves 0.5% on re-run is that signature, and it is indistinguishable from a genuine result without this field. See [Timer resolution](../statistics/measurement.md#timer-resolution).
 
 `jitLastChangeAtNs` is how far into warmup the JIT last compiled anything. With the body under continuous load that is typically the promotion of its own hot path, which makes it the closest thing to a tier-up marker to draw on the curve; compare it against `warmupElapsedNs` to see how much quiet time followed. The three `warmupJit*` counters are process-wide `System.Runtime.JitInfo` deltas, so in an in-process run the first benchmark to execute absorbs most of the startup compilation and later ones see almost none — that is real, and since benchmark order is randomised it is a large part of why the same benchmark's warmup differs between runs.
 

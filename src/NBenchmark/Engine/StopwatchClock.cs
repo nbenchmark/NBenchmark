@@ -37,6 +37,19 @@ internal sealed class StopwatchClock : IClock
     /// <summary>The default real-time clock; used by <see cref="BenchmarkRunner.Instance" />.</summary>
     public static StopwatchClock WallClock { get; } = new();
 
+    /// <summary>
+    ///     Whether this instance reads the real hardware counter rather than delegating to a wrapped
+    ///     <see cref="IClock" /> (in practice a test fake).
+    ///     <para>
+    ///         Consulted by <see cref="Detectors.ClockResolutionProbe" />, which must not probe an
+    ///         injected clock. Probing means calling <see cref="GetTimestamp" /> repeatedly, and a fake
+    ///         typically serves a finite scripted sequence - so a probe would consume the readings the
+    ///         test scheduled for the measurement itself. A fake also has no meaningful "resolution" to
+    ///         report: its timings are whatever the test chose.
+    ///     </para>
+    /// </summary>
+    internal bool IsRealTime => _inner is null;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public long GetTimestamp()
         => _inner?.GetTimestamp() ?? Stopwatch.GetTimestamp();

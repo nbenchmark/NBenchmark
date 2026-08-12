@@ -1038,13 +1038,13 @@ internal sealed record CliArgs
         Console.WriteLine("  --autotune-cap-behavior <mode>  Cap handling: warn (default) or error");
         Console.WriteLine("  --warmup-budget-fraction <0-1>  Max share of --max-tuning-time for calibration + warmup (default: 0.4)");
         Console.WriteLine("  --cap-grace-factor <n>  Multiplier on --max-tuning-time the measurement phase may reach while chasing --min-samples (default: 1.5)");
-        Console.WriteLine("  --min-warmup-time <ms>  Minimum warmup time before auto-warmup may settle, in ms (default: 250; 0 disables)");
+        Console.WriteLine("  --min-warmup-time <ms>  Minimum warmup time before auto-warmup may settle, in ms (default: 500; 0 disables)");
         Console.WriteLine("  --no-jit-quiescence     Disable the JIT-quiescence warmup gate (keep only the time floor)");
         Console.WriteLine("  --jit-quiet-period <ms>  How long the JIT must stay quiet before auto-warmup may settle, in ms (default: 50; 0 disables the gate)");
         Console.WriteLine("  --min-measurement-time <ms>  Minimum measurement time before the CI target may stop sampling, in ms (default: 100; 0 disables)");
         Console.WriteLine("  --drift-tolerance <0-1>  Max first-half/second-half disagreement before the CI stop is refused (default: 0.1; 0 disables)");
         Console.WriteLine("  --max-drift-restarts <n>  How many times drift may discard samples and restart measurement (default: 2)");
-        Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (harness default: 3)");
+        Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (harness default: 5)");
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");
         Console.WriteLine("  --no-samples            Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");

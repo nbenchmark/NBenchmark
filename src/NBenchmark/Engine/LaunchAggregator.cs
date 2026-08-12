@@ -62,19 +62,37 @@ internal static class LaunchAggregator
 
         double? dispersion = null;
         double? varianceRatio = null;
+        double? withinStandardError = null;
 
         if (successfulCount > 1)
         {
             if (launchMean > 0)
                 dispersion = launchStdDev / launchMean;
 
-            // The typical within-process spread, as the mean of the per-launch standard deviations.
-            // Comparing against the mean rather than the smallest keeps one unusually quiet launch
-            // from making the whole run look irreproducible.
-            var withinStdDev = successful.Average(x => x.Result.StandardDeviation);
+            // The precision a single launch *claimed* about its own median, as the mean of the
+            // per-launch standard errors. Each launch computed its own s/sqrt(n) over its full sample
+            // array, so this is the quantity a within-process interval is built from.
+            //
+            // The denominator used to be the mean per-launch standard *deviation* - the spread of
+            // individual samples. That is the wrong scale by a factor of sqrt(n), and it silently
+            // disabled this warning on exactly the benchmarks that need it. A within-process interval
+            // is t * s / sqrt(n), not s, so asking whether between-process spread is large "compared
+            // to the within-process interval" has to divide by the standard error. With n in the
+            // thousands - routine for a nanosecond-scale body, where the sample target is small enough
+            // to collect that many - sqrt(n) is 50-70x, so a ratio that should have read 35-50 read
+            // 0.5-0.7 and never crossed the threshold. Measured on this library's own calibration
+            // sample, the single-launch interval was 21x narrower than the true run-to-run spread
+            // while the metric reported 0.7 and stayed silent.
+            //
+            // Averaging rather than taking the smallest keeps one unusually quiet launch from making
+            // the whole run look irreproducible.
+            var meanStandardError = successful.Average(x => x.Result.StandardError);
 
-            if (withinStdDev > 0)
-                varianceRatio = launchStdDev / withinStdDev;
+            if (meanStandardError > 0)
+            {
+                withinStandardError = meanStandardError;
+                varianceRatio = launchStdDev / meanStandardError;
+            }
         }
 
         return new LaunchStatistics
@@ -87,32 +105,54 @@ internal static class LaunchAggregator
             LaunchConfidenceIntervalUpper = ciUpper,
             BetweenLaunchDispersion = dispersion,
             ProcessVarianceRatio = varianceRatio,
+            WithinLaunchStandardError = withinStandardError,
             Launches = details,
         };
     }
 
     /// <summary>
-    ///     The point past which the within-process confidence interval stops describing what a re-run
-    ///     would produce.
+    ///     The point past which a within-process interval stops describing what a re-run would produce:
+    ///     between-launch spread this many times the precision a single launch claimed.
     ///     <para>
-    ///         Four is a judgement rather than a derived constant: below it, between- and
-    ///         within-process spread are the same order of magnitude and the interval is a reasonable
-    ///         guide; above it, run-to-run variation dominates and a tight interval is actively
-    ///         misleading. It is deliberately generous, because a warning that fires on ordinary runs
-    ///         teaches people to ignore it.
+    ///         Four is a judgement rather than a derived constant. At a ratio of 1 the two agree and a
+    ///         within-process interval is a fair guide; by 4 a difference the size of ordinary run-to-run
+    ///         noise reads as several standard errors, which is enough for a significance test to call
+    ///         it decisively real.
+    ///     </para>
+    ///     <para>
+    ///         The threshold is unchanged from when <see cref="LaunchStatistics.ProcessVarianceRatio" />
+    ///         divided by the per-sample standard deviation, but it now means something. Under the old
+    ///         denominator the ratio carried a spurious <c>1/sqrt(n)</c>, so clearing 4 required
+    ///         between-process spread to exceed four times the spread of individual samples - a
+    ///         condition close to pathological, and one no ordinary benchmark met.
+    ///     </para>
+    ///     <para>
+    ///         It now discriminates by body cost, which is the correct behaviour rather than a
+    ///         coincidence. A cheap body collects thousands of samples, drives its standard error toward
+    ///         zero, and trips the threshold; an expensive body collects a few dozen, keeps a standard
+    ///         error comparable to its between-launch spread, and stays quiet. Fast microbenchmarks are
+    ///         where this failure mode actually lives.
     ///     </para>
     /// </summary>
     internal const double ProcessVarianceWarningThreshold = 4.0;
 
     /// <summary>
-    ///     A warning when run-to-run variation swamps the reported interval, or <c>null</c> when the
-    ///     numbers reproduce well enough for the interval to mean what it appears to mean.
+    ///     A warning when run-to-run variation swamps the precision a single process claimed, or
+    ///     <c>null</c> when the numbers reproduce well enough for that precision to mean what it
+    ///     appears to mean.
     ///     <para>
     ///         This exists because a p-value computed from samples pooled across processes inherits
     ///         the power of the pooled count, not the reproducibility of the measurement. With enough
     ///         samples, a difference far smaller than the run-to-run noise reads as overwhelmingly
     ///         significant. Saying so is the honest alternative to reporting a verdict the data
     ///         cannot support.
+    ///     </para>
+    ///     <para>
+    ///         The message deliberately does <em>not</em> claim the row's interval is a within-process
+    ///         one. Once two or more launches are aggregated, <see cref="Average" /> replaces the
+    ///         interval with the between-launch Student-t half-width, so the interval already carries
+    ///         this variance. What does not is the significance test, which pools raw samples, and the
+    ///         distribution columns, which are averaged per-launch estimates.
     ///     </para>
     /// </summary>
     public static string? DescribeReproducibility(LaunchStatistics? statistics)
@@ -124,12 +164,16 @@ internal static class LaunchAggregator
             ? $" Run-to-run spread is {d:P1} of the measurement."
             : "";
 
-        return $"Run-to-run variation is {ratio:F0}x the within-run variation across "
-               + $"{statistics.LaunchCount} launches, so the confidence interval on this row describes "
-               + "precision within a single process rather than reproducibility."
+        return $"Run-to-run variation across {statistics.LaunchCount} launches is {ratio:F0}x the "
+               + "precision any single launch reported, so this benchmark measures far more precisely "
+               + "than it reproduces."
                + dispersion
-               + " Treat any significance verdict here as provisional, and compare the per-launch "
-               + "medians instead. Raising --launch-count improves the reproducibility estimate.";
+               + " The Error on this row is the between-launch interval and already accounts for that, "
+               + "but the significance verdict does not - it pools samples across launches, so it "
+               + "inherits the power of the pooled count rather than the reproducibility of the "
+               + "measurement. Treat any verdict here as provisional and compare the per-launch medians. "
+               + "Raising --launch-count sharpens the reproducibility estimate; it will not narrow the "
+               + "spread itself.";
     }
 
     /// <summary>

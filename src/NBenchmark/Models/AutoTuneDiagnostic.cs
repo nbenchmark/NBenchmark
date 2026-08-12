@@ -211,4 +211,53 @@ public sealed record AutoTuneDiagnostic
     ///     </para>
     /// </summary>
     public double SplitHalfDrift { get; init; }
+
+    /// <summary>
+    ///     The measured effective resolution of the measurement clock, in nanoseconds: the smallest
+    ///     non-zero interval the engine can observe. <c>0</c> when the probe could not determine it.
+    ///     <para>
+    ///         Measured, not read from <c>Stopwatch.Frequency</c>, because the advertised rate can be
+    ///         badly wrong - Apple Silicon reports 1 GHz while its timebase steps in 41.667 ns units.
+    ///         Typical values: ~20-40 ns on Apple Silicon, ~100 ns on Windows QPC, a few nanoseconds on
+    ///         a TSC-backed Linux host.
+    ///     </para>
+    /// </summary>
+    public double ClockResolutionNs { get; init; }
+
+    /// <summary>
+    ///     The sample-duration target ops-per-sample calibration actually resolved against, after
+    ///     <see cref="AutoTuneOptions.MinQuantaPerSample" /> raised
+    ///     <see cref="AutoTuneOptions.TargetSampleDurationNs" /> to clear the clock's resolution. Equal
+    ///     to the configured target when the host's clock was already fine enough, or when the floor is
+    ///     disabled.
+    /// </summary>
+    public double TargetSampleDurationNs { get; init; }
+
+    /// <summary>
+    ///     What one timed sample actually spanned, in nanoseconds: the achieved per-op mean times
+    ///     <see cref="OpsPerSample" />. Overshoots <see cref="TargetSampleDurationNs" /> because
+    ///     <c>K</c> doubles, so the resolved value is the first power of two past the target.
+    /// </summary>
+    public double SampleDurationNs { get; init; }
+
+    /// <summary>
+    ///     One clock-resolution step as a fraction of one timed sample - the granularity floor on how
+    ///     finely this measurement could be resolved, whatever the reported margin says. <c>0</c> when
+    ///     the clock resolution is unknown.
+    ///     <para>
+    ///         Read this against the reported error margin. A margin well below this fraction is
+    ///         describing the clock's step grid rather than the code: within a run consecutive samples of
+    ///         a stable body land on the same step, so the spread looks tiny, while between runs a shift
+    ///         far smaller than one step moves every sample to the next step and the median with it. That
+    ///         combination - a margin of ±0.03% and a median that moves 0.5% on re-run - is the
+    ///         signature, and it is indistinguishable from a genuine result without this field.
+    ///     </para>
+    ///     <para>
+    ///         Alongside <see cref="WarmupTimeFloorMet" />, this is the field to reach for when a
+    ///         benchmark reports a tight margin and will not reproduce. That one covers a body measured
+    ///         before tiered compilation finished; this one covers a body measured finer than the timer
+    ///         can see.
+    ///     </para>
+    /// </summary>
+    public double SampleQuantizationFraction { get; init; }
 }

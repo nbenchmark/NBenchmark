@@ -38,13 +38,26 @@ public static class LaunchCounts
     ///     What Harness mode launches when the caller pinned nothing.
     /// </summary>
     /// <remarks>
-    ///     Harness mode defaults above one so the launch-aggregation view - the honest account of
-    ///     run-to-run variance from process-level effects (ASLR, scheduler placement, tiered JIT) -
-    ///     is surfaced without users having to ask for it. <see cref="Benchmark.Run" /> and
-    ///     <see cref="BenchmarkSuite" /> stay at <see cref="Single" /> unless the caller raises it,
-    ///     because neither reports a cross-launch interval by default.
+    ///     <para>
+    ///         Harness mode defaults above one so the launch-aggregation view - the honest account of
+    ///         run-to-run variance from process-level effects (ASLR, scheduler placement, tiered JIT,
+    ///         clock granularity) - is surfaced without users having to ask for it.
+    ///         <see cref="Benchmark.Run" /> and <see cref="BenchmarkSuite" /> stay at
+    ///         <see cref="Single" /> unless the caller raises it, because neither reports a cross-launch
+    ///         interval by default.
+    ///     </para>
+    ///     <para>
+    ///         Five rather than three because the between-launch interval is a Student-t half-width on
+    ///         <c>k - 1</c> degrees of freedom, and the critical value falls steeply over the first few
+    ///         replicates: 12.71 at <c>k = 2</c>, 4.30 at 3, 3.18 at 4, 2.78 at 5, then only slowly
+    ///         (2.57 at 6, 2.26 at 10). Three replicates spend two extra processes to produce an
+    ///         interval 55% wider than five does on the same spread - wide enough that a real regression
+    ///         often cannot clear it, which is the failure that pushes people back to single-launch runs
+    ///         and a tight interval that means nothing. Five is where the t-curve flattens; past it,
+    ///         replicates buy little and cost linearly.
+    ///     </para>
     /// </remarks>
-    public const int HarnessDefault = 3;
+    public const int HarnessDefault = 5;
 
     /// <summary>Whether <paramref name="count" /> is a launch count this library will accept.</summary>
     public static bool IsValid(int count) => count is >= Single and <= Max;
