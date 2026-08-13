@@ -272,8 +272,9 @@ internal sealed record BodyRef
         Delegate factory,
         string displayName,
         out BodyRef bodyRef,
-        out Refusal refusal)
-        => TryCreateCore(factory, displayName, out bodyRef, out refusal, null, null, null, true);
+        out Refusal refusal,
+        ReceiverTable? receivers = null)
+        => TryCreateCore(factory, displayName, out bodyRef, out refusal, null, null, receivers, true);
 
     private static bool TryCreateCore(
         Delegate body,
@@ -325,7 +326,8 @@ internal sealed record BodyRef
                 return false;
             }
         }
-        else if (!TryBuildArgumentSources(method, displayName, arguments, recipes, out argumentSources, out refusal))
+        else if (!TryBuildArgumentSources(
+                     method, displayName, arguments, recipes, receivers, out argumentSources, out refusal))
         {
             return false;
         }
@@ -389,6 +391,7 @@ internal sealed record BodyRef
         string displayName,
         IReadOnlyList<object?>? arguments,
         IReadOnlyList<StateRecipe?>? recipes,
+        ReceiverTable? receivers,
         out IReadOnlyList<ArgumentSource> sources,
         out Refusal refusal)
     {
@@ -470,7 +473,8 @@ internal sealed record BodyRef
                     return false;
                 }
 
-                if (!TryAddressRecipe(parameters[i], recipe, displayName, out var addressed, out refusal))
+                if (!TryAddressRecipe(
+                        parameters[i], recipe, displayName, receivers, out var addressed, out refusal))
                     return false;
 
                 built[i] = ArgumentSource.FromRecipe(addressed!);
@@ -524,6 +528,7 @@ internal sealed record BodyRef
         ParameterInfo parameter,
         StateRecipe recipe,
         string displayName,
+        ReceiverTable? receivers,
         out AddressedFactory? addressed,
         out Refusal refusal)
     {
@@ -564,7 +569,8 @@ internal sealed record BodyRef
                 out var created,
                 out var factoryRefusal,
                 displayName: $"{displayName} (prepare)",
-                arguments: recipe.Arguments))
+                arguments: recipe.Arguments,
+                receivers: receivers))
         {
             // The inner reason is kept, not replaced with PrepareDelegate. A prepare delegate that
             // captures is a captured-state refusal and earns that remedy; only the shape mismatches

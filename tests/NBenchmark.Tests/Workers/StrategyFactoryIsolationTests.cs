@@ -118,33 +118,22 @@ public sealed class StrategyFactoryIsolationTests : IDisposable
     ///     A capturing factory is refused, and says so as a capture.
     /// </summary>
     [Fact]
-    public async Task DetectorFactory_ThatCaptures_RefusesAndSaysSo()
+    public async Task DetectorFactory_ThatCaptures_IsIsolated_AndUsesTheCapturedArgument()
     {
         var fraction = 0.25;
 
-        using var stderr = new StringWriter();
-        var priorError = Console.Error;
-        Console.SetError(stderr);
+        var results = await Fast(new BenchmarkSuite("captured-detector")
+                .Add("a", () => Thread.SpinWait(2_000))
+                .WithOutlierDetector(() => new TrimFractionDetector(fraction)))
+            .RunAsync();
 
-        IReadOnlyList<BenchmarkResult> results;
+        var result = Assert.Single(results);
 
-        try
-        {
-            results = await Fast(new BenchmarkSuite("captured-detector")
-                    .Add("a", () => Thread.SpinWait(2_000))
-                    .WithOutlierDetector(() => new TrimFractionDetector(fraction)))
-                .WithRequireIsolation(false)
-                .RunAsync();
-        }
-        finally
-        {
-            Console.SetError(priorError);
-        }
+        Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
 
-        Assert.All(results, r => Assert.NotEqual(IsolationStatus.Isolated, r.IsolationStatus));
-
-        var message = stderr.ToString();
-        Assert.Contains("captures", message);
+        // The captured fraction reached the worker: the detector encodes it into the name it reports,
+        // so a run that had rebuilt the detector from a default would say something else here.
+        Assert.Equal(TrimFractionDetector.NameFor(fraction), result.OutlierDetector);
     }
 
     /// <summary>

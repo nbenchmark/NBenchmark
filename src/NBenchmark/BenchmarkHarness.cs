@@ -1397,6 +1397,10 @@ public sealed class BenchmarkHarness
                 suite.Type, suite.Lifetime, _instanceSource is not null, out _);
             var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
 
+            // One table for the group, shared by the instance source below and by whatever the
+            // strategy factories close over.
+            var receivers = new ReceiverTable(options.MaxTransferredStateBytes);
+
             var request = WorkerRunPlan.WithStrategies(new RunGroupPayload
             {
                 GroupId = $"{tfm}:{qualifiedClassName}",
@@ -1415,13 +1419,13 @@ public sealed class BenchmarkHarness
                 // launch count multiplied by the runtime count would be a different, longer run than
                 // the one asked for.
                 Options = options,
-                InstanceSource = _instanceSource?.ToPayload(),
+                InstanceSource = _instanceSource?.ToPayload(receivers),
                 Order = _cliArgs.RunOrder ?? _runOrder,
                 Seed = _cliArgs.Seed,
                 DefaultInstanceLifetime = _defaultInstanceLifetime,
                 InstanceLifetimeOverride = lifetime,
                 TotalBenchmarks = displayNames.Count,
-            }, options);
+            }, options, receivers);
 
             var group = await WorkerLauncher.Current.RunGroupAsync(
                     request, progress, observer, MeasurementBudget.For(options, displayNames.Count),
@@ -2037,6 +2041,10 @@ public sealed class BenchmarkHarness
 
         for (var replicate = 0; replicate < effectiveLaunchCount; replicate++)
         {
+            // Per replicate, because each is its own worker and its own request - and the table is
+            // what that request carries.
+            var receivers = new ReceiverTable(options.MaxTransferredStateBytes);
+
             var request = WorkerRunPlan.DiscoveredClassRequest(
                 suite.Type,
                 names,
@@ -2047,13 +2055,14 @@ public sealed class BenchmarkHarness
                 replicate,
                 startIndex,
                 totalBenchmarks,
-                _instanceSource?.ToPayload(),
+                _instanceSource?.ToPayload(receivers),
 
                 // The lifetime this class resolved to on the coordinator, sent so the worker measures
                 // the same object graph the in-process path would have. Without it a class carrying
                 // [InstanceLifetime(PerClass)] keeps its attribute in the worker and the resolution
                 // applies to exactly the half of the run that does not need it.
-                suite.Lifetime);
+                suite.Lifetime,
+                receivers);
 
             allLaunchItems.Add(
                 await RunGroupInWorkerAsync(request, replicate, names, suite, timeout, progress, observer, cancellationToken)

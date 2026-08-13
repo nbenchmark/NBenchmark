@@ -223,9 +223,9 @@ public sealed class SuitePlanIsolationTests : IDisposable
     ///     </para>
     /// </remarks>
     [Fact]
-    public async Task RunPlanAsync_CapturingFactory_WithAddressableBodies_IsStillIsolated()
+    public async Task RunPlanAsync_CapturingFactory_IsIsolated_AndTheCaptureReachesThePlan()
     {
-        var suiteName = $"plan-captures-{Guid.NewGuid():N}";
+        var label = $"captured-{Guid.NewGuid():N}";
 
         using var stderr = new StringWriter();
         var priorError = Console.Error;
@@ -235,10 +235,11 @@ public sealed class SuitePlanIsolationTests : IDisposable
 
         try
         {
-            // The factory captures `suiteName`, so it cannot be addressed. The body captures nothing,
-            // so it can.
+            // The factory captures `label`. It used to be unaddressable for that alone, and the run
+            // fell back to addressing the bodies inline; now the capture travels and the plan itself
+            // is what the worker runs.
             results = await BenchmarkSuite.RunPlanAsync(
-                () => Fast(new BenchmarkSuite(suiteName).Add("only", () => Thread.SpinWait(200))));
+                () => Fast(new BenchmarkSuite("plan-captures").Add(label, () => Thread.SpinWait(200))));
         }
         finally
         {
@@ -251,9 +252,13 @@ public sealed class SuitePlanIsolationTests : IDisposable
         Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
         Assert.Equal("steady-state", result.RuntimeProfileName);
 
+        // The name is the captured value. The plan ran in the worker, so this is only what the caller
+        // wrote if `label` crossed with it.
+        Assert.Equal(label, result.Name);
+
         var message = stderr.ToString();
 
-        Assert.Contains("could not be addressed", message);
+        Assert.DoesNotContain("could not be addressed", message);
         Assert.DoesNotContain("was measured in this process", message);
     }
 

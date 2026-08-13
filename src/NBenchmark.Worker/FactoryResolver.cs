@@ -40,6 +40,7 @@ internal static class FactoryResolver
         BenchmarkLoadContext context,
         string targetAssemblyPath,
         AddressedFactory factory,
+        ResolvedReceivers receivers,
         out T produced,
         out string? error,
         out string? detail)
@@ -47,8 +48,11 @@ internal static class FactoryResolver
     {
         produced = null!;
 
-        if (!TryInvoke(context, targetAssemblyPath, factory, typeof(T), [], out var value, out error, out detail))
+        if (!TryInvoke(
+                context, targetAssemblyPath, factory, receivers, typeof(T), [], out var value, out error, out detail))
+        {
             return false;
+        }
 
         if (value is null)
         {
@@ -81,6 +85,7 @@ internal static class FactoryResolver
         BenchmarkLoadContext context,
         string targetAssemblyPath,
         AddressedFactory factory,
+        ResolvedReceivers receivers,
         Type expected,
         object?[] arguments,
         out object? produced,
@@ -96,8 +101,12 @@ internal static class FactoryResolver
         error = null;
         detail = null;
 
-        if (!TryBind(context, targetAssemblyPath, factory, expected, arguments.Length, out var invoke, out error))
+        if (!TryBind(
+                context, targetAssemblyPath, factory, receivers, expected, arguments.Length,
+                out var invoke, out error))
+        {
             return false;
+        }
 
         return Invoke(factory, expected, invoke, arguments, out produced, out error, out detail);
     }
@@ -173,6 +182,7 @@ internal static class FactoryResolver
         BenchmarkLoadContext context,
         string targetAssemblyPath,
         AddressedFactory factory,
+        ResolvedReceivers receivers,
         Type expected,
         out object? produced,
         out string? error,
@@ -186,10 +196,13 @@ internal static class FactoryResolver
         var encoded = factory.Body?.Arguments ?? [];
 
         if (encoded.Count == 0)
-            return TryInvoke(context, targetAssemblyPath, factory, expected, [], out produced, out error, out detail);
+        {
+            return TryInvoke(
+                context, targetAssemblyPath, factory, receivers, expected, [], out produced, out error, out detail);
+        }
 
         if (!TryBind(
-                context, targetAssemblyPath, factory, expected, encoded.Count,
+                context, targetAssemblyPath, factory, receivers, expected, encoded.Count,
                 out var invoke, out var parameters, out error))
         {
             return false;
@@ -243,13 +256,14 @@ internal static class FactoryResolver
         BenchmarkLoadContext context,
         string targetAssemblyPath,
         AddressedFactory factory,
+        ResolvedReceivers receivers,
         Type expected,
         int arity,
         out Func<object?[], object?> invoke,
         out string? error)
-        => TryBind(context, targetAssemblyPath, factory, expected, arity, out invoke, out _, out error);
+        => TryBind(context, targetAssemblyPath, factory, receivers, expected, arity, out invoke, out _, out error);
 
-    /// <inheritdoc cref="TryBind(BenchmarkLoadContext, string, AddressedFactory, Type, int, out Func{object?[], object?}, out string?)" />
+    /// <inheritdoc cref="TryBind(BenchmarkLoadContext, string, AddressedFactory, ResolvedReceivers, Type, int, out Func{object?[], object?}, out string?)" />
     /// <param name="parameters">
     ///     The resolved method's own parameters, for a caller that has to decode values against them.
     ///     They are read from the assembly on disk, never from the wire.
@@ -258,6 +272,7 @@ internal static class FactoryResolver
         BenchmarkLoadContext context,
         string targetAssemblyPath,
         AddressedFactory factory,
+        ResolvedReceivers receivers,
         Type expected,
         int arity,
         out Func<object?[], object?> invoke,
@@ -278,10 +293,15 @@ internal static class FactoryResolver
             if (!TryResolveByName(context, targetAssemblyPath, factory, expected, arity, out method, out error))
                 return false;
         }
-        // No receivers: a factory that closes over state is refused on the coordinator's side, so one
-        // reaching here can only have a static or stateless-closure receiver.
+        // The group's receivers, not an empty set. A factory used to be refused on the coordinator's
+        // side the moment it closed over anything, on the reasoning that a recipe exists to be
+        // independent of the process that sent it - but a captured `int` is a parameter the factory did
+        // not get to declare, not a dependency on this process, and anything genuinely live is refused
+        // by the faithfulness rule exactly as it is for a body. Passing the group's table is also what
+        // makes a prepare delegate and a body closing over the same local share one object rather than
+        // rebuild two.
         else if (!BodyResolver.TryBindMethod(
-                     context, factory.Body!, ResolvedReceivers.None, out method, out receiver, out var bindError))
+                     context, factory.Body!, receivers, out method, out receiver, out var bindError))
         {
             error = $"{factory.Role} could not be resolved because {bindError}";
 

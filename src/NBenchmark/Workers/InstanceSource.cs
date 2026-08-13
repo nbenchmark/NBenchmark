@@ -83,8 +83,14 @@ internal sealed record InstanceSource
     /// <summary>
     ///     Addresses this source for the wire, or <c>null</c> when it has no recipe to address.
     /// </summary>
-    public InstanceSourcePayload? ToPayload()
-        => Recipe is null || !TryAddress(out var addressed, out _)
+    /// <param name="receivers">
+    ///     The group's receiver table, which anything the factory closes over is transferred into. A
+    ///     factory reading a connection string from a local is a recipe with a parameter it did not
+    ///     get to declare; the live container it would otherwise have built here is still refused,
+    ///     because that is what the faithfulness rule is for.
+    /// </param>
+    public InstanceSourcePayload? ToPayload(ReceiverTable? receivers = null)
+        => Recipe is null || !TryAddress(receivers, out var addressed, out _)
             ? null
             : new InstanceSourcePayload { Kind = Kind, Factory = addressed };
 
@@ -98,13 +104,14 @@ internal sealed record InstanceSource
     ///     than inferred from the delegate's shape, because "has a parameter nothing supplied a value
     ///     for" is the addresser's refusal for a benchmark body and is exactly the wrong answer here.
     /// </remarks>
-    private bool TryAddress(out AddressedFactory addressed, out Refusal refusal)
+    private bool TryAddress(ReceiverTable? receivers, out AddressedFactory addressed, out Refusal refusal)
         => AddressedFactory.TryCreate(
             Recipe!,
             RoleFor(Kind),
             out addressed,
             out refusal,
-            argumentsSuppliedAtInvocation: Kind == InstanceSourceKind.InstanceFactory);
+            argumentsSuppliedAtInvocation: Kind == InstanceSourceKind.InstanceFactory,
+            receivers: receivers);
 
     /// <summary>
     ///     Why this source cannot be reproduced in a worker, or <c>null</c> when it can.
@@ -128,12 +135,11 @@ internal sealed record InstanceSource
             };
         }
 
-        // A recipe that captures is refused for the reason a capturing body is: it would have to run
-        // here, and what it builds here is exactly the live object that cannot cross.
-        return TryAddress(out _, out var refusal)
+        // A throwaway table: this asks only whether the factory is addressable, and the entries that
+        // travel are built into the group's own table when the request is assembled.
+        return TryAddress(new ReceiverTable(MeasurementOptions.DefaultMaxTransferredStateBytes), out _, out var refusal)
             ? null
-            : $"{RoleFor(Kind)} {refusal.Message} Make it a static method so a worker can locate and "
-              + "run it.";
+            : $"{RoleFor(Kind)} {refusal.Message}";
     }
 
     internal static string RoleFor(InstanceSourceKind kind) => kind switch

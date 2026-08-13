@@ -160,6 +160,31 @@ The host uses `Activator.CreateInstance`, which requires a public parameterless 
 
 See [Dependency Injection](./features/dependency-injection.md) for the full API and [FAQ: instantiation](./faq.md#the-host-throws-could-not-instantiate-myclass-how-do-i-fix-it).
 
+### "cannot be sent to another process" - the run fails instead of measuring
+
+> [!CAUTION] Pick one
+> **Build the value in the worker** with a prepare delegate: `Benchmark.Run(prepare: () => BuildIt(), body: v => Use(v))`, or `WithState(() => BuildIt())` in Suite mode
+> **Mark your own type `[BenchmarkState]`** if its measured behaviour really is fully determined by its serialized contents
+> **`AddInProcess(name, body)`** to keep just that one benchmark here, with the rest of the suite still in a worker
+> **`WithRequireIsolation(false)`** to accept a labelled host-process number everywhere - right for a scratchpad, wrong for anything comparative
+
+`RequireIsolation` defaults to `true`, so a benchmark that asked for a worker and cannot have one **fails the run** rather than being measured here and stamped. The message names the benchmark and the value.
+
+Ordinary captured data is sent and the body stays isolated - an `int`, a `string`, an `int[]`, a `List<T>` or `Dictionary<K,V>` with its default comparer, a record of those. What reaches this error is a value whose behaviour is not carried by its contents:
+
+| Message says | Why | Fix |
+| --- | --- | --- |
+| *is not one of the types whose measured behaviour is fully determined by its contents* | A `Stream`, `HttpClient`, `DbConnection`, mock or similar | A prepare delegate - build it in the worker |
+| *was built with a custom comparer* | `new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase)` round-trips to identical entries with a different lookup cost | A prepare delegate, so the comparer is applied there |
+| *carries a private field* / *a get-only property* | On a `[BenchmarkState]` type. The serializer writes those and cannot read them back, so they would arrive at their defaults | Make the member a public field, or a property with a setter |
+| *holds a `X` where a `Y` was declared* | A collection of a base type holding a subclass; it would arrive as base instances with the override gone | A prepare delegate, or make the element type exact |
+| *is larger than the transfer ceiling* | Past `MaxTransferredStateBytes` (8 MiB) | A prepare delegate. Raising the ceiling is possible but rarely the right answer - see [configuration](./reference/configuration.md#maxtransferredstatebytes) |
+| *something else in this group already refers to the same object* | Two benchmarks share one array through different closures; rebuilding would make two arrays where your program has one | Build the shared state in one prepare delegate the bodies share |
+
+A suite is measured by one worker, so the message names **every** offending benchmark at once rather than the first.
+
+See [Isolated Runs](./features/isolated-runs.md#what-a-captured-value-costs).
+
 ### "Could not load file or assembly" from an ASP.NET Core or WPF project
 
 > [!CAUTION] Quick fix

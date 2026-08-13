@@ -45,20 +45,44 @@ This matters more here than anywhere else, because a lambda measured in whatever
 
 The in-process column is not noisy - it is *wrong*, by a factor of 21, until the JIT happens to promote the body to tier 1 on the third attempt. Nothing in the reported confidence interval hints at that. The isolated column is the same number every time.
 
-### When the body cannot be isolated
+### What a captured value costs
 
-A body that **captures state from its enclosing scope** cannot be measured in a worker, because the captured values live only in this process:
+A body that **captures a local** is still measured in a worker. The captured values are sent with the address, so the body a worker binds is the body you wrote, holding what you gave it:
 
 ```csharp
 var iterations = 1000;
 
-// Captures `iterations`, so this is measured in-process and labelled.
+// Captures `iterations`. Isolated: the 1000 travels with the address.
 var result = Benchmark.Run(() => Work(iterations));
 ```
 
-NBenchmark measures it here, prints the reason once, and stamps `IsolationStatus.InProcessCapturedState` on the result. It never reconstructs the captured state - a fabricated closure does not throw, it returns plausible, silently wrong numbers. To isolate a body like this, remove the capture (use a constant, or move the state into a benchmark class field).
+What crosses is a closed set: primitives, strings, arrays, the standard collections when they carry a default comparer, and types you have marked `[BenchmarkState]`. The rule is stronger than "it round-trips", because most things round-trip. It is that **nothing about how the value performs is carried outside its serialized contents** - a dictionary built with `StringComparer.OrdinalIgnoreCase` arrives with the same entries and a different lookup cost, so it is refused rather than sent.
 
-The analyzer package reports this at compile time as [NB0014](../reference/analyzers.md#nb0014---capturing-body-cannot-be-isolated), naming the symbols captured - which is more precise than the runtime can be, since by then they are fields on a compiler-generated class. It is informational rather than a warning, because capturing is the idiomatic way to benchmark over prepared data. See the analyzer page for the full lowering table - which shapes capture, which do not, and why a `static` lambda does not change the answer.
+The check runs at every position, not only at the captured field. An array of a base class holding a subclass is refused too, because serializing it against the element type would deliver base instances with the override gone.
+
+#### Extending the set with `[BenchmarkState]`
+
+A type of your own joins the set when you mark it, which is the remedy the refusal message names:
+
+```csharp
+[BenchmarkState]
+public sealed record Query(string Text, int Limit, string[] Fields);
+
+var query = new Query("select", 10, ["id", "name"]);
+
+Benchmark.Run(() => Search(query));   // isolated: the query is sent by value
+```
+
+It is an assertion you are making, and the claim is not that the type round-trips - most types do. It is that **nothing about how it performs is carried outside its serialized data**. A type holding an open handle, a warmed cache or a pooled buffer does not qualify: it would arrive intact and measure differently, which is the one failure a benchmark must not have.
+
+The attribute admits the type; it does not admit what the type holds. Every member is still checked by the ordinary rule, so a dictionary with a custom comparer is refused inside an attributed type exactly as it is outside one. Members the serializer cannot restore are refused too, with the member named - a private field never reaches the payload at all, and a public *readonly* field or a get-only property is written to it and silently discarded on the way back. Each would arrive at its default.
+
+When in doubt, do not use it. Naming the preparation costs one delegate and is strictly more faithful, because the value is then built in the process that measures it rather than reconstructed there.
+
+A value NBenchmark cannot vouch for is **declined, never guessed at**. Reconstructing it was measured: a fabricated closure does not throw, it returns plausible, silently wrong numbers. See [When isolation is refused](#when-isolation-is-refused) for what happens then.
+
+If a specific benchmark genuinely pollutes its siblings - one that permanently fills a static cache, say - put it in its own suite. Harness mode's `[IsolatedProcess]` gives per-benchmark isolation when you need it named at the benchmark level.
+
 
 ### Measuring this process on purpose
 
@@ -104,18 +128,16 @@ Residual order effects are handled instead by randomizing run order per replicat
 
 If a specific benchmark genuinely pollutes its siblings - one that permanently fills a static cache, say - put it in its own suite. Harness mode's `[IsolatedProcess]` gives per-benchmark isolation when you need it named at the benchmark level.
 
-### Prepared state: hand over a recipe, not a value
+### Prepared state: build it there instead of sending it
 
-The obvious way to benchmark over input is to build it and close over it, and that is the one shape a worker cannot measure:
+Closing over prepared input works, and for ordinary data it is the shortest thing to write:
 
 ```csharp
 var data = BuildData();
-Benchmark.Run(() => Sort(data));          // captures 'data' -> measured in this process
+Benchmark.Run(() => Sort(data));          // isolated: `data` is sent with the address
 ```
 
-The captured value exists in your process and nowhere else. NBenchmark will not fabricate a replacement - probing showed a fabricated closure does not throw, it returns plausible, silently wrong numbers - so the body is measured here and labelled `host`.
-
-Split the preparation into its own delegate and both halves capture nothing, so both can be addressed. The worker follows the recipe in the process that measures:
+Naming the preparation separately is the answer when sending the value is the wrong trade:
 
 ```csharp
 Benchmark.Run(
@@ -123,7 +145,15 @@ Benchmark.Run(
     body:    d => Sort(d));
 ```
 
-In Suite mode the same idea is `WithState`, and the payoff is larger: one worker measures the whole suite, so a single capturing body takes every sibling in-process with it.
+Reach for it when the state is:
+
+- **big** - past `MaxTransferredStateBytes` (8 MiB) a capture is refused, and below it a large value still costs the wire what a worker could rebuild in less time
+- **live** - a `Stream`, a `DbConnection`, an open handle, a warmed cache. These cannot cross at all, and a recipe builds them in the process that measures
+- **unfaithful** - anything the rule above declines, most often a collection with a custom comparer
+
+It is also strictly more faithful whatever the size, because the value is then built by the same code in the same process rather than reconstructed there. A prepare delegate that closes over a local of its own is fine - `prepare: () => BuildData(size)` sends the `size` and builds the data in the worker, which is the point.
+
+In Suite mode the same idea is `WithState`, and the payoff is larger: one worker measures the whole suite, so a single body that cannot be addressed takes every sibling in-process with it.
 
 ```csharp
 await new BenchmarkSuite("sorting")
@@ -138,23 +168,26 @@ await new BenchmarkSuite("sorting")
 
 ### What still cannot be isolated on its own
 
-A few things a worker must be *given* rather than able to *build*. NBenchmark says which benchmark and why, then measures in the host process and labels the results:
+A few things a worker must be *given* rather than able to *build*:
 
-- a body or lifecycle delegate that **captures a local**, and the same for a `prepare` delegate - the remedy is the split above
-- a lambda capturing **`this`**, an `IClassFixture`, a mock or a `[MemberData]` graph: there is no address for a live object. In a test, use `[PerformanceFact]` / `[Performance]`, which address the test method itself
+- a **live object** - a `Stream`, a `DbConnection`, an `HttpClient`, a mock, an `IClassFixture`, a built `IServiceProvider`. There is no address for one, and no bytes that reproduce how it performs
+- a capture past **`MaxTransferredStateBytes`** (8 MiB, configurable). The remedy is a prepare delegate, not a larger ceiling
+- **two receivers sharing one object** - a body and a hook in different scopes both pointing at one array. Rebuilding them makes two arrays where your program has one, so the sharing has to be reproduced by a recipe instead
 - a **parameter value** outside the marshallable set (primitives, strings, enums, `decimal`, `DateTime`, `DateTimeOffset`, `TimeSpan`, `Guid`)
 - an assembly with **no file on disk** - single-file, in-memory or dynamically emitted
 
-A custom `IOutlierDetector` or `ISignificanceTest` needing constructor arguments, and a DI container, are no longer on this list: pass a static factory instead of an instance and the worker builds its own.
+Several things are *not* on this list that once were. A lambda capturing `this`, a capturing lifecycle delegate, a capturing `prepare` delegate, a custom `IOutlierDetector` or `ISignificanceTest` built with constructor arguments, a DI container built by a factory, and a capturing `[BenchmarkPlan]` factory all isolate - each is a recipe or a value, and both cross.
 
 ```csharp
-.WithOutlierDetector(static () => new KeepFastestDetector(0.90))
-.WithSignificanceTest(static () => new MedianRatioSignificanceTest(25))
+.WithOutlierDetector(() => new KeepFastestDetector(fraction))
+.WithSignificanceTest(() => new MedianRatioSignificanceTest(minimum))
 ```
 
 ```csharp
-.UseDependencyInjection<MyBenchmarks>(BuildServices)   // static IServiceProvider BuildServices()
+.UseDependencyInjection<MyBenchmarks>(() => BuildServices(connectionString))
 ```
+
+What still fails there is passing a *built* container or a *constructed* strategy instance rather than a factory: the object itself cannot cross, and only a factory describes how to make another one.
 
 For anything genuinely left, move the suite into a static factory and hand the method group to `RunPlanAsync`. The worker invokes *your factory* in its own process, so all of that is constructed there rather than described to it - nothing has to be serializable:
 
@@ -234,9 +267,9 @@ If the worker is missing - an incomplete restore, or `NBenchmarkDeployWorker=fal
 
 A worker does not re-run your entry point, so anything NBenchmark holds as *live code in the coordinator* has no counterpart there. These are **refused**, and a refusal fails the run - see [When isolation is refused](#when-isolation-is-refused):
 
-- **Instance factories and service providers** (`WithInstanceFactory`, `WithServiceProvider`). A worker can construct a type, but it cannot reproduce a factory that exists only in your process. Building the type directly instead would measure a differently-configured object while reporting it as though nothing had changed.
+- **A built `IServiceProvider` or a live instance factory** passed as an object rather than as a factory. A worker can construct a type, but it cannot reproduce a container that exists only in your process, and building the type directly instead would measure a differently-configured object while reporting it as though nothing had changed. Pass a factory - `WithServiceProvider(BuildServices)` - and the worker builds an equivalent container in the process that measures. The factory may close over a connection string or a flag; what it may not do is hand over the container itself.
 - **Benchmarks declared in an assembly with no file on disk** - a single-file or in-memory build.
-- **Custom `IOutlierDetector` / `ISignificanceTest` instances that cannot be rebuilt from a type name** - one constructed with arguments, for example. Strategies with a parameterless constructor travel fine.
+- **A custom `IOutlierDetector` / `ISignificanceTest` passed as a constructed instance.** Only a type name would cross, and only a parameterless constructor could be reached at the other end, so `new KeepFastestDetector(0.9)` cannot be rebuilt from one. Pass a factory instead and the argument travels with it - see [Custom statistics](../guides/custom-statistics.md).
 
 The rule throughout is to refuse rather than guess. Reconstructing captured state was tried and did not fail loudly: it returned plausible, *wrong* numbers - a body over a captured `5` measured as though it were `1`, with no error and a tight confidence interval.
 
@@ -245,6 +278,8 @@ The rule throughout is to refuse rather than guess. Reconstructing captured stat
 **A refusal is an error.** `MeasurementOptions.RequireIsolation` defaults to `true`, so a benchmark that asked for a worker and cannot have one fails the run rather than being measured in the host process and labelled. In Harness mode the check runs at *discovery* time, before the first benchmark is measured, and reports every un-isolatable class in one message.
 
 What remains under the gate is the small set in *What cannot be isolated* above, and each member of it has a one-line remedy.
+
+A suite is addressed as a set - one worker measures all of it - so one body that cannot cross costs every sibling its isolation. The message names **every** offender rather than the first, because you would otherwise fix one, re-run, and discover the next.
 
 **In-process measurement is something you ask for.** Every deliberate route to the host process is legal and is *not* a refusal - the gate keys on the four refusal statuses, never on "was not isolated":
 

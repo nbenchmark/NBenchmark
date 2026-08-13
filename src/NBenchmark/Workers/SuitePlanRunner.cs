@@ -42,7 +42,11 @@ internal static class SuitePlanRunner
         var options = localSuite.ResolvedOptions;
         var names = localSuite.BenchmarkNames();
 
-        if (!TryPlan(plan, out var planRef, out var status, out var refusal))
+        // One table for the run: the plan factory's own captures, and nothing else - a plan group
+        // carries no addressed bodies, because the suite is built inside the worker.
+        var receivers = new ReceiverTable(options.MaxTransferredStateBytes);
+
+        if (!TryPlan(plan, receivers, out var planRef, out var status, out var refusal))
             return PlanOutcome.Declined(status, refusal);
 
         var replicates = localSuite.ResolvedLaunchCount;
@@ -60,6 +64,7 @@ internal static class SuitePlanRunner
                 Kind = WorkGroupKind.Plan,
                 TargetAssemblyPath = planRef.Body!.AssemblyPath,
                 Plan = planRef,
+                Receivers = receivers.Receivers,
 
                 // Sent so the coordinator and worker agree on the runtime profile to launch under.
                 // The worker measures with the options its own factory produced, which is the point
@@ -246,12 +251,18 @@ internal static class SuitePlanRunner
     }
 
     /// <summary>
-    ///     Whether the factory can be invoked in a worker. A capturing factory is refused for the
-    ///     same reason a capturing benchmark body is: the captured state lives only here, and
-    ///     reconstructing it was measured to return plausible, wrong numbers rather than failing.
+    ///     Whether the factory can be invoked in a worker.
     /// </summary>
+    /// <remarks>
+    ///     A capturing factory used to be refused here, for the reason a capturing benchmark body once
+    ///     was: the captured state lives only in this process. It no longer has to be - what the plan
+    ///     closes over is transferred into <paramref name="receivers" /> and rebuilt in the worker,
+    ///     under the same faithfulness rule a body's captures answer to, so a plan reading a
+    ///     connection string from a local is addressable while one holding an open connection is not.
+    /// </remarks>
     private static bool TryPlan(
         Func<BenchmarkSuite> plan,
+        ReceiverTable receivers,
         out AddressedFactory planRef,
         out IsolationStatus status,
         out string? refusal)
@@ -276,7 +287,8 @@ internal static class SuitePlanRunner
             return false;
         }
 
-        if (!AddressedFactory.TryCreate(plan, PlanRole(plan), out planRef, out var planRefusal))
+        if (!AddressedFactory.TryCreate(
+                plan, PlanRole(plan), out planRef, out var planRefusal, receivers: receivers))
         {
             status = planRefusal.ToStatus(IsolationStatus.InProcessUnaddressablePlan);
             refusal = planRefusal.Message;

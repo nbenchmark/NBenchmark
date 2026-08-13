@@ -155,6 +155,33 @@ internal sealed record AddressedFactory
     ///     static <c>Func&lt;Type, object&gt;</c> at addressing time, so the coordinator declined to
     ///     isolate runs the worker was already equipped to measure.
     /// </param>
+    /// <param name="receivers">
+    ///     The group's receiver table, which a capturing factory's state is transferred into.
+    /// </param>
+    /// <remarks>
+    ///     <para>
+    ///         Captures used to be refused here rather than transferred - the one place this rule
+    ///         differed from a benchmark body's - on the reasoning that a factory is the <i>recipe</i>:
+    ///         it exists to run in the measuring process and build something there, so one needing a
+    ///         value from this process would make the recipe depend on the process it was supposed to
+    ///         be independent of.
+    ///     </para>
+    ///     <para>
+    ///         That did not survive contact with the faithfulness rule. A factory closing over an
+    ///         <c>int</c> is still instructions; the <c>int</c> is a parameter it did not get to
+    ///         declare. Anything genuinely live - a <c>Stream</c>, a built container, a warmed cache -
+    ///         is refused by <see cref="StateTransfer.IsFaithful" /> whether it is reached from a
+    ///         factory or from a body. What the stricter rule actually bought was a refusal on
+    ///         <c>prepare: () =&gt; Build(size)</c>, which is the exact shape the library's own refusal
+    ///         messages tell people to write - the remedy was stricter than the thing it was a remedy
+    ///         for. Lifecycle hooks took this route first, for the same reason.
+    ///     </para>
+    ///     <para>
+    ///         Passing the <b>group's</b> table rather than a private one is load-bearing: a prepare
+    ///         delegate and a body closing over the same local have to be handed one object in the
+    ///         worker, or the prepared state the body reads is not the state the recipe built.
+    ///     </para>
+    /// </remarks>
     public static bool TryCreate(
         Delegate factory,
         string role,
@@ -162,24 +189,18 @@ internal sealed record AddressedFactory
         out Refusal refusal,
         string? displayName = null,
         IReadOnlyList<object?>? arguments = null,
-        bool argumentsSuppliedAtInvocation = false)
+        bool argumentsSuppliedAtInvocation = false,
+        ReceiverTable? receivers = null)
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentException.ThrowIfNullOrWhiteSpace(role);
 
         addressed = null!;
 
-        // Captures are refused here rather than transferred, which is the one place this rule differs
-        // from a benchmark body's. A factory is the *recipe*: it exists to run in the measuring
-        // process and build something there. One that needs a value from this process has a different
-        // remedy - make it static, so the value is part of the recipe - and sending its captures
-        // would make the recipe depend on the process it was supposed to be independent of.
-        // No receiver table, which is how "this may not transfer captures" is said: without one there
-        // is nowhere to put them, so a capturing factory is refused.
         var addressable = argumentsSuppliedAtInvocation
-            ? BodyRef.TryCreateInvokedFactory(factory, displayName ?? role, out var body, out refusal)
+            ? BodyRef.TryCreateInvokedFactory(factory, displayName ?? role, out var body, out refusal, receivers)
             : BodyRef.TryCreate(
-                factory, displayName ?? role, out body, out refusal, arguments, receivers: null);
+                factory, displayName ?? role, out body, out refusal, arguments, receivers: receivers);
 
         if (!addressable)
             return false;
@@ -241,6 +262,8 @@ internal sealed record AddressedFactory
     ///     to report. Every caller pairs this with an earlier <see cref="TryCreate" /> through
     ///     <see cref="WorkerRunPlan" />.
     /// </remarks>
-    public static AddressedFactory? OrNull(Delegate? factory, string role)
-        => factory is not null && TryCreate(factory, role, out var addressed, out _) ? addressed : null;
+    public static AddressedFactory? OrNull(Delegate? factory, string role, ReceiverTable? receivers = null)
+        => factory is not null && TryCreate(factory, role, out var addressed, out _, receivers: receivers)
+            ? addressed
+            : null;
 }

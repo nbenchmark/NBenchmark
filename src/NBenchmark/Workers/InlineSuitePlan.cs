@@ -39,7 +39,11 @@ internal static class InlineSuitePlan
         public BodyRef? SuiteTeardown { get; init; }
 
         /// <summary>The receivers the addressed delegates share, referenced by index.</summary>
-        public IReadOnlyList<TransferredReceiver> Receivers { get; init; } = [];
+        /// <summary>
+        ///     The group's receiver table, carried rather than a snapshot of its entries so the
+        ///     request builder can add a strategy factory's captures to the same one the bodies used.
+        /// </summary>
+        public ReceiverTable? Receivers { get; init; }
 
         public static Decision Refuse(IsolationStatus status, string explanation) => new(status, explanation, []);
     }
@@ -88,16 +92,31 @@ internal static class InlineSuitePlan
 
         var bodies = new List<BodyRef>(benchmarks.Count);
 
+        // Every offender, not the first. A suite is addressed as a set - one worker measures all of
+        // it - so a single un-addressable body costs the whole suite its isolation, and returning on
+        // the first one made that a sequence of re-runs: fix body 2, discover body 5, fix body 5,
+        // discover body 9. The set is what the user has to act on, so the set is what gets reported.
+        var offenders = new List<string>();
+        var firstStatus = IsolationStatus.Isolated;
+
+        void Refused(IsolationStatus status, string message)
+        {
+            if (offenders.Count == 0)
+                firstStatus = status;
+
+            offenders.Add(message);
+        }
 
         foreach (var benchmark in benchmarks)
         {
             if (benchmark.Body is null)
             {
-                return Decision.Refuse(
+                Refused(
                     IsolationStatus.InProcessUnaddressablePlan,
                     $"'{benchmark.Name}' was not added as a plain delegate, so there is no compiled "
-                    + "method for a worker to address. Move the suite into a static [BenchmarkPlan] "
-                    + "factory.");
+                    + "method for a worker to address.");
+
+                continue;
             }
 
             if (!BodyRef.TryCreate(
@@ -109,13 +128,13 @@ internal static class InlineSuitePlan
                     benchmark.StateRecipes,
                     receivers))
             {
-                // Naming the benchmark matters, because a suite has several and only one of them is
+                // Naming the benchmark matters, because a suite has several and only some of them are
                 // the problem.
-                return Decision.Refuse(
+                Refused(
                     refusal.ToStatus(IsolationStatus.InProcessUnaddressablePlan),
-                    $"'{benchmark.Name}' {refusal.Message} Either build that state with a prepare "
-                    + "delegate, or move the suite into a static [BenchmarkPlan] factory so the worker "
-                    + "builds it itself.");
+                    $"'{benchmark.Name}' {refusal.Message}");
+
+                continue;
             }
 
             if (!TryAddressHook(
@@ -125,7 +144,9 @@ internal static class InlineSuitePlan
                     out var iterationSetup,
                     out var hookRefusal))
             {
-                return Decision.Refuse(HookStatus(hookRefusal), hookRefusal.Message);
+                Refused(HookStatus(hookRefusal), hookRefusal.Message);
+
+                continue;
             }
 
             if (!TryAddressHook(
@@ -135,7 +156,9 @@ internal static class InlineSuitePlan
                     out var iterationTeardown,
                     out hookRefusal))
             {
-                return Decision.Refuse(HookStatus(hookRefusal), hookRefusal.Message);
+                Refused(HookStatus(hookRefusal), hookRefusal.Message);
+
+                continue;
             }
 
             bodies.Add(bodyRef with
@@ -145,14 +168,40 @@ internal static class InlineSuitePlan
             });
         }
 
+        if (offenders.Count > 0)
+            return Decision.Refuse(firstStatus, DescribeOffenders(offenders));
+
         return bodies.Count == 0
             ? Decision.Refuse(IsolationStatus.InProcessRequested, "the suite has no benchmarks.")
             : new Decision(IsolationStatus.Isolated, null, bodies)
             {
                 SuiteSetup = setupRef,
                 SuiteTeardown = teardownRef,
-                Receivers = receivers.Receivers,
+                Receivers = receivers,
             };
+    }
+
+    /// <summary>
+    ///     One message naming every body that cannot cross, and the remedy they share.
+    /// </summary>
+    /// <remarks>
+    ///     A single offender reads as a sentence, which is what nearly every suite has. Several are
+    ///     listed, because the reader has to change all of them before the suite isolates and finding
+    ///     that out one re-run at a time is the friction this exists to remove.
+    /// </remarks>
+    private static string DescribeOffenders(IReadOnlyList<string> offenders)
+    {
+        const string Remedy = " Either build that state with a prepare delegate, or move the suite "
+                              + "into a static [BenchmarkPlan] factory so the worker builds it itself.";
+
+        if (offenders.Count == 1)
+            return offenders[0] + Remedy;
+
+        return $"{offenders.Count} of its benchmarks cannot be addressed: "
+               + string.Join(" ", offenders)
+               + " The whole suite is measured in one worker, so all of them have to cross for any of"
+               + " them to."
+               + Remedy;
     }
 
     /// <summary>
@@ -220,7 +269,7 @@ internal static class InlineSuitePlan
         int replicate,
         BodyRef? suiteSetup = null,
         BodyRef? suiteTeardown = null,
-        IReadOnlyList<TransferredReceiver>? receivers = null)
+        ReceiverTable? receivers = null)
         => WorkerRunPlan.WithStrategies(new RunGroupPayload
         {
             GroupId = $"suite:{suiteName}#{replicate}",
@@ -233,11 +282,11 @@ internal static class InlineSuitePlan
             // still works, because the worker's resolver follows the target's dependency graph.
             TargetAssemblyPath = bodies[0].AssemblyPath,
             Bodies = bodies,
-            Receivers = receivers ?? [],
+            Receivers = receivers?.Receivers ?? [],
 
             Options = options,
             Order = order,
             Seed = seed,
             TotalBenchmarks = bodies.Count,
-        }, options);
+        }, options, receivers);
 }

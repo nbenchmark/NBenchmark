@@ -426,35 +426,18 @@ public sealed class SimpleModeIsolationTests : IDisposable
     ///     which is the reconstruction hazard wearing a different hat.
     /// </remarks>
     [Fact]
-    public void Run_WithCapturingPrepare_FallsBackAndSaysSo()
+    public void Run_WithCapturingPrepare_IsIsolated_AndPreparesTheCapturedSize()
     {
         var size = 512;
 
-        using var stderr = new StringWriter();
-        var priorError = Console.Error;
-        Console.SetError(stderr);
-
-        BenchmarkResult result;
-
-        try
-        {
-            result = Benchmark.Run(
-                prepare: () => new int[size],
-                body: data => data.Length,
-                options: FallbackOptions,
-                name: "captured-prepare");
-        }
-        finally
-        {
-            Console.SetError(priorError);
-        }
+        var result = Benchmark.Run(
+            prepare: () => new int[size],
+            body: data => data.Length == size ? 1 : throw new InvalidOperationException("wrong size"),
+            options: FallbackOptions with { RequireIsolation = true },
+            name: "captured-prepare");
 
         Assert.False(result.Errored, result.ErrorMessage);
-        Assert.Equal(IsolationStatus.InProcessCapturedState, result.IsolationStatus);
-
-        var message = stderr.ToString();
-        Assert.Contains("prepare delegate", message);
-        Assert.Contains("captures", message);
+        Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
     }
 
     /// <summary>

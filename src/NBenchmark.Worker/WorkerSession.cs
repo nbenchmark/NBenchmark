@@ -292,11 +292,17 @@ internal sealed class WorkerSession(FrameChannel channel)
             // request has to do it through the same context that discovery used.
             var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
 
+            // Built here rather than inside the Lambdas path, because a factory can carry captures
+            // too and a strategy factory is resolved on the next line. One table for the group is also
+            // the point: a prepare delegate and a body closing over the same local have to be handed
+            // one object, exactly as two bodies sharing a display class are.
+            var receivers = new ResolvedReceivers(request.Receivers, context);
+
             // Collected rather than printed. A substitution here changes how every number in the group
             // should be read, and it has to reach the rows themselves - see StreamingProgress.
             var substitutions = new List<string>();
 
-            var options = ResolveStrategies(request, context, substitutions);
+            var options = ResolveStrategies(request, context, receivers, substitutions);
 
             _maxRawSamples = options.MaxRawSamples;
 
@@ -325,15 +331,15 @@ internal sealed class WorkerSession(FrameChannel channel)
             switch (request.Kind)
             {
                 case WorkGroupKind.DiscoveredClass:
-                    await RunDiscoveredClassAsync(request, context, options, progress, cancellationToken).ConfigureAwait(false);
+                    await RunDiscoveredClassAsync(request, context, options, receivers, progress, cancellationToken).ConfigureAwait(false);
                     break;
 
                 case WorkGroupKind.Lambdas:
-                    await RunLambdasAsync(request, context, options, progress, cancellationToken).ConfigureAwait(false);
+                    await RunLambdasAsync(request, context, options, receivers, progress, cancellationToken).ConfigureAwait(false);
                     break;
 
                 case WorkGroupKind.Plan:
-                    await RunPlanAsync(request, context, progress, cancellationToken).ConfigureAwait(false);
+                    await RunPlanAsync(request, context, receivers, progress, cancellationToken).ConfigureAwait(false);
                     break;
 
                 case WorkGroupKind.TestMethod:
@@ -719,6 +725,7 @@ internal sealed class WorkerSession(FrameChannel channel)
     private bool TryBuildInstanceFactory(
         RunGroupPayload request,
         BenchmarkLoadContext context,
+        ResolvedReceivers receivers,
         out Func<Type, InstanceHandle>? instanceFactory)
     {
         instanceFactory = null;
@@ -727,12 +734,13 @@ internal sealed class WorkerSession(FrameChannel channel)
             return true;
 
         if (source.Kind == InstanceSourceKind.InstanceFactory)
-            return TryBuildFromInstanceFactory(request, context, source, out instanceFactory);
+            return TryBuildFromInstanceFactory(request, context, source, receivers, out instanceFactory);
 
         if (!FactoryResolver.TryInvoke<IServiceProvider>(
                 context,
                 request.TargetAssemblyPath,
                 source.Factory,
+                receivers,
                 out var provider,
                 out var error,
                 out var detail))
@@ -786,6 +794,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         RunGroupPayload request,
         BenchmarkLoadContext context,
         InstanceSourcePayload source,
+        ResolvedReceivers receivers,
         out Func<Type, InstanceHandle>? instanceFactory)
     {
         instanceFactory = null;
@@ -796,6 +805,7 @@ internal sealed class WorkerSession(FrameChannel channel)
                 context,
                 request.TargetAssemblyPath,
                 source.Factory,
+                receivers,
                 typeof(object),
                 arity: 1,
                 out var invoke,
@@ -825,6 +835,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         RunGroupPayload request,
         BenchmarkLoadContext context,
         MeasurementOptions options,
+        ResolvedReceivers receivers,
         StreamingProgress progress,
         CancellationToken cancellationToken)
     {
@@ -837,7 +848,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         //
         // Ahead of discovery, not after it: discovery invokes [BenchmarkCases] sources, and whether
         // instances come from a factory decides whether an *instance* source may be invoked at all.
-        if (!TryBuildInstanceFactory(request, context, out var instanceFactory))
+        if (!TryBuildInstanceFactory(request, context, receivers, out var instanceFactory))
             return;
 
         // Restricted to the class this group is about. A whole-assembly pass invokes every class's
@@ -944,6 +955,7 @@ internal sealed class WorkerSession(FrameChannel channel)
     private async Task RunPlanAsync(
         RunGroupPayload request,
         BenchmarkLoadContext context,
+        ResolvedReceivers receivers,
         StreamingProgress progress,
         CancellationToken cancellationToken)
     {
@@ -957,7 +969,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         // call: a plan is a recipe like any other, and the only thing particular to it is that what
         // it produces is a BenchmarkSuite.
         if (!FactoryResolver.TryInvoke<BenchmarkSuite>(
-                context, request.TargetAssemblyPath, plan, out var suite, out var error, out var detail))
+                context, request.TargetAssemblyPath, plan, receivers, out var suite, out var error, out var detail))
         {
             Fault(Capitalize(error!), detail);
             return;
@@ -981,6 +993,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         RunGroupPayload request,
         BenchmarkLoadContext context,
         MeasurementOptions options,
+        ResolvedReceivers receivers,
         StreamingProgress progress,
         CancellationToken cancellationToken)
     {
@@ -989,8 +1002,6 @@ internal sealed class WorkerSession(FrameChannel channel)
         // The suite's own setup runs here, once, before any body is measured - which is the whole
         // reason it travels rather than running in the coordinator, where it would prepare state in a
         // process that goes on to measure nothing.
-        var receivers = new ResolvedReceivers(request.Receivers, context);
-
         if (!TryRunSuiteHook(context, request.SuiteSetup, receivers, "setup"))
             return;
 
@@ -1177,6 +1188,7 @@ internal sealed class WorkerSession(FrameChannel channel)
     private MeasurementOptions ResolveStrategies(
         RunGroupPayload request,
         BenchmarkLoadContext context,
+        ResolvedReceivers receivers,
         List<string> substitutions)
     {
         var options = request.Options;
@@ -1184,7 +1196,8 @@ internal sealed class WorkerSession(FrameChannel channel)
         // A factory wins over a type name. It is the stronger mechanism - it reproduces the caller's own
         // object with its own constructor arguments, where a type name can only reach a parameterless
         // constructor - so where both are present the type name is the weaker fallback, not a conflict.
-        if (RunStrategyFactory<IOutlierDetector>(context, request, request.OutlierDetectorFactory, substitutions) is
+        if (RunStrategyFactory<IOutlierDetector>(
+                context, request, request.OutlierDetectorFactory, receivers, substitutions) is
             { } detector)
         {
             options = options with { OutlierDetector = detector };
@@ -1198,7 +1211,8 @@ internal sealed class WorkerSession(FrameChannel channel)
             };
         }
 
-        if (RunStrategyFactory<ISignificanceTest>(context, request, request.SignificanceTestFactory, substitutions) is
+        if (RunStrategyFactory<ISignificanceTest>(
+                context, request, request.SignificanceTestFactory, receivers, substitutions) is
             { } test)
         {
             options = options with { SignificanceTest = test };
@@ -1229,6 +1243,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         BenchmarkLoadContext context,
         RunGroupPayload request,
         AddressedFactory? factory,
+        ResolvedReceivers receivers,
         List<string> substitutions)
         where T : class
     {
@@ -1236,7 +1251,7 @@ internal sealed class WorkerSession(FrameChannel channel)
             return null;
 
         if (FactoryResolver.TryInvoke<T>(
-                context, request.TargetAssemblyPath, factory, out var produced, out var error, out _))
+                context, request.TargetAssemblyPath, factory, receivers, out var produced, out var error, out _))
         {
             return produced;
         }

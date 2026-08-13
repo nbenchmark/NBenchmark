@@ -53,6 +53,47 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     private static BenchmarkSuite Fallback(BenchmarkSuite suite) => Fast(suite).WithRequireIsolation(false);
 
     /// <summary>
+    ///     A suite with several un-addressable bodies names every one of them, in one message.
+    /// </summary>
+    /// <remarks>
+    ///     A suite is addressed as a set: one worker measures all of it, so one body that cannot cross
+    ///     costs every sibling its isolation. Reporting only the first turned that into a sequence of
+    ///     re-runs - fix the one you were told about, discover the next - and the set is what the
+    ///     reader actually has to act on.
+    /// </remarks>
+    [Fact]
+    public async Task A_Suite_With_Several_Unaddressable_Bodies_Names_All_Of_Them()
+    {
+        var first = Stream.Null;
+        var second = new StringWriter();
+
+        using var stderr = new StringWriter();
+        var priorError = Console.Error;
+        Console.SetError(stderr);
+
+        try
+        {
+            await Fallback(new BenchmarkSuite("many-offenders")
+                    .Add("clean", static () => Thread.SpinWait(200))
+                    .Add("holds-a-stream", () => first.Length)
+                    .Add("holds-a-writer", () => second.ToString().Length))
+                .RunAsync();
+        }
+        finally
+        {
+            Console.SetError(priorError);
+        }
+
+        var message = stderr.ToString();
+
+        Assert.Contains("holds-a-stream", message);
+        Assert.Contains("holds-a-writer", message);
+
+        // The sibling that would have isolated on its own is not blamed for the suite it is in.
+        Assert.DoesNotContain("'clean'", message);
+    }
+
+    /// <summary>
     ///     The plain shape people already write is now isolated. Nothing about the call moved.
     /// </summary>
     [Fact]
@@ -646,43 +687,25 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     ///     the wrong side of the boundary.
     /// </summary>
     [Fact]
-    public async Task StatefulSuite_WithCapturingState_FallsBackAndSaysSo()
+    public async Task StatefulSuite_WithCapturingState_IsIsolated_AndBuildsTheCapturedSize()
     {
         var size = 64;
 
-        using var stderr = new StringWriter();
-        var priorError = Console.Error;
-        Console.SetError(stderr);
+        var results = await new BenchmarkSuite("captured-state")
+            .WithState(() => new int[size])
+            .Add("a", buffer => buffer.Length == size ? 1 : throw new InvalidOperationException("wrong size"))
+            .WithIterations(4)
+            .WithWarmup(0)
+            .WithOpsPerSample(1)
+            .RunAsync();
 
-        IReadOnlyList<BenchmarkResult> results;
+        var result = Assert.Single(results);
 
-        try
-        {
-            results = await Fallback(new BenchmarkSuite("captured-state")
-                    .WithState(() => new int[size])
-                    .Add("a", buffer => buffer.Length))
-                .RunAsync();
-        }
-        finally
-        {
-            Console.SetError(priorError);
-        }
-
-        Assert.Single(results);
-        Assert.All(results, r => Assert.False(r.Errored, r.ErrorMessage));
-
-        // The specific reason, not merely "not isolated". The suite computed this status and assigned
-        // it to a field nothing read, so every fallback row kept BenchmarkResult's default -
-        // InProcessRequested, which means "you asked for the host". A reader saw a run they had asked
-        // to isolate reporting the status of one they had asked not to, with no remedy footer and no
-        // Iso column. The old assertion here - NotEqual(Isolated) - passed against that default.
-        Assert.All(
-            results,
-            r => Assert.Equal(IsolationStatus.InProcessCapturedState, r.IsolationStatus));
-
-        var message = stderr.ToString();
-        Assert.Contains("prepare delegate", message);
-        Assert.Contains("captures", message);
+        // Errored is the assertion that matters. A worker that had rebuilt the state from a default
+        // rather than from the captured 64 would still isolate, still measure, and still report a
+        // clean row - which is why the body throws on any length but the one the caller closed over.
+        Assert.False(result.Errored, result.ErrorMessage);
+        Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
     }
 
     /// <summary>

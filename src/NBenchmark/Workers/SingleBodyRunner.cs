@@ -64,11 +64,11 @@ internal static class SingleBodyRunner
             Kind = WorkGroupKind.Lambdas,
             TargetAssemblyPath = bodyRef.AssemblyPath,
             Bodies = [bodyRef],
-            Receivers = receivers,
+            Receivers = receivers?.Receivers ?? [],
 
             Options = options,
             TotalBenchmarks = 1,
-        }, options);
+        }, options, receivers);
 
         var group = await WorkerLauncher.Current.RunGroupAsync(
                 request,
@@ -139,12 +139,12 @@ internal static class SingleBodyRunner
         Delegate? iterationSetup,
         Delegate? iterationTeardown,
         out BodyRef bodyRef,
-        out IReadOnlyList<TransferredReceiver> receiverTable,
+        out ReceiverTable? receiverTable,
         out IsolationStatus status,
         out string? refusal)
     {
         bodyRef = null!;
-        receiverTable = [];
+        receiverTable = null;
 
         if (!WorkerLauncher.Current.IsAvailable)
         {
@@ -211,7 +211,7 @@ internal static class SingleBodyRunner
 
         bodyRef = bodyRef with { IterationSetup = setupRef, IterationTeardown = teardownRef };
 
-        receiverTable = receivers.Receivers;
+        receiverTable = receivers;
         status = IsolationStatus.Isolated;
         refusal = null;
 

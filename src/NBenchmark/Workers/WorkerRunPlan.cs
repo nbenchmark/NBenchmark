@@ -171,7 +171,16 @@ internal static class WorkerRunPlan
                 // The factory itself still has to be addressable. One that captures is refused for the
                 // same reason a capturing body is - and saying so names the actionable fix, which is to
                 // make the factory static.
-                if (!AddressedFactory.TryCreate(factory, role, out _, out var factoryRefusal))
+                // A throwaway table, because this only asks whether the factory can be addressed at
+                // all. The entries that actually travel are built into the group's own table when the
+                // request is assembled; the two agree because addressability is a property of the
+                // delegate, not of which table is holding the answer.
+                if (!AddressedFactory.TryCreate(
+                        factory,
+                        role,
+                        out _,
+                        out var factoryRefusal,
+                        receivers: new ReceiverTable(options.MaxTransferredStateBytes)))
                 {
                     return $"the factory supplied for '{strategy?.GetType().Name ?? "a custom strategy"}' "
                            + $"{factoryRefusal}";
@@ -199,17 +208,36 @@ internal static class WorkerRunPlan
     ///     silently emptied every isolated result's sample array. Adding a fifth field here cannot be
     ///     forgotten at one site, because there is only one site.
     /// </remarks>
-    public static RunGroupPayload WithStrategies(RunGroupPayload payload, MeasurementOptions options)
+    /// <param name="receivers">
+    ///     The group's receiver table, when the caller already has one because its bodies carry
+    ///     captures. A strategy factory's own captures belong in that same table - a detector and a
+    ///     body closing over one object have to be handed one object in the worker - so it is threaded
+    ///     through rather than created here. Callers with no bodies to address pass nothing and get a
+    ///     table of their own.
+    /// </param>
+    public static RunGroupPayload WithStrategies(
+        RunGroupPayload payload,
+        MeasurementOptions options,
+        ReceiverTable? receivers = null)
     {
         ArgumentNullException.ThrowIfNull(payload);
         ArgumentNullException.ThrowIfNull(options);
+
+        receivers ??= new ReceiverTable(options.MaxTransferredStateBytes);
 
         return payload with
         {
             OutlierDetectorTypeName = StrategyTypeName(options.OutlierDetector, out _),
             SignificanceTestTypeName = StrategyTypeName(options.SignificanceTest, out _),
-            OutlierDetectorFactory = AddressedFactory.OrNull(options.OutlierDetectorFactory, OutlierDetectorRole),
-            SignificanceTestFactory = AddressedFactory.OrNull(options.SignificanceTestFactory, SignificanceTestRole),
+            OutlierDetectorFactory =
+                AddressedFactory.OrNull(options.OutlierDetectorFactory, OutlierDetectorRole, receivers),
+            SignificanceTestFactory =
+                AddressedFactory.OrNull(options.SignificanceTestFactory, SignificanceTestRole, receivers),
+
+            // Set last, so it carries whatever the strategy factories added on top of what the caller's
+            // own bodies already put there. The table hands back its live list, so an entry added after
+            // this point still travels.
+            Receivers = receivers.Receivers,
         };
     }
 
@@ -222,6 +250,12 @@ internal static class WorkerRunPlan
     ///     confound - the previous isolated path hardcoded declaration order and silently discarded
     ///     <see cref="RunOrder.Random" /> whenever isolation was on, which in Harness mode is always.
     /// </param>
+    /// <param name="receivers">
+    ///     The table any captures in this group's instance source and strategy factories were
+    ///     transferred into. A discovered class has no addressed bodies of its own, so this is the only
+    ///     thing that puts entries in it - but it still has to be one table, because a service-provider
+    ///     factory and a detector factory can close over the same object.
+    /// </param>
     public static RunGroupPayload DiscoveredClassRequest(
         Type declaringType,
         IReadOnlyList<string> benchmarkNames,
@@ -233,7 +267,8 @@ internal static class WorkerRunPlan
         int startIndex,
         int totalBenchmarks,
         InstanceSourcePayload? instanceSource = null,
-        InstanceLifetime? instanceLifetimeOverride = null)
+        InstanceLifetime? instanceLifetimeOverride = null,
+        ReceiverTable? receivers = null)
     {
         ArgumentNullException.ThrowIfNull(declaringType);
         var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(declaringType);
@@ -257,7 +292,8 @@ internal static class WorkerRunPlan
                 TotalBenchmarks = totalBenchmarks,
                 InstanceSource = instanceSource,
             },
-            options);
+            options,
+            receivers);
     }
 
     /// <summary>

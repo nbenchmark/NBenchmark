@@ -75,7 +75,7 @@ internal static class BodyResolver
             return true;
         }
 
-        return TryBindArguments(context, created, body, out resolved, out boundArguments, out error);
+        return TryBindArguments(context, created, body, receivers, out resolved, out boundArguments, out error);
     }
 
     /// <summary>
@@ -347,6 +347,7 @@ internal static class BodyResolver
         BenchmarkLoadContext context,
         Delegate created,
         BodyRef body,
+        ResolvedReceivers receivers,
         out Delegate resolved,
         out IReadOnlyList<object?> boundArguments,
         out string? error)
@@ -388,6 +389,7 @@ internal static class BodyResolver
                         context,
                         body.AssemblyPath,
                         recipe,
+                        receivers,
                         parameters[i].ParameterType,
                         out bound[i],
                         out error,
@@ -548,10 +550,28 @@ internal static class BodyResolver
         // two sides are looking at one list rather than at two derivations of it.
         var fields = StateTransfer.InstanceFieldsOf(type);
 
+        // Which fields the payload actually accounted for. The doc above claims every field is set
+        // from the wire, and until this array existed the claim was unenforced: a payload naming
+        // fewer fields than the type has left the rest at whatever GetUninitializedObject produced,
+        // and one naming the same field twice silently took the last value. Both are the
+        // fabricated-closure failure this mechanism replaced - a body over a prepared million-element
+        // array sorting an empty one and reporting a tight interval for no work.
+        var assigned = new bool[fields.Length];
+
         foreach (var capture in captures)
         {
-            if (!TryResolveField(type, fields, capture, out var field, out error))
+            if (!TryResolveField(type, fields, capture, out var field, out var slot, out error))
                 return false;
+
+            if (assigned[slot])
+            {
+                error = $"the address names '{field!.Name}' more than once, so which value the field "
+                        + "should end up holding is not decidable.";
+
+                return false;
+            }
+
+            assigned[slot] = true;
 
             object? value;
 
@@ -583,6 +603,17 @@ internal static class BodyResolver
                 error = $"the captured value for '{capture.FieldName}' could not be assigned: {ex.Message}";
                 return false;
             }
+        }
+
+        for (var i = 0; i < fields.Length; i++)
+        {
+            if (assigned[i])
+                continue;
+
+            error = $"the address carries no value for '{type.Name}.{fields[i].Name}', so it would be "
+                    + "measured against a default rather than against what the benchmark closed over.";
+
+            return false;
         }
 
         built = instance;
@@ -670,6 +701,7 @@ internal static class BodyResolver
         FieldInfo[] fields,
         CapturedField capture,
         out FieldInfo? field,
+        out int slot,
         out string? error)
     {
         error = null;
@@ -677,10 +709,12 @@ internal static class BodyResolver
         // Token and name together, because a token is unique only within its own module and a base
         // type can be declared in another assembly. The name settles which level was meant; it is a
         // tiebreak rather than the address, so a rename still cannot bind a different field.
-        field = FindField(fields, capture.FieldToken, capture.FieldName, out var ambiguous);
+        slot = FindField(fields, capture.FieldToken, capture.FieldName, out var ambiguous);
 
-        if (field is null && !ambiguous)
-            field = FindField(fields, capture.FieldToken, name: null, out ambiguous);
+        if (slot < 0 && !ambiguous)
+            slot = FindField(fields, capture.FieldToken, name: null, out ambiguous);
+
+        field = slot < 0 ? null : fields[slot];
 
         if (ambiguous)
         {
@@ -712,31 +746,31 @@ internal static class BodyResolver
     }
 
     /// <summary>
-    ///     The single field matching a token - and, when one is given, a name - or <c>null</c> with
-    ///     <paramref name="ambiguous" /> set when more than one does.
+    ///     The index of the single field matching a token - and, when one is given, a name - or
+    ///     <c>-1</c>, with <paramref name="ambiguous" /> set when more than one matched.
     /// </summary>
-    private static FieldInfo? FindField(FieldInfo[] fields, int token, string? name, out bool ambiguous)
+    private static int FindField(FieldInfo[] fields, int token, string? name, out bool ambiguous)
     {
-        FieldInfo? found = null;
+        var found = -1;
 
         ambiguous = false;
 
-        foreach (var candidate in fields)
+        for (var i = 0; i < fields.Length; i++)
         {
-            if (candidate.MetadataToken != token)
+            if (fields[i].MetadataToken != token)
                 continue;
 
-            if (name is not null && !string.Equals(candidate.Name, name, StringComparison.Ordinal))
+            if (name is not null && !string.Equals(fields[i].Name, name, StringComparison.Ordinal))
                 continue;
 
-            if (found is not null)
+            if (found >= 0)
             {
                 ambiguous = true;
 
-                return null;
+                return -1;
             }
 
-            found = candidate;
+            found = i;
         }
 
         return found;
@@ -749,13 +783,36 @@ internal static class BodyResolver
 
         try
         {
-            value = capture.Kind switch
+            // Each arm requires its own payload rather than defaulting one in. `Binary ?? []` made an
+            // absent array an *empty* array, `Json ?? "null"` made an absent value null: both turn a
+            // malformed frame into a plausible wrong number instead of a refusal, which is the failure
+            // this whole mechanism exists to prevent. The default arm is a refusal too - the kind
+            // crosses as a JSON integer, so an out-of-range one used to be read as JSON and produce a
+            // null.
+            switch (capture.Kind)
             {
-                CapturedValueKind.Binary => StateTransfer.FromBytes(declared, capture.Binary ?? []),
-                _ => JsonSerializer.Deserialize(capture.Json ?? "null", declared, StateTransfer.SerializerOptions),
-            };
+                case CapturedValueKind.Binary when capture.Binary is { } bytes:
+                    value = StateTransfer.FromBytes(declared, bytes);
 
-            return true;
+                    return true;
+
+                case CapturedValueKind.Json when capture.Json is { } json:
+                    value = JsonSerializer.Deserialize(json, declared, StateTransfer.SerializerOptions);
+
+                    return true;
+
+                case CapturedValueKind.Binary or CapturedValueKind.Json:
+                    error = $"the captured value for '{capture.FieldName}' says it travels as "
+                            + $"{capture.Kind} but carries no {capture.Kind} payload.";
+
+                    return false;
+
+                default:
+                    error = $"the captured value for '{capture.FieldName}' names an unknown transfer "
+                            + $"kind ({(int)capture.Kind}).";
+
+                    return false;
+            }
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException or ArgumentException)
         {

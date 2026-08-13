@@ -591,6 +591,73 @@ public sealed class CapturedStateTransferTests : IDisposable
         Assert.Contains("this group", refusal.Message);
     }
 
+    /// <summary>
+    ///     A prepare delegate that closes over a local is addressed, and its state joins the
+    ///     <b>group's</b> table rather than a private one.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A factory used to be refused the moment it captured anything, on the reasoning that a
+    ///         recipe exists to run in the measuring process and one needing a value from this process
+    ///         is not independent of it. The consequence was that the library's own advice failed on a
+    ///         shape strictly more transferable than the one it replaced: <c>() =&gt; Sort(Build(size))</c>
+    ///         isolated, and <c>prepare: () =&gt; Build(size)</c> - what the refusal message, the
+    ///         analyzer and the over-budget message all tell you to write - did not.
+    ///     </para>
+    ///     <para>
+    ///         The table assertion is the half that matters. A recipe handed a table of its own would
+    ///         address just as happily and rebuild a <i>second</i> copy of anything the body also
+    ///         closed over, so a setup that reset prepared state would reset an array the body never
+    ///         reads. One entry here is what says both are bound to one object.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void A_Capturing_Prepare_Delegate_Joins_The_Groups_Table()
+    {
+        var size = 16;
+        var table = Table();
+
+        Assert.True(
+            BodyRef.TryCreate(
+                (int[] data) => data.Length,
+                "test",
+                out var bodyRef,
+                out var refusal,
+                arguments: null,
+                recipes: [StateRecipe.For(() => new int[size])],
+                receivers: table),
+            refusal.Message);
+
+        Assert.NotNull(bodyRef.Arguments[0].Recipe);
+
+        // One entry, holding the recipe's captured `size`. The body itself closes over nothing.
+        var entry = Assert.Single(table.Receivers);
+        var captured = Assert.Single(entry.Captures);
+
+        Assert.Equal(nameof(size), captured.FieldName);
+    }
+
+    /// <summary>
+    ///     A prepare delegate holding something live is still refused, so what opened up is transfer
+    ///     and not the rule.
+    /// </summary>
+    [Fact]
+    public void A_Prepare_Delegate_Over_A_Live_Object_Is_Still_Refused()
+    {
+        var stream = Stream.Null;
+
+        Assert.False(BodyRef.TryCreate(
+            (long length) => length,
+            "test",
+            out _,
+            out var refusal,
+            arguments: null,
+            recipes: [StateRecipe.For(() => stream.Length)],
+            receivers: Table()));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+    }
+
     /// <summary>A table with the default budget, for the addressing-level cases below.</summary>
     private static ReceiverTable Table() => new(MeasurementOptions.DefaultMaxTransferredStateBytes);
 

@@ -126,35 +126,18 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
     ///     cross in the first place.
     /// </summary>
     [Fact]
-    public async Task CapturingServiceProviderFactory_RefusesAndSaysSo()
+    public async Task CapturingServiceProviderFactory_IsIsolated()
     {
         var spins = 20_000;
 
-        using var stderr = new StringWriter();
-        var priorError = Console.Error;
-        Console.SetError(stderr);
-
-        IReadOnlyList<BenchmarkResult> results;
-
-        try
-        {
-            results = await Harness()
-                .WithServiceProvider(() => new SingleServiceProvider(new Probe(spins)))
-                .WithRequireIsolation(false)
-                .RunAsync();
-        }
-        finally
-        {
-            Console.SetError(priorError);
-        }
+        var results = await Harness()
+            .WithServiceProvider(() => new SingleServiceProvider(new Probe(spins)))
+            .RunAsync();
 
         var result = Assert.Single(results, r => r.ClassName == typeof(InjectedBenchmarks).FullName);
 
-        Assert.NotEqual(IsolationStatus.Isolated, result.IsolationStatus);
-
-        var message = stderr.ToString();
-        Assert.Contains("captures", message);
-        Assert.Contains("static", message);
+        Assert.False(result.Errored, result.ErrorMessage);
+        Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
     }
 
     /// <summary>

@@ -114,7 +114,7 @@ public class BodyRefCaptureTests
     ///     local and a reference to the instance.
     /// </summary>
     [Fact]
-    public void A_Body_Capturing_This_And_A_Local_Is_Refused_As_A_Closure()
+    public void A_Body_Capturing_This_And_A_Local_Is_Addressed_As_A_Closure()
     {
         var extra = 5;
 
@@ -122,11 +122,11 @@ public class BodyRefCaptureTests
     }
 
     /// <summary>
-    ///     A method group over a live object. The receiver is user state with no cross-process
-    ///     meaning, and unlike a closure it is not even compiler-generated.
+    ///     A method group over an ordinary object. The receiver is user state rather than a
+    ///     compiler-generated closure, and it is walked field by field exactly the same way.
     /// </summary>
     [Fact]
-    public void A_Method_Group_Over_A_Live_Object_Is_Refused()
+    public void A_Method_Group_Over_An_Ordinary_Object_Is_Addressed()
     {
         var widget = new Widget();
 
@@ -169,13 +169,13 @@ public class BodyRefCaptureTests
     ///     holding both sets of fields, so each one's refusal names symbols the other captured.
     /// </summary>
     /// <remarks>
-    ///     The decision stays correct - both genuinely capture and both are genuinely refused - but
-    ///     the message is broader than the body it describes. That is the limitation to state rather
-    ///     than to fix: the fields are on one class, and nothing at runtime records which lambda put
-    ///     each one there.
+    ///     The decision stays correct - both genuinely capture, and both are addressed onto one
+    ///     receiver entry - but a refusal's message is broader than the body it describes. That is the
+    ///     limitation to state rather than to fix: the fields are on one class, and nothing at runtime
+    ///     records which lambda put each one there.
     /// </remarks>
     [Fact]
-    public void Two_Capturing_Siblings_Share_A_Display_Class_So_Each_Refusal_Names_Both()
+    public void Two_Capturing_Siblings_Share_One_Display_Class()
     {
         var first = 5;
         var second = 7;

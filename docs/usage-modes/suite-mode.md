@@ -191,7 +191,9 @@ The whole suite shares one worker, which keeps every ratio between its benchmark
 
 `WithIsolation(false)` opts back into the host process, deliberately and silently.
 
-Parameter sweeps, suite and per-iteration lifecycle, and custom statistical strategies are all isolated. What is not is a body - or a lifecycle delegate - that **captures a local**, because the captured value exists only in your process. The remedy is to declare the state instead of closing over it:
+Parameter sweeps, suite and per-iteration lifecycle, custom statistical strategies, and bodies that **capture a local** are all isolated - a captured value is sent with the address, so the body a worker binds is the one you wrote holding what you gave it. What cannot cross is a value whose behaviour is not determined by its contents: a live handle, a collection with a custom comparer, anything past the 8 MiB transfer ceiling.
+
+`WithState` is for those, and for anything simply large - the worker builds it in the process that measures rather than being sent it:
 
 ```csharp
 await new BenchmarkSuite("sorting")
@@ -201,7 +203,7 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-Custom strategies needing constructor arguments take a factory rather than an instance, for the same reason - `.WithOutlierDetector(static () => new KeepFastest(0.9))`.
+Custom strategies needing constructor arguments take a factory rather than an instance, because only a factory describes how to make another one - `.WithOutlierDetector(() => new KeepFastest(fraction))`. The factory may capture; the constructed detector cannot cross.
 
 Anything genuinely un-addressable is **refused**, and a refusal fails the run: `RequireIsolation` defaults to `true`, so the suite does not quietly become a host-process measurement. Three answers, in the order you should reach for them:
 
