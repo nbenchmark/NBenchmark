@@ -273,7 +273,7 @@ Typical fixes:
 
 NBenchmark measures a benchmark body in a separate worker process, because the runtime configuration a process starts under is the dominant term in a small measurement. It gets the body there by resolving the method the compiler already emitted; it never serializes or regenerates it.
 
-A lambda that captures state cannot be addressed that way, so the captured *values* are sent instead - but only when the value's measured behaviour is fully determined by the bytes sent. Most ordinary data qualifies and the benchmark is isolated; a value whose behaviour is not determined by its contents (a `Stream`, a collection with a custom comparer, a user type that has not opted in) is refused, and a refusal fails the run.
+A lambda that captures state cannot be addressed that way, so the captured *values* are sent instead - but only when the value's measured behaviour is fully determined by the bytes sent. Most ordinary data qualifies and the benchmark is isolated; a value whose behaviour is not determined by its contents (a `Stream`, a collection built with a comparer that carries configuration of its own, a user type that has not opted in) is refused, and a refusal fails the run.
 
 ```csharp
 var data = BuildInput();

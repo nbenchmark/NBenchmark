@@ -17,9 +17,12 @@ namespace NBenchmark.Workers;
 ///         overhead the report would then attribute to the user's code.
 ///     </para>
 ///     <para>
-///         Taking a worker triggers a background refill. Without that, only the first measurement in
-///         a session would ever find one parked - which is the wrong shape for the case this exists
-///         for, a test suite running many performance tests one after another.
+///         Every call to <see cref="TakeOrStartAsync" /> triggers a background refill, whether it
+///         found a parked worker or started one cold. Refilling only on a hit would leave the pool
+///         empty for the life of the process for a key that never once had something parked in it -
+///         which is every key, the first time it is used, in every mode except the opt-in
+///         <c>Benchmark.Warmup</c>. The miss path is what makes the pool self-starting rather than
+///         something a caller has to remember to prime.
 ///     </para>
 ///     <para>
 ///         Keyed by worker path <i>and</i> profile name. The profile is applied to the environment
@@ -104,23 +107,41 @@ internal static class WorkerPrewarm
 
         if (pool.TryTake(out var parked))
         {
-            // Refilled in the background, so the *next* caller also finds one ready. Not awaited,
-            // and not cancelled by this call's token - the refill outlives the request that
-            // triggered it, and tying it to that token would cancel the refill the moment the
-            // measurement it was meant to help finished. Refilled for the pool that was drained,
-            // not for the application's own worker: those are the same file only in the modes where
-            // the code under test is the running application.
-            _ = Task.Run(
-                () => PrimeAsync(profile, workerAssemblyPath, runtimeConfigPath, CancellationToken.None),
-                CancellationToken.None);
+            RefillInBackground(profile, workerAssemblyPath, runtimeConfigPath);
 
             return parked;
         }
+
+        // Miss: nothing parked, so this call pays for a cold launch on the critical path. Priming
+        // here too - not only on the hit path above - is what makes the pool self-starting. Without
+        // it, a caller that never finds a parked worker never triggers a refill either, and the pool
+        // for that key sits empty for the life of the process: every mode but Warmup's explicit
+        // opt-in only ever calls this method, so the miss path is the only refill trigger they get.
+        RefillInBackground(profile, workerAssemblyPath, runtimeConfigPath);
 
         return await WorkerHost
             .StartAsync(workerAssemblyPath, profile, runtimeConfigPath, cancellationToken)
             .ConfigureAwait(false);
     }
+
+    /// <summary>
+    ///     Kicks off a prime for this key without waiting on it, so the *next* caller finds a worker
+    ///     ready regardless of whether this call took the last parked one or started fresh.
+    /// </summary>
+    /// <remarks>
+    ///     Not awaited, and not cancelled by this call's token - the refill outlives the request that
+    ///     triggered it, and tying it to that token would cancel the refill the moment the measurement
+    ///     it was meant to help finished. Refilled for the pool this key names, not for the
+    ///     application's own worker: those are the same file only in the modes where the code under
+    ///     test is the running application.
+    /// </remarks>
+    private static void RefillInBackground(
+        RuntimeProfile? profile,
+        string workerAssemblyPath,
+        string? runtimeConfigPath)
+        => _ = Task.Run(
+            () => PrimeAsync(profile, workerAssemblyPath, runtimeConfigPath, CancellationToken.None),
+            CancellationToken.None);
 
     /// <summary>Parked workers for one (worker path, runtime profile) pair.</summary>
     /// <remarks>

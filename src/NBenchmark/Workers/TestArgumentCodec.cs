@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 
 namespace NBenchmark.Workers;
 
@@ -34,7 +35,12 @@ internal static class TestArgumentCodec
                || underlying == typeof(DateTime)
                || underlying == typeof(DateTimeOffset)
                || underlying == typeof(TimeSpan)
-               || underlying == typeof(Guid);
+               || underlying == typeof(Guid)
+               || underlying == typeof(DateOnly)
+               || underlying == typeof(TimeOnly)
+               || underlying == typeof(Uri)
+               || underlying == typeof(Version)
+               || underlying == typeof(BigInteger);
     }
 
     /// <summary>
@@ -66,6 +72,13 @@ internal static class TestArgumentCodec
                 // 2024-03-05T13:45:30.1230000Z arrived as 2024-03-05T13:45:30.0000000 Unspecified.
                 DateTime dateTime => dateTime.ToString("O", CultureInfo.InvariantCulture),
                 DateTimeOffset dateTimeOffset => dateTimeOffset.ToString("O", CultureInfo.InvariantCulture),
+                DateOnly dateOnly => dateOnly.ToString("O", CultureInfo.InvariantCulture),
+                TimeOnly timeOnly => timeOnly.ToString("O", CultureInfo.InvariantCulture),
+
+                // Not IFormattable, and its own ToString() can unescape a percent-encoded absolute URI
+                // for display - lossy in exactly the way "O" avoids for the date types above.
+                // OriginalString is what the constructor was actually given, for either URI kind.
+                Uri uri => uri.OriginalString,
 
                 IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
                 _ => value.ToString(),
@@ -112,6 +125,21 @@ internal static class TestArgumentCodec
 
         if (underlying == typeof(TimeSpan))
             return TimeSpan.Parse(payload.Value, CultureInfo.InvariantCulture);
+
+        if (underlying == typeof(DateOnly))
+            return DateOnly.ParseExact(payload.Value, "O", CultureInfo.InvariantCulture);
+
+        if (underlying == typeof(TimeOnly))
+            return TimeOnly.ParseExact(payload.Value, "O", CultureInfo.InvariantCulture);
+
+        if (underlying == typeof(Uri))
+            return new Uri(payload.Value, UriKind.RelativeOrAbsolute);
+
+        if (underlying == typeof(Version))
+            return Version.Parse(payload.Value);
+
+        if (underlying == typeof(BigInteger))
+            return BigInteger.Parse(payload.Value, CultureInfo.InvariantCulture);
 
         // Both are IsPrimitive, so IsSupported accepts them - and Convert.ChangeType does not, because
         // IntPtr's IConvertible implementation throws for a string source. The claim and the capability

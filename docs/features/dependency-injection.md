@@ -55,19 +55,25 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-`UseDependencyInjection<T>` is shorthand for `AddFromAssembly<T>().WithServiceProvider(services)`. It discovers the assembly containing `T`, configures the host to resolve benchmark instances from the supplied service provider, and runs.
+`UseDependencyInjection<T>` is shorthand for `AddFromAssembly<T>().WithServiceProvider(BuildServices)`. It discovers the assembly containing `T`, configures the host to resolve benchmark instances from a container the factory builds, and runs.
 
 ## The four extension methods
 
-Pick the granularity that matches your needs:
+Pick the granularity that matches your needs. All four take a factory - there is no overload that takes a built container directly (see the note below).
 
 | Method | When to use it |
 | --- | --- |
-| `UseDependencyInjection<T>(sp)` | The common case. Discovers `T`'s assembly and resolves from the root provider. One line. |
+| `UseDependencyInjection<T>(BuildServices)` | The common case. Discovers `T`'s assembly and resolves from the root provider. One line. |
 | `UseScopedDependencyInjection<T>(BuildServices)` | Like above but creates a fresh DI scope per instance, disposing it after teardown. Good for `DbContext`, EF Core, and any other scoped service. **Isolated** - the worker builds its own container and its own scopes. |
-| `WithServiceProvider(sp)` | You already called `AddFromAssembly` yourself (perhaps with multiple assemblies) and want to plug in the root provider. |
+| `WithServiceProvider(BuildServices)` | You already called `AddFromAssembly` yourself (perhaps with multiple assemblies) and want to plug in the root provider. **Isolated.** |
 | `WithScopedServiceProvider(BuildServices)` | Same as above but with a fresh scope per instance. **Isolated.** |
-| `WithScopedServiceProvider(sp)` | Takes a live container, which no worker can reproduce - so the run is **refused** and fails. Pass the factory instead. |
+
+> [!NOTE]
+> None of these four take a built `IServiceProvider` - only a `Func<IServiceProvider>`. A container is
+> live code: it holds singletons and open connections that cannot cross a process boundary, so an
+> overload accepting one directly could only ever throw once discovery ran. Rather than let that
+> surface as a run-time refusal, the overload does not exist - passing a built container is a compile
+> error, not a thrown run.
 
 Example: multiple assemblies, scoped lifetime:
 
@@ -96,13 +102,14 @@ The DI integration matches how `BenchmarkHarness` manages benchmark instances: *
 | `WithScopedServiceProvider(BuildServices)` | One fresh instance per `[Benchmark]` method. | One fresh scope per instance, disposed in per-method teardown. | Yes - the worker builds its own container and its own scopes. |
 | `WithServiceProvider(BuildServices)` + `[InstanceLifetime(PerClass)]` | Resolved from the root container. Re-used across all `[Benchmark]` methods. | None. | Yes. |
 | `WithScopedServiceProvider(BuildServices)` + `[InstanceLifetime(PerClass)]` | Resolved from a fresh scope. The scope is disposed **after** the suite's teardown runs, so any `IDisposable` / `IAsyncDisposable` services (e.g. `DbContext`) are cleaned up. | One scope per class instance. Disposed in the `finally` block. | Yes. |
-| Either, given a built `IServiceProvider` instead of a factory | As above. | As above. | **No.** A live container cannot cross a process boundary, so the run is measured here and stamped `host`. |
 
 > [!IMPORTANT]
-> Pass the factory, not the container. Every row above is isolated only because the worker can run
-> `BuildServices` itself. Handing over a built `IServiceProvider` is the single most common reason a
-> DI-backed run silently loses its isolation - and on bodies of provably identical cost, the
-> configuration difference between an isolated worker and this process is worth roughly 3.3x.
+> Every row above is isolated because the worker runs `BuildServices` itself in its own process, and
+> builds its own container from it. That is also why there is no overload taking a *built*
+> `IServiceProvider`: a container is live code holding singletons and open connections, so handing one
+> over would cost the run its isolation before anything ran - worth roughly 3.3x on bodies of provably
+> identical cost. Passing the factory instead of the container is not a style choice; it is the whole
+> mechanism.
 
 The host **does not** auto-dispose the benchmark instance when a service provider is configured - the scope's disposal already handles that. This avoids double-disposal of `IDisposable` benchmarks that come from a scope.
 
@@ -207,13 +214,15 @@ This error fires when `Activator.CreateInstance` cannot construct your benchmark
 
 1. **Add a parameterless constructor** to the benchmark class. This is the simplest fix if the class has no real dependencies.
 2. **Install `NBenchmark.Analyzers`** for compile-time detection (NB0001). The analyzer catches the missing constructor before you run, saving a debug cycle.
-3. **Use `WithServiceProvider` or `WithInstanceFactory`** on `BenchmarkHarness` to resolve instances from your DI container. If you already have an `IServiceProvider`:
+3. **Use `WithServiceProvider` or `WithInstanceFactory`** on `BenchmarkHarness` to resolve instances from your DI container. Wrap however you already build the container in a static factory:
 
    ```csharp
     await BenchmarkHarness.Create(args)
         .AddFromAssembly<MyBenchmarks>()
-        .WithServiceProvider(services)
+        .WithServiceProvider(BuildServices)
         .RunAsync();
+
+    static IServiceProvider BuildServices() => services; // however you already build it
    ```
 
    `WithServiceProvider` is a core-library method (no extra package needed). For scoped lifetime (e.g. EF Core's `DbContext`), install `NBenchmark.DependencyInjection` and use `WithScopedServiceProvider` or `UseScopedDependencyInjection<T>` instead.

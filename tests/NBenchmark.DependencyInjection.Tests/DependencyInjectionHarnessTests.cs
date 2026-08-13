@@ -23,7 +23,7 @@ public class DependencyInjectionHarnessTests
                     "--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1",
                 ])
                 .AddFromAssembly<DependentBenchmark>()
-                .WithServiceProvider(services)
+                .WithServiceProvider(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -45,7 +45,7 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "ScopedDependentBenchmark.*", "--dry-run", "--launch-count", "1"])
                 .AddFromAssembly<ScopedDependentBenchmark>()
-                .WithScopedServiceProvider(services)
+                .WithScopedServiceProvider(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -69,7 +69,7 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run", "--launch-count", "1"])
                 .AddFromAssembly<DisposableBenchmark>()
-                .WithScopedServiceProvider(services)
+                .WithScopedServiceProvider(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -89,7 +89,7 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "UnresolvableBenchmark.*", "--dry-run"])
                 .AddFromAssembly<UnresolvableBenchmark>()
-                .WithScopedServiceProvider(services)
+                .WithScopedServiceProvider(() => services)
                 .WithIsolation(false)
                 .RunAsync();
         });
@@ -110,7 +110,7 @@ public class DependencyInjectionHarnessTests
             await BenchmarkHarness.Create([
                     "--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1",
                 ])
-                .UseDependencyInjection<DependentBenchmark>(services)
+                .UseDependencyInjection<DependentBenchmark>(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -132,7 +132,7 @@ public class DependencyInjectionHarnessTests
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
             await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run", "--launch-count", "1"])
-                .UseScopedDependencyInjection<DisposableBenchmark>(services)
+                .UseScopedDependencyInjection<DisposableBenchmark>(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -197,7 +197,7 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<PerMethodScopeBenchmark>()
-                .WithScopedServiceProvider(services)
+                .WithScopedServiceProvider(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -226,7 +226,7 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<PerMethodScopeBenchmark>()
-                .WithScopedServiceProvider(services)
+                .WithScopedServiceProvider(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -260,7 +260,7 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "PerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<PerClassScopeBenchmark>()
-                .WithScopedServiceProvider(services)
+                .WithScopedServiceProvider(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -282,7 +282,7 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "HarnessPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<HarnessPerClassScopeBenchmark>()
-                .WithScopedServiceProvider(services)
+                .WithScopedServiceProvider(() => services)
                 .WithInstanceLifetime(InstanceLifetime.PerClass)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
@@ -308,7 +308,7 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "ResettingPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<ResettingPerClassScopeBenchmark>()
-                .WithScopedServiceProvider(services)
+                .WithScopedServiceProvider(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();
@@ -336,7 +336,7 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "SharedStatePerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<SharedStatePerClassScopeBenchmark>()
-                .WithScopedServiceProvider(services)
+                .WithScopedServiceProvider(() => services)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(false)
                 .RunAsync();

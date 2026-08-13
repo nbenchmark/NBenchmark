@@ -361,42 +361,17 @@ public sealed class BenchmarkHarness
     internal string? InstanceSourceRefusalForTesting() => _instanceSource?.Refusal();
 
     /// <summary>
-    ///     Configures the harness to resolve benchmark instances from the specified
-    ///     <see cref="IServiceProvider" />. Each benchmark method gets a fresh instance
-    ///     resolved from the root provider. Throws if a benchmark type is not registered.
-    ///     For scoped lifetime (e.g. EF Core's DbContext), install the
-    ///     <c>NBenchmark.DependencyInjection</c> package and use
-    ///     <c>WithScopedServiceProvider</c> instead.
-    /// </summary>
-    /// <remarks>
-    ///     A live provider cannot be sent to a measurement worker, so benchmarks resolved this way are
-    ///     measured in the host process and labelled
-    ///     <see cref="IsolationStatus.InProcessLiveFixture" />. Use
-    ///     <see cref="WithServiceProvider(Func{IServiceProvider})" /> to keep isolation: the worker runs
-    ///     your factory and builds an equivalent container in the process that measures.
-    /// </remarks>
-    public BenchmarkHarness WithServiceProvider(IServiceProvider serviceProvider)
-    {
-        ArgumentNullException.ThrowIfNull(serviceProvider);
-
-        return WithInstanceSource(new InstanceSource
-        {
-            Kind = InstanceSourceKind.ServiceProvider,
-            Resolve = ResolverFor(() => serviceProvider),
-        });
-    }
-
-    /// <summary>
     ///     Configures the harness to resolve benchmark instances from a provider built by
     ///     <paramref name="factory" />, so DI-backed benchmarks can still be measured in a worker.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         A service provider is live code: it holds singletons, open connections and closures that
-    ///         cannot cross a process boundary, so passing one costs the run its isolation. The
-    ///         <i>recipe</i> for a provider can cross, though - a static factory that registers the
-    ///         services and builds the container is addressable, and the worker runs it to get an
-    ///         equivalent container in the process doing the measuring:
+    ///         There is no overload taking a built <see cref="IServiceProvider" />, on purpose. A service
+    ///         provider is live code: it holds singletons, open connections and closures that cannot
+    ///         cross a process boundary, so passing one would cost the run its isolation before anything
+    ///         is measured. The <i>recipe</i> for a provider can cross, though - a static factory that
+    ///         registers the services and builds the container is addressable, and the worker runs it to
+    ///         get an equivalent container in the process doing the measuring:
     ///     </para>
     ///     <code>
     ///     await BenchmarkHarness.Create(args)
@@ -434,8 +409,7 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     The instance resolver for a provider, shared by both <c>WithServiceProvider</c> overloads so
-    ///     the host-side behaviour cannot differ between them.
+    ///     The instance resolver for a provider built by <paramref name="factory" />.
     /// </summary>
     private static Func<Type, InstanceHandle> ResolverFor(Func<IServiceProvider> factory)
     {

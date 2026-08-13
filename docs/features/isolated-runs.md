@@ -56,7 +56,7 @@ var iterations = 1000;
 var result = Benchmark.Run(() => Work(iterations));
 ```
 
-What crosses is a closed set: primitives, strings, arrays, the standard collections when they carry a default comparer, and types you have marked `[BenchmarkState]`. The rule is stronger than "it round-trips", because most things round-trip. It is that **nothing about how the value performs is carried outside its serialized contents** - a dictionary built with `StringComparer.OrdinalIgnoreCase` arrives with the same entries and a different lookup cost, so it is refused rather than sent.
+What crosses is a closed set: primitives, strings, `DateOnly`/`TimeOnly`/`Uri`/`Version`/`BigInteger` and the other codec-backed scalars, rectangular and jagged arrays, the ordered collections (`List`, `Queue`, `Stack`, `LinkedList`, `ImmutableArray`, `ReadOnlyCollection`, `ArraySegment`...), the keyed ones when their comparer is reproducible, and types you have marked `[BenchmarkState]`. The rule is stronger than "it round-trips", because most things round-trip. It is that **nothing about how the value performs is carried outside its serialized contents** - which is why a comparer matters and a dictionary's *entries* alone do not: `StringComparer.OrdinalIgnoreCase` is a named, process-wide singleton, so carrying which one it was and rebuilding with the same instance is exact rather than a guess, and the dictionary crosses with it. A comparer with configuration of its own - a threshold, a locale baked into a private field - has no such identity to carry, so *that* is refused, with the same entries and a different lookup cost the giveaway.
 
 The check runs at every position, not only at the captured field. An array of a base class holding a subclass is refused, because serializing it against the element type would deliver base instances with the override gone.
 
@@ -85,7 +85,7 @@ Benchmark.Run(() => Search(query));   // isolated: the query is sent by value
 
 It is an assertion you are making, and the claim is not that the type round-trips - most types do. It is that **nothing about how it performs is carried outside its serialized data**. A type holding an open handle, a warmed cache or a pooled buffer does not qualify: it would arrive intact and measure differently, which is the one failure a benchmark must not have.
 
-The attribute admits the type; it does not admit what the type holds. Every member is still checked by the ordinary rule, so a dictionary with a custom comparer is refused inside an attributed type exactly as it is outside one. Members the serializer cannot restore are refused too, with the member named - a private field never reaches the payload at all, and a public *readonly* field or a get-only property is written to it and silently discarded on the way back. Each would arrive at its default.
+The attribute admits the type; it does not admit what the type holds. Every member is still checked by the ordinary rule, so a dictionary with an irreproducible comparer is refused inside an attributed type exactly as it is outside one. Members the serializer cannot restore are refused too, with the member named - a private field never reaches the payload at all, and a public *readonly* field or a get-only property is written to it and silently discarded on the way back. Each would arrive at its default.
 
 When in doubt, do not use it. Naming the preparation costs one delegate and is strictly more faithful, because the value is then built in the process that measures it rather than reconstructed there.
 
@@ -182,7 +182,7 @@ A few things a worker must be *given* rather than able to *build*:
 - a **live object** - a `Stream`, a `DbConnection`, an `HttpClient`, a mock, an `IClassFixture`, a built `IServiceProvider`. There is no address for one, and no bytes that reproduce how it performs
 - a capture past **`MaxTransferredStateBytes`** (8 MiB, configurable). The remedy is a prepare delegate, not a larger ceiling
 - **two receivers sharing one object** - a body and a hook in different scopes both pointing at one array. Rebuilding them makes two arrays where your program has one, so the sharing has to be reproduced by a recipe instead
-- a **parameter value** outside the marshallable set (primitives, strings, enums, `decimal`, `DateTime`, `DateTimeOffset`, `TimeSpan`, `Guid`)
+- a **parameter value** outside the marshallable set (primitives, strings, enums, `decimal`, `DateTime`, `DateTimeOffset`, `TimeSpan`, `Guid`, `DateOnly`, `TimeOnly`, `Uri`, `Version`, `BigInteger`)
 - an assembly with **no file on disk** - single-file, in-memory or dynamically emitted
 
 Several things are *not* on this list that once were. A lambda capturing `this`, a capturing lifecycle delegate, a capturing `prepare` delegate, a custom `IOutlierDetector` or `ISignificanceTest` built with constructor arguments, a DI container built by a factory, and a capturing `[BenchmarkPlan]` factory all isolate - each is a recipe or a value, and both cross.

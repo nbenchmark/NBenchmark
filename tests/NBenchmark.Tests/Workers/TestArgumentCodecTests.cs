@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using NBenchmark.Workers;
 using Xunit;
 
@@ -65,6 +66,18 @@ public sealed class TestArgumentCodecTests
                     typeof(DateTimeOffset),
                     new DateTimeOffset(2024, 3, 5, 13, 45, 30, TimeSpan.FromHours(11)).AddTicks(1_230_000)
                 },
+
+                // R3's additions - each carried through TestArgumentCodec independently of the
+                // captured-closure path, which goes through StateTransfer.SerializerOptions instead
+                // and can (and did, for BigInteger) disagree with this one about the same type.
+                { typeof(DateOnly), new DateOnly(2024, 3, 5) },
+                { typeof(TimeOnly), new TimeOnly(13, 45, 30, 123) },
+                { typeof(Uri), new Uri("https://example.test/path?query=1#frag") },
+                { typeof(Uri), new Uri("relative/path", UriKind.Relative) },
+                { typeof(Version), new Version(1, 2, 3, 4) },
+                { typeof(Version), new Version(1, 2) },
+                { typeof(BigInteger), BigInteger.Parse("123456789012345678901234567890") },
+                { typeof(BigInteger), BigInteger.MinusOne },
             };
 
             return data;
@@ -127,6 +140,11 @@ public sealed class TestArgumentCodecTests
         suite.WithParameter("id", Guid.Empty);
         suite.WithParameter("native", (nint)1);
         suite.WithParameter("unsignedNative", (nuint)1);
+        suite.WithParameter("date", new DateOnly(2024, 1, 1));
+        suite.WithParameter("time", new TimeOnly(12, 0));
+        suite.WithParameter("uri", new Uri("https://example.test"));
+        suite.WithParameter("version", new Version(1, 0));
+        suite.WithParameter("big", BigInteger.One);
     }
 
     /// <summary>

@@ -611,7 +611,7 @@ internal static class BodyResolver
                 if (!TryResolveDecodeType(capture, field!, context, out var decodeAs, out error))
                     return false;
 
-                if (!TryDecode(capture, decodeAs!, out value, out error))
+                if (!TryDecode(capture, decodeAs!, context, out value, out error))
                     return false;
             }
 
@@ -839,7 +839,12 @@ internal static class BodyResolver
         return found;
     }
 
-    private static bool TryDecode(CapturedField capture, Type declared, out object? value, out string? error)
+    private static bool TryDecode(
+        CapturedField capture,
+        Type declared,
+        BenchmarkLoadContext context,
+        out object? value,
+        out string? error)
     {
         value = null;
         error = null;
@@ -855,14 +860,17 @@ internal static class BodyResolver
             switch (capture.Kind)
             {
                 case CapturedValueKind.Binary when capture.Binary is { } bytes:
-                    value = StateTransfer.FromBytes(declared, bytes);
+                    value = StateTransfer.FromBytes(declared, bytes, capture.ArrayDimensions);
 
                     return true;
 
                 case CapturedValueKind.Json when capture.Json is { } json:
                     value = JsonSerializer.Deserialize(json, declared, StateTransfer.SerializerOptions);
 
-                    return true;
+                    // The plain deserialize above builds the entries correctly either way; only a
+                    // named, non-default comparer needs the collection rebuilt on top of them.
+                    return capture.ComparerName is null
+                           || TryApplyComparer(capture, declared, context, ref value, out error);
 
                 case CapturedValueKind.Binary or CapturedValueKind.Json:
                     error = $"the captured value for '{capture.FieldName}' says it travels as "
@@ -884,6 +892,106 @@ internal static class BodyResolver
 
             return false;
         }
+    }
+
+    /// <summary>
+    ///     Rebuilds a keyed collection with the comparer it was actually built with. The entries the
+    ///     plain deserialize already produced are correct as they stand; only the lookup structure
+    ///     they are indexed by needs to change.
+    /// </summary>
+    private static bool TryApplyComparer(
+        CapturedField capture,
+        Type declared,
+        BenchmarkLoadContext context,
+        ref object? value,
+        out string? error)
+    {
+        error = null;
+
+        if (value is null || capture.ComparerName is not { } name)
+            return true;
+
+        if (!TryResolveComparer(name, context, out var comparer, out var reason))
+        {
+            error = $"the captured value for '{capture.FieldName}' {reason}";
+
+            return false;
+        }
+
+        try
+        {
+            // Every one of the four collection types R4 supports has this constructor - the existing
+            // entries plus the comparer to index them by - so one call rebuilds any of them.
+            value = Activator.CreateInstance(declared, value, comparer);
+
+            return true;
+        }
+        catch (Exception ex) when (ex is MissingMethodException or TargetInvocationException or ArgumentException)
+        {
+            error = $"the captured value for '{capture.FieldName}' names comparer '{name}' but "
+                    + $"'{declared.Name}' could not be rebuilt with it: {ex.Message}";
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Resolves a comparer identity <see cref="StateTransfer" /> put on the wire: <c>"F:"</c> for a
+    ///     named framework singleton, resolved by name with no type loading at all; <c>"T:"</c> for a
+    ///     stateless user comparer, resolved the same way any other captured type is.
+    /// </summary>
+    private static bool TryResolveComparer(
+        string name,
+        BenchmarkLoadContext context,
+        out object? comparer,
+        out string? reason)
+    {
+        comparer = null;
+        reason = null;
+
+        if (name.StartsWith("F:", StringComparison.Ordinal))
+        {
+            if (StateTransfer.TryResolveKnownStringComparer(name[2..], out var known))
+            {
+                comparer = known;
+
+                return true;
+            }
+
+            reason = $"names a comparer ('{name}') this worker does not recognize.";
+
+            return false;
+        }
+
+        if (name.StartsWith("T:", StringComparison.Ordinal))
+        {
+            var typeName = name[2..];
+
+            if (TypeNames.Resolve(typeName, context) is not { } type)
+            {
+                reason = $"names a comparer type '{typeName}' that could not be resolved in this worker.";
+
+                return false;
+            }
+
+            try
+            {
+                comparer = Activator.CreateInstance(type);
+
+                return true;
+            }
+            catch (Exception ex) when (ex is MissingMethodException or MemberAccessException
+                                            or TargetInvocationException)
+            {
+                reason = $"names a comparer type '{typeName}' that could not be constructed: {ex.Message}";
+
+                return false;
+            }
+        }
+
+        reason = $"names a comparer ('{name}') in a form this worker does not recognize.";
+
+        return false;
     }
 
     /// <summary>

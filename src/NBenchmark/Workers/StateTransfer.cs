@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using System.Reflection;
 using NBenchmark.Attributes;
 using System.Runtime.CompilerServices;
@@ -86,6 +88,30 @@ internal sealed record CapturedField
     public byte[]? Binary { get; init; }
 
     public IReadOnlyList<CapturedField>? Nested { get; init; }
+
+    /// <summary>
+    ///     Identity of the comparer a keyed collection - <c>Dictionary</c>, <c>HashSet</c>,
+    ///     <c>SortedDictionary</c> or <c>SortedSet</c> - was built with, when it is not the default and
+    ///     is still reproducible: <c>"F:Ordinal"</c> for a named <see cref="StringComparer" /> singleton,
+    ///     or <c>"T:"</c> plus an assembly-qualified name for a stateless user comparer. <c>null</c> for
+    ///     the ordinary case - no comparer at all, or the default one - so nothing is paid for it.
+    /// </summary>
+    /// <remarks>
+    ///     Carried at the field only, the same boundary <see cref="RuntimeTypeName" /> draws for the
+    ///     same reason: the field's whole value is written as one JSON blob, so a comparer belonging to
+    ///     something nested inside it - a dictionary held by an opted-in type's member, or inside a
+    ///     list - has nowhere of its own to be named and is refused rather than guessed at.
+    /// </remarks>
+    public string? ComparerName { get; init; }
+
+    /// <summary>
+    ///     The length of each dimension of a rectangular array, in <see cref="Binary" />, or
+    ///     <c>null</c> for a rank-1 array (and everything that is not an array at all). Rank-1 needs
+    ///     no dimensions of its own - the byte count and the element size already determine its single
+    ///     length - but <c>Buffer.BlockCopy</c> is blind to shape past that: it moves the same bytes
+    ///     for a <c>[2,6]</c> array as for a <c>[3,4]</c> one, so the shape has to travel separately.
+    /// </summary>
+    public int[]? ArrayDimensions { get; init; }
 }
 
 /// <summary>
@@ -250,14 +276,26 @@ internal static class StateTransfer
     /// </remarks>
     private const int MaxScopeDepth = 16;
 
-    internal static readonly JsonSerializerOptions SerializerOptions = new()
+    internal static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
+
+    private static JsonSerializerOptions CreateSerializerOptions()
     {
-        // A cycle would otherwise be a stack overflow inside the serializer. Bounded here so it
-        // surfaces as a refusal naming the field.
-        MaxDepth = 32,
-        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals,
-        IncludeFields = true,
-    };
+        var options = new JsonSerializerOptions
+        {
+            // A cycle would otherwise be a stack overflow inside the serializer. Bounded here so it
+            // surfaces as a refusal naming the field.
+            MaxDepth = 32,
+            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals,
+            IncludeFields = true,
+        };
+
+        // Shared by both directions of the crossing, so the host encodes exactly what the worker
+        // knows how to decode - see OrderedCollectionConverters and BigIntegerConverter.
+        OrderedCollectionConverters.Register(options);
+        options.Converters.Add(new BigIntegerConverter());
+
+        return options;
+    }
 
     /// <summary>
     ///     Captures every instance field of <paramref name="receiver" />, or refuses and names the
@@ -446,17 +484,36 @@ internal static class StateTransfer
 
         if (total > budgetBytes)
         {
-            refusal = new Refusal(
-                RefusalReason.CapturedState,
-                $"{subject} state exceeding {budgetBytes / 1024 / 1024} MiB once encoded. At that "
-                + "size, building the value in the measuring process is both faster and more faithful "
-                + "than sending it - name the preparation with "
-                + "Benchmark.Run(prepare: () => Build(), body: d => Use(d)), or BenchmarkSuite.Over(name, () => Build()).");
+            refusal = new Refusal(RefusalReason.CapturedState, BudgetRefusalMessage(field, subject, declared, total, budgetBytes));
 
             return false;
         }
 
         return true;
+    }
+
+    /// <summary>
+    ///     Names the field that tipped the budget and the specific rewrite - raise the ceiling if the
+    ///     capture would fit under it, or build in the worker if it would not - rather than one generic
+    ///     line for both cases.
+    /// </summary>
+    private static string BudgetRefusalMessage(FieldInfo field, string subject, Type declared, int total, int budgetBytes)
+    {
+        var configuredMiB = budgetBytes / 1024 / 1024;
+        var neededMiB = (total + 1024 * 1024 - 1) / 1024 / 1024; // round up: "8 MiB" should mean "raise past 8"
+        var ceilingMiB = MeasurementOptions.MaxTransferredStateCeiling / 1024 / 1024;
+
+        var remedy = total <= MeasurementOptions.MaxTransferredStateCeiling
+            ? $"MaxTransferredStateBytes is a one-line option - raising it past {configuredMiB} MiB (to at "
+              + $"least {neededMiB}, up to the {ceilingMiB} MiB ceiling) would let this through as encoded. "
+              + "Building it in the worker is still faster and more faithful at this size, though: "
+            : $"Raising MaxTransferredStateBytes would not help here - {neededMiB} MiB clears even the "
+              + $"{ceilingMiB} MiB ceiling the option can be set to, so build it in the worker instead: ";
+
+        return $"{subject} '{FriendlyFieldName(field)}' of type '{FriendlyTypeName(declared)}', pushing the "
+               + $"captured state past {configuredMiB} MiB once encoded. "
+               + remedy
+               + "Benchmark.Run(prepare: () => Build(), body: d => Use(d)), or BenchmarkSuite.Over(name, () => Build()).";
     }
 
     private static bool TryEncode(
@@ -484,10 +541,17 @@ internal static class StateTransfer
             // Carried only when it says something the declared type does not, so the ordinary capture -
             // where the two are the same - costs nothing on the wire.
             RuntimeTypeName = runtime == declared ? null : NameOf(runtime),
+
+            // Likewise null for everything but a keyed collection built with a non-default, named
+            // comparer - the ordinary capture, and every field that is not one of the four collection
+            // types at all, costs nothing extra to represent.
+            ComparerName = ComparerNameFor(runtime, value),
         };
 
         if (value is not null && IsBlittablePrimitiveArray(runtime))
         {
+            var array = (Array)value;
+
             captured = new CapturedField
             {
                 FieldToken = common.Token,
@@ -495,7 +559,8 @@ internal static class StateTransfer
                 Kind = CapturedValueKind.Binary,
                 DeclaredTypeName = common.TypeName,
                 RuntimeTypeName = common.RuntimeTypeName,
-                Binary = ToBytes((Array)value),
+                Binary = ToBytes(array),
+                ArrayDimensions = array.Rank > 1 ? DimensionsOf(array) : null,
             };
 
             return true;
@@ -510,12 +575,17 @@ internal static class StateTransfer
                 Kind = CapturedValueKind.Json,
                 DeclaredTypeName = common.TypeName,
                 RuntimeTypeName = common.RuntimeTypeName,
+                ComparerName = common.ComparerName,
                 Json = JsonSerializer.Serialize(value, runtime, SerializerOptions),
             };
 
             return true;
         }
-        catch (Exception ex) when (ex is JsonException or NotSupportedException)
+        // InvalidOperationException joins the other two for a value that reached here allow-listed by
+        // type but not usable in the state it was in - a default, uninitialized `ImmutableArray<T>`
+        // throws exactly this on the attempt to serialize it, and a refusal naming the field beats an
+        // unhandled exception naming neither the field nor the benchmark.
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
         {
             refusal = new Refusal(
                 RefusalReason.CapturedState,
@@ -629,11 +699,22 @@ internal static class StateTransfer
 
         if (underlying.IsArray)
         {
-            if (underlying.GetArrayRank() != 1)
+            if (underlying.GetArrayRank() > 1)
             {
-                why = "multi-dimensional arrays are not transferred.";
+                // A rectangular array cannot be JSON-serialized at all - System.Text.Json refuses
+                // every rank above 1 outright - so `Binary` is not a faster alternative here, it is
+                // the only one. That means the element has to be blittable, not merely faithful:
+                // jagged `int[][]` is unaffected, since each of its levels is a rank-1 array in its
+                // own right and takes the ordinary path below.
+                if (!IsBlittablePrimitiveElement(underlying.GetElementType()))
+                {
+                    why = $"'{FriendlyTypeName(underlying)}' is a multi-dimensional array whose element "
+                          + "type is not a blittable primitive, so there is no wire form for it at all.";
 
-                return false;
+                    return false;
+                }
+
+                return true;
             }
 
             var element = underlying.GetElementType()!;
@@ -665,30 +746,74 @@ internal static class StateTransfer
             if (definition == typeof(Dictionary<,>))
             {
                 return AllFaithful(arguments, walk, out why)
-                       && HasDefaultComparer(underlying, value, typeof(EqualityComparer<>), arguments[0], out why)
+                       && ComparerFaithful(underlying, value, typeof(EqualityComparer<>), arguments[0], out why)
                        && AllEntriesFaithful(arguments[0], arguments[1], value, walk, out why);
             }
 
             if (definition == typeof(HashSet<>))
             {
                 return AllFaithful(arguments, walk, out why)
-                       && HasDefaultComparer(underlying, value, typeof(EqualityComparer<>), arguments[0], out why)
+                       && ComparerFaithful(underlying, value, typeof(EqualityComparer<>), arguments[0], out why)
                        && AllItemsFaithful(arguments[0], value as IEnumerable, walk, out why);
             }
 
             if (definition == typeof(SortedDictionary<,>))
             {
                 return AllFaithful(arguments, walk, out why)
-                       && HasDefaultComparer(underlying, value, typeof(Comparer<>), arguments[0], out why)
+                       && ComparerFaithful(underlying, value, typeof(Comparer<>), arguments[0], out why)
                        && AllEntriesFaithful(arguments[0], arguments[1], value, walk, out why);
             }
 
             if (definition == typeof(SortedSet<>))
             {
                 return AllFaithful(arguments, walk, out why)
-                       && HasDefaultComparer(underlying, value, typeof(Comparer<>), arguments[0], out why)
+                       && ComparerFaithful(underlying, value, typeof(Comparer<>), arguments[0], out why)
                        && AllItemsFaithful(arguments[0], value as IEnumerable, walk, out why);
             }
+
+            // Ordered, content-determined, and - unlike the four above - carry no comparer to
+            // reproduce. Queue<> and LinkedList<> round-trip through the plain serializer with no
+            // help. ReadOnlyCollection<>, ArraySegment<> and Stack<> need the converters registered
+            // on SerializerOptions instead: the first two have no constructor the serializer's own
+            // reflection recognizes, and Stack<> round-trips through one but pops in reverse -
+            // measured, not assumed; see OrderedCollectionConverters.
+            if (definition == typeof(Queue<>) || definition == typeof(LinkedList<>)
+                || definition == typeof(ReadOnlyCollection<>) || definition == typeof(ArraySegment<>)
+                || definition == typeof(Stack<>))
+            {
+                return AllFaithful(arguments, walk, out why)
+                       && AllItemsFaithful(arguments[0], value as IEnumerable, walk, out why);
+            }
+
+            if (definition == typeof(ImmutableArray<>))
+            {
+                // A default, uninitialized ImmutableArray reports itself IsDefault rather than empty,
+                // and every member past that check throws - including the enumerator AllItemsFaithful
+                // would otherwise walk. Caught structurally here rather than by exception, though
+                // TryEncode also widens its catch as a second line of defense.
+                if (value is not null
+                    && underlying.GetProperty(nameof(ImmutableArray<int>.IsDefault))!.GetValue(value) is true)
+                {
+                    why = $"'{FriendlyTypeName(underlying)}' is a default, uninitialized ImmutableArray, "
+                          + "which has no elements to inspect and no wire form either.";
+
+                    return false;
+                }
+
+                return AllFaithful(arguments, walk, out why)
+                       && AllItemsFaithful(arguments[0], value as IEnumerable, walk, out why);
+            }
+        }
+
+        // ValueTuple and Tuple, of any arity - the same admission KeyValuePair<,> already has, one
+        // level more general. Both expose their elements through ITuple, in declaration order, which
+        // lines up with the generic arguments read below.
+        if (typeof(ITuple).IsAssignableFrom(underlying) && underlying.IsGenericType)
+        {
+            var elementTypes = underlying.GetGenericArguments();
+
+            return AllFaithful(elementTypes, walk, out why)
+                   && TupleFaithful(elementTypes, value as ITuple, walk, out why);
         }
 
         why = $"'{FriendlyTypeName(type)}' is not one of the types whose measured behaviour is fully "
@@ -708,7 +833,7 @@ internal static class StateTransfer
     ///         looked at. That made it a wider claim than its own documentation describes, because it
     ///         silently waived the rules the rest of this class exists to enforce - an opted-in type
     ///         holding a <c>Dictionary</c> built with <c>StringComparer.OrdinalIgnoreCase</c> never
-    ///         reached <see cref="HasDefaultComparer" /> at all, and arrived with a different lookup
+    ///         reached <see cref="ComparerFaithful" /> at all, and arrived with a different lookup
     ///         cost under the same name. The comparer is the crux of the whole rule; an escape hatch
     ///         that waives it is not an escape hatch, it is a hole.
     ///     </para>
@@ -886,6 +1011,31 @@ internal static class StateTransfer
     }
 
     /// <summary>
+    ///     <see cref="PairFaithful" /> generalized past two elements: <c>ITuple</c> is what
+    ///     <c>ValueTuple</c> and <c>Tuple</c> both implement, indexed in the same declaration order as
+    ///     the generic arguments this is called with.
+    /// </summary>
+    private static bool TupleFaithful(Type[] elementTypes, ITuple? tuple, FaithfulnessWalk walk, out string? why)
+    {
+        why = null;
+
+        if (tuple is null)
+            return true;
+
+        for (var i = 0; i < elementTypes.Length; i++)
+        {
+            if (!CanVaryAtRuntime(elementTypes[i]))
+                continue;
+
+            if (!IsFaithfulValue(
+                    elementTypes[i], tuple[i], $"its item {i + 1}", walk, carriesItsOwnType: false, out why))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     ///     The array behind a <c>Memory&lt;T&gt;</c>, and only when its elements need inspecting -
     ///     <c>ToArray</c> copies, which is not worth paying for a <c>Memory&lt;byte&gt;</c> that cannot
     ///     vary.
@@ -1015,16 +1165,19 @@ internal static class StateTransfer
     }
 
     /// <summary>
-    ///     Whether a keyed collection uses the default comparer for its key type.
+    ///     Whether a keyed collection's comparer is reproducible: the default, a named framework
+    ///     singleton, or a stateless user comparer - see <see cref="TryIdentifyComparer" />.
     /// </summary>
     /// <remarks>
     ///     The crux of the whole rule. A dictionary built with <c>StringComparer.OrdinalIgnoreCase</c>
     ///     serializes to exactly the same entries as one built without it, so no amount of comparing
     ///     the data afterwards could distinguish them - and the two have materially different lookup
     ///     cost, which is very often the thing being measured. The comparer is observable at runtime,
-    ///     so this is a check rather than a gamble.
+    ///     so this is a check rather than a gamble. It no longer has to be a <i>guess</i> either: a
+    ///     named singleton's identity is exactly as reproducible as the default's, so it travels with
+    ///     the capture instead of being refused.
     /// </remarks>
-    private static bool HasDefaultComparer(
+    private static bool ComparerFaithful(
         Type collectionType,
         object? value,
         Type defaultComparerDefinition,
@@ -1033,10 +1186,34 @@ internal static class StateTransfer
     {
         why = null;
 
-        if (value is null)
+        if (TryIdentifyComparer(collectionType, value, defaultComparerDefinition, keyType, out _))
             return true;
 
-        var comparer = collectionType.GetProperty("Comparer")?.GetValue(value);
+        var comparer = ComparerOf(collectionType, value)!;
+
+        why = $"it was built with a custom comparer ('{FriendlyTypeName(comparer.GetType())}'), which "
+              + "changes its lookup cost but not its contents - so rebuilding it from those contents "
+              + "would measure a differently-behaved collection under the same name. Mark the comparer's "
+              + "type [BenchmarkState] with no instance fields to send it by identity instead.";
+
+        return false;
+    }
+
+    /// <summary>
+    ///     The comparer's identity to carry on the wire, or <c>null</c> when there is nothing to carry:
+    ///     no comparer at all, or the default one. Returns <c>false</c> only when the collection was
+    ///     built with something this cannot reproduce.
+    /// </summary>
+    private static bool TryIdentifyComparer(
+        Type collectionType,
+        object? value,
+        Type defaultComparerDefinition,
+        Type keyType,
+        out string? name)
+    {
+        name = null;
+
+        var comparer = ComparerOf(collectionType, value);
 
         if (comparer is null)
             return true;
@@ -1049,9 +1226,105 @@ internal static class StateTransfer
         if (ReferenceEquals(comparer, expected) || Equals(comparer, expected))
             return true;
 
-        why = $"it was built with a custom comparer ('{FriendlyTypeName(comparer.GetType())}'), which "
-              + "changes its lookup cost but not its contents - so rebuilding it from those contents "
-              + "would measure a differently-behaved collection under the same name.";
+        // A framework singleton's identity is a static fact about the process, not about this
+        // instance - naming it and looking the same property up on arrival reproduces the comparer
+        // exactly, the same way the default case already does.
+        if (comparer is StringComparer && NameOfKnownStringComparer(comparer) is { } known)
+        {
+            name = $"F:{known}";
+
+            return true;
+        }
+
+        // The same escape hatch every other user type uses, and for the same reason: nothing infers
+        // it, the author asserts it. What this class can verify on top of the assertion is that the
+        // type has no instance fields - so it cannot have been configured with anything a fresh
+        // instance would not also have, proven from its shape rather than assumed from its intent.
+        var comparerType = comparer.GetType();
+
+        if (comparerType.IsDefined(typeof(BenchmarkStateAttribute), inherit: false)
+            && comparerType.GetConstructor(Type.EmptyTypes) is { IsPublic: true }
+            && InstanceFieldsOf(comparerType).Length == 0)
+        {
+            name = $"T:{NameOf(comparerType)}";
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static object? ComparerOf(Type collectionType, object? value)
+        => value is null ? null : collectionType.GetProperty("Comparer")?.GetValue(value);
+
+    /// <summary>
+    ///     The comparer identity to attach to a captured field whose value is itself a keyed
+    ///     collection, or <c>null</c> for every other field - including a keyed collection using the
+    ///     default comparer, which costs nothing extra to represent.
+    /// </summary>
+    private static string? ComparerNameFor(Type runtime, object? value)
+    {
+        if (value is null || !runtime.IsGenericType)
+            return null;
+
+        var definition = runtime.GetGenericTypeDefinition();
+        var arguments = runtime.GetGenericArguments();
+
+        Type defaultComparerDefinition;
+
+        if (definition == typeof(Dictionary<,>) || definition == typeof(HashSet<>))
+            defaultComparerDefinition = typeof(EqualityComparer<>);
+        else if (definition == typeof(SortedDictionary<,>) || definition == typeof(SortedSet<>))
+            defaultComparerDefinition = typeof(Comparer<>);
+        else
+            return null;
+
+        TryIdentifyComparer(runtime, value, defaultComparerDefinition, arguments[0], out var name);
+
+        return name;
+    }
+
+    /// <summary>
+    ///     Framework-provided <see cref="StringComparer" /> singletons, named so their identity can
+    ///     travel on the wire instead of the comparer being refused outright. Each is one static
+    ///     instance for the life of the process, so naming it and reading the same property back is
+    ///     exact rather than an approximation.
+    /// </summary>
+    private static readonly (string Name, StringComparer Comparer)[] KnownStringComparers =
+    [
+        ("Ordinal", StringComparer.Ordinal),
+        ("OrdinalIgnoreCase", StringComparer.OrdinalIgnoreCase),
+        ("InvariantCulture", StringComparer.InvariantCulture),
+        ("InvariantCultureIgnoreCase", StringComparer.InvariantCultureIgnoreCase),
+        ("CurrentCulture", StringComparer.CurrentCulture),
+        ("CurrentCultureIgnoreCase", StringComparer.CurrentCultureIgnoreCase),
+    ];
+
+    private static string? NameOfKnownStringComparer(object comparer)
+    {
+        foreach (var (name, known) in KnownStringComparers)
+        {
+            if (ReferenceEquals(comparer, known))
+                return name;
+        }
+
+        return null;
+    }
+
+    /// <summary>Resolves a name <see cref="NameOfKnownStringComparer" /> produced, in the worker.</summary>
+    internal static bool TryResolveKnownStringComparer(string name, out StringComparer comparer)
+    {
+        foreach (var (candidateName, known) in KnownStringComparers)
+        {
+            if (string.Equals(candidateName, name, StringComparison.Ordinal))
+            {
+                comparer = known;
+
+                return true;
+            }
+        }
+
+        comparer = null!;
 
         return false;
     }
@@ -1112,12 +1385,30 @@ internal static class StateTransfer
         return type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false) && type.IsClass;
     }
 
+    /// <summary>
+    ///     Whether an array's element type is one <c>Buffer.BlockCopy</c> can move as raw bytes -
+    ///     regardless of the array's own rank, which the caller decides separately. <c>bool</c> and
+    ///     <c>char</c> report themselves primitive but are excluded: see <see cref="ToBytes" />.
+    /// </summary>
+    private static bool IsBlittablePrimitiveElement(Type? element)
+        => element is { IsPrimitive: true } && element != typeof(bool) && element != typeof(char);
+
     private static bool IsBlittablePrimitiveArray(Type type)
-        => type.IsArray
-           && type.GetArrayRank() == 1
-           && type.GetElementType() is { IsPrimitive: true } element
-           && element != typeof(bool)
-           && element != typeof(char);
+        => type.IsArray && IsBlittablePrimitiveElement(type.GetElementType());
+
+    /// <summary>
+    ///     The length of each dimension, outermost first - the shape <c>Buffer.BlockCopy</c> itself
+    ///     does not carry, since it moves bytes without regard for how they are addressed.
+    /// </summary>
+    private static int[] DimensionsOf(Array array)
+    {
+        var dimensions = new int[array.Rank];
+
+        for (var i = 0; i < array.Rank; i++)
+            dimensions[i] = array.GetLength(i);
+
+        return dimensions;
+    }
 
     private static byte[] ToBytes(Array array)
     {
@@ -1128,15 +1419,21 @@ internal static class StateTransfer
         return bytes;
     }
 
-    /// <summary>Rebuilds a blittable primitive array from its raw bytes.</summary>
-    public static Array FromBytes(Type arrayType, byte[] bytes)
+    /// <summary>
+    ///     Rebuilds a blittable primitive array from its raw bytes - rank 1, sized from the byte
+    ///     count alone, when <paramref name="dimensions" /> is <c>null</c>; the shape it names
+    ///     otherwise.
+    /// </summary>
+    public static Array FromBytes(Type arrayType, byte[] bytes, int[]? dimensions = null)
     {
         ArgumentNullException.ThrowIfNull(arrayType);
         ArgumentNullException.ThrowIfNull(bytes);
 
         var element = arrayType.GetElementType()!;
-        var size = Marshal.SizeOf(element);
-        var array = Array.CreateInstance(element, bytes.Length / size);
+
+        var array = dimensions is null
+            ? Array.CreateInstance(element, bytes.Length / Marshal.SizeOf(element))
+            : Array.CreateInstance(element, dimensions);
 
         Buffer.BlockCopy(bytes, 0, array, 0, bytes.Length);
 

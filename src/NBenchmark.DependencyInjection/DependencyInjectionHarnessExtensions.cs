@@ -6,28 +6,13 @@ namespace NBenchmark.DependencyInjection;
 
 public static class DependencyInjectionHarnessExtensions
 {
-    // No WithServiceProvider here. BenchmarkHarness declares both overloads itself, and an extension
-    // method of the same name on the same type is shadowed by the instance method - so the one this
-    // package used to carry could never be called.
+    // No WithServiceProvider here. BenchmarkHarness declares the (single) overload itself, and an
+    // extension method of the same name on the same type is shadowed by the instance method - so the
+    // one this package used to carry could never be called.
 
-    /// <remarks>
-    ///     A live provider cannot cross a process boundary. Pass a <c>Func&lt;IServiceProvider&gt;</c>
-    ///     instead - see
-    ///     <see cref="WithScopedServiceProvider(BenchmarkHarness, Func{IServiceProvider})" />.
-    /// </remarks>
-    public static BenchmarkHarness WithScopedServiceProvider(
-        this BenchmarkHarness harness,
-        IServiceProvider serviceProvider)
-    {
-        ArgumentNullException.ThrowIfNull(harness);
-        ArgumentNullException.ThrowIfNull(serviceProvider);
-
-        return harness.WithInstanceSource(new InstanceSource
-        {
-            Kind = InstanceSourceKind.ScopedServiceProvider,
-            Resolve = ScopedResolver(() => serviceProvider),
-        });
-    }
+    // No overload taking a built IServiceProvider, on purpose. It set no Recipe, so InstanceSource
+    // .Refusal() was unconditional and the run threw before anything was measured - a compile error
+    // catches that earlier than a thrown run does. Pass a Func<IServiceProvider> instead.
 
     /// <summary>
     ///     Resolves benchmark instances from a container built by <paramref name="factory" />, giving
@@ -35,12 +20,11 @@ public static class DependencyInjectionHarnessExtensions
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The overload this replaces for isolated runs takes a live
-    ///         <see cref="IServiceProvider" />, which cannot cross a process boundary - so until this
-    ///         existed, <b>every scoped-DI benchmark was permanently measured in the host process</b>.
-    ///         That is the flagship EF Core case, and the one the whole package is usually installed
-    ///         for: the numbers carried the host's JIT tiering and GC flavour, worth up to 3.3x on
-    ///         bodies of provably identical cost, with no way for the user to opt out of it.
+    ///         There is no overload taking a built <see cref="IServiceProvider" />: it is live code and
+    ///         cannot cross a process boundary, so a scoped-DI benchmark configured that way would be
+    ///         permanently measured in the host process - the flagship EF Core case, and the one the
+    ///         whole package is usually installed for, with the numbers carrying the host's JIT tiering
+    ///         and GC flavour, worth up to 3.3x on bodies of provably identical cost.
     ///     </para>
     ///     <para>
     ///         The worker runs the factory, builds its own container, and creates a scope per benchmark
@@ -115,22 +99,16 @@ public static class DependencyInjectionHarnessExtensions
         };
     }
 
-    /// <inheritdoc cref="UseDependencyInjection{T}(BenchmarkHarness, Func{IServiceProvider})" />
-    public static BenchmarkHarness UseDependencyInjection<T>(
-        this BenchmarkHarness harness,
-        IServiceProvider services)
-        => harness.AddFromAssembly<T>().WithServiceProvider(services);
-
     /// <summary>
     ///     Discovers benchmarks on <typeparamref name="T" />'s assembly and resolves their instances from
     ///     a container built by <paramref name="services" />, keeping the run isolated.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The overload taking a live <see cref="IServiceProvider" /> cannot be isolated: a container
-    ///         is live code holding singletons and open handles, so a worker would have to be handed one
-    ///         rather than able to build it. Passing the factory instead lets the worker build an
-    ///         equivalent container in the process that measures:
+    ///         There is no overload taking a built <see cref="IServiceProvider" />: a container is live
+    ///         code holding singletons and open handles, so a worker would have to be handed one rather
+    ///         than able to build it. Passing the factory instead lets the worker build an equivalent
+    ///         container in the process that measures:
     ///     </para>
     ///     <code>
     ///     await BenchmarkHarness.Create(args)
@@ -160,12 +138,6 @@ public static class DependencyInjectionHarnessExtensions
 
         return harness.AddFromAssembly<T>().WithServiceProvider(services);
     }
-
-    /// <inheritdoc cref="UseScopedDependencyInjection{T}(BenchmarkHarness, Func{IServiceProvider})" />
-    public static BenchmarkHarness UseScopedDependencyInjection<T>(
-        this BenchmarkHarness harness,
-        IServiceProvider services)
-        => harness.AddFromAssembly<T>().WithScopedServiceProvider(services);
 
     /// <summary>
     ///     Discovers benchmarks on <typeparamref name="T" />'s assembly and resolves each instance from

@@ -45,29 +45,16 @@ public class ScopedFactoryIsolationTests
         Assert.Null(harness.InstanceSourceRefusalForTesting());
     }
 
-    /// <summary>A live provider still cannot, and says which API to reach for instead.</summary>
-    [Fact]
-    public void ScopedServiceProvider_LiveProvider_CannotIsolate()
-    {
-        var harness = BenchmarkHarness.Create([]).WithScopedServiceProvider(BuildServices());
-
-        var refusal = harness.InstanceSourceRefusalForTesting();
-
-        Assert.NotNull(refusal);
-        Assert.Contains("service provider", refusal);
-        Assert.Contains("factory", refusal);
-    }
-
     /// <summary>
     ///     A factory that closes over a local is addressable: what it captures travels with it, and the
     ///     container is still built in the process that measures.
     /// </summary>
     /// <remarks>
     ///     This used to be refused alongside a built provider, which put the two very different things
-    ///     under one rule. A container is live code and genuinely cannot cross; a connection string the
-    ///     factory reads is a parameter it did not get to declare, and sending it leaves the recipe a
-    ///     recipe. The control for the real case is
-    ///     <see cref="ScopedServiceProvider_LiveProvider_CannotIsolate" /> above, which still refuses.
+    ///     under one rule. A container is live code and genuinely cannot cross - which is now a compile
+    ///     error rather than a thrown run, since the overload taking one no longer exists (S3) - while a
+    ///     connection string the factory reads is a parameter it did not get to declare, and sending it
+    ///     leaves the recipe a recipe.
     /// </remarks>
     [Fact]
     public void A_Capturing_Scoped_Factory_CanIsolate()

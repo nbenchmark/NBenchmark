@@ -171,20 +171,130 @@ public sealed class CapturedStateTransferTests : IDisposable
     }
 
     /// <summary>
-    ///     A dictionary with a custom comparer is refused. It round-trips into one with identical
-    ///     entries and different lookup cost, so no comparison of the data could catch it - which is
-    ///     why the rule inspects the comparer.
+    ///     A dictionary built with a genuinely custom comparer - one that carries configuration of its
+    ///     own - is refused. It round-trips into one with identical entries and different lookup cost,
+    ///     so no comparison of the data could catch it, and a fresh instance would not carry whatever
+    ///     the comparer's own fields hold - which is why the rule inspects the comparer rather than the
+    ///     contents. R4 narrows this to comparers that are not reproducible; see
+    ///     <see cref="A_Collection_With_A_Named_Framework_Comparer_Isolates" /> for the case it lifted.
     /// </summary>
     [Fact]
-    public void A_Collection_With_A_Custom_Comparer_Is_Refused()
+    public void A_Collection_With_A_Custom_Stateful_Comparer_Is_Refused()
+    {
+        var byPrefix = new Dictionary<string, int>(new PrefixComparer(length: 3)) { ["abc"] = 1 };
+
+        Assert.False(
+            BodyRef.TryCreate(() => byPrefix.Count, "test", out _, out var refusal, receivers: Table()));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains("comparer", refusal.Message);
+    }
+
+    /// <summary>
+    ///     A dictionary built with a named <see cref="StringComparer" /> singleton is no longer refused:
+    ///     the comparer's identity travels with the capture, and the worker rebuilds the same static
+    ///     instance rather than guessing at an equivalent one from the entries alone.
+    /// </summary>
+    [Fact]
+    public void A_Collection_With_A_Named_Framework_Comparer_Isolates()
     {
         var caseInsensitive = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["a"] = 1 };
+
+        Assert.True(
+            BodyRef.TryCreate(() => caseInsensitive.Count, "test", out _, out var refusal, receivers: Table()),
+            refusal.Message);
+    }
+
+    /// <summary>
+    ///     A comparer with no fields of its own cannot have been configured with anything a fresh
+    ///     instance would not also have, so it travels by type name rather than being refused - once
+    ///     its author has opted in, the same as every other user type.
+    /// </summary>
+    [Fact]
+    public void A_Collection_With_A_Stateless_User_Comparer_Isolates()
+    {
+        var caseInsensitive = new Dictionary<string, int>(new StatelessCaseInsensitiveComparer()) { ["a"] = 1 };
+
+        Assert.True(
+            BodyRef.TryCreate(() => caseInsensitive.Count, "test", out _, out var refusal, receivers: Table()),
+            refusal.Message);
+    }
+
+    /// <summary>
+    ///     Statelessness alone is not enough - nothing is inferred here either. Without
+    ///     <c>[BenchmarkState]</c> the comparer is refused exactly as a custom, stateful one is, even
+    ///     though a fresh instance would in fact behave identically.
+    /// </summary>
+    [Fact]
+    public void A_Stateless_Comparer_Without_BenchmarkState_Is_Still_Refused()
+    {
+        var caseInsensitive = new Dictionary<string, int>(new UnmarkedStatelessComparer()) { ["a"] = 1 };
 
         Assert.False(
             BodyRef.TryCreate(() => caseInsensitive.Count, "test", out _, out var refusal, receivers: Table()));
 
         Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
         Assert.Contains("comparer", refusal.Message);
+    }
+
+    /// <summary>
+    ///     Not just "it isolated" - the worker's dictionary actually looks keys up case-insensitively,
+    ///     which only holds if the comparer that crossed is the real
+    ///     <see cref="StringComparer.OrdinalIgnoreCase" /> singleton rather than a guess reconstructed
+    ///     from the entries.
+    /// </summary>
+    [Fact]
+    public void A_Named_Framework_Comparer_Rebuilds_With_The_Same_Lookup_Behaviour()
+    {
+        var lookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Key"] = 42 };
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"found={lookup.ContainsKey("KEY")}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("found=True", saw);
+    }
+
+    /// <summary>Same proof for a stateless user comparer, which travels by type name rather than a fixed key.</summary>
+    [Fact]
+    public void A_Stateless_User_Comparer_Rebuilds_With_The_Same_Lookup_Behaviour()
+    {
+        var lookup = new HashSet<string>(new StatelessCaseInsensitiveComparer()) { "Key" };
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"found={lookup.Contains("KEY")}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("found=True", saw);
+    }
+
+    /// <summary>A comparer whose own field means the entries alone can never reproduce it.</summary>
+    private sealed class PrefixComparer(int length) : IEqualityComparer<string>
+    {
+        public bool Equals(string? x, string? y)
+            => x is not null && y is not null && Prefix(x) == Prefix(y);
+
+        public int GetHashCode(string obj) => Prefix(obj).GetHashCode();
+
+        private string Prefix(string s) => s.Length <= length ? s : s[..length];
+    }
+
+    /// <summary>
+    ///     Opted in and provably stateless - a fresh instance is identical to this one - the R4 escape
+    ///     hatch for a comparer.
+    /// </summary>
+    [BenchmarkState]
+    private sealed class StatelessCaseInsensitiveComparer : IEqualityComparer<string>
+    {
+        public bool Equals(string? x, string? y) => string.Equals(x, y, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode(string obj) => obj.ToUpperInvariant().GetHashCode();
+    }
+
+    /// <summary>Same shape as <see cref="StatelessCaseInsensitiveComparer" />, deliberately not opted in.</summary>
+    private sealed class UnmarkedStatelessComparer : IEqualityComparer<string>
+    {
+        public bool Equals(string? x, string? y) => string.Equals(x, y, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode(string obj) => obj.ToUpperInvariant().GetHashCode();
     }
 
     /// <summary>
@@ -510,18 +620,202 @@ public sealed class CapturedStateTransferTests : IDisposable
     }
 
     /// <summary>
+    ///     R3: a rectangular array is admitted alongside the jagged form it was inconsistent with -
+    ///     `Buffer.BlockCopy` moves the same bytes either way, so only the shape needed a wire slot.
+    /// </summary>
+    [Fact]
+    public void A_Rectangular_Array_Arrives_Intact()
+    {
+        var grid = new int[2, 3] { { 1, 2, 3 }, { 4, 5, 6 } };
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException(
+            $"dims={grid.GetLength(0)}x{grid.GetLength(1)},corner={grid[1, 2]},sum={grid[0, 0] + grid[1, 2]}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("dims=2x3", saw);
+        Assert.Contains("corner=6", saw);
+        Assert.Contains("sum=7", saw);
+    }
+
+    /// <summary>A three-dimensional array is not a special case - the rank travels either way.</summary>
+    [Fact]
+    public void A_Three_Dimensional_Array_Arrives_Intact()
+    {
+        var cube = new int[2, 2, 2];
+        cube[1, 1, 1] = 42;
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"corner={cube[1, 1, 1]}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("corner=42", saw);
+    }
+
+    /// <summary>A rectangular array of a non-blittable element has no wire form and is still refused.</summary>
+    [Fact]
+    public void A_Rectangular_Array_Of_A_Non_Blittable_Element_Is_Refused()
+    {
+        var grid = new decimal[2, 2];
+
+        Assert.False(BodyRef.TryCreate(() => grid.Length, "test", out _, out var refusal, receivers: Table()));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains("multi-dimensional", refusal.Message);
+    }
+
+    [Fact]
+    public void An_ImmutableArray_Arrives_Intact()
+    {
+        var values = System.Collections.Immutable.ImmutableArray.Create(1, 2, 3);
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"sum={values.Sum()}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("sum=6", saw);
+    }
+
+    /// <summary>
+    ///     A default, uninitialized ImmutableArray throws on nearly every member - including the one
+    ///     the serializer would call - so it is refused structurally rather than by exception.
+    /// </summary>
+    [Fact]
+    public void A_Default_ImmutableArray_Is_Refused()
+    {
+        var values = default(System.Collections.Immutable.ImmutableArray<int>);
+
+        Assert.False(BodyRef.TryCreate(() => values.IsDefault, "test", out _, out var refusal, receivers: Table()));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains("default", refusal.Message);
+    }
+
+    [Fact]
+    public void A_ReadOnlyCollection_Arrives_Intact()
+    {
+        var values = new System.Collections.ObjectModel.ReadOnlyCollection<int>([1, 2, 3]);
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"sum={values.Sum()}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("sum=6", saw);
+    }
+
+    [Fact]
+    public void An_ArraySegment_Arrives_Intact()
+    {
+        var values = new ArraySegment<int>(new[] { 0, 1, 2, 3, 4 }, offset: 1, count: 3);
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"joined={string.Join(",", values)}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("joined=1,2,3", saw);
+    }
+
+    [Fact]
+    public void A_Queue_Arrives_Intact_In_Order()
+    {
+        var values = new Queue<int>([1, 2, 3]);
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"dequeued={values.Dequeue()}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("dequeued=1", saw);
+    }
+
+    [Fact]
+    public void A_LinkedList_Arrives_Intact_In_Order()
+    {
+        var values = new LinkedList<int>([1, 2, 3]);
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"first={values.First!.Value}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("first=1", saw);
+    }
+
+    /// <summary>
+    ///     The regression a probe caught rather than reasoning: <c>Stack&lt;T&gt;</c> serializes
+    ///     top-first, and feeding that straight back into the constructor pops the entries in reverse
+    ///     of the stack that was captured. Peek is the assertion that would not have noticed a stack
+    ///     with the same <i>contents</i> in the wrong order - only the wrong top would.
+    /// </summary>
+    [Fact]
+    public void A_Stack_Arrives_Intact_With_The_Same_Pop_Order()
+    {
+        var values = new Stack<int>();
+        values.Push(1);
+        values.Push(2);
+        values.Push(3);
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"top={values.Peek()},next={values.ElementAt(1)}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("top=3", saw);
+        Assert.Contains("next=2", saw);
+    }
+
+    [Fact]
+    public void A_ValueTuple_Arrives_Intact()
+    {
+        var pair = (Count: 5, Label: "widgets");
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"n={pair.Count},s={pair.Label}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("n=5", saw);
+        Assert.Contains("s=widgets", saw);
+    }
+
+    [Fact]
+    public void A_Tuple_Arrives_Intact()
+    {
+        var pair = Tuple.Create(5, "widgets");
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"n={pair.Item1},s={pair.Item2}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("n=5", saw);
+        Assert.Contains("s=widgets", saw);
+    }
+
+    /// <summary>
+    ///     R3's codec additions - one representative capture per new scalar, rather than one test each,
+    ///     since all five take the same path through <see cref="TestArgumentCodec" />.
+    /// </summary>
+    [Fact]
+    public void The_New_Codec_Scalars_Arrive_Intact()
+    {
+        var date = new DateOnly(2024, 3, 5);
+        var time = new TimeOnly(13, 45, 30);
+        var uri = new Uri("https://example.test/path?query=1");
+        var version = new Version(1, 2, 3);
+        var big = System.Numerics.BigInteger.Parse("123456789012345678901234567890");
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException(
+            $"date={date:O},time={time:O},uri={uri},version={version},big={big}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("date=2024-03-05", saw);
+        Assert.Contains("time=13:45:30", saw);
+        Assert.Contains("uri=https://example.test/path?query=1", saw);
+        Assert.Contains("version=1.2.3", saw);
+        Assert.Contains("big=123456789012345678901234567890", saw);
+    }
+
+    /// <summary>
     ///     <c>[BenchmarkState]</c> no longer waives the comparer rule for what the type holds.
     /// </summary>
     /// <remarks>
     ///     The attribute used to end the walk, so an opted-in type was admitted and nothing inside it
-    ///     was looked at. That made it a way to get a case-insensitive dictionary across without ever
-    ///     reaching the check that exists to stop exactly that - the crux of the whole rule, waived by
-    ///     the escape hatch from it.
+    ///     was looked at. That made it a way to get a dictionary's comparer across unchecked - the crux
+    ///     of the whole rule, waived by the escape hatch from it. A stateful comparer still proves the
+    ///     rule applies inside an opted-in type; a named framework comparer no longer would, since R4
+    ///     made that case reproducible rather than refused - see
+    ///     <see cref="A_Collection_With_A_Named_Framework_Comparer_Isolates" />.
     /// </remarks>
     [Fact]
     public void An_Opted_In_Type_Does_Not_Waive_The_Comparer_Rule()
     {
-        var index = new Index { Entries = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) };
+        var index = new Index { Entries = new Dictionary<string, int>(new PrefixComparer(length: 2)) };
 
         Assert.False(
             BodyRef.TryCreate(() => index.Entries.Count, "test", out _, out var refusal, receivers: Table()));

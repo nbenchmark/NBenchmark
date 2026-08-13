@@ -175,10 +175,10 @@ Ordinary captured data is sent and the body stays isolated - an `int`, a `string
 | Message says | Why | Fix |
 | --- | --- | --- |
 | *is not one of the types whose measured behaviour is fully determined by its contents* | A `Stream`, `HttpClient`, `DbConnection`, mock or similar | A prepare delegate - build it in the worker |
-| *was built with a custom comparer* | `new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase)` round-trips to identical entries with a different lookup cost | A prepare delegate, so the comparer is applied there |
+| *was built with a custom comparer* | The dictionary's comparer is neither the default nor one this can reproduce - a custom type with a threshold or a locale baked into a field, say. A named framework singleton (`StringComparer.OrdinalIgnoreCase` and friends) or a comparer with no fields of its own isolates instead of hitting this | Mark the comparer type `[BenchmarkState]` with no instance fields, or a prepare delegate so the comparer is applied there |
 | *carries a private field* / *a get-only property* | On a `[BenchmarkState]` type. The serializer writes those and cannot read them back, so they would arrive at their defaults | Make the member a public field, or a property with a setter |
 | *holds a `X` where a `Y` was declared* | A collection of a base type holding a subclass; it would arrive as base instances with the override gone | A prepare delegate, or make the element type exact |
-| *is larger than the transfer ceiling* | Past `MaxTransferredStateBytes` (8 MiB) | A prepare delegate. Raising the ceiling is possible but rarely the right answer - see [configuration](./reference/configuration.md#maxtransferredstatebytes) |
+| *pushing the captured state past N MiB once encoded* | Past `MaxTransferredStateBytes` (8 MiB default). The message says whether raising it (up to the 32 MiB ceiling) would actually let this through | A prepare delegate, or raise `MaxTransferredStateBytes` when the message says it would fit - see [configuration](./reference/configuration.md#maxtransferredstatebytes) |
 | *something else in this group already refers to the same object* | Two benchmarks share one array through different closures; rebuilding would make two arrays where your program has one | Build the shared state in one prepare delegate the bodies share |
 
 A suite is measured by one worker, so the message names **every** offending benchmark at once rather than the first.

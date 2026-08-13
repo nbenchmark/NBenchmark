@@ -191,7 +191,7 @@ The whole suite shares one worker, which keeps every ratio between its benchmark
 
 `WithIsolation(false)` opts back into the host process, deliberately and silently.
 
-Parameter sweeps, suite and per-iteration lifecycle, custom statistical strategies, and bodies that **capture a local** are all isolated - a captured value is sent with the address, so the body a worker binds is the one you wrote holding what you gave it. What cannot cross is a value whose behaviour is not determined by its contents: a live handle, a collection with a custom comparer, anything past the 8 MiB transfer ceiling.
+Parameter sweeps, suite and per-iteration lifecycle, custom statistical strategies, and bodies that **capture a local** are all isolated - a captured value is sent with the address, so the body a worker binds is the one you wrote holding what you gave it. What cannot cross is a value whose behaviour is not determined by its contents: a live handle, a collection built with a comparer that carries configuration of its own, anything past the 8 MiB transfer ceiling.
 
 `BenchmarkSuite.Over` is for those, and for anything simply large - the worker builds it in the process that measures rather than being sent it. It also types each body's parameter, which is the other half of what it is for:
 

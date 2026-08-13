@@ -9,11 +9,12 @@ namespace NBenchmark.Tests.Workers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         A live <see cref="IServiceProvider" /> cannot cross a process boundary, so passing one costs
-///         the run its isolation - correctly, because constructing the benchmark type directly instead
-///         would measure an object with none of its dependencies configured and report it under the
-///         right name. A static factory is a <i>recipe</i> for a container, and a recipe is addressable:
-///         the worker runs it and resolves instances from the container it built itself.
+///         A live <see cref="IServiceProvider" /> cannot cross a process boundary, which is why there is
+///         no <c>WithServiceProvider</c> overload that takes one directly (S3) - constructing the
+///         benchmark type in a worker instead would measure an object with none of its dependencies
+///         configured and report it under the right name. A static factory is a <i>recipe</i> for a
+///         container, and a recipe is addressable: the worker runs it and resolves instances from the
+///         container it built itself.
 ///     </para>
 ///     <para>
 ///         Written because the first implementation of this shipped broken in a way no unit test would
@@ -90,40 +91,8 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     A live provider still refuses, so the factory is what changed the outcome and nothing else.
-    /// </summary>
-    [Fact]
-    public async Task LiveServiceProvider_StillRefuses_AndPointsAtTheFactory()
-    {
-        using var stderr = new StringWriter();
-        var priorError = Console.Error;
-        Console.SetError(stderr);
-
-        IReadOnlyList<BenchmarkResult> results;
-
-        try
-        {
-            results = await Harness()
-                .WithServiceProvider(BuildProvider())
-                .WithRequireIsolation(false)
-                .RunAsync();
-        }
-        finally
-        {
-            Console.SetError(priorError);
-        }
-
-        var result = Assert.Single(results, r => r.ClassName == typeof(InjectedBenchmarks).FullName);
-
-        Assert.NotEqual(IsolationStatus.Isolated, result.IsolationStatus);
-
-        // The refusal names the way out, which is the only reason a user would find it.
-        Assert.Contains("WithServiceProvider(BuildServices)", stderr.ToString());
-    }
-
-    /// <summary>
-    ///     A capturing factory is refused, because a container built here is the live object that cannot
-    ///     cross in the first place.
+    ///     A capturing factory still isolates - the overload taking a live provider directly no longer
+    ///     exists at all (S3), so there is nothing left to refuse it against.
     /// </summary>
     [Fact]
     public async Task CapturingServiceProviderFactory_IsIsolated()
