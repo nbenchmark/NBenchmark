@@ -525,6 +525,7 @@ internal static class BodyResolver
     internal static bool TryBuild(
         Type type,
         IReadOnlyList<CapturedField> captures,
+        BenchmarkLoadContext context,
         out object? built,
         out string? error)
     {
@@ -552,7 +553,14 @@ internal static class BodyResolver
 
             if (capture.Kind == CapturedValueKind.Nested)
             {
-                if (!TryBuild(field!.FieldType, capture.Nested ?? [], out value, out error))
+                // The runtime type the coordinator read the fields off, not the field's declared type.
+                // A lambda declared in a base class and registered from a derived instance holds its
+                // `this` in a base-typed field, and rebuilding that would restore the derived object's
+                // fields onto the wrong class.
+                if (!TryResolveNestedType(capture, field!, context, out var nestedType, out error))
+                    return false;
+
+                if (!TryBuild(nestedType!, capture.Nested ?? [], context, out value, out error))
                     return false;
             }
             else if (!TryDecode(capture, field!.FieldType, out value, out error))
@@ -572,6 +580,49 @@ internal static class BodyResolver
         }
 
         built = instance;
+
+        return true;
+    }
+
+    /// <summary>
+    ///     The type to rebuild a nested scope as: the one the coordinator actually walked, checked
+    ///     against what the field will accept.
+    /// </summary>
+    private static bool TryResolveNestedType(
+        CapturedField capture,
+        FieldInfo field,
+        BenchmarkLoadContext context,
+        out Type? nested,
+        out string? error)
+    {
+        nested = null;
+        error = null;
+
+        if (capture.RuntimeTypeName is not { } name)
+        {
+            error = $"the captured scope '{capture.FieldName}' carries no runtime type, so there is "
+                    + "nothing to rebuild it as. Rebuild the benchmark project and re-run.";
+
+            return false;
+        }
+
+        if (TypeNames.Resolve(name, context) is not { } resolved)
+        {
+            error = $"the captured scope '{capture.FieldName}' names a runtime type '{name}' that could "
+                    + "not be resolved in this worker.";
+
+            return false;
+        }
+
+        if (!field.FieldType.IsAssignableFrom(resolved))
+        {
+            error = $"the captured scope '{capture.FieldName}' names a runtime type "
+                    + $"'{resolved.Name}' that cannot be stored in a '{field.FieldType.Name}' field.";
+
+            return false;
+        }
+
+        nested = resolved;
 
         return true;
     }

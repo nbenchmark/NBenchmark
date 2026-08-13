@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Reflection;
 using NBenchmark.Attributes;
 using System.Runtime.CompilerServices;
@@ -58,6 +59,25 @@ internal sealed record CapturedField
     /// </summary>
     public required string DeclaredTypeName { get; init; }
 
+    /// <summary>
+    ///     Assembly-qualified name of the value's <b>runtime</b> type. Carried only for
+    ///     <see cref="CapturedValueKind.Nested" />, and required there.
+    /// </summary>
+    /// <remarks>
+    ///     A nested scope is rebuilt rather than deserialized, so the worker has to allocate a type -
+    ///     and the declared one is the wrong answer. A lambda written in a base class and registered
+    ///     from a derived instance holds its <c>&lt;&gt;4__this</c> in a field declared as the base,
+    ///     while the walk on this side reads the fields of the derived object it actually points at.
+    ///     Rebuilding the declared type would restore those fields onto an instance of the wrong class
+    ///     and dispatch every virtual member to the wrong override.
+    ///     <para>
+    ///         Not carried for the other kinds because they do not need it: a value whose runtime type
+    ///         differs from its declared type is refused outright by <see cref="IsFaithful" />, so for
+    ///         those two the declared type <i>is</i> the runtime type.
+    ///     </para>
+    /// </remarks>
+    public string? RuntimeTypeName { get; init; }
+
     public string? Json { get; init; }
 
     public byte[]? Binary { get; init; }
@@ -68,14 +88,32 @@ internal sealed record CapturedField
 /// <summary>
 ///     One receiver a group's delegates bind to, with the values it holds.
 /// </summary>
-/// <remarks>
-///     No type address, deliberately. Every delegate sharing a receiver shares its runtime type by
-///     construction, so the worker takes the type from whichever delegate reaches it first - the
-///     receiver of a lambda <i>is</i> its method's declaring type - and one fewer thing on the wire is
-///     one fewer thing the two sides can disagree about.
-/// </remarks>
 internal sealed record TransferredReceiver
 {
+    /// <summary>
+    ///     Assembly-qualified name of the receiver's <b>runtime</b> type - the type whose fields
+    ///     <see cref="Captures" /> describes.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This used to be omitted, on the reasoning that every delegate sharing a receiver shares
+    ///         its runtime type by construction, so the worker could take the type from whichever
+    ///         delegate reached the entry first. The premise is true and the conclusion did not follow:
+    ///         what the worker actually had to hand was the method's <i>declaring</i> type, and those
+    ///         are the same thing only when the method is declared on the object's own class.
+    ///     </para>
+    ///     <para>
+    ///         For a method group over an inherited method - <c>turbo.Tick</c> where <c>Tick</c> is
+    ///         declared on the base - the walk on this side reads the fields of the derived object
+    ///         while the worker allocated the base. When the derived class adds no fields of its own
+    ///         every token still resolves, every value still lands, and the benchmark measures the base
+    ///         class's overrides under the derived class's name. Naming the type is what closes that,
+    ///         and it also settles the entry's type before any delegate arrives rather than leaving it
+    ///         to the run order.
+    ///     </para>
+    /// </remarks>
+    public required string TypeName { get; init; }
+
     public required IReadOnlyList<CapturedField> Captures { get; init; }
 }
 
@@ -136,7 +174,14 @@ internal sealed class ReceiverTable(int budgetBytes)
 
         index = _receivers.Count;
 
-        _receivers.Add(new TransferredReceiver { Captures = captured });
+        // The runtime type, matching the type StateTransfer walked the fields of. Taking it from the
+        // object rather than from any delegate bound to it is the whole point - see TypeName.
+        _receivers.Add(new TransferredReceiver
+        {
+            TypeName = StateTransfer.NameOf(receiver.GetType()),
+            Captures = captured,
+        });
+
         _indices[receiver] = index;
 
         return true;
@@ -339,6 +384,10 @@ internal static class StateTransfer
                 FieldName = field.Name,
                 Kind = CapturedValueKind.Nested,
                 DeclaredTypeName = NameOf(declared),
+
+                // The type the fields above were read from, which for a captured `this` can be a
+                // subclass of the field's declared type. See CapturedField.RuntimeTypeName.
+                RuntimeTypeName = NameOf(value.GetType()),
                 Nested = nested,
             };
 
@@ -448,22 +497,52 @@ internal static class StateTransfer
     ///     that would be sent for it.
     /// </summary>
     /// <remarks>
-    ///     Note the runtime-type check. A field declared <c>IList&lt;int&gt;</c> holding a
-    ///     <c>MyPagedList</c> would round-trip into a <c>List&lt;int&gt;</c> with the same entries and
-    ///     entirely different performance, so a value whose runtime type differs from its declared
-    ///     type is refused rather than flattened.
+    ///     <para>
+    ///         Note the runtime-type check. A field declared <c>IList&lt;int&gt;</c> holding a
+    ///         <c>MyPagedList</c> would round-trip into a <c>List&lt;int&gt;</c> with the same entries
+    ///         and entirely different performance, so a value whose runtime type differs from its
+    ///         declared type is refused rather than flattened.
+    ///     </para>
+    ///     <para>
+    ///         That check runs at <b>every</b> position the walk reaches, not only at the field itself.
+    ///         Applying it to the field alone left the substitution it exists to prevent reachable one
+    ///         level down, because a collection is serialized against its <i>element</i> type: a
+    ///         <c>Shape[]</c> holding a <c>Square</c> wrote <c>{"Sides":4}</c>, arrived as a
+    ///         <c>Shape</c>, and measured the base class's overrides under the derived class's name.
+    ///         Elements are only enumerated where a mismatch is possible - a sealed or value element
+    ///         type cannot vary - so an <c>int[]</c> or a <c>string[]</c> pays nothing for it.
+    ///     </para>
     /// </remarks>
     public static bool IsFaithful(Type declared, object? value, out string? why)
     {
         ArgumentNullException.ThrowIfNull(declared);
 
+        return IsFaithfulValue(declared, value, "it", new FaithfulnessWalk(), out why);
+    }
+
+    /// <summary>
+    ///     One position - a field, an element, a member - where a declared type has to describe
+    ///     whatever value is actually sitting there.
+    /// </summary>
+    /// <param name="what">
+    ///     How to name the position in a refusal. The caller owns the wording because the same failure
+    ///     reads completely differently for a captured local, an array element and a member of an
+    ///     opted-in type, and the reader has to know which one to go and look at.
+    /// </param>
+    private static bool IsFaithfulValue(
+        Type declared,
+        object? value,
+        string what,
+        FaithfulnessWalk walk,
+        out string? why)
+    {
         why = null;
 
         if (value is null)
         {
             if (declared.IsValueType && Nullable.GetUnderlyingType(declared) is null)
             {
-                why = "a null was found in a non-nullable field.";
+                why = $"{what} is null and its declared type is not nullable.";
 
                 return false;
             }
@@ -475,16 +554,16 @@ internal static class StateTransfer
 
         if (runtime != declared && !declared.IsValueType)
         {
-            why = $"the value is a '{FriendlyTypeName(runtime)}' held in a '{FriendlyTypeName(declared)}' "
-                  + "field, and rebuilding it would substitute the declared type for the real one.";
+            why = $"{what} holds a '{FriendlyTypeName(runtime)}' where a '{FriendlyTypeName(declared)}' "
+                  + "was declared, and rebuilding it would substitute the declared type for the real one.";
 
             return false;
         }
 
-        return IsFaithfulType(declared, value, out why);
+        return IsFaithfulType(declared, value, walk, out why);
     }
 
-    private static bool IsFaithfulType(Type type, object? value, out string? why)
+    private static bool IsFaithfulType(Type type, object? value, FaithfulnessWalk walk, out string? why)
     {
         why = null;
 
@@ -494,7 +573,7 @@ internal static class StateTransfer
             return true;
 
         if (underlying.IsDefined(typeof(BenchmarkStateAttribute), inherit: false))
-            return true;
+            return IsFaithfulState(underlying, value, walk, out why);
 
         if (underlying.IsArray)
         {
@@ -505,7 +584,10 @@ internal static class StateTransfer
                 return false;
             }
 
-            return IsFaithfulType(underlying.GetElementType()!, value: null, out why);
+            var element = underlying.GetElementType()!;
+
+            return IsFaithfulType(element, value: null, walk, out why)
+                   && AllItemsFaithful(element, value as IEnumerable, walk, out why);
         }
 
         if (underlying.IsGenericType)
@@ -513,25 +595,47 @@ internal static class StateTransfer
             var definition = underlying.GetGenericTypeDefinition();
             var arguments = underlying.GetGenericArguments();
 
-            if (definition == typeof(List<>)
-                || definition == typeof(IReadOnlyList<>)
-                || definition == typeof(KeyValuePair<,>)
-                || definition == typeof(Memory<>)
-                || definition == typeof(ReadOnlyMemory<>))
+            if (definition == typeof(List<>) || definition == typeof(IReadOnlyList<>))
             {
-                return AllFaithful(arguments, out why);
+                return AllFaithful(arguments, walk, out why)
+                       && AllItemsFaithful(arguments[0], value as IEnumerable, walk, out why);
             }
 
-            if (definition == typeof(Dictionary<,>) || definition == typeof(HashSet<>))
+            if (definition == typeof(KeyValuePair<,>))
+                return AllFaithful(arguments, walk, out why) && PairFaithful(underlying, value, walk, out why);
+
+            if (definition == typeof(Memory<>) || definition == typeof(ReadOnlyMemory<>))
             {
-                return AllFaithful(arguments, out why)
-                       && HasDefaultComparer(underlying, value, typeof(EqualityComparer<>), arguments[0], out why);
+                return AllFaithful(arguments, walk, out why)
+                       && AllItemsFaithful(arguments[0], BufferOf(underlying, arguments[0], value), walk, out why);
             }
 
-            if (definition == typeof(SortedDictionary<,>) || definition == typeof(SortedSet<>))
+            if (definition == typeof(Dictionary<,>))
             {
-                return AllFaithful(arguments, out why)
-                       && HasDefaultComparer(underlying, value, typeof(Comparer<>), arguments[0], out why);
+                return AllFaithful(arguments, walk, out why)
+                       && HasDefaultComparer(underlying, value, typeof(EqualityComparer<>), arguments[0], out why)
+                       && AllEntriesFaithful(arguments[0], arguments[1], value, walk, out why);
+            }
+
+            if (definition == typeof(HashSet<>))
+            {
+                return AllFaithful(arguments, walk, out why)
+                       && HasDefaultComparer(underlying, value, typeof(EqualityComparer<>), arguments[0], out why)
+                       && AllItemsFaithful(arguments[0], value as IEnumerable, walk, out why);
+            }
+
+            if (definition == typeof(SortedDictionary<,>))
+            {
+                return AllFaithful(arguments, walk, out why)
+                       && HasDefaultComparer(underlying, value, typeof(Comparer<>), arguments[0], out why)
+                       && AllEntriesFaithful(arguments[0], arguments[1], value, walk, out why);
+            }
+
+            if (definition == typeof(SortedSet<>))
+            {
+                return AllFaithful(arguments, walk, out why)
+                       && HasDefaultComparer(underlying, value, typeof(Comparer<>), arguments[0], out why)
+                       && AllItemsFaithful(arguments[0], value as IEnumerable, walk, out why);
             }
         }
 
@@ -542,17 +646,316 @@ internal static class StateTransfer
         return false;
     }
 
-    private static bool AllFaithful(Type[] types, out string? why)
+    /// <summary>
+    ///     Walks the members of a type whose author opted in with
+    ///     <see cref="BenchmarkStateAttribute" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The attribute used to end the walk: the type was admitted and nothing inside it was
+    ///         looked at. That made it a wider claim than its own documentation describes, because it
+    ///         silently waived the rules the rest of this class exists to enforce - an opted-in type
+    ///         holding a <c>Dictionary</c> built with <c>StringComparer.OrdinalIgnoreCase</c> never
+    ///         reached <see cref="HasDefaultComparer" /> at all, and arrived with a different lookup
+    ///         cost under the same name. The comparer is the crux of the whole rule; an escape hatch
+    ///         that waives it is not an escape hatch, it is a hole.
+    ///     </para>
+    ///     <para>
+    ///         So the attribute now claims what it reads as - <i>this type is transferable</i> - and
+    ///         every member is held to the ordinary rule. What it still cannot check, and what it is
+    ///         really for, is whether a member's value means something outside its own contents.
+    ///     </para>
+    ///     <para>
+    ///         A member the serializer cannot restore is refused rather than accepted, because the
+    ///         alternative is the quietest failure available. The payload is written by
+    ///         System.Text.Json, which restores public fields and properties with a setter and nothing
+    ///         else - but it <i>writes</i> more than it can read back. A public readonly field and a
+    ///         get-only property both appear in the JSON, in full, and are both silently discarded on
+    ///         arrival; a private field carrying the type's real state never appears at all. Each one
+    ///         reaches the worker as its default, which is precisely the fabricated-closure failure
+    ///         this mechanism was built to end.
+    ///     </para>
+    /// </remarks>
+    private static bool IsFaithfulState(Type type, object? value, FaithfulnessWalk walk, out string? why)
+    {
+        why = null;
+
+        if (!walk.TryDescend(type, out why))
+            return false;
+
+        var tracked = value is not null && !type.IsValueType;
+
+        if (tracked && !walk.Visiting.Add(value!))
+        {
+            why = $"'{FriendlyTypeName(type)}' refers back to itself, and a graph with a cycle in it "
+                  + "cannot be rebuilt as one graph in another process.";
+
+            return false;
+        }
+
+        try
+        {
+            foreach (var field in InstanceFieldsOf(type))
+            {
+                if (SerializerCannotRestore(field, type) is { } lost)
+                {
+                    why = $"'{FriendlyTypeName(type)}' carries {lost}, which is written to the payload "
+                          + "but cannot be restored from it, so it would arrive at its default. Make it "
+                          + "a public field or a property with a setter, or build the value in the "
+                          + "measuring process with a prepare delegate.";
+
+                    return false;
+                }
+
+                var position = $"its member '{MemberNameOf(field, type)}'";
+
+                // With no instance in hand there is nothing to inspect, so the member is checked for
+                // the type it declares alone. Reading the absent value as a null would refuse every
+                // non-nullable member of a type reached as an element type rather than as a value.
+                var faithful = value is null
+                    ? IsFaithfulType(field.FieldType, null, walk, out why)
+                    : IsFaithfulValue(field.FieldType, field.GetValue(value), position, walk, out why);
+
+                if (faithful)
+                    continue;
+
+                // The inner rule names the position for the failures that have one; the type-shaped
+                // ones name only a type, and a reader given 'Stream is not transferable' still has to
+                // find which member that was.
+                if (why is not null && !why.StartsWith(position, StringComparison.Ordinal))
+                    why = $"{position} is not transferable: {why}";
+
+                return false;
+            }
+
+            return true;
+        }
+        finally
+        {
+            if (tracked)
+                walk.Visiting.Remove(value!);
+
+            walk.Ascend();
+        }
+    }
+
+    /// <summary>
+    ///     Checks the actual elements of a collection, when the element type is one a subclass could
+    ///     be substituted for.
+    /// </summary>
+    /// <remarks>
+    ///     The <see cref="CanVaryAtRuntime" /> guard is what keeps this affordable. An <c>int[]</c>, a
+    ///     <c>string[]</c> or a <c>List&lt;Guid&gt;</c> cannot hold anything but what it declares, so
+    ///     the walk stops before enumerating a single element - which matters, because these are the
+    ///     large captures.
+    /// </remarks>
+    private static bool AllItemsFaithful(
+        Type declaredItem,
+        IEnumerable? items,
+        FaithfulnessWalk walk,
+        out string? why)
+    {
+        why = null;
+
+        if (items is null || !CanVaryAtRuntime(declaredItem))
+            return true;
+
+        foreach (var item in items)
+        {
+            if (!walk.TryInspect(out why))
+                return false;
+
+            if (!IsFaithfulValue(declaredItem, item, "one of its elements", walk, out why))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool AllEntriesFaithful(
+        Type keyType,
+        Type valueType,
+        object? value,
+        FaithfulnessWalk walk,
+        out string? why)
+    {
+        why = null;
+
+        if (!CanVaryAtRuntime(keyType) && !CanVaryAtRuntime(valueType))
+            return true;
+
+        if (value is not IDictionary entries)
+            return true;
+
+        foreach (DictionaryEntry entry in entries)
+        {
+            if (!walk.TryInspect(out why))
+                return false;
+
+            if (CanVaryAtRuntime(keyType)
+                && !IsFaithfulValue(keyType, entry.Key, "one of its keys", walk, out why))
+            {
+                return false;
+            }
+
+            if (CanVaryAtRuntime(valueType)
+                && !IsFaithfulValue(valueType, entry.Value, "one of its values", walk, out why))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool PairFaithful(Type pairType, object? value, FaithfulnessWalk walk, out string? why)
+    {
+        why = null;
+
+        if (value is null)
+            return true;
+
+        foreach (var (name, position) in new[] { ("Key", "its key"), ("Value", "its value") })
+        {
+            var property = pairType.GetProperty(name)!;
+
+            if (!CanVaryAtRuntime(property.PropertyType))
+                continue;
+
+            if (!IsFaithfulValue(property.PropertyType, property.GetValue(value), position, walk, out why))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     The array behind a <c>Memory&lt;T&gt;</c>, and only when its elements need inspecting -
+    ///     <c>ToArray</c> copies, which is not worth paying for a <c>Memory&lt;byte&gt;</c> that cannot
+    ///     vary.
+    /// </summary>
+    private static IEnumerable? BufferOf(Type memoryType, Type element, object? value)
+        => value is null || !CanVaryAtRuntime(element)
+            ? null
+            : memoryType.GetMethod("ToArray", Type.EmptyTypes)?.Invoke(value, null) as IEnumerable;
+
+    /// <summary>
+    ///     Whether a subclass of <paramref name="type" /> could be sitting in a position declared as
+    ///     it. Arrays are included because array assignment is covariant, so a <c>Shape[]</c> position
+    ///     genuinely can hold a <c>Square[]</c> even though an array type reports itself sealed.
+    /// </summary>
+    private static bool CanVaryAtRuntime(Type type)
+        => !type.IsValueType && (type.IsArray || !type.IsSealed);
+
+    private static bool AllFaithful(Type[] types, FaithfulnessWalk walk, out string? why)
     {
         foreach (var type in types)
         {
-            if (!IsFaithfulType(type, value: null, out why))
+            if (!IsFaithfulType(type, value: null, walk, out why))
                 return false;
         }
 
         why = null;
 
         return true;
+    }
+
+    /// <summary>
+    ///     Names the member System.Text.Json will drop on arrival, or <c>null</c> when it will carry
+    ///     it. Verified against the serializer rather than reasoned about: a public readonly field and
+    ///     a get-only property are both <i>written</i> and both discarded on read.
+    /// </summary>
+    private static string? SerializerCannotRestore(FieldInfo field, Type owner)
+    {
+        if (field.IsPublic)
+            return field.IsInitOnly ? $"a public readonly field '{field.Name}'" : null;
+
+        if (BackingPropertyOf(field, owner) is { } property)
+            return property.SetMethod is { IsPublic: true } ? null : $"a get-only property '{property.Name}'";
+
+        return $"a private field '{field.Name}'";
+    }
+
+    /// <summary>
+    ///     The auto-property a compiler-generated backing field belongs to, or <c>null</c> when the
+    ///     field is one the author declared themselves.
+    /// </summary>
+    private static PropertyInfo? BackingPropertyOf(FieldInfo field, Type owner)
+    {
+        if (!field.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
+            return null;
+
+        var name = field.Name;
+
+        if (!name.StartsWith('<'))
+            return null;
+
+        var close = name.IndexOf('>', StringComparison.Ordinal);
+
+        if (close < 2)
+            return null;
+
+        return owner.GetProperty(
+            name[1..close],
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+    }
+
+    /// <summary>The member as its author wrote it - the property name, for a backing field.</summary>
+    private static string MemberNameOf(FieldInfo field, Type owner)
+        => BackingPropertyOf(field, owner)?.Name ?? field.Name;
+
+    /// <summary>
+    ///     Bounds the value walk, so a deep or enormous opted-in graph refuses rather than running out
+    ///     of stack or spending measurable time in the coordinator.
+    /// </summary>
+    private sealed class FaithfulnessWalk
+    {
+        /// <summary>Nesting of opted-in types, which - unlike a display class chain - is unbounded.</summary>
+        private const int MaxStateDepth = 16;
+
+        /// <summary>
+        ///     How many individual elements are type-checked before the walk gives up. Only positions
+        ///     that <see cref="CanVaryAtRuntime" /> counts against it, so the collections that reach it
+        ///     are large collections of polymorphism-capable objects - exactly the shape a prepare
+        ///     delegate is better at anyway.
+        /// </summary>
+        private const int MaxInspectedItems = 100_000;
+
+        private int _depth;
+
+        private int _inspected;
+
+        public HashSet<object> Visiting { get; } = new(ReferenceEqualityComparer.Instance);
+
+        public bool TryDescend(Type type, out string? why)
+        {
+            why = null;
+
+            if (++_depth <= MaxStateDepth)
+                return true;
+
+            why = $"'{FriendlyTypeName(type)}' nests more than {MaxStateDepth} levels of transferable "
+                  + "state, which is not walked to the end. Build the value in the measuring process "
+                  + "with a prepare delegate instead.";
+
+            return false;
+        }
+
+        public void Ascend() => _depth--;
+
+        public bool TryInspect(out string? why)
+        {
+            why = null;
+
+            if (++_inspected <= MaxInspectedItems)
+                return true;
+
+            why = $"it contains more than {MaxInspectedItems:N0} elements whose type has to be checked "
+                  + "one by one, because a subclass could be substituted for any of them. Build the "
+                  + "value in the measuring process with a prepare delegate instead.";
+
+            return false;
+        }
     }
 
     /// <summary>
@@ -684,7 +1087,7 @@ internal static class StateTransfer
         return array;
     }
 
-    private static string NameOf(Type type)
+    internal static string NameOf(Type type)
         => type.AssemblyQualifiedName ?? type.FullName ?? type.Name;
 
     /// <summary>

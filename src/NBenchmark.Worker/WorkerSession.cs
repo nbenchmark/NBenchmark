@@ -950,7 +950,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         // The suite's own setup runs here, once, before any body is measured - which is the whole
         // reason it travels rather than running in the coordinator, where it would prepare state in a
         // process that goes on to measure nothing.
-        var receivers = new ResolvedReceivers(request.Receivers);
+        var receivers = new ResolvedReceivers(request.Receivers, context);
 
         if (!TryRunSuiteHook(context, request.SuiteSetup, receivers, "setup"))
             return;

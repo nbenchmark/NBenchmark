@@ -297,7 +297,8 @@ A few shapes are worth knowing because they do not read the way they lower:
 | `() => Work(local)` | if `local` can be sent faithfully | An `int`, a `string`, an `int[]` or a record of those is sent by value. A `Stream` is not. |
 | `() => Work(_field)` | if the whole object can be sent faithfully | Captures `this` - naming an instance member without a receiver carries the whole object, so every field of it has to qualify. |
 | `() => Work(StaticField)` | yes | A static needs no receiver. |
-| `widget.Compute` | if `widget` can be sent faithfully | A method group over a live object; the receiver is walked field by field like any other. |
+| `widget.Compute` | if `widget` can be sent faithfully | A method group over a live object; the receiver is walked field by field like any other, and rebuilt as the class `widget` actually is rather than the one that declared `Compute`. |
+| `() => Work(shapes)` where `shapes` is a `Shape[]` holding a `Square` | no | A collection is sent against its *element* type, so the square would arrive as a shape with its override gone. The elements are checked, and only when the element type is one a subclass could stand in for - an `int[]` or a `string[]` is never walked. |
 | `() => 43` beside `() => local` | yes | A non-capturing lambda keeps its isolation even when a sibling in the same scope captures. |
 
 `Add` is where capture reads as most idiomatic, and where it costs most. A suite is addressed as a *set* - one worker measures all of its bodies - so the first body that cannot be addressed takes every sibling in-process with it, including the ones that would have isolated fine on their own. The message says so:

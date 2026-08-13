@@ -349,6 +349,173 @@ public sealed class CapturedStateTransferTests : IDisposable
             .RunAsync();
     }
 
+    /// <summary>
+    ///     A method group over an <b>inherited</b> method is measured against the object it was taken
+    ///     from, not against the class that declared the method.
+    /// </summary>
+    /// <remarks>
+    ///     The receiver's type used to be inferred in the worker from the method's declaring type, on
+    ///     the reasoning that a lambda's receiver <i>is</i> its declaring type. True for a lambda and
+    ///     false for an inherited method: the coordinator walked the fields of a <c>TurboEngine</c>
+    ///     while the worker allocated an <c>Engine</c>. Because the derived class adds no fields, every
+    ///     token still resolved and every value still landed - so the run measured the base class's
+    ///     override under the derived class's name and said nothing. In-process it answered 4000; in a
+    ///     worker, 1000.
+    /// </remarks>
+    [Fact]
+    public void A_Method_Group_Over_An_Inherited_Method_Keeps_The_Derived_Override()
+    {
+        var saw = WorkerSaw(new TurboEngine().Tick);
+
+        Assert.NotNull(saw);
+        Assert.Contains("rpm=4000", saw);
+    }
+
+    /// <summary>
+    ///     The same substitution one level down: a lambda declared in a base class holds its
+    ///     <c>this</c> in a field declared as the base, and the value there can be a subclass.
+    /// </summary>
+    [Fact]
+    public void A_Lambda_Capturing_This_From_A_Derived_Instance_Keeps_The_Override()
+    {
+        var saw = WorkerSaw(new Triangle().Body(scale: 3));
+
+        Assert.NotNull(saw);
+        Assert.Contains("area=9", saw);
+    }
+
+    /// <summary>
+    ///     Two bodies on one object whose methods are declared at different points in the hierarchy
+    ///     bind whichever order they are measured in.
+    /// </summary>
+    /// <remarks>
+    ///     The receiver table entry is shared, so the type it was built as used to be settled by
+    ///     whichever body reached it first - and the bodies are shuffled. The suite passed or failed on
+    ///     the seed. Both declaration orders are run here because that is the difference the defect
+    ///     turned on.
+    /// </remarks>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Two_Bodies_On_One_Object_Bind_In_Either_Order(bool inheritedFirst)
+    {
+        var engine = new TurboEngine();
+        var suite = new BenchmarkSuite($"hierarchy-{inheritedFirst}");
+
+        // Method groups, not lambdas: two delegates on one object whose declaring types differ, which
+        // is the shape that made the entry's type depend on the run order.
+        if (inheritedFirst)
+            suite.Add("read", engine.Read).Add("boost", engine.Boost);
+        else
+            suite.Add("boost", engine.Boost).Add("read", engine.Read);
+
+        var results = await suite
+            .WithRunOrder(RunOrder.Declaration)
+            .WithIterations(4)
+            .WithWarmup(0)
+            .WithOpsPerSample(1)
+            .RunAsync();
+
+        Assert.All(results, r => Assert.False(r.Errored, r.ErrorMessage));
+        Assert.All(results, r => Assert.Equal(IsolationStatus.Isolated, r.IsolationStatus));
+    }
+
+    /// <summary>
+    ///     An array of a base type holding a subclass is refused. Serialization projects each element
+    ///     against the <i>element</i> type, so it would arrive as a base instance with the override
+    ///     gone - the substitution the field-level check prevents, one level down.
+    /// </summary>
+    [Fact]
+    public void A_Collection_Holding_A_Subclass_Of_Its_Element_Type_Is_Refused()
+    {
+        Node[] nodes = [new Leaf { Weight = 1, Extra = 2 }];
+
+        Assert.False(
+            BodyRef.TryCreate(() => nodes.Length, "test", out _, out var refusal, receivers: Table()));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains("Leaf", refusal.Message);
+        Assert.Contains("Node", refusal.Message);
+    }
+
+    /// <summary>An array whose elements really are their declared type still crosses.</summary>
+    [Fact]
+    public void A_Collection_Of_Its_Own_Element_Type_Is_Faithful()
+    {
+        Node[] nodes = [new Node { Weight = 1 }, new Node { Weight = 2 }];
+
+        Assert.True(StateTransfer.IsFaithful(typeof(Node[]), nodes, out var why), why);
+    }
+
+    /// <summary>
+    ///     An element type that cannot be subclassed is never enumerated, so the large captures pay
+    ///     nothing for the check above.
+    /// </summary>
+    [Fact]
+    public void A_Sealed_Element_Type_Still_Transfers()
+    {
+        var words = new[] { "a", "b", "c" };
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"joined={string.Concat(words)}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("joined=abc", saw);
+    }
+
+    /// <summary>
+    ///     <c>[BenchmarkState]</c> no longer waives the comparer rule for what the type holds.
+    /// </summary>
+    /// <remarks>
+    ///     The attribute used to end the walk, so an opted-in type was admitted and nothing inside it
+    ///     was looked at. That made it a way to get a case-insensitive dictionary across without ever
+    ///     reaching the check that exists to stop exactly that - the crux of the whole rule, waived by
+    ///     the escape hatch from it.
+    /// </remarks>
+    [Fact]
+    public void An_Opted_In_Type_Does_Not_Waive_The_Comparer_Rule()
+    {
+        var index = new Index { Entries = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) };
+
+        Assert.False(
+            BodyRef.TryCreate(() => index.Entries.Count, "test", out _, out var refusal, receivers: Table()));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains("comparer", refusal.Message);
+    }
+
+    /// <summary>
+    ///     State the serializer writes but cannot read back is refused rather than delivered as a
+    ///     default.
+    /// </summary>
+    /// <remarks>
+    ///     Verified against System.Text.Json rather than reasoned about: a private field never appears
+    ///     in the payload at all, while a public readonly field and a get-only property both appear in
+    ///     full and are silently discarded on arrival. All three used to be accepted, so an opted-in
+    ///     type whose real state was private reached the worker empty and measured a different program.
+    /// </remarks>
+    [Theory]
+    [InlineData(typeof(PrivateState), "private field")]
+    [InlineData(typeof(GetOnlyState), "get-only property")]
+    [InlineData(typeof(ReadonlyFieldState), "public readonly field")]
+    public void State_The_Serializer_Cannot_Restore_Is_Refused(Type stateType, string expected)
+    {
+        var state = Activator.CreateInstance(stateType, nonPublic: true);
+
+        Assert.False(StateTransfer.IsFaithful(stateType, state, out var why));
+
+        Assert.NotNull(why);
+        Assert.Contains(expected, why);
+    }
+
+    /// <summary>The documented shape - a record of plain data - still crosses.</summary>
+    [Fact]
+    public void An_Opted_In_Record_Of_Plain_Data_Is_Still_Faithful()
+    {
+        var query = new Query("select", 10, ["id", "name"]);
+
+        Assert.True(StateTransfer.IsFaithful(typeof(Query), query, out var why), why);
+    }
+
     /// <summary>A table with the default budget, for the addressing-level cases below.</summary>
     private static ReceiverTable Table() => new(MeasurementOptions.DefaultMaxTransferredStateBytes);
 
@@ -360,5 +527,84 @@ public sealed class CapturedStateTransferTests : IDisposable
         private readonly Stream _stream = Stream.Null;
 
         public long Use() => _stream.Length;
+    }
+
+    private class Engine
+    {
+        protected int Rpm = 1000;
+
+        protected virtual int Multiplier => 1;
+
+        /// <summary>Declared here, so a method group over it addresses <c>Engine</c>.</summary>
+        public void Tick() => throw new InvalidOperationException($"rpm={Rpm * Multiplier}");
+
+        public int Read() => Rpm;
+    }
+
+    private sealed class TurboEngine : Engine
+    {
+        protected override int Multiplier => 4;
+
+        public int Boost() => Rpm * 2;
+    }
+
+    private class Shape
+    {
+        public virtual int Sides => 0;
+
+        /// <summary>
+        ///     Declared on the base and capturing both <c>this</c> and a local, so Roslyn interposes a
+        ///     display class whose <c>&lt;&gt;4__this</c> field is typed <c>Shape</c> while the value
+        ///     there is whatever subclass built it.
+        /// </summary>
+        public Action Body(int scale)
+        {
+            var factor = scale;
+
+            return () => throw new InvalidOperationException($"area={Sides * factor}");
+        }
+    }
+
+    private sealed class Triangle : Shape
+    {
+        public override int Sides => 3;
+    }
+
+    [BenchmarkState]
+    private class Node
+    {
+        public int Weight { get; set; }
+    }
+
+    [BenchmarkState]
+    private sealed class Leaf : Node
+    {
+        public int Extra { get; set; }
+    }
+
+    [BenchmarkState]
+    private sealed class Index
+    {
+        public Dictionary<string, int> Entries { get; init; } = [];
+    }
+
+    [BenchmarkState]
+    private sealed class PrivateState
+    {
+        private readonly int[] _data = [1, 2, 3];
+
+        public int Length => _data.Length;
+    }
+
+    [BenchmarkState]
+    private sealed class GetOnlyState
+    {
+        public int[] Data { get; } = [1, 2, 3];
+    }
+
+    [BenchmarkState]
+    private sealed class ReadonlyFieldState
+    {
+        public readonly int[] Data = [1, 2, 3];
     }
 }

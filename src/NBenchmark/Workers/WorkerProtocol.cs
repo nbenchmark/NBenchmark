@@ -74,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 10;
+    public const int Version = 11;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
