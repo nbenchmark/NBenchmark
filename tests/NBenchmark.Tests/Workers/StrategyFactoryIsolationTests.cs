@@ -1,3 +1,4 @@
+using System.Reflection;
 using NBenchmark.Stats;
 using NBenchmark.Workers;
 using Xunit;
@@ -166,6 +167,59 @@ public sealed class StrategyFactoryIsolationTests : IDisposable
         var candidate = results.Single(r => r.Name == "b");
         Assert.Equal(0.001, candidate.PValue);
     }
+
+    /// <summary>
+    ///     A factory that is perfectly addressable and fails once it runs in the worker leaves the
+    ///     substitution on the results.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The coordinator can only check that a factory can be <i>found</i>; whether it works is
+    ///         not knowable until it runs in the process that measures. When it does not, the group is
+    ///         still measurable and the engine falls back to its built-in detector - which is the right
+    ///         call, and used to be announced on stderr and nowhere else.
+    ///     </para>
+    ///     <para>
+    ///         That is not loud, it just looks it. The coordinator redirects worker stderr into a
+    ///         rolling buffer read only on the worker-died and timed-out paths, so a group that
+    ///         completed normally threw the warning away and reported an ordinary isolated row. What
+    ///         the reader was owed is on the row: these numbers were scored by a method they did not
+    ///         choose.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task DetectorFactory_ThatFailsInTheWorker_WarnsOnEveryResult()
+    {
+        var results = await Fast(new BenchmarkSuite("substituted")
+                .Add("work", static () => _ = Guid.NewGuid())
+                .WithOutlierDetector(FailingDetector))
+            .RunAsync();
+
+        var result = Assert.Single(results);
+
+        Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
+
+        var warning = Assert.Single(result.Warnings, w => w.Contains(nameof(IOutlierDetector), StringComparison.Ordinal));
+
+        Assert.Contains("built-in", warning, StringComparison.Ordinal);
+        Assert.Contains("no detector is available here", warning, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Addressable from the coordinator, and unable to produce anything once it runs in the worker,
+    ///     which is the split this test exists for.
+    /// </summary>
+    /// <remarks>
+    ///     Keyed on the entry assembly rather than throwing outright because
+    ///     <see cref="BenchmarkSuite.WithOutlierDetector(Func{IOutlierDetector})" /> invokes the factory
+    ///     where it is registered - so a factory that always threw would fail at registration and never
+    ///     reach a worker at all. This stands in for the real shape: a factory that reads something
+    ///     present beside the benchmark and absent beside <c>nbworker</c>.
+    /// </remarks>
+    private static IOutlierDetector FailingDetector()
+        => Assembly.GetEntryAssembly()?.GetName().Name == "nbworker"
+            ? throw new InvalidOperationException("no detector is available here")
+            : new TrimFractionDetector(0.25);
 
     /// <summary>
     ///     A detector whose trimming fraction is a constructor argument, so the argument is visible in the

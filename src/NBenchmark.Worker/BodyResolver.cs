@@ -544,9 +544,13 @@ internal static class BodyResolver
             return false;
         }
 
+        // Walked once for the whole receiver, and by the same function the coordinator used - so the
+        // two sides are looking at one list rather than at two derivations of it.
+        var fields = StateTransfer.InstanceFieldsOf(type);
+
         foreach (var capture in captures)
         {
-            if (!TryResolveField(type, capture, out var field, out error))
+            if (!TryResolveField(type, fields, capture, out var field, out error))
                 return false;
 
             object? value;
@@ -572,7 +576,9 @@ internal static class BodyResolver
             {
                 field!.SetValue(instance, value);
             }
-            catch (Exception ex) when (ex is ArgumentException or FieldAccessException)
+            catch (Exception ex) when (ex is ArgumentException
+                                           or FieldAccessException
+                                           or InvalidOperationException)
             {
                 error = $"the captured value for '{capture.FieldName}' could not be assigned: {ex.Message}";
                 return false;
@@ -627,46 +633,113 @@ internal static class BodyResolver
         return true;
     }
 
+    /// <summary>
+    ///     Finds the field a capture names among the receiver's own instance fields.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Matched against <see cref="StateTransfer.InstanceFieldsOf" /> - the same walk, over the
+    ///         same type, that produced the captures on the other side - rather than resolved off a
+    ///         module. Resolving off <c>type.Module</c> answered three questions wrongly at once.
+    ///     </para>
+    ///     <para>
+    ///         A <b>generic</b> display class resolved to the open definition's field, whose type is
+    ///         still <c>T</c> and which cannot be set on an instance of the closed type. The repair for
+    ///         that - <c>GetFieldFromHandle(openHandle, closedTypeHandle)</c> - is rejected by the
+    ///         runtime outright ("field handle with declaring type ... are incompatible"), so the branch
+    ///         written to support a capturing lambda in a generic context could only ever throw, and
+    ///         reported it as a bad token. A closed type's own <c>GetFields</c> carries the same
+    ///         metadata token with the type argument substituted, which is what was wanted throughout.
+    ///     </para>
+    ///     <para>
+    ///         A <b>base type in another assembly</b> contributes tokens belonging to <i>its</i> module,
+    ///         and a module-scoped lookup either failed or - worse - resolved an unrelated field that
+    ///         happened to share the number and the declared type, writing the value somewhere else
+    ///         and leaving the real field at its default. Walking the hierarchy finds each level's
+    ///         fields in the scope that defines them.
+    ///     </para>
+    ///     <para>
+    ///         And a token names anything in a module, including a <b>static</b> field, on which
+    ///         <c>SetValue</c> quietly ignores its instance argument and mutates process-wide state.
+    ///         Nothing here validated that; the walk excludes statics by construction, and cannot
+    ///         return a field belonging to some other type.
+    ///     </para>
+    /// </remarks>
     private static bool TryResolveField(
         Type type,
+        FieldInfo[] fields,
         CapturedField capture,
         out FieldInfo? field,
         out string? error)
     {
-        field = null;
         error = null;
 
-        try
-        {
-            if (type.Module.ResolveField(capture.FieldToken) is not { } resolved)
-            {
-                error = $"metadata token 0x{capture.FieldToken:X8} is not a field.";
-                return false;
-            }
+        // Token and name together, because a token is unique only within its own module and a base
+        // type can be declared in another assembly. The name settles which level was meant; it is a
+        // tiebreak rather than the address, so a rename still cannot bind a different field.
+        field = FindField(fields, capture.FieldToken, capture.FieldName, out var ambiguous);
 
-            // A generic display class - a lambda declared inside a generic method - resolves its
-            // fields against the open type, and those cannot be set on an instance of the closed one.
-            field = type.IsConstructedGenericType
-                ? FieldInfo.GetFieldFromHandle(resolved.FieldHandle, type.TypeHandle)
-                : resolved;
-        }
-        catch (Exception ex) when (ex is ArgumentException or BadImageFormatException)
+        if (field is null && !ambiguous)
+            field = FindField(fields, capture.FieldToken, name: null, out ambiguous);
+
+        if (ambiguous)
         {
-            error = $"metadata token 0x{capture.FieldToken:X8} could not be resolved as a field: {ex.Message}";
+            error = $"'{type.Name}' has more than one instance field matching '{capture.FieldName}' "
+                    + $"(token 0x{capture.FieldToken:X8}), so which one the address meant is not decidable.";
+
             return false;
         }
 
-        var actual = field!.FieldType.AssemblyQualifiedName ?? field.FieldType.FullName ?? field.FieldType.Name;
+        if (field is null)
+        {
+            error = $"no instance field matching '{capture.FieldName}' (token 0x{capture.FieldToken:X8}) "
+                    + $"was found on '{type.Name}'.";
+
+            return false;
+        }
+
+        var actual = field.FieldType.AssemblyQualifiedName ?? field.FieldType.FullName ?? field.FieldType.Name;
 
         if (!string.Equals(actual, capture.DeclaredTypeName, StringComparison.Ordinal))
         {
-            error = $"the field '{field.Name}' is declared '{field.FieldType.Name}' here but the "
+            error = $"the field '{field.Name}' is declared '{actual}' here but the "
                     + $"address carries a value for '{capture.DeclaredTypeName}'.";
 
             return false;
         }
 
         return true;
+    }
+
+    /// <summary>
+    ///     The single field matching a token - and, when one is given, a name - or <c>null</c> with
+    ///     <paramref name="ambiguous" /> set when more than one does.
+    /// </summary>
+    private static FieldInfo? FindField(FieldInfo[] fields, int token, string? name, out bool ambiguous)
+    {
+        FieldInfo? found = null;
+
+        ambiguous = false;
+
+        foreach (var candidate in fields)
+        {
+            if (candidate.MetadataToken != token)
+                continue;
+
+            if (name is not null && !string.Equals(candidate.Name, name, StringComparison.Ordinal))
+                continue;
+
+            if (found is not null)
+            {
+                ambiguous = true;
+
+                return null;
+            }
+
+            found = candidate;
+        }
+
+        return found;
     }
 
     private static bool TryDecode(CapturedField capture, Type declared, out object? value, out string? error)

@@ -1,3 +1,4 @@
+using NBenchmark.Workers;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -89,6 +90,36 @@ public class MeasurementOptionsTests
         var opts = new MeasurementOptions { HistogramBucketCount = value };
         Assert.Equal(value, opts.HistogramBucketCount);
     }
+
+    /// <summary>
+    ///     The transferred-state budget is bounded, because raising it past the transport's own limit
+    ///     exchanges a refusal that names the remedy for a frame that cannot be written at all.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(MeasurementOptions.MaxTransferredStateCeiling + 1)]
+    [InlineData(int.MaxValue)]
+    public void MaxTransferredStateBytes_Rejects_Out_Of_Range_Values(int value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MeasurementOptions { MaxTransferredStateBytes = value });
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(MeasurementOptions.DefaultMaxTransferredStateBytes)]
+    [InlineData(MeasurementOptions.MaxTransferredStateCeiling)]
+    public void MaxTransferredStateBytes_Accepts_Valid_Values(int value)
+    {
+        var opts = new MeasurementOptions { MaxTransferredStateBytes = value };
+
+        Assert.Equal(value, opts.MaxTransferredStateBytes);
+    }
+
+    [Fact]
+    public void MaxTransferredStateCeiling_Stays_Under_The_Frame_Ceiling()
+        => Assert.True(MeasurementOptions.MaxTransferredStateCeiling < WorkerProtocol.MaxFrameBytes);
 
     [Fact]
     public void Independent_ForcesGc_And_KeepsAllocationTracking()

@@ -227,13 +227,21 @@ internal static class WorkerGroupRunner
                 WorkerDied = true,
             };
         }
-        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        catch (Exception ex) when (ex is IOException
+                                       or JsonException
+                                       or InvalidDataException
+                                       or InvalidOperationException)
         {
             // A torn or unreadable frame: the worker died while writing, or the stream desynchronized.
             // <see cref="FrameChannel.ReadAsync" /> throws <see cref="EndOfStreamException" /> (an
             // <see cref="IOException" />) when the pipe dies mid-frame, <see cref="InvalidDataException" />
-            // on a bad length prefix, and <see cref="JsonException" /> on a corrupt payload. None of these
-            // is the user's fault or something a retry of this group would fix, and none should take down
+            // on a bad length prefix, and <see cref="JsonException" /> on a corrupt payload.
+            //
+            // <see cref="InvalidOperationException" /> is the one that comes from *this* side: writing
+            // a frame past the protocol's size ceiling. Every other transport failure in this method is
+            // turned into a fault, and that one was not - so it escaped here, escaped the launcher, and
+            // took down the benchmark program over a frame that could simply have been reported. None of
+            // these is the user's fault or something a retry of this group would fix, and none should take down
             // the whole benchmark program - which is what happened before this catch, because every
             // caller was a bare await and <c>ProcessWorkerLauncher</c> caught only
             // <c>WorkerStartException</c>. A worker that hard-crashes mid-payload-write is the reachable

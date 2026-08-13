@@ -296,6 +296,14 @@ public record MeasurementOptions
     }
 
     /// <summary>
+    ///     The largest value <see cref="MaxTransferredStateBytes" /> may be set to: 32 MiB, half the
+    ///     protocol's 64 MiB frame ceiling.
+    /// </summary>
+    public const int MaxTransferredStateCeiling = 32 * 1024 * 1024;
+
+    private readonly int _maxTransferredStateBytes = DefaultMaxTransferredStateBytes;
+
+    /// <summary>
     ///     Ceiling on the encoded size of the values a benchmark's closure may send to a measurement
     ///     worker. Default <see cref="DefaultMaxTransferredStateBytes" /> (8 MiB).
     /// </summary>
@@ -312,8 +320,23 @@ public record MeasurementOptions
     ///         Exceeding it is a refusal naming the prepare delegate, not a truncation. A truncated
     ///         capture would measure a smaller input under the caller's name.
     ///     </para>
+    ///     <para>
+    ///         Bounded by <see cref="MaxTransferredStateCeiling" />, which is well under the frame
+    ///         ceiling this reasons about. Raising it past that point does not buy a larger capture -
+    ///         it exchanges a refusal that names the remedy for a frame the transport cannot write,
+    ///         and an unwritable frame is a dead group rather than a labelled one. The margin is
+    ///         deliberate: the encoded size counted here is the value's own, while the frame also
+    ///         carries the rest of the payload and pays for JSON escaping on top.
+    ///     </para>
     /// </remarks>
-    public int MaxTransferredStateBytes { get; init; } = DefaultMaxTransferredStateBytes;
+    public int MaxTransferredStateBytes
+    {
+        get => _maxTransferredStateBytes;
+        init => _maxTransferredStateBytes = value is > 0 and <= MaxTransferredStateCeiling
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value,
+                $"MaxTransferredStateBytes must be between 1 and {MaxTransferredStateCeiling}.");
+    }
 
     /// <summary>
     ///     How many raw samples an isolated worker returns per benchmark.

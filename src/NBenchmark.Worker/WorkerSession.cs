@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading.Channels;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
@@ -48,6 +49,18 @@ internal sealed class WorkerSession(FrameChannel channel)
     ///     rather than that it finished.
     /// </summary>
     private volatile bool _abandonedMidGroup;
+
+    /// <summary>
+    ///     Set when the inbound stream became unreadable rather than merely ending, so the exit code
+    ///     distinguishes a corrupt frame from a normal shutdown.
+    /// </summary>
+    /// <remarks>
+    ///     Both end the pump and both close the channel, so without this they were indistinguishable
+    ///     from here - and the shared path returned <see cref="WorkerExitCode.Success" />. A protocol
+    ///     corruption exited 0 with an empty stderr, which is the least diagnosable outcome available
+    ///     for a defect that is always a real one: a build skew, or a coordinator killed mid-frame.
+    /// </remarks>
+    private volatile string? _protocolError;
 
     /// <summary>
     ///     Runs until end-of-stream or a shutdown frame. Returns the process exit code.
@@ -103,12 +116,23 @@ internal sealed class WorkerSession(FrameChannel channel)
             }
             catch (ChannelClosedException)
             {
-                // End of stream. The coordinator closed its write end - deliberately, or because it
-                // died. Either way this worker has nothing left to serve and no reason to linger.
+                // End of stream. The coordinator closed its write end - deliberately, because it died,
+                // or because what arrived could not be read at all. Either way this worker has nothing
+                // left to serve and no reason to linger.
                 //
                 // Said out loud because from the coordinator's side this is indistinguishable from a
                 // crash: its next read returns end-of-stream either way. Without this line a worker
                 // that exited for a perfectly ordinary reason looks like a lost process.
+                if (_protocolError is { } corruption)
+                {
+                    Console.Error.WriteLine(
+                        $"nbworker: the inbound stream could not be read ({corruption}); exiting. This is "
+                        + "a protocol or build-skew problem rather than a normal shutdown - the worker "
+                        + "ships inside the NBenchmark package and should always match the coordinator.");
+
+                    return WorkerExitCode.ProtocolError;
+                }
+
                 Console.Error.WriteLine(
                     _abandonedMidGroup
                         ? "nbworker: coordinator went away mid-group; stopped measuring and exiting."
@@ -178,10 +202,20 @@ internal sealed class WorkerSession(FrameChannel channel)
                 await writer.WriteAsync(frame, CancellationToken.None).ConfigureAwait(false);
             }
         }
+        catch (Exception ex) when (ex is InvalidDataException or JsonException)
+        {
+            // The stream desynchronized, or a payload arrived that is not a frame. Separated from the
+            // benign endings below because it is never benign: something wrote bytes this worker cannot
+            // parse, and folding it in with "the pipe closed" reported a defect as a clean exit.
+            //
+            // The coordinator's own read loop already treats these two as a torn frame
+            // (WorkerGroupRunner catches JsonException and InvalidDataException); this is the same
+            // judgement at the other end of the same transport.
+            _protocolError = $"{ex.GetType().Name}: {ex.Message}";
+        }
         catch (Exception ex) when (ex is IOException
                                        or ObjectDisposedException
-                                       or OperationCanceledException
-                                       or InvalidDataException)
+                                       or OperationCanceledException)
         {
             // The pipe broke or the session is shutting down. Either way there is nothing more to read
             // and the finally below is the whole response.
@@ -258,7 +292,11 @@ internal sealed class WorkerSession(FrameChannel channel)
             // request has to do it through the same context that discovery used.
             var context = new BenchmarkLoadContext(request.TargetAssemblyPath);
 
-            var options = ResolveStrategies(request, context);
+            // Collected rather than printed. A substitution here changes how every number in the group
+            // should be read, and it has to reach the rows themselves - see StreamingProgress.
+            var substitutions = new List<string>();
+
+            var options = ResolveStrategies(request, context, substitutions);
 
             _maxRawSamples = options.MaxRawSamples;
 
@@ -281,7 +319,8 @@ internal sealed class WorkerSession(FrameChannel channel)
                 cancellationToken,
                 options.StreamSamples,
                 _maxRawSamples,
-                _sampleSeed);
+                _sampleSeed,
+                substitutions);
 
             switch (request.Kind)
             {
@@ -1129,14 +1168,23 @@ internal sealed class WorkerSession(FrameChannel channel)
     ///     context, so a user's custom detector or significance test is the same class the
     ///     coordinator would have used - not a silent fallback to the built-in one.
     /// </summary>
-    private MeasurementOptions ResolveStrategies(RunGroupPayload request, BenchmarkLoadContext context)
+    /// <param name="substitutions">
+    ///     Collects a sentence per strategy that could not be rebuilt here. Each one is attached to
+    ///     every result in the group, because the alternative - a line on stderr - is only ever read
+    ///     when the worker dies, and a group that completes normally is exactly the case where the
+    ///     substitution goes unnoticed.
+    /// </param>
+    private MeasurementOptions ResolveStrategies(
+        RunGroupPayload request,
+        BenchmarkLoadContext context,
+        List<string> substitutions)
     {
         var options = request.Options;
 
         // A factory wins over a type name. It is the stronger mechanism - it reproduces the caller's own
         // object with its own constructor arguments, where a type name can only reach a parameterless
         // constructor - so where both are present the type name is the weaker fallback, not a conflict.
-        if (RunStrategyFactory<IOutlierDetector>(context, request, request.OutlierDetectorFactory) is
+        if (RunStrategyFactory<IOutlierDetector>(context, request, request.OutlierDetectorFactory, substitutions) is
             { } detector)
         {
             options = options with { OutlierDetector = detector };
@@ -1145,11 +1193,12 @@ internal sealed class WorkerSession(FrameChannel channel)
         {
             options = options with
             {
-                OutlierDetector = Construct<IOutlierDetector>(detectorName, request.TargetAssemblyPath),
+                OutlierDetector = Construct<IOutlierDetector>(
+                    detectorName, request.TargetAssemblyPath, substitutions),
             };
         }
 
-        if (RunStrategyFactory<ISignificanceTest>(context, request, request.SignificanceTestFactory) is
+        if (RunStrategyFactory<ISignificanceTest>(context, request, request.SignificanceTestFactory, substitutions) is
             { } test)
         {
             options = options with { SignificanceTest = test };
@@ -1158,7 +1207,8 @@ internal sealed class WorkerSession(FrameChannel channel)
         {
             options = options with
             {
-                SignificanceTest = Construct<ISignificanceTest>(testName, request.TargetAssemblyPath),
+                SignificanceTest = Construct<ISignificanceTest>(
+                    testName, request.TargetAssemblyPath, substitutions),
             };
         }
 
@@ -1169,15 +1219,17 @@ internal sealed class WorkerSession(FrameChannel channel)
     ///     Resolves and invokes an addressed factory, returning what it produced.
     /// </summary>
     /// <remarks>
-    ///     A failure here is reported on stderr and returns <c>null</c>, letting the caller fall through
+    ///     A failure here records a substitution and returns <c>null</c>, letting the caller fall through
     ///     to the type name and then to the built-in strategy. Not a fault: the benchmark bodies are still
-    ///     measurable, and losing a custom scoring method is worth a loud line rather than a dead group -
-    ///     but it must be loud, because the alternative is a result scored under a method nobody chose.
+    ///     measurable, and losing a custom scoring method is worth saying rather than a dead group - but
+    ///     it has to be said <i>on the results</i>, because the alternative is a row that reports itself
+    ///     as isolated and unremarkable while having been scored under a method nobody chose.
     /// </remarks>
     private static T? RunStrategyFactory<T>(
         BenchmarkLoadContext context,
         RunGroupPayload request,
-        AddressedFactory? factory)
+        AddressedFactory? factory,
+        List<string> substitutions)
         where T : class
     {
         if (factory is null)
@@ -1189,9 +1241,24 @@ internal sealed class WorkerSession(FrameChannel channel)
             return produced;
         }
 
-        Console.Error.WriteLine($"nbworker: {error} Using the built-in {typeof(T).Name} instead.");
+        Substituted<T>(substitutions, error ?? "it could not be built in the measuring process.");
 
         return null;
+    }
+
+    /// <summary>
+    ///     Records that a requested strategy was replaced by the built-in one, on stderr for a live
+    ///     reader and on every result for everybody else.
+    /// </summary>
+    private static void Substituted<T>(List<string> substitutions, string reason)
+    {
+        var warning = $"The {typeof(T).Name} requested for this run could not be rebuilt in the "
+                      + $"measurement worker, so these results were scored with the built-in "
+                      + $"{typeof(T).Name} instead: {reason}";
+
+        substitutions.Add(warning);
+
+        Console.Error.WriteLine($"nbworker: {warning}");
     }
 
     /// <summary>
@@ -1203,7 +1270,8 @@ internal sealed class WorkerSession(FrameChannel channel)
             ? message
             : char.ToUpperInvariant(message[0]) + message[1..];
 
-    private static T? Construct<T>(string typeName, string targetAssemblyPath) where T : class
+    private static T? Construct<T>(string typeName, string targetAssemblyPath, List<string> substitutions)
+        where T : class
     {
         // Types defined by the engine resolve from the default context; a user's own strategy
         // resolves from the target's graph. Trying the plain lookup first keeps the common case
@@ -1230,23 +1298,31 @@ internal sealed class WorkerSession(FrameChannel channel)
 
         if (type is null)
         {
-            // Not fatal: the engine falls back to its built-in strategy. Saying so on stderr is
-            // better than silently measuring under a different statistical method than requested.
-            Console.Error.WriteLine(
-                $"nbworker: could not load '{typeName}'; using the built-in {typeof(T).Name} instead.");
+            Substituted<T>(substitutions, $"the type '{typeName}' could not be loaded here.");
 
             return null;
         }
 
         try
         {
-            return Activator.CreateInstance(type) as T;
+            if (Activator.CreateInstance(type) as T is { } constructed)
+                return constructed;
+
+            // `as` returning null is the quietest failure in this method and used to be the only one
+            // with nothing to say: the object was built and is not a T, which happens when the
+            // interface itself resolved from two different load contexts.
+            Substituted<T>(
+                substitutions,
+                $"'{typeName}' was constructed but is not a {typeof(T).Name} this process recognises, "
+                + "which usually means NBenchmark was loaded twice.");
+
+            return null;
         }
         catch (Exception ex) when (ex is MissingMethodException or MemberAccessException or TargetInvocationException)
         {
-            Console.Error.WriteLine(
-                $"nbworker: '{typeName}' has no usable parameterless constructor ({ex.Message}); "
-                + $"using the built-in {typeof(T).Name} instead.");
+            Substituted<T>(
+                substitutions,
+                $"'{typeName}' has no usable parameterless constructor ({ex.Message}).");
 
             return null;
         }

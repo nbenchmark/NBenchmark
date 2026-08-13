@@ -516,8 +516,120 @@ public sealed class CapturedStateTransferTests : IDisposable
         Assert.True(StateTransfer.IsFaithful(typeof(Query), query, out var why), why);
     }
 
+    /// <summary>
+    ///     A capturing lambda declared inside a generic method crosses, with its value intact.
+    /// </summary>
+    /// <remarks>
+    ///     This shape was addressed by the coordinator, sent, and then refused on arrival for the whole
+    ///     time the mechanism has existed. The worker resolved the display class's field off the module,
+    ///     which yields the <i>open</i> definition's field - whose type is still <c>T</c> and which
+    ///     cannot be set on an instance of the closed type - and the repair it reached for,
+    ///     <c>GetFieldFromHandle</c>, is rejected by the runtime outright. The branch could only throw,
+    ///     and reported it as a bad metadata token. Nothing caught it because the one generic test in
+    ///     the suite used a <c>static</c> lambda, which takes the cached-singleton path instead.
+    /// </remarks>
+    [Fact]
+    public void A_Capture_Inside_A_Generic_Method_Arrives_Intact()
+    {
+        var saw = WorkerSaw(GenericBody(42));
+
+        Assert.NotNull(saw);
+        Assert.Contains("seed=42", saw);
+    }
+
+    /// <summary>The same shape one level out: a lambda in a method of a generic class.</summary>
+    [Fact]
+    public void A_Capture_Inside_A_Generic_Class_Arrives_Intact()
+    {
+        var saw = WorkerSaw(new Holder<string>().Body("abc"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("held=abc", saw);
+    }
+
+    /// <summary>
+    ///     A private field declared on a base class is restored, not left at its default.
+    /// </summary>
+    /// <remarks>
+    ///     The coordinator walks the hierarchy level by level, because <c>GetFields</c> does not return
+    ///     a base type's private fields - so the payload carries a token belonging to whichever level
+    ///     declared it. The worker now matches against the same walk rather than resolving the token
+    ///     off one module, which is what makes a base declared in another assembly findable at all.
+    /// </remarks>
+    [Fact]
+    public void An_Inherited_Private_Field_Arrives_Intact()
+    {
+        var saw = WorkerSaw(new AuditedLedger().Report);
+
+        Assert.NotNull(saw);
+        Assert.Contains("total=6", saw);
+    }
+
+    /// <summary>
+    ///     Two different receivers in one group pointing at one array are refused.
+    /// </summary>
+    /// <remarks>
+    ///     The identity set used to be scoped to each receiver while the byte budget was scoped to the
+    ///     table, so this case was invisible: the array was sent twice and rebuilt twice, and the two
+    ///     benchmarks stopped seeing each other's writes in a worker while sharing one array here. That
+    ///     is the exact divergence the receiver table was introduced to end, surviving one level up.
+    /// </remarks>
+    [Fact]
+    public void Two_Receivers_Sharing_One_Object_Are_Refused()
+    {
+        var shared = new int[4];
+        var ledger = new Tally { Entries = shared };
+        var table = Table();
+
+        Assert.True(
+            BodyRef.TryCreate(ledger.Count, "first", out _, out var first, receivers: table), first.Message);
+
+        Assert.False(
+            BodyRef.TryCreate(() => shared.Length, "second", out _, out var refusal, receivers: table));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains("this group", refusal.Message);
+    }
+
     /// <summary>A table with the default budget, for the addressing-level cases below.</summary>
     private static ReceiverTable Table() => new(MeasurementOptions.DefaultMaxTransferredStateBytes);
+
+    /// <summary>Capturing a value of the method's own type argument, so the display class is generic.</summary>
+    private static Action GenericBody<T>(T seed)
+    {
+        var local = seed;
+
+        return () => throw new InvalidOperationException($"seed={local}");
+    }
+
+    private sealed class Holder<T>
+    {
+        public Action Body(T seed)
+        {
+            var local = seed;
+
+            return () => throw new InvalidOperationException($"held={local}");
+        }
+    }
+
+    private class Ledger
+    {
+        private readonly int[] _entries = [1, 2, 3];
+
+        protected int Total => _entries.Sum();
+    }
+
+    private sealed class AuditedLedger : Ledger
+    {
+        public void Report() => throw new InvalidOperationException($"total={Total}");
+    }
+
+    private sealed class Tally
+    {
+        public int[] Entries = [];
+
+        public int Count() => Entries.Length;
+    }
 
     [BenchmarkState]
     private sealed record Query(string Text, int Limit, string[] Fields);

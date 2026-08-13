@@ -138,7 +138,11 @@ internal sealed record TransferredReceiver
 ///         reads.
 ///     </para>
 ///     <para>
-///         The budget is the table's, not each delegate's, because the wire cost is the table's.
+///         The budget is the table's, not each delegate's, because the wire cost is the table's - and
+///         so is the identity set, for the same reason one level up. Two <i>different</i> receivers in
+///         one group can point at one array, and a set scoped to each of them saw nothing wrong: the
+///         array was sent twice and rebuilt twice, so the two benchmarks stopped seeing each other's
+///         writes exactly as they did before this table existed. Aliasing is a fact about the group.
 ///     </para>
 /// </remarks>
 internal sealed class ReceiverTable(int budgetBytes)
@@ -146,6 +150,12 @@ internal sealed class ReceiverTable(int budgetBytes)
     private readonly Dictionary<object, int> _indices = new(ReferenceEqualityComparer.Instance);
 
     private readonly List<TransferredReceiver> _receivers = [];
+
+    /// <summary>
+    ///     Every object already committed to this group's wire form, so a second reference to one from
+    ///     anywhere in the group is refused rather than duplicated.
+    /// </summary>
+    private readonly HashSet<object> _seen = new(ReferenceEqualityComparer.Instance);
 
     private int _spent;
 
@@ -165,7 +175,11 @@ internal sealed class ReceiverTable(int budgetBytes)
         if (_indices.TryGetValue(receiver, out index))
             return true;
 
-        if (!StateTransfer.TryCapture(receiver, subject, budgetBytes, ref _spent, out var captured, out refusal))
+        // The receiver joins the group's identity set before its own walk, so a later receiver holding
+        // a reference to *it* is caught as sharing rather than rebuilt as a second object.
+        _seen.Add(receiver);
+
+        if (!StateTransfer.TryCapture(receiver, subject, budgetBytes, _seen, ref _spent, out var captured, out refusal))
         {
             index = -1;
 
@@ -257,23 +271,27 @@ internal static class StateTransfer
     ///     with a pointer at the prepare delegate, because at that size building the value in the
     ///     worker is both faster and more faithful than shipping it.
     /// </param>
+    /// <param name="seen">
+    ///     Every object the <b>group</b> has already committed to sending. Identity is tracked across
+    ///     the whole group rather than per field or per receiver: two fields pointing at one array are
+    ///     observably shared - a body that mutates through one sees it through the other - and
+    ///     rebuilding them as two arrays would measure a program the user did not write. That is as
+    ///     true of two fields on two different receivers as it is of two fields on one.
+    /// </param>
     public static bool TryCapture(
         object receiver,
         string subject,
         int budgetBytes,
+        HashSet<object> seen,
         ref int spent,
         out IReadOnlyList<CapturedField> captured,
         out Refusal refusal)
     {
         ArgumentNullException.ThrowIfNull(receiver);
+        ArgumentNullException.ThrowIfNull(seen);
 
         captured = [];
         refusal = Refusal.None;
-
-        // Identity is tracked across the whole set, not per field. Two fields pointing at one array
-        // are observably shared - a body that mutates through one sees it through the other - and
-        // rebuilding them as two arrays would measure a program the user did not write.
-        var seen = new HashSet<object>(ReferenceEqualityComparer.Instance);
 
         if (!TryCaptureInto(receiver, subject, seen, budgetBytes, depth: 0, ref spent, out captured, out refusal))
         {
@@ -410,9 +428,10 @@ internal static class StateTransfer
         {
             refusal = new Refusal(
                 RefusalReason.CapturedState,
-                $"{subject} '{FriendlyFieldName(field)}' as well as another field referring to the "
-                + "same object. Rebuilding them would produce two objects where the benchmark sees "
-                + "one, so the sharing has to be reproduced by a prepare delegate rather than sent.");
+                $"{subject} '{FriendlyFieldName(field)}' as well as something else in this group "
+                + "referring to the same object. Rebuilding them would produce two objects where the "
+                + "benchmark sees one, so the sharing has to be reproduced by a prepare delegate "
+                + "rather than sent.");
 
             return false;
         }

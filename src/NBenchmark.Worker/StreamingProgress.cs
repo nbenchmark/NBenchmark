@@ -24,9 +24,25 @@ internal sealed class StreamingProgress(
     CancellationToken cancellationToken,
     bool streamSamples = false,
     int maxRawSamples = MeasurementOptions.DefaultMaxRawSamples,
-    int sampleSeed = 0)
+    int sampleSeed = 0,
+    IReadOnlyList<string>? groupWarnings = null)
     : IBenchmarkProgress, IMeasurementObserver
 {
+    /// <summary>
+    ///     Warnings that are true of the whole group rather than of one benchmark, attached to every
+    ///     result on its way out.
+    /// </summary>
+    /// <remarks>
+    ///     What lives here is anything the worker decided before measuring that changes how a number
+    ///     should be read - so far, a custom outlier detector or significance test that could not be
+    ///     rebuilt here and was substituted for the built-in one. That used to be a line on stderr,
+    ///     which reads as loud and is not: the coordinator redirects the worker's stderr into a
+    ///     rolling buffer it only prints when the worker <i>dies</i>, so a group that completed
+    ///     normally discarded the warning and reported the row as isolated and unremarkable. A result
+    ///     scored by a method nobody chose has to say so on the result.
+    /// </remarks>
+    private readonly IReadOnlyList<string> _groupWarnings = groupWarnings ?? [];
+
     /// <summary>
     ///     Minimum gap between forwarded per-sample progress ticks. The engine calls
     ///     <see cref="OnIterationCompleted" /> once per sample and can take thousands of samples per
@@ -186,6 +202,11 @@ internal sealed class StreamingProgress(
         var final = _renameResult is { } rename
             ? result with { Name = rename(result.Name) }
             : result;
+
+        // Appended rather than replacing, so a warning the engine already attached to this benchmark
+        // survives alongside the group's.
+        if (_groupWarnings.Count > 0)
+            final = final with { Warnings = [.. final.Warnings, .. _groupWarnings] };
 
         // Varied per result so two benchmarks in one group do not keep the same sample positions.
         // Identical positions would not bias any single benchmark, but it would make a shared

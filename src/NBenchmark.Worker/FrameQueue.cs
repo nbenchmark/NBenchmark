@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NBenchmark.Workers;
 
 namespace NBenchmark.Worker;
@@ -21,7 +22,8 @@ namespace NBenchmark.Worker;
 ///     Invoked at most once, the first time a write proves the coordinator can no longer be reached.
 ///     Failures are still swallowed - the chain has to stay usable - but "the coordinator cannot be
 ///     written to" and "there is no point continuing to measure" are the same fact, and something has
-///     to carry it out of here.
+///     to carry it out of here. Only a genuine <i>transport</i> failure counts: a frame this process
+///     cannot write is dropped with a line on stderr and does not claim the coordinator is gone.
 /// </param>
 internal sealed class FrameQueue(
     FrameChannel channel,
@@ -52,7 +54,20 @@ internal sealed class FrameQueue(
 
     private async Task Continue(Task previous, WorkerFrame frame)
     {
-        await previous.ConfigureAwait(false);
+        // Awaited inside a try, because the chain has to survive a link that failed in a way this
+        // method did not anticipate. It did not: `await previous` sat outside, so one unhandled write
+        // failure faulted the tail, every later Enqueue rethrew it as its own, and the fault finally
+        // escaped `DrainAsync` - which is awaited in a `finally`, so the group ended with no terminal
+        // frame at all and the coordinator saw a worker that had simply vanished. One bad frame cost
+        // the group and its diagnosis.
+        try
+        {
+            await previous.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Whatever it was, the link that produced it has already said so.
+        }
 
         try
         {
@@ -71,6 +86,17 @@ internal sealed class FrameQueue(
             // Already shutting down. Deliberately *not* reported as coordinator loss: that is the
             // benign case, and treating a cancellation as proof the coordinator died would make the
             // conclusion self-fulfilling once anything cancels the group.
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or JsonException or NotSupportedException)
+        {
+            // This frame cannot be written, but the pipe is fine: it exceeded the protocol's size
+            // ceiling, or it carries a value the serializer refuses - a `[BenchmarkCase(typeof(X))]`
+            // argument is the reachable one. Deliberately *not* reported as transport failure, because
+            // the coordinator is still there and every other frame will reach it. Dropping this one
+            // loses a result; treating it as coordinator loss would lose the group.
+            Console.Error.WriteLine(
+                $"nbworker: a {frame.Kind} frame could not be sent and was dropped ({ex.GetType().Name}: "
+                + $"{ex.Message}).");
         }
     }
 

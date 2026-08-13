@@ -640,6 +640,28 @@ BenchmarkSuite fluent method: `.WithOutlierDetector(detector)`
 > [!NOTE]
 > The `--outlier` CLI flag always wins: passing it clears any programmatic `OutlierDetector` so the command line stays authoritative. See [Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors).
 
+### MaxTransferredStateBytes
+
+```csharp
+MaxTransferredStateBytes = 8 * 1024 * 1024   // 8 MiB default
+```
+
+Ceiling on the encoded size of the values a benchmark's closure sends to a measurement worker. A lambda that closes over data has that data sent to the process that measures it, so the benchmark is isolated without the value being rebuilt from a guess - and past a certain size that trade stops being worth making. A value large enough to approach the ceiling is one a prepare delegate would build in the worker faster than this can ship it, and more faithfully, because it would then be built by the same code in the same process rather than reconstructed there.
+
+Exceeding it is a refusal naming the prepare delegate, not a truncation - a truncated capture would measure a smaller input under your benchmark's name.
+
+Must be between `1` and `MeasurementOptions.MaxTransferredStateCeiling` (32 MiB). The bound is not arbitrary: raising it further does not buy a larger capture, it exchanges a refusal that names the remedy for a frame the transport cannot write, and an unwritable frame costs the whole group rather than one benchmark.
+
+```csharp
+// A benchmark over a genuinely large prepared input, kept isolated:
+new MeasurementOptions { MaxTransferredStateBytes = 24 * 1024 * 1024 };
+
+// Better, if the value can be described rather than shipped:
+Benchmark.Run(prepare: () => BuildIndex(), body: index => index.Lookup("key"));
+```
+
+See [Isolated runs](../features/isolated-runs.md).
+
 ### ConfidenceLevel
 
 ```csharp
