@@ -233,7 +233,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-The worker runs `BuildServices` in its own process and resolves the class from the container it builds there, so the run stays isolated. There is no overload taking a built `IServiceProvider` instead - a live container cannot cross a process boundary, so passing one is a **compile error** rather than a run that throws after discovery. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per instance and disposed after teardown. See the [Dependency Injection guide](./features/dependency-injection.md) for the full API and lifetime semantics.
+The worker runs `BuildServices` in its own process and resolves the class from the container it builds there, so the run stays isolated. There is no overload taking a built `IServiceProvider` instead - a live container cannot cross a process boundary, so passing one is a **compile error**. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes - the scope is created per instance and disposed after teardown. See the [Dependency Injection guide](./features/dependency-injection.md) for the full API and lifetime semantics.
 
 ### Can I use a DI container other than `Microsoft.Extensions.DependencyInjection`?
 

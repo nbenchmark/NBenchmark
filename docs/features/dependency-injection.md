@@ -70,10 +70,8 @@ Pick the granularity that matches your needs. All four take a factory - there is
 
 > [!NOTE]
 > None of these four take a built `IServiceProvider` - only a `Func<IServiceProvider>`. A container is
-> live code: it holds singletons and open connections that cannot cross a process boundary, so an
-> overload accepting one directly could only ever throw once discovery ran. Rather than let that
-> surface as a run-time refusal, the overload does not exist - passing a built container is a compile
-> error, not a thrown run.
+> live code: it holds singletons and open connections that cannot cross a process boundary, so
+> passing a built container is a compile error, not a run-time concern.
 
 Example: multiple assemblies, scoped lifetime:
 

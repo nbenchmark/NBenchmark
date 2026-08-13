@@ -89,7 +89,7 @@ The attribute admits the type; it does not admit what the type holds. Every memb
 
 When in doubt, do not use it. Naming the preparation costs one delegate and is strictly more faithful, because the value is then built in the process that measures it rather than reconstructed there.
 
-A value NBenchmark cannot vouch for is **declined, never guessed at**. Reconstructing it was measured: a fabricated closure does not throw, it returns plausible, silently wrong numbers. See [When isolation is refused](#when-isolation-is-refused) for what happens then.
+A value NBenchmark cannot vouch for is **declined, never guessed at**: a fabricated closure does not throw, it returns plausible, silently wrong numbers. See [When isolation is refused](#when-isolation-is-refused) for what happens then.
 
 If a specific benchmark genuinely pollutes its siblings - one that permanently fills a static cache, say - put it in its own suite. Harness mode's `[IsolatedProcess]` gives per-benchmark isolation when you need it named at the benchmark level.
 
@@ -185,7 +185,7 @@ A few things a worker must be *given* rather than able to *build*:
 - a **parameter value** outside the marshallable set (primitives, strings, enums, `decimal`, `DateTime`, `DateTimeOffset`, `TimeSpan`, `Guid`, `DateOnly`, `TimeOnly`, `Uri`, `Version`, `BigInteger`)
 - an assembly with **no file on disk** - single-file, in-memory or dynamically emitted
 
-Several things are *not* on this list that once were. A lambda capturing `this`, a capturing lifecycle delegate, a capturing `prepare` delegate, a custom `IOutlierDetector` or `ISignificanceTest` built with constructor arguments, a DI container built by a factory, and a capturing `[BenchmarkPlan]` factory all isolate - each is a recipe or a value, and both cross.
+Several things are *not* on this list: a lambda capturing `this`, a capturing lifecycle delegate, a capturing `prepare` delegate, a custom `IOutlierDetector` or `ISignificanceTest` built with constructor arguments, a DI container built by a factory, and a capturing `[BenchmarkPlan]` factory all isolate - each is a recipe or a value, and both cross.
 
 ```csharp
 .WithOutlierDetector(() => new KeepFastestDetector(fraction))
@@ -280,7 +280,7 @@ A worker does not re-run your entry point, so anything NBenchmark holds as *live
 - **Benchmarks declared in an assembly with no file on disk** - a single-file or in-memory build.
 - **A custom `IOutlierDetector` / `ISignificanceTest` passed as a constructed instance.** Only a type name would cross, and only a parameterless constructor could be reached at the other end, so `new KeepFastestDetector(0.9)` cannot be rebuilt from one. Pass a factory instead and the argument travels with it - see [Custom statistics](../guides/custom-statistics.md).
 
-The rule throughout is to refuse rather than guess. Reconstructing captured state was tried and did not fail loudly: it returned plausible, *wrong* numbers - a body over a captured `5` measured as though it were `1`, with no error and a tight confidence interval.
+The rule throughout is to refuse rather than guess. Reconstructing captured state does not fail loudly: it returns plausible, *wrong* numbers - a body over a captured `5` measures as though it were `1`, with no error and a tight confidence interval.
 
 ## When isolation is refused
 
