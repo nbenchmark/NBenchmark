@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NBenchmark.Engine;
 
 namespace NBenchmark.Workers;
@@ -45,6 +46,14 @@ internal static class InlineSuitePlan
         /// </summary>
         public ReceiverTable? Receivers { get; init; }
 
+        /// <summary>
+        ///     R5 part 2: benchmarks demoted to run in this process instead of costing the whole suite
+        ///     its isolation, each with why. Only <see cref="TryAddressWithDemotion" /> ever populates
+        ///     this - demotion is not a promise <see cref="MeasurementOptions.RequireIsolation" /> makes,
+        ///     so it only happens when isolation is best-effort.
+        /// </summary>
+        public IReadOnlyDictionary<string, string> DemotedNames { get; init; } = new Dictionary<string, string>();
+
         public static Decision Refuse(IsolationStatus status, string explanation) => new(status, explanation, []);
     }
 
@@ -77,6 +86,27 @@ internal static class InlineSuitePlan
                 + "worker constructs it the same way you did.");
         }
 
+        // Demotion is additive and opt-in by construction: RequireIsolation promises every benchmark
+        // isolates or the run is refused, and demoting only the offenders would quietly break that
+        // promise instead of honouring it loudly. The strict path below is untouched by R5 part 2 -
+        // same single pass, same all-or-nothing refusal, so a suite that already depends on that
+        // guarantee sees no change at all.
+        return options.RequireIsolation
+            ? TryAddressStrict(benchmarks, options, suiteSetup, suiteTeardown)
+            : TryAddressWithDemotion(benchmarks, options, suiteSetup, suiteTeardown);
+    }
+
+    /// <summary>
+    ///     Today's all-or-nothing addressing, unchanged: every benchmark has to cross or the whole
+    ///     suite is refused. What <see cref="TryAddress" /> uses under
+    ///     <see cref="MeasurementOptions.RequireIsolation" />.
+    /// </summary>
+    private static Decision TryAddressStrict(
+        IReadOnlyList<BenchmarkEnvelope> benchmarks,
+        MeasurementOptions options,
+        Delegate? suiteSetup,
+        Delegate? suiteTeardown)
+    {
         // The suite's lifecycle is addressed rather than refused for existing. A setup that captures
         // still cannot cross - it would have to run here and prepare state the benchmarks never see -
         // but one that captures nothing is exactly as reproducible in the worker as the bodies are.
@@ -179,6 +209,292 @@ internal static class InlineSuitePlan
                 SuiteTeardown = teardownRef,
                 Receivers = receivers,
             };
+    }
+
+    /// <summary>The suite's own lifecycle, as an <see cref="ownersOf" /> key that no benchmark name can collide with.</summary>
+    private const string SuiteLifecycleOwner = "\0suite-lifecycle";
+
+    /// <summary>
+    ///     R5 part 2: addresses what can be addressed, and demotes only the benchmarks that cannot -
+    ///     rather than costing the whole suite its isolation - by repeating the addressing pass with
+    ///     the offenders excluded until a pass finds none. What <see cref="TryAddress" /> uses when
+    ///     <see cref="MeasurementOptions.RequireIsolation" /> is off.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Why repeating the pass, rather than fixing up one pass's table.</b> Addressing a body
+    ///         that turns out to be excluded leaves its receiver's entries in the group's identity set
+    ///         - the budget it spent, the objects it claimed - so re-attempting the *remaining* bodies
+    ///         against that same table would answer against a table that never should have held them.
+    ///         A fresh <see cref="ReceiverTable" /> per pass is the cheap alternative: rebuilding it a
+    ///         few times costs nothing next to a worker launch, and it is the only way to guarantee the
+    ///         table a pass succeeds with never held anything excluded.
+    ///     </para>
+    ///     <para>
+    ///         <b>Why a collision cascades to everyone already sharing the index, not just the two
+    ///         sides of it.</b> The guard the entry was blocked on: an offender sharing a receiver with
+    ///         a kept body must not be split, because splitting them sends one shared object to the
+    ///         worker as a rebuilt clone while the demoted side keeps mutating the live original - the
+    ///         two stop seeing each other's writes with nothing in the result saying so. Cross-receiver
+    ///         sharing is refused outright by design (see <see cref="StateTransfer.TryCaptureField" />,
+    ///         the "as well as something else in this group" refusal), so every collision this ever
+    ///         sees is exactly that shape - never two kept bodies wrongly split from each other, because
+    ///         two kept bodies by construction do not collide.
+    ///     </para>
+    ///     <para>
+    ///         <b>What this does not close.</b> A receiver's fields are walked in declaration order and
+    ///         the walk returns at the first one that fails, so a body refused for an earlier, unrelated
+    ///         field - a live <c>Stream</c>, say - never reaches a later field that would have collided
+    ///         with a kept receiver. That collision goes undetected, and the two are split anyway. Left
+    ///         open rather than closed by making the walk collect every field's outcome instead of the
+    ///         first, which would change what every other refusal in this file reports its reason as.
+    ///     </para>
+    /// </remarks>
+    private static Decision TryAddressWithDemotion(
+        IReadOnlyList<BenchmarkEnvelope> benchmarks,
+        MeasurementOptions options,
+        Delegate? suiteSetup,
+        Delegate? suiteTeardown)
+    {
+        var excluded = new HashSet<string>();
+        var reasons = new Dictionary<string, string>();
+        var firstStatus = IsolationStatus.Isolated;
+
+        // Bounded by the number of names that could ever be excluded, plus the pass that finds none -
+        // a hard stop rather than a loop trusted to converge on its own.
+        for (var attempt = 0; attempt <= benchmarks.Count; attempt++)
+        {
+            var pass = TryAddressPass(benchmarks, options, suiteSetup, suiteTeardown, excluded);
+
+            if (pass.LifecycleFailure is { } lifecycleFailure)
+                return lifecycleFailure;
+
+            if (pass.OffenderNames.Count == 0)
+            {
+                if (pass.Bodies.Count == 0)
+                {
+                    // Nothing addressed at all - demoting the lot is the same outcome a whole-suite
+                    // refusal would have been, so report it the same way rather than inventing a
+                    // second phrasing for "none of this isolates".
+                    return excluded.Count == 0
+                        ? Decision.Refuse(IsolationStatus.InProcessRequested, "the suite has no benchmarks.")
+                        : Decision.Refuse(firstStatus, DescribeOffenders([.. reasons.Values]));
+                }
+
+                var decision = new Decision(IsolationStatus.Isolated, null, pass.Bodies)
+                {
+                    SuiteSetup = pass.SuiteSetup,
+                    SuiteTeardown = pass.SuiteTeardown,
+                    Receivers = pass.Receivers,
+                };
+
+                return excluded.Count == 0
+                    ? decision
+                    : decision with { DemotedNames = reasons };
+            }
+
+            // The suite's own setup or teardown is not a benchmark this can exclude - demoting a
+            // per-benchmark body that shares a receiver with it would still send that receiver to the
+            // worker, addressed, which is exactly the split the guard above exists to refuse. Falling
+            // back to the all-or-nothing pass is the same safe default TryAddressStrict already is.
+            if (pass.OffenderNames.Contains(SuiteLifecycleOwner))
+                return TryAddressStrict(benchmarks, options, suiteSetup, suiteTeardown);
+
+            if (excluded.Count == 0)
+                firstStatus = pass.FirstOffenderStatus;
+
+            foreach (var name in pass.OffenderNames)
+            {
+                excluded.Add(name);
+                reasons[name] = pass.OffenderMessages[name];
+            }
+        }
+
+        // Unreachable: OffenderNames only ever names something not yet in `excluded`, so `excluded`
+        // grows by at least one every iteration that does not return, and there are only
+        // benchmarks.Count names to exhaust.
+        throw new UnreachableException("R5 part 2's demotion loop did not converge.");
+    }
+
+    private readonly record struct PassResult(
+        IReadOnlyList<BodyRef> Bodies,
+        BodyRef? SuiteSetup,
+        BodyRef? SuiteTeardown,
+        ReceiverTable Receivers,
+        IReadOnlySet<string> OffenderNames,
+        IReadOnlyDictionary<string, string> OffenderMessages,
+        IsolationStatus FirstOffenderStatus,
+        Decision? LifecycleFailure);
+
+    /// <summary>
+    ///     One addressing attempt against a fresh table, skipping every name in <paramref name="excluded" />
+    ///     entirely - not addressing them at all, rather than addressing and then discarding, so their
+    ///     budget and identity-set entries never exist for this pass's survivors to collide with.
+    /// </summary>
+    private static PassResult TryAddressPass(
+        IReadOnlyList<BenchmarkEnvelope> benchmarks,
+        MeasurementOptions options,
+        Delegate? suiteSetup,
+        Delegate? suiteTeardown,
+        IReadOnlySet<string> excluded)
+    {
+        var receivers = new ReceiverTable(options.MaxTransferredStateBytes);
+
+        if (!TryAddressHook(suiteSetup, "WithSuiteSetup", receivers, out var setupRef, out var lifecycleRefusal))
+        {
+            return new PassResult(
+                [], null, null, receivers, new HashSet<string>(), new Dictionary<string, string>(),
+                IsolationStatus.Isolated, Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal.Message));
+        }
+
+        if (!TryAddressHook(suiteTeardown, "WithSuiteTeardown", receivers, out var teardownRef, out lifecycleRefusal))
+        {
+            return new PassResult(
+                [], null, null, receivers, new HashSet<string>(), new Dictionary<string, string>(),
+                IsolationStatus.Isolated, Decision.Refuse(HookStatus(lifecycleRefusal), lifecycleRefusal.Message));
+        }
+
+        // Which name(s) already own each receiver index committed so far this pass - the suite's own
+        // lifecycle included, under a key no benchmark name can spell, so a collision with it is
+        // findable the same way a collision with an ordinary benchmark is.
+        var ownersOf = new Dictionary<int, List<string>>();
+
+        AttributeOwner(ownersOf, setupRef, SuiteLifecycleOwner);
+        AttributeOwner(ownersOf, teardownRef, SuiteLifecycleOwner);
+
+        var bodies = new List<BodyRef>(benchmarks.Count);
+        var offenderNames = new HashSet<string>();
+        var offenderMessages = new Dictionary<string, string>();
+        var firstStatus = IsolationStatus.Isolated;
+
+        void Offend(string name, IsolationStatus status, string message)
+        {
+            if (!offenderNames.Add(name))
+                return;
+
+            if (offenderNames.Count == 1)
+                firstStatus = status;
+
+            offenderMessages[name] = message;
+        }
+
+        // Every name already sharing the colliding index is pulled in too, not just the one attempt
+        // that happened to collide - see TryAddressWithDemotion's remarks on why splitting them is
+        // never safe to do silently.
+        void Cascade(int owner, string collidingName)
+        {
+            if (!ownersOf.TryGetValue(owner, out var owners))
+                return;
+
+            foreach (var ownerName in owners)
+            {
+                Offend(
+                    ownerName,
+                    IsolationStatus.InProcessCapturedState,
+                    $"'{ownerName}' shares captured state with '{collidingName}', which cannot be "
+                    + "addressed on its own - splitting them apart would send one shared object across "
+                    + "as two, so neither isolates.");
+            }
+        }
+
+        foreach (var benchmark in benchmarks)
+        {
+            if (excluded.Contains(benchmark.Name))
+                continue;
+
+            if (benchmark.Body is null)
+            {
+                Offend(
+                    benchmark.Name,
+                    IsolationStatus.InProcessUnaddressablePlan,
+                    $"'{benchmark.Name}' was not added as a plain delegate, so there is no compiled "
+                    + "method for a worker to address.");
+
+                continue;
+            }
+
+            var checkpoint = receivers.Save();
+
+            if (!BodyRef.TryCreate(
+                    benchmark.Body,
+                    benchmark.Name,
+                    out var bodyRef,
+                    out var refusal,
+                    benchmark.Arguments,
+                    benchmark.StateRecipes,
+                    receivers))
+            {
+                receivers.Restore(checkpoint);
+                Offend(benchmark.Name, refusal.ToStatus(IsolationStatus.InProcessUnaddressablePlan),
+                    $"'{benchmark.Name}' {refusal.Message}");
+
+                if (refusal.EntangledReceiverIndex is { } owner)
+                    Cascade(owner, benchmark.Name);
+
+                continue;
+            }
+
+            if (!TryAddressHook(
+                    benchmark.IterationSetup,
+                    $"'{benchmark.Name}' per-iteration setup",
+                    receivers,
+                    out var iterationSetup,
+                    out var hookRefusal))
+            {
+                receivers.Restore(checkpoint);
+                Offend(benchmark.Name, HookStatus(hookRefusal), hookRefusal.Message);
+
+                if (hookRefusal.EntangledReceiverIndex is { } owner)
+                    Cascade(owner, benchmark.Name);
+
+                continue;
+            }
+
+            if (!TryAddressHook(
+                    benchmark.IterationTeardown,
+                    $"'{benchmark.Name}' per-iteration teardown",
+                    receivers,
+                    out var iterationTeardown,
+                    out hookRefusal))
+            {
+                receivers.Restore(checkpoint);
+                Offend(benchmark.Name, HookStatus(hookRefusal), hookRefusal.Message);
+
+                if (hookRefusal.EntangledReceiverIndex is { } owner)
+                    Cascade(owner, benchmark.Name);
+
+                continue;
+            }
+
+            bodies.Add(bodyRef with
+            {
+                IterationSetup = iterationSetup,
+                IterationTeardown = iterationTeardown,
+            });
+
+            AttributeOwner(ownersOf, bodyRef, benchmark.Name);
+            AttributeOwner(ownersOf, iterationSetup, benchmark.Name);
+            AttributeOwner(ownersOf, iterationTeardown, benchmark.Name);
+        }
+
+        // A benchmark cascaded into offending after this pass already recorded it as addressed - its
+        // body is still sitting in `bodies`. That is fine: a non-empty OffenderNames means the caller
+        // discards this pass's Bodies wholesale and reruns with the wider exclusion, so a stale entry
+        // here is never read as a real answer.
+        return new PassResult(
+            bodies, setupRef, teardownRef, receivers, offenderNames, offenderMessages, firstStatus, null);
+    }
+
+    /// <summary>Records that <paramref name="owner" /> is (also) using <paramref name="addressed" />'s receiver.</summary>
+    private static void AttributeOwner(Dictionary<int, List<string>> ownersOf, BodyRef? addressed, string owner)
+    {
+        if (addressed?.ReceiverIndex is not { } index)
+            return;
+
+        if (!ownersOf.TryGetValue(index, out var owners))
+            ownersOf[index] = owners = [];
+
+        owners.Add(owner);
     }
 
     /// <summary>

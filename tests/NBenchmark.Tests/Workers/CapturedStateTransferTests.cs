@@ -96,6 +96,29 @@ public sealed class CapturedStateTransferTests : IDisposable
     }
 
     /// <summary>
+    ///     A6: a scalar <c>nint</c> field takes a different path than an <c>nint[]</c> one - a
+    ///     blittable array is encoded as <see cref="CapturedValueKind.Binary" /> with no serializer
+    ///     involved, but a bare scalar falls to the ordinary <see cref="CapturedValueKind.Json" /> path,
+    ///     which handed it straight to <c>System.Text.Json</c>. <c>IntPtr</c> has no built-in converter
+    ///     and System.Text.Json refuses to serialize it at all, so the capture that
+    ///     <see cref="TestArgumentCodec.IsSupported" /> already promised to accept was refused with the
+    ///     serializer's own message instead. Two spellings of "a native integer", one isolated and one
+    ///     refused, for a difference the user did not write.
+    /// </summary>
+    [Fact]
+    public void A_Captured_Scalar_NativeInt_Is_Isolated_Not_Refused()
+    {
+        nint value = 12_345;
+        nuint other = 67_890;
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"value={value},other={other}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("value=12345", saw);
+        Assert.Contains("other=67890", saw);
+    }
+
+    /// <summary>
     ///     The widest fixed-size element, 8 bytes - byte's own size, the narrowest, is already covered
     ///     by the pre-existing 512-byte payload test below.
     /// </summary>

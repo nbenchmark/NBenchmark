@@ -1666,6 +1666,12 @@ public class BenchmarkSuite(string name)
             return null;
         }
 
+        // R5 part 2: joins the explicitly-in-process rows rather than replacing them, so the two
+        // reasons a row ends up measured here - the author's own AddInProcess and the addresser's own
+        // demotion - are handled by the one path that already exists for "some rows are host-bound".
+        if (decision.DemotedNames.Count > 0)
+            hostBound = [.. hostBound, .. candidates.Where(b => decision.DemotedNames.ContainsKey(b.Name))];
+
         var replicates = _launchCount;
         var timeout = MeasurementBudget.For(_options, decision.Bodies.Count);
 
@@ -1741,11 +1747,22 @@ public class BenchmarkSuite(string name)
 
             // Stamped as a request rather than left at the default, for the same reason the fallback
             // path stamps its rows: the two produce the same enum value today, and relying on that is
-            // how a label comes to be right by accident.
+            // how a label comes to be right by accident. A row R5 part 2 demoted rather than the
+            // author's own AddInProcess gets the addresser's own status and its reason as a warning -
+            // the row was not measured here by request, and saying nothing would read as a label that
+            // just happened to be right.
             for (var i = 0; i < hostResults.Count; i++)
             {
-                if (!hostResults[i].Errored)
-                    hostResults[i] = hostResults[i] with { IsolationStatus = IsolationStatus.InProcessRequested };
+                if (hostResults[i].Errored)
+                    continue;
+
+                hostResults[i] = decision.DemotedNames.TryGetValue(hostResults[i].Name, out var demotedBecause)
+                    ? hostResults[i] with
+                    {
+                        IsolationStatus = IsolationStatus.InProcessCapturedState,
+                        Warnings = [.. hostResults[i].Warnings, demotedBecause],
+                    }
+                    : hostResults[i] with { IsolationStatus = IsolationStatus.InProcessRequested };
             }
 
             results.AddRange(hostResults);

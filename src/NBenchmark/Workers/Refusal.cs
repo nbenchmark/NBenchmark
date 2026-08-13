@@ -62,7 +62,15 @@ internal enum RefusalReason
 /// <summary>
 ///     A refusal: why, in a form a consumer can branch on, and what to tell the user.
 /// </summary>
-internal readonly record struct Refusal(RefusalReason Reason, string Message)
+/// <param name="EntangledReceiverIndex">
+///     Set only for the specific <see cref="RefusalReason.CapturedState" /> shape where this refusal
+///     is a collision with an object <b>another</b> receiver in the same group already captured - the
+///     index of that other receiver in <see cref="ReceiverTable.Receivers" />, structured rather than
+///     recovered from the message for the same reason <see cref="Reason" /> itself is: a caller
+///     deciding whether two addresses can be split apart needs a fact to branch on, not a string to
+///     search.
+/// </param>
+internal readonly record struct Refusal(RefusalReason Reason, string Message, int? EntangledReceiverIndex = null)
 {
     public static Refusal None => default;
 

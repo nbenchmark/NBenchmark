@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Reflection;
 using NBenchmark.Workers;
 
@@ -212,6 +213,18 @@ internal static class FactoryResolver
 
         for (var i = 0; i < encoded.Count; i++)
         {
+            // Checked the same way BodyResolver checks a body's own slots (A10): a slot is read off a
+            // frame that came off a pipe, not constructed by the coordinator's own code, so a claim of
+            // "both" or "neither" has to be refused here rather than resolved by whichever branch this
+            // switch happens to test first. Before this check, a slot carrying both a value and a
+            // recipe silently took the value and never said the recipe was there at all.
+            if (!encoded[i].IsWellFormed(out var problem))
+            {
+                error = $"{factory.Role}'s argument '{parameters[i].Name}' {problem}";
+
+                return false;
+            }
+
             // A recipe's own arguments are values, never nested recipes: the thing a prepare delegate
             // needs is the local the user would otherwise have captured, and anything not encodable as
             // a value has its own prepare delegate one slot up rather than one level down.
@@ -376,11 +389,16 @@ internal static class FactoryResolver
             return false;
         }
 
-        if (target.GetType(factory.DeclaringTypeFullName!, throwOnError: false) is not { } type)
+        if (ResolveDeclaringType(context, target, targetAssemblyPath, factory.DeclaringTypeFullName!, out var searchedSiblings)
+            is not { } type)
         {
             error = $"{factory.Role} could not be located: the type "
                     + $"'{factory.DeclaringTypeFullName}' was not found in "
-                    + $"'{Path.GetFileName(targetAssemblyPath)}'.";
+                    + $"'{Path.GetFileName(targetAssemblyPath)}'"
+                    + (searchedSiblings == 0
+                        ? "."
+                        : $" or the {searchedSiblings} other assembl{(searchedSiblings == 1 ? "y" : "ies")} "
+                          + "alongside it.");
 
             return false;
         }
@@ -418,5 +436,78 @@ internal static class FactoryResolver
         method = found[0];
 
         return true;
+    }
+
+    /// <summary>
+    ///     Searches the target assembly itself, then every other assembly built alongside it - A11: a
+    ///     <c>[BenchmarkPlan]</c> factory declared in a shared helper library is exactly the shape a
+    ///     multi-runtime suite reaches for, since sharing the plan across the per-runtime projects is
+    ///     the point, and by-name addressing exists specifically for multi-runtime.
+    ///     <see cref="Assembly.GetType(string, bool)" /> only ever looked at the target itself, so a
+    ///     plan factory living in a library like that was never found.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Deliberately not <see cref="Assembly.GetReferencedAssemblies" />: that walks the
+    ///         target's own metadata, which only names an assembly the target's <i>compiled code</i>
+    ///         uses a type from. A plan factory is never called by the target's own code - it is found
+    ///         and invoked by the worker, by reflection - so a shared library holding nothing else the
+    ///         target references would never appear there even though the library ships right beside
+    ///         it, copied there for exactly this reason. The directory a <c>ProjectReference</c>'s
+    ///         output lands in is the fact that is actually true regardless of whether the target's own
+    ///         code calls into it.
+    ///     </para>
+    ///     <para>
+    ///         A sibling this fails to load is skipped rather than treated as a refusal of its own -
+    ///         the type is not in it either way, and the caller already has a precise message for "not
+    ///         found".
+    ///     </para>
+    /// </remarks>
+    private static Type? ResolveDeclaringType(
+        BenchmarkLoadContext context, Assembly target, string targetAssemblyPath, string fullName, out int searched)
+    {
+        if (target.GetType(fullName, throwOnError: false) is { } declaredDirectly)
+        {
+            searched = 0;
+
+            return declaredDirectly;
+        }
+
+        var directory = Path.GetDirectoryName(Path.GetFullPath(targetAssemblyPath));
+        var targetFileName = Path.GetFileName(targetAssemblyPath);
+
+        var siblings = directory is null
+            ? []
+            : Directory.EnumerateFiles(directory, "*.dll")
+                .Where(path => !string.Equals(Path.GetFileName(path), targetFileName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+        searched = siblings.Count;
+
+        foreach (var path in siblings)
+        {
+            Assembly loaded;
+
+            try
+            {
+                // Named, then loaded by name - not loaded directly from the path. Going straight
+                // through LoadFromAssemblyPath would bind this file's own identity fine but bypass the
+                // context's Load override for everything *it* depends on, including NBenchmark itself -
+                // which the target has already loaded through that override. Two different routes to
+                // the same NBenchmark.dll produce two different Type identities for BenchmarkSuite, and
+                // the return-type check two lines below this method would then refuse a plan that is
+                // completely well-formed, reporting "returns BenchmarkSuite rather than BenchmarkSuite".
+                loaded = context.LoadFromAssemblyName(AssemblyName.GetAssemblyName(path));
+            }
+            catch (Exception ex) when (ex is FileLoadException or BadImageFormatException or FileNotFoundException)
+            {
+                continue;
+            }
+
+            if (loaded.GetType(fullName, throwOnError: false) is { } found)
+                return found;
+        }
+
+        return null;
     }
 }

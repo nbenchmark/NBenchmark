@@ -71,13 +71,17 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     private static BenchmarkSuite Fallback(BenchmarkSuite suite) => Fast(suite).WithRequireIsolation(false);
 
     /// <summary>
-    ///     A suite with several un-addressable bodies names every one of them, in one message.
+    ///     Under <c>RequireIsolation</c> - still all-or-nothing, unaffected by R5 part 2 below - a
+    ///     suite with several un-addressable bodies names every one of them, in the one message the
+    ///     thrown exception carries.
     /// </summary>
     /// <remarks>
     ///     A suite is addressed as a set: one worker measures all of it, so one body that cannot cross
     ///     costs every sibling its isolation. Reporting only the first turned that into a sequence of
     ///     re-runs - fix the one you were told about, discover the next - and the set is what the
-    ///     reader actually has to act on.
+    ///     reader actually has to act on. <c>RequireIsolation</c> promises every benchmark isolates or
+    ///     the run is refused, which is exactly the guarantee demoting only the offenders would break,
+    ///     so this path stays all-or-nothing even after R5 part 2.
     /// </remarks>
     [Fact]
     public async Task A_Suite_With_Several_Unaddressable_Bodies_Names_All_Of_Them()
@@ -85,30 +89,118 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         var first = Stream.Null;
         var second = new StringWriter();
 
-        using var stderr = new StringWriter();
-        var priorError = Console.Error;
-        Console.SetError(stderr);
-
-        try
-        {
-            await Fallback(new BenchmarkSuite("many-offenders")
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Fast(new BenchmarkSuite("many-offenders")
                     .Add("clean", static () => Thread.SpinWait(200))
                     .Add("holds-a-stream", () => first.Length)
                     .Add("holds-a-writer", () => second.ToString().Length))
-                .RunAsync();
-        }
-        finally
-        {
-            Console.SetError(priorError);
-        }
+                .WithRequireIsolation()
+                .RunAsync());
 
-        var message = stderr.ToString();
-
-        Assert.Contains("holds-a-stream", message);
-        Assert.Contains("holds-a-writer", message);
+        Assert.Contains("holds-a-stream", ex.Message);
+        Assert.Contains("holds-a-writer", ex.Message);
 
         // The sibling that would have isolated on its own is not blamed for the suite it is in.
-        Assert.DoesNotContain("'clean'", message);
+        Assert.DoesNotContain("'clean'", ex.Message);
+    }
+
+    /// <summary>
+    ///     R5 part 2: with isolation best-effort rather than required, a suite with several
+    ///     un-addressable bodies no longer loses isolation for every sibling - only the offenders are
+    ///     demoted, and only they carry the reason as a warning on their own row.
+    /// </summary>
+    /// <remarks>
+    ///     Before this, <c>Fallback</c> (RequireIsolation off) measured the whole suite in this process,
+    ///     which is what <see cref="A_Suite_With_Several_Unaddressable_Bodies_Names_All_Of_Them" />
+    ///     used to assert here - the two offenders and the clean sibling alike. The guard R5 part 2 was
+    ///     blocked on does not apply: none of the three shares a receiver with another, so none of them
+    ///     has to be split from anything to be addressed apart from the others.
+    /// </remarks>
+    [Fact]
+    public async Task A_Suite_With_Several_Unaddressable_Bodies_Isolates_The_Rest_And_Demotes_Only_Them()
+    {
+        var first = Stream.Null;
+        var second = new StringWriter();
+
+        var results = await Fallback(new BenchmarkSuite("many-offenders-demoted")
+                .Add("clean", static () => Thread.SpinWait(200))
+                .Add("holds-a-stream", () => first.Length)
+                .Add("holds-a-writer", () => second.ToString().Length))
+            .RunAsync();
+
+        Assert.Equal(3, results.Count);
+        Assert.All(results, r => Assert.False(r.Errored, r.ErrorMessage));
+
+        var clean = results.Single(r => r.Name == "clean");
+        var stream = results.Single(r => r.Name == "holds-a-stream");
+        var writer = results.Single(r => r.Name == "holds-a-writer");
+
+        Assert.Equal(IsolationStatus.Isolated, clean.IsolationStatus);
+
+        Assert.Equal(IsolationStatus.InProcessCapturedState, stream.IsolationStatus);
+        Assert.Contains(stream.Warnings, w => w.Contains("holds-a-stream"));
+
+        Assert.Equal(IsolationStatus.InProcessCapturedState, writer.IsolationStatus);
+        Assert.Contains(writer.Warnings, w => w.Contains("holds-a-writer"));
+    }
+
+    /// <summary>
+    ///     R5 part 2's own guard: two benchmarks sharing a captured object are demoted <i>together</i>,
+    ///     not one kept and the other split off, even though only one of them is ever the one whose
+    ///     own address collides.
+    /// </summary>
+    /// <remarks>
+    ///     Cross-receiver sharing is refused outright by design - see
+    ///     <c>StateTransfer.TryCaptureField</c>'s "as well as something else in this group" refusal -
+    ///     so whichever of "first" and "second" is addressed second is always the one whose attempt
+    ///     fails. Demoting only that one would isolate the other with a <i>rebuilt clone</i> of the
+    ///     array while the demoted body kept mutating the <i>live</i> one: the two would stop seeing
+    ///     each other's writes with nothing in the result saying so - silent divergence, the exact
+    ///     failure this guard exists to refuse. Both ending up demoted is what proves the entangled
+    ///     receiver was pulled in rather than only the collision's own side.
+    /// </remarks>
+    [Fact]
+    public async Task Two_Benchmarks_Sharing_Captured_State_Are_Demoted_Together_Not_Split()
+    {
+        // Two lambdas that both capture the same outer local share one display class - one receiver,
+        // deduplicated fine by ReceiverTable.TryIndex, no collision at all. Each closing over its own
+        // local function's parameter instead forces two separate display classes, each with its own
+        // field referring to the one array both point at - the actual shape the guard is about.
+        static Func<int> MakeFirst(int[] s) => () => s.Sum();
+        static Func<int> MakeSecond(int[] s) => () => s.Length;
+
+        var shared = new[] { 1, 2, 3 };
+        var firstBody = MakeFirst(shared);
+        var secondBody = MakeSecond(shared);
+
+        Assert.NotSame(firstBody.Target, secondBody.Target);
+
+        var results = await Fallback(new BenchmarkSuite("shared-capture-demoted")
+                .Add("alone", static () => Thread.SpinWait(200))
+                .Add("first", firstBody)
+                .Add("second", secondBody))
+            .RunAsync();
+
+        Assert.Equal(3, results.Count);
+        Assert.All(results, r => Assert.False(r.Errored, r.ErrorMessage));
+
+        var alone = results.Single(r => r.Name == "alone");
+        var first = results.Single(r => r.Name == "first");
+        var second = results.Single(r => r.Name == "second");
+
+        // Unrelated to the sharing, so it isolates on its own regardless of how "first" and "second"
+        // are resolved.
+        Assert.Equal(IsolationStatus.Isolated, alone.IsolationStatus);
+
+        // Both, not just whichever one's own address happened to collide. "second" is the one whose
+        // own attempt collided, so its warning is the direct refusal; "first" was already addressed
+        // when the collision was found, so its warning is the cascaded one naming what pulled it back
+        // out - which is the assertion that matters here, since a synthesized reason for a receiver
+        // that never itself failed is the part a naive "just refuse the second one" fix would not say.
+        Assert.Equal(IsolationStatus.InProcessCapturedState, first.IsolationStatus);
+        Assert.Equal(IsolationStatus.InProcessCapturedState, second.IsolationStatus);
+        Assert.Contains(first.Warnings, w => w.Contains("shares captured state") && w.Contains("second"));
+        Assert.Contains(second.Warnings, w => w.Contains("second") && w.Contains("as well as something else"));
     }
 
     /// <summary>
@@ -191,9 +283,9 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     A body whose capture cannot be sent names itself in the refusal. A suite has several
-    ///     benchmarks and only one of them is usually the problem, so a message that does not say which
-    ///     is not actionable.
+    ///     Under <c>RequireIsolation</c>, a body whose capture cannot be sent names itself in the
+    ///     thrown refusal and suggests the plan factory. A suite has several benchmarks and only one
+    ///     of them is usually the problem, so a message that does not say which is not actionable.
     /// </summary>
     /// <remarks>
     ///     A capture of ordinary data is sent and the suite stays isolated; what reaches this path is a
@@ -204,31 +296,42 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     {
         var stream = Stream.Null;
 
-        using var stderr = new StringWriter();
-        var priorError = Console.Error;
-        Console.SetError(stderr);
-
-        IReadOnlyList<BenchmarkResult> results;
-
-        try
-        {
-            results = await Fallback(new BenchmarkSuite("captures")
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Fast(new BenchmarkSuite("captures")
                     .Add("clean", () => Thread.SpinWait(200))
                     .Add("dirty", () => stream.Length))
-                .RunAsync();
-        }
-        finally
-        {
-            Console.SetError(priorError);
-        }
+                .WithRequireIsolation()
+                .RunAsync());
+
+        Assert.Contains("dirty", ex.Message);
+        Assert.Contains("captures", ex.Message);
+        Assert.Contains("[BenchmarkPlan]", ex.Message);
+    }
+
+    /// <summary>
+    ///     R5 part 2: with isolation best-effort, the same suite keeps "clean" isolated and demotes
+    ///     only "dirty", carrying why on its own row instead of losing both to a fallback that neither
+    ///     of them needed.
+    /// </summary>
+    [Fact]
+    public async Task InlineSuite_UnsendableCapture_IsolatesTheCleanSiblingAndDemotesOnlyItself()
+    {
+        var stream = Stream.Null;
+
+        var results = await Fallback(new BenchmarkSuite("captures-demoted")
+                .Add("clean", () => Thread.SpinWait(200))
+                .Add("dirty", () => stream.Length))
+            .RunAsync();
 
         Assert.Equal(2, results.Count);
         Assert.All(results, r => Assert.False(r.Errored, r.ErrorMessage));
 
-        var message = stderr.ToString();
-        Assert.Contains("dirty", message);
-        Assert.Contains("captures", message);
-        Assert.Contains("[BenchmarkPlan]", message);
+        var clean = results.Single(r => r.Name == "clean");
+        var dirty = results.Single(r => r.Name == "dirty");
+
+        Assert.Equal(IsolationStatus.Isolated, clean.IsolationStatus);
+        Assert.Equal(IsolationStatus.InProcessCapturedState, dirty.IsolationStatus);
+        Assert.Contains(dirty.Warnings, w => w.Contains("dirty") && w.Contains("captures"));
     }
 
     /// <summary>

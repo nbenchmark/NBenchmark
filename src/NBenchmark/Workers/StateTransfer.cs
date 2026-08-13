@@ -203,20 +203,44 @@ internal sealed record TransferredReceiver
 /// </remarks>
 internal sealed class ReceiverTable(int budgetBytes)
 {
-    private readonly Dictionary<object, int> _indices = new(ReferenceEqualityComparer.Instance);
+    private Dictionary<object, int> _indices = new(ReferenceEqualityComparer.Instance);
 
-    private readonly List<TransferredReceiver> _receivers = [];
+    private List<TransferredReceiver> _receivers = [];
 
     /// <summary>
     ///     Every object already committed to this group's wire form, so a second reference to one from
     ///     anywhere in the group is refused rather than duplicated.
     /// </summary>
-    private readonly HashSet<object> _seen = new(ReferenceEqualityComparer.Instance);
+    private readonly GroupIdentitySet _seen = new();
 
     private int _spent;
 
     /// <summary>The entries built so far, in index order.</summary>
     public IReadOnlyList<TransferredReceiver> Receivers => _receivers;
+
+    /// <summary>
+    ///     A cheap copy of everything committed so far, restored by <see cref="Restore" /> when an
+    ///     attempt spanning several <see cref="TryIndex" /> calls - a body plus its per-iteration hooks
+    ///     - fails partway through. Without it, the entries the earlier, successful calls already added
+    ///     linger in the table for whatever is addressed next: exactly the defect R5 part 2 was blocked
+    ///     on, "addressing a refused body leaves partial entries in the group's identity set".
+    /// </summary>
+    public readonly record struct Checkpoint(
+        Dictionary<object, int> Indices, List<TransferredReceiver> Receivers, Dictionary<object, int> Seen, int Spent);
+
+    public Checkpoint Save() => new(
+        new Dictionary<object, int>(_indices, ReferenceEqualityComparer.Instance),
+        new List<TransferredReceiver>(_receivers),
+        _seen.Snapshot(),
+        _spent);
+
+    public void Restore(Checkpoint checkpoint)
+    {
+        _indices = checkpoint.Indices;
+        _receivers = checkpoint.Receivers;
+        _seen.Restore(checkpoint.Seen);
+        _spent = checkpoint.Spent;
+    }
 
     /// <summary>
     ///     Returns the index for <paramref name="receiver" />, capturing its fields the first time it
@@ -231,9 +255,17 @@ internal sealed class ReceiverTable(int budgetBytes)
         if (_indices.TryGetValue(receiver, out index))
             return true;
 
+        // Reserved before the walk starts, so everything the walk adds to _seen - the receiver itself,
+        // a chained scope, an ordinary field value - can be tagged with the entry it would become if it
+        // succeeds. A caller that gets a collision back can then name exactly which other, already-
+        // committed receiver it collided with, rather than only knowing that a collision happened.
+        var provisional = _receivers.Count;
+
+        _seen.CurrentOwner = provisional;
+
         // The receiver joins the group's identity set before its own walk, so a later receiver holding
         // a reference to *it* is caught as sharing rather than rebuilt as a second object.
-        _seen.Add(receiver);
+        _seen.Add(receiver, out _);
 
         if (!StateTransfer.TryCapture(receiver, subject, budgetBytes, _seen, ref _spent, out var captured, out refusal))
         {
@@ -242,7 +274,7 @@ internal sealed class ReceiverTable(int budgetBytes)
             return false;
         }
 
-        index = _receivers.Count;
+        index = provisional;
 
         // The runtime type, matching the type StateTransfer walked the fields of. Taking it from the
         // object rather than from any delegate bound to it is the whole point - see TypeName.
@@ -256,6 +288,38 @@ internal sealed class ReceiverTable(int budgetBytes)
 
         return true;
     }
+}
+
+/// <summary>
+///     <see cref="ReceiverTable" />'s identity set, tagging every member with the index of the receiver
+///     whose capture added it.
+/// </summary>
+/// <remarks>
+///     A plain <c>HashSet&lt;object&gt;</c> can say "already seen" and nothing more. Owner-tagging is
+///     what lets a caller ask "seen by whom" when two receivers collide over one object, which is what
+///     a caller deciding whether they can be addressed apart from each other needs.
+/// </remarks>
+internal sealed class GroupIdentitySet
+{
+    private Dictionary<object, int> _owners = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The receiver index whose capture is currently in flight, attributed to anything it adds.</summary>
+    public int CurrentOwner { get; set; } = -1;
+
+    /// <summary>Adds <paramref name="value" />, or reports the index that already owns it.</summary>
+    public bool Add(object value, out int owner)
+    {
+        if (_owners.TryGetValue(value, out owner))
+            return false;
+
+        _owners[value] = owner = CurrentOwner;
+
+        return true;
+    }
+
+    public Dictionary<object, int> Snapshot() => new(_owners, ReferenceEqualityComparer.Instance);
+
+    public void Restore(Dictionary<object, int> snapshot) => _owners = snapshot;
 }
 
 /// <summary>
@@ -317,9 +381,12 @@ internal static class StateTransfer
         };
 
         // Shared by both directions of the crossing, so the host encodes exactly what the worker
-        // knows how to decode - see OrderedCollectionConverters and BigIntegerConverter.
+        // knows how to decode - see OrderedCollectionConverters, BigIntegerConverter and
+        // NintConverter/NuintConverter.
         OrderedCollectionConverters.Register(options);
         options.Converters.Add(new BigIntegerConverter());
+        options.Converters.Add(new NintConverter());
+        options.Converters.Add(new NuintConverter());
 
         return options;
     }
@@ -350,7 +417,7 @@ internal static class StateTransfer
         object receiver,
         string subject,
         int budgetBytes,
-        HashSet<object> seen,
+        GroupIdentitySet seen,
         ref int spent,
         out IReadOnlyList<CapturedField> captured,
         out Refusal refusal)
@@ -374,7 +441,7 @@ internal static class StateTransfer
     private static bool TryCaptureInto(
         object receiver,
         string subject,
-        HashSet<object> seen,
+        GroupIdentitySet seen,
         int budgetBytes,
         int depth,
         ref int total,
@@ -417,7 +484,7 @@ internal static class StateTransfer
         FieldInfo field,
         object? value,
         string subject,
-        HashSet<object> seen,
+        GroupIdentitySet seen,
         int budgetBytes,
         int depth,
         ref int total,
@@ -449,11 +516,12 @@ internal static class StateTransfer
                 return false;
             }
 
-            if (!seen.Add(value))
+            if (!seen.Add(value, out var owner))
             {
                 refusal = new Refusal(
                     RefusalReason.CapturedState,
-                    $"{subject} enclosing scopes that form a cycle or share an instance.");
+                    $"{subject} enclosing scopes that form a cycle or share an instance.",
+                    EntangledReceiverIndex: owner);
 
                 return false;
             }
@@ -492,14 +560,15 @@ internal static class StateTransfer
 
         // Sharing is only observable through a mutable reference. Strings are immutable and boxed
         // value types are copied on the way in, so neither can be aliased by the body.
-        if (value is not null and not string && !declared.IsValueType && !seen.Add(value))
+        if (value is not null and not string && !declared.IsValueType && !seen.Add(value, out var sharedWith))
         {
             refusal = new Refusal(
                 RefusalReason.CapturedState,
                 $"{subject} '{FriendlyFieldName(field)}' as well as something else in this group "
                 + "referring to the same object. Rebuilding them would produce two objects where the "
                 + "benchmark sees one, so the sharing has to be reproduced by a prepare delegate "
-                + "rather than sent.");
+                + "rather than sent.",
+                EntangledReceiverIndex: sharedWith);
 
             return false;
         }

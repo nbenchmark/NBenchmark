@@ -12,5 +12,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
+
+    <!-- For NamedFactoryResolutionTests' A11 case: a [BenchmarkPlan] declared in a library this
+         executable only references, not in this executable itself. -->
+    <ProjectReference Include="..\NBenchmark.Tests.SharedPlanFixture\NBenchmark.Tests.SharedPlanFixture.csproj"/>
   </ItemGroup>
 </Project>

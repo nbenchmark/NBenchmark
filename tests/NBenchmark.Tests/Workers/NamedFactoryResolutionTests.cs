@@ -112,6 +112,39 @@ public sealed class NamedFactoryResolutionTests : IDisposable
     }
 
     /// <summary>
+    ///     A11: the fixture executable only <i>references</i>
+    ///     <c>NBenchmark.Tests.SharedPlanFixture</c> - the plan factory is not declared in it. By-name
+    ///     addressing exists for multi-runtime, where sharing one plan factory across the per-runtime
+    ///     projects is exactly the point, so a factory living one level away in the target's own
+    ///     dependency graph is the ordinary shape, not an edge case. Before this, only the target
+    ///     assembly itself was searched, so a factory placed here for exactly that reason was refused
+    ///     as "not found" in the one assembly that was never going to declare it.
+    /// </summary>
+    [Fact]
+    public async Task A_Plan_Declared_In_A_Referenced_Library_Is_Located_And_Measured()
+    {
+        var request = PlanRequest("BuildSuite") with
+        {
+            Plan = new AddressedFactory
+            {
+                Role = "the benchmark plan",
+                DeclaringTypeFullName = "NBenchmark.Tests.SharedPlanFixture.SharedHelperPlan",
+                MethodName = "BuildSuite",
+            },
+        };
+
+        var group = await RunAsync(request);
+
+        Assert.Empty(group.Faults);
+        Assert.False(group.WorkerDied);
+
+        var result = Assert.Single(group.Results);
+
+        Assert.Equal("only", result.Name);
+        Assert.False(result.Errored);
+    }
+
+    /// <summary>
     ///     A missing declaring type is named too. The fixture assembly loads fine, so this is the type
     ///     lookup failing rather than the assembly, and the two need different fixes.
     /// </summary>
