@@ -63,8 +63,13 @@ internal static class BodyResolver
         {
             created = method.CreateDelegate(delegateType, receiver);
         }
-        catch (Exception ex) when (ex is ArgumentException or MissingMethodException)
+        catch (Exception ex) when (ex is ArgumentException
+                                       or MissingMethodException
+                                       or InvalidOperationException)
         {
+            // InvalidOperationException is what an incompletely-closed generic produces. Binding a
+            // body is allowed to fail - the row says why and the group carries on - so every way it
+            // can fail belongs in this filter rather than escaping to the group handler.
             error = $"the resolved method '{method.Name}' could not be bound as {delegateType.Name}: {ex.Message}";
             return false;
         }
@@ -143,7 +148,9 @@ internal static class BodyResolver
 
             created = method.CreateDelegate(delegateType, receiver);
         }
-        catch (Exception ex) when (ex is ArgumentException or MissingMethodException)
+        catch (Exception ex) when (ex is ArgumentException
+                                       or MissingMethodException
+                                       or InvalidOperationException)
         {
             error = $"the resolved hook '{method.Name}' could not be bound: {ex.Message}";
 
@@ -256,10 +263,18 @@ internal static class BodyResolver
             BodyShape.TransferredReceiver =>
                 TryTransferReceiver(context, ref method, body, receivers, out receiver, out error),
 
-            // A static method needs no receiver, and every other shape was refused before it could be
-            // addressed. Switched rather than tested for one shape, so a new one cannot silently take
-            // the null-receiver path - which is how a transferred receiver first arrived bound to
-            // nothing and failed inside the measurement rather than at bind time.
+            // A static method needs no receiver - but it can still be declared on a *closed generic
+            // type*, and the token resolves to the open definition. Nothing closed it: only the two
+            // receiver shapes reached TryCloseDeclaringType, and TryCloseMethod below closes method
+            // generics only. So `Benchmark.Run(Box<int>.Count)` bound `Box<T>.Count` and CreateDelegate
+            // threw "the containing type is not fully instantiated" - an InvalidOperationException,
+            // which was not in the filter that catches bind failures, so it escaped and faulted the
+            // whole group over one body.
+            BodyShape.StaticMethod => TryCloseDeclaringType(context, ref method, body, out _, out error),
+
+            // Switched rather than tested for one shape, so a new one cannot silently take the
+            // null-receiver path - which is how a transferred receiver first arrived bound to nothing
+            // and failed inside the measurement rather than at bind time.
             _ => true,
         };
 
@@ -587,9 +602,17 @@ internal static class BodyResolver
                 if (!TryBuild(nestedType!, capture.Nested ?? [], context, out value, out error))
                     return false;
             }
-            else if (!TryDecode(capture, field!.FieldType, out value, out error))
+            else
             {
-                return false;
+                // Decoded as the type the value *was*, which is not always the type the field is
+                // declared as: an `IReadOnlyList<int>` field can hold a `List<int>`, and rebuilding it
+                // as the interface is not a thing that can be done. The coordinator vetted the runtime
+                // type against the same allow-list, and only names it when it differs.
+                if (!TryResolveDecodeType(capture, field!, context, out var decodeAs, out error))
+                    return false;
+
+                if (!TryDecode(capture, decodeAs!, out value, out error))
+                    return false;
             }
 
             try
@@ -617,6 +640,46 @@ internal static class BodyResolver
         }
 
         built = instance;
+
+        return true;
+    }
+
+    /// <summary>
+    ///     The type to decode a captured value as: the runtime type the coordinator encoded it against
+    ///     when it named one, and otherwise the field's own.
+    /// </summary>
+    private static bool TryResolveDecodeType(
+        CapturedField capture,
+        FieldInfo field,
+        BenchmarkLoadContext context,
+        out Type? decodeAs,
+        out string? error)
+    {
+        decodeAs = field.FieldType;
+        error = null;
+
+        if (capture.RuntimeTypeName is not { } name)
+            return true;
+
+        if (TypeNames.Resolve(name, context) is not { } resolved)
+        {
+            error = $"the captured value for '{capture.FieldName}' names a runtime type '{name}' that "
+                    + "could not be resolved in this worker.";
+
+            return false;
+        }
+
+        // The field has to accept what comes back. Checked here rather than left to SetValue, which
+        // reports the same disagreement as an argument exception naming neither side usefully.
+        if (!field.FieldType.IsAssignableFrom(resolved))
+        {
+            error = $"the captured value for '{capture.FieldName}' names a runtime type "
+                    + $"'{resolved.Name}' that cannot be stored in a '{field.FieldType.Name}' field.";
+
+            return false;
+        }
+
+        decodeAs = resolved;
 
         return true;
     }

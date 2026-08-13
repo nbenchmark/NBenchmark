@@ -71,9 +71,12 @@ internal sealed record CapturedField
     ///     Rebuilding the declared type would restore those fields onto an instance of the wrong class
     ///     and dispatch every virtual member to the wrong override.
     ///     <para>
-    ///         Not carried for the other kinds because they do not need it: a value whose runtime type
-    ///         differs from its declared type is refused outright by <see cref="IsFaithful" />, so for
-    ///         those two the declared type <i>is</i> the runtime type.
+    ///         Carried for the other two kinds as well, and for the same reason one step smaller: a
+    ///         value is serialized against the type it <i>is</i> rather than the type its field is
+    ///         declared as. That is what lets an <c>IReadOnlyList&lt;int&gt;</c> holding a
+    ///         <c>List&lt;int&gt;</c> cross - the faithfulness rule vets the runtime type, so naming it
+    ///         is all the worker needs to rebuild the same object. Omitted when the two agree, which is
+    ///         the ordinary capture, so nothing is paid for the common case.
     ///     </para>
     /// </remarks>
     public string? RuntimeTypeName { get; init; }
@@ -448,7 +451,7 @@ internal static class StateTransfer
                 $"{subject} state exceeding {budgetBytes / 1024 / 1024} MiB once encoded. At that "
                 + "size, building the value in the measuring process is both faster and more faithful "
                 + "than sending it - name the preparation with "
-                + "Benchmark.Run(prepare: () => Build(), body: d => Use(d)), or .WithState(() => Build()).");
+                + "Benchmark.Run(prepare: () => Build(), body: d => Use(d)), or BenchmarkSuite.Over(name, () => Build()).");
 
             return false;
         }
@@ -467,14 +470,23 @@ internal static class StateTransfer
         captured = null;
         refusal = Refusal.None;
 
+        // The type the value actually is, which the faithfulness rule has just vetted. Serializing
+        // against the *declared* type instead would write an `IReadOnlyList<int>` projection of a
+        // `List<int>` and hand the worker no way to rebuild the latter.
+        var runtime = value?.GetType() ?? declared;
+
         var common = new
         {
             Token = field.MetadataToken,
             Name = field.Name,
             TypeName = NameOf(declared),
+
+            // Carried only when it says something the declared type does not, so the ordinary capture -
+            // where the two are the same - costs nothing on the wire.
+            RuntimeTypeName = runtime == declared ? null : NameOf(runtime),
         };
 
-        if (value is not null && IsBlittablePrimitiveArray(declared))
+        if (value is not null && IsBlittablePrimitiveArray(runtime))
         {
             captured = new CapturedField
             {
@@ -482,6 +494,7 @@ internal static class StateTransfer
                 FieldName = common.Name,
                 Kind = CapturedValueKind.Binary,
                 DeclaredTypeName = common.TypeName,
+                RuntimeTypeName = common.RuntimeTypeName,
                 Binary = ToBytes((Array)value),
             };
 
@@ -496,7 +509,8 @@ internal static class StateTransfer
                 FieldName = common.Name,
                 Kind = CapturedValueKind.Json,
                 DeclaredTypeName = common.TypeName,
-                Json = JsonSerializer.Serialize(value, declared, SerializerOptions),
+                RuntimeTypeName = common.RuntimeTypeName,
+                Json = JsonSerializer.Serialize(value, runtime, SerializerOptions),
             };
 
             return true;
@@ -536,7 +550,9 @@ internal static class StateTransfer
     {
         ArgumentNullException.ThrowIfNull(declared);
 
-        return IsFaithfulValue(declared, value, "it", new FaithfulnessWalk(), out why);
+        // The field is the one position whose runtime type can be named on the wire, so it is the one
+        // position allowed to differ from its declared type.
+        return IsFaithfulValue(declared, value, "it", new FaithfulnessWalk(), carriesItsOwnType: true, out why);
     }
 
     /// <summary>
@@ -548,11 +564,21 @@ internal static class StateTransfer
     ///     reads completely differently for a captured local, an array element and a member of an
     ///     opted-in type, and the reader has to know which one to go and look at.
     /// </param>
+    /// <param name="carriesItsOwnType">
+    ///     Whether this position gets its own <see cref="CapturedField.RuntimeTypeName" /> on the wire.
+    ///     True for the captured field itself, and false everywhere the walk reaches below it: a
+    ///     collection is serialized against its <i>element</i> type and an opted-in type's members
+    ///     against their <i>declared</i> types, so there is one type on the wire for all of them and a
+    ///     value that is not it cannot be rebuilt. That is the difference between
+    ///     <c>IReadOnlyList&lt;int&gt; xs = new List&lt;int&gt;()</c>, which crosses, and a
+    ///     <c>Node[]</c> holding a <c>Leaf</c>, which does not.
+    /// </param>
     private static bool IsFaithfulValue(
         Type declared,
         object? value,
         string what,
         FaithfulnessWalk walk,
+        bool carriesItsOwnType,
         out string? why)
     {
         why = null;
@@ -571,7 +597,7 @@ internal static class StateTransfer
 
         var runtime = value.GetType();
 
-        if (runtime != declared && !declared.IsValueType)
+        if (runtime != declared && !declared.IsValueType && !carriesItsOwnType)
         {
             why = $"{what} holds a '{FriendlyTypeName(runtime)}' where a '{FriendlyTypeName(declared)}' "
                   + "was declared, and rebuilding it would substitute the declared type for the real one.";
@@ -579,7 +605,14 @@ internal static class StateTransfer
             return false;
         }
 
-        return IsFaithfulType(declared, value, walk, out why);
+        // Vetted as the *runtime* type. Refusing outright whenever the two differed was broader than
+        // the hazard it named: an interface can never be its own runtime type, so
+        // `IReadOnlyList<int> xs = new List<int>()` was declined before the allow-list was ever
+        // consulted - and `IReadOnlyList<>` is on that list, so the entry was unreachable at the top
+        // level. The hazard itself - a `MyPagedList` behind `IList<int>` flattening into a `List<int>`
+        // with the same entries and entirely different performance - is caught here regardless,
+        // because `MyPagedList` is not on the list.
+        return IsFaithfulType(runtime, value, walk, out why);
     }
 
     private static bool IsFaithfulType(Type type, object? value, FaithfulnessWalk walk, out string? why)
@@ -733,7 +766,9 @@ internal static class StateTransfer
                 // non-nullable member of a type reached as an element type rather than as a value.
                 var faithful = value is null
                     ? IsFaithfulType(field.FieldType, null, walk, out why)
-                    : IsFaithfulValue(field.FieldType, field.GetValue(value), position, walk, out why);
+                    : IsFaithfulValue(
+                        field.FieldType, field.GetValue(value), position, walk,
+                        carriesItsOwnType: false, out why);
 
                 if (faithful)
                     continue;
@@ -784,7 +819,7 @@ internal static class StateTransfer
             if (!walk.TryInspect(out why))
                 return false;
 
-            if (!IsFaithfulValue(declaredItem, item, "one of its elements", walk, out why))
+            if (!IsFaithfulValue(declaredItem, item, "one of its elements", walk, carriesItsOwnType: false, out why))
                 return false;
         }
 
@@ -812,13 +847,13 @@ internal static class StateTransfer
                 return false;
 
             if (CanVaryAtRuntime(keyType)
-                && !IsFaithfulValue(keyType, entry.Key, "one of its keys", walk, out why))
+                && !IsFaithfulValue(keyType, entry.Key, "one of its keys", walk, carriesItsOwnType: false, out why))
             {
                 return false;
             }
 
             if (CanVaryAtRuntime(valueType)
-                && !IsFaithfulValue(valueType, entry.Value, "one of its values", walk, out why))
+                && !IsFaithfulValue(valueType, entry.Value, "one of its values", walk, carriesItsOwnType: false, out why))
             {
                 return false;
             }
@@ -841,7 +876,9 @@ internal static class StateTransfer
             if (!CanVaryAtRuntime(property.PropertyType))
                 continue;
 
-            if (!IsFaithfulValue(property.PropertyType, property.GetValue(value), position, walk, out why))
+            if (!IsFaithfulValue(
+                    property.PropertyType, property.GetValue(value), position, walk,
+                    carriesItsOwnType: false, out why))
                 return false;
         }
 

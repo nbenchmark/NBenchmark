@@ -69,16 +69,15 @@ Report(prepared);
 Report(unsendable);
 
 Console.WriteLine();
-Console.WriteLine("=== Suite mode: WithState shares one recipe across the comparison ===");
+Console.WriteLine("=== Suite mode: one recipe shared across the comparison ===");
 Console.WriteLine();
 
-// WithState is the suite-shaped version, and this is where it earns its keep rather than merely
-// avoiding a fallback: both bodies *mutate* their input. The recipe runs once per benchmark, so each
+// BenchmarkSuite.Over is the suite-shaped version, and this is where it earns its keep rather than
+// merely avoiding a fallback: both bodies *mutate* their input. The recipe runs once per benchmark, so each
 // one sorts an unsorted array. Capturing a single array instead would isolate perfectly well and
 // measure the wrong thing - the second body would sort what the first already sorted, and under the
 // default random run order which one that is would change between runs.
-var suite = await new BenchmarkSuite("sorting")
-    .WithState(() => BuildData())
+var suite = await BenchmarkSuite.Over("sorting", BuildData)
     .Add("array-sort", values => Array.Sort(values))
     .Add("linq-orderby", values => values.OrderBy(static x => x).ToArray())
     .WithBaseline("array-sort")

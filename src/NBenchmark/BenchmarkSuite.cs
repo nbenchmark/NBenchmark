@@ -657,84 +657,45 @@ public class BenchmarkSuite(string name)
     // --- Private helpers ---
 
     /// <summary>
-    ///     Switches this suite to one whose benchmarks are measured over state built by
-    ///     <paramref name="prepare" />, in whichever process does the measuring.
+    ///     Creates a suite whose benchmarks are measured over prepared state.
     /// </summary>
+    /// <param name="prepare">
+    ///     Builds the value each body receives. Run once per benchmark, before that benchmark's warmup
+    ///     and outside the timed region - not once per suite, so two sorts do not share one array and
+    ///     have the second measure what the first already sorted.
+    /// </param>
     /// <remarks>
     ///     <para>
-    ///         This is the suite-shaped answer to the same problem
-    ///         <see cref="Benchmark.Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    ///         solves for a single body. Writing <c>var data = Build();</c> and closing over it makes
-    ///         every benchmark in the suite un-addressable - and because one worker measures the set,
-    ///         a single capturing body takes every sibling in-process with it. Naming the preparation
-    ///         instead means the worker builds the data itself.
+    ///         State is declared at construction rather than partway along the chain. It used to be a
+    ///         <c>WithState</c> call that returned a differently-typed suite, which had to come first
+    ///         and threw if it did not - because carrying the existing configuration across meant
+    ///         copying it field by field, and a copy that forgets a field fails as a setting that
+    ///         simply stopped working. Declaring it here means there is no configuration to carry and
+    ///         no order to get wrong.
     ///     </para>
     ///     <para>
-    ///         <paramref name="prepare" /> runs <b>once per benchmark</b>, before that benchmark's
-    ///         warmup - not once for the suite. That is deliberate: two sorts sharing one array would
-    ///         have the second measure what the first already sorted, and with the default random run
-    ///         order which one that is would change between runs.
-    ///     </para>
-    ///     <para>
-    ///         Call it before configuring anything else. A suite that already carries benchmarks or
-    ///         settings cannot be converted without silently transplanting them, and a transplant that
-    ///         forgets a field is the kind of defect that shows up as a setting that simply stopped
-    ///         working - so it throws instead.
+    ///         The prepared value is also what makes a body's parameter typed, and that is now the only
+    ///         reason the generic suite exists. Getting the state built in the worker no longer is:
+    ///         a body that closes over its input is isolated too, and the value is sent with the
+    ///         address. Reach for this when the state is <i>large</i>, <i>live</i>, or one the transfer
+    ///         rule declines - see <see href="https://docs.nbenchmark.net/features/isolated-runs" />.
     ///     </para>
     /// </remarks>
     /// <example>
     ///     <code>
-    ///     await new BenchmarkSuite("sorting")
-    ///         .WithState(() => Enumerable.Range(0, 10_000).Reverse().ToArray())
+    ///     await BenchmarkSuite.Over("sorting", () => Enumerable.Range(0, 10_000).Reverse().ToArray())
     ///         .Add("array", d => Array.Sort(d))
     ///         .Add("linq",  d => d.OrderBy(x => x).ToArray())
     ///         .WithBaseline("array")
     ///         .RunAsync();
     ///     </code>
     /// </example>
-    public BenchmarkSuite<TState> WithState<TState>(Func<TState> prepare)
+    public static BenchmarkSuite<TState> Over<TState>(string name, Func<TState> prepare)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(prepare);
 
-        if (DescribeConfiguration() is { } configured)
-        {
-            throw new InvalidOperationException(
-                $"WithState must be called before the rest of the suite is configured, but {configured} "
-                + "already set. Move the WithState call directly after the constructor:\n\n"
-                + $"    new BenchmarkSuite(\"{Name}\").WithState(...).Add(...)\n\n"
-                + "It returns a differently-typed suite so the bodies can take the prepared value, and "
-                + "carrying existing configuration across would mean copying it field by field - which "
-                + "fails silently the first time a field is missed.");
-        }
-
-        return new BenchmarkSuite<TState>(Name, prepare);
-    }
-
-    /// <summary>
-    ///     Names what has already been configured on this suite, or <c>null</c> when it is untouched.
-    ///     Used only to explain a misplaced <see cref="WithState{TState}" /> call.
-    /// </summary>
-    private string? DescribeConfiguration()
-    {
-        if (_benchmarks.Count > 0 || _parameterizedFactories.Count > 0)
-            return "benchmarks have been";
-
-        if (_parameterDefs.Count > 0)
-            return "parameters have been";
-
-        if (_reporters.Count > 0 || _observers.Count > 0)
-            return "reporters or observers have been";
-
-        if (_baselineName is not null)
-            return "a baseline has been";
-
-        if (_suiteSetup is not null || _suiteTeardown is not null)
-            return "suite setup or teardown has been";
-
-        if (_options != MeasurementOptions.Default || _launchCount != LaunchCounts.Single)
-            return "measurement options have been";
-
-        return null;
+        return new BenchmarkSuite<TState>(name, prepare);
     }
 
     /// <summary>
@@ -894,6 +855,29 @@ public class BenchmarkSuite(string name)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
         _options = _options with { Diagnostics = diagnostics };
+        return this;
+    }
+
+    /// <summary>
+    ///     Replaces the suite's whole <see cref="MeasurementOptions" /> in one call.
+    /// </summary>
+    /// <remarks>
+    ///     The bulk escape hatch the individual setters do not add up to. There are more than thirty of
+    ///     them and no way to hand over an options object you already have - one built by a helper,
+    ///     shared between suites, or read from configuration - so the alternative was to unpack it
+    ///     setter by setter and discover the missing one at runtime. <c>BenchmarkHarness</c> has had
+    ///     this since it existed.
+    ///     <para>
+    ///         Replaces rather than merges, and therefore discards anything set on this suite before
+    ///         it. Call it first, or treat the object you pass as the whole configuration.
+    ///     </para>
+    /// </remarks>
+    public BenchmarkSuite WithOptions(MeasurementOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        _options = options;
+
         return this;
     }
 

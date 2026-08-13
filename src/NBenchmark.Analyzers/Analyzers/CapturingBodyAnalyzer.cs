@@ -156,7 +156,7 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
         {
             return ("BenchmarkSuite.Add",
                 "The whole suite falls back to this process, not just this benchmark; to isolate it, "
-                + "declare the state with .WithState(() => Build()) and take it as a body parameter, or "
+                + "declare the state with BenchmarkSuite.Over(name, () => Build()) and take it as a body parameter, or "
                 + "move the suite into a static [BenchmarkPlan] factory.");
         }
 

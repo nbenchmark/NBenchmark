@@ -193,11 +193,10 @@ The whole suite shares one worker, which keeps every ratio between its benchmark
 
 Parameter sweeps, suite and per-iteration lifecycle, custom statistical strategies, and bodies that **capture a local** are all isolated - a captured value is sent with the address, so the body a worker binds is the one you wrote holding what you gave it. What cannot cross is a value whose behaviour is not determined by its contents: a live handle, a collection with a custom comparer, anything past the 8 MiB transfer ceiling.
 
-`WithState` is for those, and for anything simply large - the worker builds it in the process that measures rather than being sent it:
+`BenchmarkSuite.Over` is for those, and for anything simply large - the worker builds it in the process that measures rather than being sent it. It also types each body's parameter, which is the other half of what it is for:
 
 ```csharp
-await new BenchmarkSuite("sorting")
-    .WithState(() => BuildData())          // the worker builds it, once per benchmark
+await BenchmarkSuite.Over("sorting", () => BuildData())   // built once per benchmark, in the worker
     .Add("array", d => Array.Sort(d))
     .Add("linq",  d => d.OrderBy(x => x).ToArray())
     .RunAsync();

@@ -40,6 +40,24 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         });
 
     /// <summary>
+    ///     The same for a suite over prepared state. That this compiles at all is the parity guarantee:
+    ///     every <c>With*</c> below returns the stateful suite, so the typed <c>Add</c> is still in
+    ///     scope afterwards.
+    /// </summary>
+    private static BenchmarkSuite<TState> Fast<TState>(BenchmarkSuite<TState> suite) => suite
+        .WithIterations(16)
+        .WithWarmup(1)
+        .WithOpsPerSample(1)
+        .WithAutoTune(AutoTuneOptions.Default with
+        {
+            MaxTuningTime = TimeSpan.FromSeconds(5),
+            MinWarmupTime = TimeSpan.Zero,
+            MinMeasurementTime = TimeSpan.Zero,
+            RequireJitQuiescence = false,
+            EnableJitterCalibration = false,
+        });
+
+    /// <summary>
     ///     The same, with the hard-error gate turned off, for the tests that are about what the
     ///     <i>fallback</i> does and says.
     /// </summary>
@@ -599,8 +617,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     [Fact]
     public async Task StatefulSuite_IsIsolated_AndBuildsStateInTheWorker()
     {
-        var results = await Fast(new BenchmarkSuite("stateful")
-                .WithState(() => PreparedStateProbe.Build())
+        var results = await Fast(BenchmarkSuite.Over("stateful", () => PreparedStateProbe.Build())
                 .Add("spin", spins => Thread.SpinWait(spins))
                 .Add("half", spins => Thread.SpinWait(spins / 2))
                 .WithBaseline("spin"))
@@ -646,8 +663,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         var launcher = new CountingLauncher(WorkerLocatorForTests.WorkerAssemblyPath());
         WorkerLauncher.Current = launcher;
 
-        var results = await Fast(new BenchmarkSuite("per-benchmark")
-                .WithState(() => new int[64])
+        var results = await Fast(BenchmarkSuite.Over("per-benchmark", () => new int[64])
                 .Add("a", buffer => buffer.Length)
                 .Add("b", buffer => buffer.Length)
                 .Add("c", buffer => buffer.Length))
@@ -661,26 +677,6 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         Assert.Equal(3, launcher.LastBodyCount);
     }
 
-    /// <summary>
-    ///     <c>WithState</c> after the suite is configured throws, rather than silently transplanting
-    ///     settings into the new typed suite.
-    /// </summary>
-    /// <remarks>
-    ///     The conversion cannot preserve configuration without copying roughly twenty fields, and a copy
-    ///     that misses one presents as a setting that quietly stopped working. Refusing, with the corrected
-    ///     call spelled out, is the honest version.
-    /// </remarks>
-    [Fact]
-    public void WithState_AfterConfiguration_ThrowsAndSaysWhereToPutIt()
-    {
-        var suite = new BenchmarkSuite("late").Add("a", () => Thread.SpinWait(200));
-
-        var ex = Assert.Throws<InvalidOperationException>(() => suite.WithState(() => 1));
-
-        Assert.Contains("WithState must be called before", ex.Message);
-        Assert.Contains("benchmarks have been", ex.Message);
-        Assert.Contains("new BenchmarkSuite(\"late\").WithState(...)", ex.Message);
-    }
 
     /// <summary>
     ///     A capturing state factory is refused, so the suite falls back rather than preparing state on
@@ -691,8 +687,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     {
         var size = 64;
 
-        var results = await new BenchmarkSuite("captured-state")
-            .WithState(() => new int[size])
+        var results = await BenchmarkSuite.Over("captured-state", () => new int[size])
             .Add("a", buffer => buffer.Length == size ? 1 : throw new InvalidOperationException("wrong size"))
             .WithIterations(4)
             .WithWarmup(0)

@@ -282,6 +282,13 @@ internal sealed class WorkerSession(FrameChannel channel)
         // would drop the events leading up to whatever went wrong - the ones worth having.
         StreamingProgress? progress = null;
 
+        // Held outside the try for the same reason, and a sharper one. A `using var` inside the try
+        // disposes at the end of *that block*, which is before the finally runs - so affinity and
+        // priority were restored before MeasureCalibration() measured the standard a test gate
+        // divides by. The numerator was pinned and the denominator was not, and the ratio absorbed
+        // the difference.
+        IDisposable? environment = null;
+
         try
         {
             // One load context for the whole group. Not an optimisation: a second context loads a
@@ -314,7 +321,7 @@ internal sealed class WorkerSession(FrameChannel channel)
             // The worker was launched with the runtime profile already applied to its environment
             // block - that is the only moment it could have been. Affinity and priority, by
             // contrast, are settable at any time and belong here.
-            using var _ = EnvironmentControl.Apply(options.Environment);
+            environment = EnvironmentControl.Apply(options.Environment);
 
             // The failure callback is a second, independent route to the same conclusion: the pump sees
             // the inbound half break, this sees the outbound half. Either one means there is no
@@ -407,8 +414,9 @@ internal sealed class WorkerSession(FrameChannel channel)
                     await _queue.DrainAsync().ConfigureAwait(false);
 
                 // Measured here, after the group's work, so it reflects the process the benchmark
-                // actually ran in rather than a freshly-started one. Its whole purpose is to be
-                // divisible into that benchmark's number.
+                // actually ran in rather than a freshly-started one - which includes its affinity and
+                // priority, so the environment scope is still open at this point and is disposed
+                // below. Its whole purpose is to be divisible into that benchmark's number.
                 var calibration = request.MeasureCalibration ? MeasureCalibration() : null;
 
                 try
@@ -432,6 +440,11 @@ internal sealed class WorkerSession(FrameChannel channel)
                     _abandonedMidGroup = true;
                 }
             }
+
+            // Last, after the calibration it has to cover. Restoring affinity and priority is the end
+            // of the group in the most literal sense, and doing it any earlier is what left the
+            // standard measured under a different process configuration than the benchmark it judges.
+            environment?.Dispose();
 
             _queue = null;
         }
@@ -1206,8 +1219,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         {
             options = options with
             {
-                OutlierDetector = Construct<IOutlierDetector>(
-                    detectorName, request.TargetAssemblyPath, substitutions),
+                OutlierDetector = Construct<IOutlierDetector>(detectorName, context, substitutions),
             };
         }
 
@@ -1221,8 +1233,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         {
             options = options with
             {
-                SignificanceTest = Construct<ISignificanceTest>(
-                    testName, request.TargetAssemblyPath, substitutions),
+                SignificanceTest = Construct<ISignificanceTest>(testName, context, substitutions),
             };
         }
 
@@ -1285,31 +1296,21 @@ internal sealed class WorkerSession(FrameChannel channel)
             ? message
             : char.ToUpperInvariant(message[0]) + message[1..];
 
-    private static T? Construct<T>(string typeName, string targetAssemblyPath, List<string> substitutions)
+    /// <param name="context">
+    ///     The <b>group's</b> load context. This used to build one of its own, in direct contradiction
+    ///     of the rule stated at the top of <see cref="RunGroupAsync" /> - a second context loads a
+    ///     second copy of the target assembly, so the same logical type from the two is two distinct
+    ///     Type identities, with its static constructor run twice. It survived only because
+    ///     <see cref="IOutlierDetector" /> and <see cref="ISignificanceTest" /> come from NBenchmark,
+    ///     which both contexts unify to Default; the moment a strategy touched a user type it was in
+    ///     the failure that comment describes. Both callers had the group's context in scope already.
+    /// </param>
+    private static T? Construct<T>(string typeName, BenchmarkLoadContext context, List<string> substitutions)
         where T : class
     {
-        // Types defined by the engine resolve from the default context; a user's own strategy
-        // resolves from the target's graph. Trying the plain lookup first keeps the common case
-        // free of load-context subtleties.
-        var type = Type.GetType(typeName, throwOnError: false);
-
-        if (type is null)
-        {
-            var context = new BenchmarkLoadContext(targetAssemblyPath);
-
-            // Resolved *from* the assembly the resolver loaded. Discarding it and calling the plain
-            // Type.GetType searches the worker's default context instead, where a user's own strategy
-            // never is - so the lookup failed, the worker fell back to the built-in detector, and the
-            // result was scored under a statistical method nobody chose. The stderr line said so, which
-            // is the only reason it was not silent.
-            type = Type.GetType(
-                typeName,
-                name => context.LoadFromAssemblyName(name),
-                (assembly, name, ignoreCase) => assembly is null
-                    ? Type.GetType(name, throwOnError: false, ignoreCase)
-                    : assembly.GetType(name, throwOnError: false, ignoreCase),
-                throwOnError: false);
-        }
+        // TypeNames tries the default context first - a strategy defined by the engine is there, and
+        // the common case stays free of load-context subtleties - then the target's own graph.
+        var type = TypeNames.Resolve(typeName, context);
 
         if (type is null)
         {

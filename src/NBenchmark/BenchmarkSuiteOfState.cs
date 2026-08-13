@@ -1,11 +1,13 @@
+using System.Diagnostics;
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
+using NBenchmark.Stats;
 
 namespace NBenchmark;
 
 /// <summary>
 ///     A suite whose benchmarks are measured over prepared state, obtained from
-///     <see cref="BenchmarkSuite.WithState{TState}" />.
+///     <see cref="BenchmarkSuite.Over{TState}" />.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -148,7 +150,7 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
 
     // --- Fluent surface, re-typed ---
     //
-    // Behaviourless forwarders. They exist because `new BenchmarkSuite("x").WithState(f).Add(...)
+    // Behaviourless forwarders. They exist because `BenchmarkSuite.Over("x", f).Add(...)
     // .WithBaseline("a").Add(...)` must keep compiling: without them the chain returns the base type
     // after the first With* call and the typed Add is no longer in scope.
 
@@ -204,6 +206,111 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
 
     /// <inheritdoc cref="BenchmarkSuite.WithIsolation" />
     public new BenchmarkSuite<TState> WithIsolation(bool enabled = true) => Chain(() => base.WithIsolation(enabled));
+
+    // --- The rest of the base's fluent surface ---
+    //
+    // Re-declared for one reason: to return this type, so the chain does not decay to the base and
+    // take the typed Add out of scope with it. There is a parity test asserting that this list is
+    // complete, because the failure mode when it is not has no diagnostic at all - the call compiles,
+    // returns BenchmarkSuite, and the next Add(string, Action<TState>) simply cannot infer its
+    // parameter.
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithAllocations(bool enabled = true)
+        => Chain(() => base.WithAllocations(enabled));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithAutoTune(AutoTuneOptions autoTune)
+        => Chain(() => base.WithAutoTune(autoTune));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithAutoTune(AutoTunePreset preset)
+        => Chain(() => base.WithAutoTune(preset));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithCategories(params string[] categories)
+        => Chain(() => base.WithCategories(categories));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithCategoryFilter(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
+        => Chain(() => base.WithCategoryFilter(include, exclude));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithConfidenceLevel(double level)
+        => Chain(() => base.WithConfidenceLevel(level));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithDedicatedHostGuidance(bool enabled = true)
+        => Chain(() => base.WithDedicatedHostGuidance(enabled));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithDiagnostics(DiagnosticsOptions diagnostics)
+        => Chain(() => base.WithDiagnostics(diagnostics));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithDiagnostics(DiagnosticsMode mode)
+        => Chain(() => base.WithDiagnostics(mode));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithHardwareAffinity(params int[] cores)
+        => Chain(() => base.WithHardwareAffinity(cores));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithMinimumPracticalEffect(double minimumDelta)
+        => Chain(() => base.WithMinimumPracticalEffect(minimumDelta));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithMinimumRelativeShift(double minimumRelativeShift)
+        => Chain(() => base.WithMinimumRelativeShift(minimumRelativeShift));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithOptions(MeasurementOptions options)
+        => Chain(() => base.WithOptions(options));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithObserver(IMeasurementObserver observer)
+        => Chain(() => base.WithObserver(observer));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithOutlierDetector(IOutlierDetector detector)
+        => Chain(() => base.WithOutlierDetector(detector));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithOutlierDetector(Func<IOutlierDetector> factory)
+        => Chain(() => base.WithOutlierDetector(factory));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithProcessPriority(ProcessPriorityClass priority)
+        => Chain(() => base.WithProcessPriority(priority));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithRequireIsolation(bool required = true)
+        => Chain(() => base.WithRequireIsolation(required));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithRuntimes(params RuntimeMoniker[] runtimes)
+        => Chain(() => base.WithRuntimes(runtimes));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithSignificance(bool enabled)
+        => Chain(() => base.WithSignificance(enabled));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithSignificanceLevel(double level)
+        => Chain(() => base.WithSignificanceLevel(level));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithSignificanceTest(ISignificanceTest test)
+        => Chain(() => base.WithSignificanceTest(test));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithSignificanceTest(Func<ISignificanceTest> factory)
+        => Chain(() => base.WithSignificanceTest(factory));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithSuppressBuildConfigurationWarning(bool suppress = true)
+        => Chain(() => base.WithSuppressBuildConfigurationWarning(suppress));
+
 
     private BenchmarkSuite<TState> Chain(Func<BenchmarkSuite> configure)
     {

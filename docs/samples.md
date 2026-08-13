@@ -16,7 +16,7 @@ Runs the same work two ways - closing over prepared data, and passing the prepar
 delegate - and prints where each was measured. Both are isolated: an `int[]` is sent to the worker by
 value. The third row is a capture that cannot be sent (a `Stream`), measured here on purpose with
 `Benchmark.RunInProcess`, because a refusal is an error rather than a silent downgrade. Also shows
-`WithState` on a suite.
+`BenchmarkSuite.Over` for a suite.
 
 ```bash
 cd samples/PreparedState

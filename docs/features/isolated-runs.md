@@ -58,7 +58,17 @@ var result = Benchmark.Run(() => Work(iterations));
 
 What crosses is a closed set: primitives, strings, arrays, the standard collections when they carry a default comparer, and types you have marked `[BenchmarkState]`. The rule is stronger than "it round-trips", because most things round-trip. It is that **nothing about how the value performs is carried outside its serialized contents** - a dictionary built with `StringComparer.OrdinalIgnoreCase` arrives with the same entries and a different lookup cost, so it is refused rather than sent.
 
-The check runs at every position, not only at the captured field. An array of a base class holding a subclass is refused too, because serializing it against the element type would deliver base instances with the override gone.
+The check runs at every position, not only at the captured field. An array of a base class holding a subclass is refused, because serializing it against the element type would deliver base instances with the override gone.
+
+What is checked is **what the value is**, not what its field says. A field declared as an interface or a base class crosses when the object in it is one the rule admits:
+
+```csharp
+IReadOnlyList<int> values = new List<int> { 4, 5, 6 };
+
+Benchmark.Run(() => Sum(values));   // isolated: rebuilt as the List<int> it actually is
+```
+
+The field itself is the one position whose real type is named on the wire, which is why it is the one allowed to differ. Inside a collection there is a single element type for every element, so a `Shape[]` holding a `Square` is still refused - there is nowhere to say which element was which.
 
 #### Extending the set with `[BenchmarkState]`
 
@@ -153,11 +163,10 @@ Reach for it when the state is:
 
 It is also strictly more faithful whatever the size, because the value is then built by the same code in the same process rather than reconstructed there. A prepare delegate that closes over a local of its own is fine - `prepare: () => BuildData(size)` sends the `size` and builds the data in the worker, which is the point.
 
-In Suite mode the same idea is `WithState`, and the payoff is larger: one worker measures the whole suite, so a single body that cannot be addressed takes every sibling in-process with it.
+In Suite mode the same idea is `BenchmarkSuite.Over`, and the payoff is larger: one worker measures the whole suite, so a single body that cannot be addressed takes every sibling in-process with it. The state is declared at construction because that is what types each body's parameter - there is no configuration to carry across and no ordering to get wrong.
 
 ```csharp
-await new BenchmarkSuite("sorting")
-    .WithState(() => BuildData())
+await BenchmarkSuite.Over("sorting", () => BuildData())
     .Add("array", d => Array.Sort(d))
     .Add("linq",  d => d.OrderBy(x => x).ToArray())
     .WithBaseline("array")

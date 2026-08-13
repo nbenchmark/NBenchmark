@@ -37,7 +37,7 @@ public enum IsolationStatus
     ///         The remedy is to hand over a recipe rather than a value: pass the preparation as its own
     ///         delegate, with
     ///         <see cref="Benchmark.Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    ///         or <see cref="BenchmarkSuite.WithState{TState}" />, and the worker builds the state
+    ///         or <see cref="BenchmarkSuite.Over{TState}" />, and the worker builds the state
     ///         itself.
     ///     </para>
     /// </summary>
@@ -125,7 +125,7 @@ public static class IsolationStatusExtensions
         // is the answer, and it is one line away from what they already wrote.
         IsolationStatus.InProcessCapturedState =>
             "pass the prepared state as its own delegate - Benchmark.Run(prepare: () => Build(), "
-            + "body: d => Use(d)), or .WithState(() => Build()) on a suite - so the worker can build it "
+            + "body: d => Use(d)), or BenchmarkSuite.Over(name, () => Build()) - so the worker can build it "
             + "rather than needing a value from this process",
         IsolationStatus.InProcessLiveFixture =>
             "instances come from a factory or fixture this process owns; supply a static factory instead "

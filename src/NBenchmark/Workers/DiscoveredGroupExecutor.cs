@@ -200,7 +200,29 @@ internal static class DiscoveredGroupExecutor
             var created = BenchmarkLifecycle.CreateInstance(suite.Type, instanceFactory, out var failure);
 
             if (created is null)
-                return GroupOutcome.Failed(failure);
+            {
+                // One benchmark's dependency problem costs that benchmark, not the group. This used to
+                // return GroupOutcome.Failed: benchmark 3 of 5 needing a service that was registered
+                // only conditionally abandoned 4 and 5, discarded the results already accumulated, and
+                // surfaced as a whole-class fault with no benchmark name on it. A *setup* failure at
+                // the same point in the same loop has always produced errored rows and continued, and
+                // there was never a reason for two adjacent user-code failures to differ.
+                var uninstantiable = OutcomeBuilder.Build(
+                    new RunOutcome.Errored(new InvalidOperationException(failure), failure!),
+                    BenchmarkEnvelope.QualifiedDiscoveredBenchmarkName(suite.Type, benchmark.DisplayName),
+                    qualifiedClassName,
+                    benchmark.Attribute.Description,
+                    benchmark.IsBaseline,
+                    options,
+                    TimeSpan.Zero,
+                    TimeSpan.Zero).Result;
+
+                results.Add(uninstantiable);
+
+                await progress.OnBenchmarkCompleted(uninstantiable).ConfigureAwait(false);
+
+                continue;
+            }
 
             var (instance, instanceTeardown) = created.Value;
             var instanceFromFactory = instanceFactory is not null;

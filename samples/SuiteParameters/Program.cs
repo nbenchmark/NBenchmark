@@ -13,7 +13,7 @@ using NBenchmark.Reporters.Console;
 //
 // The one limit is the value type: parameters must be primitives, strings, enums, decimal,
 // DateTime, DateTimeOffset, TimeSpan or Guid. Anything else has to be built in the measuring
-// process, which is what a [BenchmarkPlan] factory or WithState is for.
+// process, which is what a [BenchmarkPlan] factory or BenchmarkSuite.Over is for.
 //
 // Run with: dotnet run --project samples/SuiteParameters
 

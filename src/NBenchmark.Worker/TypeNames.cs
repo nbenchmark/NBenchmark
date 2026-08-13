@@ -18,6 +18,17 @@ namespace NBenchmark.Worker;
 ///         and calling the plain lookup looks equivalent and is not; that mistake shipped once already,
 ///         in the strategy loader, and cost every named custom detector its registration.
 ///     </para>
+///     <para>
+///         <b>Returns <c>null</c> rather than throwing</b>, which the signature says and the
+///         implementation did not. <c>throwOnError: false</c> governs the parser's own not-found path
+///         and nothing else: an exception out of the <i>assembly resolver</i> propagates, and
+///         <c>LoadFromAssemblyName</c> throws <see cref="FileNotFoundException" /> for anything the
+///         target's graph cannot supply. Every caller here treats <c>null</c> as "unresolved" and has a
+///         precise message ready for it, so the throw skipped all of them and unwound to the group
+///         handler - which reports a missing shared framework, and sent the reader after a file that
+///         was not the problem. One unresolvable type argument cost the whole group and got the wrong
+///         advice.
+///     </para>
 /// </remarks>
 internal static class TypeNames
 {
@@ -30,12 +41,26 @@ internal static class TypeNames
         if (Type.GetType(assemblyQualifiedName, throwOnError: false) is { } fromDefault)
             return fromDefault;
 
-        return Type.GetType(
-            assemblyQualifiedName,
-            name => context.LoadFromAssemblyName(name),
-            (assembly, name, ignoreCase) => assembly is null
-                ? Type.GetType(name, throwOnError: false, ignoreCase)
-                : assembly.GetType(name, throwOnError: false, ignoreCase),
-            throwOnError: false);
+        try
+        {
+            return Type.GetType(
+                assemblyQualifiedName,
+                name => context.LoadFromAssemblyName(name),
+                (assembly, name, ignoreCase) => assembly is null
+                    ? Type.GetType(name, throwOnError: false, ignoreCase)
+                    : assembly.GetType(name, throwOnError: false, ignoreCase),
+                throwOnError: false);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException
+                                       or FileLoadException
+                                       or BadImageFormatException
+                                       or TypeLoadException)
+        {
+            // Not resolvable here, which is exactly what this method's callers are asking. Caught
+            // around the whole lookup rather than inside the resolver delegate, because returning null
+            // from the resolver only sends Type.GetType back to the default context - where nothing
+            // belonging to the code under test ever is.
+            return null;
+        }
     }
 }

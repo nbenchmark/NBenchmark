@@ -163,7 +163,7 @@ See [Dependency Injection](./features/dependency-injection.md) for the full API 
 ### "cannot be sent to another process" - the run fails instead of measuring
 
 > [!CAUTION] Pick one
-> **Build the value in the worker** with a prepare delegate: `Benchmark.Run(prepare: () => BuildIt(), body: v => Use(v))`, or `WithState(() => BuildIt())` in Suite mode
+> **Build the value in the worker** with a prepare delegate: `Benchmark.Run(prepare: () => BuildIt(), body: v => Use(v))`, or `BenchmarkSuite.Over(name, () => BuildIt())` in Suite mode
 > **Mark your own type `[BenchmarkState]`** if its measured behaviour really is fully determined by its serialized contents
 > **`AddInProcess(name, body)`** to keep just that one benchmark here, with the rest of the suite still in a worker
 > **`WithRequireIsolation(false)`** to accept a labelled host-process number everywhere - right for a scratchpad, wrong for anything comparative

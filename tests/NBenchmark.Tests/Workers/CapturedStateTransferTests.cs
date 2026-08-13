@@ -448,6 +448,53 @@ public sealed class CapturedStateTransferTests : IDisposable
     }
 
     /// <summary>
+    ///     A field declared as an interface, holding an implementation the rule admits, crosses.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         An interface can never be its own runtime type, so the old rule - refuse whenever the
+    ///         runtime and declared types differ - fired here before the allow-list was ever consulted.
+    ///         <c>IReadOnlyList&lt;&gt;</c> is on that list and was unreachable at the top level: a
+    ///         listed entry that nothing could ever satisfy.
+    ///     </para>
+    ///     <para>
+    ///         The hazard the old rule named is still caught, by
+    ///         <see cref="An_Interface_Holding_An_Unlistable_Implementation_Is_Refused" /> below. What
+    ///         changed is which question gets asked - what the value <i>is</i>, rather than whether it
+    ///         matches a declaration.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void An_Interface_Field_Holding_A_Listed_Implementation_Arrives_Intact()
+    {
+        IReadOnlyList<int> values = new List<int> { 4, 5, 6 };
+
+        var saw = WorkerSaw(() =>
+            throw new InvalidOperationException($"sum={values.Sum()},type={values.GetType().Name}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("sum=15", saw);
+
+        // Rebuilt as what it was, not as the interface's default stand-in.
+        Assert.Contains("type=List`1", saw);
+    }
+
+    /// <summary>
+    ///     The hazard the mismatch rule was written for: an implementation whose behaviour is not
+    ///     determined by its contents, behind an interface that would flatten it into one whose is.
+    /// </summary>
+    [Fact]
+    public void An_Interface_Holding_An_Unlistable_Implementation_Is_Refused()
+    {
+        IReadOnlyList<int> paged = new PagedList(10);
+
+        Assert.False(BodyRef.TryCreate(() => paged.Count, "test", out _, out var refusal, receivers: Table()));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains(nameof(PagedList), refusal.Message);
+    }
+
+    /// <summary>
     ///     An element type that cannot be subclassed is never enumerated, so the large captures pay
     ///     nothing for the check above.
     /// </summary>
@@ -535,6 +582,26 @@ public sealed class CapturedStateTransferTests : IDisposable
 
         Assert.NotNull(saw);
         Assert.Contains("seed=42", saw);
+    }
+
+    /// <summary>
+    ///     A static method on a <b>closed generic type</b> is measured rather than faulting the group.
+    /// </summary>
+    /// <remarks>
+    ///     Nothing closed the declaring type for this shape. Only the two receiver shapes reached the
+    ///     type-closing step, and the method-closing step below it handles method generics only, so the
+    ///     token resolved to <c>Box&lt;T&gt;.Count</c> and <c>CreateDelegate</c> threw "the containing
+    ///     type is not fully instantiated". That is an <see cref="InvalidOperationException" />, which
+    ///     the filter around binding did not catch - so instead of one errored row it escaped to the
+    ///     group handler and took every remaining benchmark with it.
+    /// </remarks>
+    [Fact]
+    public void A_Static_Method_On_A_Closed_Generic_Type_Is_Measured()
+    {
+        var saw = WorkerSaw(Box<int>.Report);
+
+        Assert.NotNull(saw);
+        Assert.Contains("count=7", saw);
     }
 
     /// <summary>The same shape one level out: a lambda in a method of a generic class.</summary>
@@ -667,6 +734,28 @@ public sealed class CapturedStateTransferTests : IDisposable
         var local = seed;
 
         return () => throw new InvalidOperationException($"seed={local}");
+    }
+
+    /// <summary>
+    ///     An <c>IReadOnlyList&lt;int&gt;</c> whose lookup cost is nothing like a list's. Round-tripping
+    ///     it through the interface would produce identical entries and a different program, which is
+    ///     the substitution the rule exists to catch.
+    /// </summary>
+    private sealed class PagedList(int pageSize) : IReadOnlyList<int>
+    {
+        public int Count => pageSize;
+
+        public int this[int index] => index * pageSize;
+
+        public IEnumerator<int> GetEnumerator() => Enumerable.Range(0, Count).GetEnumerator();
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    /// <summary>A static method whose declaring type - not the method - carries the type argument.</summary>
+    private static class Box<T>
+    {
+        public static void Report() => throw new InvalidOperationException($"count={7}");
     }
 
     private sealed class Holder<T>
