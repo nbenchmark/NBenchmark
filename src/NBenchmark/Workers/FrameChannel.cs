@@ -64,6 +64,11 @@ internal sealed class FrameChannel : IDisposable
     {
         WriteIndented = false,
         NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
+
+        // D7: a BenchmarkParameter's Value is object?, which the default reflection-based handling
+        // cannot serialize (a [BenchmarkCase(typeof(X))] value) or deserialize back to anything but a
+        // type-blind JsonElement. See BenchmarkParameterConverter.
+        Converters = { new BenchmarkParameterConverter() },
     };
 
     /// <summary>

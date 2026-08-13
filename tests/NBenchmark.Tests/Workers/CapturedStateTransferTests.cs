@@ -74,6 +74,43 @@ public sealed class CapturedStateTransferTests : IDisposable
     }
 
     /// <summary>
+    ///     A7: the element count used to be derived from the byte count via
+    ///     <c>Marshal.SizeOf(element)</c> - the unmanaged marshaled size, a different question from
+    ///     the managed size <c>Buffer.BlockCopy</c> actually moves. The two happened to agree for
+    ///     every element type reaching this path, so the gap was never live - but <c>nint</c> is the
+    ///     type whose managed size is architecture-dependent, so it is the one most exposed if that
+    ///     ever stopped being true. The count now travels on the wire rather than being derived at
+    ///     all; this pins that the array still arrives with the right shape and values.
+    /// </summary>
+    [Fact]
+    public void A_Captured_NativeInt_Array_Arrives_Intact()
+    {
+        nint[] values = [10, 20, 30, 40, 50];
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException(
+            $"len={values.Length},sum={values.Sum(v => (long)v)}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("len=5", saw);
+        Assert.Contains("sum=150", saw);
+    }
+
+    /// <summary>
+    ///     The widest fixed-size element, 8 bytes - byte's own size, the narrowest, is already covered
+    ///     by the pre-existing 512-byte payload test below.
+    /// </summary>
+    [Fact]
+    public void A_Captured_Long_Array_Arrives_Intact()
+    {
+        long[] values = [1_000_000_000_000L, 2_000_000_000_000L];
+
+        var saw = WorkerSaw(() => throw new InvalidOperationException($"sum={values.Sum()}"));
+
+        Assert.NotNull(saw);
+        Assert.Contains("sum=3000000000000", saw);
+    }
+
+    /// <summary>
     ///     The regression the whole mechanism exists to prevent: the probe that was rejected sent no
     ///     values, so a captured <c>5</c> arrived as <c>0</c>.
     /// </summary>
@@ -334,6 +371,60 @@ public sealed class CapturedStateTransferTests : IDisposable
 
         Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
         Assert.Contains("prepare", refusal.Message);
+    }
+
+    /// <summary>
+    ///     D5: the budget counts what a blittable array actually costs on the wire - base64, always
+    ///     larger than the raw bytes - not what it costs in memory. Old accounting compared the raw
+    ///     length against the budget, so setting the budget to exactly the raw length must still
+    ///     refuse, because base64 is strictly larger for any non-empty array.
+    /// </summary>
+    [Fact]
+    public void The_Budget_Counts_Base64_Encoded_Binary_Bytes_Not_Raw_Ones()
+    {
+        var raw = new byte[300];
+
+        Assert.False(BodyRef.TryCreate(
+            () => raw.Length, "test", out _, out var refusal, receivers: new ReceiverTable(budgetBytes: raw.Length)));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains("encoded", refusal.Message);
+    }
+
+    /// <summary>The other direction: a budget that genuinely covers the encoded size still admits it.</summary>
+    [Fact]
+    public void An_Array_Within_The_Encoded_Budget_Still_Isolates()
+    {
+        var raw = new byte[300];
+
+        Assert.True(
+            BodyRef.TryCreate(() => raw.Length, "test", out _, out var refusal, receivers: new ReceiverTable(1024)),
+            refusal.Message);
+    }
+
+    /// <summary>
+    ///     D5's other half: a JSON payload is itself embedded as a JSON <i>string</i> in the frame, so
+    ///     it is escaped a second time - every quote and backslash the payload already contains costs
+    ///     an extra byte. Old accounting compared the pre-escaping length against the budget, so a
+    ///     budget set to exactly that length must still refuse once escaping is counted.
+    /// </summary>
+    [Fact]
+    public void The_Budget_Counts_Escaped_Json_Bytes_Not_Raw_Ones()
+    {
+        var many = Enumerable.Repeat("a", 2000).ToList();
+
+        var generous = Table();
+
+        Assert.True(BodyRef.TryCreate(() => many.Count, "test", out _, out var setupRefusal, receivers: generous),
+            setupRefusal.Message);
+
+        var rawLength = generous.Receivers[0].Captures[0].Json!.Length;
+
+        Assert.False(BodyRef.TryCreate(
+            () => many.Count, "test", out _, out var refusal, receivers: new ReceiverTable(budgetBytes: rawLength)));
+
+        Assert.Equal(RefusalReason.CapturedState, refusal.Reason);
+        Assert.Contains("encoded", refusal.Message);
     }
 
     /// <summary>

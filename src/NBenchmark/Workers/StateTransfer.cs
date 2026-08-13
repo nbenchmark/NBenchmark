@@ -1,10 +1,10 @@
+using System.Buffers.Text;
 using System.Collections;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using NBenchmark.Attributes;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace NBenchmark.Workers;
@@ -16,12 +16,28 @@ internal enum CapturedValueKind
     Json = 0,
 
     /// <summary>
-    ///     Raw little-endian bytes, for an array of a blittable primitive.
+    ///     Raw bytes, for an array of a blittable primitive - the array's own in-memory layout,
+    ///     copied by <c>Buffer.BlockCopy</c> rather than reinterpreted into a fixed one.
     /// </summary>
     /// <remarks>
-    ///     Not an optimisation afterthought. A <c>byte[]</c> or <c>int[]</c> written as a JSON number
-    ///     array is roughly four times its own size and slow to parse, and the frame ceiling is 64 MiB -
-    ///     so the JSON form would refuse a capture at a quarter of the size this one carries.
+    ///     <para>
+    ///         Not an optimisation afterthought. A <c>byte[]</c> or <c>int[]</c> written as a JSON
+    ///         number array is roughly four times its own size and slow to parse, and the frame
+    ///         ceiling is 64 MiB - so the JSON form would refuse a capture at a quarter of the size
+    ///         this one carries.
+    ///     </para>
+    ///     <para>
+    ///         This used to be documented "little-endian", which is not what <c>Buffer.BlockCopy</c>
+    ///         does or promises - it moves whatever byte order and pointer width the sending process's
+    ///         own memory holds, native to that process rather than pinned to one wire format. That
+    ///         happens to be little-endian on every architecture .NET currently runs on, so it is not a
+    ///         live defect; it is a format that only round-trips between two processes of the same
+    ///         endianness and pointer width, which is what the coordinator and its worker always are -
+    ///         the worker is launched as a child of the exact runtime the coordinator is running under,
+    ///         never cross-architecture. An <c>nint[]</c> is the field this bites first if that
+    ///         invariant is ever the one that breaks: 4 bytes an element under a 32-bit worker of a
+    ///         64-bit host, 8 the other way round, and nothing here would notice which was intended.
+    ///     </para>
     /// </remarks>
     Binary = 1,
 
@@ -105,12 +121,23 @@ internal sealed record CapturedField
     public string? ComparerName { get; init; }
 
     /// <summary>
-    ///     The length of each dimension of a rectangular array, in <see cref="Binary" />, or
-    ///     <c>null</c> for a rank-1 array (and everything that is not an array at all). Rank-1 needs
-    ///     no dimensions of its own - the byte count and the element size already determine its single
-    ///     length - but <c>Buffer.BlockCopy</c> is blind to shape past that: it moves the same bytes
-    ///     for a <c>[2,6]</c> array as for a <c>[3,4]</c> one, so the shape has to travel separately.
+    ///     The length of each dimension of the array in <see cref="Binary" />, outermost first.
+    ///     Present whenever <see cref="Kind" /> is <see cref="CapturedValueKind.Binary" /> - including
+    ///     rank 1 - and <c>null</c> otherwise, since <see cref="CapturedValueKind.Json" /> and
+    ///     <see cref="CapturedValueKind.Nested" /> do not describe a raw array at all.
     /// </summary>
+    /// <remarks>
+    ///     Carried even at rank 1, where the shape is only ever one number, so that number is never
+    ///     <i>derived</i> on the other side. It used to be: the worker divided the byte count by
+    ///     <c>Marshal.SizeOf(element)</c>, which answers "how big does this type marshal to for
+    ///     unmanaged interop" - a different question from "how big is this type in managed memory",
+    ///     the one <c>Buffer.ByteLength</c> and <c>Buffer.BlockCopy</c> both actually ask. The two
+    ///     happened to agree for every element type this ever allowed through, which is exactly what
+    ///     made the disagreement latent rather than live - <c>bool</c> is the type that would have
+    ///     caught it (1 managed byte, 4 marshaled), and it is excluded from
+    ///     <see cref="IsBlittablePrimitiveElement" /> for other reasons already. Naming the element
+    ///     count directly removes the question rather than answering it more carefully.
+    /// </remarks>
     public int[]? ArrayDimensions { get; init; }
 }
 
@@ -477,10 +504,29 @@ internal static class StateTransfer
             return false;
         }
 
+        // A blittable primitive array is the one shape whose wire size is knowable without doing the
+        // work encoding costs - Buffer.ByteLength reads the array's own length rather than copying
+        // it - so the budget is checked here, before ToBytes, rather than after. Everything else
+        // (below) still pays for its own encoding before the check can run: there is no cheaper way
+        // to know a JSON payload's size than producing it.
+        if (value is not null && IsBlittablePrimitiveArray(value.GetType()))
+        {
+            var projected = total + Base64.GetMaxEncodedToUtf8Length(Buffer.ByteLength((Array)value));
+
+            if (projected > budgetBytes)
+            {
+                refusal = new Refusal(
+                    RefusalReason.CapturedState,
+                    BudgetRefusalMessage(field, subject, declared, projected, budgetBytes));
+
+                return false;
+            }
+        }
+
         if (!TryEncode(field, subject, declared, value, out captured, out refusal))
             return false;
 
-        total += captured!.Binary?.Length ?? captured.Json?.Length ?? 0;
+        total += WireBytesOf(captured!);
 
         if (total > budgetBytes)
         {
@@ -560,7 +606,7 @@ internal static class StateTransfer
                 DeclaredTypeName = common.TypeName,
                 RuntimeTypeName = common.RuntimeTypeName,
                 Binary = ToBytes(array),
-                ArrayDimensions = array.Rank > 1 ? DimensionsOf(array) : null,
+                ArrayDimensions = DimensionsOf(array),
             };
 
             return true;
@@ -1420,20 +1466,39 @@ internal static class StateTransfer
     }
 
     /// <summary>
-    ///     Rebuilds a blittable primitive array from its raw bytes - rank 1, sized from the byte
-    ///     count alone, when <paramref name="dimensions" /> is <c>null</c>; the shape it names
-    ///     otherwise.
+    ///     The bytes a captured field actually costs in the frame, rather than the bytes it costs in
+    ///     memory - the two agree for neither encoding. <c>Binary</c> crosses as base64 inside the
+    ///     frame's own JSON, which is exactly <c>4/3</c> its raw length rounded up to a multiple of 4;
+    ///     <see cref="Base64.GetMaxEncodedToUtf8Length" /> gives that count without encoding anything.
+    ///     <c>Json</c> is itself a JSON *string*, escaped a second time to sit inside the frame, so its
+    ///     wire cost is the escaped length - measured by re-encoding the string exactly as the frame
+    ///     writer will, rather than approximated by a multiplier, because the escaping ratio depends on
+    ///     how many quotes and backslashes the payload happens to contain.
     /// </summary>
-    public static Array FromBytes(Type arrayType, byte[] bytes, int[]? dimensions = null)
+    private static int WireBytesOf(CapturedField captured)
+    {
+        if (captured.Binary is { } binary)
+            return Base64.GetMaxEncodedToUtf8Length(binary.Length);
+
+        if (captured.Json is { } json)
+            return JsonEncodedText.Encode(json).EncodedUtf8Bytes.Length + 2; // the wrapping quotes
+
+        return 0;
+    }
+
+    /// <summary>
+    ///     Rebuilds a blittable primitive array from its raw bytes and the shape
+    ///     <paramref name="dimensions" /> names - required, not derived, for the reason documented on
+    ///     <see cref="CapturedField.ArrayDimensions" />.
+    /// </summary>
+    public static Array FromBytes(Type arrayType, byte[] bytes, int[] dimensions)
     {
         ArgumentNullException.ThrowIfNull(arrayType);
         ArgumentNullException.ThrowIfNull(bytes);
+        ArgumentNullException.ThrowIfNull(dimensions);
 
         var element = arrayType.GetElementType()!;
-
-        var array = dimensions is null
-            ? Array.CreateInstance(element, bytes.Length / Marshal.SizeOf(element))
-            : Array.CreateInstance(element, dimensions);
+        var array = Array.CreateInstance(element, dimensions);
 
         Buffer.BlockCopy(bytes, 0, array, 0, bytes.Length);
 

@@ -859,8 +859,8 @@ internal static class BodyResolver
             // null.
             switch (capture.Kind)
             {
-                case CapturedValueKind.Binary when capture.Binary is { } bytes:
-                    value = StateTransfer.FromBytes(declared, bytes, capture.ArrayDimensions);
+                case CapturedValueKind.Binary when capture.Binary is { } bytes && capture.ArrayDimensions is { } dimensions:
+                    value = StateTransfer.FromBytes(declared, bytes, dimensions);
 
                     return true;
 
@@ -872,9 +872,16 @@ internal static class BodyResolver
                     return capture.ComparerName is null
                            || TryApplyComparer(capture, declared, context, ref value, out error);
 
-                case CapturedValueKind.Binary or CapturedValueKind.Json:
-                    error = $"the captured value for '{capture.FieldName}' says it travels as "
-                            + $"{capture.Kind} but carries no {capture.Kind} payload.";
+                case CapturedValueKind.Binary:
+                    error = $"the captured value for '{capture.FieldName}' says it travels as Binary "
+                            + "but carries no Binary payload, or no shape for it - so its element "
+                            + "count cannot be known without guessing, and this does not guess.";
+
+                    return false;
+
+                case CapturedValueKind.Json:
+                    error = $"the captured value for '{capture.FieldName}' says it travels as Json "
+                            + "but carries no Json payload.";
 
                     return false;
 

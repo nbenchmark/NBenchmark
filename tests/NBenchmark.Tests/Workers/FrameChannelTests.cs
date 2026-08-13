@@ -499,6 +499,52 @@ public sealed class FrameChannelTests
     }
 
     /// <summary>
+    ///     D7: a benchmark parameter's value crosses as a formatted display string and its type name
+    ///     rather than the raw <c>object?</c> <see cref="BenchmarkParameter.Value" /> declares - see
+    ///     <see cref="BenchmarkParameterConverter" />. A <c>Type</c> value is the one that used to
+    ///     make the whole frame write throw; an enum is the one that used to arrive as its
+    ///     underlying number instead of its member name.
+    /// </summary>
+    [Fact]
+    public async Task BenchmarkParameter_CrossesAsAFormattedValue_NotARawObject()
+    {
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new BenchmarkCompletedPayload
+            {
+                Result = ResultNamed("Bench.Typed") with
+                {
+                    ParameterSet =
+                    [
+                        new BenchmarkParameter("kind", typeof(string)),
+                        new BenchmarkParameter("mode", DayOfWeek.Friday),
+                        new BenchmarkParameter("n", 42),
+                        new BenchmarkParameter("nothing", null),
+                    ],
+                },
+                RawSamples = [],
+            }),
+            CancellationToken.None);
+
+        var frame = await right.ReadAsync(CancellationToken.None);
+        var parameters = frame!.BenchmarkCompleted!.Result.ParameterSet;
+
+        Assert.Equal("System.String", BenchmarkParameter.FormatValue(parameters[0].Value));
+        Assert.Equal("Friday", BenchmarkParameter.FormatValue(parameters[1].Value));
+        Assert.Equal("42", BenchmarkParameter.FormatValue(parameters[2].Value));
+        Assert.Null(parameters[3].Value);
+
+        // The type component the grouping key carries for the enum matches what the same value's
+        // key would carry in-process - not System.Text.Json.JsonElement for every parameter alike.
+        var crossedKey = BenchmarkParameter.GetKey([parameters[1]]);
+        var inProcessKey = BenchmarkParameter.GetKey([new BenchmarkParameter("mode", DayOfWeek.Friday)]);
+
+        Assert.Equal(inProcessKey, crossedKey);
+    }
+
+    /// <summary>
     ///     The coalesced sample stream. Every field has to survive, because the coordinator rebuilds a
     ///     <see cref="SampleEvent" /> from it and hands that to the user's observer as though it had
     ///     been emitted locally - a dropped <c>Warmup</c> flag would silently move warmup samples into
