@@ -62,7 +62,7 @@ The envelope opens with `schemaVersion` and `measurementEpoch` - see
 ```json
 {
   "schemaVersion": 1,
-  "measurementEpoch": 1,
+  "measurementEpoch": 4,
   "generatedAt": "2026-06-06T03:40:00.000Z",
   "detail": "simple",
   "profile": "realistic",
@@ -173,6 +173,8 @@ The result carries **two populations**, and `tailMetricsBasis` says which basis 
 > **`achievedRelativeCiWidth` and `marginOfError` measure different things.** The former is the CI half-width the loop achieved on the **raw** stream at its stop decision; the latter is recomputed on the **trimmed** set. When the outliers carry most of the variance the two diverge sharply — a benchmark can report `marginOfError` at ±1% of the mean next to an `achievedRelativeCiWidth` of `1.05`. That is not a contradiction, but treat the trimmed margin as optimistic whenever `sampleStop` is not `ciTargetMet`.
 
 `warmupCurve` is the mean per-op time of each warmup batch, oldest first — the shape of tiered compilation landing, since a body promoted from tier-0 to tier-1 (and re-optimized again under dynamic PGO) gets faster in steps. `warmupSampleInterval` gives the warmup iterations between consecutive points, so the array can be plotted against a real iteration axis. The array is bounded at 512 points: longer warmups are decimated by a doubling stride, keeping the points evenly spaced and the shape intact at coarser resolution. It is empty for pinned `warmupIterations` (which runs no plateau detection) and when `IncludeSamples` is off.
+
+Two limits worth knowing. This is **aggregate decay, not per-method tier attribution** — naming individual methods and their tiers (`QuickJitted`, `OptimizedTier1`, OSR, instrumented) requires the runtime's `MethodLoadVerbose` events via EventPipe or an in-process `EventListener`, which NBenchmark does not collect. And **ops-per-sample calibration runs before warmup** and already exercises the body, so some tier-up has typically happened before the first warmup batch is recorded — the curve shows what remains of tiering plus cache and branch-predictor warming, not the full cold-start cliff.
 
 `clockResolutionNs` is the **measured** effective resolution of the timer, not `Stopwatch.Frequency` — that figure is an advertised conversion rate and reports 1 ns on Apple Silicon, where the counter actually steps in 41.667 ns units. `targetSampleDurationNs` is the sample-duration target calibration resolved against, after the measured resolution raised it to span `AutoTune.MinQuantaPerSample` steps; `sampleDurationNs` is what one sample really spanned (K is a power of two, so it overshoots).
 

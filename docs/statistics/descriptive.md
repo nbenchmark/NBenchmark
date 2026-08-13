@@ -27,7 +27,7 @@ Configurable percentile values computed via the [nearest-rank](https://en.wikipe
 Because the split is not obvious from the numbers themselves, the basis that was actually used is recorded on the result as `BenchmarkResult.TailMetricsBasis` (and emitted as `tailMetricsBasis` by the JSON reporter), alongside `OutlierDetector` naming the detector that drew the line. Anything rendering both groups - a table, a dashboard, a chart axis - should say which basis each number came from rather than leaving a reader to assume one distribution. `Max` sitting hundreds of times above `Median` is normal under the default basis and does not mean the mean is wrong; it means they describe different sample sets.
 
 > [!IMPORTANT] Percentiles describe samples, and a sample may be a batch
-> When [ops-per-sample calibration](./measurement.md#phase-1---ops-per-sample-calibration-k) resolves `K > 1` (the norm for sub-10 µs bodies), each **sample** is the mean of `K` back-to-back operations. Percentiles, Min, Max, and the histogram are therefore over **batch means**, not individual operations - a single slow op is averaged with its `K-1` neighbours, so the tail percentiles understate true per-operation tail latency. This is the deliberate cost of amortising timer overhead on fast bodies. When you need genuine per-op tail latency, pin `OpsPerSample = 1` (accepting that at that scale the reported values are dominated by timer resolution and read overhead - compare against a baseline measured the same way). Bodies that already span ≥ `AutoTune.TargetSampleDurationNs` (10 µs) keep `K = 1`, so their percentiles are already per-operation.
+> When [ops-per-sample calibration](./measurement.md#phase-a---ops-per-sample-calibration-k) resolves `K > 1` (the norm for sub-10 µs bodies), each **sample** is the mean of `K` back-to-back operations. Percentiles, Min, Max, and the histogram are therefore over **batch means**, not individual operations - a single slow op is averaged with its `K-1` neighbours, so the tail percentiles understate true per-operation tail latency. This is the deliberate cost of amortising timer overhead on fast bodies. When you need genuine per-op tail latency, pin `OpsPerSample = 1` (accepting that at that scale the reported values are dominated by timer resolution and read overhead - compare against a baseline measured the same way). Bodies that already span ≥ `AutoTune.TargetSampleDurationNs` (10 µs) keep `K = 1`, so their percentiles are already per-operation.
 
 ### Min and Max
 
@@ -130,7 +130,7 @@ $$\text{MAD} = \text{median}(\lvert x_i - \text{median}(x) \rvert) \times 1.4826
 
 MAD is a **robust** measure of spread - it uses the median rather than the mean, so it is far less sensitive to outliers than the standard deviation. The scaling factor `1.4826` makes MAD consistent with the standard deviation $\sigma$ for normally distributed data, which means the two can be compared directly: if MAD is noticeably smaller than the standard deviation, outliers are inflating the standard deviation more than the bulk of the data warrant.
 
-Reported as `0` when `n < 1$.
+Reported as `0` when `n < 1`.
 
 ## Summary of all reported fields
 

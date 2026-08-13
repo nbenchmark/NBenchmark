@@ -127,5 +127,5 @@ See [Reading Your Results](../output/reading-your-results.md) for every column, 
 - [Multi-runtime comparison](../features/multi-runtime.md) - the full model, including how `--runtimes` and `[Runtimes]` interact, the build / DLL-location / cleanup lifecycle, and the moniker-to-TFM mapping.
 - [Isolated runs](../features/isolated-runs.md) - the underlying process-isolation model that cross-runtime execution builds on.
 - [Environment control](../features/environment-control.md) - controls that propagate to every spawned worker so each runtime runs under the same hardware constraints.
-- [Samples: MultiRuntimeSuite](../samples.md#multiruntimesuite---suite-mode-multi-runtime) and [MultiRuntimeHarness](../samples.md#multiruntimehost---harness-mode-multi-runtime) - runnable sample projects.
+- [Samples: MultiRuntimeSuite](../samples.md#multiruntimesuite---suite-mode-multi-runtime) and [MultiRuntimeHarness](../samples.md#multiruntimeharness---harness-mode-multi-runtime) - runnable sample projects.
 - [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) - the noise-reduction stack to apply when running cross-runtime in CI, where the host difference can dwarf the runtime difference.

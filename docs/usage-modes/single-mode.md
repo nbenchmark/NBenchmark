@@ -24,21 +24,9 @@ var result = Benchmark.Run(() =>
 
 ## Isolation
 
-`Benchmark.Run` measures the body in a dedicated worker process by default, not in the process that called it. The same body measured both ways can differ by more than 20× until the host's JIT happens to promote it, and nothing in the reported confidence interval hints at that. A worker starts under a controlled runtime profile, so the number reflects the body rather than whatever the host was doing beforehand.
+`Benchmark.Run` measures the body in a dedicated worker process by default - no configuration needed. The same body measured in the host process can differ by more than 20× until the JIT happens to promote it, and nothing in the confidence interval hints at that.
 
-A body that **captures a value the worker cannot rebuild** is the one shape that cannot cross that boundary: the value exists in this process and nowhere else, and a fabricated replacement returns plausible, silently wrong numbers rather than throwing. Such a body is **refused**, and a refusal fails the run by default rather than producing a labelled in-process measurement. Use `Benchmark.RunInProcess` (below) to measure it here on purpose, or set `RequireIsolation = false` to accept a measurement stamped `IsolationStatus.InProcessCapturedState` instead. Ordinary data - an `int`, a string, an `int[]`, a record of those - is sent to the worker by value, so a body that captures it is isolated with no rewrite. To keep the build out of the measured body entirely, split the preparation into its own delegate so the worker builds the data itself:
-
-```csharp
-var data = BuildData();
-
-// Captures `data` -> the array is sent to the worker, so this is isolated too
-var result = Benchmark.Run(() => Sort(data));
-
-// Both halves capture nothing -> measured in a worker
-var result = Benchmark.Run(
-    prepare: () => BuildData(),
-    body:    d => Sort(d));
-```
+A body that **captures a value the worker cannot rebuild** is the one shape that cannot cross the boundary: the value exists in this process and nowhere else. Such a body is **refused**, and a refusal fails the run by default rather than producing a labelled in-process measurement. Ordinary data - an `int`, a string, an `int[]`, a record of those - is sent to the worker by value, so a body that captures it is isolated with no rewrite. For prepared state that the worker should build itself, use the `prepare:` / `body:` overload (below).
 
 `Benchmark.RunInProcess` is the opposite choice - not a fallback, but the correct one when the current process *is* the subject: cold-start and first-call cost, or a body that must observe host state such as a warm cache or an open connection. It measures here deliberately, with no warning, and stamps `IsolationStatus.InProcessRequested`:
 
@@ -48,7 +36,7 @@ var cold = Benchmark.RunInProcess(() => ColdStartSensitivePath(), name: "cold pa
 
 `Benchmark.Warmup()` optionally starts a worker in the background so the first measured call does not pay the roughly 70 ms launch.
 
-See [Isolated runs](../features/isolated-runs.md) for the full mechanism, the `Iso` column, and what else cannot cross.
+See [Isolated runs](../features/isolated-runs.md) for the full model: what can and cannot cross, `RequireIsolation`, and the `Iso` column.
 
 ## Overloads
 

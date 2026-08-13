@@ -1,7 +1,7 @@
 ---
 title: "Isolated Runs"
 description: Run benchmarks in clean workers to avoid runtime cross-contamination.
-order: 4
+order: 1
 ---
 
 # Isolated Runs
@@ -56,11 +56,23 @@ var iterations = 1000;
 var result = Benchmark.Run(() => Work(iterations));
 ```
 
-What crosses is a closed set: primitives, strings, `DateOnly`/`TimeOnly`/`Uri`/`Version`/`BigInteger` and the other codec-backed scalars, rectangular and jagged arrays, the ordered collections (`List`, `Queue`, `Stack`, `LinkedList`, `ImmutableArray`, `ReadOnlyCollection`, `ArraySegment`...), the keyed ones when their comparer is reproducible, and types you have marked `[BenchmarkState]`. The rule is stronger than "it round-trips", because most things round-trip. It is that **nothing about how the value performs is carried outside its serialized contents** - which is why a comparer matters and a dictionary's *entries* alone do not: `StringComparer.OrdinalIgnoreCase` is a named, process-wide singleton, so carrying which one it was and rebuilding with the same instance is exact rather than a guess, and the dictionary crosses with it. A comparer with configuration of its own - a threshold, a locale baked into a private field - has no such identity to carry, so *that* is refused, with the same entries and a different lookup cost the giveaway.
+For state the worker should *build* rather than be sent - and for anything the capture rule below declines - name the preparation separately, and the worker builds it in the process that measures:
 
-The check runs at every position, not only at the captured field. An array of a base class holding a subclass is refused, because serializing it against the element type would deliver base instances with the override gone.
+```csharp
+var result = Benchmark.Run(
+    prepare: () => BuildData(),           // runs once, before warmup, in the worker
+    body:    d => Sort(d));
+```
 
-What is checked is **what the value is**, not what its field says. A field declared as an interface or a base class crosses when the object in it is one the rule admits:
+Reach for `prepare:` when the state is:
+
+- **big** - past `MaxTransferredStateBytes` (8 MiB) a capture is refused, and below it a large value still costs the wire what a worker could rebuild in less time
+- **live** - a `Stream`, a `DbConnection`, an open handle, a warmed cache. These cannot cross at all, and a recipe builds them in the process that measures
+- **unfaithful** - anything the rule below declines, most often a collection with a custom comparer
+
+It is also strictly more faithful whatever the size, because the value is then built by the same code in the same process rather than reconstructed there. A prepare delegate that closes over a local of its own is fine - `prepare: () => BuildData(size)` sends the `size` and builds the data in the worker, which is the point. In Suite mode the same idea is `BenchmarkSuite.Over` (see below).
+
+When you do not use `prepare:`, what crosses is a closed set: primitives, strings, `DateOnly`/`TimeOnly`/`Uri`/`Version`/`BigInteger` and the other codec-backed scalars, rectangular and jagged arrays, the ordered collections (`List`, `Queue`, `Stack`, `LinkedList`, `ImmutableArray`, `ReadOnlyCollection`, `ArraySegment`...), the keyed ones when their comparer is reproducible, and types you have marked `[BenchmarkState]`. The rule is stronger than "it round-trips": **nothing about how the value performs is carried outside its serialized contents** - a dictionary with a custom comparer is refused even though its entries round-trip, because the comparer's lookup cost is part of what you would be measuring. What is checked is **what the value is**, not what its field says - a field declared as an interface crosses when the object in it is one the rule admits:
 
 ```csharp
 IReadOnlyList<int> values = new List<int> { 4, 5, 6 };
@@ -68,7 +80,7 @@ IReadOnlyList<int> values = new List<int> { 4, 5, 6 };
 Benchmark.Run(() => Sum(values));   // isolated: rebuilt as the List<int> it actually is
 ```
 
-The field itself is the one position whose real type is named on the wire, which is why it is the one allowed to differ. Inside a collection there is a single element type for every element, so a `Shape[]` holding a `Square` is still refused - there is nowhere to say which element was which.
+See [Isolation internals: captured-state transfer](../deep-dives/isolation-internals.md#captured-state-transfer) for the full fidelity model, including the per-position checks.
 
 #### Extending the set with `[BenchmarkState]`
 
@@ -92,7 +104,6 @@ When in doubt, do not use it. Naming the preparation costs one delegate and is s
 A value NBenchmark cannot vouch for is **declined, never guessed at**: a fabricated closure does not throw, it returns plausible, silently wrong numbers. See [When isolation is refused](#when-isolation-is-refused) for what happens then.
 
 If a specific benchmark genuinely pollutes its siblings - one that permanently fills a static cache, say - put it in its own suite. Harness mode's `[IsolatedProcess]` gives per-benchmark isolation when you need it named at the benchmark level.
-
 
 ### Measuring this process on purpose
 
@@ -138,32 +149,9 @@ Residual order effects are handled instead by randomizing run order per replicat
 
 If a specific benchmark genuinely pollutes its siblings - one that permanently fills a static cache, say - put it in its own suite. Harness mode's `[IsolatedProcess]` gives per-benchmark isolation when you need it named at the benchmark level.
 
-### Prepared state: build it there instead of sending it
+### Prepared state: `BenchmarkSuite.Over`
 
-Closing over prepared input works, and for ordinary data it is the shortest thing to write:
-
-```csharp
-var data = BuildData();
-Benchmark.Run(() => Sort(data));          // isolated: `data` is sent with the address
-```
-
-Naming the preparation separately is the answer when sending the value is the wrong trade:
-
-```csharp
-Benchmark.Run(
-    prepare: () => BuildData(),           // runs once, before warmup, in the worker
-    body:    d => Sort(d));
-```
-
-Reach for it when the state is:
-
-- **big** - past `MaxTransferredStateBytes` (8 MiB) a capture is refused, and below it a large value still costs the wire what a worker could rebuild in less time
-- **live** - a `Stream`, a `DbConnection`, an open handle, a warmed cache. These cannot cross at all, and a recipe builds them in the process that measures
-- **unfaithful** - anything the rule above declines, most often a collection with a custom comparer
-
-It is also strictly more faithful whatever the size, because the value is then built by the same code in the same process rather than reconstructed there. A prepare delegate that closes over a local of its own is fine - `prepare: () => BuildData(size)` sends the `size` and builds the data in the worker, which is the point.
-
-In Suite mode the same idea is `BenchmarkSuite.Over`, and the payoff is larger: one worker measures the whole suite, so a single body that cannot be addressed takes every sibling in-process with it. The state is declared at construction because that is what types each body's parameter - there is no configuration to carry across and no ordering to get wrong.
+In Suite mode the `prepare:` idea is `BenchmarkSuite.Over`, and the payoff is larger: one worker measures the whole suite, so a single body that cannot be addressed takes every sibling in-process with it. The state is declared at construction because that is what types each body's parameter - there is no configuration to carry across and no ordering to get wrong.
 
 ```csharp
 await BenchmarkSuite.Over("sorting", () => BuildData())
@@ -260,18 +248,6 @@ When isolation resolves to a mix, NBenchmark runs the in-process benchmarks in t
 
 See [Harness mode](../usage-modes/harness-mode.md#isolatedprocess) for the full attribute reference.
 
-### How the worker works
-
-Harness mode measures in a dedicated worker process, `nbworker`, which ships inside the NBenchmark package and is copied next to your application at build time. The coordinator - the process you started - plans the work, aggregates statistics and renders reports, but never measures.
-
-A worker loads the assembly declaring your benchmarks into its own load context, runs the same attribute discovery the host would, measures with the same engine, and streams results back over a private pipe. Three consequences are worth knowing:
-
-- **Your `Main` does not re-run.** A worker is given an assembly and a class name rather than re-executing the entry assembly, so a program with *M* isolated suites does *M* work, not *M²*, and any side effect in `Main` - a file write, an HTTP call, database seeding - happens once, in the host.
-- **Progress is live.** Warmup and measurement phases, detector snapshots and results stream from the worker into your own `IBenchmarkProgress` and `IMeasurementObserver` as they happen. Per-*sample* observer events are the exception: they stop at the process boundary unless `--stream-samples` asks for them, because a benchmark emits them in the thousands and forwarding all of them would add measurable time to the run. The full raw samples arrive with each result either way. See [Measurement Observer](../reference/observers.md#what-an-isolated-run-delivers) for the per-callback table.
-- **Results and their samples arrive together.** A worker computes every statistic over the full sample array and ships the samples on the completion frame, so `BenchmarkResult.RawSamples` is complete and significance testing reads them.
-
-If the worker is missing - an incomplete restore, or `NBenchmarkDeployWorker=false` - the run fails with a message naming the directories that were searched. Set `NBENCHMARK_WORKER_PATH` to point at a specific `nbworker.dll` if you need to override discovery, or `RequireIsolation = false` to accept a labelled host-process measurement instead.
-
 ### What cannot be isolated
 
 A worker does not re-run your entry point, so anything NBenchmark holds as *live code in the coordinator* has no counterpart there. These are **refused**, and a refusal fails the run - see [When isolation is refused](#when-isolation-is-refused):
@@ -333,7 +309,7 @@ See [CLI reference](../reference/cli.md#--strict-isolation) for both.
 ## Important behavior notes
 
 - Isolation adds overhead: one worker launch per group. A worker costs roughly 70 ms to start and complete its handshake. Against the per-benchmark wall-clock floor of about 600 ms (`MinWarmupTime` plus `MinMeasurementTime`), either is a small tax for a comparison group of any size.
-- **Do not rely on `--in-process` for anything comparative.** In-process runs of identical-cost benchmarks can spread 3x across runs while each reports a tight confidence interval. See the table under [Why one worker for the whole suite](#why-one-worker-for-the-whole-suite) and `plans/out-of-process-pivot.md` for the measurements and the reason.
+- **Do not rely on `--in-process` for anything comparative.** In-process runs of identical-cost benchmarks can spread 3x across runs while each reports a tight confidence interval. See the table under [Why one worker for the whole suite](#why-one-worker-for-the-whole-suite) for the measurements and the reason.
 - **`LaunchCount` is a replicate count, and each replicate is a fresh process.** In Harness mode, `--launch-count 3` measures the group in three separate workers, each with its own shuffle order derived from the session seed. That is what gives a run-to-run reproducibility estimate rather than three repetitions inside one process - and reproducibility, not within-process precision, is what a regression gate should read.
 - Run-order randomization is honoured everywhere, and each replicate derives a distinct order from the session seed, so run order is a randomized nuisance factor rather than a fixed confound.
 - `--dry-run` (equivalent to `--iterations 0 --warmup 0`) always runs in-process - no worker is spawned.
@@ -341,8 +317,9 @@ See [CLI reference](../reference/cli.md#--strict-isolation) for both.
 - A worker that never returns is killed, along with its whole process tree, once it exceeds a wall-clock ceiling derived from the tuning budget (`MaxTuningTime` and `CapGraceFactor`, plus warmup and process-start allowances). The affected benchmarks are reported as errored, naming the timeout, rather than hanging the run. Raise `--max-tuning-time` if the work is genuinely that slow.
 - A worker cannot outlive the run that started it, and does not keep measuring for a coordinator that is gone. It reads its inbound pipe continuously - while idle *and* while measuring - so if the coordinator exits for any reason (a clean finish, a Ctrl-C, a crash, an IDE stop button) the read ends, the worker stops at its next sample and exits on its own with a distinct exit code. Nothing supervises it, which matters because the supervisor would be the process most likely to have died.
 
-## Related
+## See also
 
-- See [Harness mode](../usage-modes/harness-mode.md#isolatedprocess) for `[IsolatedProcess]` and `[InProcess]` on attribute-discovered benchmarks.
-- See [Suite mode](../usage-modes/suite-mode.md) for the full `BenchmarkSuite` fluent API.
-- See [Samples](../samples.md) for a runnable isolated-runs sample project.
+- [Isolation internals](../deep-dives/isolation-internals.md) - the engineering underneath: how a worker is found and launched, what crosses the wire and how, and why a refusal is classified the way it is.
+- [Harness mode](../usage-modes/harness-mode.md#isolatedprocess) - `[IsolatedProcess]` and `[InProcess]` on attribute-discovered benchmarks.
+- [Suite mode](../usage-modes/suite-mode.md) - the full `BenchmarkSuite` fluent API.
+- [Samples](../samples.md) - a runnable isolated-runs sample project.

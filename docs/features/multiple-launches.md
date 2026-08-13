@@ -6,26 +6,11 @@ order: 6
 
 # Multiple launches
 
-**Harness mode launches each benchmark 5 times by default**; `Benchmark.Run` and `BenchmarkSuite` run once unless you raise the count. Each launch includes its own warmup and GC cycle, so variance across launches reflects real run-to-run differences (process state, ASLR, scheduler placement, clock granularity), not just intra-run noise.
+**Harness mode launches each benchmark 5 times by default**; `Benchmark.Run` and `BenchmarkSuite` run once unless you raise the count. Each launch is a separate worker process with its own warmup and GC cycle, so variance across launches reflects real run-to-run differences (process state, ASLR, scheduler placement, clock granularity), not just intra-run noise.
 
-Harness mode defaults above one because a single launch cannot estimate the thing most readers assume the interval describes. Five because the between-launch interval is a Student-t half-width on `k - 1` degrees of freedom, and the critical value drops steeply over the first few replicates - 12.71 at `k = 2`, 4.30 at 3, 3.18 at 4, 2.78 at 5, then only slowly. Below five the interval is too wide for a real regression to clear; five is where the curve flattens.
+A single launch cannot estimate the thing most readers assume the interval describes: how much the number moves between runs. Five is where the between-launch interval stops being too wide for a real regression to clear - see [Why five?](#why-five) below.
 
-The primary result fields (median, mean, percentiles, etc.) are the **average across launches**, and the reported confidence interval comes from the spread **between** launches rather than from within any one of them. Cross-launch statistics are also computed in full and displayed in a "Launch Aggregation" table below the main results when `LaunchCount > 1`.
-
-Averaging matters more than it sounds, because each launch is a separate process. The differences between launches are a real systematic component - a different CPU draw, page layout, and address-space layout each time - not transient noise that a minimum would filter out. Reporting the fastest launch selected for the luckiest of those draws, so raising `LaunchCount` to get a *better* estimate produced a *more optimistic* number.
-
-Taking the interval from between the launches is what makes it mean what a reader assumes. On this repository's own sample, three launches of the same in-process benchmark read 4.32, 3.63 and 1.66 ns:
-
-| | reported median | reported interval |
-| --- | --- | --- |
-| fastest launch | 1.66 ns | ±0.02 ns (that launch's own precision) |
-| average of launches | 3.20 ns | **±3.42 ns** |
-
-The second row is the honest one. The first says a number that does not reproduce is known to within one percent.
-
-Counts and durations are totals - `N`, `MeasuredIterations` and `TotalDuration` cover every launch - while `Min` and `Max` span everything observed across all of them.
-
-`RawSamples` and the trimmed-sample marks come from the single launch nearest the averaged median, because the marks are positions *into* that sample array and marks from one launch against another's samples would point at the wrong ones. The pooled samples from every launch are what significance testing reads.
+The primary result fields (median, mean, percentiles, etc.) are the **average across launches**, and the reported confidence interval comes from the spread **between** launches rather than from within any one of them - see [Why the average, not the best launch](#why-the-average-not-the-best-launch) at the end of this page. Cross-launch statistics are also computed in full and displayed in a "Launch Aggregation" table below the main results when `LaunchCount > 1`.
 
 Use multiple launches when single-run noise is a concern and you want to understand how stable the measurement is at the launch level.
 
@@ -155,6 +140,25 @@ dotnet run -- --filter MyBenchmarks.NoisyWork
 ```
 
 The "Launch Aggregation" table shows cross-launch mean, standard deviation, median, and 95% confidence interval for each benchmark that ran multiple launches. Only benchmarks with `LaunchCount > 1` appear in this table.
+
+## Why the average, not the best launch
+
+Averaging matters more than it sounds, because each launch is a separate process. The differences between launches are a real systematic component - a different CPU draw, page layout, and address-space layout each time - not transient noise that a minimum would filter out. Reporting the fastest launch selected for the luckiest of those draws, so raising `LaunchCount` to get a *better* estimate produced a *more optimistic* number.
+
+Taking the interval from between the launches is what makes it mean what a reader assumes. On this repository's own sample, three launches of the same in-process benchmark read 4.32, 3.63 and 1.66 ns:
+
+| | reported median | reported interval |
+| --- | --- | --- |
+| fastest launch | 1.66 ns | ±0.02 ns (that launch's own precision) |
+| average of launches | 3.20 ns | **±3.42 ns** |
+
+The second row is the honest one. The first says a number that does not reproduce is known to within one percent.
+
+Two further details of how the aggregate is built: counts and durations are totals - `N`, `MeasuredIterations` and `TotalDuration` cover every launch - while `Min` and `Max` span everything observed across all of them. `RawSamples` and the trimmed-sample marks come from the single launch nearest the averaged median, because the marks are positions *into* that sample array and marks from one launch against another's samples would point at the wrong ones; the pooled samples from every launch are what significance testing reads.
+
+## Why five?
+
+Five is where the between-launch interval stops being too wide for a real regression to clear. The interval is a Student-t half-width on `k - 1` degrees of freedom, and the critical value drops steeply over the first few replicates - 12.71 at `k = 2`, 4.30 at 3, 3.18 at 4, 2.78 at 5 - and then only slowly. Below five the interval is too wide for a regression to clear; five is where the curve flattens.
 
 ## See also
 

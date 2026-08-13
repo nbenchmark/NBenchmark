@@ -1,7 +1,7 @@
 ---
 title: FAQ
 description: Frequently asked questions about NBenchmark.
-order: 10
+order: 12
 ---
 
 # FAQ

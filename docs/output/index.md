@@ -1,7 +1,7 @@
 ---
 title: Output
 description: Reporters and output control - console, JSON, Markdown, CSV, custom reporters, and reading your results.
-order: 5
+order: 4
 ---
 
 # Output
@@ -121,7 +121,7 @@ NBenchmark itself never reads its own reports back.
 | `schemaVersion` | Can my parser still read this file? | A field is renamed, removed, or changes type; the envelope is restructured. **Not** bumped for added fields. |
 | `measurementEpoch` | Can I plot this number next to that one? | NBenchmark changes what a benchmark reports: harness overhead, the default runtime profile, or the definition of a reported statistic. |
 
-Both are `1` today. They are separate because they move independently, and the case that proves it
+The schema is at `1` and the measurement epoch is at `4` today. They are separate because they move independently, and the case that proves it
 is the one that prompted them: replacing NBenchmark's boxing dispatch path with typed delegates
 moved the calibration standard from **9.34 ns / 24 B per op to 2.53 ns / 0 B** while leaving the
 JSON shape byte-for-byte identical. A schema version alone would have said nothing had changed. A

@@ -187,39 +187,30 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-The whole suite shares one worker, which keeps every ratio between its benchmarks a paired, within-process comparison. See [Isolated Runs](../features/isolated-runs.md) for the full model.
+The whole suite shares one worker, which keeps every ratio between its benchmarks a paired, within-process comparison. Three options exist for the common variations:
 
-`WithIsolation(false)` opts back into the host process, deliberately and silently.
+- **`WithIsolation(false)`** - opts the whole suite back into the host process, deliberately and silently.
+- **`BenchmarkSuite.Over("name", () => BuildData())`** - the worker builds the state itself in the measuring process, which is the answer for prepared data that is large, live (a `Stream`, a `DbConnection`), or otherwise cannot cross the process boundary. It also types each body's parameter:
 
-Parameter sweeps, suite and per-iteration lifecycle, custom statistical strategies, and bodies that **capture a local** are all isolated - a captured value is sent with the address, so the body a worker binds is the one you wrote holding what you gave it. What cannot cross is a value whose behaviour is not determined by its contents: a live handle, a collection built with a comparer that carries configuration of its own, anything past the 8 MiB transfer ceiling.
+  ```csharp
+  await BenchmarkSuite.Over("sorting", () => BuildData())   // built once per benchmark, in the worker
+      .Add("array", d => Array.Sort(d))
+      .Add("linq",  d => d.OrderBy(x => x).ToArray())
+      .RunAsync();
+  ```
 
-`BenchmarkSuite.Over` is for those, and for anything simply large - the worker builds it in the process that measures rather than being sent it. It also types each body's parameter, which is the other half of what it is for:
+- **`AddInProcess(name, body)`** - measures one benchmark here on purpose while the rest of the suite stays in a worker. This is the answer when a single body holds something that genuinely cannot cross (a live handle, a mock, a warm cache the benchmark is *about*):
 
-```csharp
-await BenchmarkSuite.Over("sorting", () => BuildData())   // built once per benchmark, in the worker
-    .Add("array", d => Array.Sort(d))
-    .Add("linq",  d => d.OrderBy(x => x).ToArray())
-    .RunAsync();
-```
+  ```csharp
+  await new BenchmarkSuite("cache")
+      .Add("cold", () => Parse(Payload))
+      .AddInProcess("warm", () => connection.Query())   // in the host, by request
+      .RunAsync();
+  ```
 
-Custom strategies needing constructor arguments take a factory rather than an instance, because only a factory describes how to make another one - `.WithOutlierDetector(() => new KeepFastest(fraction))`. The factory may capture; the constructed detector cannot cross.
+  An `AddInProcess` row is a *request*, not a refusal: it is stamped `InProcessRequested`, does not trip the isolation gate, and is never given a ratio against an isolated row - the configuration difference between the two processes does not go away because it was asked for. It exists because `WithIsolation(false)` is all-or-nothing: one un-addressable body takes every other benchmark in the suite into the host process with it.
 
-Anything genuinely un-addressable is **refused**, and a refusal fails the run: `RequireIsolation` defaults to `true`, so the suite does not quietly become a host-process measurement. Three answers, in the order you should reach for them:
-
-1. **`AddInProcess(name, body)`** - measure that one benchmark here on purpose, and keep the rest of the suite in a worker. This is the answer when one body holds something that genuinely cannot cross: a live handle, a mock, a warm cache the benchmark is *about*.
-2. **A static `[BenchmarkPlan]` factory** with `BenchmarkSuite.RunPlanAsync(BuildSuite)` - the worker runs your factory in its own process, so nothing has to be described to it.
-3. **`WithRequireIsolation(false)`** - accept a labelled host-process measurement for the whole suite. Right for scratchpad use; wrong for anything comparative.
-
-```csharp
-await new BenchmarkSuite("cache")
-    .Add("cold", () => Parse(Payload))
-    .AddInProcess("warm", () => connection.Query())   // in the host, by request
-    .RunAsync();
-```
-
-An `AddInProcess` row is a *request*, not a refusal: it is stamped `InProcessRequested`, does not trip the gate, and is not counted by `--strict-isolation`. It is never given a ratio against an isolated row - the configuration difference between the two processes does not go away because it was asked for. `AddInProcess` exists because `WithIsolation(false)` is all-or-nothing: one un-addressable body takes every other benchmark in the suite into the host process with it.
-
-See [Isolated Runs](../features/isolated-runs.md) for the full model.
+Anything a worker cannot rebuild - a value whose behaviour is not determined by its contents, or a suite that must be built by user code - is **refused**, and a refusal fails the run: `RequireIsolation` defaults to `true`, so the suite does not quietly become a host-process measurement. The [static `[BenchmarkPlan]` factory](../features/isolated-runs.md#what-still-cannot-be-isolated-on-its-own) with `RunPlanAsync` is the remedy for the second case. See [Isolated runs](../features/isolated-runs.md) for the full model: what can and cannot cross, the capture rules, `RequireIsolation`, and `--strict-isolation`.
 
 ## Multiple launches
 

@@ -39,6 +39,9 @@ Run with `dotnet run` and you'll see something like:
 
 That's it. NBenchmark measured your code in a freshly spawned worker process, warmed up until the timings plateaued (to let the JIT compile your code), collected enough measured samples to tighten the confidence interval, trimmed outliers using the IQR fence rule, and printed a summary. The `steady-state` label means the worker started with a known runtime configuration for consistent results. See [Process isolation](./key-concepts.md#process-isolation).
 
+> [!NOTE] You didn't ask for a process - why is there one?
+> NBenchmark measures in a clean worker by default so the number reflects your code, not your process's history. It's on in every mode and needs no configuration. See [Isolated runs](../features/isolated-runs.md) for what that means for you and how to opt out.
+
 ## Measuring async code
 
 ```csharp

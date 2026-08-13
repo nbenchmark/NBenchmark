@@ -75,6 +75,6 @@ Because all four modes produce the same `BenchmarkResult` type, upgrading from o
 
 ## Next steps
 
-Once you've picked a mode, the [Features](../features/) section covers advanced cross-cutting capabilities: [parameterized benchmarks](../features/parameterized-suite.md), [categories](../features/categories.md), [isolated runs](../features/isolated-runs.md), [multi-runtime comparison](../features/multi-runtime.md), [multiple launches](../features/multiple-launches.md), and [dependency injection](../features/dependency-injection.md).
+Once you've picked a mode, the [Features](../features/) section covers advanced cross-cutting capabilities: [isolated runs](../features/isolated-runs.md), [parameterized benchmarks](../features/parameterized-suite.md), [categories](../features/categories.md), [multi-runtime comparison](../features/multi-runtime.md), [multiple launches](../features/multiple-launches.md), and [dependency injection](../features/dependency-injection.md). For the engineering internals behind them, see [Deep dives](../deep-dives/).
 
 The [Guides](../guides/) section assembles those features into real-world workflow recipes: [benchmarking ASP.NET Core services](../guides/aspnet-core-services.md), [tuning for CI/CD pipelines](../guides/ci-cd-pipelines.md), [comparing a refactor side-by-side](../guides/refactor-comparison.md), and more.

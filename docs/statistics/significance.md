@@ -1,7 +1,7 @@
 ---
 title: Significance Testing
 description: How NBenchmark decides whether benchmark differences are statistically real - the Mann-Whitney U test for two groups and the Kruskal-Wallis omnibus test (with post-hoc pairwise Mann-Whitney U and Holm-Bonferroni correction) for three or more. Plus Cliff's delta effect size and the MinimumPracticalEffect practical-significance gate (on by default at 0.147).
-order: 5
+order: 6
 ---
 
 # Significance Testing

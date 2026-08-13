@@ -68,7 +68,7 @@ See [Raw vs. trimmed statistics](./statistics/measurement.md#raw-vs-trimmed-stat
 
 The measured timings kept moving while they were being collected, so the interval describes a moving target. Usually a JIT tier-up or dynamic-PGO re-optimization landing inside measurement; otherwise a thermal ramp, a filling cache, or a growing data structure.
 
-See [Measurement: Steady-state (drift) gate](./statistics/measurement.md#phase-3---measurement-ci-width-target) for the drift detection mechanism and the restart limit.
+See [Measurement: Steady-state (drift) gate](./statistics/measurement.md#phase-c---measurement-ci-width-target) for the drift detection mechanism and the restart limit.
 
 ### Sample count varies between runs
 

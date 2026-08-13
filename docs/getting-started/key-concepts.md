@@ -19,10 +19,12 @@ Warmup exists because the first few runs of .NET code are artificially slow:
 
 If you skipped warmup, your first measurements would include JIT compilation time, which is not representative of steady-state performance. After warmup, subsequent runs use the compiled, cached version of your code.
 
-By default NBenchmark **auto-detects** how much warmup each benchmark needs: it watches the per-sample timings and stops once they stop improving (a plateau). A method that JITs quickly gets a short warmup; one that keeps speeding up gets a longer one. Warmup also never ends before a minimum *duration* (500 ms by default) and not while the JIT is still compiling — a fast method plateaus in microseconds, long before .NET's background tiered compilation has actually produced its optimized code, so stopping at the plateau alone would measure the slow tier-0 version. Pin an exact count with `WithWarmup(n)` / `WarmupIterations = n` when you want a fixed budget.
+By default NBenchmark **auto-detects** how much warmup each benchmark needs: it watches the per-sample timings and stops once they stop improving (a plateau). A method that JITs quickly gets a short warmup; one that keeps speeding up gets a longer one. Warmup also never ends before a minimum *duration* (500 ms by default) and not while the JIT is still compiling - a fast method plateaus in microseconds, long before .NET's background tiered compilation has actually produced its optimized code, so stopping at the plateau alone would measure the slow tier-0 version. Pin an exact count with `WithWarmup(n)` / `WarmupIterations = n` when you want a fixed budget.
 
 > [!TIP]
 > If your benchmark is a one-shot operation where you specifically want to measure cold-start time, set `WithWarmup(0)` to skip warmup entirely.
+
+See [Measurement](../statistics/measurement.md) for the full warmup model: the time floor, the JIT-quiescence gate, and how the two keep tiered compilation from landing inside your measurements.
 
 ## Process isolation
 

@@ -188,6 +188,6 @@ In-process and isolated runs look identical to the dashboard: both are OTLP prod
 
 ## See also
 
-- `docs/reference/observers.md` - the `IMeasurementObserver` interface and event types.
-- `docs/reference/cli.md` - the `--otlp-endpoint` CLI flag.
-- `docs/statistics/diagnostics.md` - runtime diagnostics counters (GC, heap, exceptions, CPU).
+- [Measurement Observer](./observers.md) - the `IMeasurementObserver` interface and event types.
+- [CLI Reference](./cli.md) - the `--otlp-endpoint` CLI flag.
+- [Diagnostics](../statistics/diagnostics.md) - runtime diagnostics counters (GC, heap, exceptions, CPU).

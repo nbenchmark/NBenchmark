@@ -1,7 +1,7 @@
 ---
 title: Guides
 description: Real-world workflow recipes that combine NBenchmark features to solve common benchmarking tasks end-to-end.
-order: 4
+order: 6
 ---
 
 # Guides

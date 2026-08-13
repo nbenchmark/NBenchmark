@@ -100,7 +100,7 @@ Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail
 | --- | --- | --- | --- |
 | **Console** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation + auto-tune | Standard + per-benchmark stats block (incl. diagnostics breakdown) |
 | **Markdown** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation | Standard + dedicated details section (incl. diagnostics breakdown) |
-| **CSV** | 12 core columns (incl. GC counts) | 25 core columns (incl. GC counts) | 51 columns including quartiles, fences, shape stats, and full diagnostics |
+| **CSV** | 17 core columns (incl. GC counts) | 33 core columns (incl. GC counts) | 68 columns including quartiles, fences, shape stats, and full diagnostics |
 | **JSON** | Full record (always) | Full record (always) | Full record (always) |
 
 ## See also

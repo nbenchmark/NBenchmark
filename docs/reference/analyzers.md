@@ -247,6 +247,22 @@ Typical fixes:
 
 > **CI note.** This is a compile-time warning, not a runtime error. In CI/CD pipelines the warning scrolls past in the build log and is easy to miss. If you suppress NB0011, verify that the shared state does not create a timing dependency between methods - for example, by running each method in isolation and comparing results.
 
+### NB0012 - `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]`
+
+A method carries both attributes. `[BenchmarkCase]` declares literal cases inline; `[BenchmarkCases]` names a programmatic source of cases. The two ask for different things on the same method, and the expansion order would be ambiguous, so the combination is an error.
+
+```csharp
+// Error NB0012: both attributes on one method
+[BenchmarkCase(10)]
+[BenchmarkCases(nameof(SortCases))]
+[Benchmark]
+public void Sort(int size) { }
+
+static IEnumerable<(int Size, string Label)> SortCases() => ...
+```
+
+Use one or the other. For a small literal list, `[BenchmarkCase]` is the shorter form; for generated values, file/database-backed inputs, or parameter sweeps, move the whole set into a `[BenchmarkCases]` source method. See [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) for the full comparison of the two attributes.
+
 ### NB0013 - `PerClass` lifetime with mutable instance field
 
 When a class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a non-`readonly` instance field that is accessed by at least two `[Benchmark]` methods, the field can carry warmed state from one method to the next, violating the statistical-independence assumption.
@@ -349,6 +365,34 @@ public class ProcessBenchmarks
 dotnet_diagnostic.NB0014.severity = warning
 ```
 
+### NB0015 - Conflicting isolation attributes
+
+`[InProcess]` asks for the host process and `[IsolatedProcess]` asks for a dedicated worker. On one member they cannot both be honoured, so the combination is an error rather than silently resolved.
+
+```csharp
+public class MyBenchmarks
+{
+    // Error NB0015
+    [Benchmark, InProcess, IsolatedProcess]
+    public void Both() { }
+}
+```
+
+A **method-level** attribute overriding a **class-level** one is a different thing and is not reported - it is the documented way to force one benchmark out of a mostly-in-process class:
+
+```csharp
+[InProcess]
+public class MostlyHere
+{
+    [Benchmark] public void Here() { }
+
+    // Fine: the method wins over the class.
+    [Benchmark, IsolatedProcess] public void There() { }
+}
+```
+
+Discovery refuses the same combination at runtime, with the same message, for assemblies that do not run the analyzer.
+
 ## Runtime independence warning
 
 In addition to the compile-time analyzers above, NBenchmark emits a runtime warning on every `BenchmarkResult.Warnings` list when a class actually runs under `InstanceLifetime.PerClass` with more than one `[Benchmark]` method and has declared neither `IStateReset` nor `[SharedState]`. This covers suite mode (where analyzers do not run) and cases where the analyzer package is not installed. It is raised by whichever process measured the group, so an isolated worker reports it too - which is the default Harness path.
@@ -389,34 +433,6 @@ Or set the severity in `.editorconfig`:
 [*.cs]
 dotnet_diagnostic.NB0004.severity = none
 ```
-
-### NB0015 - Conflicting isolation attributes
-
-`[InProcess]` asks for the host process and `[IsolatedProcess]` asks for a dedicated worker. On one member they cannot both be honoured, so the combination is an error rather than silently resolved.
-
-```csharp
-public class MyBenchmarks
-{
-    // Error NB0015
-    [Benchmark, InProcess, IsolatedProcess]
-    public void Both() { }
-}
-```
-
-A **method-level** attribute overriding a **class-level** one is a different thing and is not reported - it is the documented way to force one benchmark out of a mostly-in-process class:
-
-```csharp
-[InProcess]
-public class MostlyHere
-{
-    [Benchmark] public void Here() { }
-
-    // Fine: the method wins over the class.
-    [Benchmark, IsolatedProcess] public void There() { }
-}
-```
-
-Discovery refuses the same combination at runtime, with the same message, for assemblies that do not run the analyzer.
 
 ## Severity
 

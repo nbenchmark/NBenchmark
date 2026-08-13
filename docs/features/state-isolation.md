@@ -1,7 +1,7 @@
 ---
 title: State Isolation
 description: Keep PerClass benchmark instances clean between methods with IStateReset, declare deliberate sharing with [SharedState], and understand how the lifetime is resolved for container-resolved classes.
-order: 8
+order: 9
 ---
 
 # State isolation across benchmark methods
@@ -107,3 +107,4 @@ See the [analyzers reference](../reference/analyzers.md#nb0011---perclass-lifeti
 - [Dependency injection](./dependency-injection.md) - `WithScopedServiceProvider`, `WithServiceProvider`, and the PerClass sharing warning.
 - [Analyzers reference](../reference/analyzers.md) - NB0011 (PerClass with scoped service) and NB0013 (PerClass with mutable field).
 - [Configuration reference](../reference/configuration.md) - `SuppressPerClassIndependenceWarning` and `MeasurementOptions`.
+- [Deep dive: Instance lifetime resolution](../deep-dives/instance-lifetime-resolution.md) - who decides how long an instance lives, and why the answer travels with the run.

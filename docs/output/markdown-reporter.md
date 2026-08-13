@@ -61,7 +61,7 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 
 > **2026-06-06 03:40:00 UTC** · 40 warmup · 190 measured · realistic profile
 > Runtime: **steady-state** (tiered=off pgo=off r2r=off)
-> Format: schema 1, measurement epoch 1 (numbers are comparable only with the same epoch)
+> Format: schema 1, measurement epoch 4 (numbers are comparable only with the same epoch)
 
 ### Comparison
 

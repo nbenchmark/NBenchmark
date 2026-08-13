@@ -1,6 +1,7 @@
 ---
 title: Ratios
 description: How the Ratio column is estimated, why it is paired across launches, and how to read its interval.
+order: 5
 ---
 
 # Ratios

@@ -1,7 +1,7 @@
 ---
 title: Diagnostics
 description: Runtime counters for GC pressure, heap state, exceptions, and CPU usage.
-order: 6
+order: 7
 ---
 
 # Diagnostics

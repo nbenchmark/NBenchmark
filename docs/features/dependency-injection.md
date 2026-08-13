@@ -225,7 +225,7 @@ This error fires when `Activator.CreateInstance` cannot construct your benchmark
 
    `WithServiceProvider` is a core-library method (no extra package needed). For scoped lifetime (e.g. EF Core's `DbContext`), install `NBenchmark.DependencyInjection` and use `WithScopedServiceProvider` or `UseScopedDependencyInjection<T>` instead.
 
-## Next steps
+## See also
 
 - [Harness mode: BenchmarkHarness](../usage-modes/harness-mode.md) - full reference for the harness mode
 - [Samples](../samples.md) - see the `samples/DependencyInjection/` project for a complete working example
