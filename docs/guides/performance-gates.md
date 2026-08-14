@@ -38,7 +38,7 @@ Without a `ReferenceMethod`, the test runs a built-in CPU-bound calibration benc
 
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse))]
-public void OptimisedParse() => OptimisedParser.Parse(Payload);
+public void OptimizedParse() => OptimizedParser.Parse(Payload);
 
 private static void NaiveParse() => NaiveParser.Parse(Payload);
 ```
@@ -49,7 +49,7 @@ What that ratio does not have, at the default `LaunchCount = 1`, is an interval:
 
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse), LaunchCount = 3)]
-public void OptimisedParse() => OptimisedParser.Parse(Payload);
+public void OptimizedParse() => OptimizedParser.Parse(Payload);
 ```
 
 Three workers, each measuring the pair, each producing its own ratio. The gate then applies the threshold to the combined estimate and fails only when the interval excludes `1.00x` - so a failure means the slowdown is larger than the difference between two runs of the same code. See [replicates and the paired ratio](../test-integration/index.md#replicates-and-the-paired-ratio).
@@ -131,7 +131,7 @@ Applies to a method, a class, or a whole assembly. It says: this test cannot be 
 public class ParserTests : IClassFixture<ParserFixture>
 {
     [PerformanceFact(MaxSlowdownRatio = 1.5, ReferenceMethod = nameof(Naive))]
-    public void Optimised() => _fixture.Parser.Parse(Payload);
+    public void Optimized() => _fixture.Parser.Parse(Payload);
 }
 ```
 
@@ -147,7 +147,7 @@ The same attribute is also the *only* opt-out from the isolation requirement. A 
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-That default is deliberate. Isolation can be lost quietly - somebody adds a fixture argument, or the worker fails to deploy on a build agent - and a labelled-but-passing test is indistinguishable from a healthy one, because CI does not read output. Failing is the conservative direction: the message names the reason and its remedy. `[AllowInProcessGate]` waives both the isolation requirement and the ratio-gate restriction above, because both are the same judgement.
+That default is deliberate. Isolation can be lost quietly - somebody adds a fixture argument, or the worker fails to deploy on a build agent - and a labeled-but-passing test is indistinguishable from a healthy one, because CI does not read output. Failing is the conservative direction: the message names the reason and its remedy. `[AllowInProcessGate]` waives both the isolation requirement and the ratio-gate restriction above, because both are the same judgement.
 
 There is deliberately no `RequireIsolation = false` on the attributes - xUnit reads attribute values as named arguments, where an absent argument and an explicit `false` are indistinguishable. The `PerformanceAssert` option bags do expose it, because they are ordinary objects.
 
@@ -190,7 +190,7 @@ PerformanceAssert: slowdown ratio 6.2x exceeded MaxSlowdownRatio 5.0
   p = 0.0003 (significant)  Cliff's delta = 0.92 (large)
 ```
 
-The `p` and Cliff's delta values tell you whether the slowdown is real and how large. See [Reading Your Results](../output/reading-your-results.md) for every column the underlying benchmark reports.
+The `p` and Cliff's delta values tell you whether the slowdown is real and how large. See [Reading Your Results](../getting-started/reading-your-results.md) for every column the underlying benchmark reports.
 
 ## How this differs from `--threshold-pct`
 

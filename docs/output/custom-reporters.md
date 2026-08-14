@@ -88,7 +88,7 @@ Because auto-attached reporters fire on every run by design, packages that ship 
 - The reporter should also accept a package-specific disable env var (e.g. `NBENCHMARK_MYTOOL_DISABLE=1`) as an explicit escape hatch for users who want the package referenced locally but do not want every benchmark run written to the sink.
 - Both guards should run before any directory creation or file I/O so a CI runner with neither env var set pays only the cost of two `GetEnvironmentVariable` calls.
 
-The contract is convention, not enforced by NBenchmark - the package owning the reporter is responsible for honouring it.
+The contract is convention, not enforced by NBenchmark - the package owning the reporter is responsible for honoring it.
 
 ## Using BenchmarkTable in a custom reporter
 

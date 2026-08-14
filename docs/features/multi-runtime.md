@@ -42,7 +42,7 @@ dotnet run -- --runtimes net8.0,net10.0
 dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output ./results
 ```
 
-When `--runtimes` is specified, the coordinator builds the project for each target framework via `dotnet build -f <tfm>`, measures the benchmarks in **that build's own worker process**, and aggregates the results. A worker is framework-dependent, so only the net8.0 worker can load a net8.0 build - the build targets already deploy the right one beside each build's assemblies, which makes worker selection a lookup rather than a guess.
+When `--runtimes` is specified, NBenchmark builds the project for each target framework via `dotnet build -f <tfm>`, measures the benchmarks in **that build's own worker process**, and aggregates the results. A worker is framework-dependent, so only the net8.0 worker can load a net8.0 build - the build targets already deploy the right one beside each build's assemblies, which makes worker selection a lookup rather than a guess.
 
 ## Harness mode: `[Runtimes]` attribute
 

@@ -33,7 +33,7 @@ dotnet run -- --cpu-affinity 2,3
 
 Core indices are zero-based and logical (as reported by the OS). The prior affinity mask is restored when the run completes.
 
-**Choosing cores:** core 0 is often used by the OS for driver interrupt handling on Linux and Windows; avoid it for single-core pinning. A small group away from core 0 (e.g. `2,3` on an 8-core host) is the typical sweet spot for single-threaded benchmarks: it avoids the OS core and gives the scheduler room to honour affinity without starving the benchmark.
+**Choosing cores:** core 0 is often used by the OS for driver interrupt handling on Linux and Windows; avoid it for single-core pinning. A small group away from core 0 (e.g. `2,3` on an 8-core host) is the typical sweet spot for single-threaded benchmarks: it avoids the OS core and gives the scheduler room to honor affinity without starving the benchmark.
 
 **Platform support:** processor affinity is applied on Linux and Windows. On macOS the BCL does not expose the `setaffinity` syscall, so the flag is accepted but skipped with a warning. Pin to a Linux or Windows host for affinity-pinned CI gates.
 

@@ -1,17 +1,19 @@
 ---
 title: Output
 description: Reporters and output control - console, JSON, Markdown, CSV, custom reporters, and reading your results.
-order: 4
+order: 5
 ---
 
 # Output
 
 Reporters consume the finished `BenchmarkResult` list and produce output - terminal tables, Markdown files, CSVs, or JSON. You can attach as many reporters as you like to a single run.
 
+> Looking for what the numbers mean rather than how to emit them? See
+> [Reading your results](../getting-started/reading-your-results.md).
+
 ## In this section
 
-- **[Reading Your Results](./reading-your-results.md)** - interpret every column, indicator, and warning in the output.
-- **[Console Reporter](./console-reporter.md)** - rich terminal table with colour and a bar chart.
+- **[Console Reporter](./console-reporter.md)** - rich terminal table with color and a bar chart.
 - **[Markdown Reporter](./markdown-reporter.md)** - `.md` file with a formatted results table.
 - **[CSV Reporter](./csv-reporter.md)** - `.csv` file with all statistics, suitable for post-processing.
 - **[JSON Reporter](./json-reporter.md)** - `.json` file with full structured results.
@@ -70,7 +72,7 @@ await result.ToJsonAsync("results/");
 
 | Reporter | Package | Output |
 | --- | --- | --- |
-| [ConsoleReporter](./console-reporter.md) | `NBenchmark.Reporters.Console` | Rich terminal table with colour and a bar chart |
+| [ConsoleReporter](./console-reporter.md) | `NBenchmark.Reporters.Console` | Rich terminal table with color and a bar chart |
 | [MarkdownReporter](./markdown-reporter.md) | `NBenchmark` | `.md` file with a formatted results table |
 | [CsvReporter](./csv-reporter.md) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |
 | [JsonReporter](./json-reporter.md) | `NBenchmark` | `.json` file with full structured results |
@@ -109,6 +111,10 @@ If you reference an unknown reporter name, the host prints the list of available
 ## Detail levels
 
 Reporters support three detail levels - **Simple** (default), **Standard**, and **Advanced** - that control how much statistical information is included in the output. Set the level via `WithDetail(ReportDetail.Standard)` on both `BenchmarkHarness` and `BenchmarkSuite`, or via the `--detail standard` CLI flag in harness mode. See the [Report Detail Levels guide](./report-detail-levels.md) for the full column reference.
+
+## Writing a custom reporter
+
+See the [Custom Reporters](./custom-reporters.md) page for a step-by-step guide to implementing `IReporter`, registering it with `ReporterRegistry`, and using `BenchmarkTable` for comparison output. That page also documents **auto-attached reporters** (`ReporterRegistry.RegisterAutoAttach`) - side-effect reporters that fire on every run after the user's explicit reporters, with no opt-in required.
 
 ## Report format versioning
 
@@ -161,7 +167,3 @@ if report["measurementEpoch"] != baseline_epoch:
 The constants are `NBenchmark.Reporters.ReportFormat.SchemaVersion` and
 `ReportFormat.MeasurementEpoch` if you are writing a [custom reporter](./custom-reporters.md) and
 want to stamp it the same way.
-
-## Writing a custom reporter
-
-See the [Custom Reporters](./custom-reporters.md) page for a step-by-step guide to implementing `IReporter`, registering it with `ReporterRegistry`, and using `BenchmarkTable` for comparison output. That page also documents **auto-attached reporters** (`ReporterRegistry.RegisterAutoAttach`) - side-effect reporters that fire on every run after the user's explicit reporters, with no opt-in required.

@@ -1,12 +1,12 @@
 ---
 title: Statistics
-description: How NBenchmark measures, analyses, and reports benchmark data.
-order: 5
+description: How NBenchmark measures, analyzes, and reports benchmark data.
+order: 6
 ---
 
 # Statistics
 
-This section explains how NBenchmark collects and analyses measurements - the mathematical methodology behind the numbers. The [Key Concepts](../getting-started/key-concepts.md) page covers the practical side. For a practical guide to interpreting the output you see on screen, see [Reading Your Results](../output/reading-your-results.md). For the engineering internals - how the clock is probed, what crosses the process boundary, how the engine resolves its numbers - see [Deep Dives](../deep-dives/).
+This section explains how NBenchmark collects and analyzes measurements - the mathematical methodology behind the numbers. The [Key Concepts](../getting-started/key-concepts.md) page covers the practical side. For a practical guide to interpreting the output you see on screen, see [Reading Your Results](../getting-started/reading-your-results.md). For the engineering internals - how the clock is probed, what crosses the process boundary, how the engine resolves its numbers - see [Deep Dives](../deep-dives/).
 
 ## In this section
 

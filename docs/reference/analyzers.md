@@ -33,7 +33,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that may hold per-instance state (any non-primitive, non-ambient reference type), which can leak warmed state across benchmark methods. |
 | NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method has both `[BenchmarkCase]` and `[BenchmarkCases]`. Use one or the other. |
 | NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a mutable instance field that is read or written by at least two `[Benchmark]` methods, which can leak warmed state across methods. |
-| NB0014 | Benchmark body captures state | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, `Benchmark.RunRawAsync()` or `BenchmarkSuite.Add()` captures a local, a parameter, or `this`. Ordinary data is sent to the worker and the body is still isolated; a value whose behaviour is not determined by its contents is refused, which fails the run. `IsolationStatus` on the result is the authority. |
+| NB0014 | Benchmark body captures state | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, `Benchmark.RunRawAsync()` or `BenchmarkSuite.Add()` captures a local, a parameter, or `this`. Ordinary data is sent to the worker and the body is still isolated; a value whose behavior is not determined by its contents is refused, which fails the run. `IsolationStatus` on the result is the authority. |
 | NB0015 | Conflicting isolation attributes | Error | One member carries both `[InProcess]` and `[IsolatedProcess]`. The two ask for opposite things. Remove one. |
 
 ### NB0001 - Missing parameterless constructor
@@ -99,7 +99,7 @@ public static IEnumerable<(int a,)> Cases() { yield return (1,); } // arity 1, e
 
 ### NB0004 / NB0005 - No observable side effects
 
-If a `[Benchmark]` method body contains only pure operations (local variable assignments, empty loops, no method calls, no field writes, no return value), the JIT may optimise the entire body away, producing a result of 0 ns. A syntax-level heuristic detects when a body has no observable side effects:
+If a `[Benchmark]` method body contains only pure operations (local variable assignments, empty loops, no method calls, no field writes, no return value), the JIT may optimize the entire body away, producing a result of 0 ns. A syntax-level heuristic detects when a body has no observable side effects:
 
 - No method calls
 - No field/property writes
@@ -289,7 +289,7 @@ Typical fixes:
 
 NBenchmark measures a benchmark body in a separate worker process, because the runtime configuration a process starts under is the dominant term in a small measurement. It gets the body there by resolving the method the compiler already emitted; it never serializes or regenerates it.
 
-A lambda that captures state cannot be addressed that way, so the captured *values* are sent instead - but only when the value's measured behaviour is fully determined by the bytes sent. Most ordinary data qualifies and the benchmark is isolated; a value whose behaviour is not determined by its contents (a `Stream`, a collection built with a comparer that carries configuration of its own, a user type that has not opted in) is refused, and a refusal fails the run.
+A lambda that captures state cannot be addressed that way, so the captured *values* are sent instead - but only when the value's measured behavior is fully determined by the bytes sent. Most ordinary data qualifies and the benchmark is isolated; a value whose behavior is not determined by its contents (a `Stream`, a collection built with a comparer that carries configuration of its own, a user type that has not opted in) is refused, and a refusal fails the run.
 
 ```csharp
 var data = BuildInput();
@@ -367,7 +367,7 @@ dotnet_diagnostic.NB0014.severity = warning
 
 ### NB0015 - Conflicting isolation attributes
 
-`[InProcess]` asks for the host process and `[IsolatedProcess]` asks for a dedicated worker. On one member they cannot both be honoured, so the combination is an error rather than silently resolved.
+`[InProcess]` asks for the host process and `[IsolatedProcess]` asks for a dedicated worker. On one member they cannot both be honored, so the combination is an error rather than silently resolved.
 
 ```csharp
 public class MyBenchmarks

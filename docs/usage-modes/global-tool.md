@@ -110,15 +110,26 @@ dotnet benchmark                              # isolated (default)
 dotnet benchmark --in-process                 # all in-process
 ```
 
-The tool itself never measures. It loads your assembly to discover benchmarks, then hands each class to a worker along with the path to the assembly that declares it — so no environment forwarding is involved and isolated runs work from any working directory.
+The tool itself never measures. It loads your assembly to discover benchmarks, then hands each class
+to a worker, so isolated runs work from any working directory.
 
-The worker it launches is the one deployed **beside the assembly under test**, not beside the tool. That matters because a worker is framework-dependent: only the net8.0 worker can load a net8.0 build, and it is your project's own `bin` that has it. If a run reports every benchmark as `in-process (no worker)`, the usual cause is that the target project was built without the worker — check that it references the `NBenchmark` package and has not set `NBenchmarkDeployWorker=false`.
+If a run reports every benchmark as `in-process (no worker)`, the target project was most likely
+built without the worker - check that it references the `NBenchmark` package and has not set
+`NBenchmarkDeployWorker=false`. See
+[Troubleshooting](../troubleshooting.md#could-not-load-file-or-assembly-from-an-aspnet-core-or-wpf-project).
 
 ## ASP.NET Core and WPF projects
 
-Because the tool loads your assembly into its own process to discover benchmarks, a project that targets a shared framework — `Microsoft.NET.Sdk.Web`, WinForms, WPF — needs that framework present in the tool's process, and the tool is an ordinary console application. It handles this itself: it reads the `runtimeconfig.json` beside your assembly and, if that names a framework the tool was not started with, restarts once under the right set before reading anything. You will not see it happen, and there is nothing to configure.
+These work with no configuration. The tool detects that your assembly needs a shared framework it
+was not started with, and restarts itself once under the right one before reading anything.
 
-This needs the matching shared runtime installed, which it will be if the project builds and runs. It does not work for a **self-contained** target, whose framework lives in its own output directory rather than in a shared location — build the benchmark project framework-dependent, or pass `--in-process`. See [Troubleshooting](../troubleshooting.md#could-not-load-file-or-assembly-from-an-aspnet-core-or-wpf-project).
+The exception is a **self-contained** target, whose framework lives in its own output directory
+rather than a shared location. Build the benchmark project framework-dependent, or pass
+`--in-process`. See
+[Troubleshooting](../troubleshooting.md#could-not-load-file-or-assembly-from-an-aspnet-core-or-wpf-project)
+for the full explanation, and
+[Isolation internals](../deep-dives/isolation-internals.md#shared-framework-configuration) for how
+the framework set is resolved.
 
 ## Examples
 

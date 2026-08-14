@@ -30,7 +30,7 @@ Quantization presents asymmetrically, and that asymmetry is what makes it danger
 
 *Within* a run, consecutive samples of a stable body land on the **same** step. The spread between them collapses, so the standard deviation is small, and the margin of error - which divides that by √n - becomes very small indeed. *Between* runs, a shift far smaller than one step is enough to push every sample to the next step, taking the median with it in one discrete jump.
 
-The result is a benchmark that looks precise to four significant figures and moves by a whole step when you run it again. Measured on this repository's own calibration sample: a 2.53 ns body at K = 4096 spanned ~10.4 µs, or ~250 steps of the 41.667 ns clock, and reported a margin of **±0.027%** - while eight isolated runs of the same benchmark produced medians of 10209, 10250, 10291, 10375, 10416, 10458, 10500 and 10542 ns. Every one of those is a whole step from its neighbour, and the true run-to-run spread was **21× the reported margin**.
+The result is a benchmark that looks precise to four significant figures and moves by a whole step when you run it again. Measured on this repository's own calibration sample: a 2.53 ns body at K = 4096 spanned ~10.4 µs, or ~250 steps of the 41.667 ns clock, and reported a margin of **±0.027%** - while eight isolated runs of the same benchmark produced medians of 10209, 10250, 10291, 10375, 10416, 10458, 10500 and 10542 ns. Every one of those is a whole step from its neighbor, and the true run-to-run spread was **21× the reported margin**.
 
 NBenchmark reports the floor rather than leaving it implicit. `AutoTune.SampleQuantizationFraction` is one step as a fraction of one sample, and a warning fires when the measured interval is finer than the clock can resolve:
 
@@ -62,9 +62,47 @@ The stop rule itself is unchanged (it remains the cheap online gate); `CiWidthDe
 
 Bonferroni over the per-cadence look count is deliberately conservative - at the default `BatchSize` of 8 a converging run accumulates dozens of looks, so the corrected interval can be substantially wider; a Pocock or O'Brien-Fleming group-sequential boundary is a lighter-touch alternative when that proves too wide in practice.
 
+## The warmup gates
+
+The plateau rule alone measures warmup in *iterations*, but a fast body plateaus in microseconds of
+wall-clock - long before the background JIT delivers tier-1 (and dynamic-PGO) code. Warmup would
+then settle on the stable-but-slow tier-0 plateau and the tier-1 switch would land mid-measurement
+as a step change: the dominant source of run-to-run variance on very fast benchmarks. Two gates
+prevent that.
+
+### Why the time floor is 500 ms
+
+`AutoTune.MinWarmupTime` defaults to 5× the runtime's `TieredCompilation.CallCountingDelayMs`
+(100 ms). That delay *restarts* whenever tier-0 methods are still being called for the first time,
+and tier-1 is only *queued* once it finally expires - then compiled on a background thread, with a
+second instrumented→optimized transition under dynamic PGO. A floor at or below 100 ms therefore
+reliably lands those transitions inside the measurement window rather than before it.
+
+The floor is also why `AutoTune.MaxWarmup` defaults to **100,000** rather than the 10,000 that
+bounds a pinned `WarmupIterations`: a fast body needs roughly 50,000 samples to accumulate 500 ms at
+a 10 µs sample, or ~24,000 at the ~21 µs a coarse-clocked host resolves to. A count ceiling that
+binds before the time floor would silently defeat it, so hitting the ceiling below the floor raises
+a prominent warning and records `AutoTune.WarmupTimeFloorMet`. A body that cannot reach the floor
+within the ceiling at all - typically `OpsPerSample` pinned to 1 on a nanosecond body - is told to
+raise `--ops-per-sample` so each sample spans more work.
+
+### Why quiescence is a sustained interval, not a per-batch delta
+
+The gate reads `System.Runtime.JitInfo`'s compiled-method count at each batch boundary and remembers
+where in warmup it last changed, continuing until that change is `JitQuietPeriod` in the past.
+
+Asking only whether the JIT compiled anything *during the most recent batch* does not work: for a
+fast body one batch spans tens of microseconds, so a background compilation almost never lands
+inside that particular window and a per-batch delta reads zero essentially always.
+
+Two clamps keep the gate from becoming the problem it solves. The quiet period is clamped down to
+`MinWarmupTime` so it can never become the binding floor, and the gate deactivates once warmup has
+run 4 × `MinWarmupTime`, so a busy in-process host that JITs unrelated code cannot hold warmup open
+forever.
+
 ## Post-warmup recalibration
 
-Ops-per-sample calibration (Phase A) resolves K against the body's **cold** code. Once warmup has driven the body to its steady-state (tiered / PGO-optimized) speed - often several times faster - the same K may span well under the target duration, re-exposing the fixed timer overhead calibration existed to amortise. So after auto-warmup settles, the loop re-derives K from the warm per-op estimate the plateau detector measured (the last warmup batch mean): if the warm sample spans less than half the target, K is bumped to the next power of two that reaches the target, and one untimed sample runs to warm the larger batch's cache/branch state before measurement.
+Ops-per-sample calibration (Phase A) resolves K against the body's **cold** code. Once warmup has driven the body to its steady-state (tiered / PGO-optimized) speed - often several times faster - the same K may span well under the target duration, re-exposing the fixed timer overhead calibration existed to amortize. So after auto-warmup settles, the loop re-derives K from the warm per-op estimate the plateau detector measured (the last warmup batch mean): if the warm sample spans less than half the target, K is bumped to the next power of two that reaches the target, and one untimed sample runs to warm the larger batch's cache/branch state before measurement.
 
 Recalibration only applies when calibration ran (not a pinned K, no setup/teardown) and only ever increases K. When it fires, `BenchmarkResult.AutoTune.InitialOpsPerSample` records the pre-recalibration (cold) K while `OpsPerSample` holds the final value; the gap shows how much faster the warm body ran than the cold code first timed. When no recalibration occurs, `InitialOpsPerSample` is `null`.
 

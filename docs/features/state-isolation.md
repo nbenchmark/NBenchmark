@@ -6,7 +6,14 @@ order: 9
 
 # State isolation across benchmark methods
 
-When a benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]`, a single instance is shared across every `[Benchmark]` method in the class. This is useful when construction is expensive (a database connection, a large in-memory dataset) and you want to amortise that cost across multiple methods. The tradeoff is **state contamination**: method A can leave cached state behind that method B observes, so method B's timings depend on method A running first. That violates the statistical-independence assumption of the significance test and produces false-confidence p-values.
+**The symptom:** your second benchmark reads a cache the first one filled, so it looks faster than
+it is - and the order it ran in decides the result.
+
+That happens when a benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]`, which
+shares one instance across every `[Benchmark]` method in the class. Sharing is useful when
+construction is expensive (a database connection, a large in-memory dataset) and you want to
+amortize that cost. The cost is that the methods are no longer independent measurements - which is
+an assumption the significance test relies on, so you get confident-looking p-values that are wrong.
 
 Three things keep PerClass sharing honest: an explicit reset contract (`IStateReset`), an explicit declaration that the carry-over is deliberate (`[SharedState]`), and - for a class whose instances come from a container - an automatic resolution to a fresh instance per method when neither is present.
 
@@ -95,12 +102,12 @@ With `LaunchCount > 1` each launch builds a **new instance** and re-runs `[Bench
 
 ## Compile-time diagnostic (NB0011)
 
-The `PerClassWithScopedServiceAnalyzer` (NB0011) flags at compile time when a PerClass class with two or more `[Benchmark]` methods injects a constructor parameter that looks like a scoped service (any non-primitive, non-ambient reference type). PerClass is recognised from the class attribute *or* from a `WithInstanceLifetime(InstanceLifetime.PerClass)` call elsewhere in the same compilation. The diagnostic is a suppressible warning, and it also fires when `IStateReset` is implemented with an empty body. A code fix provider offers two fixes:
+Analyzer **NB0011** catches this at build time when a PerClass class with two or more `[Benchmark]`
+methods injects something that looks like a scoped service, and offers two code fixes: switch to
+`PerMethod`, or implement `IStateReset`. It also fires on an empty `ResetAsync`.
 
-1. **Use InstanceLifetime.PerMethod** - change the attribute to `[InstanceLifetime(InstanceLifetime.PerMethod)]`, giving each method a fresh instance.
-2. **Implement IStateReset** - add `IStateReset` to the class and generate a `ResetAsync` stub (available when the `NBenchmark.Lifecycle.IStateReset` type is resolvable in the compilation). The generated body is a `TODO` and a `throw`, not a completed task: a body that compiles away quietly would silence the diagnostic without resetting anything.
-
-See the [analyzers reference](../reference/analyzers.md#nb0011---perclass-lifetime-with-scoped-service) for the full NB0011 description and suppression guidance.
+See the [analyzers reference](../reference/analyzers.md#nb0011---perclass-lifetime-with-scoped-service)
+for the full description and suppression guidance.
 
 ## See also
 

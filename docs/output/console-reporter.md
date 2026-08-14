@@ -1,12 +1,12 @@
 ---
 title: ConsoleReporter
-description: Rich terminal output with colour-coded tables, significance indicators, and a bar chart.
+description: Rich terminal output with color-coded tables, significance indicators, and a bar chart.
 order: 1
 ---
 
 # ConsoleReporter
 
-`ConsoleReporter` renders results to the terminal as a colour-coded table using [Spectre.Console](https://spectreconsole.net/). It is part of the `NBenchmark.Reporters.Console` package.
+`ConsoleReporter` renders results to the terminal as a color-coded table using [Spectre.Console](https://spectreconsole.net/). It is part of the `NBenchmark.Reporters.Console` package.
 
 ## Setup
 
@@ -32,7 +32,7 @@ No explicit `.WithReporter(new ConsoleReporter())` call is needed when using the
 
 ## Example output
 
-```
+```text
 ── BENCHMARK RESULTS  2026-06-06 03:40:00 UTC ──────────────────────────────────
 
   Benchmark              Median   Mean     Ops/s       Ratio                  Sig    Mag     Alloc/op
@@ -59,9 +59,9 @@ Baseline: auto-tuned: 190 samples × 1 ops, warmup 40, CI ±1.9%
 
 When there are two or more benchmarks, a bar chart of median timings is also displayed below the table.
 
-When **three or more** benchmarks are compared, the per-row Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and a single omnibus line is printed above the footer, summarising the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
+When **three or more** benchmarks are compared, the per-row Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and a single omnibus line is printed above the footer, summarizing the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
 
-```
+```text
 Omnibus Kruskal-Wallis across 3 groups: H(2) = 7.20, p = 0.027 → significant
 
 Significance: Kruskal-Wallis (p < 0.05)
@@ -71,7 +71,7 @@ Profile: realistic (no per-iteration GC, no between-benchmark GC, alloc tracking
 3 benchmark(s) · 0.0s total · CI 95%
 ```
 
-After the Interpretation section, ConsoleReporter prints a grey `auto-tuned: …` line per benchmark summarising what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) resolved - the measured-sample count, ops-per-sample (K), warmup length, and the achieved CI half-width. Pinned runs still show the line, with the resolved counts you set.
+After the Interpretation section, ConsoleReporter prints a grey `auto-tuned: …` line per benchmark summarizing what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) resolved - the measured-sample count, ops-per-sample (K), warmup length, and the achieved CI half-width. Pinned runs still show the line, with the resolved counts you set.
 
 After the comparison and precision tables, ConsoleReporter prints an **Interpretation** section with omnibus/significance context, outlier mode, effect-metric semantics, and the measurement profile. If warnings exist, they are shown in a separate **Warnings** section below the auto-tune lines. The final summary line shows benchmark count, total run time, and confidence interval.
 
@@ -79,7 +79,7 @@ After the comparison and precision tables, ConsoleReporter prints an **Interpret
 
 | Column | Description |
 | --- | --- |
-| **Benchmark** | Name of the benchmark. Colour-coded: green (≤ 5% slower than baseline), yellow (≤ 50% slower), red (> 50% slower). Baseline is shown in bold. |
+| **Benchmark** | Name of the benchmark. Color-coded: green (≤ 5% slower than baseline), yellow (≤ 50% slower), red (> 50% slower). Baseline is shown in bold. |
 | **Median** | Median timing. |
 | **Mean** | Arithmetic mean. |
 | **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). `-` for errored or dry-run results. |
@@ -115,7 +115,7 @@ Pinning the warmup and sample counts gives the progress bar an exact total to tr
 
 Progress output is a live, updating line per benchmark:
 
-```
+```text
 ──────────────── Running 2 benchmark(s) ────────────────
 
   [1/2] Compute ████████████░░░░░░░░ 60% measuring (120/200) ETA 0.4s

@@ -158,7 +158,7 @@ If no baseline is set, NBenchmark uses the benchmark with the lowest median as t
 
 ## Suite setup and teardown
 
-`WithSuiteSetup` and `WithSuiteTeardown` run once around the entire suite - useful for starting a server, opening a connection, or initialising shared state:
+`WithSuiteSetup` and `WithSuiteTeardown` run once around the entire suite - useful for starting a server, opening a connection, or initializing shared state:
 
 ```csharp
 await new BenchmarkSuite("http")
@@ -169,7 +169,7 @@ await new BenchmarkSuite("http")
     .RunAsync();
 ```
 
-Once suite setup has succeeded, suite teardown is **guaranteed to run** - even when the run is cancelled through a `CancellationToken` - so resources opened in setup are always released.
+Once suite setup has succeeded, suite teardown is **guaranteed to run** - even when the run is canceled through a `CancellationToken` - so resources opened in setup are always released.
 
 ## Multi-runtime comparison
 
@@ -187,10 +187,12 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-The whole suite shares one worker, which keeps every ratio between its benchmarks a paired, within-process comparison. Three options exist for the common variations:
+The whole suite shares one worker, which keeps every ratio between its benchmarks a paired,
+within-process comparison. Three options cover the common variations:
 
-- **`WithIsolation(false)`** - opts the whole suite back into the host process, deliberately and silently.
-- **`BenchmarkSuite.Over("name", () => BuildData())`** - the worker builds the state itself in the measuring process, which is the answer for prepared data that is large, live (a `Stream`, a `DbConnection`), or otherwise cannot cross the process boundary. It also types each body's parameter:
+- **`BenchmarkSuite.Over("name", () => BuildData())`** - the worker builds the state itself, which is
+  the answer for prepared data that is large, live (a `Stream`, a `DbConnection`), or otherwise
+  cannot be copied. It also types each body's parameter:
 
   ```csharp
   await BenchmarkSuite.Over("sorting", () => BuildData())   // built once per benchmark, in the worker
@@ -199,18 +201,16 @@ The whole suite shares one worker, which keeps every ratio between its benchmark
       .RunAsync();
   ```
 
-- **`AddInProcess(name, body)`** - measures one benchmark here on purpose while the rest of the suite stays in a worker. This is the answer when a single body holds something that genuinely cannot cross (a live handle, a mock, a warm cache the benchmark is *about*):
+- **`AddInProcess(name, body)`** - measures one benchmark in the host process on purpose while the
+  rest of the suite stays in a worker. Use it when a single body holds something that cannot cross,
+  such as a live handle or a warm cache the benchmark is *about*.
 
-  ```csharp
-  await new BenchmarkSuite("cache")
-      .Add("cold", () => Parse(Payload))
-      .AddInProcess("warm", () => connection.Query())   // in the host, by request
-      .RunAsync();
-  ```
+- **`WithIsolation(false)`** - opts the whole suite back into the host process.
 
-  An `AddInProcess` row is a *request*, not a refusal: it is stamped `InProcessRequested`, does not trip the isolation gate, and is never given a ratio against an isolated row - the configuration difference between the two processes does not go away because it was asked for. It exists because `WithIsolation(false)` is all-or-nothing: one un-addressable body takes every other benchmark in the suite into the host process with it.
-
-Anything a worker cannot rebuild - a value whose behaviour is not determined by its contents, or a suite that must be built by user code - is **refused**, and a refusal fails the run: `RequireIsolation` defaults to `true`, so the suite does not quietly become a host-process measurement. The [static `[BenchmarkPlan]` factory](../features/isolated-runs.md#what-still-cannot-be-isolated-on-its-own) with `RunPlanAsync` is the remedy for the second case. See [Isolated runs](../features/isolated-runs.md) for the full model: what can and cannot cross, the capture rules, `RequireIsolation`, and `--strict-isolation`.
+A benchmark that asked for a worker and cannot have one **fails the run** rather than quietly
+becoming a host-process measurement. See
+[Isolated runs](../features/isolated-runs.md#when-isolation-is-refused) for the short list of what
+cannot cross and the one-line remedy for each.
 
 ## Multiple launches
 

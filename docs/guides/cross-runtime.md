@@ -120,7 +120,7 @@ Reading this:
 
 The within-runtime significance is the authoritative signal. Do not read the cross-runtime medians as a significance verdict - they're presented for comparison, not tested.
 
-See [Reading Your Results](../output/reading-your-results.md) for every column, indicator, and warning.
+See [Reading Your Results](../getting-started/reading-your-results.md) for every column, indicator, and warning.
 
 ## When to go deeper
 

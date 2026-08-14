@@ -31,7 +31,7 @@ When two or more benchmarks have been run, NBenchmark tests whether their differ
 
 **What to do:**
 - A ✓ with a small Ratio (e.g. `1.01x`) means the difference is statistically real but may be too small to matter in practice. Check the Magnitude column.
-- A ✗ with a large Ratio (e.g. `1.5x`) means the measurements are too noisy to tell. Try reducing noise (see [Tuning for noisy CI](../reference/configuration.md#tuning-for-noisy-ci-environments)) or collecting more samples.
+- A ✗ with a large Ratio (e.g. `1.5x`) means the measurements are too noisy to tell. Try reducing noise (see [Tuning for noisy CI](../guides/tuning-recipes.md#tuning-for-noisy-ci-environments)) or collecting more samples.
 - A ✓ whose **ratio interval spans `1.00x`** (shown as `1.24x?` in the console) means the two disagree, and the interval is the one to trust. Significance is computed on samples pooled across launches, where a large count grants power regardless of reproducibility; the ratio interval is the run-to-run spread. See [Ratios](./ratios.md#when-sig-and-the-ratio-interval-disagree).
 
 The significance threshold (alpha) is configurable via `MeasurementOptions.SignificanceLevel`, the `.WithSignificanceLevel(...)` fluent method, or the `--alpha` CLI flag. Lower it (e.g. `0.01`) to demand stronger evidence before calling a difference real.
@@ -53,9 +53,9 @@ The sign convention is: **positive delta = candidate tends to be slower than bas
 
 ### Practical-significance gate
 
-`MeasurementOptions.MinimumPracticalEffect` requires a minimum practical-effect score in `[0, 1]` for a comparison to count as meaningful. **It defaults to `0.147`** — the Romano negligible/small boundary (the same cutoff the Magnitude column uses) — so out of the box a ✓ verdict means "statistically real **and** at least a small effect", not merely "p < alpha". Built-in Mann-Whitney tests map this score to `|delta|`; custom tests can map any effect metric by returning `EffectSize.PracticalValue` in `PairwiseComparison`.
+`MeasurementOptions.MinimumPracticalEffect` requires a minimum practical-effect score in `[0, 1]` for a comparison to count as meaningful. **It defaults to `0.147`** - the Romano negligible/small boundary (the same cutoff the Magnitude column uses) - so out of the box a ✓ verdict means "statistically real **and** at least a small effect", not merely "p < alpha". Built-in Mann-Whitney tests map this score to `|delta|`; custom tests can map any effect metric by returning `EffectSize.PracticalValue` in `PairwiseComparison`.
 
-- Comparisons with practical effect below the threshold are reported with `Magnitude = neg` (so a sub-threshold result is never labelled `large`).
+- Comparisons with practical effect below the threshold are reported with `Magnitude = neg` (so a sub-threshold result is never labeled `large`).
 - The Sig verdict is downgraded from `Significant` to `NotSignificant` even when the p-value is below alpha, and a **warning records the downgrade** (visible in the reporters' warnings section) so the change is discoverable rather than silent.
 - The configured value must be in the range `[0, 1]`. Set it to **`0`** (`--min-practical-effect 0`) to restore p-value-only verdicts, or to `null` in code to disable the gate entirely.
 
@@ -71,13 +71,11 @@ The engine enforces the gate in `Significance.ApplyReport` after the test runs, 
 
 Set it via `MeasurementOptions.MinimumPracticalEffect`, `BenchmarkSuite.WithMinimumPracticalEffect(...)` / `BenchmarkHarness.WithMinimumPracticalEffect(...)`, or `--min-practical-effect <0-1>` on the CLI.
 
-Leave it `null` (the default) to keep p-value-only Sig semantics, in which case the Magnitude column is purely informational.
-
 ### The omnibus line (three or more groups)
 
 When three or more benchmarks are compared, the console and Markdown reporters print an omnibus line below the table:
 
-```
+```text
 Omnibus Kruskal-Wallis across 3 groups: H(2) = 7.20, p = 0.027 → significant
 ```
 

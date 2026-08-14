@@ -20,6 +20,34 @@ Or with a published binary:
 MyApp.Benchmarks [options]
 ```
 
+## The flags you'll actually use
+
+| Flag | What it does |
+| --- | --- |
+| [`--filter <pattern>`](#--filter-pattern) | Run only benchmarks whose name matches |
+| [`--list`](#--list) | Show what would run, without running it |
+| [`--dry-run`](#--dry-run) | Validate discovery and wiring without measuring |
+| [`--reporter <type>`](#--reporter-type) | Add an output format (`json`, `markdown`, `csv`, `console`) |
+| [`--output <directory>`](#--output-directory) | Where file reporters write |
+| [`--detail <level>`](#--detail-level) | How much statistical detail to show |
+| [`--launch-count <n>`](#--launch-count-n) | Repeat in N processes to measure run-to-run spread |
+| [`--threshold-pct <n>`](#--threshold-pct-n) | Fail the run when a benchmark regresses past this percentage |
+
+## All options
+
+Grouped by what they affect. Every flag is documented in full below.
+
+| Group | Flags |
+| --- | --- |
+| **Selection** | [`--filter`](#--filter-pattern) · [`--category`](#--category-name) · [`--exclude-category`](#--exclude-category-name) · [`--list`](#--list) |
+| **Measurement** | [`--iterations`](#--iterations-n) · [`--warmup`](#--warmup-n) · [adaptive tuning flags](#adaptive-tuning-flags) · [`--profile`](#--profile-mode) · [`--runtime-profile`](#--runtime-profile-profile) · [`--force-gc`](#--force-gc) · [`--no-gc-between-benchmarks`](#--no-gc-between-benchmarks) · [`--no-allocations`](#--no-allocations) · [`--launch-count`](#--launch-count-n) · [`--dry-run`](#--dry-run) |
+| **Statistics** | [`--confidence`](#--confidence-value) · [`--alpha`](#--alpha-value) · [`--outlier`](#--outlier-mode) · [`--tail-basis`](#--tail-basis-basis) · [`--percentiles`](#--percentiles-list) · [`--min-practical-effect`](#--min-practical-effect-0-1) · [`--cross-class`](#--cross-class) |
+| **Output** | [`--reporter`](#--reporter-type) · [`--output`](#--output-directory) · [`--detail`](#--detail-level) · [`--no-histogram`](#--no-histogram) · [`--emit-raw`](#--emit-raw) · [`--no-samples`](#--no-samples) |
+| **Isolation** | [`--in-process`](#--in-process) · [`--strict-isolation`](#--strict-isolation) · [`--verify-isolation`](#--verify-isolation) · [`--runtimes`](#--runtimes-list) |
+| **Environment** | [`--cpu-affinity`](#--cpu-affinity-list) · [`--priority`](#--priority-level) · [`--dedicated-host-guidance`](#--dedicated-host-guidance) |
+| **Diagnostics** | [`--diagnostics`](#--diagnostics-mode) · [`--observer`](#--observer-type) · [`--stream-samples`](#--stream-samples) · [`--otlp-endpoint`](#--otlp-endpoint-url) |
+| **Run control** | [`--order`](#--order-mode) · [`--seed`](#--seed-n) · [`--threshold-pct`](#--threshold-pct-n) · `--help` |
+
 ## Options
 
 ### `--filter <pattern>`
@@ -228,7 +256,7 @@ dotnet run -- --reporter markdown --output ./results
 
 Control the order benchmarks run in.
 
-| Value | Behaviour |
+| Value | Behavior |
 | --- | --- |
 | `random` | Fisher-Yates shuffle, random seed each run. **(default)** |
 | `declaration` | Run in the order methods are declared in the class. |
@@ -273,7 +301,7 @@ dotnet run -- --strict-isolation
 
 Two things at once: it turns `MeasurementOptions.RequireIsolation` on for the run - so a refusal throws at discovery time, before anything is measured - and it audits the results afterwards as a backstop, setting exit code 1 and naming every offender grouped by cause:
 
-```
+```text
 --strict-isolation: 1 of 4 measured benchmark(s) ran in this process rather than an
 isolated worker, so their numbers carry the host's JIT and GC configuration.
   in-process (captures): HarnessBenchmarks.InHarness
@@ -293,7 +321,7 @@ Measure everything a second time in the host process and print the per-benchmark
 dotnet run -- --verify-isolation
 ```
 
-```
+```text
 Isolation verification - the same benchmarks measured both ways:
 
   Benchmark                        Isolated    In-process  Difference
@@ -331,7 +359,7 @@ Equivalent to calling `WithCrossClassSignificance()` in code.
 
 Set the measurement profile. Controls the per-iteration Gen0 GC and the pre-measurement full GC as a bundle. Between-benchmark GC and allocation tracking are on for **both** profiles.
 
-| Value | Behaviour |
+| Value | Behavior |
 | --- | --- |
 | `realistic` | No per-iteration GC, no pre-measurement GC (inherits the warmup heap). **(default)** |
 | `independent` | Per-iteration Gen0 GC, full GC after warmup before measurement. |
@@ -340,10 +368,10 @@ Set the measurement profile. Controls the per-iteration Gen0 GC and the pre-meas
 dotnet run -- --profile independent
 ```
 
-Individual behaviours can be overridden with `--force-gc`, `--no-gc-between-benchmarks`, and `--no-allocations`. See [Measurement Profiles](../statistics/measurement.md#measurement-profiles) for a worked example.
+Individual behaviors can be overridden with `--force-gc`, `--no-gc-between-benchmarks`, and `--no-allocations`. See [Measurement Profiles](../statistics/measurement.md#measurement-profiles) for a worked example.
 
 > [!NOTE]
-> `--profile` controls *GC behaviour during* a run. `--runtime-profile` (below) controls the *runtime configuration a process starts with*. They are independent.
+> `--profile` controls *GC behavior during* a run. `--runtime-profile` (below) controls the *runtime configuration a process starts with*. They are independent.
 
 ---
 
@@ -367,9 +395,9 @@ dotnet run -- --runtime-profile host                          # reproduce a pre-
 
 **Limits, stated plainly:**
 
-- `steady-state` forbids on-stack replacement and changes startup behaviour, so it is **the wrong choice for measuring cold-start or first-call cost**. Use `production` for that.
+- `steady-state` forbids on-stack replacement and changes startup behavior, so it is **the wrong choice for measuring cold-start or first-call cost**. Use `production` for that.
 - It also costs wall clock, because every method is compiled eagerly at full optimization.
-- **It cannot apply to in-process benchmarks.** Anything measured in the host process - all of Simple mode, and `--in-process` or `[InProcess]` benchmarks - reports `host` and inherits the host's configuration. NBenchmark says so rather than claiming otherwise: every result carries the profile it was *actually* measured under, and results measured under different profiles are never compared against each other.
+- **It cannot apply to in-process benchmarks.** Anything measured in the host process - all of Single mode, and `--in-process` or `[InProcess]` benchmarks - reports `host` and inherits the host's configuration. NBenchmark says so rather than claiming otherwise: every result carries the profile it was *actually* measured under, and results measured under different profiles are never compared against each other.
 
 Set `RuntimeProfile.Host` (or `--runtime-profile host`) to accept the host's configuration everywhere and silence the guidance message; `NBENCHMARK_SUPPRESS_RUNTIME_PROFILE_WARNING=1` suppresses it without changing the profile.
 
@@ -425,7 +453,7 @@ dotnet run -- --min-practical-effect 0
 
 Control which runtime diagnostics are collected during measurement. GC collection counts are cheap and always available; heap info, exceptions, and CPU time add more detail at a small overhead cost.
 
-| Value | Behaviour |
+| Value | Behavior |
 | --- | --- |
 | `none` | No diagnostics collected. |
 | `gc` | GC Gen0/Gen1/Gen2 collection counts. **(default)** |
@@ -453,7 +481,7 @@ Programmatic equivalent: `WithDiagnostics(DiagnosticsMode.All)` or `WithOptions(
 
 Set the report detail level. Controls how much information reporters display.
 
-| Value | Behaviour |
+| Value | Behavior |
 | --- | --- |
 | `simple` | 6-column table with the essential statistics. **(default)** |
 | `standard` | Full comparison table plus Precision & Tail Latency, Diagnostics, Interpretation, and auto-tune sections. |
@@ -483,7 +511,7 @@ dotnet run -- --list
 
 Output:
 
-```
+```text
 ── StringBenchmarks ──
     Concat - current production implementation
     Interpolate

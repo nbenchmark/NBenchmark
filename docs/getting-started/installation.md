@@ -40,14 +40,12 @@ Create a new console project and add a quick sanity check:
 dotnet new console -n MyBenchmarks
 cd MyBenchmarks
 dotnet add package NBenchmark
-dotnet add package NBenchmark.Reporters.Console
 ```
 
 Replace the contents of `Program.cs`:
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Reporters.Console;
 
 var result = Benchmark.Run(() =>
 {
@@ -65,11 +63,15 @@ dotnet run
 
 You should see output similar to:
 
-```
-  Benchmark: 1.20 µs median
-    Mean: 1.24 µs, P95: 2.00 µs
-    StdDev: 360 ns
-    95% CI: 1.19 µs … 1.29 µs (±50 ns)
+```text
+  ┌─ Benchmark ─────────────────────────────────────
+  │
+  │  Median: 1.20 µs       Ops/s: 833.3 Kops/s
+  │  Alloc/op: 0 B
+  │
+  │  Measured in an isolated worker under 'steady-state'.
+  │
+  └─────────────────────────────────────────────────
 ```
 
 If you see numbers, everything is working.
@@ -78,7 +80,7 @@ If you see numbers, everything is working.
 
 ### Console package
 
-The console package adds a rich terminal table with colour-coded results and an optional progress display. It depends on [Spectre.Console](https://spectreconsole.net/).
+The console package adds a rich terminal table with color-coded results and an optional progress display. It depends on [Spectre.Console](https://spectreconsole.net/).
 
 ```bash
 dotnet add package NBenchmark.Reporters.Console
@@ -124,4 +126,5 @@ After installation, run `dotnet benchmark --help` to verify. See the [Global Too
 
 ## Next steps
 
-Continue to the [Quick Start](./quick-start.md) guide to learn more about what you can do.
+- **[Choose your path](./choose-your-path.md)** - match what you want to do to the right API
+- **[Quick Start](./quick-start.md)** - your first benchmark in 60 seconds

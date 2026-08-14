@@ -41,7 +41,7 @@ BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-The launch count is **not** a field on `MeasurementOptions`, so `WithOptions` cannot carry one. A launch is a process: the count is spent by the coordinator launching workers, and a worker - which measures exactly once - is never sent it. See [why](../reference/configuration.md#launchcount).
+The launch count is **not** a field on `MeasurementOptions`, so `WithOptions` cannot carry one. A launch is a process: the count is spent by the host process launching workers, and a worker - which measures exactly once - is never sent it. See [why](../reference/configuration.md#launchcount).
 
 ## Per-method attribute override
 
@@ -76,8 +76,8 @@ public class MyBenchmarks
 ```
 
 > [!NOTE] An isolated group takes the maximum
-> The coordinator spawns one set of workers per isolated group, using the highest launch count any
-> member asked for — so raising it on one method above raises it for every benchmark measured
+> NBenchmark spawns one set of workers per isolated group, using the highest launch count any
+> member asked for - so raising it on one method above raises it for every benchmark measured
 > alongside it. Give a method its own `[IsolatedProcess]` if you want the extra launches to stay
 > confined to it.
 
@@ -87,8 +87,8 @@ Two fields on `LaunchStatistics` answer "should I trust the interval on this row
 
 | Field | What it is |
 | --- | --- |
-| `LaunchStandardDeviation` | How much the median moves between launches — the reproducibility of the number. |
-| `WithinLaunchStandardError` | How precisely a single launch measured its own median — the precision it claimed. |
+| `LaunchStandardDeviation` | How much the median moves between launches - the reproducibility of the number. |
+| `WithinLaunchStandardError` | How precisely a single launch measured its own median - the precision it claimed. |
 | `ProcessVarianceRatio` | The first divided by the second. |
 | `BetweenLaunchDispersion` | The between-launch spread as a fraction of the measurement. |
 
@@ -102,32 +102,32 @@ When the ratio passes 4, NBenchmark adds a warning:
   inherits the power of the pooled count rather than the reproducibility of the measurement.
 ```
 
-**Expect large ratios on nanosecond-scale bodies.** A ratio of 30-60 there is ordinary, not a defect: a cheap body collects thousands of samples, which drives its standard error toward zero while leaving real machine variance — code and heap layout, scheduler placement, clock granularity — completely untouched. The warning is a statement about *which interval to trust*, not a sign the benchmark is broken.
+**Expect large ratios on nanosecond-scale bodies.** A ratio of 30-60 there is ordinary, not a defect: a cheap body collects thousands of samples, which drives its standard error toward zero while leaving real machine variance - code and heap layout, scheduler placement, clock granularity - completely untouched. The warning is a statement about *which interval to trust*, not a sign the benchmark is broken.
 
 What it is telling you is narrow and specific. The `Error` column already carries this variance, because a multi-launch row reports the between-launch half-width. The **significance verdict** does not: it pools raw samples across every launch, so its power grows with the pooled sample count regardless of whether the difference reproduces. At a high ratio, treat `Sig` as provisional and compare the per-launch medians in the Launch Aggregation table.
 
-Raising `--launch-count` sharpens the estimate of the spread; it does not narrow the spread itself. Nothing configurable inside a single process will, either — more samples and longer warmup both leave the between-process component untouched by construction. If the spread is too wide to gate on, reduce it at the source with [environment controls](./environment-control.md) or a quieter host.
+Raising `--launch-count` sharpens the estimate of the spread; it does not narrow the spread itself. Nothing configurable inside a single process will, either - more samples and longer warmup both leave the between-process component untouched by construction. If the spread is too wide to gate on, reduce it at the source with [environment controls](./environment-control.md) or a quieter host.
 
 > [!NOTE] The ratio divides by the standard error, not the standard deviation
 > A within-process interval is `t × s / √n`, so comparing between-process spread against the
-> per-sample `s` understates the problem by `√n` — and `n` reaches the thousands on exactly the
+> per-sample `s` understates the problem by `√n` - and `n` reaches the thousands on exactly the
 > cheap bodies where this matters. Dividing by `s` instead would put the ratio at 0.5-0.7
 > against a threshold of 4 and leave the warning silent on a benchmark whose single-launch
 > interval is 21× narrower than its true run-to-run spread.
 
 ## Dry-run interaction
 
-`--dry-run` (Iterations=0, WarmupIterations=0) takes neither the harness default nor `--launch-count`, so exactly one dry launch is performed. Extra launches would not add information since dry runs skip the body. An explicit `WithLaunchCount(n)` in code is still honoured.
+`--dry-run` (Iterations=0, WarmupIterations=0) takes neither the harness default nor `--launch-count`, so exactly one dry launch is performed. Extra launches would not add information since dry runs skip the body. An explicit `WithLaunchCount(n)` in code is still honored.
 
 ## Isolation interaction
 
-In isolated mode (the Harness mode default), the coordinator spawns N worker processes per isolated group. A worker is not merely unaware of the launch count - it is never sent one, so it cannot repeat the measurement internally and report within-process precision as though it were reproducibility. Per-method attribute overrides are respected: the coordinator uses the maximum launch count across all benchmarks in the group so that every benchmark receives at least the launches it requested.
+In isolated mode (the Harness mode default), NBenchmark spawns N worker processes per isolated group. A worker is not merely unaware of the launch count - it is never sent one, so it cannot repeat the measurement internally and report within-process precision as though it were reproducibility. Per-method attribute overrides are respected: NBenchmark uses the maximum launch count across all benchmarks in the group so that every benchmark receives at least the launches it requested.
 
-In Suite mode the suite repeats in a fresh worker process per launch. The coordinator orchestrates the repeats, which is what makes the spread between them a run-to-run reproducibility estimate. This matters most on the `[BenchmarkPlan]` path, where the user's factory runs in the coordinator *and* in every worker: the worker's copy of the suite carries the same `WithLaunchCount(3)`, and the worker's measurement path does not read it.
+In Suite mode the suite repeats in a fresh worker process per launch. The host process orchestrates the repeats, which is what makes the spread between them a run-to-run reproducibility estimate. This matters most on the `[BenchmarkPlan]` path, where the user's factory runs in the host process *and* in every worker: the worker's copy of the suite carries the same `WithLaunchCount(3)`, and the worker's measurement path does not read it.
 
 ## Test-integration interaction
 
-A `[Performance]` test defaults to `LaunchCount = 1`, because replicates cost a worker launch each and a test suite should not be made to pay for them everywhere. Setting it on the attribute spends them the same way the coordinator does - one worker per replicate - and gives the test's ratio gate a paired confidence interval instead of a bare quotient. A test that names a `ReferenceMethod` measures both sides inside each of those workers, so the replicate count is the number of launches, not twice it. See [test integration](../test-integration/index.md#replicates-and-the-paired-ratio).
+A `[Performance]` test defaults to `LaunchCount = 1`, because replicates cost a worker launch each and a test suite should not be made to pay for them everywhere. Setting it on the attribute spends them the same way a suite run does - one worker per replicate - and gives the test's ratio gate a paired confidence interval instead of a bare quotient. A test that names a `ReferenceMethod` measures both sides inside each of those workers, so the replicate count is the number of launches, not twice it. See [test integration](../test-integration/index.md#replicates-and-the-paired-ratio).
 
 ## Example
 

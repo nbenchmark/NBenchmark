@@ -1,7 +1,7 @@
 ---
 title: Features
 description: Advanced cross-cutting NBenchmark capabilities - isolated runs, parameterized benchmarks, categories, multi-runtime comparison, multiple launches, and dependency injection.
-order: 3
+order: 4
 ---
 
 # Features

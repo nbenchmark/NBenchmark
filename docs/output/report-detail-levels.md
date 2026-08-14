@@ -82,7 +82,7 @@ dotnet run -- --detail standard
 dotnet run -- --detail simple
 ```
 
-| Value | Behaviour |
+| Value | Behavior |
 | --- | --- |
 | `simple` | Compact table with the essential statistics. **(default)** |
 | `standard` | Full comparison table plus Precision & Tail Latency, auto-tune, and Interpretation sections. |
@@ -92,9 +92,18 @@ The `--detail` flag affects all registered reporters. JSON always emits the full
 
 ### Single mode
 
-Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail and does not support `WithDetail()`.
+Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) has no `WithDetail()` - there is no builder to
+call it on. Pass the level to `Print` instead:
 
-## Reporter behaviour
+```csharp
+var result = Benchmark.Run(() => MyMethod());
+
+result.Print();                            // Simple (default) - Median and Ops/s
+result.Print(ReportDetail.Standard);       // adds Mean, percentiles, StdDev, Error, CI
+result.Print(ReportDetail.Advanced);       // adds quartiles, fences, shape, allocation breakdown
+```
+
+## Reporter behavior
 
 | Reporter | Simple | Standard | Advanced |
 | --- | --- | --- | --- |

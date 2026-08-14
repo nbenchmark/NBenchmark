@@ -91,7 +91,7 @@ The console reporter prints one comparison table per class, grouped by parameter
 - **Magnitude** - how large the difference is (Negligible / Small / Medium / Large). A ✓ with a Negligible magnitude is real but too small to act on.
 - **Alloc/op** - mean heap allocation per operation. EF Core query materialization is allocation-heavy; this column is often the most actionable signal.
 
-See [Reading Your Results](../output/reading-your-results.md) for every column, indicator, and warning.
+See [Reading Your Results](../getting-started/reading-your-results.md) for every column, indicator, and warning.
 
 ## When to go deeper
 

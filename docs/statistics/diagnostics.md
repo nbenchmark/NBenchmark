@@ -53,7 +53,7 @@ Process CPU time (via `Process.GetCurrentProcess().TotalProcessorTime`) brackete
 **Default:** off. Enable with `CpuTime = true`, `--diagnostics gcandcpu`, or `--diagnostics all`.
 
 > [!NOTE]
-> The CPU/wall-clock ratio is process-wide and can exceed `1.0` on multi-core machines. A multi-threaded benchmark on a 4-core machine can show up to `4.0` (400%). In console output, CPU% is colour-coded from the raw ratio: green at 85%+, yellow at 50-85%, red below 50%.
+> The CPU/wall-clock ratio is process-wide and can exceed `1.0` on multi-core machines. A multi-threaded benchmark on a 4-core machine can show up to `4.0` (400%). In console output, CPU% is color-coded from the raw ratio: green at 85%+, yellow at 50-85%, red below 50%.
 
 ## How collection works
 
@@ -159,7 +159,7 @@ At `standard` and `advanced` detail levels, a separate **Diagnostics** table app
 
 At `advanced` detail, the per-benchmark stats block (shown below each console row, or in the Markdown details section) includes a **Diagnostics** sub-block with the same fields in a vertical layout:
 
-```
+```text
 Diagnostics:
   Gen0: 12   Gen1: 0   Gen2: 0
   Heap: 1.2 MiB (fragmented 80 KiB)
@@ -187,7 +187,7 @@ The JSON reporter serializes the full `BenchmarkResult` record, so `Diagnostics`
 
 Both the default and Spectre.Console progress displays append a GC summary to the `OnBenchmarkCompleted` line when GC collection counts are available:
 
-```
+```text
   ✓ MyBenchmark  42.3 ns · 12/0/0 GC  (1.2s)
 ```
 

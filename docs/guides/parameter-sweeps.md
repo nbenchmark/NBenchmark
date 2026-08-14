@@ -145,7 +145,7 @@ binary    |  100 | 110.0 ns | 112.4 ns |  9,090,909 | 0.44x             |  ✓  
 
 Here `binary(size=100)` is 2.27x faster than `linear(size=100)` with a `large` effect and `✓` significance, while `binary(size=10)` is barely different and not significant. The scaling trend tells you where the algorithm choice starts to matter.
 
-See [Reading Your Results](../output/reading-your-results.md) for every column, indicator, and warning.
+See [Reading Your Results](../getting-started/reading-your-results.md) for every column, indicator, and warning.
 
 ## When to go deeper
 
@@ -153,4 +153,4 @@ See [Reading Your Results](../output/reading-your-results.md) for every column, 
 - [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - `[BenchmarkCase]` vs. `[BenchmarkCases]`, named-tuple display names, `--filter` by display name, the Suite vs. Harness comparison table.
 - [Suite mode: Run order](../usage-modes/suite-mode.md#run-order) - why declaration order is usually clearer for sweeps, and why randomization is the default for comparisons.
 - [Configuration: Iterations](../reference/configuration.md#iterations) - pinning the run for reproducible sweeps across CI and local.
-- [Reading Your Results](../output/reading-your-results.md) - the full column reference, including how the `Ratio` column behaves for single-method vs. multi-method sweeps.
+- [Reading Your Results](../getting-started/reading-your-results.md) - the full column reference, including how the `Ratio` column behaves for single-method vs. multi-method sweeps.

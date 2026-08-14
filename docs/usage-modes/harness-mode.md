@@ -333,7 +333,7 @@ dotnet run -- --list
 
 Output:
 
-```
+```text
 ── StringBenchmarks ──
     Concat - current production implementation
     Interpolate - candidate replacement

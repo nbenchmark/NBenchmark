@@ -130,7 +130,7 @@ new MeasurementOptions
 
 - **The `MinimumPracticalEffect` gate works for any test.** The engine enforces the gate in `Significance.ApplyReport` after the test runs, so a custom test that returns an `EffectSize` with a `PracticalValue` is gated automatically. Tests that don't return a practical value are unaffected. See [Significance Testing: Practical-significance gate](../statistics/significance.md#practical-significance-gate).
 
-- **Isolated workers preserve your custom statistics, and say so when they cannot.** A strategy reaches the worker either as a factory it runs or as a type name it constructs, so the object that scores an isolated run is your own. Where that is not possible the coordinator declines to isolate rather than substitute quietly - a strategy built with constructor arguments and passed as an *instance* is refused, because only a type name would cross and only a parameterless constructor could be reached at the other end. Pass a factory instead and the argument travels with it. In Harness mode, scalar CLI overrides (iterations, warmup, confidence, etc.) are forwarded to each worker. See [Isolated runs](../features/isolated-runs.md#important-behavior-notes).
+- **Isolated workers preserve your custom statistics, and say so when they cannot.** A strategy reaches the worker either as a factory it runs or as a type name it constructs, so the object that scores an isolated run is your own. Where that is not possible NBenchmark declines to isolate rather than substitute quietly - a strategy built with constructor arguments and passed as an *instance* is refused, because only a type name would cross and only a parameterless constructor could be reached at the other end. Pass a factory instead and the argument travels with it. In Harness mode, scalar CLI overrides (iterations, warmup, confidence, etc.) are forwarded to each worker. See [Isolated runs](../features/isolated-runs.md#things-worth-knowing).
 
 - **A strategy that fails inside the worker warns on every result it scored.** Whether a factory *works* is not knowable until it runs in the process that measures - it may read a file that is not deployed beside the worker, or need a type that will not load there. The group is still measurable, so the engine falls back to its built-in strategy rather than failing the run, and attaches a warning to each affected result naming what was substituted and why. Read it: those numbers were scored by a method you did not choose.
 
@@ -159,7 +159,7 @@ The custom detector and test are named in the header and footer so the report is
 
 ## Read the results
 
-The output is the same as any other run. The custom detector and test change which samples are kept and how significance is decided, but the columns, indicators, and warnings are unchanged. See [Reading Your Results](../output/reading-your-results.md).
+The output is the same as any other run. The custom detector and test change which samples are kept and how significance is decided, but the columns, indicators, and warnings are unchanged. See [Reading Your Results](../getting-started/reading-your-results.md).
 
 One caveat: the `Magnitude` column reflects whatever your custom test returns in `EffectSize.Magnitude`. The built-in tests classify Cliff's delta into Negligible / Small / Medium / Large; a custom test can use any labels, but the console reporter color-codes based on the conventional labels. Stick to `neg` / `small` / `med` / `large` if you want the color coding to work.
 

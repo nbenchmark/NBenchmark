@@ -167,7 +167,7 @@ new PerformanceAssertionOptions
 
 When a threshold is violated the test fails with a `PerformanceAssertException` (which extends `AssertFailedException`). The message lists every violated threshold:
 
-```
+```text
 Performance thresholds exceeded for 'GetRecentOrders':
   - Mean 2,341,289.50 ns exceeds maximum 2,000,000.00 ns (excess: 341,289.50 ns)
 ```
