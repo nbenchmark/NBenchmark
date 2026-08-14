@@ -105,7 +105,7 @@ When you have two implementations to compare, point `ReferenceMethod` at the bas
 ```csharp
 // xUnit
 [PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse))]
-public void OptimisedParse() => OptimisedParser.Parse(Payload);
+public void OptimizedParse() => OptimizedParser.Parse(Payload);
 
 private static void NaiveParse() => NaiveParser.Parse(Payload);
 ```
@@ -127,7 +127,7 @@ A ratio gate decides a build, so the question that matters is not "is this numbe
     MaxSlowdownRatio = 1.2,
     ReferenceMethod = nameof(NaiveParse),
     LaunchCount = 3)]
-public void OptimisedParse() => OptimisedParser.Parse(Payload);
+public void OptimizedParse() => OptimizedParser.Parse(Payload);
 ```
 
 That measures the pair in **three separate worker processes**. Each one produces its own candidate/reference ratio, and the three are combined on the log scale into a geometric mean with a confidence interval - the same estimator the engine's `Ratio CI` column uses. See [Ratios](../statistics/ratios.md).
@@ -141,7 +141,11 @@ What changes when the interval exists:
 | worker launches | 1 | one per replicate - the pair shares each |
 | test output | mean, P95, allocations, iterations | the above plus a `Launches:` line with the run-to-run spread |
 
-The p-value is still computed and reported at `LaunchCount >= 2`, but it is no longer what the gate turns on. Pooling samples across launches multiplies statistical power without improving reproducibility, so a difference far below the run-to-run noise can read as overwhelmingly significant - on NBenchmark's own calibration sample, four bodies of provably identical cost, that combination marks one significantly slower than another routinely. The interval over per-replicate ratios is the run-to-run spread, and that is the quantity a gate must survive.
+The p-value is still computed and reported at `LaunchCount >= 2`, but it is no longer what the gate
+turns on: pooling samples across launches multiplies statistical power without improving
+reproducibility, so a difference far below the run-to-run noise can read as overwhelmingly
+significant. The interval over per-replicate ratios is the run-to-run spread, and that is the
+quantity a gate must survive. See [Ratios](../statistics/ratios.md#when-sig-and-the-ratio-interval-disagree).
 
 Two consequences worth knowing before you set it:
 
@@ -166,7 +170,7 @@ All three packages share the same set of threshold properties. A threshold of `-
 | `Iterations` | `int` | 0 (use default) | Override the number of measured samples. `0` uses the framework default (auto-resolved). |
 | `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup samples. `0` uses the framework default (auto-detected). |
 | `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
-| `RequireIsolation` | `bool` | **true** | Fail the test when the measurement was taken in the test host rather than a worker process. On by default, because isolation can be lost quietly when a fixture argument is added or a worker fails to deploy, and a labelled-but-passing test is indistinguishable from a healthy one in CI. Opt out with `[AllowInProcessGate]` on the method, class or assembly. Settable only on the `PerformanceAssert` option bags - not on the attributes, where an absent named argument could not be told apart from an explicit `false`. |
+| `RequireIsolation` | `bool` | **true** | Fail the test when the measurement was taken in the test host rather than a worker process. On by default, because isolation can be lost quietly when a fixture argument is added or a worker fails to deploy, and a labeled-but-passing test is indistinguishable from a healthy one in CI. Opt out with `[AllowInProcessGate]` on the method, class or assembly. Settable only on the `PerformanceAssert` option bags - not on the attributes, where an absent named argument could not be told apart from an explicit `false`. |
 | `LaunchCount` | `int` | 1 | Worker processes to measure this test in. Two or more turn the ratio gate into a paired per-replicate estimate with a confidence interval, at the cost of a worker launch each. See [Replicates and the paired ratio](#replicates-and-the-paired-ratio). |
 | `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
 | `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |

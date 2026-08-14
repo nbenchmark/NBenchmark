@@ -32,7 +32,7 @@ All instrument and tag names use the `nbenchmark.*` namespace for OpenTelemetry 
 
 NBenchmark emits nested `Activity` spans that render the autotune lifecycle as a flame-graph-shaped trace:
 
-```
+```text
 benchmark.suite
   └── benchmark.run
         ├── nbenchmark.phase.jitter
@@ -136,13 +136,13 @@ CI-sourced values take precedence over the git CLI fallback. When no CI or git e
 
 ### OpenTelemetry-standard env vars
 
-`OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` are honoured verbatim. `OTEL_RESOURCE_ATTRIBUTES` is parsed as a comma-separated `key=value` list (the OTel convention) and each pair is copied onto the span. `OTEL_SERVICE_NAME` is mapped to `service.name`. A user who has already configured these for the rest of their service does not need to repeat themselves.
+`OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` are honored verbatim. `OTEL_RESOURCE_ATTRIBUTES` is parsed as a comma-separated `key=value` list (the OTel convention) and each pair is copied onto the span. `OTEL_SERVICE_NAME` is mapped to `service.name`. A user who has already configured these for the rest of their service does not need to repeat themselves.
 
 ## Cross-process streaming
 
-Benchmarks are measured in a separate `nbworker` process by default. Your own `IMeasurementObserver` and `IBenchmarkProgress` instances still fire: the worker streams its phase and progress events back over its pipe and the coordinator replays them into the live objects you registered, so no OTLP configuration is needed to observe an isolated run.
+Benchmarks are measured in a separate `nbworker` process by default. Your own `IMeasurementObserver` and `IBenchmarkProgress` instances still fire: the worker streams its phase and progress events back over its pipe and your process replays them into the live objects you registered, so no OTLP configuration is needed to observe an isolated run.
 
-What OTLP adds is a channel to something *outside* both processes - a collector, a tracing backend, a dashboard. For that the worker needs its own exporter configuration, which it inherits from the coordinator's environment.
+What OTLP adds is a channel to something *outside* both processes - a collector, a tracing backend, a dashboard. For that the worker needs its own exporter configuration, which it inherits from your process's environment.
 
 ### Env-var forwarding
 
@@ -174,7 +174,7 @@ When `--observer <name>` is supplied, the host forwards the observer names to is
 
 ### Topology
 
-```
+```text
 In-process / local dev:
   AdaptiveLoop -> Observer shim -> Embedded web host -> React SPA in browser
 
@@ -188,6 +188,6 @@ In-process and isolated runs look identical to the dashboard: both are OTLP prod
 
 ## See also
 
-- `docs/reference/observers.md` - the `IMeasurementObserver` interface and event types.
-- `docs/reference/cli.md` - the `--otlp-endpoint` CLI flag.
-- `docs/statistics/diagnostics.md` - runtime diagnostics counters (GC, heap, exceptions, CPU).
+- [Measurement Observer](./observers.md) - the `IMeasurementObserver` interface and event types.
+- [CLI Reference](./cli.md) - the `--otlp-endpoint` CLI flag.
+- [Diagnostics](../statistics/diagnostics.md) - runtime diagnostics counters (GC, heap, exceptions, CPU).

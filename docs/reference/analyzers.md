@@ -33,7 +33,7 @@ The analyzers run automatically. No additional configuration is needed. The pack
 | NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and injects a constructor dependency that may hold per-instance state (any non-primitive, non-ambient reference type), which can leak warmed state across benchmark methods. |
 | NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method has both `[BenchmarkCase]` and `[BenchmarkCases]`. Use one or the other. |
 | NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A benchmark class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a mutable instance field that is read or written by at least two `[Benchmark]` methods, which can leak warmed state across methods. |
-| NB0014 | Benchmark body captures state | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, `Benchmark.RunRawAsync()` or `BenchmarkSuite.Add()` captures a local, a parameter, or `this`. Ordinary data is sent to the worker and the body is still isolated; a value whose behaviour is not determined by its contents is refused, which fails the run. `IsolationStatus` on the result is the authority. |
+| NB0014 | Benchmark body captures state | Info | A lambda passed to `Benchmark.Run()`, `Benchmark.RunAsync()`, `Benchmark.RunRaw()`, `Benchmark.RunRawAsync()` or `BenchmarkSuite.Add()` captures a local, a parameter, or `this`. Ordinary data is sent to the worker and the body is still isolated; a value whose behavior is not determined by its contents is refused, which fails the run. `IsolationStatus` on the result is the authority. |
 | NB0015 | Conflicting isolation attributes | Error | One member carries both `[InProcess]` and `[IsolatedProcess]`. The two ask for opposite things. Remove one. |
 
 ### NB0001 - Missing parameterless constructor
@@ -99,7 +99,7 @@ public static IEnumerable<(int a,)> Cases() { yield return (1,); } // arity 1, e
 
 ### NB0004 / NB0005 - No observable side effects
 
-If a `[Benchmark]` method body contains only pure operations (local variable assignments, empty loops, no method calls, no field writes, no return value), the JIT may optimise the entire body away, producing a result of 0 ns. A syntax-level heuristic detects when a body has no observable side effects:
+If a `[Benchmark]` method body contains only pure operations (local variable assignments, empty loops, no method calls, no field writes, no return value), the JIT may optimize the entire body away, producing a result of 0 ns. A syntax-level heuristic detects when a body has no observable side effects:
 
 - No method calls
 - No field/property writes
@@ -247,6 +247,22 @@ Typical fixes:
 
 > **CI note.** This is a compile-time warning, not a runtime error. In CI/CD pipelines the warning scrolls past in the build log and is easy to miss. If you suppress NB0011, verify that the shared state does not create a timing dependency between methods - for example, by running each method in isolation and comparing results.
 
+### NB0012 - `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]`
+
+A method carries both attributes. `[BenchmarkCase]` declares literal cases inline; `[BenchmarkCases]` names a programmatic source of cases. The two ask for different things on the same method, and the expansion order would be ambiguous, so the combination is an error.
+
+```csharp
+// Error NB0012: both attributes on one method
+[BenchmarkCase(10)]
+[BenchmarkCases(nameof(SortCases))]
+[Benchmark]
+public void Sort(int size) { }
+
+static IEnumerable<(int Size, string Label)> SortCases() => ...
+```
+
+Use one or the other. For a small literal list, `[BenchmarkCase]` is the shorter form; for generated values, file/database-backed inputs, or parameter sweeps, move the whole set into a `[BenchmarkCases]` source method. See [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) for the full comparison of the two attributes.
+
 ### NB0013 - `PerClass` lifetime with mutable instance field
 
 When a class uses `[InstanceLifetime(InstanceLifetime.PerClass)]` and has a non-`readonly` instance field that is accessed by at least two `[Benchmark]` methods, the field can carry warmed state from one method to the next, violating the statistical-independence assumption.
@@ -273,7 +289,7 @@ Typical fixes:
 
 NBenchmark measures a benchmark body in a separate worker process, because the runtime configuration a process starts under is the dominant term in a small measurement. It gets the body there by resolving the method the compiler already emitted; it never serializes or regenerates it.
 
-A lambda that captures state cannot be addressed that way, so the captured *values* are sent instead - but only when the value's measured behaviour is fully determined by the bytes sent. Most ordinary data qualifies and the benchmark is isolated; a value whose behaviour is not determined by its contents (a `Stream`, a collection built with a comparer that carries configuration of its own, a user type that has not opted in) is refused, and a refusal fails the run.
+A lambda that captures state cannot be addressed that way, so the captured *values* are sent instead - but only when the value's measured behavior is fully determined by the bytes sent. Most ordinary data qualifies and the benchmark is isolated; a value whose behavior is not determined by its contents (a `Stream`, a collection built with a comparer that carries configuration of its own, a user type that has not opted in) is refused, and a refusal fails the run.
 
 ```csharp
 var data = BuildInput();
@@ -349,6 +365,34 @@ public class ProcessBenchmarks
 dotnet_diagnostic.NB0014.severity = warning
 ```
 
+### NB0015 - Conflicting isolation attributes
+
+`[InProcess]` asks for the host process and `[IsolatedProcess]` asks for a dedicated worker. On one member they cannot both be honored, so the combination is an error rather than silently resolved.
+
+```csharp
+public class MyBenchmarks
+{
+    // Error NB0015
+    [Benchmark, InProcess, IsolatedProcess]
+    public void Both() { }
+}
+```
+
+A **method-level** attribute overriding a **class-level** one is a different thing and is not reported - it is the documented way to force one benchmark out of a mostly-in-process class:
+
+```csharp
+[InProcess]
+public class MostlyHere
+{
+    [Benchmark] public void Here() { }
+
+    // Fine: the method wins over the class.
+    [Benchmark, IsolatedProcess] public void There() { }
+}
+```
+
+Discovery refuses the same combination at runtime, with the same message, for assemblies that do not run the analyzer.
+
 ## Runtime independence warning
 
 In addition to the compile-time analyzers above, NBenchmark emits a runtime warning on every `BenchmarkResult.Warnings` list when a class actually runs under `InstanceLifetime.PerClass` with more than one `[Benchmark]` method and has declared neither `IStateReset` nor `[SharedState]`. This covers suite mode (where analyzers do not run) and cases where the analyzer package is not installed. It is raised by whichever process measured the group, so an isolated worker reports it too - which is the default Harness path.
@@ -389,34 +433,6 @@ Or set the severity in `.editorconfig`:
 [*.cs]
 dotnet_diagnostic.NB0004.severity = none
 ```
-
-### NB0015 - Conflicting isolation attributes
-
-`[InProcess]` asks for the host process and `[IsolatedProcess]` asks for a dedicated worker. On one member they cannot both be honoured, so the combination is an error rather than silently resolved.
-
-```csharp
-public class MyBenchmarks
-{
-    // Error NB0015
-    [Benchmark, InProcess, IsolatedProcess]
-    public void Both() { }
-}
-```
-
-A **method-level** attribute overriding a **class-level** one is a different thing and is not reported - it is the documented way to force one benchmark out of a mostly-in-process class:
-
-```csharp
-[InProcess]
-public class MostlyHere
-{
-    [Benchmark] public void Here() { }
-
-    // Fine: the method wins over the class.
-    [Benchmark, IsolatedProcess] public void There() { }
-}
-```
-
-Discovery refuses the same combination at runtime, with the same message, for assemblies that do not run the analyzer.
 
 ## Severity
 

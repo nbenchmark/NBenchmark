@@ -1,6 +1,7 @@
 ---
 title: Ratios
 description: How the Ratio column is estimated, why it is paired across launches, and how to read its interval.
+order: 5
 ---
 
 # Ratios
@@ -39,7 +40,7 @@ Two consequences worth knowing:
 
 | Where it appears | How |
 | --- | --- |
-| Console | `1.24x` - a `?` suffix and a dim colour when the interval spans `1.00x` |
+| Console | `1.24x` - a `?` suffix and a dim color when the interval spans `1.00x` |
 | Markdown | a `Ratio CI` column, marked ⚠️ when it spans `1.00x` |
 | CSV (Standard, Advanced) | `RatioCiLower`, `RatioCiUpper`, `RatioReplicates` |
 | Console / Markdown, `--detail advanced` | a `Ratio:` line in the per-benchmark stats block |
@@ -80,7 +81,7 @@ A `[Performance]` test measures one launch by default, so its ratio is a quotien
 
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(Naive), LaunchCount = 3)]
-public void Optimised() => Optimised.Parse(Payload);
+public void Optimized() => Optimized.Parse(Payload);
 ```
 
 The candidate and its reference are measured **co-resident in one worker per replicate**, not in a worker each, so the pairing is the same within-process pairing described above - and it costs three launches rather than six.

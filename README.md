@@ -8,12 +8,12 @@
 
 **Straightforward benchmarking for .NET.**
 
-Benchmarking code sounds simple - run it, time it, compare. In practice the numbers are easy to get wrong: the JIT compiler is still optimizing your method during the first runs, the timer can cost more than a fast method, a single GC pause or OS context switch skews an average, and a 2% improvement you were sure you measured can be statistical noise.
+Benchmarking sounds simple - run it, time it, compare. In practice the numbers are easy to get wrong: the JIT is still optimizing your method during the first runs, the timer can cost more than a fast method, one GC pause skews an average, and the 2% improvement you were sure you measured can be noise.
 
-NBenchmark takes care of the statistical analysis. One line of code gives you a calibrated, warmed-up, outlier-trimmed result with a confidence interval.
+NBenchmark handles that for you. One line gives you a calibrated, warmed-up, outlier-trimmed result with a confidence interval.
 
 ```csharp
-var result = Benchmark.Run(() => MandelbrotCalculation(), name: "Mandelbrot calculation");
+var result = Benchmark.Run(() => MandelbrotCalculation());
 result.Print();
 ```
 
@@ -21,21 +21,11 @@ result.Print();
 
 ## Why NBenchmark?
 
-- **No setup required.** `Benchmark.Run(() => ...)` - no attributes, no class structure, no dedicated project. Drop it into a console app, a test, or a scratchpad.
-
-- **Measured in a clean process, by default.** Each benchmark runs in its own process with a controlled runtime, so the numbers reflect your code rather than the state of whatever was running before it.
-
-- **Adaptive measurement.** No iteration counts to guess. The engine calibrates ops-per-sample for fast methods so timer overhead doesn't dominate, and detects when warmup has plateaued so the JIT has settled. Pin any dimension when you want a fixed, reproducible run.
-
-- **Statistical rigor built in.** Samples stream until the confidence interval is tight enough, then stop. Outlier trimming filters OS noise (IQR fence by default, with a bimodal-distribution warning when discarded samples look like real latency spikes rather than random jitter). A/B comparisons automatically determine whether a difference is statistically real or just noise, with an effect-size magnitude (Negligible / Small / Medium / Large) so a ✓ always means "real and at least a small effect". The built-in tests are non-parametric rank-based methods, cross-validated against SciPy and NumPy - see [Significance Testing](./docs/statistics/significance.md) for the methodology.
-
-- **Pluggable statistics.** Swap in your own outlier detector (`IOutlierDetector`) or significance test (`ISignificanceTest`) when the built-in IQR/MAD trimming and rank-based tests don't fit your domain.
-
-- **Low-overhead execution.** The measurement loop is reflection-free and uses typed delegates to avoid virtual dispatch and boxing during timing, so the JIT optimizes your benchmark body as it would in production.
-
-- **Async-native.** Measures the true duration of `Task` and `Task<T>` work without sync-over-async wrappers.
-
-- **Compile-time analysis.** The optional `NBenchmark.Analyzers` package catches common benchmark authoring mistakes - dead code elimination, implicit order dependence, missing return values - as Roslyn diagnostics during build, before you ever run a measurement.
+- **No setup.** One static call. No attributes, no class structure, no dedicated project.
+- **No numbers to guess.** Warmup, batch size, and sample count all resolve themselves.
+- **Clean process by default.** Your numbers reflect your code, not your process's history.
+- **Real statistics.** Confidence intervals and significance testing, not just an average.
+- **Zero dependencies.** The core package is BCL-only.
 
 ## Installation
 
@@ -122,25 +112,26 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 
 ## Features
 
-- **Parameterized benchmarks.** Run the same body across multiple input values to see how an algorithm scales - `WithParameter` in Suite mode, `[BenchmarkCase]` in Harness mode. ([Suite](./docs/features/parameterized-suite.md) / [Harness](./docs/features/parameterized-harness.md))
+| Feature | What it does | |
+| --- | --- | --- |
+| Isolated runs | Measures in a fresh worker process so earlier work can't bias the numbers. On by default. | [→](./docs/features/isolated-runs.md) |
+| Parameterized benchmarks | Runs one body across many input values to show how it scales. | [→](./docs/features/parameterized-suite.md) |
+| Categories | Tags benchmarks and includes or excludes groups from a run. | [→](./docs/features/categories.md) |
+| Multi-runtime | Runs the same benchmarks on net8, net9, and net10 side-by-side. | [→](./docs/features/multi-runtime.md) |
+| Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [→](./docs/features/multiple-launches.md) |
+| Environment control | Pins CPU affinity and process priority to cut noise at the source. | [→](./docs/features/environment-control.md) |
+| Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [→](./docs/test-integration/index.md) |
+| CI regression gate | Fails the run when a benchmark regresses past a percentage. | [→](./docs/reference/cli.md) |
+| Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [→](./docs/statistics/diagnostics.md) |
+| Live telemetry | Streams per-sample events to an observer or to OpenTelemetry. | [→](./docs/reference/observers.md) |
+| Compile-time analysis | Catches benchmark authoring mistakes as build-time diagnostics. | [→](./docs/reference/analyzers.md) |
+| Pluggable statistics | Swaps in your own outlier detector or significance test. | [→](./docs/guides/custom-statistics.md) |
 
-- **Categories.** Tag benchmarks with `[BenchmarkCategory]` and include or exclude groups from a run via CLI flags or the programmatic filter API. ([Categories](./docs/features/categories.md))
+## Built on real statistics
 
-- **Isolated runs.** Run benchmarks in freshly spawned child processes so JIT, GC, and thread-pool state from earlier work can't bias later measurements; isolated by default in Harness mode. ([Isolated runs](./docs/features/isolated-runs.md))
-
-- **Multi-runtime comparison.** Build and run the same benchmarks across net8, net9, and net10 in separate child processes and compare side-by-side. ([Multi-runtime](./docs/features/multi-runtime.md))
-
-- **Multiple launches.** Repeat each benchmark as independent launches to surface run-to-run variance and produce cross-launch aggregation stats. ([Multiple launches](./docs/features/multiple-launches.md))
-
-- **Environment control.** Pin CPU affinity, raise process priority, and detect noisy hosts to reduce measurement noise at its source. ([Environment control](./docs/features/environment-control.md))
-
-- **Performance gates in CI.** Enforce absolute or relative performance thresholds as xUnit, NUnit, or MSTest tests that fail on regression. ([Test integration](./docs/test-integration/index.md))
-
-- **CI regression gate.** Fail the harness run with a non-zero exit code when any benchmark regresses beyond a percentage against the baseline (`--threshold-pct`). ([CLI reference](./docs/reference/cli.md))
-
-- **Runtime diagnostics.** Record GC collection counts, heap state, exceptions, and CPU time per operation alongside timings. ([Diagnostics](./docs/statistics/diagnostics.md))
-
-- **Live telemetry.** Stream per-sample, per-phase, and per-detector events to an `IMeasurementObserver`, or export spans and metrics to OpenTelemetry via the built-in `System.Diagnostics` instrumentation. ([Observers](./docs/reference/observers.md) / [OTel](./docs/reference/bcl-instrumentation.md))
+- **Adaptive measurement.** Samples stream until the confidence interval is tight enough, then stop. Warmup ends when the timings plateau and the JIT has settled - not after a guessed count. ([Measurement](./docs/statistics/measurement.md))
+- **Non-parametric significance testing.** Benchmark timings are not normally distributed, so the built-in tests are rank-based. A ✓ in the `Sig` column means "real, and at least a small effect", not merely `p < 0.05`. ([Significance testing](./docs/statistics/significance.md))
+- **Verified against SciPy and NumPy.** Every statistical primitive is dependency-free and cross-validated on each build. ([Validation](./docs/statistics/validation.md))
 
 ---
 

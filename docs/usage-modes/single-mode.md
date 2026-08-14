@@ -22,34 +22,6 @@ var result = Benchmark.Run(() =>
 
 `Benchmark.Run` warms up until the timings plateau, collects measured samples until the confidence interval is tight enough, trims outliers using the IQR fence rule, and returns a `BenchmarkResult`.
 
-## Isolation
-
-`Benchmark.Run` measures the body in a dedicated worker process by default, not in the process that called it. The same body measured both ways can differ by more than 20× until the host's JIT happens to promote it, and nothing in the reported confidence interval hints at that. A worker starts under a controlled runtime profile, so the number reflects the body rather than whatever the host was doing beforehand.
-
-A body that **captures a value the worker cannot rebuild** is the one shape that cannot cross that boundary: the value exists in this process and nowhere else, and a fabricated replacement returns plausible, silently wrong numbers rather than throwing. Such a body is **refused**, and a refusal fails the run by default rather than producing a labelled in-process measurement. Use `Benchmark.RunInProcess` (below) to measure it here on purpose, or set `RequireIsolation = false` to accept a measurement stamped `IsolationStatus.InProcessCapturedState` instead. Ordinary data - an `int`, a string, an `int[]`, a record of those - is sent to the worker by value, so a body that captures it is isolated with no rewrite. To keep the build out of the measured body entirely, split the preparation into its own delegate so the worker builds the data itself:
-
-```csharp
-var data = BuildData();
-
-// Captures `data` -> the array is sent to the worker, so this is isolated too
-var result = Benchmark.Run(() => Sort(data));
-
-// Both halves capture nothing -> measured in a worker
-var result = Benchmark.Run(
-    prepare: () => BuildData(),
-    body:    d => Sort(d));
-```
-
-`Benchmark.RunInProcess` is the opposite choice - not a fallback, but the correct one when the current process *is* the subject: cold-start and first-call cost, or a body that must observe host state such as a warm cache or an open connection. It measures here deliberately, with no warning, and stamps `IsolationStatus.InProcessRequested`:
-
-```csharp
-var cold = Benchmark.RunInProcess(() => ColdStartSensitivePath(), name: "cold path");
-```
-
-`Benchmark.Warmup()` optionally starts a worker in the background so the first measured call does not pay the roughly 70 ms launch.
-
-See [Isolated runs](../features/isolated-runs.md) for the full mechanism, the `Iso` column, and what else cannot cross.
-
 ## Overloads
 
 ### Synchronous
@@ -91,7 +63,16 @@ var result = Benchmark.Run(
     setup:   d => Shuffle(d));
 ```
 
-A `prepare` delegate that itself captures a local is refused - and a refusal fails the run by default - rather than measured in this process. Pass the captured value as an argument instead: `Run(prepare: (int size) => Build(size), prepareArgument: 100_000, body: d => Sort(d))`.
+A `prepare` delegate may capture locals of its own - `prepare: () => BuildData(size)` sends the
+`size` and builds the data in the worker, which is the point. If you would rather name the input
+explicitly, the parameterized overload takes it as an argument:
+
+```csharp
+var result = Benchmark.Run(
+    prepare:         (int size) => BuildData(size),
+    prepareArgument: 100_000,
+    body:            d => Sort(d));
+```
 
 ### Raw outcome
 
@@ -133,13 +114,30 @@ var result = Benchmark.Run(() => MyMethod(), name: "MyMethod with 1000-item inpu
 
 ### Plain text (core package)
 
+`Print()` defaults to `ReportDetail.Simple`:
+
 ```csharp
 result.Print();
 ```
 
-Output:
-
+```text
+  ┌─ Benchmark ─────────────────────────────────────
+  │
+  │  Median: 342.1 ns       Ops/s: 2.87 Mops/s
+  │  Alloc/op: 0 B
+  │
+  │  Measured in an isolated worker under 'steady-state'.
+  │
+  └─────────────────────────────────────────────────
 ```
+
+Pass a detail level for the full distribution:
+
+```csharp
+result.Print(ReportDetail.Standard);
+```
+
+```text
   ┌─ Benchmark ─────────────────────────────────────
   │
   │  Median: 342.1 ns       Mean: 348.7 ns
@@ -150,8 +148,13 @@ Output:
   │  CI:     [345.6 ns … 351.8 ns] (95%)
   │  Alloc/op: 0 B
   │
+  │  Measured in an isolated worker under 'steady-state'.
+  │
   └─────────────────────────────────────────────────
 ```
+
+`ReportDetail.Advanced` adds sample counts, quartiles, fences, skewness, kurtosis, MAD, and an
+allocation breakdown.
 
 ### Rich console table (NBenchmark.Reporters.Console)
 
@@ -187,6 +190,29 @@ Console.WriteLine($"CI:      {result.ConfidenceIntervalLower} … {result.Confid
 if (result.MeanAllocatedBytes.HasValue)
     Console.WriteLine($"Alloc:   {result.MeanAllocatedBytes.Value} bytes/op");
 ```
+
+## Where it measures
+
+`Benchmark.Run` measures the body in a dedicated worker process by default - no configuration
+needed. That is what makes the number reproducible; the same body measured in the host process can
+read more than 20x wrong until the JIT happens to promote it.
+
+Ordinary captured data - an `int`, a string, an `int[]`, a record of those - travels to the worker
+by value, so most bodies isolate with no rewrite. For state the worker should *build* rather than be
+sent, use the `prepare:` / `body:` overload above.
+
+`Benchmark.RunInProcess` measures in the current process on purpose, which is the right choice when
+that process *is* the subject - cold-start cost, or a body that must observe host state such as a
+warm cache or an open connection:
+
+```csharp
+var cold = Benchmark.RunInProcess(() => ColdStartSensitivePath(), name: "cold path");
+```
+
+`Benchmark.Warmup()` optionally starts a worker in the background so your first measured call does
+not pay the roughly 70 ms launch.
+
+See [Isolated runs](../features/isolated-runs.md) for the full model.
 
 ## What Benchmark does not do
 

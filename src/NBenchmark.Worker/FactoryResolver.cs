@@ -172,11 +172,12 @@ internal static class FactoryResolver
     ///         signature on disk is a fact, and a type name on the wire is only a claim about it.
     ///     </para>
     ///     <para>
-    ///         This is what makes a prepare delegate able to take parameters at all, which is the answer
-    ///         to the refusal users hit after they have already done the rewrite the diagnostic asked
-    ///         for: <c>prepare: () =&gt; Build(size)</c> captures and can only be refused, while
+    ///         This is what makes a prepare delegate able to take parameters at all:
     ///         <c>prepare: (int size) =&gt; Build(size)</c> with the size sent alongside is a complete
-    ///         recipe.
+    ///         recipe, with the value named rather than captured. The capturing form
+    ///         <c>prepare: () =&gt; Build(size)</c> also crosses now - its capture is transferred through
+    ///         the group's receiver table - so the two are alternatives rather than a refusal and its
+    ///         remedy.
     ///     </para>
     /// </remarks>
     public static bool TryInvoke(

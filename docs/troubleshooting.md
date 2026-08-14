@@ -32,21 +32,21 @@ See [Configuration: AutoTune](./reference/configuration.md#autotune) for the `Th
 ### Same benchmark, a different median each run, and every run reports a tight Error
 
 > [!CAUTION] Quick fix
-> Run with `--launch-count 5` or higher (the Harness default) and read the `Error` column, which then describes reproducibility rather than one process's precision. Do **not** reach for more samples or longer warmup first — neither addresses the usual cause.
+> Run with `--launch-count 5` or higher (the Harness default) and read the `Error` column, which then describes reproducibility rather than one process's precision. Do **not** reach for more samples or longer warmup first - neither addresses the usual cause.
 
-Three different things produce this symptom, and they need different fixes. Diagnose before treating, in this order — the first two are the ones you can fix, and both are rare with default settings.
+Three different things produce this symptom, and they need different fixes. Diagnose before treating, in this order - the first two are the ones you can fix, and both are rare with default settings.
 
 **1. Warmup ended before the JIT finished tiering up.** The run measured pre-tier-1 (unoptimized) code, which can read several times slow. Each run is internally consistent, which is why the margin looks trustworthy.
 
 Check `autoTune.warmupTimeFloorMet` in the JSON (or `warmup cut short` on the console summary), plus `autoTune.jitQuiescenceAchieved` and `autoTune.splitHalfDrift`. `autoTune.warmupCurve` shows whether the body was still speeding up when warmup ended, and `autoTune.jitLastChangeAtNs` against `warmupElapsedNs` shows how much quiet time followed the last compilation. Fix by raising `--min-warmup-time <ms>` (default 500) and `--max-warmup <n>` if the ceiling is what cut warmup short.
 
-**2. The measurement is finer than the clock can resolve.** Check `autoTune.sampleQuantizationFraction` against the reported margin. If one timer step is a larger fraction of the sample than the margin is, the digits are describing the clock's step grid rather than your code — within a run every sample lands on the same step, and between runs a tiny shift moves them all to the next one. NBenchmark warns when it detects this. The default `MinQuantaPerSample` floor prevents it, so it generally only appears with a small pinned `--ops-per-sample` on a fast body; raise it so each sample spans hundreds of steps. See [Timer resolution](./statistics/measurement.md#timer-resolution).
+**2. The measurement is finer than the clock can resolve.** Check `autoTune.sampleQuantizationFraction` against the reported margin. If one timer step is a larger fraction of the sample than the margin is, the digits are describing the clock's step grid rather than your code - within a run every sample lands on the same step, and between runs a tiny shift moves them all to the next one. NBenchmark warns when it detects this. The default `MinQuantaPerSample` floor prevents it, so it generally only appears with a small pinned `--ops-per-sample` on a fast body; raise it so each sample spans hundreds of steps. See [Timer resolution](./statistics/measurement.md#timer-resolution).
 
-**3. Neither — the number genuinely does not reproduce that precisely.** This is the common case on a healthy run, and there is nothing to fix in the measurement. A single process cannot see it: within-run sampling estimates how precisely *that process* measured, and drives the margin toward zero as `1/√n`, while the between-process component — code and heap layout, scheduler placement, CPU frequency and thermal state — is fixed inside a process and completely untouched by it. **More samples make the margin narrower without making it more honest, and longer warmup does not change it at all.**
+**3. Neither - the number genuinely does not reproduce that precisely.** This is the common case on a healthy run, and there is nothing to fix in the measurement. A single process cannot see it: within-run sampling estimates how precisely *that process* measured, and drives the margin toward zero as `1/√n`, while the between-process component - code and heap layout, scheduler placement, CPU frequency and thermal state - is fixed inside a process and completely untouched by it. **More samples make the margin narrower without making it more honest, and longer warmup does not change it at all.**
 
 Only replication across processes can measure it. Run `--launch-count 5` (or more) and read `launchStatistics`: `betweenLaunchDispersion` is the run-to-run spread, and `processVarianceRatio` is how far the single-process margin was understating it. On a nanosecond-scale body a ratio of 30-60 is ordinary. See [Reading the reproducibility warning](./features/multiple-launches.md#reading-the-reproducibility-warning).
 
-To actually *reduce* that spread you have to work outside the statistics — [environment controls](./features/environment-control.md) for CPU affinity and process priority, or a quieter, less thermally constrained host. Note that CPU affinity is unavailable on macOS, so an Apple Silicon laptop with performance and efficiency cores will show more run-to-run spread than a pinned Linux box, and there is no in-process remedy for it.
+To actually *reduce* that spread you have to work outside the statistics - [environment controls](./features/environment-control.md) for CPU affinity and process priority, or a quieter, less thermally constrained host. Note that CPU affinity is unavailable on macOS, so an Apple Silicon laptop with performance and efficiency cores will show more run-to-run spread than a pinned Linux box, and there is no in-process remedy for it.
 
 ### Tight Error next to a `maxCeiling` stop, or next to a Max hundreds of times the median
 
@@ -68,7 +68,7 @@ See [Raw vs. trimmed statistics](./statistics/measurement.md#raw-vs-trimmed-stat
 
 The measured timings kept moving while they were being collected, so the interval describes a moving target. Usually a JIT tier-up or dynamic-PGO re-optimization landing inside measurement; otherwise a thermal ramp, a filling cache, or a growing data structure.
 
-See [Measurement: Steady-state (drift) gate](./statistics/measurement.md#phase-3---measurement-ci-width-target) for the drift detection mechanism and the restart limit.
+See [Measurement: Steady-state (drift) gate](./statistics/measurement.md#phase-c---measurement-ci-width-target) for the drift detection mechanism and the restart limit.
 
 ### Sample count varies between runs
 
@@ -125,7 +125,7 @@ Dry-run mode is active (`--dry-run`, or `Iterations=0` and `WarmupIterations=0`)
 > [!CAUTION] Quick fix
 > Unpin `Iterations` to use auto mode (collects at least `AutoTune.MinSamples`), or pin a larger count.
 
-Either only one sample was collected (`n < 2`, from a pinned `Iterations = 1`) or all measurements were identical (timer resolution coarser than the benchmark duration). For a fast body, auto ops-per-sample calibration amortises a coarse timer - note that calibration is skipped when setup/teardown is set, and bypassed when `OpsPerSample` is pinned.
+Either only one sample was collected (`n < 2`, from a pinned `Iterations = 1`) or all measurements were identical (timer resolution coarser than the benchmark duration). For a fast body, auto ops-per-sample calibration amortizes a coarse timer - note that calibration is skipped when setup/teardown is set, and bypassed when `OpsPerSample` is pinned.
 
 Identical measurements are the extreme of the quantization case above: every sample landed on the same clock step. Compare `autoTune.clockResolutionNs` against `autoTune.sampleDurationNs` - if a sample spans only a step or two, the timer cannot distinguish your samples from each other. See [Timer resolution](./statistics/measurement.md#timer-resolution).
 
@@ -164,17 +164,17 @@ See [Dependency Injection](./features/dependency-injection.md) for the full API 
 
 > [!CAUTION] Pick one
 > **Build the value in the worker** with a prepare delegate: `Benchmark.Run(prepare: () => BuildIt(), body: v => Use(v))`, or `BenchmarkSuite.Over(name, () => BuildIt())` in Suite mode
-> **Mark your own type `[BenchmarkState]`** if its measured behaviour really is fully determined by its serialized contents
+> **Mark your own type `[BenchmarkState]`** if its measured behavior really is fully determined by its serialized contents
 > **`AddInProcess(name, body)`** to keep just that one benchmark here, with the rest of the suite still in a worker
-> **`WithRequireIsolation(false)`** to accept a labelled host-process number everywhere - right for a scratchpad, wrong for anything comparative
+> **`WithRequireIsolation(false)`** to accept a labeled host-process number everywhere - right for a scratchpad, wrong for anything comparative
 
 `RequireIsolation` defaults to `true`, so a benchmark that asked for a worker and cannot have one **fails the run** rather than being measured here and stamped. The message names the benchmark and the value.
 
-Ordinary captured data is sent and the body stays isolated - an `int`, a `string`, an `int[]`, a `List<T>` or `Dictionary<K,V>` with its default comparer, a record of those. What reaches this error is a value whose behaviour is not carried by its contents:
+Ordinary captured data is sent and the body stays isolated - an `int`, a `string`, an `int[]`, a `List<T>` or `Dictionary<K,V>` with its default comparer, a record of those. What reaches this error is a value whose behavior is not carried by its contents:
 
 | Message says | Why | Fix |
 | --- | --- | --- |
-| *is not one of the types whose measured behaviour is fully determined by its contents* | A `Stream`, `HttpClient`, `DbConnection`, mock or similar | A prepare delegate - build it in the worker |
+| *is not one of the types whose measured behavior is fully determined by its contents* | A `Stream`, `HttpClient`, `DbConnection`, mock or similar | A prepare delegate - build it in the worker |
 | *was built with a custom comparer* | The dictionary's comparer is neither the default nor one this can reproduce - a custom type with a threshold or a locale baked into a field, say. A named framework singleton (`StringComparer.OrdinalIgnoreCase` and friends) or a comparer with no fields of its own isolates instead of hitting this | Mark the comparer type `[BenchmarkState]` with no instance fields, or a prepare delegate so the comparer is applied there |
 | *carries a private field* / *a get-only property* | On a `[BenchmarkState]` type. The serializer writes those and cannot read them back, so they would arrive at their defaults | Make the member a public field, or a property with a setter |
 | *holds a `X` where a `Y` was declared* | A collection of a base type holding a subclass; it would arrive as base instances with the override gone | A prepare delegate, or make the element type exact |
@@ -183,16 +183,16 @@ Ordinary captured data is sent and the body stays isolated - an `int`, a `string
 
 A suite is measured by one worker, so the message names **every** offending benchmark at once rather than the first.
 
-See [Isolated Runs](./features/isolated-runs.md#what-a-captured-value-costs).
+See [Isolated Runs](./features/isolated-runs.md#when-isolation-is-refused).
 
 ### "Could not load file or assembly" from an ASP.NET Core or WPF project
 
 > [!CAUTION] Quick fix
 > Rebuild, so the `runtimeconfig.json` beside the assembly under test is present and current. That file is how the worker learns which shared frameworks to ask for.
 
-Benchmarks that live in a `Microsoft.NET.Sdk.Web` (or WinForms/WPF) project run in an assembly whose dependency graph reaches a shared framework — `Microsoft.AspNetCore.App` or `Microsoft.WindowsDesktop.App`. Those assemblies ship with the framework rather than in your output directory, so they are absent from your project's `deps.json` and are expected to be supplied by the process. The measurement worker is a plain console application, so on its own it supplies only `Microsoft.NETCore.App`, and the load fails with a message naming an assembly that is not actually missing from disk — `Microsoft.Extensions.Hosting.Abstractions` is the usual one.
+Benchmarks that live in a `Microsoft.NET.Sdk.Web` (or WinForms/WPF) project run in an assembly whose dependency graph reaches a shared framework - `Microsoft.AspNetCore.App` or `Microsoft.WindowsDesktop.App`. Those assemblies ship with the framework rather than in your output directory, so they are absent from your project's `deps.json` and are expected to be supplied by the process. The measurement worker is a plain console application, so on its own it supplies only `Microsoft.NETCore.App`, and the load fails with a message naming an assembly that is not actually missing from disk - `Microsoft.Extensions.Hosting.Abstractions` is the usual one.
 
-The framework set is extended automatically: before launching the worker, NBenchmark reads the `runtimeconfig.json` beside the assembly under test and adds any framework the worker does not already declare. `dotnet benchmark` does the same thing for itself — unlike every other mode it loads the target into its own process to discover benchmarks, so it restarts once under the right framework set before reading anything. Nothing needs configuring, and nothing changes for an ordinary console benchmark project.
+The framework set is extended automatically: before launching the worker, NBenchmark reads the `runtimeconfig.json` beside the assembly under test and adds any framework the worker does not already declare. `dotnet benchmark` does the same thing for itself - unlike every other mode it loads the target into its own process to discover benchmarks, so it restarts once under the right framework set before reading anything. Nothing needs configuring, and nothing changes for an ordinary console benchmark project.
 
 Two cases remain:
 

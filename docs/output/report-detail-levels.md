@@ -82,7 +82,7 @@ dotnet run -- --detail standard
 dotnet run -- --detail simple
 ```
 
-| Value | Behaviour |
+| Value | Behavior |
 | --- | --- |
 | `simple` | Compact table with the essential statistics. **(default)** |
 | `standard` | Full comparison table plus Precision & Tail Latency, auto-tune, and Interpretation sections. |
@@ -92,15 +92,24 @@ The `--detail` flag affects all registered reporters. JSON always emits the full
 
 ### Single mode
 
-Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) always uses `Simple` detail and does not support `WithDetail()`.
+Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) has no `WithDetail()` - there is no builder to
+call it on. Pass the level to `Print` instead:
 
-## Reporter behaviour
+```csharp
+var result = Benchmark.Run(() => MyMethod());
+
+result.Print();                            // Simple (default) - Median and Ops/s
+result.Print(ReportDetail.Standard);       // adds Mean, percentiles, StdDev, Error, CI
+result.Print(ReportDetail.Advanced);       // adds quartiles, fences, shape, allocation breakdown
+```
+
+## Reporter behavior
 
 | Reporter | Simple | Standard | Advanced |
 | --- | --- | --- | --- |
 | **Console** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation + auto-tune | Standard + per-benchmark stats block (incl. diagnostics breakdown) |
 | **Markdown** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation | Standard + dedicated details section (incl. diagnostics breakdown) |
-| **CSV** | 12 core columns (incl. GC counts) | 25 core columns (incl. GC counts) | 51 columns including quartiles, fences, shape stats, and full diagnostics |
+| **CSV** | 17 core columns (incl. GC counts) | 33 core columns (incl. GC counts) | 68 columns including quartiles, fences, shape stats, and full diagnostics |
 | **JSON** | Full record (always) | Full record (always) | Full record (always) |
 
 ## See also

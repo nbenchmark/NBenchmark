@@ -8,10 +8,12 @@ order: 5
 
 Reporters consume the finished `BenchmarkResult` list and produce output - terminal tables, Markdown files, CSVs, or JSON. You can attach as many reporters as you like to a single run.
 
+> Looking for what the numbers mean rather than how to emit them? See
+> [Reading your results](../getting-started/reading-your-results.md).
+
 ## In this section
 
-- **[Reading Your Results](./reading-your-results.md)** - interpret every column, indicator, and warning in the output.
-- **[Console Reporter](./console-reporter.md)** - rich terminal table with colour and a bar chart.
+- **[Console Reporter](./console-reporter.md)** - rich terminal table with color and a bar chart.
 - **[Markdown Reporter](./markdown-reporter.md)** - `.md` file with a formatted results table.
 - **[CSV Reporter](./csv-reporter.md)** - `.csv` file with all statistics, suitable for post-processing.
 - **[JSON Reporter](./json-reporter.md)** - `.json` file with full structured results.
@@ -70,7 +72,7 @@ await result.ToJsonAsync("results/");
 
 | Reporter | Package | Output |
 | --- | --- | --- |
-| [ConsoleReporter](./console-reporter.md) | `NBenchmark.Reporters.Console` | Rich terminal table with colour and a bar chart |
+| [ConsoleReporter](./console-reporter.md) | `NBenchmark.Reporters.Console` | Rich terminal table with color and a bar chart |
 | [MarkdownReporter](./markdown-reporter.md) | `NBenchmark` | `.md` file with a formatted results table |
 | [CsvReporter](./csv-reporter.md) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |
 | [JsonReporter](./json-reporter.md) | `NBenchmark` | `.json` file with full structured results |
@@ -110,6 +112,10 @@ If you reference an unknown reporter name, the host prints the list of available
 
 Reporters support three detail levels - **Simple** (default), **Standard**, and **Advanced** - that control how much statistical information is included in the output. Set the level via `WithDetail(ReportDetail.Standard)` on both `BenchmarkHarness` and `BenchmarkSuite`, or via the `--detail standard` CLI flag in harness mode. See the [Report Detail Levels guide](./report-detail-levels.md) for the full column reference.
 
+## Writing a custom reporter
+
+See the [Custom Reporters](./custom-reporters.md) page for a step-by-step guide to implementing `IReporter`, registering it with `ReporterRegistry`, and using `BenchmarkTable` for comparison output. That page also documents **auto-attached reporters** (`ReporterRegistry.RegisterAutoAttach`) - side-effect reporters that fire on every run after the user's explicit reporters, with no opt-in required.
+
 ## Report format versioning
 
 Every file-writing reporter stamps its output with two independent numbers. They exist for whoever
@@ -121,7 +127,7 @@ NBenchmark itself never reads its own reports back.
 | `schemaVersion` | Can my parser still read this file? | A field is renamed, removed, or changes type; the envelope is restructured. **Not** bumped for added fields. |
 | `measurementEpoch` | Can I plot this number next to that one? | NBenchmark changes what a benchmark reports: harness overhead, the default runtime profile, or the definition of a reported statistic. |
 
-Both are `1` today. They are separate because they move independently, and the case that proves it
+The schema is at `1` and the measurement epoch is at `4` today. They are separate because they move independently, and the case that proves it
 is the one that prompted them: replacing NBenchmark's boxing dispatch path with typed delegates
 moved the calibration standard from **9.34 ns / 24 B per op to 2.53 ns / 0 B** while leaving the
 JSON shape byte-for-byte identical. A schema version alone would have said nothing had changed. A
@@ -161,7 +167,3 @@ if report["measurementEpoch"] != baseline_epoch:
 The constants are `NBenchmark.Reporters.ReportFormat.SchemaVersion` and
 `ReportFormat.MeasurementEpoch` if you are writing a [custom reporter](./custom-reporters.md) and
 want to stamp it the same way.
-
-## Writing a custom reporter
-
-See the [Custom Reporters](./custom-reporters.md) page for a step-by-step guide to implementing `IReporter`, registering it with `ReporterRegistry`, and using `BenchmarkTable` for comparison output. That page also documents **auto-attached reporters** (`ReporterRegistry.RegisterAutoAttach`) - side-effect reporters that fire on every run after the user's explicit reporters, with no opt-in required.

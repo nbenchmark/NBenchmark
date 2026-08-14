@@ -42,7 +42,7 @@ dotnet run -- --runtimes net8.0,net10.0
 dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output ./results
 ```
 
-When `--runtimes` is specified, the coordinator builds the project for each target framework via `dotnet build -f <tfm>`, measures the benchmarks in **that build's own worker process**, and aggregates the results. A worker is framework-dependent, so only the net8.0 worker can load a net8.0 build - the build targets already deploy the right one beside each build's assemblies, which makes worker selection a lookup rather than a guess.
+When `--runtimes` is specified, NBenchmark builds the project for each target framework via `dotnet build -f <tfm>`, measures the benchmarks in **that build's own worker process**, and aggregates the results. A worker is framework-dependent, so only the net8.0 worker can load a net8.0 build - the build targets already deploy the right one beside each build's assemblies, which makes worker selection a lookup rather than a guess.
 
 ## Harness mode: `[Runtimes]` attribute
 
@@ -90,7 +90,7 @@ static BenchmarkSuite BuildSuite() =>
         .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net10);
 ```
 
-Measuring another target framework means measuring a *different build* of your code, and an inline suite's bodies are located by metadata token - a number that only means anything inside the build that produced it. A factory is found by name, which is stable across builds, so each runtime's worker constructs the suite from that runtime's own assemblies. An inline suite with `WithRuntimes` says so rather than measuring the wrong thing.
+Measuring another target framework means measuring a *different build* of your code, and a suite body is located by a build-specific address that changes when the code is recompiled. A factory is located by name, which is stable across builds, so each runtime's worker constructs the suite from that runtime's own assemblies. An inline suite with `WithRuntimes` says so rather than measuring the wrong thing. (For the addressing detail - how bodies are located across a process boundary, by build-specific token or by stable name - see [Isolation internals: by token, or by name](../deep-dives/isolation-internals.md#by-token-or-by-name).)
 
 Harness mode needs no change: it already addresses benchmark classes by name.
 
@@ -99,7 +99,7 @@ The console and markdown reporters add a "Runtime" column when results span mult
 ## Samples
 
 - [MultiRuntimeSuite sample](../samples.md#multiruntimesuite---suite-mode-multi-runtime) - Suite mode multi-runtime
-- [MultiRuntimeHost sample](../samples.md#multiruntimehost---harness-mode-multi-runtime) - Harness mode multi-runtime
+- [MultiRuntimeHarness sample](../samples.md#multiruntimeharness---harness-mode-multi-runtime) - Harness mode multi-runtime
 
 ## See also
 

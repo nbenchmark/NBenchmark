@@ -1,7 +1,7 @@
 ---
 title: "Parameterized benchmarks: Suite mode"
 description: Run a benchmark body across multiple input values using WithParameter and typed Add lambdas in BenchmarkSuite.
-order: 2
+order: 3
 ---
 
 # Parameterized benchmarks: Suite mode
@@ -228,7 +228,7 @@ foreach (var r in results)
 }
 ```
 
-## Next steps
+## See also
 
 - [Parameterized benchmarks: Harness mode](./parameterized-harness.md) - the `[BenchmarkCase]` / `[BenchmarkCases]` attribute API
 - [Suite mode](../usage-modes/suite-mode.md) - the full fluent API

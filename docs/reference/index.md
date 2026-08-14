@@ -10,7 +10,8 @@ Technical reference for NBenchmark.
 
 ## In this section
 
-- **[Configuration](./configuration.md)** - task-based guides and the full MeasurementOptions reference.
+- **[Configuration](./configuration.md)** - the full MeasurementOptions reference.
 - **[CLI Reference](./cli.md)** - all command-line flags accepted by `BenchmarkHarness`.
 - **[Analyzers](./analyzers.md)** - compile-time Roslyn diagnostics (NB0001-NB0015).
 - **[Measurement Observer](./observers.md)** - live-telemetry callback surface for streaming measurement events.
+- **[BCL Instrumentation](./bcl-instrumentation.md)** - built-in `System.Diagnostics` Meter/ActivitySource telemetry.

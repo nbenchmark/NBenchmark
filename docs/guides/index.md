@@ -1,7 +1,7 @@
 ---
 title: Guides
 description: Real-world workflow recipes that combine NBenchmark features to solve common benchmarking tasks end-to-end.
-order: 4
+order: 3
 ---
 
 # Guides
@@ -40,6 +40,10 @@ Fail PRs on performance regression inside your existing xUnit, NUnit, or MSTest 
 
 The built-in IQR/MAD outlier trimming or rank-based significance tests don't fit your domain (latency SLOs, fixed physical thresholds, bootstrap comparison). Swap in a custom `IOutlierDetector` and a custom `ISignificanceTest`.
 
+### [Tuning recipes](./tuning-recipes.md)
+
+Five configuration recipes for situations you are likely to hit: a noisy CI runner, fast feedback while developing, publication-grade precision, pure CPU measurement, and debugging results that won't reproduce.
+
 ## How to use these guides
 
 Each guide is self-contained and produces a runnable example. The pattern is:
@@ -48,7 +52,7 @@ Each guide is self-contained and produces a runnable example. The pattern is:
 2. **Complete example** - the configuration body, copy-pasteable.
 3. **What's happening** - brief callouts on the feature interactions, linking to the feature pages for depth.
 4. **Run it** - the `dotnet run` / CLI invocations.
-5. **Read the results** - plain-English, linking to [Reading Your Results](../output/reading-your-results.md).
+5. **Read the results** - plain-English, linking to [Reading Your Results](../getting-started/reading-your-results.md).
 6. **When to go deeper** - links into the relevant feature and statistics pages.
 
 If you're new to NBenchmark, start with the [Quick Start](../getting-started/quick-start.md) and [Key Concepts](../getting-started/key-concepts.md), then come back here once you have a specific goal in mind.

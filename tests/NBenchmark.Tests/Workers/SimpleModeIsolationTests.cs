@@ -418,12 +418,15 @@ public sealed class SimpleModeIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     A prepare delegate that captures is refused, exactly as a capturing body is.
+    ///     A prepare delegate that captures is isolated, with the captured value transferred, exactly
+    ///     as a capturing body is.
     /// </summary>
     /// <remarks>
-    ///     Splitting the shape is only worth anything if both halves are held to the same rule. A
-    ///     capturing factory would leave the value in this process while claiming to be a recipe for it,
-    ///     which is the reconstruction hazard wearing a different hat.
+    ///     Both halves are held to the same rule, and that rule is the faithfulness one rather than a
+    ///     blanket no-captures one. A captured <c>int</c> is a parameter the recipe did not get to
+    ///     declare, so refusing it refused the exact shape the refusal messages tell people to write.
+    ///     What stays refused is a capture that is not faithfully transferable - a live object has no
+    ///     byte-level answer that preserves how it performs.
     /// </remarks>
     [Fact]
     public void Run_WithCapturingPrepare_IsIsolated_AndPreparesTheCapturedSize()

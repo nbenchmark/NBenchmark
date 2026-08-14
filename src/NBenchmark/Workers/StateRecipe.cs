@@ -6,20 +6,22 @@ namespace NBenchmark.Workers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The delegate and its arguments travel together because they are one claim. A prepare
-///         delegate is refused if it captures, and the whole point of letting it take parameters is to
-///         give the user somewhere to put the value they would otherwise have captured:
-///         <c>prepare: () =&gt; Build(size)</c> closes over <c>size</c> and can only be refused, while
+///         The delegate and its arguments travel together because they are one claim.
 ///         <c>prepare: (int size) =&gt; Build(size)</c> paired with <c>1000</c> is a complete recipe
-///         that the worker can follow on its own.
+///         the worker can follow on its own, with the value named rather than captured.
 ///     </para>
 ///     <para>
-///         That refusal is the one people find most frustrating, because they reach it <i>after</i>
-///         doing the rewrite the diagnostic asked for.
+///         Parameters are no longer the <i>only</i> way to get a value across.
+///         <c>prepare: () =&gt; Build(size)</c> closes over <c>size</c> and isolates too - the capture
+///         is transferred through the group's receiver table, the same route a body's captures take
+///         (see <see cref="AddressedFactory" />). Requiring a non-capturing factory used to refuse
+///         exactly the shape the library's own refusal messages tell people to write, which is the
+///         refusal users reached <i>after</i> doing the rewrite the diagnostic asked for.
 ///     </para>
 /// </remarks>
 /// <param name="Factory">
-///     The recipe. Addressed by the same rule as a body, so it must not capture.
+///     The recipe. Addressed by the same rule as a body: it may capture, provided what it captures is
+///     faithfully transferable.
 /// </param>
 /// <param name="Arguments">
 ///     Values for <paramref name="Factory" />'s own parameters, in declaration order. Empty for the

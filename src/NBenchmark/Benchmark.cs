@@ -221,12 +221,12 @@ public static class Benchmark
     ///     Measures <paramref name="body" /> over state built by <paramref name="prepare" /> from
     ///     <paramref name="prepareArgument" />.
     ///     <para>
-    ///         This exists for the refusal people reach <i>after</i> doing the rewrite the diagnostic
-    ///         asked for. Splitting <c>var d = Build(size); Run(() =&gt; Sort(d))</c> into
-    ///         <c>Run(prepare: () =&gt; Build(size), body: d =&gt; Sort(d))</c> removes the body's
-    ///         capture and moves it into the prepare delegate, which is refused for exactly the same
-    ///         reason - <c>size</c> still lives only in this process. Naming it as a parameter and
-    ///         passing the value makes the recipe complete:
+    ///         This names the recipe's input explicitly rather than letting it be captured. A
+    ///         capturing <c>prepare: () =&gt; Build(size)</c> also isolates - the captured value
+    ///         travels in the group's receiver table, see <see cref="Workers.AddressedFactory" /> -
+    ///         so this overload is a clarity choice, not a workaround. Prefer it when the input is a
+    ///         scalar you want visible in the call, or when you want the value bound at the call site
+    ///         rather than wherever the local happens to be assigned:
     ///     </para>
     ///     <code>
     ///     Benchmark.Run(
@@ -236,8 +236,10 @@ public static class Benchmark
     ///     </code>
     /// </summary>
     /// <param name="prepare">
-    ///     Builds the state, once, before warmup, in the process that measures. Must capture nothing;
-    ///     whatever it needs comes through <paramref name="prepareArgument" />.
+    ///     Builds the state, once, before warmup, in the process that measures. Receives
+    ///     <paramref name="prepareArgument" />. It may additionally capture, on the same faithfulness
+    ///     rule a body is held to - what it captures must be reproducible from its serialized
+    ///     contents, so a live object is still refused.
     /// </param>
     /// <param name="prepareArgument">
     ///     The value to call <paramref name="prepare" /> with. Sent alongside the address, so it must be

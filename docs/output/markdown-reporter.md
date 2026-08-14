@@ -38,7 +38,7 @@ MarkdownReporter(string outputDirectory = ".", string? fileName = null)
 
 When `fileName` is not provided, the reporter generates a filename that includes the UTC timestamp and a per-process counter:
 
-```
+```text
 benchmark-results-20260606-034000-001.md
 ```
 
@@ -61,7 +61,7 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 
 > **2026-06-06 03:40:00 UTC** · 40 warmup · 190 measured · realistic profile
 > Runtime: **steady-state** (tiered=off pgo=off r2r=off)
-> Format: schema 1, measurement epoch 1 (numbers are comparable only with the same epoch)
+> Format: schema 1, measurement epoch 4 (numbers are comparable only with the same epoch)
 
 ### Comparison
 
@@ -92,7 +92,7 @@ Percentile columns (P95, P99, etc.) are dynamic -- they appear only when the cor
 - Effect metric: Cliff's δ (Romano neg/small/med/large labels)
 ```
 
-When **three or more** benchmarks are compared, the Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and the **Interpretation** section includes an omnibus line summarising the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
+When **three or more** benchmarks are compared, the Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and the **Interpretation** section includes an omnibus line summarizing the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
 
 ```markdown
 **Omnibus (Kruskal-Wallis)** across 3 groups: H(2) = 7.20, p = 0.027 → significant
@@ -120,7 +120,7 @@ When **three or more** benchmarks are compared, the Sig column shows the post-ho
 - The output directory is created automatically if it does not exist.
 - The report order is: Comparison -> Precision & Tail Latency -> (optional) Distribution Details -> Interpretation -> (optional) Warnings.
 - In Standard mode (`--detail standard` or `WithDetail(ReportDetail.Standard)`), the full multi-section output is shown: comparison table, Precision & Tail Latency, and Interpretation.
-- In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown, followed by an `auto-tuned: …` line summarising the adaptive loop's decisions (resolved samples × ops-per-sample, warmup length, achieved CI half-width).
+- In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown, followed by an `auto-tuned: …` line summarizing the adaptive loop's decisions (resolved samples × ops-per-sample, warmup length, achieved CI half-width).
 
 ## Using with Benchmark (Single mode)
 

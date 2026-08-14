@@ -1,7 +1,7 @@
 ---
 title: Categories
 description: Tag and filter benchmarks by category.
-order: 1
+order: 2
 ---
 
 # Categories
@@ -97,3 +97,9 @@ var results = await new BenchmarkSuite("string")
 dotnet run -- --list
 dotnet run -- --reporter markdown --detail advanced --output ./results
 ```
+
+## See also
+
+- [Parameterized benchmarks: Suite mode](./parameterized-suite.md) - categories combine with parameter sweeps
+- [Parameterized benchmarks: Harness mode](./parameterized-harness.md) - `[BenchmarkCategory]` on attribute-discovered methods
+- [CLI Reference: `--category` / `--exclude-category`](../reference/cli.md#--category-name) - the CLI filter flags

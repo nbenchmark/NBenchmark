@@ -1,16 +1,31 @@
 ---
 title: Reading Your Results
 description: How to interpret every column, indicator, and warning in NBenchmark's output.
-order: 0
+order: 4
 ---
 
 # Reading Your Results
 
 This page explains what you see in the console output and what to do with it. For the mathematical detail behind any number, follow the links to the statistics pages.
 
+## The 30-second read
+
+If you want one rule for each thing you're looking at:
+
+| You see | It means |
+| --- | --- |
+| **CV under 5%** and **Error under 1%** | The benchmark is stable. Trust the number. |
+| **CV over 20%** or **Error over 5%** | The benchmark is noisy. Fix that before drawing conclusions - see [Troubleshooting](../troubleshooting.md). |
+| **✓** in Sig, with Small / Medium / Large magnitude | A real difference worth acting on. |
+| **✓** in Sig, with Negligible magnitude | Real, but too small to care about. |
+| **✗** in Sig | The run can't tell the two apart. Don't claim a win. |
+| **Any warning** | Read it. NBenchmark only warns when the number needs a caveat. |
+
+The rest of this page is the detail behind each of those.
+
 ## Console output example
 
-```
+```text
   ┌─ Benchmark ─────────────────────────────────────
   │
   │  Median: 342.1 ns       Mean: 348.7 ns
@@ -21,10 +36,16 @@ This page explains what you see in the console output and what to do with it. Fo
   │  CI:     [345.6 ns … 351.8 ns] (95%)
   │  Alloc/op: 0 B
   │
+  │  Measured in an isolated worker under 'steady-state'.
+  │
   └─────────────────────────────────────────────────
 ```
 
-In suite mode, the console reporter adds a comparison table with Ratio, Sig, and Magnitude columns. See [Console Reporter](./console-reporter.md) for the full table layout.
+That is `result.Print(ReportDetail.Standard)`. A bare `result.Print()` shows Median and Ops/s only;
+`ReportDetail.Advanced` adds quartiles, fences, and distribution shape. See
+[Report detail levels](../output/report-detail-levels.md).
+
+In suite mode, the console reporter adds a comparison table with Ratio, Sig, and Magnitude columns. See [Console Reporter](../output/console-reporter.md) for the full table layout.
 
 ## The columns
 
@@ -65,7 +86,7 @@ See [Descriptive Statistics](../statistics/descriptive.md#coefficient-of-variati
 
 ### P95 / P99 / P99.9
 
-Percentiles tell you about the distribution tail. P95 means 95% of individual measurements completed within this time. These are important for latency-sensitive code where you care about worst-case behaviour, not just the average.
+Percentiles tell you about the distribution tail. P95 means 95% of individual measurements completed within this time. These are important for latency-sensitive code where you care about worst-case behavior, not just the average.
 
 The set of reported percentiles is configurable via `--percentiles` or `MeasurementOptions.ReportedPercentiles`.
 
@@ -92,13 +113,13 @@ Runtime configuration dominates small measurements - an in-process reading and a
 **What to do:**
 
 - A ✓ with a small Ratio (e.g. `1.01x`) means the difference is statistically real but may be too small to matter in practice. Check the Magnitude column.
-- A ✗ with a large Ratio (e.g. `1.5x`) means the measurements are too noisy to tell. Try reducing noise (see [Tuning for noisy CI](../reference/configuration.md#tuning-for-noisy-ci-environments)) or collecting more samples.
+- A ✗ with a large Ratio (e.g. `1.5x`) means the measurements are too noisy to tell. Try reducing noise (see [Tuning for noisy CI](../guides/tuning-recipes.md#tuning-for-noisy-ci-environments)) or collecting more samples.
 
 See [Significance Testing](../statistics/significance.md) for the full detail.
 
 ### Magnitude (suite mode)
 
-Classifies the effect size using Cliff's delta:
+How *big* the difference is, separately from whether it's real:
 
 | Label | What it means |
 | --- | --- |
@@ -123,7 +144,7 @@ See [Allocation Measurement](../statistics/allocations.md).
 
 In Advanced detail mode (`--detail advanced`), the output includes an auto-tune line:
 
-```
+```text
 auto-tuned: K=64, warmup=12, samples=47, CI half-width=1.8%, jitter=0.03
 ```
 
@@ -143,7 +164,7 @@ See [Measurement: The measurement loop](../statistics/measurement.md#the-measure
 
 If you see a warning like:
 
-```
+```text
 ⚠ MyBench.FastPath: 5 discarded outlier(s) form a distinct cluster near 502 ns rather than
   scattered noise - possible bimodal distribution; investigate this tail latency
 ```
@@ -153,7 +174,7 @@ This means the slow samples were **not** random noise - they were a repeatable s
 **What to do:**
 
 - Do not ignore it. The warning is telling you something real about your code's performance distribution.
-- Re-run with `OutlierMode.None` to see the full distribution.
+- Read the tail metrics as they are - P99, P99.9, and Max are computed from the full pre-trim distribution by default, so the second cluster is already visible there. You do not need to re-run.
 - Investigate the cause with a profiler.
 - If you suspect GC, try `--profile independent`.
 
@@ -171,7 +192,7 @@ Operations per second, derived from the mean timing. `Median ops/s` is derived f
 
 ## See also
 
-- [Key Concepts](../getting-started/key-concepts.md) - understand what the numbers mean conceptually
+- [Key Concepts](./key-concepts.md) - understand what the numbers mean conceptually
 - [Descriptive Statistics](../statistics/descriptive.md) - the formulas behind every field
 - [Significance Testing](../statistics/significance.md) - how Sig and Magnitude are computed
 - [Outlier Trimming](../statistics/outliers.md) - how outliers are detected and removed

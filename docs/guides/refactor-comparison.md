@@ -60,7 +60,7 @@ The console reporter adds a `Class` column so the rows are distinguishable, and 
 
 - **Sig** - **✓** means the difference would occur by chance less than 5% of the time (p < 0.05, two-sided). **✗** means the measurements are too noisy to conclude one is faster. (blank) means the benchmark is the baseline or significance wasn't tested. The default test is non-parametric and rank-based; for two benchmarks it's a Mann-Whitney U test, for three or more an omnibus test gates pairwise comparisons. See [Significance Testing](../statistics/significance.md).
 
-- **Magnitude** - classifies the effect size as Negligible / Small / Medium / Large from Cliff's delta. A statistically significant result (✓) with a Negligible magnitude means the difference is real but too small to care about. Positive = candidate slower (red in the console); negative = candidate faster (green). See [Reading Your Results: Magnitude](../output/reading-your-results.md#magnitude-suite-mode).
+- **Magnitude** - classifies the effect size as Negligible / Small / Medium / Large from Cliff's delta. A statistically significant result (✓) with a Negligible magnitude means the difference is real but too small to care about. Positive = candidate slower (red in the console); negative = candidate faster (green). See [Reading Your Results: Magnitude](../getting-started/reading-your-results.md#magnitude-suite-mode).
 
 - **`MinimumPracticalEffect`** (default `0.147`, the Romano negligible/small boundary). A ✓ means "real **and** at least a small effect". A sub-threshold difference is downgraded to `NotSignificant`, its magnitude is forced to `neg`, and a warning records the downgrade so it's discoverable. Set `--min-practical-effect 0` to restore p-value-only verdicts, or `null` to disable the gate. See [Significance Testing: Practical-significance gate](../statistics/significance.md#practical-significance-gate).
 
@@ -104,7 +104,7 @@ v2-candidate  | 305.0 ns  | 307.1 ns  | 3,278,689  | 0.73x      |  ✓  | large 
 
 If the row had read `Sig ✓ | Mag neg`, the difference would be real but below the practical-significance threshold - the refactor is statistically faster but not enough to act on. If it had read `Sig ✗ | Mag large`, the measurements would be too noisy; reduce noise or collect more samples before deciding.
 
-See [Reading Your Results](../output/reading-your-results.md) for every column, indicator, and warning.
+See [Reading Your Results](../getting-started/reading-your-results.md) for every column, indicator, and warning.
 
 ## When to go deeper
 

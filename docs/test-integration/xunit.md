@@ -108,7 +108,7 @@ private static void ReferenceImpl() { /* ... */ }
 
 When a threshold is violated the test fails with a `PerformanceAssertException`. The message lists every violated threshold:
 
-```
+```text
 Performance thresholds exceeded for 'CriticalPath':
   - Mean 612,847.23 ns exceeds maximum 500,000.00 ns (excess: 112,847.23 ns)
   - P95 1,204,312.00 ns exceeds maximum 1,000,000.00 ns (excess: 204,312.00 ns)

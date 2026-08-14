@@ -1,7 +1,7 @@
 ---
 title: FAQ
 description: Frequently asked questions about NBenchmark.
-order: 10
+order: 12
 ---
 
 # FAQ
@@ -45,7 +45,7 @@ If a few iterations are very slow (e.g. a GC pause), the mean is pulled upward b
 
 ### My benchmark produces `0 ns`. What's happening?
 
-The compiler or JIT has likely optimised the benchmark body away because it has no observable side effects. Make sure your benchmark either:
+The compiler or JIT has likely optimized the benchmark body away because it has no observable side effects. Make sure your benchmark either:
 
 - Returns a value (use `Benchmark.Run(() => Compute())` which uses the generic overload that consumes the result), or
 - Has a side effect (writes to a field, uses a passed-in output parameter, etc.)
@@ -78,7 +78,7 @@ It shows the result of a **[Mann-Whitney U test](https://en.wikipedia.org/wiki/M
 
 When you compare **three or more** benchmarks, NBenchmark first runs a **[Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) omnibus** test. If the omnibus is significant (at least one group differs), post-hoc pairwise Mann-Whitney U tests run with Holm-Bonferroni correction, and the per-row Sig column is populated with the corrected verdicts. If the omnibus is not significant, the Sig column stays blank.
 
-See [Statistical Significance](./getting-started/key-concepts.md#statistical-significance) and the [Statistics Deep Dive](./statistics/) for full details.
+See [Statistical Significance](./getting-started/key-concepts.md#significance-and-magnitude) and the [Statistics Deep Dive](./statistics/) for full details.
 
 ### Why is significance sometimes blank?
 
@@ -194,7 +194,7 @@ Use `--list` to check what NBenchmark finds before running.
 
 `BenchmarkHarness` creates benchmark class instances using `Activator.CreateInstance`, which requires a **public parameterless constructor**. There are three ways to satisfy this:
 
-1. **Add a parameterless constructor** that initialises dependencies itself (simplest, but couples the benchmark class to the dependency).
+1. **Add a parameterless constructor** that initializes dependencies itself (simplest, but couples the benchmark class to the dependency).
 2. **Use `[BenchmarkSetup]`** to populate fields on a parameterless-constructed instance.
 3. **Use the `NBenchmark.DependencyInjection` companion package** to resolve the class from a container built by a factory:
 

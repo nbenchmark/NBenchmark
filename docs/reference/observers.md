@@ -20,7 +20,7 @@ public interface IMeasurementObserver
 }
 ```
 
-All four methods are `void`-returning. The contract is **"return immediately, never block, never allocate on the hot path."** The observer must not throw - doing so is undefined behaviour (the engine does not catch observer exceptions on the hot path).
+All four methods are `void`-returning. The contract is **"return immediately, never block, never allocate on the hot path."** The observer must not throw - doing so is undefined behavior (the engine does not catch observer exceptions on the hot path).
 
 ## Getting started
 
@@ -150,7 +150,7 @@ When `OpsPerSample` is pinned (calibration skipped) or `WarmupIterations=0` (war
 
 ## What an isolated run delivers
 
-Benchmarks are measured in a separate `nbworker` process by default, and the observer you registered lives in *your* process. Your instance is still called - the worker streams events back over its pipe and the coordinator replays them into the live object - but not every callback crosses:
+Benchmarks are measured in a separate `nbworker` process by default, and the observer you registered lives in *your* process. Your instance is still called - the worker streams events back over its pipe and your process replays them into the live object - but not every callback crosses:
 
 | Callback | Isolated (default) | `--in-process` / `RunInProcess` |
 | --- | --- | --- |
@@ -234,5 +234,5 @@ public class LoggingObserver : IMeasurementObserver
 
 ## See also
 
-- `docs/reference/bcl-instrumentation.md` - the `System.Diagnostics` Meter/ActivitySource instrumentation.
-- `docs/reference/configuration.md` - the `MeasurementOptions` surface.
+- [BCL instrumentation](./bcl-instrumentation.md) - the `System.Diagnostics` Meter/ActivitySource instrumentation.
+- [Configuration](./configuration.md) - the `MeasurementOptions` surface.

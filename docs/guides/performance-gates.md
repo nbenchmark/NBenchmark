@@ -38,7 +38,7 @@ Without a `ReferenceMethod`, the test runs a built-in CPU-bound calibration benc
 
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse))]
-public void OptimisedParse() => OptimisedParser.Parse(Payload);
+public void OptimizedParse() => OptimizedParser.Parse(Payload);
 
 private static void NaiveParse() => NaiveParser.Parse(Payload);
 ```
@@ -49,7 +49,7 @@ What that ratio does not have, at the default `LaunchCount = 1`, is an interval:
 
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse), LaunchCount = 3)]
-public void OptimisedParse() => OptimisedParser.Parse(Payload);
+public void OptimizedParse() => OptimizedParser.Parse(Payload);
 ```
 
 Three workers, each measuring the pair, each producing its own ratio. The gate then applies the threshold to the combined estimate and fails only when the interval excludes `1.00x` - so a failure means the slowdown is larger than the difference between two runs of the same code. See [replicates and the paired ratio](../test-integration/index.md#replicates-and-the-paired-ratio).
@@ -100,7 +100,7 @@ public void Repository_Query_Is_Fast_Enough()
 
 Performance tests are measured in a **worker process**, not in the test host - the same isolation the rest of NBenchmark uses, for the same reason: JIT tiering, dynamic PGO and GC flavour are fixed when a process starts, and a test host's are whatever the preceding tests left behind.
 
-The worker builds your test class itself, so this works when the class can be constructed from nothing. That covers the ordinary case. It cannot cover a class the test framework injects into, and NBenchmark says so rather than guessing:
+The worker builds your test class itself, so this works when the class can be constructed from nothing. It cannot cover a class the test framework injects into, and NBenchmark says so rather than guessing:
 
 | Situation | Where it runs | Reported as |
 | --- | --- | --- |
@@ -110,14 +110,7 @@ The worker builds your test class itself, so this works when the class can be co
 | An argument that is an object graph or mock | Test host | `InProcessLiveFixture` |
 | No worker deployed | Test host | `InProcessNoWorker` |
 
-The reason is printed with the test's metrics, naming the specific parameter or dependency:
-
-```
-NBenchmark: 'ParserTests.Parse' measured in the test host - parameter 'documents'
-(of type 'List`1') is a live object that exists only in this test process.
-```
-
-Those results are still produced and still gated on absolute thresholds. What changes is the **ratio** gate.
+The reason is printed with the test's metrics, naming the specific parameter or dependency. Those results are still produced and still gated on absolute thresholds; what changes is the **ratio** gate.
 
 ### When a ratio gate is enforced
 
@@ -127,16 +120,7 @@ Those results are still produced and still gated on absolute thresholds. What ch
 | Test host | Test host | Not enforced, and the reason is logged. Add `[AllowInProcessGate]` to enforce it anyway. |
 | Worker | Test host (or the reverse) | **Never enforced.** No opt-in covers it. |
 
-The middle row is the one to understand. Two bodies measured in the same test host share its JIT tiering and PGO state, and that state is whatever the preceding tests left behind - so a ratio between them can report the host's history rather than the code. The gate declines rather than reporting an effect that may not exist, and prints why:
-
-```
-NBenchmark: the ratio gate for 'ParserTests.Parse' was not enforced - both it and its
-reference were measured in the test host, where the runtime configuration is whatever
-the preceding tests left behind. Make the test isolatable, or add
-[AllowInProcessGate] to gate on it anyway.
-```
-
-The bottom row is refused outright: a ratio spanning a process boundary is dominated by the difference between the two runtime configurations. Making both sides isolatable - usually by moving injected state into the method - is the fix.
+The middle row exists because two bodies measured in the same test host share its JIT tiering and PGO state - whatever the preceding tests left behind - so a ratio between them can report the host's history rather than the code. The bottom row is refused outright: a ratio spanning a process boundary is dominated by the difference between the two runtime configurations. Making both sides isolatable - usually by moving injected state into the method - is the fix.
 
 ### `[AllowInProcessGate]`
 
@@ -147,7 +131,7 @@ Applies to a method, a class, or a whole assembly. It says: this test cannot be 
 public class ParserTests : IClassFixture<ParserFixture>
 {
     [PerformanceFact(MaxSlowdownRatio = 1.5, ReferenceMethod = nameof(Naive))]
-    public void Optimised() => _fixture.Parser.Parse(Payload);
+    public void Optimized() => _fixture.Parser.Parse(Payload);
 }
 ```
 
@@ -163,11 +147,9 @@ The same attribute is also the *only* opt-out from the isolation requirement. A 
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-That default is deliberate. Isolation can be lost quietly - somebody adds a fixture argument, or the worker fails to deploy on a build agent - and a labelled-but-passing test is indistinguishable from a healthy one, because CI does not read output. Failing is the conservative direction: the message names the reason and its remedy.
+That default is deliberate. Isolation can be lost quietly - somebody adds a fixture argument, or the worker fails to deploy on a build agent - and a labeled-but-passing test is indistinguishable from a healthy one, because CI does not read output. Failing is the conservative direction: the message names the reason and its remedy. `[AllowInProcessGate]` waives both the isolation requirement and the ratio-gate restriction above, because both are the same judgement.
 
-Add `[AllowInProcessGate]` to accept a host measurement, at method, class or assembly scope. It waives both the isolation requirement and the ratio-gate restriction above, because both are the same judgement - "this test cannot be isolated and I accept a noisier number". The result then carries a note saying where it was measured.
-
-There is deliberately no `RequireIsolation = false` on the attributes. xUnit reads attribute values as named arguments, where an absent argument and an explicit `false` are indistinguishable, and attribute arguments cannot be nullable to tell them apart - so the setting would have been silently ignored on one framework and honoured on the others. The `PerformanceAssert` option bags do expose `RequireIsolation`, because they are ordinary objects with no attribute target to carry `[AllowInProcessGate]`.
+There is deliberately no `RequireIsolation = false` on the attributes - xUnit reads attribute values as named arguments, where an absent argument and an explicit `false` are indistinguishable. The `PerformanceAssert` option bags do expose it, because they are ordinary objects.
 
 Simple values reach the worker intact: `int`, `string`, `bool`, `enum`, `decimal`, `DateTime`, `Guid` and the like, so `[InlineData]` and `[DataRow]` cases isolate normally. Object arguments are refused rather than reconstructed, because a reconstruction that is usually right is worse than one that declines.
 
@@ -208,7 +190,7 @@ PerformanceAssert: slowdown ratio 6.2x exceeded MaxSlowdownRatio 5.0
   p = 0.0003 (significant)  Cliff's delta = 0.92 (large)
 ```
 
-The `p` and Cliff's delta values tell you whether the slowdown is real and how large. See [Reading Your Results](../output/reading-your-results.md) for every column the underlying benchmark reports.
+The `p` and Cliff's delta values tell you whether the slowdown is real and how large. See [Reading Your Results](../getting-started/reading-your-results.md) for every column the underlying benchmark reports.
 
 ## How this differs from `--threshold-pct`
 

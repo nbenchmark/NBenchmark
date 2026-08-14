@@ -64,10 +64,10 @@ public sealed class StateGapIsolationTests : IDisposable
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The refusal this closes is the one users reach <i>after</i> doing the rewrite the
-    ///         diagnostic asked for: splitting <c>var d = Build(size); Run(() =&gt; Sort(d))</c> moves the
-    ///         capture from the body into the prepare delegate, which is refused for exactly the same
-    ///         reason.
+    ///         Splitting <c>var d = Build(size); Run(() =&gt; Sort(d))</c> moves the capture from the body
+    ///         into the prepare delegate. Both forms isolate - the capturing one through the group's
+    ///         receiver table - so this covers the parameterized form specifically: the value named as a
+    ///         parameter and sent alongside the address, rather than captured.
     ///     </para>
     ///     <para>
     ///         The <i>value</i> is asserted from inside the body, not from a return value. The

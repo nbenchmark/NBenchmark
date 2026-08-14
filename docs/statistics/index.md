@@ -1,12 +1,12 @@
 ---
 title: Statistics
-description: How NBenchmark measures, analyses, and reports benchmark data.
+description: How NBenchmark measures, analyzes, and reports benchmark data.
 order: 6
 ---
 
 # Statistics
 
-This section explains how NBenchmark collects and analyses measurements. The [Key Concepts](../getting-started/key-concepts.md) page covers the practical side. For a practical guide to interpreting the output you see on screen, see [Reading Your Results](../output/reading-your-results.md). These pages are for readers who want the full mathematical picture.
+This section explains how NBenchmark collects and analyzes measurements - the mathematical methodology behind the numbers. The [Key Concepts](../getting-started/key-concepts.md) page covers the practical side. For a practical guide to interpreting the output you see on screen, see [Reading Your Results](../getting-started/reading-your-results.md). For the engineering internals - how the clock is probed, what crosses the process boundary, how the engine resolves its numbers - see [Deep Dives](../deep-dives/).
 
 ## In this section
 
@@ -18,3 +18,7 @@ This section explains how NBenchmark collects and analyses measurements. The [Ke
 - **[Significance Testing](./significance.md)** - the Mann-Whitney U test for two groups and the Kruskal-Wallis omnibus test (with post-hoc pairwise Mann-Whitney U and Holm-Bonferroni correction) for three or more: why non-parametric, the algorithms, p-value interpretation, **Cliff's delta effect size and Magnitude column**, the `MinimumPracticalEffect` practical-significance gate, and custom tests.
 - **[Diagnostics](./diagnostics.md)** - runtime counters for GC collection counts, heap state, exceptions, and CPU time.
 - **[Validation & Accuracy](./validation.md)** - how the numerical implementations are verified against SciPy and NumPy.
+
+## See also
+
+- [Deep Dives](../deep-dives/) - the engineering internals behind these numbers (clock probe, jitter auto-switch, optional-stopping correction, worker protocol)

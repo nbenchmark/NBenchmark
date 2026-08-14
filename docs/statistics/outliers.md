@@ -43,7 +43,7 @@ The detector runs on the boundary between trimming and statistics (`StatsPipelin
 
 When both conditions hold, the warning names the cluster size and its centre:
 
-```
+```text
 ⚠ MyBench.FastPath: 5 discarded outlier(s) form a distinct cluster near 502 ns rather than
   scattered noise - possible bimodal distribution; investigate this tail latency
   (e.g. GC pauses, lock contention, or cache misses).
@@ -84,7 +84,7 @@ The detector never changes which samples are kept - it only adds a warning. The 
 
 When GC collection counts are collected (`DiagnosticsOptions.GcCollectionCounts`, on by default), NBenchmark records a per-sample GC delta alongside each timing. After trimming, it counts how many of the discarded samples coincided with a collection and annotates the result - answering the first question an outlier tail raises, *"was that a GC?"*, without a re-run:
 
-```
+```text
 ⚠ 5 of 7 removed outlier(s) coincided with a garbage collection.
 ```
 

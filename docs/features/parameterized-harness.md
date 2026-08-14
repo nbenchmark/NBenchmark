@@ -1,7 +1,7 @@
 ---
 title: "Parameterized benchmarks: Harness mode"
 description: Run a benchmark body across multiple input values using BenchmarkCase and BenchmarkCases attributes in BenchmarkHarness.
-order: 3
+order: 4
 ---
 
 # Parameterized benchmarks: Harness mode
@@ -117,32 +117,7 @@ dotnet run -- --filter "Sort*100*"   # runs Sort(n=100) and Sort(n=100000)
 
 ## Reading the report
 
-Console and Markdown reporters consolidate a parameterized benchmark into a **single comparison table** - one table per class in harness mode. Each parameter becomes its own column, and the `Benchmark` column shows the base method name without its parameter suffix:
-
-```text
-search benchmarks
-Benchmark | size | Median   | Mean     | Ops/s      | Ratio             | Sig | Mag   | Alloc/op
-----------+------+----------+----------+------------+-------------------+-----+-------+---------
-binary    |   10 |  90.0 ns |  91.2 ns | 11,111,111 | ████ baseline    |  -  |  -    |    32 B
-linear    |   10 | 108.0 ns | 109.4 ns |  9,259,259 | █████ 1.20x      |  ✓  | large |    24 B
-binary    |  100 | 250.0 ns | 252.1 ns |  4,000,000 | ███████ baseline  |  -  |  -    |    32 B
-linear    |  100 | 300.0 ns | 305.7 ns |  3,333,333 | █████████ 1.20x   |  ✓  | large |    24 B
-```
-
-Rows are grouped by parameter set in expansion order and sorted by median within each group. To leave room for the parameter columns, parametric tables use the compact labels `Ratio`, `Sig` and `Mag`. When a parameter group holds competing benchmarks, the baseline, ratio, significance (`Sig`) and effect magnitude are computed independently **per parameter group**, so every comparison stays within a single parameter combination.
-
-When a single method is swept across parameter values, every parameter group holds just one benchmark, so there is no within-group comparison. The table instead ranks every row against its fastest point: the `Ratio` column reports each point's scaling factor (the fastest point is the `baseline`), while `Sig` and `Mag` stay `-`, because the engine does not test different workloads against one another. This makes scaling trends easy to read:
-
-```text
-LinearSearch benchmarks
-Benchmark    | count | Median   | Mean     | Ops/s      | Ratio               | Sig | Mag | Alloc/op
--------------+-------+----------+----------+------------+---------------------+-----+-----+---------
-LinearSearch |    10 |  31.2 ns |  32.7 ns | 30,567,164 | █ baseline          |  -  |  -  |     24 B
-LinearSearch |   100 | 117.2 ns | 132.2 ns |  7,565,906 | ███ 3.76x           |  -  |  -  |     24 B
-LinearSearch |  1000 |  1.40 µs |  1.27 µs |    789,515 | ████████████ 44.87x |  -  |  -  |  4,048 B
-```
-
-In a mixed class, a non-parameterized benchmark shows `-` in every parameter column; when no parameter group has a within-group comparison, it joins the table-wide ranking against the fastest row.
+Console and Markdown reporters consolidate a parameterized benchmark into a **single comparison table** - one table per class in harness mode. Each parameter becomes its own column, and the `Benchmark` column shows the base method name without its parameter suffix. The table shape, the per-parameter-group baseline/ratio/significance rules, and the single-method sweep ranking are identical to Suite mode - see [Reading the report](./parameterized-suite.md#reading-the-report) for the full explanation and examples. The only difference is the grouping: one table per class rather than one table for the whole suite.
 
 CSV and JSON reporters keep one record per result, each carrying its full `ParameterSet`, for machine consumption.
 
@@ -176,7 +151,7 @@ foreach (var r in results)
 | Result metadata | `ParameterSet` property on `BenchmarkResult` | `ParameterSet` property on `BenchmarkResult` |
 | CLI filtering | N/A (programmatic only) | `--filter` by display name |
 
-## Next steps
+## See also
 
 - [Parameterized benchmarks: Suite mode](./parameterized-suite.md) - the `WithParameter` fluent API
 - [Harness mode](../usage-modes/harness-mode.md) - attribute-based discovery and CLI

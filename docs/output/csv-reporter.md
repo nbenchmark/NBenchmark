@@ -38,7 +38,7 @@ CsvReporter(string outputDirectory = ".", string? fileName = null)
 
 When `fileName` is not provided, the reporter generates a filename that includes the UTC timestamp and a per-process counter:
 
-```
+```text
 benchmark-results-20260606-034000-001.csv
 ```
 
@@ -57,9 +57,9 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 ## Output format
 
 ```csv
-ClassName,Name,Median,OpsPerSecond,Ratio,Significant,AllocPerOp,Detail,Profile
-"SortingBenchmarks","Compute",300.0,3636363.6,0.75,"true",96,simple,realistic
-"SortingBenchmarks","Baseline",400.0,2660985.4,1.00,"",120,simple,realistic
+ClassName,Name,Median,OpsPerSecond,Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Isolation
+"SortingBenchmarks","Compute",300.0,3636363.6,0.75,"true",96,12,3,0,1,4,simple,realistic,steady-state,"","isolated"
+"SortingBenchmarks","Baseline",400.0,2660985.4,1.00,"",120,11,2,0,1,4,simple,realistic,steady-state,"","isolated"
 
 Percentile columns (P95, P99, etc.) are dynamic -- they appear only in Standard and Advanced modes when the corresponding percentiles are configured via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set of `[0.50, 0.95, 0.99, 0.999, 1.0]`, columns P95 and P99 are emitted. P50 and Max (1.0) are excluded from percentile columns because they are shown separately as Median and Max. Values are in nanoseconds. Empty cells indicate the percentile was not in the configured set or the row is errored.
 ```
@@ -68,7 +68,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 
 ## Column reference
 
-### Simple mode (16 columns)
+### Simple mode (17 columns)
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -86,6 +86,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `Profile` | string | Active measurement profile (`realistic` or `independent`). |
 | `RuntimeProfile` | string | The runtime profile the measuring process was launched under (`steady-state`, `host`, ...). |
 | `RuntimeKnobs` | string | The environment variables that profile applied, or empty when the configuration was inherited rather than chosen. |
+| `Isolation` | string | Isolation status for the row (`isolated`, `in-process`, or a refusal status). Last column in every detail mode. |
 
 ### Standard mode (dynamic columns - adds the following after the simple columns)
 
@@ -99,7 +100,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `CiUpper` | float | Upper bound of the confidence interval on the mean (`Mean + MarginOfError`). |
 | `ConfidenceLevel` | float | The confidence level used (e.g. `0.95`). |
 | `CoefficientOfVariation` | float | `StdDev / Mean`. Dimensionless measure of relative variability. |
-| `RatioCiLower` | float or empty | Lower bound of the paired per-launch ratio interval. Empty when the run had a single launch, so there was no interval to compute — which is different from a ratio that could not be computed. |
+| `RatioCiLower` | float or empty | Lower bound of the paired per-launch ratio interval. Empty when the run had a single launch, so there was no interval to compute - which is different from a ratio that could not be computed. |
 | `RatioCiUpper` | float or empty | Upper bound of the paired per-launch ratio interval. An interval spanning `1.0` means the run cannot distinguish this benchmark from the baseline, regardless of what `Ratio` says. |
 | `RatioReplicates` | integer or empty | How many launches were paired to produce the interval. Always at least 2 when present. |
 | `P{key}` | float | Dynamic percentile columns. One column per configured percentile value between P50 and Max (e.g. `P95`, `P99`, `P99.9`). Controlled by `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. Values in nanoseconds. |
@@ -135,6 +136,18 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `AutoTuneSampleStop` | string or empty | Why measurement stopped: `CiTargetMet`, `MaxCeiling`, `ExplicitCount`, or `WallClockCap`. Empty on dry-run/errored. |
 | `AutoTuneCiWidth` | float or empty | Raw relative CI half-width achieved at stop. Empty on dry-run/errored. |
 | `AutoTuneTuningMs` | float or empty | Wall-clock time spent in the adaptive loop, in milliseconds. Empty on dry-run/errored. |
+| `AutoTuneJitterMetric` | float or empty | Pre-flight jitter metric (MAD / median). Empty on dry-run/errored. |
+| `AutoTuneDetectorSwitched` | `"true"` or empty | Set when the outlier detector was auto-switched from IQR fence to MAD. |
+| `AutoTuneSplitHalfDrift` | float or empty | Split-half drift measured on the final stop. |
+| `AutoTuneRestarts` | integer or empty | Measurement restarts from the drift gate. |
+| `AutoTuneWarmupTimeFloorMet` | `"true"` / `"false"` or empty | Whether the warmup time floor was reached. |
+| `AutoTuneWarmupJitMethods` | integer or empty | Compiled-method count delta across warmup. |
+| `HeapCommitted` | integer or empty | Heap committed bytes delta. Empty when heap diagnostics are off. |
+| `HeapFragmented` | integer or empty | Heap fragmented bytes delta. Empty when heap diagnostics are off. |
+| `ExceptionPerOp` | float or empty | First-chance exceptions per operation. Empty when exception diagnostics are off. |
+| `CpuTimeNsPerOp` | float or empty | CPU time per operation. Empty when CPU diagnostics are off. |
+| `CpuWallRatio` | float or empty | CPU/wall time ratio. Empty when CPU diagnostics are off. |
+| `DiagnosticsMode` | string or empty | Active diagnostics mode (`none`, `gc`, `gcandcpu`, `all`). |
 | `Categories` | string or empty | Semicolon-separated category names. Empty if no categories. |
 
 ## Notes
@@ -142,7 +155,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 - Results are sorted by median (fastest first).
 - The output directory is created automatically if it does not exist.
 - Names containing double-quotes are escaped by doubling the quote character (standard CSV escaping).
-- Simple mode CSV has 16 fixed columns. Standard mode has 32 non-percentile columns plus one per configured tail-latency percentile (35 with the default set). Advanced mode adds 35 further fields, for 67 non-percentile columns (70 with the default set).
+- Simple mode CSV has 17 fixed columns. Standard mode has 33 non-percentile columns plus one per configured tail-latency percentile (35 with the default set). Advanced mode adds 35 further fields, for 68 non-percentile columns (70 with the default set).
 
 ## Using with Benchmark (Single mode)
 
