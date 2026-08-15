@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
 
@@ -61,6 +62,21 @@ internal sealed class BenchmarkLoadContext : AssemblyLoadContext
                 // packages are the user's choice. Anything the worker does not have falls through
                 // to the target's own copy, which is correct: those assemblies do not define types
                 // that cross the process boundary, so a separate identity for them is harmless.
+                //
+                // DiagnosticSource is the exception, and the one case worth a diagnostic: falling
+                // through gives the process two listener registries, which costs an isolated run
+                // its entire telemetry stream and produces no other symptom. It can only happen if
+                // the target asks for a version newer than the worker carries, so name the versions
+                // - that is the whole fix.
+                if (string.Equals(name, "System.Diagnostics.DiagnosticSource", StringComparison.Ordinal))
+                {
+                    Trace.TraceWarning(
+                        "NBenchmark: the worker could not unify '{0}' (target wants {1}); telemetry from "
+                        + "this process will not reach a listener attached in the default context. "
+                        + "Raise the System.Diagnostics.DiagnosticSource version referenced by "
+                        + "NBenchmark.Worker to {1} or higher.",
+                        name, assemblyName.Version);
+                }
             }
         }
 
@@ -86,12 +102,33 @@ internal sealed class BenchmarkLoadContext : AssemblyLoadContext
     ///         strong-named, so a simple name is the only thing available to match on - which means a
     ///         prefix test also captures any third-party or user assembly that happens to be called
     ///         <c>NBenchmark.Something</c>, and silently redirects it to the worker's default context
-    ///         where the target's own copy was meant to load. Naming the seven that matter costs one
+    ///         where the target's own copy was meant to load. Naming the ones that matter costs one
     ///         line per package and cannot claim an assembly that is not ours.
     ///     </para>
     ///     <para>
     ///         <c>nbworker</c> and <c>nbenchmark-tool</c> are absent on purpose: they are entry-point
     ///         assemblies that a target never references, so there is no identity to unify.
+    ///     </para>
+    ///     <para>
+    ///         <b><c>System.Diagnostics.DiagnosticSource</c> is here for a different reason than the
+    ///         rest.</b> No type of its crosses the pipe. What must be unified is the process-wide
+    ///         listener registry inside it: <see cref="System.Diagnostics.ActivitySource" /> and
+    ///         <c>Meter</c> publish to static state, and an OpenTelemetry SDK loaded in this context
+    ///         subscribes to whichever copy it binds against. NBenchmark's instruments live in the
+    ///         default context, so a second copy here means the SDK listens to an empty registry and
+    ///         an isolated run exports nothing at all - with no error anywhere, because both halves
+    ///         are working exactly as written.
+    ///     </para>
+    ///     <para>
+    ///         It is not hypothetical, and it is TFM-dependent, which is what makes it easy to ship
+    ///         broken. <c>OpenTelemetry.Api</c> depends on <c>System.Diagnostics.DiagnosticSource</c>
+    ///         10.0.0. Under <c>net10.0</c> the shared framework already supplies that, so nothing is
+    ///         copied to the target's output and the question never arises. Under <c>net8.0</c> and
+    ///         <c>net9.0</c> the framework supplies an older one, NuGet copies 10.0.0 next to the
+    ///         target, and <see cref="AssemblyDependencyResolver" /> finds it. The worker therefore
+    ///         carries its own <c>PackageReference</c> to the same package on those two frameworks,
+    ///         so the default context has a version high enough to satisfy the bind - see
+    ///         <c>NBenchmark.Worker.csproj</c>.
     ///     </para>
     /// </remarks>
     private static readonly HashSet<string> EngineAssemblies = new(StringComparer.Ordinal)
@@ -103,6 +140,7 @@ internal sealed class BenchmarkLoadContext : AssemblyLoadContext
         "NBenchmark.Integration.MSTest",
         "NBenchmark.DependencyInjection",
         "NBenchmark.Reporters.Console",
+        "System.Diagnostics.DiagnosticSource",
     };
 
     private static bool IsEngineAssembly(string simpleName) => EngineAssemblies.Contains(simpleName);

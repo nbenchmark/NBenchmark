@@ -72,6 +72,9 @@ internal static class NBenchmarkDiagnostics
     private static Activity? _currentRunActivity;
     private static Activity? _currentSuiteActivity;
 
+    // Only ever set in a worker process, where it is the root of everything this process emits.
+    private static Activity? _currentWorkerActivity;
+
     static NBenchmarkDiagnostics()
     {
         Meter.CreateObservableGauge(
@@ -211,6 +214,65 @@ internal static class NBenchmarkDiagnostics
 
         activity.SetTag("nbenchmark.suite.result_count", results.Count);
         activity.Dispose();
+    }
+
+    /// <summary>
+    ///     Opens the span covering a worker process's whole session, parented to the coordinator's
+    ///     span via the <c>TRACEPARENT</c> the coordinator wrote into this process's environment.
+    ///     Everything the worker raises afterwards nests beneath it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This is what makes an isolated run one trace rather than one per process. The parent
+    ///         is passed explicitly rather than adopted through <see cref="Activity.Current" />,
+    ///         because there is nothing current in a freshly started process and the context being
+    ///         continued belongs to a span in another one.
+    ///     </para>
+    ///     <para>
+    ///         A real span, not a stand-in for the coordinator's. Reconstructing the parent locally
+    ///         and leaving it unexported would give every <c>benchmark.run</c> span a parent id that
+    ///         appears nowhere in the trace, which a backend renders as a broken tree. Emitting it
+    ///         also pays for itself: the process boundary becomes a row in the flame graph, so worker
+    ///         startup reads as the gap between this span opening and the first phase beginning.
+    ///     </para>
+    ///     <para>
+    ///         No variable means no parent, and the worker's spans root their own trace exactly as
+    ///         they did before - which is the right outcome when the coordinator had no exporter
+    ///         attached and so had no span to point at.
+    ///     </para>
+    /// </remarks>
+    internal static void OnWorkerSessionStarting(string? traceParent)
+    {
+        if (_currentWorkerActivity is not null)
+            return;
+
+        var activity = ActivityContext.TryParse(traceParent, traceState: null, out var parent)
+            ? ActivitySource.StartActivity("nbenchmark.worker", ActivityKind.Internal, parent)
+            : ActivitySource.StartActivity("nbenchmark.worker");
+
+        if (activity is null)
+            return;
+
+        activity.SetTag("nbenchmark.worker.pid", Environment.ProcessId);
+
+        foreach (var (key, value) in TelemetryResource.Attributes)
+        {
+            activity.SetTag(key, value);
+        }
+
+        _currentWorkerActivity = activity;
+    }
+
+    /// <summary>
+    ///     Closes the worker-session span. Called as the worker's session ends, before its exporter
+    ///     is flushed, so the span is complete by the time anything ships it.
+    /// </summary>
+    internal static void OnWorkerSessionCompleted()
+    {
+        var activity = _currentWorkerActivity;
+        _currentWorkerActivity = null;
+
+        activity?.Dispose();
     }
 
     internal static void OnBenchmarkRunStarting(string benchmarkName, string className, bool isBaseline, IReadOnlyList<BenchmarkParameter>? parameters = null)

@@ -158,6 +158,41 @@ internal static class MeasurementBudget
 
         startInfo.Environment[OtelEndpointEnvVar] =
             Environment.GetEnvironmentVariable(OtelEndpointEnvVar) ?? "";
+
+        ApplyTraceContext(startInfo);
+    }
+
+    /// <summary>
+    ///     The W3C trace-context variable, so a worker's spans join the run's trace instead of
+    ///     rooting one of their own.
+    /// </summary>
+    internal const string TraceParentEnvVar = "TRACEPARENT";
+
+    /// <summary>
+    ///     Writes the coordinator's current span into a not-yet-started measuring process, using the
+    ///     name the W3C trace-context specification gives it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Without this, an isolated run produces one trace per worker plus one for the
+    ///         coordinator, all unconnected - and the flame graph that makes the phase structure
+    ///         legible is exactly what is lost. The worker reads the variable back in
+    ///         <c>NBenchmarkDiagnostics.OnWorkerSessionStarting</c>.
+    ///     </para>
+    ///     <para>
+    ///         The value is read at launch rather than captured once per run because it must be the
+    ///         span that is current *now*: workers are launched on demand, after the suite span has
+    ///         opened, and a value captured earlier would name a span that had not started.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="Activity.Current" /> is null whenever nothing is listening to the
+    ///         <c>NBenchmark</c> source, which is the common case - no exporter, no variable, no cost.
+    ///     </para>
+    /// </remarks>
+    private static void ApplyTraceContext(ProcessStartInfo startInfo)
+    {
+        if (Activity.Current?.Id is { Length: > 0 } traceParent)
+            startInfo.Environment[TraceParentEnvVar] = traceParent;
     }
 
     /// <summary>

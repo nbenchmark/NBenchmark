@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+
+    <!--
+      Multi-targeted on purpose. Under net10.0 the shared framework supplies the
+      System.Diagnostics.DiagnosticSource version the OpenTelemetry SDK wants; under net8.0 NuGet
+      copies its own next to the app, which is the case that fails if the worker's load context does
+      not unify it. Running this sample on net8.0 is the end-to-end check for that.
+    -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>NBenchmark.Samples.Telemetry</RootNamespace>
+
+    <!-- Deploys the measurement worker, the way the package's own build targets do for a consumer. -->
+    <NBenchmarkUseWorker>true</NBenchmarkUseWorker>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NBenchmark\NBenchmark.csproj"/>
+    <ProjectReference Include="..\..\src\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj"/>
+    <ProjectReference Include="..\..\src\NBenchmark.Exporters.OpenTelemetry\NBenchmark.Exporters.OpenTelemetry.csproj"/>
+  </ItemGroup>
+
+</Project>

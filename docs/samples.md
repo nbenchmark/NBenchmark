@@ -450,3 +450,48 @@ What to look at:
 - **Advanced**: adds a per-benchmark Distribution Details block with quartiles, fences, skewness, kurtosis, MAD, Cliff's delta, and allocation breakdown.
 
 See [Report Detail Levels](./output/report-detail-levels.md) for the full column reference.
+
+---
+
+## Telemetry - OpenTelemetry export to Grafana
+
+**`samples/Telemetry/`**
+
+A `BenchmarkHarness` exporting OTLP to a Grafana stack in Docker via
+`NBenchmark.Exporters.OpenTelemetry`. The run is isolated, the way harness mode normally runs, and
+the telemetry from every `nbworker` child lands in a single trace with the harness's own.
+
+```bash
+cd samples/Telemetry
+docker compose up -d
+dotnet run -c Release
+open http://localhost:3000/d/nbenchmark-run
+```
+
+```csharp
+using NBenchmark.Exporters.OpenTelemetry;
+
+await BenchmarkHarness.Create(args)
+    .AddFromAssembly<TelemetryBenchmarks>()
+    .WithOpenTelemetry(o => o.Endpoint = "http://localhost:4317")
+    .RunAsync();
+```
+
+Even that call is optional - referencing the package and passing `--otlp-endpoint` is enough, since
+the exporter self-registers and attaches to any run that has an endpoint to export to.
+
+What to look at:
+
+- The one trace a run produces: `benchmark.suite` in the harness, an `nbenchmark.worker` span per
+  measuring process, then `benchmark.run` and the four `nbenchmark.phase.*` spans beneath it - 106
+  spans for a default four-benchmark, five-launch run.
+- The span events (`warmup.plateau_reached`, `measurement.ci_target_met`) that explain why each
+  phase ended, and how much longer warmup runs than measurement.
+- Why the dashboard aggregates over the time range rather than using `rate()`: a worker lives a
+  second or two, which is two to four points per series before the process is gone.
+- Why the project multi-targets `net8.0` as well as `net10.0` - the `net8.0` run is a regression
+  test for the worker's `System.Diagnostics.DiagnosticSource` unification, which is the difference
+  between a complete trace and no worker telemetry at all.
+
+See [BCL Instrumentation](./reference/bcl-instrumentation.md) for the full instrument, span, and
+resource-attribute reference.

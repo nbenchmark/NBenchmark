@@ -1,0 +1,28 @@
+# Grafana's single-container OTel stack: an OpenTelemetry Collector fronting Prometheus (metrics),
+# Tempo (traces) and Loki (logs), with Grafana already wired to all three. One image keeps the
+# sample about NBenchmark's telemetry rather than about assembling a backend.
+services:
+  lgtm:
+    image: grafana/otel-lgtm:latest
+    container_name: nbenchmark-lgtm
+    ports:
+      - "3000:3000"   # Grafana UI
+      - "4317:4317"   # OTLP/gRPC  <- the sample exports here
+      - "4318:4318"   # OTLP/HTTP
+      - "9090:9090"   # Prometheus, for poking at the raw series
+    environment:
+      # Anonymous auto-login, so the dashboard link works without a credential prompt.
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      # The provider is mounted as a single file so the stack's own dashboard providers, which
+      # live in the same directory, are not shadowed by a directory mount.
+      - ./grafana/provisioning.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/nbenchmark.yaml:ro
+      - ./grafana/dashboards:/nbenchmark-dashboards:ro
+    healthcheck:
+      # curl, not wget: the image ships the former and not the latter.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30

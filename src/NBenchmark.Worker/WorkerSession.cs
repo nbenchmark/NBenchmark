@@ -65,7 +65,26 @@ internal sealed class WorkerSession(FrameChannel channel)
     /// <summary>
     ///     Runs until end-of-stream or a shutdown frame. Returns the process exit code.
     /// </summary>
+    /// <remarks>
+    ///     The <c>finally</c> is the flush point for anything the target's extension packages
+    ///     activated - an OTLP exporter, most obviously. It runs on every way out of the session,
+    ///     including the ones that report a lost coordinator, which is worth having: a worker that
+    ///     measured successfully and then lost its parent still holds telemetry worth shipping.
+    ///     Only an outright kill skips it.
+    /// </remarks>
     public async Task<int> RunAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await RunSessionAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ExtensionLoader.Deactivate();
+        }
+    }
+
+    private async Task<int> RunSessionAsync(CancellationToken cancellationToken)
     {
         var handshake = await _channel.ReadAsync(cancellationToken).ConfigureAwait(false);
 
@@ -488,6 +507,9 @@ internal sealed class WorkerSession(FrameChannel channel)
         }
 
         var target = context.LoadFromAssemblyPath(Path.GetFullPath(request.TargetAssemblyPath));
+
+        ExtensionLoader.ActivateExtensions(context, target);
+
         var module = target.ManifestModule;
 
         if (module.ModuleVersionId != request.TestMethodModuleVersionId)
@@ -853,6 +875,8 @@ internal sealed class WorkerSession(FrameChannel channel)
         CancellationToken cancellationToken)
     {
         var target = context.LoadFromAssemblyPath(Path.GetFullPath(request.TargetAssemblyPath));
+
+        ExtensionLoader.ActivateExtensions(context, target);
 
         // A container built here, from the caller's own registrations, rather than a live one sent
         // across - which is impossible - or a parameterless constructor substituted for it, which would

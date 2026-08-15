@@ -38,4 +38,21 @@
     <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
   </ItemGroup>
 
+  <!--
+    Not a dependency the worker uses: a version floor it has to be able to hand out.
+
+    BenchmarkLoadContext defers System.Diagnostics.DiagnosticSource to the default context so the
+    process has one Activity/Meter listener registry rather than two - see the remarks on
+    EngineAssemblies for why two is fatal and silent. That deferral only succeeds if the default
+    context can satisfy the version the target asks for, and a target referencing the OpenTelemetry
+    SDK asks for 10.0.0. Under net10.0 the shared framework already supplies it; under net8.0 and
+    net9.0 it does not, so the worker carries the package itself on those two frameworks.
+
+    Raise this in step with the OpenTelemetry SDK's own floor. Too low and the bind falls through
+    to the target's copy, which BenchmarkLoadContext traces a warning for.
+  -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0' OR '$(TargetFramework)' == 'net9.0'">
+    <PackageReference Include="System.Diagnostics.DiagnosticSource"/>
+  </ItemGroup>
+
 </Project>

@@ -1281,57 +1281,6 @@ public class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Resolves observer names forwarded by a coordinator
-    ///     into a single <see cref="IMeasurementObserver" /> for an isolated suite child. The child
-    ///     re-runs the entry assembly, so <c>[ModuleInitializer]</c> self-registration populates
-    ///     <see cref="ObserverRegistry" /> identically and the names resolve to the same factories.
-    ///     Auto-attached observers also fire in children (dedup'd against the forwarded explicit
-    ///     names so <c>--observer studio</c> does not double-attach). An empty list collapses to
-    ///     <see cref="NullMeasurementObserver.Instance" />.
-    /// </summary>
-    private static IMeasurementObserver ResolveChildObservers(IReadOnlyList<string> names)
-    {
-        if (names.Count == 0)
-        {
-            // No explicit names forwarded, but auto-attached observers still fire in the
-            // child (e.g. a live-streaming observer referenced by the parent's entry
-            // assembly). Resolve them with an empty dedup set.
-            var autoAttachedOnly = ObserverRegistry.CreateAutoAttachedObservers(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
-
-            return autoAttachedOnly.Count switch
-            {
-                0 => NullMeasurementObserver.Instance,
-                1 => autoAttachedOnly[0],
-                _ => new CompositeMeasurementObserver(autoAttachedOnly),
-            };
-        }
-
-        var resolved = new List<IMeasurementObserver>(names.Count);
-
-        foreach (var name in names)
-        {
-            if (ObserverRegistry.TryCreate(name, out var observer)
-                && observer != NullMeasurementObserver.Instance)
-                resolved.Add(observer);
-        }
-
-        // Auto-attached observers also fire in children. EnsureExtensionsLoaded (called by
-        // CreateAutoAttachedObservers) has loaded NBenchmark.* assemblies (including
-        // NBenchmark.Studio, if referenced) and their [ModuleInitializer]s have registered
-        // auto-attached observers. Dedup against the request's explicit observer names.
-        var explicitNames = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
-        var autoAttached = ObserverRegistry.CreateAutoAttachedObservers(explicitNames);
-        resolved.AddRange(autoAttached);
-
-        return resolved.Count switch
-        {
-            0 => NullMeasurementObserver.Instance,
-            1 => resolved[0],
-            _ => new CompositeMeasurementObserver(resolved),
-        };
-    }
-
-    /// <summary>
     ///     Tags every subsequent benchmark added to the suite with the supplied categories.
     ///     <c>.WithCategories()</c> does not affect benchmarks already added.
     /// </summary>

@@ -918,6 +918,24 @@ public sealed class BenchmarkHarness
 
         var totalBenchmarks = allNames.Count;
 
+        // Resolve the observer once for the whole run so auto-attached observers (e.g. a
+        // live-streaming observer) see one stream per RunAsync, not one per per-class group.
+        // The using disposes the observer (and its composite children) on both the success
+        // and exception paths; the composite's Dispose fans out with try/catch isolation.
+        //
+        // The comparison pass gets the null observer, not the user's. It used to resolve the same
+        // instance again from inside the primary pass's `using`, so a streaming observer received a
+        // second SuiteStarting..SuiteCompleted stream for results that are never published and was then
+        // disposed twice - a double-finalise for any observer whose Dispose closes out a session.
+        //
+        // Strictly before OnSuiteStarting below. An observer may be the thing that attaches a
+        // listener to the ActivitySource - that is exactly what the OTLP exporter is - and
+        // StartActivity returns null when nothing is listening yet. Resolving second cost the run
+        // its root span, and with it the parent that every benchmark, phase and worker span in the
+        // trace hangs from: the export still happened, and still looked like a set of unrelated
+        // fragments.
+        using var observer = pass.Publishes ? ResolveObserver() : NullMeasurementObserver.Instance;
+
         // Labelled rather than suppressed for the comparison pass. Suppressing only the suite span would
         // leave the per-benchmark spans - raised from deep inside the engine, where the pass is not
         // visible - as parentless roots, which is worse than a labelled parent. A diagnostic pass must
@@ -932,16 +950,6 @@ public sealed class BenchmarkHarness
             _cliArgs.Seed,
             (_cliArgs.RunOrder ?? _runOrder).ToString());
 
-        // Resolve the observer once for the whole run so auto-attached observers (e.g. a
-        // live-streaming observer) see one stream per RunAsync, not one per per-class group.
-        // The using disposes the observer (and its composite children) on both the success
-        // and exception paths; the composite's Dispose fans out with try/catch isolation.
-        //
-        // The comparison pass gets the null observer, not the user's. It used to resolve the same
-        // instance again from inside the primary pass's `using`, so a streaming observer received a
-        // second SuiteStarting..SuiteCompleted stream for results that are never published and was then
-        // disposed twice - a double-finalise for any observer whose Dispose closes out a session.
-        using var observer = pass.Publishes ? ResolveObserver() : NullMeasurementObserver.Instance;
         var sentinelEmitted = false;
 
         try

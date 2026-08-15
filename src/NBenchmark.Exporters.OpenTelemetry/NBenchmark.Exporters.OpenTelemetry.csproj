@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>NBenchmark.Exporters.OpenTelemetry</RootNamespace>
+    <PackageId>NBenchmark.Exporters.OpenTelemetry</PackageId>
+    <Description>Exports NBenchmark's measurement telemetry over OTLP to any OpenTelemetry collector, from the harness and from every isolated worker process.</Description>
+    <PackageTags>benchmark;performance;opentelemetry;otlp;telemetry;tracing;metrics</PackageTags>
+
+    <!-- CA2255: the module initializer is the point - it is what runs inside a worker process. -->
+    <NoWarn>$(NoWarn);CA2255</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry"/>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol"/>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="NBenchmark.Exporters.OpenTelemetry.Tests"/>
+  </ItemGroup>
+
+</Project>

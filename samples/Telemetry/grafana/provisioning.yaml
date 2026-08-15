@@ -1,0 +1,16 @@
+# Bind-mounted as a single file into Grafana's dashboard-provisioning directory, alongside the
+# providers the image ships rather than over the top of them, so the NBenchmark dashboard is
+# present before the first benchmark runs and the stack's own dashboards survive.
+apiVersion: 1
+
+providers:
+  - name: nbenchmark
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 10
+    options:
+      path: /nbenchmark-dashboards
+      foldersFromFilesStructure: false

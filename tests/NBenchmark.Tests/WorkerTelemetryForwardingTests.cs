@@ -26,6 +26,7 @@ public class WorkerTelemetryForwardingTests
         NbenchmarkEndpointEnvVar,
         "OTEL_EXPORTER_OTLP_HEADERS",
         "OTEL_EXPORTER_OTLP_TIMEOUT",
+        "TRACEPARENT",
     ];
 
     [Fact]
@@ -95,6 +96,51 @@ public class WorkerTelemetryForwardingTests
         {
             Assert.False(psi.Environment.ContainsKey(name), $"{name} should not be set when the parent has no OTel env vars");
         }
+    }
+
+    [Fact]
+    public void BuildStartInfo_Forwards_TraceParent_From_The_Current_Span()
+    {
+        using var _ = WithEnv();
+        using var listener = ListenToNBenchmarkSource();
+        using var source = new ActivitySource(TestActivitySourceName);
+        using var activity = source.StartActivity("suite");
+
+        Assert.NotNull(activity);
+
+        var psi = BuildStartInfo();
+
+        // The worker reconstructs its parent from this, so it has to be the id of the span that is
+        // current at launch - not merely present and well-formed.
+        Assert.Equal(activity.Id, psi.Environment["TRACEPARENT"]);
+    }
+
+    [Fact]
+    public void BuildStartInfo_Does_Not_Forward_TraceParent_When_Nothing_Is_Listening()
+    {
+        using var _ = WithEnv();
+
+        // No listener means StartActivity returns null and Activity.Current stays null, which is
+        // the ordinary case for a run with no exporter attached. A worker that inherits no context
+        // roots its own trace, which is correct: there is no coordinator span to hang it from.
+        var psi = BuildStartInfo();
+
+        Assert.False(psi.Environment.ContainsKey("TRACEPARENT"));
+    }
+
+    private const string TestActivitySourceName = "NBenchmark.Tests.TraceContext";
+
+    private static ActivityListener ListenToNBenchmarkSource()
+    {
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == TestActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+        };
+
+        ActivitySource.AddActivityListener(listener);
+
+        return listener;
     }
 
     private static IDisposable WithEnv(IEnumerable<(string Name, string? Value)> vars)

@@ -1,0 +1,388 @@
+{
+  "uid": "nbenchmark-run",
+  "title": "NBenchmark run",
+  "description": "Telemetry emitted by NBenchmark's Meter and ActivitySource during a benchmark run. Aggregated over the dashboard's time range rather than per-second, because a run is a batch job measured by short-lived worker processes.",
+  "tags": ["nbenchmark"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Samples recorded",
+      "description": "Every sample the run timed, across all phases and all measuring processes.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "text" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "graphMode": "none",
+        "colorMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(last_over_time(nbenchmark_sample_duration_nanoseconds_per_op_count[$__range]))",
+          "instant": true,
+          "legendFormat": "samples"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Measuring processes",
+      "description": "One in an --in-process run; one per launch, per class, in an isolated run - each an nbworker child that built its own exporter.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "text" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "graphMode": "none",
+        "colorMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "count(count by (instance) (last_over_time(nbenchmark_sample_duration_nanoseconds_per_op_count[$__range])))",
+          "instant": true,
+          "legendFormat": "processes"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Outliers removed",
+      "description": "nbenchmark.outliers.removed - samples the detector trimmed before the reported statistics were computed.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "text" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "graphMode": "none",
+        "colorMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(last_over_time(nbenchmark_outliers_removed_samples_total[$__range]))",
+          "instant": true,
+          "legendFormat": "outliers"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Host jitter (worst)",
+      "description": "nbenchmark.jitter.metric - MAD / median of the pre-flight probe. Above 0.10 the outlier detector auto-switches from IQR to MAD.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 3,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "graphMode": "none",
+        "colorMode": "value",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(max_over_time(nbenchmark_jitter_metric_ratio[$__range]))",
+          "instant": true,
+          "legendFormat": "jitter"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Runs - click a trace to open the flame graph",
+      "description": "Each row is one run. The trace holds the whole tree: benchmark.suite in the harness, nbworker per measuring process, then benchmark.run and the four phase spans under it.",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "x": 0, "y": 4, "w": 9, "h": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{ name = \"benchmark.suite\" }",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true }
+    },
+    {
+      "id": 6,
+      "type": "bargauge",
+      "title": "Per-op duration by benchmark (measured samples)",
+      "description": "p50, p95 and p99 of nbenchmark.sample.duration over the whole run, warmup and calibration excluded. Aggregated across every measuring process, so an isolated run's five launches are pooled.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 9, "y": 4, "w": 15, "h": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "decimals": 1,
+          "color": { "mode": "continuous-GrYlRd" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "minVizWidth": 8,
+        "minVizHeight": 16,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.50, sum by (benchmark, le) (last_over_time(nbenchmark_sample_duration_nanoseconds_per_op_bucket{phase=\"measurement\"}[$__range])))",
+          "instant": true,
+          "legendFormat": "{{benchmark}} p50"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (benchmark, le) (last_over_time(nbenchmark_sample_duration_nanoseconds_per_op_bucket{phase=\"measurement\"}[$__range])))",
+          "instant": true,
+          "legendFormat": "{{benchmark}} p95"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum by (benchmark, le) (last_over_time(nbenchmark_sample_duration_nanoseconds_per_op_bucket{phase=\"measurement\"}[$__range])))",
+          "instant": true,
+          "legendFormat": "{{benchmark}} p99"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "title": "Samples by phase",
+      "description": "Where the loop spent its samples. Warmup usually dominates: it is held open by the 500 ms time floor and the JIT-quiescence gate, while measurement stops as soon as the CI target is met.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 14, "w": 8, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "valueMode": "text",
+        "showUnfilled": true,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (phase) (last_over_time(nbenchmark_sample_duration_nanoseconds_per_op_count[$__range]))",
+          "instant": true,
+          "legendFormat": "{{phase}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Allocation per op (p95)",
+      "description": "nbenchmark.alloc.bytes_per_op. Only ConcatStrings allocates; the others are flat zero, which is the point.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 8, "y": 14, "w": 8, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 0,
+          "color": { "mode": "continuous-BlPu" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (benchmark, le) (last_over_time(nbenchmark_alloc_bytes_per_op_B_per_op_bucket[$__range])))",
+          "instant": true,
+          "legendFormat": "{{benchmark}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "bargauge",
+      "title": "GC collections during measurement",
+      "description": "nbenchmark.gc.gen0/1/2, by benchmark. A collection landing inside a timed batch is one source of the tail the outlier detector trims.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 16, "y": 14, "w": 8, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "continuous-YlRd" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (benchmark) (last_over_time(nbenchmark_gc_gen0_collections_total[$__range]))",
+          "instant": true,
+          "legendFormat": "{{benchmark}} gen0"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (benchmark) (last_over_time(nbenchmark_gc_gen1_collections_total[$__range]))",
+          "instant": true,
+          "legendFormat": "{{benchmark}} gen1"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (benchmark) (last_over_time(nbenchmark_gc_gen2_collections_total[$__range]))",
+          "instant": true,
+          "legendFormat": "{{benchmark}} gen2"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Convergence - CI half-width vs target",
+      "description": "The live gauge from whichever process is measuring. It falls toward the dashed ±2.5% target and the measurement phase stops at the first crossing, subject to the time floor and the drift gate. In an isolated run each segment is one worker.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.025 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max by (job) (nbenchmark_ci_relative_half_width_ratio)",
+          "legendFormat": "relative half-width"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Running mean per op",
+      "description": "nbenchmark.sample.mean_per_op for the benchmark currently measuring. Steps between benchmarks; a step *within* one is what the drift gate exists to catch.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "scaleDistribution": { "type": "log", "log": 10 }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max by (job) (nbenchmark_sample_mean_per_op_nanoseconds_per_op)",
+          "legendFormat": "mean per op"
+        }
+      ]
+    }
+  ]
+}
