@@ -119,7 +119,7 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 | Categories | Tags benchmarks and includes or excludes groups from a run. | [→](./docs/features/categories.md) |
 | Multi-runtime | Runs the same benchmarks on net8, net9, and net10 side-by-side. | [→](./docs/features/multi-runtime.md) |
 | Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [→](./docs/features/multiple-launches.md) |
-| Environment control | Pins CPU affinity and process priority to cut noise at the source. | [→](./docs/features/environment-control.md) |
+| Environment control | Pins CPU affinity and process priority - process and measuring thread alike - to cut noise at the source. | [→](./docs/features/environment-control.md) |
 | Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [→](./docs/test-integration/index.md) |
 | CI regression gate | Fails the run when a benchmark regresses past a percentage. | [→](./docs/reference/cli.md) |
 | Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [→](./docs/statistics/diagnostics.md) |

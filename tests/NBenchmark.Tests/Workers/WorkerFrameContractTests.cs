@@ -268,7 +268,7 @@ public sealed class WorkerFrameContractTests
                 AllocP95 = 24,
                 AllocMax = 24,
                 RuntimeProfileName = "steady-state",
-                RuntimeKnobs = "tiered=off pgo=off r2r=off",
+                RuntimeKnobs = "tiered=off pgo=off r2r=off concurrentGc=off",
             };
         }
 

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Versioning;
+using NBenchmark.Interop;
 
 namespace NBenchmark.Engine;
 
@@ -139,25 +140,37 @@ public static class EnvironmentControl
         }
 
         if (options.DedicatedHostGuidance)
-            EmitDedicatedHostGuidance(affinityApplied, priorityApplied);
+            EmitDedicatedHostGuidance(affinityApplied, priorityApplied, options.ThreadControl);
 
         return new RestoreScope(process, priorAffinity, priorPriority, affinityApplied, priorityApplied);
     }
 
     /// <summary>
     ///     Assesses the current host for benchmark suitability. Returns a
-    ///     <see cref="HostAssessment" /> with the core count, macOS flag, and a
-    ///     <see cref="HostAssessment.IsSharedRunner" /> flag that is <c>true</c> when
-    ///     the host looks like a shared or unsuitable benchmark environment (fewer than
-    ///     4 logical CPUs, or macOS with its unobservable frequency scaling).
+    ///     <see cref="HostAssessment" /> with the core count, the macOS flag, the
+    ///     performance/efficiency core split where the platform reports one, and a
+    ///     <see cref="HostAssessment.IsSharedRunner" /> flag that is <c>true</c> when the host
+    ///     looks like a shared or unsuitable benchmark environment.
     /// </summary>
+    /// <remarks>
+    ///     <b>macOS is no longer a shared runner by itself.</b> It used to be, on the reasoning
+    ///     that frequency scaling and thermal state are unobservable there - both still true, and
+    ///     both equally true of a Windows laptop, which was never labelled this way. Being a
+    ///     shared runner relaxes every threshold gate, so the label was quietly excusing a whole
+    ///     platform from the assertions the library exists to make. It is now what it says:
+    ///     too few logical CPUs to measure on. The macOS cautions survive as
+    ///     <see cref="EmitDedicatedHostGuidance" /> advice, which is the rung they belonged on,
+    ///     and the engine now also acts where it can - see <see cref="ThreadEnvironmentControl" />
+    ///     for the quality-of-service elevation and for the limit Darwin places on it.
+    /// </remarks>
     public static HostAssessment AssessHost()
     {
         var coreCount = Environment.ProcessorCount;
         var isMac = OperatingSystem.IsMacOS();
-        var isShared = coreCount < 4 || isMac;
+        var isShared = coreCount < 4;
+        var (performanceCores, efficiencyCores) = (CoreTopology.PerformanceCoreCount, CoreTopology.EfficiencyCoreCount);
 
-        return new HostAssessment(coreCount, isMac, isShared);
+        return new HostAssessment(coreCount, isMac, isShared, performanceCores, efficiencyCores);
     }
 
     /// <summary>
@@ -165,7 +178,10 @@ public static class EnvironmentControl
     ///     benchmark environment. Called after the apply attempt so the message can note
     ///     whether affinity/priority were actually applied.
     /// </summary>
-    private static void EmitDedicatedHostGuidance(bool affinityApplied, bool priorityApplied)
+    private static void EmitDedicatedHostGuidance(
+        bool affinityApplied,
+        bool priorityApplied,
+        bool threadControlEnabled)
     {
         var assessment = AssessHost();
         var warnings = new List<string>();
@@ -180,10 +196,37 @@ public static class EnvironmentControl
 
         if (assessment.IsMacOS)
         {
-            warnings.Add(
-                "On macOS, frequency scaling and thermal throttling are not directly observable. "
-                + "Run on wall power with minimal background load, and prefer a dedicated Linux/Windows "
-                + "host for CI regression gates.");
+            // The core split is the actionable half of the macOS story, so it leads when the host
+            // reports one. What used to stand here instead - "prefer a dedicated Linux/Windows
+            // host" - was advice to stop using the machine the user is on, offered in place of
+            // the control that fixes the problem.
+            if (assessment.HasCoreSplit && threadControlEnabled)
+            {
+                warnings.Add(
+                    $"Apple Silicon detected ({assessment.PerformanceCoreCount} performance cores, "
+                    + $"{assessment.EfficiencyCoreCount} efficiency cores). The measurement thread is raised "
+                    + "to user-interactive quality of service wherever macOS permits it, which asks the "
+                    + "scheduler for a performance core; the runtime's own threads cannot be raised, and "
+                    + "NBenchmark says so when that happens rather than assuming it worked. Frequency "
+                    + "scaling and thermal throttling remain unobservable from managed code, so run on "
+                    + "wall power with minimal background load.");
+            }
+            else if (assessment.HasCoreSplit)
+            {
+                warnings.Add(
+                    $"Apple Silicon detected ({assessment.PerformanceCoreCount} performance cores, "
+                    + $"{assessment.EfficiencyCoreCount} efficiency cores) with thread control disabled "
+                    + "(--no-thread-control). The measurement thread can be scheduled onto an efficiency "
+                    + "core, where the same code runs several times slower - which presents as a bimodal "
+                    + "distribution rather than as an error. Re-enable thread control unless you are "
+                    + "deliberately measuring default scheduling.");
+            }
+            else
+            {
+                warnings.Add(
+                    "On macOS, frequency scaling and thermal throttling are not directly observable. "
+                    + "Run on wall power with minimal background load.");
+            }
         }
 
         if (!affinityApplied && assessment.CoreCount >= 4 && !assessment.IsMacOS)

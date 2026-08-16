@@ -53,7 +53,7 @@ public sealed class FrameChannelTests
                 ProtocolVersion = 11,
                 WorkerProcessId = 31337,
                 RuntimeProfileName = "steady-state",
-                RuntimeKnobs = "tiered=off pgo=off r2r=off",
+                RuntimeKnobs = "tiered=off pgo=off r2r=off concurrentGc=off",
                 RuntimeProfileApplied = true,
                 TargetFramework = "net10.0",
                 EngineVersion = "1.2.3-preview.4",
@@ -70,7 +70,7 @@ public sealed class FrameChannelTests
         Assert.Equal(11, received.ProtocolVersion);
         Assert.Equal(31337, received.WorkerProcessId);
         Assert.Equal("steady-state", received.RuntimeProfileName);
-        Assert.Equal("tiered=off pgo=off r2r=off", received.RuntimeKnobs);
+        Assert.Equal("tiered=off pgo=off r2r=off concurrentGc=off", received.RuntimeKnobs);
         Assert.True(received.RuntimeProfileApplied);
         Assert.Equal("net10.0", received.TargetFramework);
         Assert.Equal("1.2.3-preview.4", received.EngineVersion);
@@ -483,7 +483,7 @@ public sealed class FrameChannelTests
                     AllocP95 = 24,
                     AllocMax = 24,
                     RuntimeProfileName = "steady-state",
-                    RuntimeKnobs = "tiered=off pgo=off r2r=off",
+                    RuntimeKnobs = "tiered=off pgo=off r2r=off concurrentGc=off",
                 },
                 RawSamples = samples,
             }),

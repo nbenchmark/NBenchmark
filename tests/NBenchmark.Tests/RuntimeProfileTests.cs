@@ -101,7 +101,7 @@ public class RuntimeProfileTests
     [Fact]
     public void Describe_RendersKnobsCompactly()
     {
-        Assert.Equal("tiered=off pgo=off r2r=off", RuntimeProfile.SteadyState.Describe());
+        Assert.Equal("tiered=off pgo=off r2r=off concurrentGc=off", RuntimeProfile.SteadyState.Describe());
         Assert.Equal("tiered=on pgo=on r2r=on", RuntimeProfile.Production.Describe());
         Assert.Contains("gc=server", RuntimeProfile.ServerGc.Describe());
     }
@@ -297,7 +297,7 @@ public class RuntimeProfileTests
     ///     worker reading its own environment to stamp the result.
     /// </summary>
     [Theory]
-    [InlineData("steady-state", "tiered=off pgo=off r2r=off")]
+    [InlineData("steady-state", "tiered=off pgo=off r2r=off concurrentGc=off")]
     [InlineData("production", "tiered=on pgo=on r2r=on")]
     public async Task RealWorker_ReportsTheProfileItWasLaunchedUnder(string profileName, string expectedKnobs)
     {

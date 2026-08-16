@@ -508,6 +508,24 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
+    ///     Turns the thread-level OS controls on or off. They are <b>on by default</b>: the
+    ///     measuring thread takes an affinity matching <see cref="WithHardwareAffinity" />, a
+    ///     priority matching <see cref="WithProcessPriority" />, and - on macOS - the
+    ///     user-interactive quality of service that keeps it on an Apple Silicon performance
+    ///     core. Propagated to every worker, each of which applies it to its own measuring
+    ///     thread. Pass <c>false</c> to measure under the host's default thread scheduling.
+    /// </summary>
+    public BenchmarkHarness WithThreadControl(bool enabled = true)
+    {
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { ThreadControl = enabled },
+        };
+
+        return this;
+    }
+
+    /// <summary>
     ///     Suppresses the always-on Debug-build / debugger-attached guidance warning for
     ///     this harness run. Use when measuring Debug behavior is intentional. Also
     ///     propagated to isolated child processes.
@@ -933,6 +951,10 @@ public sealed class BenchmarkHarness
         // dispose. A worker applies the same settings to itself from the options it was sent; this
         // covers in-process benchmarks and the coordinator's own thread.
         using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
+
+        // Thread-scoped sibling, covering the same in-process rows. A worker opens its own on the
+        // thread its measurement loop runs on, since a thread scope cannot cross a process.
+        using var _thread = ThreadEnvironmentControl.Apply(suiteOptions.Environment);
 
         var allNames = filtered
             .SelectMany(s => s.Benchmarks.Select(b => $"{s.Type.Name}.{b.DisplayName}"))

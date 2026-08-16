@@ -103,7 +103,7 @@ All harness CLI flags pass through. See [Global tool](./usage-modes/global-tool.
 | Categories | Tags benchmarks and includes or excludes groups from a run. | [→](./features/categories.md) |
 | Multi-runtime | Runs the same benchmarks on net8, net9, and net10 side-by-side. | [→](./features/multi-runtime.md) |
 | Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [→](./features/multiple-launches.md) |
-| Environment control | Pins CPU affinity and process priority to cut noise at the source. | [→](./features/environment-control.md) |
+| Environment control | Pins CPU affinity and process priority - process and measuring thread alike - to cut noise at the source. | [→](./features/environment-control.md) |
 | Host drift canary | Times fixed control work between benchmarks, so a machine that drifted mid-run says so. On by default. | [→](./statistics/measurement.md#the-host-drift-canary) |
 | Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [→](./test-integration/index.md) |
 | CI regression gate | Fails the run when a benchmark regresses past a percentage. | [→](./reference/cli.md) |

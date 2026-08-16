@@ -46,7 +46,7 @@ Check `autoTune.warmupTimeFloorMet` in the JSON (or `warmup cut short` on the co
 
 Only replication across processes can measure it. Run `--launch-count 5` (or more) and read `launchStatistics`: `betweenLaunchDispersion` is the run-to-run spread, and `processVarianceRatio` is how far the single-process margin was understating it. On a nanosecond-scale body a ratio of 30-60 is ordinary. See [Reading the reproducibility warning](./features/multiple-launches.md#reading-the-reproducibility-warning).
 
-To actually *reduce* that spread you have to work outside the statistics - [environment controls](./features/environment-control.md) for CPU affinity and process priority, or a quieter, less thermally constrained host. Note that CPU affinity is unavailable on macOS, so an Apple Silicon laptop with performance and efficiency cores will show more run-to-run spread than a pinned Linux box, and there is no in-process remedy for it.
+To actually *reduce* that spread you have to work outside the statistics - [environment controls](./features/environment-control.md) for CPU affinity and process priority, or a quieter, less thermally constrained host. CPU affinity is unavailable on macOS at either scope, so an Apple Silicon laptop with performance and efficiency cores will still show more run-to-run spread than a pinned Linux box; NBenchmark asks the scheduler for a performance core where macOS permits it, and [says so when it cannot](./features/environment-control.md#macos-and-apple-silicon).
 
 ### Tight Error next to a `maxCeiling` stop, or next to a Max hundreds of times the median
 
@@ -231,6 +231,17 @@ See [Configuration: ForceGcBetweenBenchmarks](./reference/configuration.md#force
 | `RemoveTop5Percent` | When you want a fixed quota - always removes the slowest 5% of iterations. |
 | `RemoveTopAndBottom5Percent` | When very fast outliers (e.g. cache hits after warmup) also skew results. |
 | `None` | When every sample matters (latency-tail analysis). |
+
+### The run says my measurement thread's quality of service could not be raised
+
+> [!CAUTION] Quick fix
+> Nothing to fix - this is a note, not a failure. The run is valid. To silence it, `--no-thread-control`.
+
+On Apple Silicon the quality-of-service class is what asks the scheduler for a performance core rather than an efficiency core several times slower. macOS refuses the change on any thread that carries an explicit scheduling priority, and the .NET runtime gives one to every thread it creates - so the elevation lands on the process main thread (Single mode, an in-process suite) and is refused for a measurement running on the thread pool, which includes the default isolated-worker path.
+
+A refused thread is left at an *unspecified* class, which is eligible for a performance core rather than banned from one - it is not the background class. The residual risk is that the scheduler uses an efficiency core under load, which presents as a [bimodal distribution](./statistics/outliers.md#bimodal-distribution-warning) rather than as a uniformly slower number, so watch for that warning and for a [host drift](./statistics/measurement.md#the-host-drift-canary) warning on the row.
+
+See [macOS and Apple Silicon](./features/environment-control.md#macos-and-apple-silicon) for the mechanism.
 
 ## Still stuck?
 

@@ -18,7 +18,8 @@ equivalent, explains why the settings work together, and links to the property d
 
 | Setting | Why |
 | --- | --- |
-| `Environment.ProcessPriority = High` | Reduces preemption by unrelated OS work. The benchmark thread is less likely to be paused mid-sample. |
+| `Environment.ProcessPriority = High` | Reduces preemption by unrelated OS work. The benchmark thread is less likely to be paused mid-sample - on Windows the measuring thread's own priority is raised to match. |
+| Thread control (on by default) | The measuring thread takes the affinity you pinned rather than only the process taking it, so the runtime's own threads stop competing for the same core. Leave it on. |
 | `OutlierMode.MedianAbsoluteDeviation` | More robust than the default IQR fence when a heavy tail of preempted samples distorts the quartile-based fence. MAD has a 50% breakdown point. |
 | `.WithLaunchCount(3)` | Runs the benchmark 3 times as independent launches, one worker process each. The reported number is the average across them and the interval is the spread between them, so it describes reproducibility rather than one process's precision. |
 | `AutoTune.CapBehavior = Error` | If the wall-clock cap is hit before the CI target is met, the benchmark errors instead of silently reporting a wide interval. |
@@ -199,6 +200,7 @@ dotnet run -- --diagnostics all --outlier mad --detail advanced --launch-count 5
 **What to look for:**
 
 - High jitter metric (> 0.10) in the auto-tune diagnostic: the host is noisy. Consider [environment controls](../features/environment-control.md).
+- On an Apple Silicon Mac, a note that the quality-of-service class could not be raised: the measurement is running on a thread macOS will not let NBenchmark place, so the scheduler may put it on an efficiency core several times slower. See [macOS and Apple Silicon](../features/environment-control.md#macos-and-apple-silicon).
 - GC collection counts that correlate with slow samples: GC pressure is affecting your timings. Try `--profile independent`.
 - A bimodal-distribution warning: investigate the cause (lock contention, cache misses, GC pauses) rather than silencing it.
 - A host-drift warning on a row: the machine moved further between that row and the baseline than the difference between them. See [The host drift canary](../statistics/measurement.md#the-host-drift-canary).

@@ -1143,6 +1143,23 @@ public class BenchmarkSuite(string name)
     }
 
     /// <summary>
+    ///     Turns the thread-level OS controls on or off. They are <b>on by default</b>: the
+    ///     measuring thread takes an affinity matching <see cref="WithHardwareAffinity" />, a
+    ///     priority matching <see cref="WithProcessPriority" />, and - on macOS - the
+    ///     user-interactive quality of service that keeps it on an Apple Silicon performance
+    ///     core. Pass <c>false</c> to measure under the host's default thread scheduling.
+    /// </summary>
+    public BenchmarkSuite WithThreadControl(bool enabled = true)
+    {
+        _options = _options with
+        {
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { ThreadControl = enabled },
+        };
+
+        return this;
+    }
+
+    /// <summary>
     ///     Suppresses the always-on Debug-build / debugger-attached guidance warning for
     ///     this suite. Use when measuring Debug behavior is intentional.
     /// </summary>
@@ -1894,6 +1911,10 @@ public class BenchmarkSuite(string name)
         // itself - see MeasureInWorkerAsync.
         using var _ = EnvironmentControl.Apply(_options.Environment);
 
+        // The thread-scoped sibling: it is this thread that runs the bodies in-process, and it is
+        // the only scope that can place the thread on an Apple Silicon performance core.
+        using var _thread = ThreadEnvironmentControl.Apply(_options.Environment);
+
         _suiteSetup?.Invoke();
 
         var envelopes = benchmarks
@@ -1974,6 +1995,7 @@ public class BenchmarkSuite(string name)
         // the only moment it could have been. Affinity and priority are settable at any time and
         // belong here.
         using var _ = EnvironmentControl.Apply(_options.Environment);
+        using var _thread = ThreadEnvironmentControl.Apply(_options.Environment);
 
         _suiteSetup?.Invoke();
 

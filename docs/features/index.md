@@ -38,7 +38,7 @@ Use `Microsoft.Extensions.DependencyInjection` (or any container that exposes an
 
 ## [Environment control](./environment-control.md)
 
-Pin benchmarks to CPU cores, raise process priority, and detect noisy hosts to reduce measurement noise at its source. Opt-in controls that complement the statistical noise handling.
+Pin benchmarks to CPU cores, raise process priority, place the measuring thread, and detect noisy hosts to reduce measurement noise at its source. Thread control is on by default; the rest are opt-in.
 
 ## [State isolation](./state-isolation.md)
 

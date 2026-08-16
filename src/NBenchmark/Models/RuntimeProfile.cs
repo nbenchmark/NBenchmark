@@ -49,11 +49,23 @@ public sealed record RuntimeProfile
     /// <summary>
     ///     Fully-optimized steady-state throughput, and the default. Disables tiered compilation
     ///     and ReadyToRun so every method is jitted at full optimization on first call, which
-    ///     removes the dominant source of measurement error for short bodies.
+    ///     removes the dominant source of measurement error for short bodies. Also disables the
+    ///     background GC, so the collector cannot run a thread against the benchmark's.
     ///     <para>
     ///         Honest limitations: it forbids on-stack replacement, changes startup behaviour, and
     ///         is <b>the wrong choice for measuring cold-start or first-call cost</b>. It also
     ///         costs wall clock - everything is compiled eagerly at full optimization.
+    ///     </para>
+    ///     <para>
+    ///         <b>On the background GC.</b> Leaving it on gives an allocating benchmark a second
+    ///         thread competing for the same core - continuously, and at points the sample stream
+    ///         cannot predict. Turning it off makes a Gen2 collection blocking instead: rarer, and
+    ///         landing as a discrete spike the outlier machinery already handles well, rather than
+    ///         as a diffuse widening of every sample. This does change what is measured - an
+    ///         allocation-heavy body under a concurrent-GC host is a different program - so
+    ///         <see cref="Production" /> deliberately leaves the knob unset, and a benchmark whose
+    ///         subject <i>is</i> collector behaviour should measure under that profile or under a
+    ///         custom one.
     ///     </para>
     /// </summary>
     public static readonly RuntimeProfile SteadyState = new()
@@ -62,6 +74,7 @@ public sealed record RuntimeProfile
         TieredCompilation = false,
         TieredPgo = false,
         ReadyToRun = false,
+        ConcurrentGc = false,
     };
 
     /// <summary>

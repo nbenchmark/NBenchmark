@@ -519,10 +519,12 @@ public record MeasurementOptions
     public bool SuppressPerClassIndependenceWarning { get; init; }
 
     /// <summary>
-    ///     Opt-in hardware/OS controls applied for the duration of a run: CPU affinity,
-    ///     process priority, and dedicated-host guidance. <c>null</c> (the default) does
-    ///     nothing - the benchmark runs with whatever affinity and priority the host
-    ///     started it with. Set via <see cref="BenchmarkSuite.WithHardwareAffinity" /> /
+    ///     Hardware/OS controls applied for the duration of a run: CPU affinity, process
+    ///     priority, dedicated-host guidance, and thread-level control. <c>null</c> (the default)
+    ///     leaves the process with whatever affinity and priority the host started it with, but
+    ///     is <b>not</b> inert: <see cref="EnvironmentOptions.ThreadControl" /> defaults to on, so
+    ///     the measuring thread is still raised to user-interactive quality of service on macOS.
+    ///     Set via <see cref="BenchmarkSuite.WithHardwareAffinity" /> /
     ///     <see cref="BenchmarkHarness.WithHardwareAffinity" />, the <c>--cpu-affinity</c> /
     ///     <c>--priority</c> / <c>--dedicated-host-guidance</c> CLI flags, or directly on
     ///     the options record.

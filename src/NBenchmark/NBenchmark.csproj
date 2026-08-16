@@ -7,6 +7,14 @@
     <Description>NBenchmark is the easiest way to measure the speed of your .NET code. With zero setup and a focus on simplicity, you can go from installation to your first accurate benchmark in seconds-perfect for quick checks and full performance suites alike.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>benchmark;performance;measurement;microbenchmark</PackageTags>
+
+    <!--
+      Required by [LibraryImport] in Interop/: the source generator emits pointer-based marshalling
+      stubs. It is the AOT- and trim-safe way to declare a native call, so the alternative is not
+      "no unsafe code" but a reflective [DllImport] that warns under both. Nothing outside
+      Interop/ uses it.
+    -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

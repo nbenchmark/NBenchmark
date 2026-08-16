@@ -66,7 +66,7 @@ public sealed class RealWorkerTests
     ///     this could have been done.
     /// </summary>
     [Theory]
-    [InlineData("steady-state", "tiered=off pgo=off r2r=off")]
+    [InlineData("steady-state", "tiered=off pgo=off r2r=off concurrentGc=off")]
     [InlineData("production", "tiered=on pgo=on r2r=on")]
     public async Task Worker_ReportsTheRuntimeProfileItWasLaunchedUnder(string profileName, string expectedKnobs)
     {
@@ -136,7 +136,7 @@ public sealed class RealWorkerTests
             // Stamped by the worker from its own environment, so it describes the process that
             // actually did the measuring.
             Assert.Equal("steady-state", result.RuntimeProfileName);
-            Assert.Equal("tiered=off pgo=off r2r=off", result.RuntimeKnobs);
+            Assert.Equal("tiered=off pgo=off r2r=off concurrentGc=off", result.RuntimeKnobs);
         }
 
         // The fixture's two bodies differ by an order of magnitude of spin count, so a worker that

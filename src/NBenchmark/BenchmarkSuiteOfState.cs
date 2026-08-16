@@ -319,6 +319,10 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     public new BenchmarkSuite<TState> WithSuppressBuildConfigurationWarning(bool suppress = true)
         => Chain(() => base.WithSuppressBuildConfigurationWarning(suppress));
 
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithThreadControl(bool enabled = true)
+        => Chain(() => base.WithThreadControl(enabled));
+
 
     private BenchmarkSuite<TState> Chain(Func<BenchmarkSuite> configure)
     {

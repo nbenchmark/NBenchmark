@@ -186,7 +186,40 @@ public static class ReportFormat
     ///                 </para>
     ///             </description>
     ///         </item>
+    ///         <item>
+    ///             <term>6</term>
+    ///             <description>
+    ///                 Thread-level environment control, and the background GC off under the
+    ///                 default runtime profile.
+    ///                 <list type="bullet">
+    ///                     <item>
+    ///                         <description>
+    ///                             <c>RuntimeProfile.SteadyState</c> - the default, and what almost
+    ///                             every stored number was measured under - now sets
+    ///                             <c>DOTNET_gcConcurrent=0</c>. The collector no longer runs a
+    ///                             background thread against the benchmark's, so an allocating body
+    ///                             generally reports a tighter distribution, and its Gen2 pauses
+    ///                             arrive as rare blocking spikes rather than as continuous
+    ///                             competition. This is a change of measurement regime for any body
+    ///                             that allocates; a non-allocating one is unaffected.
+    ///                         </description>
+    ///                     </item>
+    ///                     <item>
+    ///                         <description>
+    ///                             The measuring thread is placed as well as the process:
+    ///                             <c>--cpu-affinity</c> now pins the thread and not only the
+    ///                             process, and on macOS the thread is raised to
+    ///                             <c>QOS_CLASS_USER_INTERACTIVE</c> by default. On Apple Silicon
+    ///                             that is the difference between measuring on a performance core
+    ///                             and measuring on an efficiency core several times slower, so
+    ///                             numbers stored from a Mac before this epoch may have been drawn
+    ///                             from either.
+    ///                         </description>
+    ///                     </item>
+    ///                 </list>
+    ///             </description>
+    ///         </item>
     ///     </list>
     /// </remarks>
-    public const int MeasurementEpoch = 5;
+    public const int MeasurementEpoch = 6;
 }

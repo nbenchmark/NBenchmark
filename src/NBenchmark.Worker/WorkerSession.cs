@@ -308,6 +308,11 @@ internal sealed class WorkerSession(FrameChannel channel)
         // the difference.
         IDisposable? environment = null;
 
+        // The thread-scoped half of the same idea, and held outside the try for the same reason -
+        // the calibration standard has to be measured under the same thread placement as the
+        // benchmarks it is divided into.
+        IDisposable? threadEnvironment = null;
+
         try
         {
             // One load context for the whole group. Not an optimisation: a second context loads a
@@ -341,6 +346,15 @@ internal sealed class WorkerSession(FrameChannel channel)
             // block - that is the only moment it could have been. Affinity and priority, by
             // contrast, are settable at any time and belong here.
             environment = EnvironmentControl.Apply(options.Environment);
+
+            // Applied to *this* thread, which is the one the measurement loop runs on: the group's
+            // work is awaited from here, and the loop itself is straight-line synchronous code. A
+            // process affinity does not stop the runtime's own threads from sharing the pinned
+            // core, and on macOS the process call does not exist - the quality-of-service class
+            // that decides performance- versus efficiency-core placement is settable only on the
+            // calling thread, which is what makes this a sibling scope rather than part of the one
+            // above.
+            threadEnvironment = ThreadEnvironmentControl.Apply(options.Environment);
 
             // The failure callback is a second, independent route to the same conclusion: the pump sees
             // the inbound half break, this sees the outbound half. Either one means there is no
@@ -463,6 +477,9 @@ internal sealed class WorkerSession(FrameChannel channel)
             // Last, after the calibration it has to cover. Restoring affinity and priority is the end
             // of the group in the most literal sense, and doing it any earlier is what left the
             // standard measured under a different process configuration than the benchmark it judges.
+            // The thread scope goes first, innermost-last-opened, and restores nothing if the finally
+            // arrived on a different thread than the one it pinned.
+            threadEnvironment?.Dispose();
             environment?.Dispose();
 
             _queue = null;

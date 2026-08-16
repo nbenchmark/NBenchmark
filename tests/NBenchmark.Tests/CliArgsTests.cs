@@ -1127,6 +1127,70 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_NoThreadControl_Sets_NoThreadControl_Flag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--no-thread-control"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.NoThreadControl);
+    }
+
+    [Fact]
+    public void ParseCore_Leaves_NoThreadControl_Unset_By_Default()
+    {
+        var (result, errors) = CliArgs.ParseCore([]);
+
+        Assert.Empty(errors);
+        Assert.False(result.NoThreadControl);
+    }
+
+    /// <summary>
+    ///     The flag has to be able to create an <c>EnvironmentOptions</c> where none existed:
+    ///     <c>ThreadControl</c> is the one member of that record that does something when every
+    ///     other member is unset, and the default options carry a null <c>Environment</c>.
+    /// </summary>
+    [Fact]
+    public void MeasurementOverrides_NoThreadControl_Disables_Thread_Control_From_Null_Environment()
+    {
+        var (args, _) = CliArgs.ParseCore(["--no-thread-control"]);
+
+        var applied = MeasurementOverrides.FromCliArgs(args).Apply(MeasurementOptions.Default);
+
+        Assert.NotNull(applied.Environment);
+        Assert.False(applied.Environment!.ThreadControl);
+    }
+
+    [Fact]
+    public void MeasurementOverrides_NoThreadControl_Preserves_The_Other_Environment_Settings()
+    {
+        var (args, _) = CliArgs.ParseCore(["--no-thread-control", "--priority", "high"]);
+
+        var applied = MeasurementOverrides.FromCliArgs(args).Apply(MeasurementOptions.Default);
+
+        Assert.False(applied.Environment!.ThreadControl);
+        Assert.Equal(ProcessPriorityClass.High, applied.Environment.ProcessPriority);
+    }
+
+    /// <summary>
+    ///     One-way, like <c>--no-drift-canary</c>: the flag's absence must not switch thread
+    ///     control back on over a programmatic <c>WithThreadControl(false)</c>.
+    /// </summary>
+    [Fact]
+    public void MeasurementOverrides_Without_The_Flag_Leaves_Thread_Control_Disabled()
+    {
+        var (args, _) = CliArgs.ParseCore([]);
+
+        var configured = MeasurementOptions.Default with
+        {
+            Environment = new EnvironmentOptions { ThreadControl = false },
+        };
+
+        var applied = MeasurementOverrides.FromCliArgs(args).Apply(configured);
+
+        Assert.False(applied.Environment!.ThreadControl);
+    }
+
+    [Fact]
     public void ParseCore_NoSamples_Sets_NoSamples_Flag()
     {
         var (result, errors) = CliArgs.ParseCore(["--no-samples"]);

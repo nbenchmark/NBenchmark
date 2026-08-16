@@ -192,6 +192,12 @@ internal sealed record CliArgs
     public bool NoDriftCanary { get; init; }
 
     /// <summary>
+    ///     When true, disables the thread-level OS controls - the measuring thread keeps the
+    ///     host's default affinity, priority and (on macOS) quality-of-service class.
+    /// </summary>
+    public bool NoThreadControl { get; init; }
+
+    /// <summary>
     ///     When true, omits raw per-sample arrays from reporter output (JSON).
     ///     Samples are still collected for significance and the Console histogram;
     ///     this only controls whether they are serialized to file.
@@ -326,6 +332,7 @@ internal sealed record CliArgs
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
         var noDriftCanary = false;
+        var noThreadControl = false;
         var noSamples = false;
         var emitRaw = false;
         var streamSamples = false;
@@ -704,6 +711,9 @@ internal sealed record CliArgs
                 case "--no-drift-canary":
                     noDriftCanary = true;
                     break;
+                case "--no-thread-control":
+                    noThreadControl = true;
+                    break;
                 case "--no-samples":
                     noSamples = true;
                     break;
@@ -846,6 +856,7 @@ internal sealed record CliArgs
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
             NoDriftCanary = noDriftCanary,
+            NoThreadControl = noThreadControl,
             NoSamples = noSamples,
             EmitRaw = emitRaw,
             StreamSamples = streamSamples,
@@ -1012,7 +1023,7 @@ internal sealed record CliArgs
         "--min-practical-effect", "--min-relative-shift", "--min-samples", "--min-warmup", "--min-warmup-time",
         "--no-allocations", "--no-drift-canary", "--no-gc-between-benchmarks", "--no-histogram",
         "--no-jit-quiescence",
-        "--no-samples", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint", "--outlier",
+        "--no-samples", "--no-thread-control", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint", "--outlier",
         "--output", "--percentiles", "--priority", "--profile", "--reporter", "--runtime-profile",
         "--runtimes", "--seed", "--stream-samples", "--strict-isolation", "--tail-basis",
         "--threshold-pct", "--verify-isolation", "--warmup", "--warmup-budget-fraction",
@@ -1060,6 +1071,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");
         Console.WriteLine("  --no-drift-canary       Disable the host drift canary (the control workload measured between benchmarks)");
+        Console.WriteLine("  --no-thread-control     Disable thread-level affinity, priority and (on macOS) performance-core placement");
         Console.WriteLine("  --no-samples            Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
         Console.WriteLine($"  --emit-raw              Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset");
         Console.WriteLine("  --stream-samples        Forward the live per-sample observer stream out of an isolated worker (needs --observer; costs fidelity)");

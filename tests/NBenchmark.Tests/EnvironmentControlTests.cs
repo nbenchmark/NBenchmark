@@ -184,15 +184,84 @@ public class EnvironmentControlTests
         Assert.True(assessment.IsSharedRunner);
     }
 
+    /// <summary>
+    ///     macOS used to be labelled a shared runner on sight, which relaxed every threshold gate
+    ///     on it. The label was standing in for one specific, fixable problem - a default-QoS
+    ///     thread being eligible for an efficiency core - and the thread scope now fixes it, so a
+    ///     Mac with enough cores is judged by the same rule as any other host.
+    /// </summary>
     [Fact]
-    public void AssessHost_IsSharedRunner_True_On_MacOS()
+    public void AssessHost_IsSharedRunner_Depends_Only_On_The_Core_Count()
     {
-        if (!OperatingSystem.IsMacOS())
+        var assessment = EnvironmentControl.AssessHost();
+
+        Assert.Equal(Environment.ProcessorCount < 4, assessment.IsSharedRunner);
+    }
+
+    [Fact]
+    public void AssessHost_Reports_The_Core_Split_On_Apple_Silicon()
+    {
+        if (!OperatingSystem.IsMacOS() || !System.Runtime.Intrinsics.Arm.ArmBase.IsSupported)
             return;
 
         var assessment = EnvironmentControl.AssessHost();
 
-        Assert.True(assessment.IsSharedRunner);
+        Assert.True(assessment.HasCoreSplit);
+        Assert.True(assessment.PerformanceCoreCount > 0);
+        Assert.True(assessment.EfficiencyCoreCount > 0);
+        Assert.True(assessment.PerformanceCoreCount + assessment.EfficiencyCoreCount <= assessment.CoreCount);
+    }
+
+    [Fact]
+    public void HostAssessment_HasCoreSplit_Is_False_When_The_Counts_Are_Unknown()
+    {
+        // The three-argument shape is what every test-integration caller uses, and it has to keep
+        // meaning "I know nothing about the topology" rather than "this machine has no cores".
+        var assessment = new HostAssessment(8, false, false);
+
+        Assert.False(assessment.HasCoreSplit);
+        Assert.Equal(0, assessment.PerformanceCoreCount);
+        Assert.Equal(0, assessment.EfficiencyCoreCount);
+    }
+
+    [Fact]
+    public void Apply_DedicatedHostGuidance_Names_The_Core_Split_On_Apple_Silicon()
+    {
+        if (!OperatingSystem.IsMacOS() || !System.Runtime.Intrinsics.Arm.ArmBase.IsSupported)
+            return;
+
+        var assessment = EnvironmentControl.AssessHost();
+
+        var stderr = CaptureStderr(() =>
+        {
+            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { DedicatedHostGuidance = true });
+        });
+
+        Assert.Contains($"{assessment.PerformanceCoreCount} performance cores", stderr);
+        Assert.Contains("user-interactive quality of service", stderr);
+
+        // The advice this replaced. Telling a Mac user to go and use a different operating system
+        // was the guidance the thread scope exists to stop giving.
+        Assert.DoesNotContain("dedicated Linux/Windows", stderr);
+    }
+
+    [Fact]
+    public void Apply_DedicatedHostGuidance_Warns_When_Thread_Control_Is_Off_On_Apple_Silicon()
+    {
+        if (!OperatingSystem.IsMacOS() || !System.Runtime.Intrinsics.Arm.ArmBase.IsSupported)
+            return;
+
+        var stderr = CaptureStderr(() =>
+        {
+            using var _ = EnvironmentControl.Apply(new EnvironmentOptions
+            {
+                DedicatedHostGuidance = true,
+                ThreadControl = false,
+            });
+        });
+
+        Assert.Contains("--no-thread-control", stderr);
+        Assert.Contains("efficiency core", stderr);
     }
 
     [Fact]

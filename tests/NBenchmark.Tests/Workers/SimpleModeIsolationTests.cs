@@ -99,7 +99,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
 
         // Stamped by the measuring process from its own environment, so it describes reality.
         Assert.Equal("steady-state", result.RuntimeProfileName);
-        Assert.Equal("tiered=off pgo=off r2r=off", result.RuntimeKnobs);
+        Assert.Equal("tiered=off pgo=off r2r=off concurrentGc=off", result.RuntimeKnobs);
 
         Assert.True(result.Mean > 0);
         Assert.NotEmpty(result.RawSamples);

@@ -44,7 +44,7 @@ Grouped by what they affect. Every flag is documented in full below.
 | **Statistics** | [`--confidence`](#--confidence-value) · [`--alpha`](#--alpha-value) · [`--outlier`](#--outlier-mode) · [`--tail-basis`](#--tail-basis-basis) · [`--percentiles`](#--percentiles-list) · [`--min-practical-effect`](#--min-practical-effect-0-1) · [`--cross-class`](#--cross-class) |
 | **Output** | [`--reporter`](#--reporter-type) · [`--output`](#--output-directory) · [`--detail`](#--detail-level) · [`--no-histogram`](#--no-histogram) · [`--emit-raw`](#--emit-raw) · [`--no-samples`](#--no-samples) |
 | **Isolation** | [`--in-process`](#--in-process) · [`--strict-isolation`](#--strict-isolation) · [`--verify-isolation`](#--verify-isolation) · [`--runtimes`](#--runtimes-list) |
-| **Environment** | [`--cpu-affinity`](#--cpu-affinity-list) · [`--priority`](#--priority-level) · [`--dedicated-host-guidance`](#--dedicated-host-guidance) |
+| **Environment** | [`--cpu-affinity`](#--cpu-affinity-list) · [`--priority`](#--priority-level) · [`--no-thread-control`](#--no-thread-control) · [`--dedicated-host-guidance`](#--dedicated-host-guidance) |
 | **Diagnostics** | [`--diagnostics`](#--diagnostics-mode) · [`--no-drift-canary`](#--no-drift-canary) · [`--observer`](#--observer-type) · [`--stream-samples`](#--stream-samples) · [`--otlp-endpoint`](#--otlp-endpoint-url) |
 | **Run control** | [`--order`](#--order-mode) · [`--seed`](#--seed-n) · [`--threshold-pct`](#--threshold-pct-n) · `--help` |
 
@@ -689,7 +689,9 @@ dotnet run -- --cpu-affinity 2,3        # pin to cores 2 and 3
 
 Indices must be non-negative and within the host's logical core count (0 to `Environment.ProcessorCount - 1`). Out-of-range or non-numeric values produce a parse error and the run does not proceed.
 
-**Platform support:** processor affinity is applied on Linux and Windows. On macOS the BCL does not expose the `setaffinity` syscall, so the flag is accepted but skipped with a warning - use a Linux or Windows host for affinity-pinned CI gates. See [Environment control](../features/environment-control.md) for the full model.
+The flag pins the process **and** the thread the measurement loop runs on. The second matters because pinning a process does not stop its own runtime threads - finalizer, background GC, tiering JIT - from sharing the pinned core.
+
+**Platform support:** processor affinity is applied on Linux and Windows. On macOS neither the process nor the thread call exists, so the flag is accepted but skipped with a warning - use a Linux or Windows host for affinity-pinned CI gates, and see [macOS and Apple Silicon](../features/environment-control.md#macos-and-apple-silicon) for what is applied there instead.
 
 Programmatic equivalent: `WithHardwareAffinity(2, 3)` (suite/harness) or `new MeasurementOptions { Environment = new EnvironmentOptions { CpuAffinity = [2, 3] } }`.
 
@@ -712,15 +714,31 @@ Request a process priority for the benchmark run, reducing preemption by unrelat
 dotnet run -- --priority high
 ```
 
-`high` is the recommended value for dedicated benchmark hosts. `realtime` can starve the OS and is discouraged. See [Environment control](../features/environment-control.md) for the rationale and the `--dedicated-host-guidance` probe that suggests this flag.
+`high` is the recommended value for dedicated benchmark hosts. `realtime` can starve the OS and is discouraged. On Windows the measuring thread's priority is raised to match; on Linux it is not, because under the default `SCHED_OTHER` policy a thread priority has no effect. See [Environment control](../features/environment-control.md) for the rationale and the `--dedicated-host-guidance` probe that suggests this flag.
 
 Programmatic equivalent: `WithProcessPriority(ProcessPriorityClass.High)` (suite/harness).
 
 ---
 
+### `--no-thread-control`
+
+Disable the thread-level OS controls. They are on by default.
+
+The measuring thread normally takes an affinity matching [`--cpu-affinity`](#--cpu-affinity-list), a priority matching [`--priority`](#--priority-level) on Windows, and - on macOS - the `QOS_CLASS_USER_INTERACTIVE` quality-of-service class that asks the scheduler for an Apple Silicon performance core rather than an efficiency core several times slower.
+
+```bash
+dotnet run -- --no-thread-control
+```
+
+Pass it when the host's default thread scheduling is the thing you want to measure. Everything the flag switches off is a scheduler hint applied outside every timed window, so switching it off changes which hardware the code runs on, never what the timer counts.
+
+Programmatic equivalent: `.WithThreadControl(false)` (suite/harness), or `new MeasurementOptions { Environment = new EnvironmentOptions { ThreadControl = false } }`. See [Environment control](../features/environment-control.md#thread-control-on-by-default), and [macOS and Apple Silicon](../features/environment-control.md#macos-and-apple-silicon) for the limit Darwin places on the quality-of-service call.
+
+---
+
 ### `--dedicated-host-guidance`
 
-Emit a non-fatal pre-run warning when the host looks like a shared or otherwise noisy benchmark environment: a low CPU core count (typical of shared-tenant CI runners), an unraisable process priority, or (on macOS) unobservable frequency scaling and thermal throttling. On a suitable host (>= 4 cores, no priority set) the probe actively suggests `--priority high`. The run still proceeds - this is guidance, not a gate.
+Emit a non-fatal pre-run warning when the host looks like a shared or otherwise noisy benchmark environment: a low CPU core count (typical of shared-tenant CI runners), an unraisable process priority, or - on macOS - the performance/efficiency core split and the frequency scaling and thermal throttling that stay unobservable from managed code. On a suitable host (>= 4 cores, no priority set) the probe actively suggests `--priority high`. The run still proceeds - this is guidance, not a gate.
 
 ```bash
 dotnet run -- --dedicated-host-guidance

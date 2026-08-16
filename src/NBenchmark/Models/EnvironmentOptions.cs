@@ -54,6 +54,22 @@ public record EnvironmentOptions
     public bool DedicatedHostGuidance { get; init; }
 
     /// <summary>
+    ///     Whether the OS controls that belong to the measuring <i>thread</i> are applied:
+    ///     thread affinity matching <see cref="CpuAffinity" />, a thread priority matching
+    ///     <see cref="ProcessPriority" />, and - on macOS - the
+    ///     <c>QOS_CLASS_USER_INTERACTIVE</c> elevation that keeps the thread on an Apple Silicon
+    ///     performance core. <b>On by default</b>, unlike the other members of this record: it
+    ///     needs no configuration to be useful and the default-off alternative is a Mac measured
+    ///     on whichever core the scheduler picked.
+    ///     <para>
+    ///         Set to <c>false</c> (<c>--no-thread-control</c>) to measure under the host's
+    ///         default thread scheduling - which is what you want if the *scheduling* is the
+    ///         subject, and not otherwise. See <see cref="ThreadEnvironmentControl" />.
+    ///     </para>
+    /// </summary>
+    public bool ThreadControl { get; init; } = true;
+
+    /// <summary>
     ///     When <c>true</c>, suppresses the always-on warning that fires when the entry
     ///     assembly was built in <c>Debug</c> configuration or when a debugger is attached.
     ///     Both conditions defeat JIT inlining and tier-1 optimization, so the numbers are

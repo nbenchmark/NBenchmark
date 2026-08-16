@@ -246,17 +246,19 @@ The runtime-startup configuration a benchmark is measured under: JIT tiering, dy
 
 | Profile | Configuration | Use for |
 | --- | --- | --- |
-| `RuntimeProfile.SteadyState` | tiering off, PGO off, R2R off | **(default)** fully-optimized steady-state throughput |
+| `RuntimeProfile.SteadyState` | tiering off, PGO off, R2R off, background GC off | **(default)** fully-optimized steady-state throughput |
 | `RuntimeProfile.Production` | tiering on, PGO on, R2R on | what ships; reproducible but imprecise |
-| `RuntimeProfile.ServerGc` | `SteadyState` + non-concurrent server GC | code destined for a server-GC host |
+| `RuntimeProfile.ServerGc` | `SteadyState` + server GC | code destined for a server-GC host |
 | `RuntimeProfile.Host` | nothing set | inherit the host's configuration |
+
+**On the background GC.** `SteadyState` turns it off. Leaving it on gives an allocating benchmark a second thread competing for the same core, continuously and at points the sample stream cannot predict; turning it off makes a Gen2 collection blocking instead - rarer, and landing as a discrete spike the [outlier machinery](../statistics/outliers.md) already handles well. It does change what is measured, so a benchmark whose subject *is* collector behavior belongs under `Production` or a custom profile. `Production` deliberately leaves the knob unset.
 
 **These settings can only be applied to a process as it starts** - the runtime reads them once and never re-reads them. So they can be honored for benchmarks that run in a worker, and cannot be honored for anything measured in the host process.
 
 NBenchmark therefore reports what was *actually* applied rather than what was requested. Every result carries:
 
 - `RuntimeProfileName` - the profile actually in effect, or `"host"` when the measuring process inherited its configuration.
-- `RuntimeKnobs` - the knobs in effect, e.g. `"tiered=off pgo=off r2r=off"`, read from the measuring process's own environment. A knob you set by hand is reported just as faithfully as one NBenchmark applied.
+- `RuntimeKnobs` - the knobs in effect, e.g. `"tiered=off pgo=off r2r=off concurrentGc=off"`, read from the measuring process's own environment. A knob you set by hand is reported just as faithfully as one NBenchmark applied.
 
 Results measured under different runtime profiles are **never placed in the same comparison group**, so no significance test, effect size, ratio or threshold gate ever spans them. A table that mixes them (a class combining `[InProcess]` benchmarks with isolated ones) is flagged.
 
@@ -615,13 +617,16 @@ See [Custom significance tests](../statistics/significance.md#custom-significanc
 Environment = null   // default - no hardware/OS controls applied
 ```
 
-Opt-in hardware/OS controls applied for the duration of a run, typed as `EnvironmentOptions?`. When `null` (the default), the benchmark runs with whatever CPU affinity and process priority the host started it with - the zero-ceremony path. Set it to reduce measurement noise at its source (CPU migration, preemption, shared-host jitter) before the timer starts.
+Hardware/OS controls applied for the duration of a run, typed as `EnvironmentOptions?`. When `null` (the default), the benchmark runs with whatever CPU affinity and process priority the host started it with - the zero-ceremony path. Set it to reduce measurement noise at its source (CPU migration, preemption, shared-host jitter) before the timer starts.
+
+A `null` here is not inert. `ThreadControl` defaults to on and needs no configuration, so the thread-level controls apply whether or not this record exists; the other three fields do nothing until you set them.
 
 | Field | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `CpuAffinity` | `IReadOnlyList<int>?` | `null` | Logical CPU core indices to pin the process to (e.g. `[2, 3]`). Restored on run exit. Linux/Windows only; ignored with a warning on macOS. |
-| `ProcessPriority` | `ProcessPriorityClass?` | `null` | Process priority to request. `High` is recommended for dedicated hosts. Restored on run exit. A refused elevation is a warning, not an error. |
-| `DedicatedHostGuidance` | `bool` | `false` | Emit a non-fatal pre-run warning when the host looks noisy (low core count, unraisable priority, or on macOS unobservable frequency scaling/thermal throttling). On a suitable host, actively suggests `--priority high`. |
+| `CpuAffinity` | `IReadOnlyList<int>?` | `null` | Logical CPU core indices to pin the process **and the measuring thread** to (e.g. `[2, 3]`). Restored on run exit. Linux/Windows only; ignored with a warning on macOS. |
+| `ProcessPriority` | `ProcessPriorityClass?` | `null` | Process priority to request, and (on Windows) the measuring thread's priority to match. `High` is recommended for dedicated hosts. Restored on run exit. A refused elevation is a warning, not an error. |
+| `ThreadControl` | `bool` | **`true`** | Apply the thread-scoped controls: thread affinity, thread priority (Windows), and on macOS the `QOS_CLASS_USER_INTERACTIVE` class that asks for an Apple Silicon performance core. Set `false` to measure under the host's default thread scheduling. |
+| `DedicatedHostGuidance` | `bool` | `false` | Emit a non-fatal pre-run warning when the host looks noisy (low core count, unraisable priority, or on macOS the performance/efficiency core split and unobservable frequency scaling/thermal throttling). On a suitable host, actively suggests `--priority high`. |
 | `SuppressBuildConfigurationWarning` | `bool` | `false` | Suppress the always-on warning that appears when the entry assembly is Debug-built or a debugger is attached. Use this only when measuring Debug behavior intentionally. |
 
 ```csharp
@@ -636,8 +641,8 @@ var options = new MeasurementOptions
 };
 ```
 
-BenchmarkSuite/BenchmarkHarness fluent methods: `.WithHardwareAffinity(2, 3)`, `.WithProcessPriority(ProcessPriorityClass.High)`, `.WithDedicatedHostGuidance()`  
-CLI flags: `--cpu-affinity <list>`, `--priority <level>`, `--dedicated-host-guidance`  
+BenchmarkSuite/BenchmarkHarness fluent methods: `.WithHardwareAffinity(2, 3)`, `.WithProcessPriority(ProcessPriorityClass.High)`, `.WithThreadControl(false)`, `.WithDedicatedHostGuidance()`  
+CLI flags: `--cpu-affinity <list>`, `--priority <level>`, `--no-thread-control`, `--dedicated-host-guidance`  
 Additional suppression knobs: `.WithSuppressBuildConfigurationWarning()` (suite/harness) or `NBENCHMARK_SUPPRESS_DEBUG_WARNING=1` (environment variable)
 
 This is the proactive counterpart to the statistical noise handling in [Outlier Trimming](../statistics/outliers.md): trimming reacts to noise after the fact; environment control reduces it at the source. See [Environment control](../features/environment-control.md) for the full model, platform notes, and isolated-process propagation.

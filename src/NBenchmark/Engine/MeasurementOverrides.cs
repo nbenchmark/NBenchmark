@@ -108,6 +108,12 @@ internal sealed record MeasurementOverrides
     public bool? NoDriftCanary { get; init; }
 
     /// <summary>
+    ///     Switches off the thread-level OS controls
+    ///     (<see cref="EnvironmentOptions.ThreadControl" />), set by <c>--no-thread-control</c>.
+    /// </summary>
+    public bool? NoThreadControl { get; init; }
+
+    /// <summary>
     ///     Lifts the cap on how many raw samples an isolated worker returns
     ///     (<see cref="MeasurementOptions.MaxRawSamples" />), set by <c>--emit-raw</c>.
     /// </summary>
@@ -164,6 +170,7 @@ internal sealed record MeasurementOverrides
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
         NoDriftCanary = cliArgs.NoDriftCanary ? true : null,
+        NoThreadControl = cliArgs.NoThreadControl ? true : null,
         EmitRaw = cliArgs.EmitRaw,
         StreamSamples = cliArgs.StreamSamples ? true : null,
         Diagnostics = cliArgs.Diagnostics,
@@ -344,6 +351,19 @@ internal sealed record MeasurementOverrides
 
         if (Environment is not null)
             result = result with { Environment = MergeEnvironment(result.Environment, Environment) };
+
+        // After the environment merge, not inside it: the flag has to be able to create an
+        // EnvironmentOptions where none existed, since ThreadControl is the one member of that
+        // record that does something when every other member is unset. One-way for the same reason
+        // as --no-drift-canary above - the absence of the flag means "leave what was configured
+        // alone", so a programmatic WithThreadControl(false) survives a parsed command line.
+        if (NoThreadControl is true)
+        {
+            result = result with
+            {
+                Environment = (result.Environment ?? new EnvironmentOptions()) with { ThreadControl = false },
+            };
+        }
 
         return result;
     }
