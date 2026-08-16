@@ -186,6 +186,12 @@ internal sealed record CliArgs
     public bool NoHistogram { get; init; }
 
     /// <summary>
+    ///     When true, disables the host drift canary - no control readings are taken between
+    ///     benchmarks, and no host-drift warning can fire.
+    /// </summary>
+    public bool NoDriftCanary { get; init; }
+
+    /// <summary>
     ///     When true, omits raw per-sample arrays from reporter output (JSON).
     ///     Samples are still collected for significance and the Console histogram;
     ///     this only controls whether they are serialized to file.
@@ -319,6 +325,7 @@ internal sealed record CliArgs
         int? launchCount = null;
         IReadOnlyList<double>? reportedPercentiles = null;
         var noHistogram = false;
+        var noDriftCanary = false;
         var noSamples = false;
         var emitRaw = false;
         var streamSamples = false;
@@ -694,6 +701,9 @@ internal sealed record CliArgs
                 case "--no-histogram":
                     noHistogram = true;
                     break;
+                case "--no-drift-canary":
+                    noDriftCanary = true;
+                    break;
                 case "--no-samples":
                     noSamples = true;
                     break;
@@ -835,6 +845,7 @@ internal sealed record CliArgs
             LaunchCount = launchCount,
             ReportedPercentiles = reportedPercentiles,
             NoHistogram = noHistogram,
+            NoDriftCanary = noDriftCanary,
             NoSamples = noSamples,
             EmitRaw = emitRaw,
             StreamSamples = streamSamples,
@@ -999,7 +1010,8 @@ internal sealed record CliArgs
         "--iterations", "--jit-quiet-period", "--launch-count", "--list", "--max-drift-restarts",
         "--max-samples", "--max-tuning-time", "--max-warmup", "--min-measurement-time",
         "--min-practical-effect", "--min-relative-shift", "--min-samples", "--min-warmup", "--min-warmup-time",
-        "--no-allocations", "--no-gc-between-benchmarks", "--no-histogram", "--no-jit-quiescence",
+        "--no-allocations", "--no-drift-canary", "--no-gc-between-benchmarks", "--no-histogram",
+        "--no-jit-quiescence",
         "--no-samples", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint", "--outlier",
         "--output", "--percentiles", "--priority", "--profile", "--reporter", "--runtime-profile",
         "--runtimes", "--seed", "--stream-samples", "--strict-isolation", "--tail-basis",
@@ -1047,6 +1059,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (harness default: 5)");
         Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");
+        Console.WriteLine("  --no-drift-canary       Disable the host drift canary (the control workload measured between benchmarks)");
         Console.WriteLine("  --no-samples            Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
         Console.WriteLine($"  --emit-raw              Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset");
         Console.WriteLine("  --stream-samples        Forward the live per-sample observer stream out of an isolated worker (needs --observer; costs fidelity)");

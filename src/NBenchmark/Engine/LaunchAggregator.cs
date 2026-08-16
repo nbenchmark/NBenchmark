@@ -390,6 +390,15 @@ internal static class LaunchAggregator
             AllocMax = successful.Select(r => r.AllocMax).Where(v => v.HasValue).Max(),
             MeanAllocatedBytes = MeanOrNull(successful, r => r.MeanAllocatedBytes),
 
+            // Averaged rather than taken from one launch. Each launch is its own worker with its
+            // own canary origin, so the absolute readings are not comparable between them - but
+            // RelativeToRunStart is dimensionless and normalised within each launch, so its mean
+            // is the honest answer to "across the launches, how far into a drifting host was this
+            // row measured?". Position averages for the same reason: under a random run order each
+            // launch places the benchmark differently, and no single launch's index describes the
+            // aggregate.
+            HostTimeline = AverageTimeline(successful),
+
             // A warning any launch raised is true of the run, so they union rather than being taken
             // from one launch. Deduplicated because the same condition usually fires in all of them.
             Warnings = successful
@@ -416,6 +425,28 @@ internal static class LaunchAggregator
             .OrderBy(g => g.Key)
             .Select(g => new PercentileEntry(g.Key, g.Average(p => p.Value)))
             .ToList();
+
+    /// <summary>
+    ///     The mean drift-canary stamp over the launches that produced one, or <c>null</c> when
+    ///     none did. Averaged over the launches that have a stamp rather than requiring all of
+    ///     them, because one launch whose canary reading came back unusable should not remove the
+    ///     timeline from the row.
+    /// </summary>
+    private static HostTimeline? AverageTimeline(IReadOnlyList<BenchmarkResult> results)
+    {
+        var stamps = results.Select(r => r.HostTimeline).OfType<HostTimeline>().ToList();
+
+        if (stamps.Count == 0)
+            return null;
+
+        return new HostTimeline
+        {
+            BeforeNs = stamps.Average(s => s.BeforeNs),
+            AfterNs = stamps.Average(s => s.AfterNs),
+            RelativeToRunStart = stamps.Average(s => s.RelativeToRunStart),
+            Position = stamps.Average(s => s.Position),
+        };
+    }
 
     /// <summary>The launch whose median is nearest <paramref name="target" />.</summary>
     private static Launch Nearest(IReadOnlyList<Launch> successful, double target)

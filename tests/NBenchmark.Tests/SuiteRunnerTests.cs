@@ -183,6 +183,114 @@ public class SuiteRunnerTests
         Assert.Empty(rawSamples["boom"]);
     }
 
+    /// <summary>
+    ///     The canary's readings bracket the benchmarks: one before the first, one at each
+    ///     boundary, one after the last. Driven by a scripted clock so the "host" ramps by a
+    ///     programmed amount rather than by whatever the machine running the tests did.
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_Stamps_Each_Result_With_Its_Bracketing_Canary_Readings()
+    {
+        var options = CanaryOptions();
+
+        // Three readings of four samples each: steady across the first benchmark, 40% slower
+        // across the second.
+        var clock = new ScriptedClock(call => (call / 4) switch
+        {
+            0 => 100,
+            1 => 100,
+            _ => 140,
+        });
+
+        var (results, _) = await SuiteRunner.RunAsync(
+            [StaticEnvelope("a", options), StaticEnvelope("b", options)],
+            RunOrder.Declaration, null, options,
+            0, 2,
+            NullBenchmarkProgress.Instance, CancellationToken.None,
+            clock: clock);
+
+        Assert.Equal(100, results[0].HostTimeline!.BeforeNs);
+        Assert.Equal(100, results[0].HostTimeline!.AfterNs);
+        Assert.Equal(1.0, results[0].HostTimeline!.RelativeToRunStart, 9);
+
+        Assert.Equal(100, results[1].HostTimeline!.BeforeNs);
+        Assert.Equal(140, results[1].HostTimeline!.AfterNs);
+        Assert.Equal(1.2, results[1].HostTimeline!.RelativeToRunStart, 9);
+    }
+
+    [Fact]
+    public async Task RunAsync_Leaves_The_Timeline_Unstamped_When_The_Canary_Is_Off()
+    {
+        var options = CanaryOptions() with { DriftCanary = DriftCanaryOptions.Disabled };
+
+        var (results, _) = await SuiteRunner.RunAsync(
+            [StaticEnvelope("a", options), StaticEnvelope("b", options)],
+            RunOrder.Declaration, null, options,
+            0, 2,
+            NullBenchmarkProgress.Instance, CancellationToken.None,
+            clock: new ScriptedClock(100));
+
+        Assert.All(results, r => Assert.Null(r.HostTimeline));
+    }
+
+    /// <summary>
+    ///     A dry-run measures nothing, so it should cost nothing - including the canary. Pinned
+    ///     because the canary is on by default and <c>--dry-run</c> is the configuration smoke
+    ///     test people run in a loop.
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_Skips_The_Canary_On_A_Dry_Run()
+    {
+        var options = new MeasurementOptions { Iterations = 0, WarmupIterations = 0 };
+
+        var (results, _) = await SuiteRunner.RunAsync(
+            [StaticEnvelope("a", options)],
+            RunOrder.Declaration, null, options,
+            0, 1,
+            NullBenchmarkProgress.Instance, CancellationToken.None,
+            clock: new ScriptedClock(100));
+
+        Assert.Null(results[0].HostTimeline);
+    }
+
+    /// <summary>
+    ///     An errored row was not measured anywhere, so there is no measurement point to describe.
+    ///     Stamping one would invite a drift comparison against a row that has no number. The rows
+    ///     either side keep their stamps, because the reading indices are not compacted.
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_Does_Not_Stamp_An_Errored_Result()
+    {
+        var options = CanaryOptions();
+
+        var envelopes = new[]
+        {
+            new BenchmarkEnvelope("boom", "", null, false, [], (_, _) => throw new InvalidOperationException("boom")),
+            StaticEnvelope("ok", options),
+        };
+
+        var (results, _) = await SuiteRunner.RunAsync(
+            envelopes, RunOrder.Declaration, null, options,
+            0, 2,
+            NullBenchmarkProgress.Instance, CancellationToken.None,
+            clock: new ScriptedClock(100));
+
+        Assert.True(results[0].Errored);
+        Assert.Null(results[0].HostTimeline);
+        Assert.NotNull(results[1].HostTimeline);
+    }
+
+    /// <summary>
+    ///     One measured sample per benchmark and a four-sample canary: enough to exercise the
+    ///     bracketing without the test paying for a real adaptive run.
+    /// </summary>
+    private static MeasurementOptions CanaryOptions() => new()
+    {
+        Iterations = 1,
+        WarmupIterations = 0,
+        DriftCanary = new DriftCanaryOptions { Samples = 4, WorkPerSample = 64 },
+    };
+
     [Fact]
     public void ShouldForceGcBetweenBenchmarks_Skips_True_DryRun()
     {

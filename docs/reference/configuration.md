@@ -367,6 +367,64 @@ CLI flag: `--diagnostics <none|gc|gcandcpu|all>`
 
 See [Diagnostics](../statistics/diagnostics.md) for what each counter measures and how collection works.
 
+### DriftCanary
+
+```csharp
+DriftCanary = DriftCanaryOptions.Default   // default - on, 32 samples of 4 096 iterations
+```
+
+The host drift canary. NBenchmark runs a fixed, deterministic control workload at every benchmark
+boundary, so a change in how long that work takes is a change in the machine rather than in your
+code. Every other drift check in the engine looks inside one benchmark's own samples, which cannot
+see a thermal ramp or a background process that started halfway through the run - those move every
+benchmark measured afterwards and none measured before, leaving each individual result internally
+consistent and every comparison between them confounded.
+
+Typed as a `DriftCanaryOptions` record:
+
+| Property | Default | What it does |
+| --- | --- | --- |
+| `Enabled` | `true` | Whether readings are taken at all. |
+| `Samples` | `32` | Timed samples per reading. `4` - `1024`. |
+| `WorkPerSample` | `4096` | Busy-weight iterations per sample. `64` - `1 048 576`. |
+| `MinimumReportableDrift` | `0.01` | How far the host must move before it is worth mentioning, as a fraction. `0` - `1`. |
+
+Each result carries the readings taken either side of it on `BenchmarkResult.HostTimeline`, whose
+`RelativeToRunStart` is the number to compare between rows: `1.07` means the same fixed work took
+7% longer at that point in the run than it did at the start.
+
+The output you act on is a warning. When the difference reported between a benchmark and the
+baseline is smaller than the distance the host moved between the two points at which they were
+measured, the candidate's row says so:
+
+```
+host drift exceeds the difference being reported: the machine was 8% slower when 'Candidate' was
+measured than when 'Baseline' was, and the 3% difference between them is smaller than that.
+```
+
+It warns and never changes the verdict. `MinimumPracticalEffect` and `MinimumRelativeShift`
+downgrade a result because they are statements about the comparison itself; the canary is a
+statement about the machine, measured by a different workload at a different moment, so what it
+produces is evidence for you rather than a decision made on your behalf.
+
+A reading at the defaults costs a fraction of a millisecond and is taken between benchmarks, never
+inside a timed window - so the canary can cost wall-clock but never accuracy. It is skipped
+entirely on a dry-run.
+
+```csharp
+// Leave the canary on but only mention drift past 5%
+var options = new MeasurementOptions
+{
+    DriftCanary = DriftCanaryOptions.Default with { MinimumReportableDrift = 0.05 },
+};
+
+// Off
+var options = new MeasurementOptions { DriftCanary = DriftCanaryOptions.Disabled };
+```
+
+BenchmarkSuite/BenchmarkHarness fluent methods: `.WithDriftCanary(false)` or `.WithDriftCanary(DriftCanaryOptions)`  
+CLI flag: `--no-drift-canary`
+
 ### OutlierMode
 
 ```csharp
@@ -646,6 +704,7 @@ Categories are not part of `MeasurementOptions`; they are metadata declared with
 | `SignificanceTest` | `ISignificanceTest?` | `null` | Defaults to `DefaultSignificanceTest` |
 | `Environment` | `EnvironmentOptions?` | `null` | See [Environment](#environment) |
 | `Diagnostics` | `DiagnosticsOptions` | `DiagnosticsOptions.Default` (GC counts on) | See [Diagnostics](#diagnostics) |
+| `DriftCanary` | `DriftCanaryOptions` | `DriftCanaryOptions.Default` (on) | See [DriftCanary](#driftcanary) |
 
 Values outside the valid range throw `ArgumentOutOfRangeException`.
 

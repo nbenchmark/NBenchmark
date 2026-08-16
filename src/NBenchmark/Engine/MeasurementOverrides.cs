@@ -102,6 +102,12 @@ internal sealed record MeasurementOverrides
     public bool? NoHistogram { get; init; }
 
     /// <summary>
+    ///     Switches off the host drift canary (<see cref="DriftCanaryOptions.Enabled" />), set by
+    ///     <c>--no-drift-canary</c>.
+    /// </summary>
+    public bool? NoDriftCanary { get; init; }
+
+    /// <summary>
     ///     Lifts the cap on how many raw samples an isolated worker returns
     ///     (<see cref="MeasurementOptions.MaxRawSamples" />), set by <c>--emit-raw</c>.
     /// </summary>
@@ -157,6 +163,7 @@ internal sealed record MeasurementOverrides
         MaxDriftRestarts = cliArgs.MaxDriftRestarts,
         ReportedPercentiles = cliArgs.ReportedPercentiles,
         NoHistogram = cliArgs.NoHistogram,
+        NoDriftCanary = cliArgs.NoDriftCanary ? true : null,
         EmitRaw = cliArgs.EmitRaw,
         StreamSamples = cliArgs.StreamSamples ? true : null,
         Diagnostics = cliArgs.Diagnostics,
@@ -314,6 +321,12 @@ internal sealed record MeasurementOverrides
 
         if (NoHistogram.HasValue && NoHistogram.Value)
             result = result with { EnableHistogram = false };
+
+        // One-way, like --emit-raw below: the flag asks for the canary to be off, and its absence
+        // means "leave whatever was configured alone" rather than "impose the default", so a
+        // programmatic WithDriftCanary(false) survives a parsed command line.
+        if (NoDriftCanary is true)
+            result = result with { DriftCanary = result.DriftCanary with { Enabled = false } };
 
         // One-way: the flag asks for everything, and its absence means "leave whatever was
         // configured alone" rather than "impose the default". A programmatic MaxRawSamples would

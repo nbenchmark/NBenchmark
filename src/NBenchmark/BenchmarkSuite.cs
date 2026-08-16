@@ -889,6 +889,28 @@ public class BenchmarkSuite(string name)
     }
 
     /// <summary>
+    ///     Configures the host drift canary - the deterministic control workload measured at each
+    ///     benchmark boundary, which is what lets a run say how much the host's effective speed
+    ///     moved while it was running. On by default.
+    /// </summary>
+    public BenchmarkSuite WithDriftCanary(DriftCanaryOptions driftCanary)
+    {
+        ArgumentNullException.ThrowIfNull(driftCanary);
+        _options = _options with { DriftCanary = driftCanary };
+        return this;
+    }
+
+    /// <summary>
+    ///     Turns the host drift canary on or off. On by default; switching it off takes no control
+    ///     readings between benchmarks and silences the host-drift warning.
+    /// </summary>
+    public BenchmarkSuite WithDriftCanary(bool enabled)
+    {
+        _options = _options with { DriftCanary = _options.DriftCanary with { Enabled = enabled } };
+        return this;
+    }
+
+    /// <summary>
     ///     Sets the measurement profile, which bundles per-iteration GC, between-benchmark GC, and
     ///     allocation tracking. <see cref="MeasurementProfile.Realistic" /> (the default) keeps natural
     ///     GC pressure in the timing; <see cref="MeasurementProfile.Independent" /> isolates iterations

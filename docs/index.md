@@ -104,6 +104,7 @@ All harness CLI flags pass through. See [Global tool](./usage-modes/global-tool.
 | Multi-runtime | Runs the same benchmarks on net8, net9, and net10 side-by-side. | [→](./features/multi-runtime.md) |
 | Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [→](./features/multiple-launches.md) |
 | Environment control | Pins CPU affinity and process priority to cut noise at the source. | [→](./features/environment-control.md) |
+| Host drift canary | Times fixed control work between benchmarks, so a machine that drifted mid-run says so. On by default. | [→](./statistics/measurement.md#the-host-drift-canary) |
 | Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [→](./test-integration/index.md) |
 | CI regression gate | Fails the run when a benchmark regresses past a percentage. | [→](./reference/cli.md) |
 | Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [→](./statistics/diagnostics.md) |
@@ -122,6 +123,10 @@ The numbers are not an average of a fixed loop.
   interval: a discarded sample still counts as an observation, so the reported margin describes the
   run that happened rather than the samples that survived it.
   ([Outlier trimming](./statistics/outliers.md))
+- **A control workload that catches a drifting host.** Fixed work is timed at every benchmark
+  boundary, so a machine that got slower mid-run says so - and a comparison smaller than the drift
+  that separated its two rows is flagged rather than reported as a result.
+  ([Measurement](./statistics/measurement.md#the-host-drift-canary))
 - **Non-parametric significance testing.** Benchmark timings are not normally distributed, so the
   built-in tests are rank-based. A ✓ in the `Sig` column means "real, and at least a small effect",
   not merely `p < 0.05`. ([Significance testing](./statistics/significance.md))

@@ -557,6 +557,70 @@ public class LaunchAggregatorTests
     }
 
     /// <summary>
+    ///     Each launch is its own worker with its own canary origin, so the absolute readings are
+    ///     not comparable between them - but <c>RelativeToRunStart</c> is normalised inside each
+    ///     launch, so the mean of it is what describes the aggregate row. Taking launch 0's stamp
+    ///     (which is what a bare <c>with</c> expression would do) would report one process's drift
+    ///     as though it were the run's.
+    /// </summary>
+    [Fact]
+    public void Combine_Averages_The_Host_Timeline_Across_Launches()
+    {
+        var launches = new[]
+        {
+            Launch(WithTimeline(CreateResult("a", 100, 100, 5, 10), relative: 1.00, position: 0)),
+            Launch(WithTimeline(CreateResult("a", 100, 100, 5, 10), relative: 1.10, position: 2)),
+        };
+
+        var combined = LaunchAggregator.Combine(launches);
+
+        Assert.Equal(1.05, combined.HostTimeline!.RelativeToRunStart, 9);
+        Assert.Equal(1.0, combined.HostTimeline!.Position, 9);
+    }
+
+    /// <summary>
+    ///     One launch whose canary reading came back unusable should cost that launch its stamp,
+    ///     not cost the row its timeline.
+    /// </summary>
+    [Fact]
+    public void Combine_Averages_Over_Only_The_Launches_That_Have_A_Timeline()
+    {
+        var launches = new[]
+        {
+            Launch(WithTimeline(CreateResult("a", 100, 100, 5, 10), relative: 1.20, position: 1)),
+            Launch(CreateResult("a", 100, 100, 5, 10)),
+        };
+
+        var combined = LaunchAggregator.Combine(launches);
+
+        Assert.Equal(1.20, combined.HostTimeline!.RelativeToRunStart, 9);
+    }
+
+    [Fact]
+    public void Combine_Leaves_The_Host_Timeline_Null_When_No_Launch_Has_One()
+    {
+        var launches = new[]
+        {
+            Launch(CreateResult("a", 100, 100, 5, 10)),
+            Launch(CreateResult("a", 100, 100, 5, 10)),
+        };
+
+        Assert.Null(LaunchAggregator.Combine(launches).HostTimeline);
+    }
+
+    private static BenchmarkResult WithTimeline(BenchmarkResult result, double relative, double position)
+        => result with
+        {
+            HostTimeline = new HostTimeline
+            {
+                BeforeNs = 100 * relative,
+                AfterNs = 100 * relative,
+                RelativeToRunStart = relative,
+                Position = position,
+            },
+        };
+
+    /// <summary>
     ///     A launch whose samples are whatever the result already carries - enough for the assertions
     ///     that are about the averaged statistics rather than about which launch's samples survive.
     /// </summary>

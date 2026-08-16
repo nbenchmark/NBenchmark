@@ -296,6 +296,14 @@ public record BenchmarkResult
     /// </summary>
     public DiagnosticsResult? Diagnostics { get; init; }
 
+    /// <summary>
+    ///     Where in the run this benchmark was measured and how fast the host was at that point,
+    ///     from the drift canary's bracketing readings. <c>null</c> when the canary was off
+    ///     (<c>--no-drift-canary</c>), for dry-run and errored results, and whenever a bracketing
+    ///     reading was unusable.
+    /// </summary>
+    public HostTimeline? HostTimeline { get; init; }
+
     public double ConfidenceIntervalLower => Mean - MarginOfError;
     public double ConfidenceIntervalUpper => Mean + MarginOfError;
     public double Range => Max - Min;

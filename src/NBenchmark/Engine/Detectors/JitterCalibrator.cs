@@ -1,6 +1,36 @@
 namespace NBenchmark.Engine.Detectors;
 
 /// <summary>
+///     What one run of the busy-weight probe observed: the median of its per-sample timings,
+///     and the robust jitter metric derived from them.
+/// </summary>
+/// <param name="MedianNs">
+///     The median per-sample timing, in nanoseconds - the probe's throughput reading. Because the
+///     work is fixed and deterministic, this is a measurement of the <em>host</em>: the same probe
+///     run later in the same process returns a larger number when the machine has got slower.
+///     <see cref="double.NaN" /> when the probe could not produce a usable reading.
+/// </param>
+/// <param name="JitterMetric">
+///     The ratio of the median absolute deviation to the median (<c>MAD / median</c>), or
+///     <c>null</c> when the probe produced fewer than two samples, the median was zero, or any
+///     sample was non-finite.
+/// </param>
+/// <remarks>
+///     The two numbers answer different questions from one pass over the same samples - "how
+///     interrupted is this host?" (the spread) and "how fast is this host right now?" (the
+///     centre) - so the probe returns both rather than computing the centre twice. The second is
+///     what <see cref="HostDriftCanary" /> reads.
+/// </remarks>
+internal readonly record struct JitterProbeResult(double MedianNs, double? JitterMetric)
+{
+    /// <summary>An unusable reading: no median, no metric.</summary>
+    public static readonly JitterProbeResult None = new(double.NaN, null);
+
+    /// <summary>Whether <see cref="MedianNs" /> is a usable throughput reading.</summary>
+    public bool HasMedian => double.IsFinite(MedianNs) && MedianNs > 0;
+}
+
+/// <summary>
 ///     The pre-flight environment probe. Runs a deterministic, allocation-free busy-weight
 ///     loop <c>N</c> times, timing each sample, and derives a robust jitter metric: the ratio
 ///     of the median absolute deviation to the median (MAD / median) of the per-sample
@@ -24,10 +54,12 @@ internal static class JitterCalibrator
     public static long Accumulator;
 
     /// <summary>
-    ///     Runs the jitter probe and returns a robust jitter metric: the ratio of the median
-    ///     absolute deviation to the median (<c>MAD / median</c>) of the per-sample timings.
-    ///     Returns <c>null</c> when the probe produced fewer than two samples, the median was
-    ///     zero, or any sample was non-finite.
+    ///     Runs the busy-weight probe and returns both of its readings: the median per-sample
+    ///     timing, and a robust jitter metric (the ratio of the median absolute deviation to the
+    ///     median, <c>MAD / median</c>). <see cref="JitterProbeResult.JitterMetric" /> is
+    ///     <c>null</c> when the probe produced fewer than two samples, the median was zero, or
+    ///     any sample was non-finite; <see cref="JitterProbeResult.MedianNs" /> is
+    ///     <see cref="double.NaN" /> in the same cases.
     /// </summary>
     /// <param name="sampleCount">How many timed samples to collect.</param>
     /// <param name="workPerSample">How many busy-weight iterations each sample performs.</param>
@@ -38,10 +70,10 @@ internal static class JitterCalibrator
     ///     cannot distort the metric the way stddev/mean can. A quiet dedicated host reports
     ///     well below 0.05; a shared-tenant CI runner typically reports 0.10-0.30.
     /// </remarks>
-    public static double? Run(int sampleCount, int workPerSample, IClock clock)
+    public static JitterProbeResult Run(int sampleCount, int workPerSample, IClock clock)
     {
         if (sampleCount < 2 || workPerSample < 1)
-            return null;
+            return JitterProbeResult.None;
 
         // Warm up the probe path before timing: the first call to BusyWeight pays one-off JIT
         // compilation for BusyWeight, Run, and the clock methods, and the first cache miss for
@@ -66,7 +98,7 @@ internal static class JitterCalibrator
         // informational, not a synchronization primitive.
         Volatile.Write(ref Accumulator, accumulator);
 
-        return RobustJitterMetric(samples);
+        return Summarize(samples);
     }
 
     /// <summary>
@@ -91,20 +123,23 @@ internal static class JitterCalibrator
     }
 
     /// <summary>
-    ///     Computes a robust jitter metric: the ratio of the median absolute deviation to the
-    ///     median (<c>MAD / median</c>). Both the median and MAD have a ~50% breakdown point,
-    ///     so a single JIT spike or one-off preemption cannot distort the metric the way
-    ///     stddev/mean can. Returns <c>null</c> when the median is zero or any sample is
-    ///     non-finite.
+    ///     Reduces the probe's samples to their median and a robust jitter metric: the ratio of
+    ///     the median absolute deviation to the median (<c>MAD / median</c>). Both the median and
+    ///     MAD have a ~50% breakdown point, so a single JIT spike or one-off preemption cannot
+    ///     distort either the way stddev/mean can. Returns
+    ///     <see cref="JitterProbeResult.None" /> when the median is zero or any sample is
+    ///     non-finite - the same conditions that used to return a null metric, now applying to
+    ///     both readings, because a probe whose centre is unusable has no throughput reading
+    ///     either.
     /// </summary>
-    private static double? RobustJitterMetric(double[] samples)
+    private static JitterProbeResult Summarize(double[] samples)
     {
         var n = samples.Length;
 
         for (var i = 0; i < n; i++)
         {
             if (!double.IsFinite(samples[i]))
-                return null;
+                return JitterProbeResult.None;
         }
 
         Array.Sort(samples);
@@ -112,7 +147,7 @@ internal static class JitterCalibrator
         var median = Median(samples);
 
         if (median <= 0)
-            return null;
+            return JitterProbeResult.None;
 
         // MAD = median(|x_i - median|). Compute on a second sorted array of absolute deviations.
         var absDeviations = new double[n];
@@ -126,7 +161,7 @@ internal static class JitterCalibrator
 
         var mad = Median(absDeviations);
 
-        return mad / median;
+        return new JitterProbeResult(median, mad / median);
     }
 
     /// <summary>

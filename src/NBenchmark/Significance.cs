@@ -23,7 +23,7 @@ public static class Significance
         if (results.Count(r => !r.Errored) < 2)
             return;
 
-        ComputeSignificance(results, rawSamples, options.ResolveSignificanceTest(), options.SignificanceLevel, options.MinimumPracticalEffect, options.MinimumRelativeShift);
+        ComputeSignificance(results, rawSamples, options.ResolveSignificanceTest(), options.SignificanceLevel, options.MinimumPracticalEffect, options.MinimumRelativeShift, options.DriftCanary.MinimumReportableDrift);
     }
 
     /// <summary>
@@ -37,8 +37,9 @@ public static class Significance
         Dictionary<string, double[]> rawSamples,
         double significanceLevel = 0.05,
         double? minimumPracticalEffect = null,
-        double? minimumRelativeShift = null) =>
-        ComputeSignificance(results, rawSamples, DefaultSignificanceTest.Instance, significanceLevel, minimumPracticalEffect, minimumRelativeShift);
+        double? minimumRelativeShift = null,
+        double? minimumReportableDrift = null) =>
+        ComputeSignificance(results, rawSamples, DefaultSignificanceTest.Instance, significanceLevel, minimumPracticalEffect, minimumRelativeShift, minimumReportableDrift);
 
     /// <summary>
     ///     Runs <paramref name="test" /> over the successful results and updates
@@ -53,7 +54,8 @@ public static class Significance
         ISignificanceTest test,
         double significanceLevel = 0.05,
         double? minimumPracticalEffect = null,
-        double? minimumRelativeShift = null)
+        double? minimumRelativeShift = null,
+        double? minimumReportableDrift = null)
     {
         var successful = results.Where(r => !r.Errored).ToList();
 
@@ -132,7 +134,7 @@ public static class Significance
 
         var report = test.Analyze(context);
 
-        ApplyReport(results, report, baseline, minimumPracticalEffect, minimumRelativeShift, significanceLevel);
+        ApplyReport(results, report, baseline, minimumPracticalEffect, minimumRelativeShift, significanceLevel, minimumReportableDrift);
     }
 
     private static void ApplyReport(
@@ -141,7 +143,8 @@ public static class Significance
         BenchmarkResult baseline,
         double? minimumPracticalEffect,
         double? minimumRelativeShift,
-        double significanceLevel)
+        double significanceLevel,
+        double? minimumReportableDrift)
     {
         var baselineMedian = ComparisonGroup.ComparisonMedian(baseline);
         if (report.Pairwise.Count > 0)
@@ -269,6 +272,27 @@ public static class Significance
                             + "difference rather than a code change. Compare the per-launch medians "
                             + "and raise --launch-count to tighten the reproducibility estimate.",
                         ];
+                    }
+
+                    // The host drift canary's one output. Unlike the two gates above this never
+                    // touches the verdict - the canary measures the machine, not the comparison,
+                    // and a downgrade would be acting on indirect evidence. It fires on the
+                    // reported median difference rather than the Hodges-Lehmann shift because
+                    // that is the number the ratio column shows, and because it is present even
+                    // when the strategy produced no shift estimate.
+                    if (baselineMedian > 0)
+                    {
+                        var reportedShift =
+                            Math.Abs(ComparisonGroup.ComparisonMedian(results[i]) - baselineMedian) / baselineMedian;
+
+                        var driftWarning = HostDrift.Describe(
+                            results[i],
+                            baseline,
+                            reportedShift,
+                            minimumReportableDrift ?? DriftCanaryOptions.DefaultMinimumReportableDrift);
+
+                        if (driftWarning is not null)
+                            warnings = [.. warnings, driftWarning];
                     }
 
                     results[i] = results[i] with

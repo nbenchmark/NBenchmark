@@ -1,5 +1,5 @@
-using System.Runtime.CompilerServices;
 using NBenchmark.Diagnostics;
+using NBenchmark.Engine.Detectors;
 
 namespace NBenchmark.Engine;
 
@@ -15,7 +15,8 @@ internal static class SuiteRunner
         IBenchmarkProgress progress,
         CancellationToken cancellationToken,
         Func<Task>? onBetweenBenchmarksAsync = null,
-        IMeasurementObserver? observer = null)
+        IMeasurementObserver? observer = null,
+        IClock? clock = null)
     {
         ArgumentNullException.ThrowIfNull(envelopes);
         ArgumentNullException.ThrowIfNull(progress);
@@ -24,6 +25,16 @@ internal static class SuiteRunner
 
         var results = new List<BenchmarkResult>(ordered.Count);
         var rawSamples = new Dictionary<string, double[]>(ordered.Count);
+
+        // The host drift canary. Readings bracket the benchmarks - one here, one at each boundary
+        // after the inter-benchmark GC, one after the last - so benchmark i is bracketed by
+        // readings i and i+1. Skipped for a dry-run, which measures nothing and should therefore
+        // cost nothing.
+        var canary = defaultOptions.Iterations == 0
+            ? null
+            : HostDriftCanary.Create(defaultOptions.DriftCanary, clock ?? StopwatchClock.WallClock);
+
+        canary?.Take();
 
         for (var index = 0; index < ordered.Count; index++)
         {
@@ -102,7 +113,12 @@ internal static class SuiteRunner
             await progress.OnBenchmarkCompleted(completedResult).ConfigureAwait(false);
 
             if (ShouldForceGcBetweenBenchmarks(spec.Options, completedResult))
-                ForceFullGc();
+                GcControl.ForceFullGc();
+
+            // Taken after the GC so a collection the benchmark just provoked is charged to that
+            // benchmark rather than to the machine, and before the reset hook so user cleanup code
+            // sits outside the bracket rather than inside it.
+            canary?.Take();
 
             // PerClass shared-instance reset hook: fired once per gap, after this method's
             // completion + inter-benchmark GC and before the next method's OnBenchmarkStarting.
@@ -119,7 +135,29 @@ internal static class SuiteRunner
                 await onBetweenBenchmarksAsync().ConfigureAwait(false);
         }
 
+        StampHostTimeline(results, canary);
+
         return (results, rawSamples);
+    }
+
+    /// <summary>
+    ///     Attaches each successful result's bracketing canary readings. Errored rows are skipped:
+    ///     nothing was measured, so there is no measurement point to describe, and a stamp there
+    ///     would invite a comparison against a row that has no number.
+    /// </summary>
+    private static void StampHostTimeline(List<BenchmarkResult> results, HostDriftCanary? canary)
+    {
+        if (canary is null)
+            return;
+
+        for (var index = 0; index < results.Count; index++)
+        {
+            if (results[index].Errored)
+                continue;
+
+            if (canary.StampFor(index) is { } stamp)
+                results[index] = results[index] with { HostTimeline = stamp };
+        }
     }
 
     private static bool ShouldForceGcBetweenBenchmarks(MeasurementOptions options, BenchmarkResult result)
@@ -129,13 +167,5 @@ internal static class SuiteRunner
 
         // True dry-runs do no work (0 warmup, 0 measured); skip inter-benchmark GC overhead.
         return result.WarmupIterations != 0 || result.MeasuredIterations != 0 || result.Errored;
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ForceFullGc()
-    {
-        GC.Collect(2, GCCollectionMode.Forced, true, true);
-        GC.WaitForPendingFinalizers();
-        GC.Collect(2, GCCollectionMode.Forced, true, true);
     }
 }

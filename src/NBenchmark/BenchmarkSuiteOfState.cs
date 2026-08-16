@@ -252,6 +252,14 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         => Chain(() => base.WithDiagnostics(mode));
 
     /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithDriftCanary(DriftCanaryOptions driftCanary)
+        => Chain(() => base.WithDriftCanary(driftCanary));
+
+    /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithDriftCanary(bool enabled)
+        => Chain(() => base.WithDriftCanary(enabled));
+
+    /// <inheritdoc />
     public new BenchmarkSuite<TState> WithHardwareAffinity(params int[] cores)
         => Chain(() => base.WithHardwareAffinity(cores));
 

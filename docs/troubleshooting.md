@@ -70,6 +70,21 @@ The measured timings kept moving while they were being collected, so the interva
 
 See [Measurement: Steady-state (drift) gate](./statistics/measurement.md#phase-c---measurement-ci-width-target) for the drift detection mechanism and the restart limit.
 
+### A row warns that host drift exceeds the difference being reported
+
+> [!CAUTION] Pick one
+> **Measure the two co-resident, several times over:** `--launch-count 5`
+> **Take the machine out of it:** `--cpu-affinity 2,3 --priority high` on a host you control
+> **Re-run just the pair:** `--filter 'Baseline|Candidate' --order declaration` on a quiet machine
+
+Between the moment the baseline was measured and the moment the candidate was, the host's effective speed moved by more than the difference the table is reporting between them. The machine drifted - a laptop warming up, a build starting in another terminal, a co-tenant arriving on the runner - and the row you are looking at cannot separate that from your code.
+
+Nothing is wrong with either measurement. Each one is internally consistent, which is exactly why the per-benchmark drift gate did not fire: it looks inside a single benchmark's samples, and drift *between* benchmarks is invisible there. What caught it is the control workload NBenchmark runs at every benchmark boundary; the readings either side of each row are on `hostTimeline` in the JSON, and `hostTimeline.relativeToRunStart` is what the two rows disagree about.
+
+Raising `--launch-count` is the straightest fix: each launch measures the pair close together, so the drift becomes something the replicates average over rather than something one ordering baked in.
+
+See [The host drift canary](./statistics/measurement.md#the-host-drift-canary) for the mechanism, and [`--no-drift-canary`](./reference/cli.md#--no-drift-canary) to switch the check off.
+
 ### Sample count varies between runs
 
 > [!CAUTION] Quick fix

@@ -22,6 +22,7 @@ equivalent, explains why the settings work together, and links to the property d
 | `OutlierMode.MedianAbsoluteDeviation` | More robust than the default IQR fence when a heavy tail of preempted samples distorts the quartile-based fence. MAD has a 50% breakdown point. |
 | `.WithLaunchCount(3)` | Runs the benchmark 3 times as independent launches, one worker process each. The reported number is the average across them and the interval is the spread between them, so it describes reproducibility rather than one process's precision. |
 | `AutoTune.CapBehavior = Error` | If the wall-clock cap is hit before the CI target is met, the benchmark errors instead of silently reporting a wide interval. |
+| The drift canary (on by default) | A shared runner's speed moves during a run. The canary times fixed work at each benchmark boundary, so a comparison smaller than the drift that separated its two rows is flagged instead of reported as a result. Leave it on here of all places. |
 
 **Fluent API:**
 
@@ -200,6 +201,7 @@ dotnet run -- --diagnostics all --outlier mad --detail advanced --launch-count 5
 - High jitter metric (> 0.10) in the auto-tune diagnostic: the host is noisy. Consider [environment controls](../features/environment-control.md).
 - GC collection counts that correlate with slow samples: GC pressure is affecting your timings. Try `--profile independent`.
 - A bimodal-distribution warning: investigate the cause (lock contention, cache misses, GC pauses) rather than silencing it.
+- A host-drift warning on a row: the machine moved further between that row and the baseline than the difference between them. See [The host drift canary](../statistics/measurement.md#the-host-drift-canary).
 - `outliersRemoved` as a fraction of the sample count: this is how much of the run the fence threw away, and it is now visible in the Error column too - a run that trimmed heavily reports a wider margin than one that trimmed nothing, because [a discarded sample still counts as an observation](../statistics/outliers.md).
 
 If each individual run reports a *tight* interval and only the runs disagree with each other, the cause is not noise and none of the above will find it. Three separate things produce that, each with its own field:

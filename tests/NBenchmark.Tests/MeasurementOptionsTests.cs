@@ -572,4 +572,41 @@ public class MeasurementOptionsTests
         Assert.Equal(0, new AutoTuneOptions { MeasurementRestartLimit = 0 }.MeasurementRestartLimit);
         Assert.Throws<ArgumentOutOfRangeException>(() => new AutoTuneOptions { MeasurementRestartLimit = -1 });
     }
+
+    [Fact]
+    public void DriftCanary_Is_On_By_Default()
+    {
+        Assert.True(MeasurementOptions.Default.DriftCanary.Enabled);
+        Assert.Equal(DriftCanaryOptions.DefaultSamples, MeasurementOptions.Default.DriftCanary.Samples);
+        Assert.Equal(
+            DriftCanaryOptions.DefaultWorkPerSample,
+            MeasurementOptions.Default.DriftCanary.WorkPerSample);
+        Assert.Equal(
+            DriftCanaryOptions.DefaultMinimumReportableDrift,
+            MeasurementOptions.Default.DriftCanary.MinimumReportableDrift);
+    }
+
+    [Theory]
+    [InlineData(DriftCanaryOptions.MinSamples - 1)]
+    [InlineData(DriftCanaryOptions.MaxSamples + 1)]
+    public void DriftCanary_Samples_Rejects_Out_Of_Range(int value)
+        => Assert.Throws<ArgumentOutOfRangeException>(() => new DriftCanaryOptions { Samples = value });
+
+    [Theory]
+    [InlineData(DriftCanaryOptions.MinWorkPerSample - 1)]
+    [InlineData(DriftCanaryOptions.MaxWorkPerSample + 1)]
+    public void DriftCanary_WorkPerSample_Rejects_Out_Of_Range(int value)
+        => Assert.Throws<ArgumentOutOfRangeException>(() => new DriftCanaryOptions { WorkPerSample = value });
+
+    [Theory]
+    [InlineData(-0.01)]
+    [InlineData(1.01)]
+    [InlineData(double.NaN)]
+    public void DriftCanary_MinimumReportableDrift_Rejects_Out_Of_Range(double value)
+        => Assert.Throws<ArgumentOutOfRangeException>(
+            () => new DriftCanaryOptions { MinimumReportableDrift = value });
+
+    [Fact]
+    public void DriftCanary_Disabled_Preset_Is_Off()
+        => Assert.False(DriftCanaryOptions.Disabled.Enabled);
 }

@@ -45,7 +45,7 @@ Grouped by what they affect. Every flag is documented in full below.
 | **Output** | [`--reporter`](#--reporter-type) · [`--output`](#--output-directory) · [`--detail`](#--detail-level) · [`--no-histogram`](#--no-histogram) · [`--emit-raw`](#--emit-raw) · [`--no-samples`](#--no-samples) |
 | **Isolation** | [`--in-process`](#--in-process) · [`--strict-isolation`](#--strict-isolation) · [`--verify-isolation`](#--verify-isolation) · [`--runtimes`](#--runtimes-list) |
 | **Environment** | [`--cpu-affinity`](#--cpu-affinity-list) · [`--priority`](#--priority-level) · [`--dedicated-host-guidance`](#--dedicated-host-guidance) |
-| **Diagnostics** | [`--diagnostics`](#--diagnostics-mode) · [`--observer`](#--observer-type) · [`--stream-samples`](#--stream-samples) · [`--otlp-endpoint`](#--otlp-endpoint-url) |
+| **Diagnostics** | [`--diagnostics`](#--diagnostics-mode) · [`--no-drift-canary`](#--no-drift-canary) · [`--observer`](#--observer-type) · [`--stream-samples`](#--stream-samples) · [`--otlp-endpoint`](#--otlp-endpoint-url) |
 | **Run control** | [`--order`](#--order-mode) · [`--seed`](#--seed-n) · [`--threshold-pct`](#--threshold-pct-n) · `--help` |
 
 ## Options
@@ -645,6 +645,26 @@ dotnet run -- --observer live --stream-samples
 It needs an observer to be attached; with nothing to replay into, the request is withdrawn and the flag costs nothing. It is unrelated to [`--emit-raw`](#--emit-raw): that bounds the sample array carried on each *result*, this is the live stream. The complete array arrives with the result whether or not this is set.
 
 Programmatic equivalent: `WithOptions(o => o with { StreamSamples = true })`. Samples cross in batches - one frame per 128 samples or per 100 ms, whichever comes first - and your observer still sees one `OnSample` call per sample. See [Measurement Observer](observers.md#--stream-samples) for the batching rule and its ordering guarantee.
+
+---
+
+### `--no-drift-canary`
+
+Disable the host drift canary.
+
+By default NBenchmark runs a fixed control workload at every benchmark boundary. The work never changes, so a change in how long it takes is a change in the machine - a laptop warming up, a build starting in another terminal, a co-tenant on a CI runner. That is the one kind of noise the per-benchmark drift checks cannot see: it moves every benchmark measured after it and none measured before, so each row stays internally consistent while every comparison between them quietly stops meaning what it says.
+
+The reading either side of each benchmark lands on `BenchmarkResult.HostTimeline`, and when the difference reported between a benchmark and the baseline is smaller than the distance the host moved between them, the candidate's row carries a warning saying so. The verdict is left alone - the canary measures the machine, not the comparison.
+
+Pass this to take no readings at all:
+
+```bash
+dotnet run -- --no-drift-canary
+```
+
+A reading costs a fraction of a millisecond and is taken between benchmarks, never inside a timed window, so switching it off buys wall-clock rather than accuracy. It is already skipped on a `--dry-run`.
+
+Programmatic equivalent: `.WithDriftCanary(false)`, or `WithOptions(new MeasurementOptions { DriftCanary = DriftCanaryOptions.Disabled })`. To keep the canary but change when it speaks up, set `DriftCanaryOptions.MinimumReportableDrift` - see [DriftCanary](configuration.md#driftcanary).
 
 ---
 

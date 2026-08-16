@@ -105,7 +105,7 @@ internal static class AdaptiveLoop
             jitterMetric = JitterCalibrator.Run(
                 autoTune.JitterCalibrationSamples,
                 autoTune.JitterCalibrationWorkPerSample,
-                clock);
+                clock).JitterMetric;
 
             if (ShouldSwitchDetector(o, autoTune, jitterMetric))
                 detectorSwitched = true;
@@ -672,7 +672,7 @@ internal static class AdaptiveLoop
             jitterMetric = JitterCalibrator.Run(
                 autoTune.JitterCalibrationSamples,
                 autoTune.JitterCalibrationWorkPerSample,
-                clock);
+                clock).JitterMetric;
 
             if (ShouldSwitchDetector(o, autoTune, jitterMetric))
                 detectorSwitched = true;

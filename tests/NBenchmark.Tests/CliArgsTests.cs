@@ -1084,6 +1084,49 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_NoDriftCanary_Sets_NoDriftCanary_Flag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--no-drift-canary"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.NoDriftCanary);
+    }
+
+    [Fact]
+    public void ParseCore_Leaves_NoDriftCanary_Unset_By_Default()
+    {
+        var (result, errors) = CliArgs.ParseCore([]);
+
+        Assert.Empty(errors);
+        Assert.False(result.NoDriftCanary);
+    }
+
+    [Fact]
+    public void MeasurementOverrides_NoDriftCanary_Disables_The_Canary()
+    {
+        var (args, _) = CliArgs.ParseCore(["--no-drift-canary"]);
+
+        var applied = MeasurementOverrides.FromCliArgs(args).Apply(MeasurementOptions.Default);
+
+        Assert.False(applied.DriftCanary.Enabled);
+    }
+
+    /// <summary>
+    ///     One-way, like <c>--emit-raw</c>: the flag's absence must not switch the canary back on
+    ///     over a programmatic <c>WithDriftCanary(false)</c>.
+    /// </summary>
+    [Fact]
+    public void MeasurementOverrides_Without_The_Flag_Leaves_A_Disabled_Canary_Disabled()
+    {
+        var (args, _) = CliArgs.ParseCore([]);
+
+        var configured = MeasurementOptions.Default with { DriftCanary = DriftCanaryOptions.Disabled };
+        var applied = MeasurementOverrides.FromCliArgs(args).Apply(configured);
+
+        Assert.False(applied.DriftCanary.Enabled);
+    }
+
+    [Fact]
     public void ParseCore_NoSamples_Sets_NoSamples_Flag()
     {
         var (result, errors) = CliArgs.ParseCore(["--no-samples"]);
@@ -1329,6 +1372,7 @@ public class CliArgsTests
         Assert.Contains("--autotune-cap-behavior", stdout);
         Assert.Contains("--percentiles", stdout);
         Assert.Contains("--no-histogram", stdout);
+        Assert.Contains("--no-drift-canary", stdout);
         Assert.Contains("--no-samples", stdout);
         Assert.Contains("--cpu-affinity", stdout);
         Assert.Contains("--priority", stdout);

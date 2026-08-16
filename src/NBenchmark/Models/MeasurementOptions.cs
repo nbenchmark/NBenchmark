@@ -157,6 +157,13 @@ public record MeasurementOptions
     public DiagnosticsOptions Diagnostics { get; init; } = DiagnosticsOptions.Default;
 
     /// <summary>
+    ///     Settings for the host drift canary - the deterministic control workload measured at each
+    ///     benchmark boundary, which is what lets a run say how much the host's effective speed
+    ///     moved while it was running. On by default; see <see cref="DriftCanaryOptions" />.
+    /// </summary>
+    public DriftCanaryOptions DriftCanary { get; init; } = DriftCanaryOptions.Default;
+
+    /// <summary>
     ///     The authoritative measurement profile. The resolved booleans
     ///     (<see cref="ForceGcBeforeEachIteration" />, <see cref="ForceGcBeforeMeasurement" />,
     ///     <see cref="ForceGcBetweenBenchmarks" />, <see cref="MeasureAllocations" />) derive from

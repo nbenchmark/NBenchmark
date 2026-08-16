@@ -222,6 +222,59 @@ Why quantization is worth this much trouble - the asymmetry that makes it danger
 > a fixed addend on every sample, so treat absolute values at that scale as upper
 > bounds and compare against a baseline measured the same way.
 
+## The host drift canary
+
+Every drift check described above looks inside **one** benchmark's own sample stream. That is the
+wrong shape for the noise that matters most across a table: a laptop warming up, a build starting
+in another terminal, a co-tenant arriving on a CI runner. Those move every benchmark measured
+afterwards and none measured before, so each row stays internally consistent - tight interval,
+clean split-half, no restarts - while every comparison between them quietly stops meaning what it
+says.
+
+So NBenchmark measures the machine as well as the code. A fixed, deterministic control workload
+runs at every benchmark boundary: once before the first benchmark, once after each one, once after
+the last. The work never changes, so a change in how long it takes is a change in the host.
+
+Each result carries the readings taken either side of it, on `BenchmarkResult.HostTimeline`:
+
+| Field | What it is |
+| --- | --- |
+| `BeforeNs` / `AfterNs` | The readings bracketing this benchmark. Absolute nanoseconds of an arbitrary amount of work - only their ratios mean anything. |
+| `RelativeToRunStart` | The bracketing mean as a multiple of the run's first reading. `1.07` = the same work took 7% longer here than at the start of the run. |
+| `Position` | How many benchmarks had completed when this one started. |
+
+`RelativeToRunStart` is the number to compare between rows, and comparing it is what the feature is
+for. When the difference reported between a benchmark and the baseline is **smaller than the
+distance the host moved between the two points at which they were measured**, the candidate's row
+carries a warning:
+
+```
+host drift exceeds the difference being reported: the machine was 8% slower when 'Candidate' was
+measured than when 'Baseline' was, and the 3% difference between them is smaller than that.
+```
+
+That is the one thing NBenchmark could not previously tell you when you were about to act on a 3%
+regression.
+
+It warns and never downgrades the verdict. `MinimumPracticalEffect` and `MinimumRelativeShift`
+change a verdict because they are statements about the comparison itself; the canary is a statement
+about the machine, measured by a different workload at a different moment. That is indirect
+evidence about your comparison, and it belongs in your hands rather than in the ✓ column.
+
+Readings are taken between benchmarks, never inside a timed window, and one costs a fraction of a
+millisecond - so a twenty-benchmark run pays for the canary in microseconds and it cannot affect
+accuracy. It is on by default, skipped entirely on a dry-run, and switched off with
+`--no-drift-canary` or `.WithDriftCanary(false)`. To keep it but change when it speaks up, set
+`DriftCanaryOptions.MinimumReportableDrift` (default 1%) - see
+[DriftCanary](../reference/configuration.md#driftcanary).
+
+> [!NOTE]
+> With more than one launch, each launch is a fresh worker with its own first reading, so the row
+> reports the mean of its launches' `RelativeToRunStart`. Raising `--launch-count` is also the
+> straightest remedy when the warning fires: it measures the two benchmarks near each other several
+> times over, so the drift becomes something the replicates average over rather than something one
+> ordering baked in.
+
 ## Reducing noise at the source
 
 The adaptive loop, [outlier trimming](./outliers.md) (including the [bimodal warning](./outliers.md#bimodal-distribution-warning)), and [significance testing](./significance.md) all work around OS noise statistically - they discard or down-weight samples that look like interference. They cannot remove noise that is baked into every sample, such as a benchmark thread migrating between cores (cold-cache stalls on every migration) or a normal-priority process on a busy host. NBenchmark provides opt-in **environment controls** - CPU affinity, process priority, and dedicated-host guidance - that reduce this noise before the timer starts. See [Environment control](../features/environment-control.md) for the full model, platform notes, and isolated-process propagation.

@@ -600,6 +600,28 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
+    ///     Configures the host drift canary - the deterministic control workload measured at each
+    ///     benchmark boundary, which is what lets a run say how much the host's effective speed
+    ///     moved while it was running. On by default.
+    /// </summary>
+    public BenchmarkHarness WithDriftCanary(DriftCanaryOptions driftCanary)
+    {
+        ArgumentNullException.ThrowIfNull(driftCanary);
+        _options = _options with { DriftCanary = driftCanary };
+        return this;
+    }
+
+    /// <summary>
+    ///     Turns the host drift canary on or off. On by default; switching it off takes no control
+    ///     readings between benchmarks and silences the host-drift warning.
+    /// </summary>
+    public BenchmarkHarness WithDriftCanary(bool enabled)
+    {
+        _options = _options with { DriftCanary = _options.DriftCanary with { Enabled = enabled } };
+        return this;
+    }
+
+    /// <summary>
     ///     Controls Harness mode's isolated-by-default execution. When enabled (the default),
     ///     each discovered class runs in its own clean-room child process unless a benchmark
     ///     or its class opts out with <c>[InProcess]</c>. When disabled, every benchmark
