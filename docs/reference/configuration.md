@@ -405,7 +405,7 @@ Which sample set the order statistics - percentiles, `Min`, `Max`, and the histo
 
 The resolved basis is recorded on the result (`BenchmarkResult.TailMetricsBasis`) so a consumer can label which sample set each statistic describes instead of inferring it. See [Descriptive statistics](../statistics/descriptive.md).
 
-Central-tendency and dispersion statistics (mean, standard deviation, CI, CV, skewness, kurtosis, MAD, median, median CI) always stay on the trimmed set regardless of this setting.
+Central-tendency and dispersion statistics (mean, standard deviation, CV, skewness, kurtosis, MAD, median, median CI) always stay on the trimmed set regardless of this setting. The confidence interval on the mean is the one exception in the other direction: it is the [Winsorized interval](../statistics/descriptive.md#after-outlier-trimming-the-winsorized-standard-error) over the pre-trim set, so trimming never narrows the error bar.
 
 CLI flag: `--tail-basis <raw|trimmed>`
 

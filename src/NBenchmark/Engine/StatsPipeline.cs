@@ -32,13 +32,19 @@ public static class StatsPipeline
             ? trimResult.SortedAll
             : null;
 
+        // The trim context is what lets the reported interval be the Winsorized (Yuen) one: a
+        // t-interval on the kept set alone describes a run that produced only the inliers, which is
+        // not the run that happened. It is passed separately from tailSource even though both can
+        // be the same array - the tail basis is a user choice about which distribution the
+        // percentiles describe, while the interval correction is not optional.
         var stats = StatsSummary.Compute(
             trimResult.Kept,
             options.ConfidenceLevel,
             options.ReportedPercentiles,
             options.EnableHistogram,
             options.HistogramBucketCount,
-            tailSource);
+            tailSource,
+            TrimContext.From(trimResult));
 
         long? meanAllocs = rawAllocations is not null ? ComputeMean(rawAllocations) : null;
         var warnings = BuildWarnings(

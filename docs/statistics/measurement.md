@@ -66,7 +66,7 @@ Ops-per-sample calibration (Phase A) resolves K against the body's **cold** code
 
 If `Iterations` is `null`, NBenchmark streams measured samples and, every `AutoTune.BatchSize` samples, recomputes the confidence interval on the mean. Sampling stops once the interval's relative half-width falls below `AutoTune.CiTarget` (±2.5% by default) - never before `AutoTune.MinSamples`, never after `AutoTune.MaxSamples`. A pinned `Iterations` collects exactly that many samples. A per-benchmark `AutoTune.MaxTuningTime` wall-clock cap bounds the whole loop so a pathological body can never run away.
 
-The reported interval is corrected for the fact that the loop stopped precisely when the interval happened to be narrow (optional stopping) - see [The measurement engine: the optional-stopping correction](../deep-dives/measurement-engine.md#the-optional-stopping-correction).
+Stopping at the first sample count that meets the target is *optional stopping*, and the reported interval is not corrected for it. Read the stop reason alongside the margin - see [The measurement engine: optional stopping](../deep-dives/measurement-engine.md#the-optional-stopping-correction).
 
 Two gates sit on that stop rule, mirroring the warmup settle gates. The CI rule decides whether the interval is *narrow enough*; the gates decide whether it is *honest to stop*.
 
@@ -101,9 +101,21 @@ Each measured sample does the following:
 
 ### Raw vs. trimmed statistics
 
-The CI-width stop rule evaluates the **raw** (untrimmed) sample stream as it arrives. After the loop ends, the collected per-op samples pass through [outlier trimming](./outliers.md) and the reported statistics - including the Error column - are computed on the **trimmed** set. So the diagnostic's `AchievedRelativeCiWidth` reflects the raw stop value while the reported interval reflects the trimmed result.
+The CI-width stop rule evaluates the **raw** (untrimmed) sample stream as it arrives. After the loop ends, the collected per-op samples pass through [outlier trimming](./outliers.md), and the reported statistics - including the Error column - describe the **trimmed** set. So `AutoTune.AchievedRelativeCiWidth` is the raw stop value while `MarginOfError` is the reported interval on the trimmed mean.
 
-The two are usually close, but they can diverge by two orders of magnitude, and the direction is always the same: **the reported interval is the narrower one.** When a benchmark's variance lives almost entirely in the outliers, trimming removes it and the reported margin tightens around what remains - one sample body reported `MarginOfError` at ±1.3% of its mean next to an `AchievedRelativeCiWidth` of `1.05` (±105%) and a `MaxCeiling` stop. Neither number is wrong; they describe different sample sets. But a tight Error column is only trustworthy evidence that the *measurement converged* when `SampleStop` is `CiTargetMet`. Read the stop reason before the margin.
+They answer different questions, and the reported one is deliberately the narrower:
+
+| Number | Describes | Read it when |
+|---|---|---|
+| `MarginOfError` | How precisely the **trimmed mean** is known - the [Winsorized interval](./descriptive.md#after-outlier-trimming-the-winsorized-standard-error), which accounts for the samples the fence removed rather than dropping their variance | You want an error bar on the reported number |
+| `AutoTune.AchievedRelativeCiWidth` | How wide the interval on the **raw mean** got before the loop stopped | You want to know whether the machine was quiet enough for the measurement to converge |
+| `Max`, `P99`, `P99.9` | The raw distribution's actual tail (they read the pre-trim set by default) | You want to know how slow the slow samples really were |
+
+**The Winsorized interval closes part of the gap and is not meant to close all of it.** Before it, `MarginOfError` was a plain t-interval on the kept samples alone - describing a run that had produced only the inliers, which is not the run that happened - and it could sit two orders of magnitude tighter than the achieved width. Winsorizing keeps every sample and clamps the trimmed ones, so the interval widens by the amount that was trimmed. It does not widen by the outliers' *magnitude*, on purpose: an interval on the trimmed mean that moved when a discarded sample moved would not be an interval on the trimmed mean. So a body that reported `MarginOfError` at ±1.3% next to an `AchievedRelativeCiWidth` of `1.05` (±105%) still reports a far tighter margin than that after the correction, and the honest reading has not changed:
+
+> A tight Error column is trustworthy evidence that the *measurement converged* only when `SampleStop` is `CiTargetMet`. Read the stop reason before the margin, and the raw percentiles beside it.
+
+If you want the reported number and its interval to describe the whole distribution, tail and all, set `OutlierMode.None` (`--outlier none`) - then nothing is trimmed, the Winsorized interval reduces to the plain one, and every statistic is on the same raw set.
 
 ### What the loop decided
 

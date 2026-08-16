@@ -26,6 +26,7 @@ first principles inside the test**:
 | Standard deviation | $\sqrt{\sum(x_i-\bar{x})^2/(n-1)}$ | 1e-9 relative |
 | Standard error | $s/\sqrt{n}$ | 1e-9 relative |
 | Margin of error | $t^{*} \times \text{SEM}$ | 1e-9 relative |
+| Winsorized standard error (trimmed sets) | Clamp, then $s_w\sqrt{n}/h$ | 1e-9 relative |
 | Coefficient of variation | $s/\bar{x}$ | 1e-9 relative |
 | Percentiles (P1–P99) | Nearest-rank `ceil(p·n)−1` | exact |
 
@@ -33,12 +34,14 @@ Because this covers arbitrary inputs rather than a handful of hand-picked
 arrays, it is the strongest guard against a regression in the descriptive
 statistics.
 
-## 2. External cross-checks (SciPy / NumPy)
+## 2. External cross-checks
 
 `StatsCrossCheckTests` and `MannWhitneyCrossCheckTests` pin NBenchmark's output
-against values pre-computed with **SciPy 1.17.1** and **NumPy 2.4.6**. The
-reference values are embedded as constants in the tests; the generators are
-listed below so they can be regenerated.
+against values pre-computed with **SciPy 1.17.1** and **NumPy 2.4.6**.
+`WinsorizedErrorCrossCheckTests` pins the one quantity neither package computes
+against the reference formula for it. The reference values are embedded as
+constants in the tests; the generators are listed below so they can be
+regenerated.
 
 | NBenchmark | Reference | Agreement |
 |---|---|---|
@@ -51,6 +54,7 @@ listed below so they can be regenerated.
 | `MannWhitneyU.Test` (otherwise) | `scipy.stats.mannwhitneyu(method='asymptotic', use_continuity=True)` | < 1e-6 absolute |
 | `ChiSquared.SurvivalFunction` | Closed forms (df = 2: $e^{-x/2}$; df = 4) and `scipy.stats.chi2.sf` | \u2264 1e-9 on closed forms; \u2264 1e-4 on spot values |
 | `KruskalWallis.Test` (H, p) | `scipy.stats.kruskal` (with tie correction) | H \u2264 1e-9; p \u2264 1e-6 |
+| `WinsorizedError.Compute` (Winsorized SEM) | Yuen's formula; equals R's `WRS2::trimse` on a symmetric trim | \u2264 1e-9 relative |
 
 Reference values were generated with:
 
@@ -70,6 +74,37 @@ stats.mannwhitneyu(a, b, alternative='two-sided',
 stats.chi2.sf(x, df)                         # chi-squared survival function
 stats.kruskal(*groups)                       # Kruskal-Wallis H and p-value
 ```
+
+### The Winsorized (Yuen) standard error
+
+SciPy has no reference for this one: `scipy.stats.trim_mean` returns a location estimate and no
+standard error at all. The reference is Wilcox's Winsorized standard error - the quantity R's
+`WRS2::trimse` computes - written out from its definition, so the generator is self-contained and
+does not depend on either package:
+
+```python
+import math
+
+def winsorized_standard_error(x, g_low, g_high):
+    """Yuen's standard error of the trimmed mean. g_low / g_high are trim COUNTS, not a proportion:
+    a fence-based detector discards whatever falls past the fence, asymmetrically."""
+    xs = sorted(x)
+    n = len(xs)
+    h = n - g_low - g_high                      # samples kept
+    lo, hi = xs[g_low], xs[n - g_high - 1]      # the innermost retained order statistics
+    w = [lo] * g_low + xs[g_low:n - g_high] + [hi] * g_high   # clamp, never drop
+    mean = sum(w) / n
+    s_w = math.sqrt(sum((v - mean) ** 2 for v in w) / (n - 1))
+    return s_w * math.sqrt(n) / h               # rescaled onto the trimmed mean; df = h - 1
+```
+
+`WinsorizedErrorCrossCheckTests` pins the output of this generator and additionally asserts the
+`WRS2::trimse` identity: for a symmetric trim where `tr·n` is a whole number,
+`sqrt(winvar(x, tr)) / ((1 − 2·tr)·sqrt(n))` and `s_w·sqrt(n)/h` are the same number written two
+ways. `StatsRecomputationTests` recomputes the same formula from first principles over the random
+sample sets, and asserts the reduction property - with `g_low = g_high = 0` the result is
+bit-identical to `s/sqrt(n)`, so a run that trimmed nothing reports exactly what it reported before
+the estimator existed.
 
 ### Exact vs. approximate Mann-Whitney U
 

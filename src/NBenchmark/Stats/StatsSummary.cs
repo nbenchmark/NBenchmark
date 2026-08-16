@@ -10,8 +10,19 @@ public sealed class StatsSummary
     public double Max { get; init; }
     public double StandardDeviation { get; init; }
 
+    /// <summary>
+    ///     Standard error of the mean. <c>s / sqrt(n)</c> on an untrimmed set; the Winsorized (Yuen)
+    ///     standard error <c>s_w × sqrt(n) / h</c> when outlier trimming removed samples, so the
+    ///     variance the fence discarded is accounted for rather than dropped. See
+    ///     <see cref="WinsorizedError" />.
+    /// </summary>
     public double StandardError { get; init; }
 
+    /// <summary>
+    ///     Half-width of the confidence interval on the mean: <c>t* × StandardError</c>, read on
+    ///     <c>n - 1</c> degrees of freedom on an untrimmed set and on <c>h - 1</c> when trimming
+    ///     removed samples. See <see cref="StandardError" />.
+    /// </summary>
     public double MarginOfError { get; init; }
 
     public double ConfidenceLevel { get; init; }
@@ -47,6 +58,15 @@ public sealed class StatsSummary
     ///         <paramref name="samples" />. The engine passes the pre-trim set here so tail metrics
     ///         describe the full distribution while the central statistics stay robust to outliers.
     ///     </para>
+    ///     <para>
+    ///         When <paramref name="trim" /> is supplied and describes a set that actually lost
+    ///         samples, <see cref="StandardError" /> and <see cref="MarginOfError" /> are the
+    ///         Winsorized (Yuen) ones - see <see cref="WinsorizedError" /> - so the interval accounts
+    ///         for the variance trimming removed instead of reporting the precision of a run that
+    ///         happened to produce only the inliers. Every other statistic is unaffected. Omitting
+    ///         the argument, or passing a context with nothing trimmed, leaves the plain
+    ///         <c>s / sqrt(n)</c> interval exactly as it was.
+    ///     </para>
     /// </summary>
     public static StatsSummary Compute(
         double[] samples,
@@ -54,7 +74,8 @@ public sealed class StatsSummary
         IReadOnlyList<double>? reportedPercentiles = null,
         bool enableHistogram = true,
         int histogramBucketCount = 20,
-        double[]? tailSource = null)
+        double[]? tailSource = null,
+        TrimContext? trim = null)
     {
         if (samples.Length == 0)
             return new StatsSummary { ConfidenceLevel = confidenceLevel };
@@ -120,6 +141,21 @@ public sealed class StatsSummary
 
             if (!double.IsNaN(tCritical))
                 marginOfError = tCritical * standardError;
+        }
+
+        // The interval - and only the interval - moves onto the Winsorized (Yuen) estimator when the
+        // caller says samples were trimmed away. The dispersion statistics below stay on the trimmed
+        // set on purpose: a fenced-out spike must not move the standard deviation, the CV or the
+        // shape moments, which is the whole reason the fence exists. What it must move is the claim
+        // about how precisely the mean is known, because that claim is about the run and the run
+        // produced n readings, not h. The short-circuit on an untrimmed context is deliberate rather
+        // than an optimization: it keeps a clean run's margin bit-identical to the pre-Yuen value
+        // instead of merely mathematically equal to it.
+        if (trim is { IsTrimmed: true } context
+            && WinsorizedError.Compute(context, confidenceLevel) is { } winsorized)
+        {
+            standardError = winsorized.StandardError;
+            marginOfError = winsorized.MarginOfError;
         }
 
         var cv = mean != 0 ? sampleStdDev / mean : 0.0;

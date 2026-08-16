@@ -54,7 +54,7 @@ To actually *reduce* that spread you have to work outside the statistics - [envi
 > **Accept the variance as the finding:** `--launch-count 5` (the honest signal of run-to-run spread across launches)
 > **Chase precision:** raise `--max-samples` and loosen `--ci-target` (e.g. `--ci-target 0.05`)
 
-The reported Error is computed on the **trimmed** set while the loop's stop rule ran on the **raw** stream. When the variance lives in the outliers, trimming removes it and the reported margin tightens around what remains. A benchmark can show `MarginOfError` at ±1.3% of its mean while `autoTune.achievedRelativeCiWidth` is `1.05` (±105%). Neither number is wrong; they describe different sample sets.
+The reported Error describes the **trimmed** mean while the loop's stop rule ran on the **raw** stream. The Error already accounts for how many samples the fence removed - it is a Winsorized interval, so a discarded sample still counts as an observation - but not for how *far out* they were, because an interval on the trimmed mean cannot. A benchmark can show `MarginOfError` at ±1.4% of its mean while `autoTune.achievedRelativeCiWidth` is `1.05` (±105%). Neither number is wrong; they describe different sample sets.
 
 Read `autoTune.sampleStop` before the Error column: a tight margin is evidence the measurement *converged* only when it reads `ciTargetMet`. Compare `autoTune.achievedRelativeCiWidth` against `marginOfError / mean`, and check `outliersRemoved` against the pre-trim sample count.
 

@@ -200,6 +200,7 @@ dotnet run -- --diagnostics all --outlier mad --detail advanced --launch-count 5
 - High jitter metric (> 0.10) in the auto-tune diagnostic: the host is noisy. Consider [environment controls](../features/environment-control.md).
 - GC collection counts that correlate with slow samples: GC pressure is affecting your timings. Try `--profile independent`.
 - A bimodal-distribution warning: investigate the cause (lock contention, cache misses, GC pauses) rather than silencing it.
+- `outliersRemoved` as a fraction of the sample count: this is how much of the run the fence threw away, and it is now visible in the Error column too - a run that trimmed heavily reports a wider margin than one that trimmed nothing, because [a discarded sample still counts as an observation](../statistics/outliers.md).
 
 If each individual run reports a *tight* interval and only the runs disagree with each other, the cause is not noise and none of the above will find it. Three separate things produce that, each with its own field:
 

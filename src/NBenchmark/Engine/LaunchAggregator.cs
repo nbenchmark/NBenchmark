@@ -227,6 +227,21 @@ internal static class LaunchAggregator
     ///         of twenty.
     ///     </para>
     ///     <para>
+    ///         <b>The Winsorized (Yuen) correction is deliberately not applied here.</b> A trimming
+    ///         correction answers "how much variance did the fence remove from this process's
+    ///         samples?", and above one launch the reported interval is not describing one process's
+    ///         samples at all - it is the spread of <c>k</c> launch medians, which contains the
+    ///         between-process component the trimming correction has no view of and is the wider
+    ///         question by a large factor. Layering a within-launch correction onto a between-launch
+    ///         interval would mix two scales. The correction still reaches this path twice, on its
+    ///         own terms: the single-launch case passes the per-launch result through untouched, so
+    ///         it carries the Yuen interval; and <see cref="LaunchStatistics.WithinLaunchStandardError" />
+    ///         - the denominator of <c>ProcessVarianceRatio</c> - is the mean of the per-launch
+    ///         standard errors, which are now the Winsorized ones. The ratio therefore falls slightly,
+    ///         which is correct: part of what it was attributing to between-process variance was the
+    ///         within-launch interval being too narrow.
+    ///     </para>
+    ///     <para>
     ///         <b>Why the raw samples are not pooled and the statistics recomputed.</b> That is the
     ///         obvious implementation and it is wrong here: an isolated worker computes its statistics
     ///         over its full sample array and then ships a bounded <c>SampleReservoir</c> subset.

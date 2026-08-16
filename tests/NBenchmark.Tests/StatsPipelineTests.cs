@@ -224,4 +224,95 @@ public class StatsPipelineTests
 
         Assert.DoesNotContain(result.Warnings, w => w.Contains("garbage collection"));
     }
+
+    // ---- Winsorized (Yuen) interval after trimming (W3) ---------------------
+
+    /// <summary>
+    ///     The reported interval is the Winsorized one, end to end. Trimming removed variance from
+    ///     the sample set, and the interval has to keep it: the run produced <c>n</c> readings, not
+    ///     the <c>h</c> that survived the fence.
+    /// </summary>
+    [Fact]
+    public void Run_ReportedInterval_Is_Wider_When_The_Fence_Trimmed_Samples()
+    {
+        // A tight body with three preempted samples past the upper fence.
+        var timings = new double[40];
+
+        for (var i = 0; i < 37; i++)
+        {
+            timings[i] = 100.0 + i % 5;
+        }
+
+        timings[37] = 4_000.0;
+        timings[38] = 4_500.0;
+        timings[39] = 5_000.0;
+
+        var options = new MeasurementOptions { Iterations = 40 };
+        var trimmed = StatsPipeline.Run(timings, null, options);
+
+        Assert.Equal(3, trimmed.OutliersRemoved);
+
+        // What the naive formula would have reported: a plain t-interval on the kept samples alone.
+        var detailed = OutlierTrim.TrimDetailed(timings, options.ResolveOutlierDetector());
+        var naive = StatsSummary.Compute(detailed.Kept, options.ConfidenceLevel);
+
+        Assert.Equal(naive.Mean, trimmed.Stats.Mean);
+        Assert.Equal(naive.StandardDeviation, trimmed.Stats.StandardDeviation);
+        Assert.True(trimmed.Stats.StandardError > naive.StandardError);
+        Assert.True(trimmed.Stats.MarginOfError > naive.MarginOfError);
+
+        // The recomputed Winsorized value is what it reports - not some other widening.
+        var expected = WinsorizedError.Compute(TrimContext.From(detailed), options.ConfidenceLevel);
+
+        Assert.NotNull(expected);
+        Assert.Equal(expected.Value.StandardError, trimmed.Stats.StandardError);
+        Assert.Equal(expected.Value.MarginOfError, trimmed.Stats.MarginOfError);
+    }
+
+    /// <summary>
+    ///     The reduction property where it matters most: a run that trims nothing reports exactly the
+    ///     numbers it reported before the correction existed. Exact equality, not a tolerance - the
+    ///     estimator is defined to collapse, so anything else is a defect rather than rounding.
+    /// </summary>
+    [Fact]
+    public void Run_With_OutlierMode_None_Reports_The_Unchanged_Naive_Interval()
+    {
+        var rng = new Random(4242);
+        var timings = new double[200];
+
+        for (var i = 0; i < timings.Length; i++)
+        {
+            timings[i] = 100.0 + rng.NextDouble() * 40.0;
+        }
+
+        var options = new MeasurementOptions { Iterations = 200, OutlierMode = OutlierMode.None };
+        var result = StatsPipeline.Run(timings, null, options);
+
+        var sorted = (double[])timings.Clone();
+        Array.Sort(sorted);
+        var naive = StatsSummary.Compute(sorted, options.ConfidenceLevel);
+
+        Assert.Equal(0, result.OutliersRemoved);
+        Assert.Equal(naive.StandardError, result.Stats.StandardError);
+        Assert.Equal(naive.MarginOfError, result.Stats.MarginOfError);
+    }
+
+    /// <summary>
+    ///     A fence that finds nothing to trim is the same case as no fence at all, and must report
+    ///     the same interval - so the correction never fires on a clean run measured with the
+    ///     defaults.
+    /// </summary>
+    [Fact]
+    public void Run_With_A_Fence_That_Trims_Nothing_Reports_The_Unchanged_Naive_Interval()
+    {
+        var timings = Enumerable.Range(1, 60).Select(i => 100.0 + i % 7).ToArray();
+
+        var fenced = StatsPipeline.Run(timings, null, new MeasurementOptions { Iterations = 60 });
+        var untrimmed = StatsPipeline.Run(timings, null,
+            new MeasurementOptions { Iterations = 60, OutlierMode = OutlierMode.None });
+
+        Assert.Equal(0, fenced.OutliersRemoved);
+        Assert.Equal(untrimmed.Stats.StandardError, fenced.Stats.StandardError);
+        Assert.Equal(untrimmed.Stats.MarginOfError, fenced.Stats.MarginOfError);
+    }
 }

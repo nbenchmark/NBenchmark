@@ -163,7 +163,30 @@ public static class ReportFormat
     ///                 </para>
     ///             </description>
     ///         </item>
+    ///         <item>
+    ///             <term>5</term>
+    ///             <description>
+    ///                 The reported confidence interval is corrected for outlier trimming. Where the
+    ///                 margin of error was a plain t-interval on the kept samples - describing a run
+    ///                 that had produced only the inliers, which is not the run that happened - it is
+    ///                 now the Winsorized (Yuen) interval over the full pre-trim set: the trimmed
+    ///                 samples are clamped to the nearest retained value rather than dropped, and the
+    ///                 scale is corrected back onto the trimmed mean by <c>sqrt(n) / h</c> on
+    ///                 <c>h - 1</c> degrees of freedom.
+    ///                 <para>
+    ///                     <c>StandardError</c>, <c>MarginOfError</c> and everything derived from
+    ///                     them - the confidence bounds, <c>MarginPercent</c>,
+    ///                     <c>StandardErrorPercent</c>, and the margins a
+    ///                     <c>MaxRegressionPercent</c> or <c>--threshold-pct</c> gate reads - widen on
+    ///                     every benchmark that trimmed anything, which under the default
+    ///                     <c>IqrFence</c> is most of them. The direction is always the same and the
+    ///                     size scales with how much was trimmed. No other statistic moves, and a run
+    ///                     that trimmed nothing (<c>OutlierMode.None</c>, or a clean sample set) is
+    ///                     bit-identical to epoch 4.
+    ///                 </para>
+    ///             </description>
+    ///         </item>
     ///     </list>
     /// </remarks>
-    public const int MeasurementEpoch = 4;
+    public const int MeasurementEpoch = 5;
 }

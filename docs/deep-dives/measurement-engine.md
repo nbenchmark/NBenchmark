@@ -56,11 +56,19 @@ When the loop auto-switched the detector, the runner builds an effective options
 
 ## The optional-stopping correction
 
-The CI rule evaluates the half-width on a cadence (`BatchSize` samples past `MinSamples`) and stops at the first crossing, so each evaluation is a "look" at the accumulating data. A CI computed at the nominal `ConfidenceLevel` at the stopping look no longer has its nominal coverage, because the loop stopped precisely when the interval happened to be narrow - the classic optional-stopping bias.
+There isn't one. This section explains the bias, and why the obvious correction was implemented, measured, and withdrawn rather than shipped.
 
-The stop rule itself is unchanged (it remains the cheap online gate); `CiWidthDetector.ReportedHalfWidth(trimmedSamples)` recomputes the reported interval post-hoc on the final trimmed array with a Bonferroni-widened critical value over the actual number of looks (`t_eff = t_{1 - α/looks, df}`, tracked via `CiWidthDetector.LookCount`), restoring conservative coverage. With one look there is no optional stopping and the result equals the naive interval.
+The CI rule evaluates the half-width on a cadence (`BatchSize` samples past `MinSamples`) and stops at the first crossing, so each evaluation is a "look" at the accumulating data. A CI computed at the nominal `ConfidenceLevel` at the stopping look no longer has its nominal coverage, because the loop stopped precisely when the interval happened to be narrow - the classic optional-stopping bias. The bias is real and its direction is known: the reported interval is optimistic.
 
-Bonferroni over the per-cadence look count is deliberately conservative - at the default `BatchSize` of 8 a converging run accumulates dozens of looks, so the corrected interval can be substantially wider; a Pocock or O'Brien-Fleming group-sequential boundary is a lighter-touch alternative when that proves too wide in practice.
+The textbook fix is a Bonferroni widening over the look count: split the error rate across the looks, so the per-look α becomes α/looks and the critical value rises. That was built and it does not fit this loop. At 2,000 samples with the default `BatchSize` of 8, the look count is roughly 250 - so the effective confidence level becomes `1 − 0.05/250` and the t critical value lands near **3.7 against 1.96**, widening the reported interval about 1.9x on its own. Bonferroni assumes the looks are independent tests, and these are the opposite of independent: each look adds eight samples to a set already thousands strong, so consecutive half-widths are nearly the same number. Correcting as though 250 independent chances had been taken over-corrects severely for the bias that is actually present. A user who asked for a ±2.5% CI target would be shown ±5% or worse - not a more honest number, only a larger one, and one that would fail regression gates on runs that did converge.
+
+So the interval reports the [Winsorized precision](../statistics/descriptive.md#after-outlier-trimming-the-winsorized-standard-error) of the trimmed mean and nothing more, and the loop's stopping behavior is surfaced instead of silently priced in:
+
+- `AutoTune.SampleStop` names why sampling stopped. A `CiTargetMet` stop is the case where optional stopping applies; `MaxCeiling` and `DriftUnresolved` stops did not stop early on a narrow interval at all.
+- `AutoTune.CiWidthSeries` is the half-width at every look, so the convergence trace - and its length, the look count - is in the output.
+- `AutoTune.AchievedRelativeCiWidth` is the raw-stream width at the stopping look.
+
+The right instrument is a group-sequential boundary (Pocock, O'Brien-Fleming) or an always-valid confidence sequence, which correct for repeated looks at their actual correlation rather than at the worst case. That is a statistics project of its own rather than a rider on the trimming correction, and it is tracked as one.
 
 ## The warmup gates
 

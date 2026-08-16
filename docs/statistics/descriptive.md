@@ -8,7 +8,7 @@ order: 4
 
 ## Descriptive statistics
 
-Given a sorted, trimmed array of `n` samples:
+Given a sorted, trimmed array of `n` samples (the two exceptions are noted where they arise: tail metrics read the pre-trim set by default, and the standard error accounts for what trimming removed):
 
 ### Mean
 
@@ -41,21 +41,43 @@ The `n-1` denominator (Bessel's correction) makes `s` an unbiased estimator of t
 
 ## [Standard error of the mean](https://en.wikipedia.org/wiki/Standard_error)
 
+When nothing was trimmed, SEM is the textbook formula:
+
 $$\text{SEM} = \frac{s}{\sqrt{n}}$$
 
 SEM measures how precisely the mean is estimated. For `n = 1`, SEM is `0`.
+
+### After outlier trimming: the Winsorized standard error
+
+Applying that formula to the trimmed set alone answers a question nobody asked - "how precisely would this mean be known if the run had produced exactly these `h` samples and no others?" The variance the fence removed just disappears, so the margin tightens by however much was trimmed, always in the same direction.
+
+So when [outlier trimming](./outliers.md) removed samples, the standard error is the **Winsorized** one (Yuen's estimator). With `n` pre-trim samples, `g_L` trimmed from the fast end, `g_U` from the slow end, and `h = n − g_L − g_U` kept:
+
+1. **Winsorize** the sorted pre-trim set: clamp the `g_L` smallest up to $x_{(g_L+1)}$ and the `g_U` largest down to $x_{(n-g_U)}$. Nothing is dropped; the sample keeps all `n` values.
+2. Take the Winsorized standard deviation $s_w$ with the usual `n − 1` denominator.
+3. Rescale onto the trimmed mean's own sampling distribution:
+
+$$\text{SEM} = \frac{s_w \sqrt{n}}{h}$$
+
+A trimmed sample therefore counts as an observation - the run did produce a reading out past the fence - without its magnitude setting the width. Move a trimmed outlier from 100 ns to 100 ms and the interval does not change at all. That is the property that makes it robust rather than merely wider.
+
+**It reduces exactly.** With nothing trimmed, `h = n`, the Winsorized sample is the original sample, and this collapses to $s/\sqrt{n}$ on `n − 1` degrees of freedom - the formula above, unchanged. A clean run's numbers do not move.
+
+**What it does not do.** It makes the interval correct for what it describes: the **trimmed mean**. It does not restore the uncertainty of the *raw* mean, because clamping deliberately discards the outliers' magnitude. A body whose raw distribution is far wider than its trimmed one is described by the tail percentiles (computed on the raw set by default) and by `AutoTune.AchievedRelativeCiWidth` - see [Raw vs. trimmed statistics](./measurement.md#raw-vs-trimmed-statistics).
 
 ## [Confidence interval](https://en.wikipedia.org/wiki/Confidence_interval) on the mean
 
 The margin of error is the half-width of the confidence interval:
 
-$$\text{MoE} = t^{*}_{\alpha/2,\, n-1} \times \text{SEM}$$
+$$\text{MoE} = t^{*}_{\alpha/2,\, \nu} \times \text{SEM}$$
 
-where $t^{*}_{\alpha/2,\, n-1}$ is the two-tailed critical value of [Student's t-distribution](https://en.wikipedia.org/wiki/Student%27s_t-distribution) at the configured confidence level and `n − 1` degrees of freedom.
+where $t^{*}_{\alpha/2,\, \nu}$ is the two-tailed critical value of [Student's t-distribution](https://en.wikipedia.org/wiki/Student%27s_t-distribution) at the configured confidence level, on $\nu = n - 1$ degrees of freedom when nothing was trimmed and $\nu = h - 1$ when it was (matching the standard error above).
 
 The confidence interval is:
 
 $$\bar{x} \pm \text{MoE} = [\bar{x} - \text{MoE},\; \bar{x} + \text{MoE}]$$
+
+The interval is **not** corrected for the fact that the measurement loop stops at the first sample count that meets its CI target - see [the optional-stopping correction](../deep-dives/measurement-engine.md#the-optional-stopping-correction) for why, and what to read instead.
 
 ### Why Student's t and not the normal distribution?
 
@@ -152,8 +174,8 @@ Reported as `0` when `n < 1`.
 | `OutliersRemoved` | Count of discarded samples | [Number of samples removed by outlier trimming](https://en.wikipedia.org/wiki/Outlier). |
 | `N` | Post-trim length | Sample count after outlier removal. |
 | `StandardDeviation` | $s = \sqrt{\frac{1}{n-1}\sum(x_i-\bar{x})^2}$ | Spread of measurements (Bessel). |
-| `StandardError` | $s/\sqrt{n}$ | Precision of the mean estimate. |
-| `MarginOfError` | $t^{*} \times \text{SEM}$ | Half-width of CI on the mean. |
+| `StandardError` | $s/\sqrt{n}$ untrimmed; $s_w\sqrt{n}/h$ [Winsorized](#after-outlier-trimming-the-winsorized-standard-error) after trimming | Precision of the mean estimate. |
+| `MarginOfError` | $t^{*} \times \text{SEM}$, on $n-1$ df untrimmed and $h-1$ after trimming | Half-width of CI on the mean. |
 | `ConfidenceIntervalLower` | $\bar{x} - \text{MoE}$ | Lower CI bound. |
 | `ConfidenceIntervalUpper` | $\bar{x} + \text{MoE}$ | Upper CI bound. |
 | `MedianCiLower` / `MedianCiUpper` | Order-statistic interval | Distribution-free confidence interval on the median (exact binomial for $n < 50$, normal approximation above). `null` when undefined ($n < 2$, dry-run, errored). |

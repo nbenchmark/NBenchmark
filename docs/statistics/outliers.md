@@ -18,6 +18,8 @@ After collection, [outliers](https://en.wikipedia.org/wiki/Outlier) are removed 
 
 The trimmed array is passed to `StatsSummary.Compute`. The pre-trim raw array is stored separately for use in significance testing.
 
+**Trimming does not shrink the error bar.** The mean, standard deviation and shape statistics are computed on the kept samples - that is what trimming is for - but the reported confidence interval is the [Winsorized (Yuen) one](./descriptive.md#after-outlier-trimming-the-winsorized-standard-error), computed over the full pre-trim set with the trimmed samples clamped to the nearest kept value rather than dropped. So a discarded sample still counts as an observation and widens the interval, without its magnitude setting the width. A run that trims nothing gets the plain `s/√n` interval, unchanged.
+
 `IqrFence` is the default because it adapts to each benchmark's actual spread rather than always discarding a fixed quota: a clean run keeps almost every sample, while a noisy run trims more. When the slow samples it discards form a tight secondary cluster - low relative spread, rather than scattered scheduling noise - NBenchmark records a non-fatal **bimodal-distribution warning** on the result. See [Bimodal-distribution warning](#bimodal-distribution-warning) below for what the detector looks for, what to do, and how it interacts with each outlier mode.
 
 > [!NOTE] Quartile definition

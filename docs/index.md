@@ -118,6 +118,10 @@ The numbers are not an average of a fixed loop.
 - **Adaptive measurement.** Samples stream until the confidence interval is tight enough, then stop.
   Warmup ends when the timings plateau and the JIT has settled - not after a guessed count.
   ([Measurement](./statistics/measurement.md))
+- **Error bars that survive trimming.** Discarding an outlier does not narrow the confidence
+  interval: a discarded sample still counts as an observation, so the reported margin describes the
+  run that happened rather than the samples that survived it.
+  ([Outlier trimming](./statistics/outliers.md))
 - **Non-parametric significance testing.** Benchmark timings are not normally distributed, so the
   built-in tests are rank-based. A ✓ in the `Sig` column means "real, and at least a small effect",
   not merely `p < 0.05`. ([Significance testing](./statistics/significance.md))

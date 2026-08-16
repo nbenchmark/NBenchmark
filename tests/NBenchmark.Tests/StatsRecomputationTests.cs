@@ -92,6 +92,104 @@ public class StatsRecomputationTests
         Assert.Equal(NearestRank(samples, 0.99), stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 12);
     }
 
+    /// <summary>
+    ///     The same property, on the trimmed path: once outlier trimming has removed samples, the
+    ///     reported standard error is the Winsorized (Yuen) one, recomputed here from the definition
+    ///     - clamp the trimmed tails to the nearest retained value, take the standard deviation of
+    ///     that full-length sample with the <c>n - 1</c> denominator, and rescale onto the trimmed
+    ///     mean by <c>sqrt(n) / h</c> on <c>h - 1</c> degrees of freedom. Every other reported
+    ///     quantity stays on the trimmed set and is asserted to be untouched by the correction.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void Compute_OnATrimmedSet_Matches_FirstPrinciples_Yuen(int seed, int n)
+    {
+        // Two samples off each end needs at least five, and h >= 2 needs at least six.
+        if (n < 6)
+            return;
+
+        var rng = new Random(seed * 17 + 3);
+        var sortedAll = new double[n];
+
+        for (var i = 0; i < n; i++)
+        {
+            sortedAll[i] = 100.0 + rng.NextDouble() * 250.0 + rng.NextDouble() * rng.NextDouble() * 1000.0;
+        }
+
+        Array.Sort(sortedAll);
+
+        const int trimmedLow = 2;
+        const int trimmedHigh = 2;
+        var kept = sortedAll[trimmedLow..(n - trimmedHigh)];
+
+        const double confidence = 0.95;
+        var stats = StatsSummary.Compute(kept, confidence, trim: new TrimContext(sortedAll, trimmedLow, trimmedHigh));
+
+        // Winsorize from first principles: clamp, then the ordinary Bessel-corrected spread.
+        var winsorized = new double[n];
+
+        for (var i = 0; i < n; i++)
+        {
+            winsorized[i] = i < trimmedLow ? sortedAll[trimmedLow]
+                : i >= n - trimmedHigh ? sortedAll[n - trimmedHigh - 1]
+                : sortedAll[i];
+        }
+
+        var winsorizedMean = winsorized.Sum() / n;
+        var winsorizedSumSq = winsorized.Sum(v => (v - winsorizedMean) * (v - winsorizedMean));
+        var winsorizedStdDev = Math.Sqrt(winsorizedSumSq / (n - 1));
+
+        var h = n - trimmedLow - trimmedHigh;
+        var expectedSem = winsorizedStdDev * Math.Sqrt(n) / h;
+        var expectedMoe = StudentT.CriticalValue(confidence, h - 1) * expectedSem;
+
+        Numerics.AssertRelativeClose(expectedSem, stats.StandardError, RelTol);
+        Numerics.AssertRelativeClose(expectedMoe, stats.MarginOfError, RelTol);
+
+        // The correction moves the interval and nothing else: every central and shape statistic is
+        // still the one computed on the kept samples alone.
+        var untrimmed = StatsSummary.Compute(kept, confidence);
+
+        Assert.Equal(untrimmed.Mean, stats.Mean);
+        Assert.Equal(untrimmed.Median, stats.Median);
+        Assert.Equal(untrimmed.StandardDeviation, stats.StandardDeviation);
+        Assert.Equal(untrimmed.CoefficientOfVariation, stats.CoefficientOfVariation);
+        Assert.Equal(untrimmed.Skewness, stats.Skewness);
+        Assert.Equal(untrimmed.Kurtosis, stats.Kurtosis);
+        Assert.Equal(untrimmed.Mad, stats.Mad);
+
+        // And it widens: the reported interval is larger than the one that pretended the trimmed
+        // samples were never collected.
+        Assert.True(stats.MarginOfError > untrimmed.MarginOfError);
+    }
+
+    /// <summary>
+    ///     The reduction property, at the level users see it: an untrimmed set produces a margin of
+    ///     error bit-identical to the pre-Yuen formula, so a clean run's reported numbers do not
+    ///     move. Asserted with exact equality on purpose - "close enough" would let a rounding-level
+    ///     drift into every clean benchmark pass unnoticed.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void Compute_WithNothingTrimmed_Is_BitIdentical_To_ThePlainInterval(int seed, int n)
+    {
+        var rng = new Random(seed * 23 + 5);
+        var samples = new double[n];
+
+        for (var i = 0; i < n; i++)
+        {
+            samples[i] = 100.0 + rng.NextDouble() * 250.0;
+        }
+
+        Array.Sort(samples);
+
+        var plain = StatsSummary.Compute(samples);
+        var withContext = StatsSummary.Compute(samples, trim: new TrimContext(samples, 0, 0));
+
+        Assert.Equal(plain.StandardError, withContext.StandardError);
+        Assert.Equal(plain.MarginOfError, withContext.MarginOfError);
+    }
+
     [Theory]
     [MemberData(nameof(Seeds))]
     public void Percentile_Matches_NearestRank_Definition(int seed, int n)
