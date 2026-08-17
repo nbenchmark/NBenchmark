@@ -38,6 +38,14 @@
     <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
   </ItemGroup>
 
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" />
+  </ItemGroup>
+
   <!--
     Not a dependency the worker uses: a version floor it has to be able to hand out.
 
@@ -51,8 +59,5 @@
     Raise this in step with the OpenTelemetry SDK's own floor. Too low and the bind falls through
     to the target's copy, which BenchmarkLoadContext traces a warning for.
   -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0' OR '$(TargetFramework)' == 'net9.0'">
-    <PackageReference Include="System.Diagnostics.DiagnosticSource"/>
-  </ItemGroup>
 
 </Project>
