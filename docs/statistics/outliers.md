@@ -133,7 +133,7 @@ The filter is **on by default**, like the other automatic controls in this secti
 - Two clock reads cost more than `InterferenceOptions.ProbeCostBudgetFraction` (default 5%) of the resolved sample-duration target - measured once per process, so an expensive probe never silently eats into the measurement it is meant to protect.
 - Too few samples produced a known occupancy reading to trust a median (the thread-hopping case above, or simply too few samples were measured).
 
-Turn it off entirely with `--no-interference-filter` / `InterferenceOptions.Enabled = false` / `.WithInterferenceFilter(false)` to trim only on the statistical detector, as before this feature existed. On a quiet host where nothing was ever preempted, the filter rejects nothing and every reported number is unchanged from having it off.
+Turn it off entirely with `--no-interference-filter` / `InterferenceOptions.Enabled = false` / `.WithInterferenceFilter(false)` to leave only the statistical detector trimming the sample stream. On a quiet host where nothing was ever preempted, the filter rejects nothing and every reported number is unchanged from having it off.
 
 ## Median Absolute Deviation (MAD)
 

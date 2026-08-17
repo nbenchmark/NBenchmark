@@ -111,7 +111,7 @@ They answer different questions, and the reported one is deliberately the narrow
 | `AutoTune.AchievedRelativeCiWidth` | How wide the interval on the **raw mean** got before the loop stopped | You want to know whether the machine was quiet enough for the measurement to converge |
 | `Max`, `P99`, `P99.9` | The raw distribution's actual tail (they read the pre-trim set by default) | You want to know how slow the slow samples really were |
 
-**The Winsorized interval closes part of the gap and is not meant to close all of it.** Before it, `MarginOfError` was a plain t-interval on the kept samples alone - describing a run that had produced only the inliers, which is not the run that happened - and it could sit two orders of magnitude tighter than the achieved width. Winsorizing keeps every sample and clamps the trimmed ones, so the interval widens by the amount that was trimmed. It does not widen by the outliers' *magnitude*, on purpose: an interval on the trimmed mean that moved when a discarded sample moved would not be an interval on the trimmed mean. So a body that reported `MarginOfError` at ±1.3% next to an `AchievedRelativeCiWidth` of `1.05` (±105%) still reports a far tighter margin than that after the correction, and the honest reading has not changed:
+**The Winsorized interval closes part of the gap and is not meant to close all of it.** `MarginOfError` is the Winsorized interval on the trimmed mean, not a plain t-interval on the kept samples alone: it keeps every sample and clamps the trimmed ones, so it widens by the amount that was trimmed rather than describing a run that produced only the inliers. It does not widen by the outliers' *magnitude*, on purpose: an interval on the trimmed mean that moved when a discarded sample moved would not be an interval on the trimmed mean. So a body that reports `MarginOfError` at ±1.3% next to an `AchievedRelativeCiWidth` of `1.05` (±105%) still reports a far tighter margin than that, and the honest reading is unchanged:
 
 > A tight Error column is trustworthy evidence that the *measurement converged* only when `SampleStop` is `CiTargetMet`. Read the stop reason before the margin, and the raw percentiles beside it.
 
@@ -253,9 +253,6 @@ host drift exceeds the difference being reported: the machine was 8% slower when
 measured than when 'Baseline' was, and the 3% difference between them is smaller than that.
 ```
 
-That is the one thing NBenchmark could not previously tell you when you were about to act on a 3%
-regression.
-
 It warns and never downgrades the verdict. `MinimumPracticalEffect` and `MinimumRelativeShift`
 change a verdict because they are statements about the comparison itself; the canary is a statement
 about the machine, measured by a different workload at a different moment. That is indirect
@@ -279,4 +276,4 @@ accuracy. It is on by default, skipped entirely on a dry-run, and switched off w
 
 The adaptive loop, [outlier trimming](./outliers.md) (including the [bimodal warning](./outliers.md#bimodal-distribution-warning)), and [significance testing](./significance.md) all work around OS noise statistically - they discard or down-weight samples that look like interference, inferred from the timing value alone. [Evidence-based interference rejection](./outliers.md#evidence-based-interference-rejection) is the one exception: it reads the measuring thread's own CPU occupancy and discards a sample the OS is *known* to have preempted, as a fact rather than a guess, before the statistical rules ever see it. On by default; opt out with `--no-interference-filter`.
 
-None of this removes noise that is baked into every sample, such as a benchmark thread migrating between cores (cold-cache stalls on every migration) or a normal-priority process on a busy host. NBenchmark provides opt-in **environment controls** - CPU affinity, process priority, and dedicated-host guidance - that reduce this noise before the timer starts. See [Environment control](../features/environment-control.md) for the full model, platform notes, and isolated-process propagation.
+None of this removes noise that is baked into every sample, such as a benchmark thread migrating between cores (cold-cache stalls on every migration) or a normal-priority process on a busy host. NBenchmark provides **environment controls** - CPU affinity, process priority, thread placement, and dedicated-host guidance (thread control on by default; the rest opt-in) - that reduce this noise before the timer starts. See [Environment control](../features/environment-control.md) for the full model, platform notes, and isolated-process propagation.

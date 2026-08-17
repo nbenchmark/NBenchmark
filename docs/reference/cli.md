@@ -678,7 +678,7 @@ Every timed sample is bracketed with a read of the measuring thread's own CPU ti
 dotnet run -- --no-interference-filter
 ```
 
-Pass it to trim only on the statistical outlier detector, as before this feature existed. The filter already degrades gracefully and says why (`AutoTuneDiagnostic.InterferenceDisabledReason`) when the host has no thread-CPU clock, when the probe would cost too much relative to the sample duration, or when too few samples produced a known occupancy reading (typically an async body whose continuations mostly resumed on a different thread) - so this flag is for when you deliberately want the OS's own scheduling noise left in the reported numbers.
+Pass it to leave only the statistical outlier detector trimming the sample stream. The filter already degrades gracefully and says why (`AutoTuneDiagnostic.InterferenceDisabledReason`) when the host has no thread-CPU clock, when the probe would cost too much relative to the sample duration, or when too few samples produced a known occupancy reading (typically an async body whose continuations mostly resumed on a different thread) - so this flag is for when you deliberately want the OS's own scheduling noise left in the reported numbers.
 
 Programmatic equivalent: `.WithInterferenceFilter(false)` (suite/harness), or `new MeasurementOptions { Interference = InterferenceOptions.Disabled }`. See [Evidence-based interference rejection](../statistics/outliers.md#evidence-based-interference-rejection).
 

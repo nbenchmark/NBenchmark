@@ -54,7 +54,7 @@ To actually *reduce* that spread you have to work outside the statistics - [envi
 > **Accept the variance as the finding:** `--launch-count 5` (the honest signal of run-to-run spread across launches)
 > **Chase precision:** raise `--max-samples` and loosen `--ci-target` (e.g. `--ci-target 0.05`)
 
-The reported Error describes the **trimmed** mean while the loop's stop rule ran on the **raw** stream. The Error already accounts for how many samples the fence removed - it is a Winsorized interval, so a discarded sample still counts as an observation - but not for how *far out* they were, because an interval on the trimmed mean cannot. A benchmark can show `MarginOfError` at ±1.4% of its mean while `autoTune.achievedRelativeCiWidth` is `1.05` (±105%). Neither number is wrong; they describe different sample sets.
+The reported Error describes the **trimmed** mean while the loop's stop rule ran on the **raw** stream. The Error already accounts for how many samples the fence removed - it is a Winsorized interval, so a discarded sample still counts as an observation - but not for how *far out* they were, because an interval on the trimmed mean cannot. A benchmark can show `MarginOfError` at ±1.3% of its mean while `autoTune.achievedRelativeCiWidth` is `1.05` (±105%). Neither number is wrong; they describe different sample sets.
 
 Read `autoTune.sampleStop` before the Error column: a tight margin is evidence the measurement *converged* only when it reads `ciTargetMet`. Compare `autoTune.achievedRelativeCiWidth` against `marginOfError / mean`, and check `outliersRemoved` against the pre-trim sample count.
 
@@ -126,7 +126,7 @@ See [Outlier Trimming: Bimodal-distribution warning](./statistics/outliers.md#bi
 
 This is [evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection): a pre-stage that runs before the statistical outlier detector and discards a sample only when the OS is *known* to have preempted it, rather than when the timing merely looks slow. The two discard counts - confirmed preempted vs. statistical outlier - are reported together in one message so nothing is counted twice.
 
-It is on by default and needs no action on a normal run: a quiet host rejects nothing and the reported numbers are unaffected. To trim only on the statistical detector, as before this feature existed, pass `--no-interference-filter`.
+It is on by default and needs no action on a normal run: a quiet host rejects nothing and the reported numbers are unaffected. To leave only the statistical detector trimming the sample stream, pass `--no-interference-filter`.
 
 See [Outlier Trimming: Evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection) for the statistic and the graceful-degradation cases below.
 

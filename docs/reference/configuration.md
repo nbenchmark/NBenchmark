@@ -458,7 +458,7 @@ var options = new MeasurementOptions
     Interference = InterferenceOptions.Default with { RejectionThreshold = 0.7 },
 };
 
-// Off - trim only on the statistical outlier detector, as before this feature existed
+// Off - trim only on the statistical outlier detector, with no evidence-based stage
 var options = new MeasurementOptions { Interference = InterferenceOptions.Disabled };
 ```
 

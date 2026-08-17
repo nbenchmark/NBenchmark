@@ -81,7 +81,7 @@ new BenchmarkSuite("MySuite")
 
 ## macOS and Apple Silicon
 
-macOS used to be told to go elsewhere: the host probe labeled every Mac a shared runner, which relaxed every threshold gate, and the guidance recommended a different operating system. Both are gone.
+The host probe does not label every Mac a shared runner. It reads the performance/efficiency core split where the platform reports one, reports what it did about it, and notes that frequency scaling and thermal throttling stay unobservable from managed code.
 
 On Apple Silicon the cores are not interchangeable. An M1 Max reports 10 logical CPUs, of which 8 are performance cores and 2 are efficiency cores several times slower. NBenchmark reads that split (`hw.nperflevels` and `hw.perflevelN.logicalcpu`) and reports it in the host guidance, so the machine is described rather than dismissed:
 
