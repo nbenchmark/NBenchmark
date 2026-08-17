@@ -219,7 +219,30 @@ public static class ReportFormat
     ///                 </list>
     ///             </description>
     ///         </item>
+    ///         <item>
+    ///             <term>7</term>
+    ///             <description>
+    ///                 Evidence-based interference rejection. Before the statistical outlier detector
+    ///                 ever sees the sample stream, a new pre-stage discards samples the OS is known
+    ///                 to have preempted - the measuring thread's own CPU-occupancy ratio, bracketed
+    ///                 around every timed sample, materially below that benchmark's own median -
+    ///                 rather than inferring preemption from the timing value the way every other
+    ///                 discard decision in the engine does.
+    ///                 <para>
+    ///                     On by default (<c>InterferenceOptions.Enabled</c>; <c>--no-interference-filter</c>
+    ///                     to opt out). On a quiet host nothing is rejected and every reported number
+    ///                     is unchanged from epoch 6. On a host suffering real preemption, samples that
+    ///                     previously either passed straight through (a mild slowdown, inside the
+    ///                     statistical fence) or were blamed on the timing distribution alone (a severe
+    ///                     one, caught as a statistical outlier) are now removed on direct evidence
+    ///                     before <c>OutlierTrim</c> runs, which moves <c>OutliersRemoved</c>,
+    ///                     everything <c>StatsSummary.Compute</c> derives from the kept set, and the
+    ///                     Winsorized (Yuen) interval's degrees of freedom for any run measured under
+    ///                     real interference.
+    ///                 </para>
+    ///             </description>
+    ///         </item>
     ///     </list>
     /// </remarks>
-    public const int MeasurementEpoch = 6;
+    public const int MeasurementEpoch = 7;
 }

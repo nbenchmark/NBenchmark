@@ -238,13 +238,27 @@ public sealed class BenchmarkRunner
         var perSampleGcCounts = BuildPerSampleGcCounts(adaptive, spec.Options.Diagnostics);
 
         var pipeline = StatsPipeline.Run(
-            adaptive.PerOpTimings, adaptive.PerOpAllocations, effectiveOptions, perSampleGcCounts);
+            adaptive.PerOpTimings, adaptive.PerOpAllocations, effectiveOptions, perSampleGcCounts,
+            adaptive.PerOpOccupancy);
         var mergedWarnings = MergeWarnings(pipeline.Warnings, adaptive.Warnings);
         mergedWarnings = MergeWarnings(
             mergedWarnings,
             BuildMidBatchGcWarnings(effectiveOptions, adaptive.Diagnostic.OpsPerSample, pipeline.MeanAllocatedBytes));
         var diagnosticsResult = BuildDiagnosticsResult(adaptive, spec.Options.Diagnostics);
         var mergedPipeline = pipeline with { Warnings = mergedWarnings, DiagnosticsResult = diagnosticsResult };
+
+        // The interference filter's rejected count and median occupancy are only known once
+        // StatsPipeline has run; its own "why didn't this run" reason is folded in alongside
+        // whatever AdaptiveLoop already decided before measurement started (platform unavailable,
+        // or the probe cost exceeded its budget) - the two reasons are mutually exclusive in
+        // practice, since a benchmark that never measured occupancy has nothing for the pipeline's
+        // rejection stage to disable.
+        var diagnostic = adaptive.Diagnostic with
+        {
+            InterferenceRejectedCount = pipeline.InterferenceRejectedCount,
+            MedianOccupancyRatio = pipeline.MedianOccupancyRatio,
+            InterferenceDisabledReason = adaptive.Diagnostic.InterferenceDisabledReason ?? pipeline.InterferenceDisabledReason,
+        };
 
         return OutcomeBuilder.Build(
             new RunOutcome.Success(mergedPipeline, adaptive.PerOpTimings),
@@ -256,7 +270,7 @@ public sealed class BenchmarkRunner
             _clock.GetElapsedTime(totalStartTimestamp),
             adaptive.MeasuredDuration,
             adaptive.ResolvedWarmup,
-            adaptive.Diagnostic,
+            diagnostic,
             spec.Categories);
     }
 

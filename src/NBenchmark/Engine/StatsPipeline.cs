@@ -1,14 +1,15 @@
 using System.Diagnostics;
+using NBenchmark.Engine.Detectors;
 using NBenchmark.Stats;
 
 namespace NBenchmark.Engine;
 
 /// <summary>
-///     The full trim -> summary -> warnings pipeline that turns raw per-op timings and
+///     The full reject -> trim -> summary -> warnings pipeline that turns raw per-op timings and
 ///     allocation deltas into a <see cref="ProcessedMeasurements" />. Exposed so an
 ///     external consumer that has captured raw samples (for example NBenchmark.Studio,
 ///     ingesting OTLP) can run exactly the same statistical processing the engine uses,
-///     without reimplementing outlier trimming and warning generation.
+///     without reimplementing interference rejection, outlier trimming, and warning generation.
 /// </summary>
 public static class StatsPipeline
 {
@@ -16,18 +17,29 @@ public static class StatsPipeline
         double[] rawTimings,
         long[]? rawAllocations,
         MeasurementOptions options,
-        int[]? perSampleGcCounts = null)
+        int[]? perSampleGcCounts = null,
+        double[]? perSampleOccupancy = null)
     {
-        // OutlierTrim.TrimDetailed clones internally and does not mutate the input, so
-        // rawTimings stays in arrival order and TrimmedOrdinals map back correctly.
-        var trimResult = OutlierTrim.TrimDetailed(rawTimings, options.ResolveOutlierDetector());
+        // Evidence-based interference rejection runs first, deliberately as a separate stage from
+        // OutlierTrim: "was this sample valid?" (evidence: CPU occupancy) and "is this value an
+        // outlier?" (evidence: the timing distribution) are different questions from different
+        // evidence. IOutlierDetector.Classify never sees a rejected sample, so every built-in and
+        // every user-supplied detector composes with this filter for free.
+        var rejection = InterferenceRejector.Reject(rawTimings, perSampleOccupancy, options.Interference);
+
+        // OutlierTrim.TrimDetailed clones internally and does not mutate the input, so the surviving
+        // set stays in arrival order and TrimmedOrdinals - relative to that surviving set - map back
+        // correctly once remapped onto the original rawTimings ordinals below.
+        var trimResult = OutlierTrim.TrimDetailed(rejection.SurvivingTimings, options.ResolveOutlierDetector());
 
         Debug.Assert(IsSorted(trimResult.Kept),
             "OutlierTrim must produce sorted output; Percentile.Compute requires sorted input.");
 
-        // Tail metrics (percentiles/min/max/histogram) read from the full pre-trim set by default
-        // so the fence does not trim out the very tail those metrics exist to describe. Passing
-        // null keeps them on the trimmed (Kept) set - the Trimmed escape hatch.
+        // Tail metrics (percentiles/min/max/histogram) read from the full pre-trim, post-rejection set
+        // by default so the fence does not trim out the very tail those metrics exist to describe.
+        // Rejected samples are excluded even here: they measure the OS, not the code, so they are
+        // contamination rather than tail and must not appear in a distribution describing the
+        // benchmark. Passing null keeps them on the trimmed (Kept) set - the Trimmed escape hatch.
         var tailSource = options.TailMetricsBasis == TailMetricsBasis.Raw
             ? trimResult.SortedAll
             : null;
@@ -46,9 +58,21 @@ public static class StatsPipeline
             tailSource,
             TrimContext.From(trimResult));
 
+        // OutlierTrim's ordinals are positions in rejection.SurvivingTimings, not in rawTimings -
+        // remap them back onto the original sample stream so every ordinal-based consumer
+        // (RecoverDiscardedOrdinals, SampleReservoir, the GC-correlation annotation below) keeps
+        // pointing at the right raw sample.
+        var trimmedOrdinals = RemapOrdinals(trimResult.TrimmedOrdinals, rejection.SurvivingOriginalIndices);
+
         long? meanAllocs = rawAllocations is not null ? ComputeMean(rawAllocations) : null;
+        var interferenceRejectedCount = rejection.RejectedOriginalIndices.Length;
         var warnings = BuildWarnings(
-            trimResult.Kept, trimResult.Discarded, rawTimings, trimResult.TrimmedOrdinals, perSampleGcCounts);
+            trimResult.Kept, trimResult.Discarded, rawTimings, trimmedOrdinals, perSampleGcCounts,
+            interferenceRejectedCount, options.Interference);
+
+        // The total discarded before stats were computed - confirmed OS preemption plus statistical
+        // outliers - which is what OutliersRemoved has always meant: rawTimings.Length minus however
+        // many samples fed the summary.
         var outliersRemoved = rawTimings.Length - trimResult.Kept.Length;
 
         return new ProcessedMeasurements(
@@ -62,8 +86,32 @@ public static class StatsPipeline
                 trimResult.UpperFence,
                 outliersRemoved,
                 rawAllocations,
-                trimResult.TrimmedOrdinals)
-            { Warnings = warnings };
+                trimmedOrdinals)
+            {
+                Warnings = warnings,
+                InterferenceRejectedCount = interferenceRejectedCount,
+                MedianOccupancyRatio = rejection.MedianOccupancyRatio,
+                InterferenceDisabledReason = rejection.DisabledReason,
+            };
+    }
+
+    /// <summary>
+    ///     Translates ordinals computed against a filtered array back onto the original array's
+    ///     index space, via the parallel index map a filtering stage produces.
+    /// </summary>
+    private static int[] RemapOrdinals(int[] filteredOrdinals, int[] filteredToOriginal)
+    {
+        if (filteredOrdinals.Length == 0)
+            return [];
+
+        var remapped = new int[filteredOrdinals.Length];
+
+        for (var i = 0; i < filteredOrdinals.Length; i++)
+        {
+            remapped[i] = filteredToOriginal[filteredOrdinals[i]];
+        }
+
+        return remapped;
     }
 
     private static IReadOnlyList<string> BuildWarnings(
@@ -71,14 +119,45 @@ public static class StatsPipeline
         double[] discarded,
         double[] rawTimings,
         int[] trimmedOrdinals,
-        int[]? perSampleGcCounts)
+        int[]? perSampleGcCounts,
+        int interferenceRejectedCount,
+        InterferenceOptions interferenceOptions)
     {
         var warnings = new List<string>();
 
         var cluster = BimodalDetector.DetectSlowCluster(trimmed, discarded, rawTimings.Length);
         var gcCorrelatedOutliers = CountGcCorrelatedOutliers(trimmedOrdinals, perSampleGcCounts);
+        var statisticalOutliers = trimmedOrdinals.Length;
 
-        if (cluster is { } clusterValue)
+        // Interference rejection found confirmed evidence, so it takes the headline: fold the
+        // statistical-outlier and (when present) bimodal/GC-correlation detail into one message
+        // rather than reporting the same discarded samples from two angles. This mirrors the
+        // pre-existing fold-in of GC correlation into the bimodal warning below.
+        if (interferenceRejectedCount > 0)
+        {
+            var totalDiscarded = interferenceRejectedCount + statisticalOutliers;
+
+            var message =
+                $"{totalDiscarded} sample(s) discarded - {interferenceRejectedCount} confirmed preempted "
+                + $"by the OS (CPU occupancy well below this benchmark's own median), {statisticalOutliers} "
+                + "statistical outlier(s).";
+
+            if (cluster is { } clusterValue)
+            {
+                var (count, center) = clusterValue;
+
+                message +=
+                    $" {count} of the statistical outliers form a distinct cluster near "
+                    + $"{BenchmarkFormatter.FormatNs(center)} rather than scattered noise - possible "
+                    + "bimodal distribution; investigate further (e.g. lock contention or cache misses).";
+            }
+
+            if (gcCorrelatedOutliers > 0)
+                message += $" ({gcCorrelatedOutliers} of the statistical outliers coincided with a garbage collection.)";
+
+            warnings.Add(message);
+        }
+        else if (cluster is { } clusterValue)
         {
             var (count, center) = clusterValue;
 
@@ -99,6 +178,18 @@ public static class StatsPipeline
             var removed = trimmedOrdinals.Length;
             warnings.Add(
                 $"{gcCorrelatedOutliers} of {removed} removed outlier(s) coincided with a garbage collection.");
+        }
+
+        // The "this host is too noisy to trust" signal: a separate warning from the fold-in above,
+        // since it is about the host rather than about explaining any one discarded sample.
+        if (interferenceRejectedCount > 0 && rawTimings.Length > 0
+            && (double)interferenceRejectedCount / rawTimings.Length >= interferenceOptions.HighRejectionWarningFraction)
+        {
+            warnings.Add(
+                $"{interferenceRejectedCount} of {rawTimings.Length} samples "
+                + $"({(double)interferenceRejectedCount / rawTimings.Length:P0}) were rejected as confirmed OS "
+                + "preemption - this host is too noisy to trust for a precise measurement right now. "
+                + "Consider a quieter host, --cpu-affinity, or re-running once background load has cleared.");
         }
 
         // i.i.d. sanity checks on the arrival-order stream (drift, autocorrelation).
@@ -172,4 +263,23 @@ public sealed record ProcessedMeasurements(
 {
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public DiagnosticsResult? DiagnosticsResult { get; init; }
+
+    /// <summary>
+    ///     How many of <see cref="OutliersRemoved" /> were confirmed OS preemption (evidence-based
+    ///     interference rejection) rather than statistical outliers. <c>0</c> when the filter is
+    ///     disabled, could not run (see <see cref="InterferenceDisabledReason" />), or found nothing.
+    /// </summary>
+    public int InterferenceRejectedCount { get; init; }
+
+    /// <summary>
+    ///     This benchmark's own median CPU-occupancy ratio, the value the interference filter
+    ///     rejected against. <c>null</c> when the filter did not run.
+    /// </summary>
+    public double? MedianOccupancyRatio { get; init; }
+
+    /// <summary>
+    ///     Why the interference filter did not reject anything on its own initiative, or
+    ///     <c>null</c> when it ran normally. See <see cref="AutoTuneDiagnostic.InterferenceDisabledReason" />.
+    /// </summary>
+    public string? InterferenceDisabledReason { get; init; }
 }

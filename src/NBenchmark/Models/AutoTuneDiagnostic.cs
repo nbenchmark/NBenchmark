@@ -260,4 +260,34 @@ public sealed record AutoTuneDiagnostic
     ///     </para>
     /// </summary>
     public double SampleQuantizationFraction { get; init; }
+
+    /// <summary>
+    ///     How many measured samples the evidence-based interference filter rejected as confirmed OS
+    ///     preemption - a per-sample CPU-occupancy ratio materially below this benchmark's own
+    ///     median (see <see cref="InterferenceOptions" />) - before the statistical outlier detector
+    ///     ran. <c>0</c> when nothing was rejected, including when the filter is disabled (see
+    ///     <see cref="InterferenceDisabledReason" />) or the run was too quiet to need it.
+    /// </summary>
+    public int InterferenceRejectedCount { get; init; }
+
+    /// <summary>
+    ///     This benchmark's own median CPU-occupancy ratio (<c>cpuDelta / wallDelta</c>) among
+    ///     samples with a known reading - the value <see cref="InterferenceRejectedCount" /> was
+    ///     computed against. <c>null</c> when the filter did not run (see
+    ///     <see cref="InterferenceDisabledReason" />). Not comparable across platforms: Linux and
+    ///     macOS report the CPU side in nanoseconds, Windows in cycles, so only ratios computed
+    ///     within the same run are meaningful.
+    /// </summary>
+    public double? MedianOccupancyRatio { get; init; }
+
+    /// <summary>
+    ///     Why the interference filter did not reject anything on its own initiative for this
+    ///     benchmark, or <c>null</c> when it ran normally (whether or not it found anything to
+    ///     reject). Set when: the thread-CPU clock is unavailable on this platform; two clock reads
+    ///     cost more than <see cref="InterferenceOptions.MaxProbeCostFraction" /> of the resolved
+    ///     sample-duration target, so the probe was disabled for this run before it started; or too
+    ///     few samples carried a known occupancy reading to trust a median - typically an async body
+    ///     whose continuations mostly resumed on a different thread.
+    /// </summary>
+    public string? InterferenceDisabledReason { get; init; }
 }

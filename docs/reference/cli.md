@@ -41,7 +41,7 @@ Grouped by what they affect. Every flag is documented in full below.
 | --- | --- |
 | **Selection** | [`--filter`](#--filter-pattern) · [`--category`](#--category-name) · [`--exclude-category`](#--exclude-category-name) · [`--list`](#--list) |
 | **Measurement** | [`--iterations`](#--iterations-n) · [`--warmup`](#--warmup-n) · [adaptive tuning flags](#adaptive-tuning-flags) · [`--profile`](#--profile-mode) · [`--runtime-profile`](#--runtime-profile-profile) · [`--force-gc`](#--force-gc) · [`--no-gc-between-benchmarks`](#--no-gc-between-benchmarks) · [`--no-allocations`](#--no-allocations) · [`--launch-count`](#--launch-count-n) · [`--dry-run`](#--dry-run) |
-| **Statistics** | [`--confidence`](#--confidence-value) · [`--alpha`](#--alpha-value) · [`--outlier`](#--outlier-mode) · [`--tail-basis`](#--tail-basis-basis) · [`--percentiles`](#--percentiles-list) · [`--min-practical-effect`](#--min-practical-effect-0-1) · [`--cross-class`](#--cross-class) |
+| **Statistics** | [`--confidence`](#--confidence-value) · [`--alpha`](#--alpha-value) · [`--outlier`](#--outlier-mode) · [`--no-interference-filter`](#--no-interference-filter) · [`--tail-basis`](#--tail-basis-basis) · [`--percentiles`](#--percentiles-list) · [`--min-practical-effect`](#--min-practical-effect-0-1) · [`--cross-class`](#--cross-class) |
 | **Output** | [`--reporter`](#--reporter-type) · [`--output`](#--output-directory) · [`--detail`](#--detail-level) · [`--no-histogram`](#--no-histogram) · [`--emit-raw`](#--emit-raw) · [`--no-samples`](#--no-samples) |
 | **Isolation** | [`--in-process`](#--in-process) · [`--strict-isolation`](#--strict-isolation) · [`--verify-isolation`](#--verify-isolation) · [`--runtimes`](#--runtimes-list) |
 | **Environment** | [`--cpu-affinity`](#--cpu-affinity-list) · [`--priority`](#--priority-level) · [`--no-thread-control`](#--no-thread-control) · [`--dedicated-host-guidance`](#--dedicated-host-guidance) |
@@ -665,6 +665,22 @@ dotnet run -- --no-drift-canary
 A reading costs a fraction of a millisecond and is taken between benchmarks, never inside a timed window, so switching it off buys wall-clock rather than accuracy. It is already skipped on a `--dry-run`.
 
 Programmatic equivalent: `.WithDriftCanary(false)`, or `WithOptions(new MeasurementOptions { DriftCanary = DriftCanaryOptions.Disabled })`. To keep the canary but change when it speaks up, set `DriftCanaryOptions.MinimumReportableDrift` - see [DriftCanary](configuration.md#driftcanary).
+
+---
+
+### `--no-interference-filter`
+
+Disable evidence-based interference rejection. It is on by default.
+
+Every timed sample is bracketed with a read of the measuring thread's own CPU time, giving a per-sample occupancy ratio. A sample whose ratio falls materially below this benchmark's own median occupancy was, as a matter of fact, preempted by the OS for part of its window - and is discarded before `--outlier` or any custom detector ever sees the sample stream, rather than inferred from the timing value the way every statistical outlier rule is.
+
+```bash
+dotnet run -- --no-interference-filter
+```
+
+Pass it to trim only on the statistical outlier detector, as before this feature existed. The filter already degrades gracefully and says why (`AutoTuneDiagnostic.InterferenceDisabledReason`) when the host has no thread-CPU clock, when the probe would cost too much relative to the sample duration, or when too few samples produced a known occupancy reading (typically an async body whose continuations mostly resumed on a different thread) - so this flag is for when you deliberately want the OS's own scheduling noise left in the reported numbers.
+
+Programmatic equivalent: `.WithInterferenceFilter(false)` (suite/harness), or `new MeasurementOptions { Interference = InterferenceOptions.Disabled }`. See [Evidence-based interference rejection](../statistics/outliers.md#evidence-based-interference-rejection).
 
 ---
 

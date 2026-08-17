@@ -654,6 +654,9 @@ public sealed record BenchmarkTable
         if (!diagnostic.WarmupTimeFloorMet)
             summary += ", warmup cut short";
 
+        if (diagnostic.InterferenceRejectedCount > 0)
+            summary += $", {diagnostic.InterferenceRejectedCount:N0} preempted";
+
         return summary;
     }
 

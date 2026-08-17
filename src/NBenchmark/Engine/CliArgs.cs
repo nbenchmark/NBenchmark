@@ -198,6 +198,12 @@ internal sealed record CliArgs
     public bool NoThreadControl { get; init; }
 
     /// <summary>
+    ///     When true, disables evidence-based interference rejection - samples are trimmed only by
+    ///     the statistical outlier detector, as before this feature existed.
+    /// </summary>
+    public bool NoInterferenceFilter { get; init; }
+
+    /// <summary>
     ///     When true, omits raw per-sample arrays from reporter output (JSON).
     ///     Samples are still collected for significance and the Console histogram;
     ///     this only controls whether they are serialized to file.
@@ -333,6 +339,7 @@ internal sealed record CliArgs
         var noHistogram = false;
         var noDriftCanary = false;
         var noThreadControl = false;
+        var noInterferenceFilter = false;
         var noSamples = false;
         var emitRaw = false;
         var streamSamples = false;
@@ -714,6 +721,9 @@ internal sealed record CliArgs
                 case "--no-thread-control":
                     noThreadControl = true;
                     break;
+                case "--no-interference-filter":
+                    noInterferenceFilter = true;
+                    break;
                 case "--no-samples":
                     noSamples = true;
                     break;
@@ -857,6 +867,7 @@ internal sealed record CliArgs
             NoHistogram = noHistogram,
             NoDriftCanary = noDriftCanary,
             NoThreadControl = noThreadControl,
+            NoInterferenceFilter = noInterferenceFilter,
             NoSamples = noSamples,
             EmitRaw = emitRaw,
             StreamSamples = streamSamples,
@@ -1022,7 +1033,7 @@ internal sealed record CliArgs
         "--max-samples", "--max-tuning-time", "--max-warmup", "--min-measurement-time",
         "--min-practical-effect", "--min-relative-shift", "--min-samples", "--min-warmup", "--min-warmup-time",
         "--no-allocations", "--no-drift-canary", "--no-gc-between-benchmarks", "--no-histogram",
-        "--no-jit-quiescence",
+        "--no-interference-filter", "--no-jit-quiescence",
         "--no-samples", "--no-thread-control", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint", "--outlier",
         "--output", "--percentiles", "--priority", "--profile", "--reporter", "--runtime-profile",
         "--runtimes", "--seed", "--stream-samples", "--strict-isolation", "--tail-basis",
@@ -1072,6 +1083,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --no-histogram          Disable latency histogram computation");
         Console.WriteLine("  --no-drift-canary       Disable the host drift canary (the control workload measured between benchmarks)");
         Console.WriteLine("  --no-thread-control     Disable thread-level affinity, priority and (on macOS) performance-core placement");
+        Console.WriteLine("  --no-interference-filter  Disable evidence-based interference rejection (trim only on the statistical outlier detector)");
         Console.WriteLine("  --no-samples            Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
         Console.WriteLine($"  --emit-raw              Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset");
         Console.WriteLine("  --stream-samples        Forward the live per-sample observer stream out of an isolated worker (needs --observer; costs fidelity)");

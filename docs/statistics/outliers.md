@@ -16,6 +16,8 @@ After collection, [outliers](https://en.wikipedia.org/wiki/Outlier) are removed 
 | `IqrFence` | Compute Q1, Q3, and [IQR](https://en.wikipedia.org/wiki/Interquartile_range) = Q3 − Q1. Discard any sample above Q3 + 1.5 × IQR or below Q1 − 1.5 × IQR. **(default)** |
 | `MedianAbsoluteDeviation` | Compute the median `m` and the scaled [MAD](https://en.wikipedia.org/wiki/Median_absolute_deviation) = 1.4826 × median(\|xᵢ − m\|). Discard any sample more than 3 × scaled MAD from the median. |
 
+Before any of that runs, a separate pre-stage discards samples the OS is **known** to have preempted - see [Evidence-based interference rejection](#evidence-based-interference-rejection) below. `OutlierMode` and a custom `IOutlierDetector` see only what survives that stage.
+
 The trimmed array is passed to `StatsSummary.Compute`. The pre-trim raw array is stored separately for use in significance testing.
 
 **Trimming does not shrink the error bar.** The mean, standard deviation and shape statistics are computed on the kept samples - that is what trimming is for - but the reported confidence interval is the [Winsorized (Yuen) one](./descriptive.md#after-outlier-trimming-the-winsorized-standard-error), computed over the full pre-trim set with the trimmed samples clamped to the nearest kept value rather than dropped. So a discarded sample still counts as an observation and widens the interval, without its magnitude setting the width. A run that trims nothing gets the plain `s/√n` interval, unchanged.
@@ -91,6 +93,47 @@ When GC collection counts are collected (`DiagnosticsOptions.GcCollectionCounts`
 ```
 
 When a bimodal warning also fired, the same fact is folded into that warning ("… (3 of the discarded outliers coincided with a garbage collection.)") so the two signals are not reported twice. A high GC-correlation share points at allocation pressure; consider `--profile independent` (forces per-iteration Gen0 collection, making GC deterministic) or reducing allocations in the body.
+
+## Evidence-based interference rejection
+
+Every rule above decides whether a sample is an outlier from its **timing value alone**. That is an inference: a slow sample might be a genuinely expensive code path, or it might be a sample where the OS took the CPU away from the measuring thread partway through. Evidence-based interference rejection answers the second question directly, with a **fact** rather than a guess.
+
+Every timed sample is bracketed with a read of the measuring thread's own CPU time, immediately outside the timed window. From the two readings the engine derives a per-sample **occupancy ratio**:
+
+```text
+r_i = cpuDelta_i / wallDelta_i
+```
+
+A sample that held the CPU for the whole window has a ratio close to this benchmark's typical value; a sample the OS preempted for part of its window has a visibly lower one. The engine compares each ratio against this **benchmark's own median ratio** and rejects a sample when it falls below a threshold fraction of that median (`InterferenceOptions.RejectionThreshold`, default 0.5 - less than half the typical occupancy).
+
+This runs as a **separate stage before** the outlier trimming described above - `OutlierMode` and any custom `IOutlierDetector` only ever see the samples that survive it. The two stages answer different questions from different evidence: "was this sample valid?" (CPU occupancy) and "is this value an outlier?" (the timing distribution).
+
+### Reading the combined warning
+
+When interference rejection finds evidence, the discard counts are reported **separately**, folded into one message rather than reported twice over:
+
+```text
+⚠ 42 sample(s) discarded - 31 confirmed preempted by the OS (CPU occupancy well below this
+  benchmark's own median), 11 statistical outlier(s).
+```
+
+If the remaining statistical outliers also form a tight cluster or coincide with a garbage collection, that detail is folded into the same message rather than printed again - the same way the plain GC-correlation annotation above folds into the bimodal warning.
+
+A separate warning fires when the **rejected fraction** is high (`InterferenceOptions.HighRejectionWarningFraction`, default 20%): that is the "this host is too noisy to trust right now" signal, distinct from explaining any one discarded sample.
+
+### What gets excluded, not rejected
+
+An `await` can resume a benchmark body's continuation on a different thread, which makes a thread-CPU-time delta meaningless for that sample - it would be reading the wrong thread's clock. Such a sample's occupancy is reported as **unknown**, not low: it is excluded from the median and from the numerator/denominator entirely, and it is **never** rejected on that basis. If most samples in a benchmark hop threads this way, the filter disables itself for that benchmark and says so, rather than silently doing nothing or rejecting from too little evidence.
+
+### Degrading gracefully
+
+The filter is **on by default**, like the other automatic controls in this section, and disables itself - with a stated reason surfaced through `AutoTuneDiagnostic.InterferenceDisabledReason` - whenever it cannot safely operate:
+
+- The thread-CPU clock is not available on the host platform.
+- Two clock reads cost more than `InterferenceOptions.ProbeCostBudgetFraction` (default 5%) of the resolved sample-duration target - measured once per process, so an expensive probe never silently eats into the measurement it is meant to protect.
+- Too few samples produced a known occupancy reading to trust a median (the thread-hopping case above, or simply too few samples were measured).
+
+Turn it off entirely with `--no-interference-filter` / `InterferenceOptions.Enabled = false` / `.WithInterferenceFilter(false)` to trim only on the statistical detector, as before this feature existed. On a quiet host where nothing was ever preempted, the filter rejects nothing and every reported number is unchanged from having it off.
 
 ## Median Absolute Deviation (MAD)
 

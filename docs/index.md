@@ -105,6 +105,7 @@ All harness CLI flags pass through. See [Global tool](./usage-modes/global-tool.
 | Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [→](./features/multiple-launches.md) |
 | Environment control | Pins CPU affinity and process priority - process and measuring thread alike - to cut noise at the source. | [→](./features/environment-control.md) |
 | Host drift canary | Times fixed control work between benchmarks, so a machine that drifted mid-run says so. On by default. | [→](./statistics/measurement.md#the-host-drift-canary) |
+| Interference rejection | Discards samples the OS is known to have preempted, using the measuring thread's own CPU occupancy - a fact, not a guess. On by default. | [→](./statistics/outliers.md#evidence-based-interference-rejection) |
 | Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [→](./test-integration/index.md) |
 | CI regression gate | Fails the run when a benchmark regresses past a percentage. | [→](./reference/cli.md) |
 | Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [→](./statistics/diagnostics.md) |

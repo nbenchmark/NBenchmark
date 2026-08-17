@@ -1,5 +1,6 @@
 using NBenchmark.Diagnostics;
 using NBenchmark.Engine.Detectors;
+using NBenchmark.Interop;
 using NBenchmark.Stats;
 
 namespace NBenchmark.Engine;
@@ -75,6 +76,36 @@ internal static class AdaptiveLoop
         var clockResolutionNs = ClockResolutionProbe.ResolutionNs(clock);
         var targetSampleDurationNs = ClockResolutionProbe.ResolveTargetSampleDurationNs(
             autoTune.TargetSampleDurationNs, clockResolutionNs, autoTune.MinQuantaPerSample);
+
+        // Evidence-based interference rejection: whether the measurement phase brackets each sample
+        // with a thread-CPU-clock read. Resolved once, up front, from two involuntary reasons a run
+        // must degrade for rather than silently do nothing about - an unsupported platform, or a
+        // probe too expensive relative to the sample duration it would ride along with - on top of
+        // whichever choice InterferenceOptions.Enabled already made. A user's own choice to disable
+        // it needs no explanation, so interferenceDisabledReason stays null in that case.
+        var interference = o.Interference;
+        var measureInterference = interference.Enabled;
+        string? interferenceDisabledReason = null;
+
+        if (measureInterference && !ThreadCpuClock.IsAvailable)
+        {
+            measureInterference = false;
+            interferenceDisabledReason = "the thread-CPU clock is not available on this platform";
+        }
+        else if (measureInterference)
+        {
+            var interferenceProbeCostNs = InterferenceCostProbe.PairCostNs;
+            var interferenceBudgetNs = targetSampleDurationNs * interference.ProbeCostBudgetFraction;
+
+            if (interferenceProbeCostNs > interferenceBudgetNs)
+            {
+                measureInterference = false;
+                interferenceDisabledReason =
+                    $"two thread-CPU-clock reads cost {interferenceProbeCostNs:F0} ns, more than "
+                    + $"{interference.ProbeCostBudgetFraction:P0} of the {targetSampleDurationNs:F0} ns "
+                    + "sample-duration target";
+            }
+        }
 
         // Start the tuning-wall-clock span here, after the runner's pre-loop progress callback, so
         // the reported time covers only the adaptive loop's own work.
@@ -159,7 +190,7 @@ internal static class AdaptiveLoop
 
                 for (var probe = 0; probe < CalibrationSamplesPerStep; probe++)
                 {
-                    var (elapsed, _, _) = AcquireSampleSync(body, spec, clock, probeK, false, forceGc, DiagnosticsOptions.None);
+                    var (elapsed, _, _, _) = AcquireSampleSync(body, spec, clock, probeK, false, forceGc, DiagnosticsOptions.None, false);
                     totalBodyInvocations += probeK;
                     accumulatedNs += elapsed;
                     calibrationWarmupNs += elapsed;
@@ -261,7 +292,7 @@ internal static class AdaptiveLoop
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
-                var (elapsed, _, _) = AcquireSampleSync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None);
+                var (elapsed, _, _, _) = AcquireSampleSync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None, false);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
                 calibrationWarmupNs += elapsed;
@@ -382,6 +413,7 @@ internal static class AdaptiveLoop
         var timings = new List<double>(explicitSamples ?? sampleCeiling);
         var allocations = measureAllocations ? new List<long>(timings.Capacity) : null;
         var diagnosticsList = diagnostics.Any ? new List<DiagnosticDelta>(timings.Capacity) : null;
+        var occupancies = measureInterference ? new List<double>(timings.Capacity) : null;
         var ci = explicitSamples is null ? new CiWidthDetector(o.ConfidenceLevel, autoTune) : null;
         var tracker = new SplitHalfTracker(timings);
         double measurementNs = 0;
@@ -424,7 +456,8 @@ internal static class AdaptiveLoop
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
-                var (elapsed, allocDelta, diagDelta) = AcquireSampleSync(body, spec, clock, k, measureAllocations, forceGc, diagnostics);
+                var (elapsed, allocDelta, diagDelta, occupancy) = AcquireSampleSync(
+                    body, spec, clock, k, measureAllocations, forceGc, diagnostics, measureInterference);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
                 measurementNs += elapsed;
@@ -432,6 +465,7 @@ internal static class AdaptiveLoop
                 timings.Add(perOp);
                 allocations?.Add(allocDelta / k);
                 diagnosticsList?.Add(diagDelta);
+                occupancies?.Add(occupancy);
                 tracker.Add(perOp);
                 sampleCount++;
 
@@ -481,6 +515,7 @@ internal static class AdaptiveLoop
                             timings.Clear();
                             allocations?.Clear();
                             diagnosticsList?.Clear();
+                            occupancies?.Clear();
                             tracker.Reset();
                             sampleCount = 0;
                             measurementNs = 0;
@@ -605,7 +640,9 @@ internal static class AdaptiveLoop
             coefficientOfVariation: ci?.CoefficientOfVariation ?? double.NaN,
             hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null,
             clockResolutionNs: clockResolutionNs,
-            targetSampleDurationNs: targetSampleDurationNs);
+            targetSampleDurationNs: targetSampleDurationNs,
+            occupancies: occupancies,
+            interferenceDisabledReason: interferenceDisabledReason);
     }
 
     public static async Task<AdaptiveResult> RunAsync(
@@ -642,6 +679,36 @@ internal static class AdaptiveLoop
         var clockResolutionNs = ClockResolutionProbe.ResolutionNs(clock);
         var targetSampleDurationNs = ClockResolutionProbe.ResolveTargetSampleDurationNs(
             autoTune.TargetSampleDurationNs, clockResolutionNs, autoTune.MinQuantaPerSample);
+
+        // Evidence-based interference rejection: whether the measurement phase brackets each sample
+        // with a thread-CPU-clock read. Resolved once, up front, from two involuntary reasons a run
+        // must degrade for rather than silently do nothing about - an unsupported platform, or a
+        // probe too expensive relative to the sample duration it would ride along with - on top of
+        // whichever choice InterferenceOptions.Enabled already made. A user's own choice to disable
+        // it needs no explanation, so interferenceDisabledReason stays null in that case.
+        var interference = o.Interference;
+        var measureInterference = interference.Enabled;
+        string? interferenceDisabledReason = null;
+
+        if (measureInterference && !ThreadCpuClock.IsAvailable)
+        {
+            measureInterference = false;
+            interferenceDisabledReason = "the thread-CPU clock is not available on this platform";
+        }
+        else if (measureInterference)
+        {
+            var interferenceProbeCostNs = InterferenceCostProbe.PairCostNs;
+            var interferenceBudgetNs = targetSampleDurationNs * interference.ProbeCostBudgetFraction;
+
+            if (interferenceProbeCostNs > interferenceBudgetNs)
+            {
+                measureInterference = false;
+                interferenceDisabledReason =
+                    $"two thread-CPU-clock reads cost {interferenceProbeCostNs:F0} ns, more than "
+                    + $"{interference.ProbeCostBudgetFraction:P0} of the {targetSampleDurationNs:F0} ns "
+                    + "sample-duration target";
+            }
+        }
 
         // Start the tuning-wall-clock span here, after the runner's pre-loop progress callback, so
         // the reported time covers only the adaptive loop's own work.
@@ -726,7 +793,8 @@ internal static class AdaptiveLoop
 
                 for (var probe = 0; probe < CalibrationSamplesPerStep; probe++)
                 {
-                    var (elapsed, _, _) = await AcquireSampleAsync(body, spec, clock, probeK, false, forceGc, DiagnosticsOptions.None)
+                    var (elapsed, _, _, _) = await AcquireSampleAsync(
+                            body, spec, clock, probeK, false, forceGc, DiagnosticsOptions.None, false)
                         .ConfigureAwait(false);
 
                     totalBodyInvocations += probeK;
@@ -830,7 +898,8 @@ internal static class AdaptiveLoop
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
-                var (elapsed, _, _) = await AcquireSampleAsync(body, spec, clock, k, false, forceGc, DiagnosticsOptions.None).ConfigureAwait(false);
+                var (elapsed, _, _, _) = await AcquireSampleAsync(
+                    body, spec, clock, k, false, forceGc, DiagnosticsOptions.None, false).ConfigureAwait(false);
                 totalBodyInvocations += k;
                 accumulatedNs += elapsed;
                 calibrationWarmupNs += elapsed;
@@ -951,6 +1020,7 @@ internal static class AdaptiveLoop
         var timings = new List<double>(explicitSamples ?? sampleCeiling);
         var allocations = measureAllocations ? new List<long>(timings.Capacity) : null;
         var diagnosticsList = diagnostics.Any ? new List<DiagnosticDelta>(timings.Capacity) : null;
+        var occupancies = measureInterference ? new List<double>(timings.Capacity) : null;
         var ci = explicitSamples is null ? new CiWidthDetector(o.ConfidenceLevel, autoTune) : null;
         var tracker = new SplitHalfTracker(timings);
         double measurementNs = 0;
@@ -994,7 +1064,8 @@ internal static class AdaptiveLoop
             {
                 ct.ThrowIfCancellationRequested();
 
-                var (elapsed, allocDelta, diagDelta) = await AcquireSampleAsync(body, spec, clock, k, measureAllocations, forceGc, diagnostics)
+                var (elapsed, allocDelta, diagDelta, occupancy) = await AcquireSampleAsync(
+                        body, spec, clock, k, measureAllocations, forceGc, diagnostics, measureInterference)
                     .ConfigureAwait(false);
 
                 totalBodyInvocations += k;
@@ -1004,6 +1075,7 @@ internal static class AdaptiveLoop
                 timings.Add(perOp);
                 allocations?.Add(allocDelta / k);
                 diagnosticsList?.Add(diagDelta);
+                occupancies?.Add(occupancy);
                 tracker.Add(perOp);
                 sampleCount++;
 
@@ -1053,6 +1125,7 @@ internal static class AdaptiveLoop
                             timings.Clear();
                             allocations?.Clear();
                             diagnosticsList?.Clear();
+                            occupancies?.Clear();
                             tracker.Reset();
                             sampleCount = 0;
                             measurementNs = 0;
@@ -1177,7 +1250,9 @@ internal static class AdaptiveLoop
             coefficientOfVariation: ci?.CoefficientOfVariation ?? double.NaN,
             hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null,
             clockResolutionNs: clockResolutionNs,
-            targetSampleDurationNs: targetSampleDurationNs);
+            targetSampleDurationNs: targetSampleDurationNs,
+            occupancies: occupancies,
+            interferenceDisabledReason: interferenceDisabledReason);
     }
 
     // Per-iteration setup/teardown make a K-batch semantically wrong (each op must be paired with
@@ -1222,7 +1297,9 @@ internal static class AdaptiveLoop
         double coefficientOfVariation,
         bool hasIterationHooks,
         double clockResolutionNs,
-        double targetSampleDurationNs)
+        double targetSampleDurationNs,
+        List<double>? occupancies,
+        string? interferenceDisabledReason)
     {
         var timingsArray = timings.ToArray();
 
@@ -1268,6 +1345,7 @@ internal static class AdaptiveLoop
             TargetSampleDurationNs = targetSampleDurationNs,
             SampleDurationNs = achievedSampleDurationNs,
             SampleQuantizationFraction = quantizationFraction,
+            InterferenceDisabledReason = interferenceDisabledReason,
         };
 
         var warnings = BuildStopWarnings(
@@ -1303,7 +1381,8 @@ internal static class AdaptiveLoop
             resolvedWarmup,
             diagnostic,
             warnings,
-            effectiveDetector);
+            effectiveDetector,
+            occupancies?.ToArray());
     }
 
     /// <summary>
@@ -1587,8 +1666,9 @@ internal static class AdaptiveLoop
         return double.IsFinite(n) ? Math.Ceiling(n) : double.PositiveInfinity;
     }
 
-    private static (double elapsedNs, long allocDelta, DiagnosticDelta diagDelta) AcquireSampleSync(
-        Action body, RunSpec spec, IClock clock, int k, bool measureAllocations, bool forceGc, DiagnosticsOptions diagnostics)
+    private static (double elapsedNs, long allocDelta, DiagnosticDelta diagDelta, double occupancy) AcquireSampleSync(
+        Action body, RunSpec spec, IClock clock, int k, bool measureAllocations, bool forceGc,
+        DiagnosticsOptions diagnostics, bool measureInterference)
     {
         if (forceGc)
             GcControl.ForceGen0Collection();
@@ -1601,6 +1681,14 @@ internal static class AdaptiveLoop
             snapshot = AllocationMeter.Capture();
 
         var diagSnapshot = diagnostics.Any ? DiagnosticMeter.Capture(diagnostics) : default;
+
+        // Bracket outside the timed window, exactly like the allocation snapshot above: the CPU
+        // window ends up a strict superset of the wall window by two clock reads, biasing occupancy
+        // upward by well under 1% of a typical sample - conservative in the safe direction, since it
+        // under-reports interference rather than inventing it.
+        var threadIdBefore = measureInterference ? Environment.CurrentManagedThreadId : 0;
+        long cpuBefore = 0;
+        var haveCpuBefore = measureInterference && ThreadCpuClock.TryRead(out cpuBefore);
 
         var timestamp = clock.GetTimestamp();
 
@@ -1611,15 +1699,35 @@ internal static class AdaptiveLoop
 
         var elapsedNs = clock.GetElapsedNanoseconds(timestamp);
 
+        var occupancy = double.NaN;
+
+        // A thread hop makes the thread-CPU clock meaningless for this sample - it would be reading
+        // a different thread's accumulated time. Occupancy stays NaN ("unknown"), which the rejection
+        // stage excludes from the median and never rejects: unknown occupancy is not evidence of
+        // interference. A synchronous body cannot hop, but the check costs nothing to share with the
+        // async path below.
+        long cpuAfter = 0;
+
+        if (haveCpuBefore && elapsedNs > 0
+            && Environment.CurrentManagedThreadId == threadIdBefore
+            && ThreadCpuClock.TryRead(out cpuAfter))
+        {
+            var cpuDelta = cpuAfter - cpuBefore;
+
+            if (cpuDelta >= 0)
+                occupancy = cpuDelta / elapsedNs;
+        }
+
         var allocDelta = measureAllocations ? AllocationMeter.Delta(snapshot) : 0L;
         var diagDelta = diagnostics.Any ? DiagnosticMeter.Delta(diagSnapshot, diagnostics) : default;
 
         spec.IterationTeardown?.Invoke();
-        return (elapsedNs, allocDelta, diagDelta);
+        return (elapsedNs, allocDelta, diagDelta, occupancy);
     }
 
-    private static async Task<(double elapsedNs, long allocDelta, DiagnosticDelta diagDelta)> AcquireSampleAsync(
-        Func<Task> body, RunSpec spec, IClock clock, int k, bool measureAllocations, bool forceGc, DiagnosticsOptions diagnostics)
+    private static async Task<(double elapsedNs, long allocDelta, DiagnosticDelta diagDelta, double occupancy)> AcquireSampleAsync(
+        Func<Task> body, RunSpec spec, IClock clock, int k, bool measureAllocations, bool forceGc,
+        DiagnosticsOptions diagnostics, bool measureInterference)
     {
         if (forceGc)
             GcControl.ForceGen0Collection();
@@ -1633,6 +1741,10 @@ internal static class AdaptiveLoop
 
         var diagSnapshot = diagnostics.Any ? DiagnosticMeter.Capture(diagnostics) : default;
 
+        var threadIdBefore = measureInterference ? Environment.CurrentManagedThreadId : 0;
+        long cpuBefore = 0;
+        var haveCpuBefore = measureInterference && ThreadCpuClock.TryRead(out cpuBefore);
+
         var timestamp = clock.GetTimestamp();
 
         for (var j = 0; j < k; j++)
@@ -1642,11 +1754,28 @@ internal static class AdaptiveLoop
 
         var elapsedNs = clock.GetElapsedNanoseconds(timestamp);
 
+        var occupancy = double.NaN;
+
+        // The case this exists for: an await resumed the continuation on a different thread, so the
+        // thread-CPU clock read below would belong to the wrong thread. Mirrors AllocationMeter's own
+        // thread-hopped-sample fallback.
+        long cpuAfter = 0;
+
+        if (haveCpuBefore && elapsedNs > 0
+            && Environment.CurrentManagedThreadId == threadIdBefore
+            && ThreadCpuClock.TryRead(out cpuAfter))
+        {
+            var cpuDelta = cpuAfter - cpuBefore;
+
+            if (cpuDelta >= 0)
+                occupancy = cpuDelta / elapsedNs;
+        }
+
         var allocDelta = measureAllocations ? AllocationMeter.Delta(snapshot) : 0L;
         var diagDelta = diagnostics.Any ? DiagnosticMeter.Delta(diagSnapshot, diagnostics) : default;
 
         spec.IterationTeardown?.Invoke();
-        return (elapsedNs, allocDelta, diagDelta);
+        return (elapsedNs, allocDelta, diagDelta, occupancy);
     }
 
     private static void RunUntimedSampleSync(Action body, RunSpec spec, int k, bool forceGc)
@@ -1697,4 +1826,10 @@ internal readonly record struct AdaptiveResult(
     int ResolvedWarmup,
     AutoTuneDiagnostic Diagnostic,
     IReadOnlyList<string> Warnings,
-    IOutlierDetector? EffectiveOutlierDetector = null);
+    IOutlierDetector? EffectiveOutlierDetector = null,
+    // Per-sample CPU-occupancy ratio (cpuDelta / wallDelta), parallel to PerOpTimings. NaN for a
+    // sample whose occupancy is unknown - the probe was disabled for this run, or the sample's
+    // continuation resumed on a different thread. Null when the interference filter did not run at
+    // all for this benchmark (disabled by configuration, or the platform/cost guard fired before
+    // measurement started).
+    double[]? PerOpOccupancy = null);

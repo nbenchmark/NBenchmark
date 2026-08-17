@@ -474,6 +474,19 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
+    ///     Turns evidence-based interference rejection on or off. <b>On by default</b>: every timed
+    ///     sample is bracketed with a thread-CPU-clock read, and a sample whose CPU occupancy falls
+    ///     materially below this benchmark's own median is rejected before the statistical outlier
+    ///     detector ever sees it. Pass <c>false</c> to trim only on the statistical detector, as
+    ///     before this feature existed. See <see cref="InterferenceOptions" />.
+    /// </summary>
+    public BenchmarkHarness WithInterferenceFilter(bool enabled = true)
+    {
+        _options = _options with { Interference = _options.Interference with { Enabled = enabled } };
+        return this;
+    }
+
+    /// <summary>
     ///     Requests the specified process priority for the duration of the run, reducing
     ///     preemption by unrelated OS work. <see cref="System.Diagnostics.ProcessPriorityClass.High" />
     ///     is the recommended value for dedicated benchmark hosts. The prior priority is

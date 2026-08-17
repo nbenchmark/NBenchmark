@@ -114,6 +114,12 @@ internal sealed record MeasurementOverrides
     public bool? NoThreadControl { get; init; }
 
     /// <summary>
+    ///     Switches off evidence-based interference rejection
+    ///     (<see cref="InterferenceOptions.Enabled" />), set by <c>--no-interference-filter</c>.
+    /// </summary>
+    public bool? NoInterferenceFilter { get; init; }
+
+    /// <summary>
     ///     Lifts the cap on how many raw samples an isolated worker returns
     ///     (<see cref="MeasurementOptions.MaxRawSamples" />), set by <c>--emit-raw</c>.
     /// </summary>
@@ -171,6 +177,7 @@ internal sealed record MeasurementOverrides
         NoHistogram = cliArgs.NoHistogram,
         NoDriftCanary = cliArgs.NoDriftCanary ? true : null,
         NoThreadControl = cliArgs.NoThreadControl ? true : null,
+        NoInterferenceFilter = cliArgs.NoInterferenceFilter ? true : null,
         EmitRaw = cliArgs.EmitRaw,
         StreamSamples = cliArgs.StreamSamples ? true : null,
         Diagnostics = cliArgs.Diagnostics,
@@ -364,6 +371,13 @@ internal sealed record MeasurementOverrides
                 Environment = (result.Environment ?? new EnvironmentOptions()) with { ThreadControl = false },
             };
         }
+
+        // One-way, like --no-drift-canary and --no-thread-control above: the flag asks for the
+        // filter to be off, and its absence means "leave whatever was configured alone" rather than
+        // "impose the default", so a programmatic WithInterferenceFilter(false) survives a parsed
+        // command line.
+        if (NoInterferenceFilter is true)
+            result = result with { Interference = result.Interference with { Enabled = false } };
 
         return result;
     }

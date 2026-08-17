@@ -164,6 +164,14 @@ public record MeasurementOptions
     public DriftCanaryOptions DriftCanary { get; init; } = DriftCanaryOptions.Default;
 
     /// <summary>
+    ///     Settings for evidence-based interference rejection - discarding samples the OS is known
+    ///     to have preempted (via the measuring thread's own CPU-occupancy ratio) before the
+    ///     statistical outlier detector ever sees the stream. On by default; see
+    ///     <see cref="InterferenceOptions" />.
+    /// </summary>
+    public InterferenceOptions Interference { get; init; } = InterferenceOptions.Default;
+
+    /// <summary>
     ///     The authoritative measurement profile. The resolved booleans
     ///     (<see cref="ForceGcBeforeEachIteration" />, <see cref="ForceGcBeforeMeasurement" />,
     ///     <see cref="ForceGcBetweenBenchmarks" />, <see cref="MeasureAllocations" />) derive from

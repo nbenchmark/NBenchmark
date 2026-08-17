@@ -427,6 +427,44 @@ var options = new MeasurementOptions { DriftCanary = DriftCanaryOptions.Disabled
 BenchmarkSuite/BenchmarkHarness fluent methods: `.WithDriftCanary(false)` or `.WithDriftCanary(DriftCanaryOptions)`  
 CLI flag: `--no-drift-canary`
 
+### Interference
+
+```csharp
+Interference = InterferenceOptions.Default   // default - on, reject below 50% of the median occupancy
+```
+
+Evidence-based interference rejection. Every timed sample is bracketed with a read of the measuring
+thread's own CPU time, giving a per-sample occupancy ratio (CPU time consumed / wall time elapsed).
+A sample whose ratio falls materially below this benchmark's own median occupancy was, as a matter
+of fact, preempted by the OS for part of its window - and is discarded **before** `OutlierMode` or
+any custom `IOutlierDetector` ever sees the sample stream. See
+[Evidence-based interference rejection](../statistics/outliers.md#evidence-based-interference-rejection)
+for the full statistic and the fold-in with the bimodal/GC-correlation warning.
+
+Typed as an `InterferenceOptions` record:
+
+| Property | Default | What it does |
+| --- | --- | --- |
+| `Enabled` | `true` | Whether the filter runs at all. |
+| `RejectionThreshold` | `0.5` | A sample below this fraction of the median occupancy ratio is rejected. `0.01` - `1`. |
+| `ProbeCostBudgetFraction` | `0.05` | The probe disables itself for the run when two clock reads cost more than this fraction of the sample-duration target. `0.0001` - `1`. |
+| `KnownSampleFraction` | `0.5` | The minimum fraction of samples that must have a known occupancy reading before a median is trusted. `0` - `1`. |
+| `HighRejectionWarningFraction` | `0.2` | Warn when the rejected fraction reaches this value - "this host is too noisy to trust". `0` - `1`. |
+
+```csharp
+// Reject more aggressively (below 70% of the median occupancy)
+var options = new MeasurementOptions
+{
+    Interference = InterferenceOptions.Default with { RejectionThreshold = 0.7 },
+};
+
+// Off - trim only on the statistical outlier detector, as before this feature existed
+var options = new MeasurementOptions { Interference = InterferenceOptions.Disabled };
+```
+
+BenchmarkSuite/BenchmarkHarness fluent method: `.WithInterferenceFilter(false)`  
+CLI flag: `--no-interference-filter`
+
 ### OutlierMode
 
 ```csharp
@@ -710,6 +748,7 @@ Categories are not part of `MeasurementOptions`; they are metadata declared with
 | `Environment` | `EnvironmentOptions?` | `null` | See [Environment](#environment) |
 | `Diagnostics` | `DiagnosticsOptions` | `DiagnosticsOptions.Default` (GC counts on) | See [Diagnostics](#diagnostics) |
 | `DriftCanary` | `DriftCanaryOptions` | `DriftCanaryOptions.Default` (on) | See [DriftCanary](#driftcanary) |
+| `Interference` | `InterferenceOptions` | `InterferenceOptions.Default` (on) | See [Interference](#interference) |
 
 Values outside the valid range throw `ArgumentOutOfRangeException`.
 

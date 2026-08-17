@@ -264,6 +264,10 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         => Chain(() => base.WithHardwareAffinity(cores));
 
     /// <inheritdoc />
+    public new BenchmarkSuite<TState> WithInterferenceFilter(bool enabled = true)
+        => Chain(() => base.WithInterferenceFilter(enabled));
+
+    /// <inheritdoc />
     public new BenchmarkSuite<TState> WithMinimumPracticalEffect(double minimumDelta)
         => Chain(() => base.WithMinimumPracticalEffect(minimumDelta));
 

@@ -117,6 +117,35 @@ Do not silence it. Read the tail metrics as-is - by default the histogram and P9
 
 See [Outlier Trimming: Bimodal-distribution warning](./statistics/outliers.md#bimodal-distribution-warning) for the detector, the common-cause table, and the interaction with each outlier mode.
 
+### A warning names samples "confirmed preempted by the OS"
+
+> [!CAUTION] Quick fix
+>
+> 1. **Read it as good news, not a bug report.** These samples were removed on direct evidence (the measuring thread's own CPU occupancy), not inferred from the timing - the reported numbers are more trustworthy for having them gone.
+> 2. **If the rejected fraction is high** ("this host is too noisy to trust"), get off the shared host or re-run once background load clears, the same remedy as a high jitter metric.
+
+This is [evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection): a pre-stage that runs before the statistical outlier detector and discards a sample only when the OS is *known* to have preempted it, rather than when the timing merely looks slow. The two discard counts - confirmed preempted vs. statistical outlier - are reported together in one message so nothing is counted twice.
+
+It is on by default and needs no action on a normal run: a quiet host rejects nothing and the reported numbers are unaffected. To trim only on the statistical detector, as before this feature existed, pass `--no-interference-filter`.
+
+See [Outlier Trimming: Evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection) for the statistic and the graceful-degradation cases below.
+
+### `autoTune.interferenceDisabledReason` is set
+
+> [!CAUTION] Quick fix
+>
+> This is informational, not an error - the timings are unaffected either way.
+
+The interference filter could not run for this benchmark and says why on `AutoTuneDiagnostic.InterferenceDisabledReason` (visible at `--detail advanced`). The three causes:
+
+| Reason | What it means |
+| --- | --- |
+| Thread-CPU clock unavailable | The host platform has no thread-CPU-time API the engine knows about. |
+| Probe cost exceeded its budget | Two clock reads would have cost more than `InterferenceOptions.ProbeCostBudgetFraction` of the sample-duration target, so the probe was never armed for this run. |
+| Too few samples with a known occupancy reading | Usually an async body whose continuations mostly resumed on a different thread - a thread-CPU-time delta from that sample would be reading the wrong thread's clock, so it is reported as unknown rather than wrong, and there was not enough other evidence to trust a median. |
+
+Nothing you need to fix unless you specifically want the interference evidence back: for the async case, a body whose `await` points resume on the original thread (rare in general-purpose async code) would restore it.
+
 ## Zero or unexpected results
 
 ### Result shows `0 ns`

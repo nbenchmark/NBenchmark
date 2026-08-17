@@ -1191,6 +1191,53 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void ParseCore_NoInterferenceFilter_Sets_NoInterferenceFilter_Flag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--no-interference-filter"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.NoInterferenceFilter);
+    }
+
+    [Fact]
+    public void ParseCore_Leaves_NoInterferenceFilter_Unset_By_Default()
+    {
+        var (result, errors) = CliArgs.ParseCore([]);
+
+        Assert.Empty(errors);
+        Assert.False(result.NoInterferenceFilter);
+    }
+
+    [Fact]
+    public void MeasurementOverrides_NoInterferenceFilter_Disables_The_Filter()
+    {
+        var (args, _) = CliArgs.ParseCore(["--no-interference-filter"]);
+
+        var applied = MeasurementOverrides.FromCliArgs(args).Apply(MeasurementOptions.Default);
+
+        Assert.False(applied.Interference.Enabled);
+    }
+
+    /// <summary>
+    ///     One-way, like <c>--no-thread-control</c>: the flag's absence must not switch the filter
+    ///     back on over a programmatic <c>WithInterferenceFilter(false)</c>.
+    /// </summary>
+    [Fact]
+    public void MeasurementOverrides_Without_The_Flag_Leaves_Interference_Filter_Disabled()
+    {
+        var (args, _) = CliArgs.ParseCore([]);
+
+        var configured = MeasurementOptions.Default with
+        {
+            Interference = InterferenceOptions.Disabled,
+        };
+
+        var applied = MeasurementOverrides.FromCliArgs(args).Apply(configured);
+
+        Assert.False(applied.Interference.Enabled);
+    }
+
+    [Fact]
     public void ParseCore_NoSamples_Sets_NoSamples_Flag()
     {
         var (result, errors) = CliArgs.ParseCore(["--no-samples"]);
