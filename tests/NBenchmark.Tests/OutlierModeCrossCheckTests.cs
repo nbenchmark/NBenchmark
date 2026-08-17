@@ -73,6 +73,13 @@ public class OutlierModeCrossCheckTests
                     WarmupIterations = 1,
                     Iterations = iterations,
                     OutlierMode = mode,
+                    // These tests pin the trim-count *formulas* against a real (non-scripted)
+                    // clock, and a trivial body's samples are all a handful of nanoseconds -
+                    // exactly the regime where a genuine, real OS preemption on a shared or
+                    // noisy CI runner would otherwise remove one extra sample before the fence
+                    // ever runs, shifting the expected count by one. Interference rejection is
+                    // a different feature under test elsewhere; it must not make this test flaky.
+                    Interference = InterferenceOptions.Disabled,
                 },
             });
 }

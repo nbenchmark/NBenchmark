@@ -20,7 +20,17 @@ public class BenchmarkStaticTests
     public void Run_Executes_Sync_Benchmark()
     {
         var result = Benchmark.Run(() => Thread.SpinWait(100),
-            new MeasurementOptions { WarmupIterations = 1, Iterations = 10, OutlierMode = OutlierMode.None, RequireIsolation = false });
+            new MeasurementOptions
+            {
+                WarmupIterations = 1,
+                Iterations = 10,
+                OutlierMode = OutlierMode.None,
+                RequireIsolation = false,
+                // This test is about the sample count contract, not interference rejection - a
+                // real OS preemption during a genuinely-timed run on a noisy host would otherwise
+                // drop this below 10 and make the assertion flaky.
+                Interference = InterferenceOptions.Disabled,
+            });
 
         Assert.Equal("Benchmark", result.Name);
         Assert.True(result.Median > 0);
