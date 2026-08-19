@@ -194,6 +194,17 @@ Reported as `0` when `n < 1`.
 | `AllocP95` | Nearest-rank P95 of iteration deltas | P95 allocation per iteration (only when `MeasureAllocations = true`). |
 | `AllocMax` | Max of iteration deltas | Max allocation per iteration (only when `MeasureAllocations = true`). |
 
+### Provenance fields
+
+These record the run configuration a result was measured under, so a consumer can group, filter, or interpret results by the settings that produced them. They are set once by the measuring process and ride through every aggregation unchanged.
+
+| Field | Source | Description |
+|---|---|---|
+| `RuntimeProfileName` | Measuring process environment | The runtime-startup configuration this result was *actually* measured under - not the one requested. `"host"` means the measurement ran in a process NBenchmark did not launch. |
+| `RuntimeKnobs` | Measuring process environment | The runtime-startup knobs in effect, e.g. `"tiered=off pgo=off r2r=off"`. Read from the measuring process's own environment so a hand-set knob is reported as faithfully as one NBenchmark applied. |
+| `ThreadControlEnabled` | `MeasurementOptions.Environment` | Whether thread-level environment control was enabled: thread affinity, thread priority, and (on macOS) the `QOS_CLASS_USER_INTERACTIVE` elevation that keeps the measuring thread on an Apple Silicon performance core. On by default; `false` when disabled via `--no-thread-control` / `.WithThreadControl(false)`. Records the configured setting, not the application outcome - on macOS the elevation is refused on thread-pool threads (the default worker path), and that refusal is reported via the console warning rather than this field. |
+| `InterferenceFilterEnabled` | `MeasurementOptions.Interference` | Whether the evidence-based interference rejection filter was enabled - the pre-stage that discards samples the OS is known to have preempted before outlier trimming runs. On by default; `false` when disabled via `--no-interference-filter` / `.WithInterferenceFilter(false)`. Distinct from `AutoTuneDiagnostic.InterferenceDisabledReason`, which records *involuntary* disablement by the engine (unsupported platform, probe too costly, too few known-occupancy samples); this field records the user's configured setting. |
+
 ### Throughput fields
 
 | Field | Formula | Description |

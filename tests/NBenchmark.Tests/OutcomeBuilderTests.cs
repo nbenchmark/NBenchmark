@@ -409,6 +409,124 @@ public class OutcomeBuilderTests
         Assert.Equal(measured, outcome.Result.MeasuredDuration);
     }
 
+    // ---------- ThreadControl / InterferenceFilter sourcing ----------
+
+    [Fact]
+    public void Build_Success_SetsThreadControlEnabled_FromOptions()
+    {
+        var stats = new StatsSummary { Mean = 1 };
+        var options = new MeasurementOptions
+        {
+            Environment = new EnvironmentOptions { ThreadControl = false },
+        };
+
+        var outcome = OutcomeBuilder.Build(
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null, []),
+                [1]),
+            "b", "", null, false,
+            options,
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1));
+
+        Assert.False(outcome.Result.ThreadControlEnabled);
+    }
+
+    [Fact]
+    public void Build_Success_SetsThreadControlEnabled_DefaultTrue_WhenEnvironmentNull()
+    {
+        var stats = new StatsSummary { Mean = 1 };
+
+        var outcome = OutcomeBuilder.Build(
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null, []),
+                [1]),
+            "b", "", null, false,
+            new MeasurementOptions { Environment = null },
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1));
+
+        Assert.True(outcome.Result.ThreadControlEnabled);
+    }
+
+    [Fact]
+    public void Build_Success_SetsInterferenceFilterEnabled_FromOptions()
+    {
+        var stats = new StatsSummary { Mean = 1 };
+        var options = new MeasurementOptions
+        {
+            Interference = InterferenceOptions.Disabled,
+        };
+
+        var outcome = OutcomeBuilder.Build(
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null, []),
+                [1]),
+            "b", "", null, false,
+            options,
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1));
+
+        Assert.False(outcome.Result.InterferenceFilterEnabled);
+    }
+
+    [Fact]
+    public void Build_Success_SetsInterferenceFilterEnabled_DefaultTrue()
+    {
+        var stats = new StatsSummary { Mean = 1 };
+
+        var outcome = OutcomeBuilder.Build(
+            new RunOutcome.Success(
+                new ProcessedMeasurements(stats, 1, null, 0, 0, 0, null, null, 0, null, []),
+                [1]),
+            "b", "", null, false,
+            new MeasurementOptions(),
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1));
+
+        Assert.True(outcome.Result.InterferenceFilterEnabled);
+    }
+
+    [Fact]
+    public void Build_DryRun_PreservesThreadControlAndInterferenceFilterSettings()
+    {
+        var options = new MeasurementOptions
+        {
+            Environment = new EnvironmentOptions { ThreadControl = false },
+            Interference = InterferenceOptions.Disabled,
+        };
+
+        var outcome = OutcomeBuilder.Build(
+            new RunOutcome.DryRun(),
+            "dry", "", null, false,
+            options,
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1));
+
+        Assert.False(outcome.Result.ThreadControlEnabled);
+        Assert.False(outcome.Result.InterferenceFilterEnabled);
+    }
+
+    [Fact]
+    public void Build_Errored_PreservesThreadControlAndInterferenceFilterSettings()
+    {
+        var options = new MeasurementOptions
+        {
+            Environment = new EnvironmentOptions { ThreadControl = false },
+            Interference = InterferenceOptions.Disabled,
+        };
+
+        var outcome = OutcomeBuilder.Build(
+            new RunOutcome.Errored(new Exception("x")),
+            "b", "", null, false,
+            options,
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1));
+
+        Assert.False(outcome.Result.ThreadControlEnabled);
+        Assert.False(outcome.Result.InterferenceFilterEnabled);
+    }
+
     [Fact]
     public void Build_Null_Input_Throws_ArgumentNullException()
     {

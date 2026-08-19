@@ -57,9 +57,9 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 ## Output format
 
 ```csv
-ClassName,Name,Median,OpsPerSecond,Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Isolation
-"SortingBenchmarks","Compute",300.0,3636363.6,0.75,"true",96,12,3,0,1,4,simple,realistic,steady-state,"","isolated"
-"SortingBenchmarks","Baseline",400.0,2660985.4,1.00,"",120,11,2,0,1,4,simple,realistic,steady-state,"","isolated"
+ClassName,Name,Median,OpsPerSecond,Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation
+"SortingBenchmarks","Compute",300.0,3636363.6,0.75,"true",96,12,3,0,1,4,simple,realistic,steady-state,"",true,true,"isolated"
+"SortingBenchmarks","Baseline",400.0,2660985.4,1.00,"",120,11,2,0,1,4,simple,realistic,steady-state,"",true,true,"isolated"
 
 Percentile columns (P95, P99, etc.) are dynamic -- they appear only in Standard and Advanced modes when the corresponding percentiles are configured via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set of `[0.50, 0.95, 0.99, 0.999, 1.0]`, columns P95 and P99 are emitted. P50 and Max (1.0) are excluded from percentile columns because they are shown separately as Median and Max. Values are in nanoseconds. Empty cells indicate the percentile was not in the configured set or the row is errored.
 ```
@@ -68,7 +68,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 
 ## Column reference
 
-### Simple mode (17 columns)
+### Simple mode (19 columns)
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -86,6 +86,8 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 | `Profile` | string | Active measurement profile (`realistic` or `independent`). |
 | `RuntimeProfile` | string | The runtime profile the measuring process was launched under (`steady-state`, `host`, ...). |
 | `RuntimeKnobs` | string | The environment variables that profile applied, or empty when the configuration was inherited rather than chosen. |
+| `ThreadControl` | `true` / `false` | Whether thread-level environment control was enabled (thread affinity, thread priority, macOS performance-core placement). Records the configured setting, not the application outcome. See `BenchmarkResult.ThreadControlEnabled`. |
+| `InterferenceFilter` | `true` / `false` | Whether the evidence-based interference rejection filter was enabled. See `BenchmarkResult.InterferenceFilterEnabled`. |
 | `Isolation` | string | Isolation status for the row (`isolated`, `in-process`, or a refusal status). Last column in every detail mode. |
 
 ### Standard mode (dynamic columns - adds the following after the simple columns)
@@ -155,7 +157,7 @@ All timing values are in **nanoseconds**. `EffectMetric` / `EffectValue` / `Magn
 - Results are sorted by median (fastest first).
 - The output directory is created automatically if it does not exist.
 - Names containing double-quotes are escaped by doubling the quote character (standard CSV escaping).
-- Simple mode CSV has 17 fixed columns. Standard mode has 33 non-percentile columns plus one per configured tail-latency percentile (35 with the default set). Advanced mode adds 35 further fields, for 68 non-percentile columns (70 with the default set).
+- Simple mode CSV has 19 fixed columns. Standard mode has 35 non-percentile columns plus one per configured tail-latency percentile (37 with the default set). Advanced mode adds 35 further fields, for 70 non-percentile columns (72 with the default set).
 
 ## Using with Benchmark (Single mode)
 

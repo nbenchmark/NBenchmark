@@ -375,6 +375,8 @@ public sealed record BenchmarkTable
             RatioSuppressed = mixedGroup,
             IsolationStatus = result.IsolationStatus,
             RuntimeProfileName = result.RuntimeProfileName,
+            ThreadControlEnabled = result.ThreadControlEnabled,
+            InterferenceFilterEnabled = result.InterferenceFilterEnabled,
             IsBaseline = comparable && (isBaselineOverride ?? result.IsBaseline),
             Errored = result.Errored,
             ErrorMessage = result.ErrorMessage,
@@ -757,6 +759,21 @@ public record BenchmarkRow
 
     /// <summary>The runtime profile the measuring process was launched under.</summary>
     public string RuntimeProfileName { get; init; } = RuntimeProfile.Host.Name;
+
+    /// <summary>
+    ///     Whether thread-level environment control was enabled for this row's measurement. See
+    ///     <see cref="BenchmarkResult.ThreadControlEnabled" /> for the full semantics. Surfaced as a
+    ///     CSV column so a trend consumer can group or filter on the setting.
+    /// </summary>
+    public bool ThreadControlEnabled { get; init; } = true;
+
+    /// <summary>
+    ///     Whether the evidence-based interference rejection filter was enabled for this row's
+    ///     measurement. See <see cref="BenchmarkResult.InterferenceFilterEnabled" /> for the full
+    ///     semantics. Surfaced as a CSV column so a trend consumer can group or filter on the
+    ///     setting.
+    /// </summary>
+    public bool InterferenceFilterEnabled { get; init; } = true;
 
     public required bool IsBaseline { get; init; }
     public required bool Errored { get; init; }

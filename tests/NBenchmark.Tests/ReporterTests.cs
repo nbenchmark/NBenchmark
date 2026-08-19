@@ -828,6 +828,54 @@ public class ReporterTests
         }
     }
 
+    [Theory]
+    [InlineData(ReportDetail.Simple)]
+    [InlineData(ReportDetail.Standard)]
+    [InlineData(ReportDetail.Advanced)]
+    public async Task CsvReporter_Includes_ThreadControl_And_InterferenceFilter_Columns(ReportDetail detail)
+    {
+        var tempDir = MakeSubDir("nb-csv-settings");
+
+        try
+        {
+            var reporter = new CsvReporter(tempDir, detail: detail);
+
+            // Seeded to differ from each other, so a column that renders the wrong row field - or
+            // hardcodes a value - fails rather than reading correct by coincidence.
+            var result = MakeResult("alpha", 100) with
+            {
+                ThreadControlEnabled = true,
+                InterferenceFilterEnabled = false,
+            };
+
+            await reporter.ReportAsync([result]);
+
+            var files = Directory.GetFiles(tempDir, "*.csv");
+            var lines = await File.ReadAllLinesAsync(files[0]);
+
+            var header = SplitCsv(lines[0]);
+            var row = SplitCsv(lines[1]);
+
+            // Assert by column index rather than by searching the whole row: other columns
+            // (Significant, AutoTuneWarmupTimeFloorMet) also render "true"/"false", so a
+            // Contains assertion would pass for the wrong reason.
+            var threadControlIndex = header.IndexOf("ThreadControl");
+            var interferenceFilterIndex = header.IndexOf("InterferenceFilter");
+            Assert.True(threadControlIndex >= 0, "ThreadControl column missing from header");
+            Assert.True(interferenceFilterIndex >= 0, "InterferenceFilter column missing from header");
+            Assert.Equal("true", row[threadControlIndex]);
+            Assert.Equal("false", row[interferenceFilterIndex]);
+
+            // The column count must match the header count, or every consumer reading by index is
+            // silently off by one from here on.
+            Assert.Equal(header.Count, row.Count);
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
     /// <summary>
     ///     Splits a CSV line on commas that are outside quotes, so a quoted field containing a comma
     ///     counts as one column.

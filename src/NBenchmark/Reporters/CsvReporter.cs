@@ -48,21 +48,21 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
             baseHeaders += ",OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Isolation");
+                $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation");
         }
         else if (Detail == ReportDetail.Standard)
         {
             baseHeaders += ",Mean,OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Isolation");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation");
         }
         else
         {
             baseHeaders += ",Mean,OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,AutoTuneSplitHalfDrift,AutoTuneRestarts,AutoTuneWarmupTimeFloorMet,AutoTuneWarmupJitMethods,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories,Isolation");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,AutoTuneSplitHalfDrift,AutoTuneRestarts,AutoTuneWarmupTimeFloorMet,AutoTuneWarmupJitMethods,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories,Isolation");
         }
 
         foreach (var table in tables)
@@ -111,7 +111,10 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{ReportFormat.SchemaVersion},{ReportFormat.MeasurementEpoch}," +
                     $"{detail}," +
                     $"{profile}," +
-                    $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\",\"{safeIsolation}\"");
+                    $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\"," +
+                    $"{(row.ThreadControlEnabled ? "true" : "false")}," +
+                    $"{(row.InterferenceFilterEnabled ? "true" : "false")}," +
+                    $"\"{safeIsolation}\"");
             }
             else
             {
@@ -145,7 +148,9 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                                $"{ReportFormat.SchemaVersion},{ReportFormat.MeasurementEpoch}," +
                                $"{detail}," +
                                $"{profile}," +
-                               $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\"";
+                               $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\"," +
+                               $"{(row.ThreadControlEnabled ? "true" : "false")}," +
+                               $"{(row.InterferenceFilterEnabled ? "true" : "false")}";
 
                 if (Detail == ReportDetail.Standard)
                     sb.AppendLine($"{fullData},\"{safeIsolation}\"");

@@ -269,6 +269,12 @@ public sealed class WorkerFrameContractTests
                 AllocMax = 24,
                 RuntimeProfileName = "steady-state",
                 RuntimeKnobs = "tiered=off pgo=off r2r=off concurrentGc=off",
+                // Both non-default, for the same reason every populated member is: the guard
+                // compares sent against received, so a property that fails to cross comes back at
+                // its initializer value. Both of these initialize to true, and seeding them true
+                // would make a dropped member indistinguishable from a member that survived.
+                ThreadControlEnabled = false,
+                InterferenceFilterEnabled = false,
             };
         }
 

@@ -193,6 +193,16 @@ internal static class OutcomeBuilder
                 // make every in-process result claim a fidelity it does not have.
                 RuntimeProfileName = RuntimeProfileEnvironment.Current.Name,
                 RuntimeKnobs = RuntimeProfileEnvironment.Current.Knobs,
+
+                // Run settings, not runtime-startup knobs: the measuring process received them
+                // in RunGroupPayload.Options and they describe what the engine was configured to
+                // do, not what the process observed about itself. Sourced from options (not
+                // RuntimeProfileEnvironment) for the same reason OutlierMode/Profile are - they
+                // are the resolved MeasurementOptions the worker measured under. The ?? true on
+                // ThreadControl honours the nullable Environment field's "null is not inert"
+                // contract (ThreadControl defaults on when Environment is unset).
+                ThreadControlEnabled = options.Environment?.ThreadControl ?? true,
+                InterferenceFilterEnabled = options.Interference.Enabled,
                 Warnings = warnings,
                 AutoTune = autoTune,
                 Diagnostics = diagnosticsResult,

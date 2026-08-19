@@ -248,6 +248,38 @@ public record BenchmarkResult
     public string RuntimeKnobs { get; init; } = "";
 
     /// <summary>
+    ///     Whether thread-level environment control was enabled for this measurement:
+    ///     thread affinity, thread priority, and (on macOS) the
+    ///     <c>QOS_CLASS_USER_INTERACTIVE</c> elevation that keeps the measuring thread on
+    ///     an Apple Silicon performance core. On by default; set to <c>false</c> via
+    ///     <c>--no-thread-control</c> / <c>.WithThreadControl(false)</c>. Read from the
+    ///     <see cref="MeasurementOptions.Environment" /> that produced this result, so an
+    ///     in-process run reports the setting the host used. This records the configured
+    ///     setting, not the application outcome: on macOS the elevation is refused on
+    ///     thread-pool threads (the default worker path), and that refusal is reported via
+    ///     the console warning rather than this field. Errored and dry-run rows report the
+    ///     options they were built with; only rows built without options (e.g. calibration
+    ///     rows) inherit the <see cref="MeasurementOptions.Default" /> value.
+    /// </summary>
+    public bool ThreadControlEnabled { get; init; } = true;
+
+    /// <summary>
+    ///     Whether the evidence-based interference rejection filter was enabled for this
+    ///     measurement - the pre-stage that discards samples the OS is known to have
+    ///     preempted (per-sample CPU-occupancy ratio materially below this benchmark's own
+    ///     median) before <see cref="OutlierMode" /> trimming runs. On by default; set to
+    ///     <c>false</c> via <c>--no-interference-filter</c> /
+    ///     <c>.WithInterferenceFilter(false)</c>. Distinct from
+    ///     <see cref="AutoTuneDiagnostic.InterferenceDisabledReason" />, which records
+    ///     when the filter was <i>involuntarily</i> disabled by the engine (unsupported
+    ///     platform, probe too costly, too few known-occupancy samples); this field
+    ///     records the user's configured setting. Errored and dry-run rows report the
+    ///     options they were built with; only rows built without options (e.g. calibration
+    ///     rows) inherit the <see cref="MeasurementOptions.Default" /> value.
+    /// </summary>
+    public bool InterferenceFilterEnabled { get; init; } = true;
+
+    /// <summary>
     ///     Where this measurement ran, and - when it did not run in a worker - why not.
     ///     <para>
     ///         The default is <see cref="IsolationStatus.InProcessRequested" /> rather than
