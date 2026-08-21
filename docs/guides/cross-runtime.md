@@ -8,13 +8,13 @@ order: 5
 
 ## Scenario
 
-You support net8, net9, and net10. You want to know whether the net10 runtime delivers a real speedup for your hot paths, or whether you should hold off recommending the upgrade. NBenchmark builds the same benchmarks for each target framework, measures each build in its own worker process, stamps every result with its `RuntimeMoniker`, and groups significance within each runtime so net8 is never compared against the net10 baseline.
+If you support multiple runtimes (such as .NET 8, .NET 9, and .NET 10), you may want to determine if a newer runtime provides a real speedup for your hot paths before recommending an upgrade. NBenchmark builds the same benchmarks for each target framework, measures each build in its own worker process, stamps every result with its `RuntimeMoniker`, and groups significance within each runtime to ensure that a .NET 8 result is never compared against a .NET 10 baseline.
 
 ## Complete example
 
 ### Project setup
 
-The project must target all the runtimes you want to compare:
+The project must target all the runtimes you want to compare. Update your `.csproj` file as follows:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -30,7 +30,9 @@ The project must target all the runtimes you want to compare:
 </Project>
 ```
 
-### Suite mode - `WithRuntimes`
+### Suite mode: `WithRuntimes`
+
+Use the `WithRuntimes` method to specify the target runtimes:
 
 ```csharp
 var results = await new BenchmarkSuite("string-concat")
@@ -43,15 +45,15 @@ var results = await new BenchmarkSuite("string-concat")
     .RunAsync();
 ```
 
-### Harness mode - `--runtimes` or `[Runtimes]`
+### Harness mode: `--runtimes` or `[Runtimes]`
 
-On the CLI:
+You can specify runtimes using the CLI:
 
 ```bash
 dotnet run -c Release -- --runtimes net8,net9,net10
 ```
 
-Or declared on the class (no `--runtimes` flag needed - the attribute drives the build):
+Alternatively, declare the runtimes on the benchmark class using an attribute. This eliminates the need for the `--runtimes` flag, as the attribute drives the build process:
 
 ```csharp
 [Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)]
@@ -65,24 +67,26 @@ public class StringBenchmarks
 }
 ```
 
-When `--runtimes` is passed on the CLI, the CLI list wins and `[Runtimes]` is ignored. When multiple classes declare `[Runtimes]`, the host uses the union of all declared lists.
+If you provide the `--runtimes` flag on the CLI, it takes precedence and the `[Runtimes]` attribute is ignored. If multiple classes declare `[Runtimes]`, the host uses the union of all declared lists.
 
 ## What's happening
 
-- **`WithRuntimes(...)` / `--runtimes net8,net9,net10` / `[Runtimes(...)]`** - the three ways to trigger cross-runtime execution. Each runtime builds via `dotnet build -f <tfm>` and is measured in that build's own worker. In Suite mode this needs a `[BenchmarkPlan]` factory, because a suite's bodies are addressed by metadata token and a token from one build means nothing in another. See [Multi-runtime comparison](../features/multi-runtime.md).
+- **Multi-runtime triggers**: You can trigger cross-runtime execution via `WithRuntimes(...)`, `--runtimes net8,net9,net10`, or `[Runtimes(...)]`. The engine builds each runtime via `dotnet build -f <tfm>` and measures it in that build's own worker. In suite mode, this requires a `[BenchmarkPlan]` factory because suite bodies are addressed by metadata tokens, and a token from one build is invalid in another. For more information, see [Multi-runtime comparison](../features/multi-runtime.md).
 
-- **Cross-runtime always isolates**, regardless of `--in-process` / `WithIsolation` settings. Each runtime is a clean CLR with no JIT, GC or thread-pool state warmed by siblings. This is non-negotiable: a comparison across runtimes measured in one process is not a comparison across runtimes.
+- **Mandatory isolation**: Cross-runtime comparisons always use isolated workers, regardless of `--in-process` or `WithIsolation` settings. Each runtime is a clean CLR with no JIT, GC, or thread-pool state warmed by other runtimes. This is necessary because measuring different runtimes in a single process would not be a valid comparison.
 
-- **Significance is grouped within each runtime.** net8 results are compared against the net8 baseline, not the net10 one. Cross-runtime significance is not computed because a cross-runtime comparison is not a like-for-like comparison of your code - it conflates your code's behavior with the runtime's behavior.
+- **Grouped significance**: Significance is computed within each runtime. For example, .NET 8 results are compared against the .NET 8 baseline, not the .NET 10 baseline. The engine does not compute cross-runtime significance because such a comparison conflates the behavior of your code with the behavior of the runtime.
 
-- **The first runtime in the list is the implicit baseline** for ratio calculations within that runtime. Use `WithBaseline` (Suite) or `[Benchmark(Baseline = true)]` (Harness) to designate the benchmark that's the 1.00x reference; the runtime order controls which runtime's results are presented first.
+- **Implicit baselines**: The first runtime in the list serves as the implicit baseline for ratio calculations within that runtime. Use `WithBaseline` (Suite) or `[Benchmark(Baseline = true)]` (Harness) to designate the 1.00x reference benchmark. The runtime order determines the presentation order of the results.
 
-- **Environment controls propagate to the workers.** `--cpu-affinity`, `--priority`, and `--dedicated-host-guidance` apply to each spawned worker, so every runtime runs under the same hardware constraints. See [Environment control: Isolated-process propagation](../features/environment-control.md#isolated-process-propagation).
+- **Environment control propagation**: Settings such as `--cpu-affinity`, `--priority`, and `--dedicated-host-guidance` apply to every spawned worker. This ensures that every runtime runs under the same hardware constraints. For more information, see [Environment control: Isolated-process propagation](../features/environment-control.md#isolated-process-propagation).
 
 > [!IMPORTANT] Compare on the same host
-> Cross-runtime comparisons are only meaningful when the runtimes run on the same machine in the same conditions. Don't compare net8 results from your laptop against net10 results from CI - the host difference will dwarf the runtime difference. Run all three runtimes in the same invocation, on the same runner, with the same environment controls.
+> Cross-runtime comparisons are only meaningful when the runtimes execute on the same machine under identical conditions. Do not compare .NET 8 results from a laptop against .NET 10 results from a CI runner, as the host differences will outweigh the runtime differences. Run all runtimes in a single invocation on the same runner with the same environment controls.
 
-## Run it
+## Run the benchmark
+
+Execute the following commands based on your mode:
 
 ```bash
 # Suite mode
@@ -91,7 +95,7 @@ dotnet run -c Release
 # Harness mode, CLI-driven
 dotnet run -c Release -- --runtimes net8,net9,net10
 
-# A subset, with publication-grade precision
+# Subset of runtimes with publication-grade precision
 dotnet run -c Release -- --runtimes net8,net10 --auto-tune thorough --reporter markdown --output ./results
 
 # Attribute-driven (no --runtimes flag needed)
@@ -100,7 +104,7 @@ dotnet run -c Release --project samples/MultiRuntimeHarness
 
 ## Read the results
 
-The console and markdown reporters add a "Runtime" column when results span multiple runtimes. Significance and ratio are computed within each runtime:
+When results span multiple runtimes, the console and markdown reporters add a **Runtime** column. Significance and ratio are computed within each runtime:
 
 ```text
 string-concat
@@ -112,20 +116,21 @@ concat      | net10.0 |  15.1 ns  |  15.3 ns  | 66,225,165 | baseline          |
 interpolate | net10.0 |  14.2 ns  |  14.4 ns  | 69,444,444 | 0.94x             |  ✓  | small  |    32 B
 ```
 
-Reading this:
+Interpret the results as follows:
+- **Within .NET 8.0**: `interpolate` is not significantly different from `concat` (`✗`, `neg` magnitude).
+- **Within .NET 10.0**: `interpolate` is significantly faster (`✓`, `small` magnitude, `0.94x`).
+- **Across runtimes**: `concat` improved from 18.2 ns (.NET 8) to 15.1 ns (.NET 10), a ~17% improvement from the runtime upgrade alone. In this case, the runtime upgrade has a larger effect than the algorithm choice within .NET 10.
 
-- **Within net8.0**, `interpolate` is not significantly different from `concat` (`✗`, `neg` magnitude).
-- **Within net10.0**, `interpolate` is significantly faster (`✓`, `small` magnitude, `0.94x`).
-- **Across runtimes**, `concat` itself went from 18.2 ns (net8) to 15.1 ns (net10) - a ~17% improvement from the runtime alone. The runtime upgrade is the larger effect; the algorithm choice within net10 is smaller but real.
+Within-runtime significance is the authoritative signal. Do not treat cross-runtime medians as a significance verdict; they are provided for comparison only.
 
-The within-runtime significance is the authoritative signal. Do not read the cross-runtime medians as a significance verdict - they're presented for comparison, not tested.
+For a full explanation of every column, indicator, and warning, see [Reading Your Results](../getting-started/reading-your-results.md).
 
-See [Reading Your Results](../getting-started/reading-your-results.md) for every column, indicator, and warning.
+## Next steps
 
-## When to go deeper
+For more information, see the following pages:
 
-- [Multi-runtime comparison](../features/multi-runtime.md) - the full model, including how `--runtimes` and `[Runtimes]` interact, the build / DLL-location / cleanup lifecycle, and the moniker-to-TFM mapping.
-- [Isolated runs](../features/isolated-runs.md) - the underlying process-isolation model that cross-runtime execution builds on.
-- [Environment control](../features/environment-control.md) - controls that propagate to every spawned worker so each runtime runs under the same hardware constraints.
-- [Samples: MultiRuntimeSuite](../samples.md#multiruntimesuite---suite-mode-multi-runtime) and [MultiRuntimeHarness](../samples.md#multiruntimeharness---harness-mode-multi-runtime) - runnable sample projects.
-- [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) - the noise-reduction stack to apply when running cross-runtime in CI, where the host difference can dwarf the runtime difference.
+- [Multi-runtime comparison](../features/multi-runtime.md) - Full details on the build and cleanup lifecycle and the moniker-to-TFM mapping.
+- [Isolated runs](../features/isolated-runs.md) - The underlying process-isolation model used for cross-runtime execution.
+- [Environment control](../features/environment-control.md) - How settings propagate to workers to ensure consistent hardware constraints.
+- [Samples: MultiRuntimeSuite](../samples.md#suite-mode-multi-runtime-sample) and [MultiRuntimeHarness](../samples.md#harness-mode-multi-runtime-sample) - Runnable sample projects.
+- [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) - The noise-reduction stack to apply when running cross-runtime in CI.

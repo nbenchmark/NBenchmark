@@ -8,20 +8,20 @@ order: 7
 
 ## Scenario
 
-NBenchmark's built-in outlier trimming (IQR fence by default, MAD on noisy hosts) and significance testing (Mann-Whitney U for two groups, Kruskal-Wallis for three or more) are designed for general-purpose benchmarking. They cover the common cases well, but they are not the only choices:
+NBenchmark provides built-in outlier trimming (using an IQR fence by default, or MAD on noisy hosts) and significance testing (using Mann-Whitney U for two groups and Kruskal-Wallis for three or more). While these are designed for general-purpose benchmarking, they may not fit every domain:
 
-- **Latency SLOs** care about the tail, not the mean. Trimming the slow samples before computing statistics hides exactly the values a latency budget needs to see.
-- **Fixed physical thresholds** ("any sample above 1 ms is a stall") don't adapt to the data's spread the way an IQR fence does.
-- **Domain-specific rules** ("compare medians, not distributions") are simpler than a rank-based test and more interpretable for your team.
-- **Bootstrap or Bayesian comparison** gives you a posterior over the difference rather than a single p-value.
+- **Latency SLOs**: Service Level Objectives often care about the tail of the distribution rather than the mean. Trimming slow samples before computing statistics hides the exact values a latency budget needs to monitor.
+- **Fixed physical thresholds**: Some requirements specify that any sample above a certain limit (e.g., 1 ms) is a stall. These fixed thresholds do not adapt to the data's spread like an IQR fence does.
+- **Domain-specific rules**: Some teams prefer comparing medians directly rather than using a distribution-based rank test, as it is simpler and more interpretable.
+- **Advanced comparisons**: You may require bootstrap or Bayesian comparisons to obtain a posterior over the difference rather than a single p-value.
 
-Every statistical primitive in NBenchmark is pluggable. The built-in strategies all implement the same `IOutlierDetector` and `ISignificanceTest` interfaces, so you can swap in your own - or compose the built-in ones - without forking the engine.
+Every statistical primitive in NBenchmark is pluggable. Built-in strategies implement the `IOutlierDetector` and `ISignificanceTest` interfaces, allowing you to swap in your own implementation or compose existing ones without forking the engine.
 
 ## Complete example
 
-### A custom outlier detector
+### Custom outlier detector
 
-A tail-preserving detector that keeps the fastest `fraction` of samples - useful for latency-SLO work where the slow tail is the signal, not noise to be trimmed:
+The following `KeepFastestDetector` preserves the fastest fraction of samples. This is useful for latency-SLO work where the slow tail is the signal rather than noise to be trimmed:
 
 ```csharp
 public sealed class KeepFastestDetector(double fraction) : IOutlierDetector
@@ -45,9 +45,9 @@ public sealed class KeepFastestDetector(double fraction) : IOutlierDetector
 }
 ```
 
-### A custom significance test
+### Custom significance test
 
-A median-ratio rule that marks a result significant when the median differs by more than a threshold percentage. No p-value, no distributional assumption - just "is the median more than X% off the baseline?":
+The following `MedianRatioSignificanceTest` marks a result as significant when the median differs by more than a specified threshold percentage. It does not use p-values or distributional assumptions:
 
 ```csharp
 public sealed class MedianRatioSignificanceTest(double thresholdPercent) : ISignificanceTest
@@ -99,7 +99,7 @@ public sealed class MedianRatioSignificanceTest(double thresholdPercent) : ISign
 
 ### Wiring them in
 
-In Suite mode:
+In suite mode, use the `WithOutlierDetector` and `WithSignificanceTest` methods:
 
 ```csharp
 await new BenchmarkSuite("latency-slo")
@@ -112,7 +112,7 @@ await new BenchmarkSuite("latency-slo")
     .RunAsync();
 ```
 
-In Single / Harness mode:
+For single or harness mode, assign the strategies to the `MeasurementOptions` object:
 
 ```csharp
 new MeasurementOptions
@@ -124,28 +124,28 @@ new MeasurementOptions
 
 ## What's happening
 
-- **`IOutlierDetector`** receives the sorted-ascending sample array and returns an `OutlierClassification` with `Kept`, `Discarded`, and optional `LowerFence` / `UpperFence`. The contract: never discard every sample (return `KeepAll` when your rule would empty the set), don't mutate the input, and return `Kept` sorted ascending. A custom `OutlierDetector` takes priority over `OutlierMode`. The detector's `Name` appears in the report header (`Outliers: ...`). See [Outlier Trimming: Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors).
+- **`IOutlierDetector`**: This interface receives a sorted-ascending sample array and returns an `OutlierClassification` containing `Kept`, `Discarded`, and optional `LowerFence` or `UpperFence` values. The contract requires that the detector never discards every sample (return `KeepAll` if the rule would empty the set), does not mutate the input, and returns the `Kept` array sorted ascending. A custom `OutlierDetector` takes priority over the `OutlierMode` setting. The detector's `Name` appears in the report header. For more information, see [Outlier Trimming: Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors).
 
-- **`ISignificanceTest`** receives a `SignificanceContext` (the comparable `Groups`, the `BaselineIndex`, the `Baseline` group, the non-baseline `Candidates`, and the `SignificanceLevel`) and returns a `SignificanceReport` with `Pairwise` (one `PairwiseComparison` per candidate), optional `Effect` metadata, optional `Shift` estimate (the built-in strategies populate the Hodges-Lehmann shift), and optional `Omnibus` verdict for omnibus tests. Use `PValue: null` for rules that don't produce a p-value. See [Significance Testing: Custom significance tests](../statistics/significance.md#custom-significance-tests).
+- **`ISignificanceTest`**: This interface receives a `SignificanceContext` (including the comparable `Groups`, the `BaselineIndex`, the `Baseline` group, the non-baseline `Candidates`, and the `SignificanceLevel`) and returns a `SignificanceReport`. The report contains `Pairwise` comparisons, optional `Effect` metadata, an optional `Shift` estimate, and an optional `Omnibus` verdict. Use `PValue: null` for rules that do not produce a p-value. For more information, see [Significance Testing: Custom significance tests](../statistics/significance.md#custom-significance-tests).
 
-- **The `MinimumPracticalEffect` gate works for any test.** The engine enforces the gate in `Significance.ApplyReport` after the test runs, so a custom test that returns an `EffectSize` with a `PracticalValue` is gated automatically. Tests that don't return a practical value are unaffected. See [Significance Testing: Practical-significance gate](../statistics/significance.md#practical-significance-gate).
+- **The `MinimumPracticalEffect` gate**: The engine enforces this gate in `Significance.ApplyReport` after the test runs. If a custom test returns an `EffectSize` with a `PracticalValue`, it is gated automatically. Tests that do not return a practical value are unaffected. For more information, see [Significance Testing: Practical-significance gate](../statistics/significance.md#practical-significance-gate).
 
-- **Isolated workers preserve your custom statistics, and say so when they cannot.** A strategy reaches the worker either as a factory it runs or as a type name it constructs, so the object that scores an isolated run is your own. Where that is not possible NBenchmark declines to isolate rather than substitute quietly - a strategy built with constructor arguments and passed as an *instance* is refused, because only a type name would cross and only a parameterless constructor could be reached at the other end. Pass a factory instead and the argument travels with it. In Harness mode, scalar CLI overrides (iterations, warmup, confidence, etc.) are forwarded to each worker. See [Isolated runs](../features/isolated-runs.md#things-worth-knowing).
+- **Custom statistics in isolated workers**: Strategies are passed to the worker either as a factory or a type name. If a strategy is passed as an instance with constructor arguments, the engine refuses to isolate the run because the instance cannot cross the process boundary. To resolve this, use a factory. In harness mode, scalar CLI overrides (such as iterations, warmup, and confidence) are forwarded to each worker. For more information, see [Isolated runs](../features/isolated-runs.md#additional-details).
 
-- **A strategy that fails inside the worker warns on every result it scored.** Whether a factory *works* is not knowable until it runs in the process that measures - it may read a file that is not deployed beside the worker, or need a type that will not load there. The group is still measurable, so the engine falls back to its built-in strategy rather than failing the run, and attaches a warning to each affected result naming what was substituted and why. Read it: those numbers were scored by a method you did not choose.
+- **Worker-side failures**: If a custom strategy fails inside the worker (e.g., because a required file is missing), the engine falls back to the built-in strategy rather than failing the entire run. The engine attaches a warning to each affected result naming the substitution and the reason for the failure.
 
-> [!TIP] Compose the built-in strategies
-> The built-in strategies - `MannWhitneyUSignificanceTest`, `KruskalWallisSignificanceTest`, and the group-count-aware `DefaultSignificanceTest` - all implement `ISignificanceTest`. You can wrap or compose them: run the built-in test, then add a domain-specific gate on top, or fall back to a custom rule when the built-in test returns `NotTested` (e.g. too few samples).
+> [!TIP] Compose built-in strategies
+> Built-in strategies - such as `MannWhitneyUSignificanceTest`, `KruskalWallisSignificanceTest`, and `DefaultSignificanceTest` - all implement `ISignificanceTest`. You can wrap or compose these strategies to add a domain-specific gate on top of the standard result, or to fall back to a custom rule when a built-in test returns `NotTested` (e.g., due to too few samples).
 
-## Run it
+## Run the benchmark
+
+Execute the project to see the custom statistics in the report header:
 
 ```bash
-# The custom detector's name shows up in the report header
 dotnet run -c Release
-
-# Outliers: keep fastest 90%
-# Significance: median ratio (>25%)
 ```
+
+The output is similar to the following:
 
 ```text
 latency-slo
@@ -155,18 +155,20 @@ v1        | 420.0 ns  | 422.3 ns | 2,380,952  | baseline |  -  |  -    |   128 B
 v2        | 305.0 ns  | 307.1 ns | 3,278,689  | 0.73x    |  ✓  | large |    64 B
 ```
 
-The custom detector and test are named in the header and footer so the report is self-describing - anyone reading it knows which statistics were applied.
+The custom detector and test are named in the header and footer, ensuring the report is self-describing.
 
 ## Read the results
 
-The output is the same as any other run. The custom detector and test change which samples are kept and how significance is decided, but the columns, indicators, and warnings are unchanged. See [Reading Your Results](../getting-started/reading-your-results.md).
+The output format remains identical to standard runs. The custom detector and test only change which samples are kept and how significance is determined. For a full explanation of indicators and warnings, see [Reading Your Results](../getting-started/reading-your-results.md).
 
-One caveat: the `Magnitude` column reflects whatever your custom test returns in `EffectSize.Magnitude`. The built-in tests classify Cliff's delta into Negligible / Small / Medium / Large; a custom test can use any labels, but the console reporter color-codes based on the conventional labels. Stick to `neg` / `small` / `med` / `large` if you want the color coding to work.
+One caveat: the `Magnitude` column reflects the value returned in `EffectSize.Magnitude`. The built-in tests use labels such as Negligible, Small, Medium, or Large. The console reporter color-codes results based on these conventional labels. To maintain this color coding, use `neg`, `small`, `med`, or `large`.
 
-## When to go deeper
+## Next steps
 
-- [Outlier Trimming: Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors) - the full `IOutlierDetector` contract, the `OutlierClassification` record, fence handling, and the `Name` property.
-- [Significance Testing: Custom significance tests](../statistics/significance.md#custom-significance-tests) - the full `ISignificanceTest` contract, `SignificanceContext`, `PairwiseComparison`, `EffectSize`, `ShiftEstimate`, and `OmnibusComparison`.
-- [Significance Testing: Practical-significance gate](../statistics/significance.md#practical-significance-gate) - how the `MinimumPracticalEffect` gate applies to any test that returns a `PracticalValue`.
-- [Validation & Accuracy](../statistics/validation.md) - how the built-in statistical primitives are cross-validated against SciPy and NumPy, and what that means for a custom test that doesn't have the same validation.
-- [Samples: ExtensibleStats](../samples.md#extensiblestats---custom-statistics) - a runnable sample project with the `KeepFastestDetector` and `MedianRatioSignificanceTest` shown above.
+For more information, see the following pages:
+
+- [Outlier Trimming: Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors) - Full details on the `IOutlierDetector` contract and `OutlierClassification`.
+- [Significance Testing: Custom significance tests](../statistics/significance.md#custom-significance-tests) - Full details on the `ISignificanceTest` contract and `SignificanceContext`.
+- [Significance Testing: Practical-significance gate](../statistics/significance.md#practical-significance-gate) - How the `MinimumPracticalEffect` gate applies to custom tests.
+- [Validation & Accuracy](../statistics/validation.md) - How built-in statistical primitives are cross-validated against SciPy and NumPy.
+- [Samples: ExtensibleStats](../samples.md#custom-statistics-sample) - A runnable sample project implementing the custom strategies shown here.

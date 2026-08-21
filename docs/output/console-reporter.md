@@ -10,25 +10,30 @@ order: 1
 
 ## Setup
 
+Add the console reporter package to your project:
+
 ```bash
 dotnet add package NBenchmark.Reporters.Console
 ```
 
+Then, attach the reporter to your benchmark suite:
+
 ```csharp
 using NBenchmark.Reporters.Console;
 
+// ...
 .WithReporter(new ConsoleReporter())
 ```
 
-### CLI usage
+### Using the CLI
 
-When the `NBenchmark.Reporters.Console` package is referenced, `ConsoleReporter` self-registers via `[ModuleInitializer]` and becomes available through the `--reporter console` CLI flag:
+When you reference the `NBenchmark.Reporters.Console` package, `ConsoleReporter` self-registers via `[ModuleInitializer]` and becomes available through the `--reporter console` CLI flag:
 
 ```bash
 dotnet run -- --reporter console
 ```
 
-No explicit `.WithReporter(new ConsoleReporter())` call is needed when using the CLI - the host discovers it automatically through `ReporterRegistry`.
+You don't need to call `.WithReporter(new ConsoleReporter())` when using the CLI; the host discovers the reporter automatically through `ReporterRegistry`.
 
 ## Example output
 
@@ -57,9 +62,9 @@ Baseline: auto-tuned: 190 samples × 1 ops, warmup 40, CI ±1.9%
 ... (only shown when present)
 ```
 
-When there are two or more benchmarks, a bar chart of median timings is also displayed below the table.
+NBenchmark displays a bar chart of median timings below the table when two or more benchmarks are compared.
 
-When **three or more** benchmarks are compared, the per-row Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and a single omnibus line is printed above the footer, summarizing the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
+When three or more benchmarks are compared, the **Sig** column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected). NBenchmark also prints a single omnibus line above the footer summarizing the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
 
 ```text
 Omnibus Kruskal-Wallis across 3 groups: H(2) = 7.20, p = 0.027 → significant
@@ -71,47 +76,50 @@ Profile: realistic (no per-iteration GC, no between-benchmark GC, alloc tracking
 3 benchmark(s) · 0.0s total · CI 95%
 ```
 
-After the Interpretation section, ConsoleReporter prints a grey `auto-tuned: …` line per benchmark summarizing what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) resolved - the measured-sample count, ops-per-sample (K), warmup length, and the achieved CI half-width. Pinned runs still show the line, with the resolved counts you set.
+Following the **Interpretation** section, `ConsoleReporter` prints a grey `auto-tuned: …` line per benchmark. This line summarizes what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) resolved: the measured-sample count, operations-per-sample (K), warmup length, and the achieved CI half-width. Pinned runs still show this line with the counts you set.
 
-After the comparison and precision tables, ConsoleReporter prints an **Interpretation** section with omnibus/significance context, outlier mode, effect-metric semantics, and the measurement profile. If warnings exist, they are shown in a separate **Warnings** section below the auto-tune lines. The final summary line shows benchmark count, total run time, and confidence interval.
+The **Interpretation** section provides omnibus/significance context, the outlier mode, effect-metric semantics, and the measurement profile. If warnings exist, NBenchmark displays them in a separate **Warnings** section below the auto-tune lines. The final summary line shows the benchmark count, total run time, and confidence interval.
 
 ## Columns
 
 | Column | Description |
 | --- | --- |
-| **Benchmark** | Name of the benchmark. Color-coded: green (≤ 5% slower than baseline), yellow (≤ 50% slower), red (> 50% slower). Baseline is shown in bold. |
-| **Median** | Median timing. |
-| **Mean** | Arithmetic mean. |
-| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). `-` for errored or dry-run results. |
-| **Ratio** | Visual bar plus ratio relative to the baseline. Green for faster, yellow for moderately slower, red for significantly slower. The baseline cell shows `baseline`. |
+| **Benchmark** | The benchmark name. Color-coding indicates performance relative to baseline: green (≤ 5% slower), yellow (≤ 50% slower), and red (> 50% slower). The baseline is bold. |
+| **Median** | The median timing. |
+| **Mean** | The arithmetic mean. |
+| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). A `-` indicates errored or dry-run results. |
+| **Ratio** | A visual bar and ratio relative to the baseline. Colors indicate performance: green for faster, yellow for moderately slower, and red for significantly slower. The baseline cell shows `baseline`. |
 | **Sig** | **✓** = difference from baseline is statistically significant; **✗** = not significant; **-** = not applicable (baseline or significance not tested). |
-| **Mag** | Strategy-defined qualitative effect label. With the built-in Mann-Whitney tests this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `sml` (< 0.33), `med` (< 0.474), `lrg` (≥ 0.474). For `lrg`, the cell is bold-red when the candidate is slower and bold-green when faster. `-` for the baseline or when significance is not tested. See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
-| **Alloc/op** | Mean heap bytes per iteration (only visible when allocation tracking is enabled). |
+| **Mag** | A qualitative effect label. For built-in Mann-Whitney tests, this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `sml` (< 0.33), `med` (< 0.474), and `lrg` (≥ 0.474). For `lrg`, the cell is bold-red when the candidate is slower and bold-green when faster. See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
+| **Alloc/op** | Mean heap bytes per iteration (visible only when allocation tracking is enabled). |
 
-An optional **Description** column appears if any benchmark has a `Description` set.
+If any benchmark has a `Description` set, NBenchmark adds an optional **Description** column.
 
-For [parameterized benchmarks](../features/parameterized-suite.md#reading-the-report), one column per parameter appears immediately after **Benchmark**, and the **Benchmark** cell shows the base method name. To save width, parametric tables label the comparison columns **Ratio**, **Sig** and **Mag**. When a single method is swept across parameter values, **Ratio** reports each point's scaling factor relative to the fastest point (the reference, shown as `baseline`); **Sig** and **Mag** stay `-`, because the engine does not test different workloads against one another. When a parameter group instead holds competing benchmarks, **Sig** and **Mag** carry the usual within-group significance and effect.
+For [parameterized benchmarks](../features/parameterized-suite.md#reading-the-report), NBenchmark adds one column per parameter immediately after the **Benchmark** column. To save width, parametric tables label comparison columns **Ratio**, **Sig**, and **Mag**. 
 
-In Standard mode (`--detail standard` or `WithDetail(ReportDetail.Standard)`), the full multi-section output is shown: comparison table, Precision & Tail Latency, auto-tune, and Interpretation.
+- When a single method is swept across parameter values, **Ratio** reports each point's scaling factor relative to the fastest point (the reference, shown as `baseline`). **Sig** and **Mag** are `-` because NBenchmark does not test different workloads against one another. 
+- When a parameter group holds competing benchmarks, **Sig** and **Mag** show the usual within-group significance and effect.
 
-In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), each benchmark row is followed by an indented stats block.
+In Standard mode (`--detail standard` or `WithDetail(ReportDetail.Standard)`), NBenchmark shows the full multi-section output: the comparison table, Precision & Tail Latency, auto-tune, and Interpretation.
 
-## Adding progress display
+In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), NBenchmark follows each benchmark row with an indented stats block.
 
-`ConsoleBenchmarkProgress` displays warmup and measurement progress for each benchmark as it runs. It is independent of `ConsoleReporter` and can be used without it.
+## Adding a progress display
+
+`ConsoleBenchmarkProgress` displays warmup and measurement progress for each benchmark as it runs. You can use it with or without `ConsoleReporter`.
 
 ```csharp
 using NBenchmark.Reporters.Console;
 
 await new BenchmarkSuite("name")
-    .WithWarmup(25)        // pin so the progress bar has an exact total
-    .WithIterations(200)   // pin so the progress bar has an exact total
+    .WithWarmup(25)        // Pin to provide an exact total for the progress bar
+    .WithIterations(200)   // Pin to provide an exact total for the progress bar
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 ```
 
-Pinning the warmup and sample counts gives the progress bar an exact total to track. With the default auto-resolved counts the bar fills toward the `MaxSamples` ceiling and the run usually stops earlier, once the confidence interval is tight enough.
+Pinning the warmup and sample counts gives the progress bar an exact total to track. With default auto-resolved counts, the bar fills toward the `MaxSamples` ceiling, and the run typically stops earlier once the confidence interval is tight enough.
 
 Progress output is a live, updating line per benchmark:
 
@@ -134,8 +142,8 @@ var result = Benchmark.Run(() => MyMethod());
 await result.PrintAsync();
 ```
 
-`PrintAsync` runs the single result through `ConsoleReporter` and renders a table.
+`PrintAsync` passes the single result through `ConsoleReporter` to render a table.
 
-## Printing markup from the summary line
+## Summary line markup
 
-The summary line at the bottom always shows the confidence level from the first successful result. If all benchmarks errored, only a list of error messages is shown.
+The summary line at the bottom shows the confidence level from the first successful result. If all benchmarks error, NBenchmark only shows a list of error messages.

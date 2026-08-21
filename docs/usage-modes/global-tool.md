@@ -6,7 +6,7 @@ order: 4
 
 # Global Tool: dotnet benchmark
 
-The `dotnet benchmark` global tool wraps `BenchmarkHarness` into a single command. Install it once, then run benchmarks against any .NET assembly without creating a dedicated host project.
+The `dotnet benchmark` global tool wraps `BenchmarkHarness` into a single command. Install it once to run benchmarks against any .NET assembly without creating a dedicated host project.
 
 ```bash
 dotnet tool install -g NBenchmark.Tool
@@ -15,28 +15,30 @@ dotnet benchmark
 
 ## When to use the tool
 
-The tool replaces Harness mode when you want to benchmark an existing project without adding a `Program.cs`, `Main`, and NuGet references. It is the fastest path from "I have a project with `[Benchmark]` methods" to "I have results."
+The tool replaces Harness mode when you want to benchmark an existing project without adding a `Program.cs` file, `Main` method, or NuGet references. It provides the fastest path from having a project with `[Benchmark]` methods to obtaining results.
 
-| You want to... | Use |
+| If you want to... | Use... |
 | --- | --- |
 | Benchmark a project you already built | `dotnet benchmark` in the output directory |
 | Build and benchmark in one step | `dotnet benchmark --project ./MyBenchmarks` |
 | Benchmark a specific assembly | `dotnet benchmark --assembly ./bin/Release/net10.0/MyLib.dll` |
-| Filter, configure output, set thresholds | All `--filter`, `--reporter`, `--output`, `--threshold-pct` flags work |
+| Filter, configure output, or set thresholds | All `--filter`, `--reporter`, `--output`, and `--threshold-pct` flags |
 
 ## Installation
+
+Install the tool using the following command:
 
 ```bash
 dotnet tool install -g NBenchmark.Tool
 ```
 
-Verify it works:
+Verify the installation:
 
 ```bash
 dotnet benchmark --help
 ```
 
-To update:
+To update the tool:
 
 ```bash
 dotnet tool update -g NBenchmark.Tool
@@ -55,26 +57,26 @@ cd ./MyApp/bin/Release/net10.0
 dotnet benchmark
 ```
 
-Assemblies without `[Benchmark]` methods are skipped silently.
+The tool silently skips assemblies without `[Benchmark]` methods.
 
 ### --project: build and benchmark
 
-Pass a `.csproj` path (or a directory containing one). The tool runs `dotnet build -c Release`, finds the output assembly, and benchmarks it.
+Pass a `.csproj` path or a directory containing one. The tool runs `dotnet build -c Release`, finds the output assembly, and benchmarks it.
 
 ```bash
 dotnet benchmark --project ./MyApp.Benchmarks/MyApp.Benchmarks.csproj
-dotnet benchmark --project ./MyApp.Benchmarks   # same, if only one .csproj
+dotnet benchmark --project ./MyApp.Benchmarks   # Works if the directory contains only one .csproj
 ```
 
 ### --assembly: explicit assembly path
 
-Pass one or more `.dll` paths directly. Repeatable.
+Pass one or more `.dll` paths directly. You can repeat the `--assembly` flag for multiple files.
 
 ```bash
 dotnet benchmark --assembly ./Lib1.dll --assembly ./Lib2.dll
 ```
 
-## All host flags pass through
+## Host flags
 
 Every flag supported by `BenchmarkHarness` works unchanged:
 
@@ -89,47 +91,36 @@ dotnet benchmark --dry-run
 dotnet benchmark --in-process
 ```
 
-See the [CLI reference](../reference/cli.md) for the full flag list.
+For the full list of flags, see the [CLI reference](../reference/cli.md).
 
 ## Default reporter
 
-When no `--reporter` flag is given, the tool adds the console reporter automatically so you see results in the terminal. Pass any `--reporter` flag to override this default.
+When you do not provide a `--reporter` flag, the tool automatically adds the console reporter so you can see results in the terminal. Use any `--reporter` flag to override this default.
 
 ```bash
-dotnet benchmark                              # console output
+dotnet benchmark                              # Console output
 dotnet benchmark --reporter json              # JSON file only
-dotnet benchmark --reporter json --reporter markdown  # both files
+dotnet benchmark --reporter json --reporter markdown  # Both files
 ```
 
 ## Process isolation
 
-The tool inherits Harness mode's isolated-by-default execution. Each benchmark class runs in a clean worker unless you pass `--in-process`.
+The tool inherits the isolated-by-default execution of Harness mode. Each benchmark class runs in a clean worker unless you pass `--in-process`.
 
 ```bash
-dotnet benchmark                              # isolated (default)
-dotnet benchmark --in-process                 # all in-process
+dotnet benchmark                              # Isolated (default)
+dotnet benchmark --in-process                 # All in-process
 ```
 
-The tool itself never measures. It loads your assembly to discover benchmarks, then hands each class
-to a worker, so isolated runs work from any working directory.
+The tool itself does not perform measurements. It loads your assembly to discover benchmarks and then hands each class to a worker; this ensures isolated runs work regardless of your working directory.
 
-If a run reports every benchmark as `in-process (no worker)`, the target project was most likely
-built without the worker - check that it references the `NBenchmark` package and has not set
-`NBenchmarkDeployWorker=false`. See
-[Troubleshooting](../troubleshooting.md#could-not-load-file-or-assembly-from-an-aspnet-core-or-wpf-project).
+If a run reports every benchmark as `in-process (no worker)`, the target project was likely built without the worker. Ensure the project references the `NBenchmark` package and has not set `NBenchmarkDeployWorker=false`. For more information, see [Troubleshooting](../troubleshooting.md#could-not-load-file-or-assembly-in-aspnet-core-or-wpf).
 
 ## ASP.NET Core and WPF projects
 
-These work with no configuration. The tool detects that your assembly needs a shared framework it
-was not started with, and restarts itself once under the right one before reading anything.
+These projects work without additional configuration. The tool detects if your assembly requires a shared framework that it was not started with and restarts itself under the correct framework before reading the assembly.
 
-The exception is a **self-contained** target, whose framework lives in its own output directory
-rather than a shared location. Build the benchmark project framework-dependent, or pass
-`--in-process`. See
-[Troubleshooting](../troubleshooting.md#could-not-load-file-or-assembly-from-an-aspnet-core-or-wpf-project)
-for the full explanation, and
-[Isolation internals](../deep-dives/isolation-internals.md#shared-framework-configuration) for how
-the framework set is resolved.
+The only exception is a **self-contained** target, where the framework lives in its own output directory rather than a shared location. In this case, build the benchmark project as framework-dependent or pass `--in-process`. For a full explanation, see [Troubleshooting](../troubleshooting.md#could-not-load-file-or-assembly-in-aspnet-core-or-wpf). For details on how the framework set is resolved, see [Isolation internals](../deep-dives/isolation-internals.md#shared-framework-configuration).
 
 ## Examples
 
@@ -160,7 +151,7 @@ dotnet benchmark --assembly ./new/MyApp.dll --reporter json --output ./after
 
 ## See also
 
-- [Harness mode](./harness-mode.md) - the project-based alternative
-- [CLI reference](../reference/cli.md) - all available flags
-- [Reporters](../output/index.md) - output formats
-- [Configuration](../reference/configuration.md) - measurement options
+- [Harness mode](./harness-mode.md) - The project-based alternative
+- [CLI reference](../reference/cli.md) - All available flags
+- [Reporters](../output/index.md) - Output formats
+- [Configuration](../reference/configuration.md) - Measurement options

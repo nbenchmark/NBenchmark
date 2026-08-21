@@ -6,11 +6,13 @@ order: 4
 
 # JsonReporter
 
-`JsonReporter` writes results to a `.json` file as a structured object. It is part of the core `NBenchmark` package (uses `System.Text.Json` with no additional dependencies).
+`JsonReporter` writes results to a `.json` file as a structured object. It is part of the core `NBenchmark` package and uses `System.Text.Json` with no additional dependencies.
 
-JSON output is suitable for CI dashboards, performance tracking over time, or any tooling that consumes structured data.
+JSON output is ideal for CI dashboards, performance tracking over time, or any tooling that consumes structured data.
 
 ## Setup
+
+Attach the reporter to your benchmark suite:
 
 ```csharp
 using NBenchmark.Reporters;
@@ -31,12 +33,12 @@ using NBenchmark.Reporters;
 JsonReporter(string outputDirectory = ".", string? fileName = null)
 ```
 
-- `outputDirectory` - The directory to write the file to. Created automatically if it does not exist. Must be under the current working directory.
-- `fileName` - When `null` (the default), the reporter generates a timestamped filename to avoid overwriting previous runs. When specified, the exact filename is used (no counter or timestamp is appended).
+- `outputDirectory`: The directory where the file is written. NBenchmark creates this directory automatically if it does not exist. The path must be under the current working directory.
+- `fileName`: If `null` (the default), the reporter generates a timestamped filename to avoid overwriting previous runs. If specified, the reporter uses that exact filename without appending a counter or timestamp.
 
 ### Auto-naming
 
-When `fileName` is not provided, the reporter generates a filename that includes the UTC timestamp and a per-process counter:
+When you don't provide a `fileName`, the reporter generates a filename that includes the UTC timestamp and a per-process counter:
 
 ```text
 benchmarks-20260606-034000-001.json
@@ -44,25 +46,24 @@ benchmarks-20260606-034000-001.json
 
 The counter increments each time `ReportAsync` is called within the same process, so multiple suite runs produce separate files instead of overwriting each other.
 
-### Explicit filename
+### Explicit filenames
 
-Pass a `fileName` when you want a stable output path:
+Pass a `fileName` when you need a stable output path:
 
 ```csharp
 new JsonReporter("results/", "benchmarks.json")
 ```
 
-When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overwrite the same file.
+When you provide an explicit `fileName`, subsequent calls to `ReportAsync` overwrite the same file.
 
 ## Output format
 
-The envelope opens with `schemaVersion` and `measurementEpoch` - see
-[Report format versioning](./index.md#report-format-versioning) before diffing two files.
+The envelope begins with `schemaVersion` and `measurementEpoch`. For more information, see [Report format versioning](./index.md#report-format-versioning) before diffing two files.
 
 ```json
 {
   "schemaVersion": 1,
-  "measurementEpoch": 4,
+  "measurementEpoch": 7,
   "generatedAt": "2026-06-06T03:40:00.000Z",
   "detail": "simple",
   "profile": "realistic",
@@ -149,48 +150,58 @@ The envelope opens with `schemaVersion` and `measurementEpoch` - see
 }
 ```
 
-All timing values are in **nanoseconds**. Property names use camelCase.
+NBenchmark records all timing values in **nanoseconds**. Property names use `camelCase`.
 
-Percentile values are emitted in a `percentiles` array of `{ percentile, value }` objects. The set of reported percentiles is controlled by `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. When `EnableHistogram` is `true` (default), a `histogram` object with `min`, `max`, `sampleCount`, and `buckets` (array of `{ lower, upper, count }`) is also included.
+Percentile values are provided in a `percentiles` array of `{ percentile, value }` objects. You can control the reported percentiles via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. When `EnableHistogram` is `true` (the default), NBenchmark also includes a `histogram` object containing `min`, `max`, `sampleCount`, and `buckets` (an array of `{ lower, upper, count }`).
 
-### Which sample set each statistic describes
+### Understanding sample sets
 
-The result carries **two populations**, and `tailMetricsBasis` says which basis the tail metrics used. Under the default `raw`, the order statistics - `min`, `max`, `percentiles` and `histogram` - describe the **full pre-trim** sample set, while `mean`, `median`, `standardDeviation`, `coefficientOfVariation` and `measuredIterations` always describe the **trimmed (inlier)** set. `standardError` and `marginOfError` are the one hybrid: they are the precision of the *trimmed* mean, computed [Winsorized](../statistics/descriptive.md#after-outlier-trimming-the-winsorized-standard-error) over the pre-trim set so the samples the fence removed still count as observations. That is deliberate: the outlier fence removes exactly the slow tail P99/Max exist to describe (see [Descriptive statistics](../statistics/descriptive.md)). But it means the two groups are not directly comparable - a consumer that displays both should label which is which, and `outlierDetector` names the detector that drew the line.
+The result contains **two populations**, and the `tailMetricsBasis` field indicates which basis the tail metrics use. 
+
+When `tailMetricsBasis` is `raw`:
+- The order statistics (`min`, `max`, `percentiles`, and `histogram`) describe the **full pre-trim** sample set.
+- The core statistics (`mean`, `median`, `standardDeviation`, `coefficientOfVariation`, and `measuredIterations`) describe the **trimmed (inlier)** set.
+- The precision metrics (`standardError` and `marginOfError`) are hybrid. They describe the precision of the trimmed mean but are computed [Winsorized](../statistics/descriptive.md#winsorized-standard-error-for-trimmed-data) over the pre-trim set. This ensures that the samples removed by the outlier fence still count as observations.
+
+This distinction is deliberate because the outlier fence removes exactly the slow tail that `P99` and `Max` are designed to describe. See [Descriptive statistics](../statistics/descriptive.md) for more information. When displaying both sets of metrics, you should label them clearly; the `outlierDetector` field names the detector that separated the two.
 
 ### The `autoTune` object
 
-`autoTune` records what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) decided for this benchmark. It is `null` on dry-run and errored results.
+The `autoTune` object records the decisions made by the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) for the benchmark. This object is `null` for dry-run and errored results.
 
 | Group | Fields |
 | --- | --- |
-| **What it resolved** | `resolvedWarmup`, `resolvedSamples`, `opsPerSample`, `initialOpsPerSample` (the pre-recalibration cold K, or `null`), `totalBodyInvocations` |
-| **Why it stopped** | `warmupStop` (`settled` / `maxCeiling` / `explicitCount` / `wallClockCap`), `sampleStop` (adds `ciTargetMet` and `driftUnresolved`) |
-| **How well it converged** | `achievedRelativeCiWidth` (on the **raw** stream - see the caveat below), `ciWidthSeries` (the convergence trace, one entry per cadence check), `tuningWallClock` |
-| **Host and stability** | `jitterMetric`, `outlierDetectorSwitched`, `measurementRestarts`, `splitHalfDrift` |
-| **Warmup and tiered compilation** | `warmupTimeFloorMet`, `warmupElapsedNs`, `warmupCurve`, `warmupSampleInterval`, `warmupJitCompiledMethods`, `warmupJitCompilationTime`, `warmupJitCompiledIlBytes`, `jitLastChangeAtNs`, `jitQuiescenceAchieved` |
+| **Resolution** | `resolvedWarmup`, `resolvedSamples`, `opsPerSample`, `initialOpsPerSample` (the pre-recalibration cold K, or `null`), `totalBodyInvocations` |
+| **Stop reason** | `warmupStop` (`settled` / `maxCeiling` / `explicitCount` / `wallClockCap`), `sampleStop` (adds `ciTargetMet` and `driftUnresolved`) |
+| **Convergence** | `achievedRelativeCiWidth` (on the **raw** stream), `ciWidthSeries` (the convergence trace), `tuningWallClock` |
+| **Host stability** | `jitterMetric`, `outlierDetectorSwitched`, `measurementRestarts`, `splitHalfDrift` |
+| **Warmup and JIT** | `warmupTimeFloorMet`, `warmupElapsedNs`, `warmupCurve`, `warmupSampleInterval`, `warmupJitCompiledMethods`, `warmupJitCompilationTime`, `warmupJitCompiledIlBytes`, `jitLastChangeAtNs`, `jitQuiescenceAchieved` |
 | **Clock resolution** | `clockResolutionNs`, `targetSampleDurationNs`, `sampleDurationNs`, `sampleQuantizationFraction` |
 
-> **`achievedRelativeCiWidth` and `marginOfError` measure different things.** The former is the CI half-width the loop achieved on the **raw** stream at its stop decision; the latter is the interval on the **trimmed** mean. `marginOfError` accounts for how many samples the fence removed, but not for how far out they were - an interval on the trimmed mean cannot - so when the outliers carry most of the variance the two still diverge sharply: a benchmark can report `marginOfError` at ±1% of the mean next to an `achievedRelativeCiWidth` of `1.05`. That is not a contradiction, but treat the trimmed margin as optimistic whenever `sampleStop` is not `ciTargetMet`.
+> [!IMPORTANT]
+> `achievedRelativeCiWidth` and `marginOfError` measure different things. The former is the CI half-width the loop achieved on the **raw** stream at the time of the stop decision. The latter is the interval on the **trimmed** mean. `marginOfError` accounts for how many samples the fence removed, but not how far out they were. When outliers carry most of the variance, these two values can diverge sharply. Treat the trimmed margin as optimistic whenever `sampleStop` is not `ciTargetMet`.
 
-`warmupCurve` is the mean per-op time of each warmup batch, oldest first - the shape of tiered compilation landing, since a body promoted from tier-0 to tier-1 (and re-optimized again under dynamic PGO) gets faster in steps. `warmupSampleInterval` gives the warmup iterations between consecutive points, so the array can be plotted against a real iteration axis. The array is bounded at 512 points: longer warmups are decimated by a doubling stride, keeping the points evenly spaced and the shape intact at coarser resolution. It is empty for pinned `warmupIterations` (which runs no plateau detection) and when `IncludeSamples` is off.
+The `warmupCurve` records the mean per-op time of each warmup batch (oldest first), illustrating the shape of tiered compilation. Since a body promoted from tier-0 to tier-1 (and re-optimized under dynamic PGO) gets faster in steps, the curve shows these transitions. `warmupSampleInterval` provides the iterations between consecutive points for plotting. NBenchmark bounds this array at 512 points; longer warmups are decimated by a doubling stride to maintain shape. This array is empty for pinned `warmupIterations` or when `IncludeSamples` is off.
 
-Two limits worth knowing. This is **aggregate decay, not per-method tier attribution** - naming individual methods and their tiers (`QuickJitted`, `OptimizedTier1`, OSR, instrumented) requires the runtime's `MethodLoadVerbose` events via EventPipe or an in-process `EventListener`, which NBenchmark does not collect. And **ops-per-sample calibration runs before warmup** and already exercises the body, so some tier-up has typically happened before the first warmup batch is recorded - the curve shows what remains of tiering plus cache and branch-predictor warming, not the full cold-start cliff.
+Note two limitations:
+1. NBenchmark collects **aggregate decay**, not per-method tier attribution. To identify individual methods and their tiers, use the runtime's `MethodLoadVerbose` events via EventPipe or an in-process `EventListener`.
+2. Ops-per-sample calibration runs before warmup and exercises the body. Therefore, some tier-up typically occurs before the first warmup batch is recorded. The curve shows remaining tiering, cache warming, and branch-predictor warming, rather than the full cold-start cliff.
 
-`clockResolutionNs` is the **measured** effective resolution of the timer, not `Stopwatch.Frequency` - that figure is an advertised conversion rate and reports 1 ns on Apple Silicon, where the counter actually steps in 41.667 ns units. `targetSampleDurationNs` is the sample-duration target calibration resolved against, after the measured resolution raised it to span `AutoTune.MinQuantaPerSample` steps; `sampleDurationNs` is what one sample really spanned (K is a power of two, so it overshoots).
+The `clockResolutionNs` is the **measured** effective resolution of the timer, not `Stopwatch.Frequency`. For example, Apple Silicon may report 1 ns for frequency, but the counter steps in 41.667 ns units. `targetSampleDurationNs` is the duration target resolved against the measured resolution to span `AutoTune.MinQuantaPerSample` steps; `sampleDurationNs` is the actual duration of one sample.
 
-`sampleQuantizationFraction` is one clock step as a fraction of one sample - the granularity floor on how finely this measurement could be resolved, whatever `marginOfError` says. **Read the two together.** A margin well below this fraction is describing the clock's step grid rather than the code: within a run consecutive samples of a stable body land on the same step so the spread looks tiny, while between runs a shift far smaller than one step moves every sample to the next step and the median with it. A margin of ±0.03% next to a median that moves 0.5% on re-run is that signature, and it is indistinguishable from a genuine result without this field. See [Timer resolution](../statistics/measurement.md#timer-resolution).
+The `sampleQuantizationFraction` is one clock step as a fraction of one sample. This represents the granularity floor of the measurement. If the `marginOfError` is well below this fraction, the result describes the clock's step grid rather than the code. A margin of ±0.03% next to a median that shifts 0.5% on re-run is a typical signature of this effect. See [Timer resolution](../statistics/measurement.md#timer-resolution).
 
-`jitLastChangeAtNs` is how far into warmup the JIT last compiled anything. With the body under continuous load that is typically the promotion of its own hot path, which makes it the closest thing to a tier-up marker to draw on the curve; compare it against `warmupElapsedNs` to see how much quiet time followed. The three `warmupJit*` counters are process-wide `System.Runtime.JitInfo` deltas, so in an in-process run the first benchmark to execute absorbs most of the startup compilation and later ones see almost none - that is real, and since benchmark order is randomised it is a large part of why the same benchmark's warmup differs between runs.
+The `jitLastChangeAtNs` field records how far into warmup the JIT last compiled a method. Under continuous load, this is typically the promotion of the benchmark's own hot path. Compare this against `warmupElapsedNs` to determine how much quiet time followed the last JIT event. The `warmupJit*` counters are process-wide `System.Runtime.JitInfo` deltas. In in-process runs, the first benchmark typically absorbs most startup compilation.
 
-`totalDuration` is end-to-end wall-clock (warmup + pre-measure GC + measured loop); `measuredDuration` is the measured loop only. `measuredDuration <= totalDuration` always; the gap is dominated by warmup iterations and the pre-measure `GC.Collect`.
+`totalDuration` is the end-to-end wall-clock time (warmup + pre-measure GC + measured loop), while `measuredDuration` is the measured loop only. The gap is primarily composed of warmup iterations and the pre-measure `GC.Collect`.
 
-The `detail` and `profile` fields in the envelope report the active detail level (`simple`, `standard`, or `advanced`) and measurement profile. The result records always contain all available fields regardless of detail level.
+The `detail` and `profile` fields in the envelope report the active detail level (`simple`, `standard`, or `advanced`) and measurement profile. The result records always contain all available fields regardless of the detail level.
 
 ## Notes
 
-- The output directory is created automatically if it does not exist.
-- `BenchmarkResult` is serialised with all properties, including `ConfidenceIntervalLower` and `ConfidenceIntervalUpper` (computed from `Mean ± MarginOfError`).
-- The `autoTune` object is `null` for dry-run and errored results; for pinned runs the stop reasons are `explicitCount`.
+- NBenchmark creates the output directory automatically if it does not exist.
+- `BenchmarkResult` is serialized with all properties, including `ConfidenceIntervalLower` and `ConfidenceIntervalUpper` (computed from `Mean ± MarginOfError`).
+- The `autoTune` object is `null` for dry-run and errored results. For pinned runs, the stop reasons are `explicitCount`.
 
 ## Using with Benchmark (Single mode)
 

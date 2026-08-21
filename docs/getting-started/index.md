@@ -6,20 +6,19 @@ order: 1
 
 # Getting Started
 
-Five short pages, about ten minutes end to end. By the end you'll have a benchmark running and you'll
-know what its output is telling you.
+This section provides everything you need to start benchmarking with NBenchmark. You can complete these five pages in about ten minutes. By the end, you'll have a benchmark running and understand how to interpret the results.
 
 ## In this section
 
-1. **[Installation](./installation.md)** - add the package and verify the setup.
-2. **[Choose your path](./choose-your-path.md)** - match what you want to do to the right API.
-3. **[Quick Start](./quick-start.md)** - write your first benchmark.
-4. **[Reading your results](./reading-your-results.md)** - what every column, indicator, and warning means.
-5. **[Key concepts](./key-concepts.md)** - warmup, outliers, confidence, and significance, in plain English.
+1. [Installation](./installation.md) - Add the package and verify your setup.
+2. [Choose your path](./choose-your-path.md) - Match your goals to the appropriate API.
+3. [Quick start](./quick-start.md) - Write your first benchmark.
+4. [Reading your results](./reading-your-results.md) - Understand every column, indicator, and warning.
+5. [Key concepts](./key-concepts.md) - Learn about warmup, outliers, confidence, and significance.
 
-## In a hurry?
+## Quick start example
 
-Install the package and run this:
+Install the package and use the `Benchmark.Run` method to measure a single method:
 
 ```csharp
 using NBenchmark;
@@ -27,10 +26,12 @@ using NBenchmark;
 Benchmark.Run(() => MyMethod()).Print();
 ```
 
-Then come back for [Reading your results](./reading-your-results.md).
+For more information on how to interpret the output, see [Reading your results](./reading-your-results.md).
 
-## Where to go after
+## Next steps
 
-- **[Usage modes](../usage-modes/)** - suite mode, harness mode, and the global tool in depth
-- **[Guides](../guides/)** - complete recipes for CI gates, refactor comparisons, parameter sweeps
-- **[Troubleshooting](../troubleshooting.md)** - when the numbers look wrong
+For more advanced usage, see the following sections:
+
+- [Usage modes](../usage-modes/) - Detailed information about suite mode, harness mode, and the global tool.
+- [Guides](../guides/) - Complete recipes for CI gates, refactor comparisons, and parameter sweeps.
+- [Troubleshooting](../troubleshooting.md) - How to handle unexpected or incorrect results.

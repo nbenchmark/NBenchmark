@@ -8,11 +8,13 @@ order: 4
 
 ## Scenario
 
-You have an algorithm - a sort, a parse, a query, a hash - and you want to see how it scales across input sizes. A single number at `n=1000` doesn't tell you whether it's O(n log n) or O(n²); a sweep across `n = 10, 100, 1000, 10000` does. Parameterized benchmarks run the same method body across multiple input values and produce one benchmark entry per parameter combination, so the scaling trend is visible in a single table.
+If you have an algorithm - such as a sort, a parse, a query, or a hash - you may want to see how it scales across different input sizes. A single measurement at `n=1000` does not indicate whether the complexity is O(n log n) or O(n²). However, a sweep across `n = 10, 100, 1000, 10000` reveals the scaling trend. Parameterized benchmarks run the same method body across multiple input values and produce one benchmark entry per parameter combination, allowing you to see the trend in a single table.
 
 ## Complete example
 
-### Suite mode - `WithParameter`
+### Suite mode: `WithParameter`
+
+Use the `WithParameter` method to define the input sizes:
 
 ```csharp
 var results = await new BenchmarkSuite("sorting")
@@ -27,11 +29,11 @@ var results = await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-This produces four benchmarks: `sort(size=10)`, `sort(size=100)`, `sort(size=1_000)`, `sort(size=10_000)`.
+This configuration produces four benchmarks: `sort(size=10)`, `sort(size=100)`, `sort(size=1_000)`, and `sort(size=10_000)`.
 
-### Harness mode - `[BenchmarkCase]` and `[BenchmarkCases]`
+### Harness mode: `[BenchmarkCase]` and `[BenchmarkCases]`
 
-For a small literal list:
+For a small list of literal values, use the `[BenchmarkCase]` attribute:
 
 ```csharp
 public class SortingBenchmarks
@@ -49,7 +51,7 @@ public class SortingBenchmarks
 }
 ```
 
-For a generated sweep (powers of ten, file-backed inputs, or any source method):
+For a generated sweep (such as powers of ten or file-backed inputs), use the `[BenchmarkCases]` attribute:
 
 ```csharp
 public class SortingBenchmarks
@@ -70,9 +72,9 @@ public class SortingBenchmarks
 }
 ```
 
-### Comparing algorithms across the same sweep
+### Comparing algorithms across a sweep
 
-The real power is sweeping two or more algorithms across the same inputs and reading the scaling trend against the baseline:
+You can sweep multiple algorithms across the same inputs to compare their scaling trends against a baseline:
 
 ```csharp
 var results = await new BenchmarkSuite("search")
@@ -87,33 +89,35 @@ var results = await new BenchmarkSuite("search")
 
 ## What's happening
 
-- **`WithParameter("size", ...)`** (Suite) / **`[BenchmarkCase(...)]`** / **`[BenchmarkCases(nameof(Source))]`** (Harness) - the three ways to declare a sweep. Each value (or Cartesian product across multiple parameters) becomes a separate benchmark entry with a distinct display name. See [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) and [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
+- **Declaring a sweep**: You can declare a sweep using `WithParameter("size", ...)` in suite mode, or `[BenchmarkCase(...)]` / `[BenchmarkCases(nameof(Source))]` in harness mode. Each value (or Cartesian product of multiple parameters) becomes a separate benchmark entry with a unique display name. For more information, see [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) and [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
 
-- **Significance is grouped by parameter set.** The `size=100` benchmarks are compared against each other, not against `size=10_000`. A parameterized suite with `N` parameter combinations and `M` benchmark methods produces `N` separate significance comparisons, each over `M` benchmarks - rather than one flat comparison over `N * M` results. This keeps each comparison apples-to-apples.
+- **Grouped significance**: Significance is grouped by parameter set. For example, benchmarks with `size=100` are compared against each other, not against those with `size=10_000`. A parameterized suite with *N* parameter combinations and *M* benchmark methods produces *N* separate significance comparisons, each over *M* benchmarks. This ensures that comparisons remain apples-to-apples.
 
-- **Run order.** `RunOrder.Declaration` runs the sweep in size order, which makes the scaling trend easy to read in the output. `RunOrder.Random` (the default) shuffles within each parameter group, which guards against systematic bias but scrambles the trend. For a sweep you're reading visually, declaration order is usually clearer.
+- **Run order**: Use `RunOrder.Declaration` to run the sweep in size order, which makes the scaling trend easier to read in the output. `RunOrder.Random` (the default) shuffles benchmarks within each parameter group to guard against systematic bias, but it scrambles the visual trend.
 
-- **Baselines expand across parameters.** `WithBaseline("linear")` marks every `linear(size=...)` variant as a baseline. Each parameter group gets its own `linear(size=N)` baseline, and the `binary(size=N)` row is compared against it.
+- **Baseline expansion**: Using `WithBaseline("linear")` marks every `linear(size=...)` variant as a baseline. Each parameter group receives its own `linear(size=N)` baseline, and the `binary(size=N)` row is compared against it.
 
 > [!NOTE] Single-method sweeps rank against the fastest point
-> When a single method is swept across parameter values (no second algorithm to compare), every parameter group holds just one benchmark, so there's no within-group comparison. The table instead ranks every row against the fastest point: the `Ratio` column reports each point's scaling factor (the fastest point is the `baseline`), and `Sig` / `Mag` stay `-`, because the engine does not test different workloads against one another. This makes scaling trends easy to read.
+> When you sweep a single method across parameter values without a second algorithm for comparison, every parameter group contains only one benchmark. In this case, the engine ranks every row against the fastest point. The `Ratio` column reports each point's scaling factor (with the fastest point as the `baseline`), and the `Sig` and `Mag` columns remain `-` because the engine does not test different workloads against one another.
 
-## Run it
+## Run the benchmark
+
+Execute the following commands based on your needs:
 
 ```bash
-# Suite mode - the full sweep
+# Suite mode: Run the full sweep
 dotnet run -c Release
 
-# Harness mode - filter to a subset of sizes by display name
+# Harness mode: Filter to a subset of sizes by display name
 dotnet run -c Release -- --filter "*n=1000*" --filter "*n=10000*"
 
-# Pin the run so the sweep is reproducible across CI and local
+# Pin the run for reproducible results across CI and local environments
 dotnet run -c Release -- --iterations 200 --warmup 20 --order declaration
 ```
 
 ## Read the results
 
-A single-method sweep produces a scaling table where the `Ratio` column is the most useful signal:
+A single-method sweep produces a scaling table where the `Ratio` column provides the most useful signal:
 
 ```text
 SortingBenchmarks
@@ -125,13 +129,12 @@ Sort         |  1000 |    1.40 µs|   1.27 µs |    789,515 | 44.87x            
 Sort         | 10000 |   18.7 µs |  18.9 µs  |     53,476 | 599.0x              |  -  |  -  | 48,024 B
 ```
 
-Reading the trend:
+Interpret the trend as follows:
+- **Median scaling**: The median scales roughly linearly (e.g., 10 → 100 is 3.76x, 100 → 1000 is 11.9x). This indicates a complexity closer to O(n log n) than O(n²), though with a super-linear constant.
+- **Linear allocation growth**: The `Alloc/op` tracks the input size, which is expected when using `Enumerable.Range(...).ToArray()`.
+- **Ratio against the fastest point**: The `baseline` is `n=10`; every other row shows how many times slower the method is compared to that baseline.
 
-- **Median × 10 per 10× input** - the median scales roughly linearly (10 → 100 is 3.76x, 100 → 1000 is 11.9x, 1000 → 10000 is 13.4x). Closer to O(n log n) than O(n²) (which would be 10x per step) but with a super-linear constant.
-- **Alloc/op growing linearly with `n`** - the allocation tracks the input size, which is expected for `Enumerable.Range(...).ToArray()`.
-- **Ratio against the fastest point** - the `baseline` is `n=10`; every other row shows how many times slower it is than that.
-
-A two-algorithm sweep produces a comparison table grouped by parameter set, where each group has its own baseline and its own significance verdict:
+A two-algorithm sweep produces a comparison table grouped by parameter set, where each group has its own baseline and significance verdict:
 
 ```text
 search
@@ -143,14 +146,16 @@ linear    |  100 | 250.0 ns | 252.1 ns |  4,000,000 | baseline          |  -  | 
 binary    |  100 | 110.0 ns | 112.4 ns |  9,090,909 | 0.44x             |  ✓  | large  |    32 B
 ```
 
-Here `binary(size=100)` is 2.27x faster than `linear(size=100)` with a `large` effect and `✓` significance, while `binary(size=10)` is barely different and not significant. The scaling trend tells you where the algorithm choice starts to matter.
+In this example, `binary(size=100)` is 2.27x faster than `linear(size=100)` with a `large` effect and `✓` significance, while `binary(size=10)` is barely different and not significant. The scaling trend reveals where the algorithm choice becomes meaningful.
 
-See [Reading Your Results](../getting-started/reading-your-results.md) for every column, indicator, and warning.
+For a full explanation of indicators and warnings, see [Reading Your Results](../getting-started/reading-your-results.md).
 
-## When to go deeper
+## Next steps
 
-- [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) - `WithParameter` for up to 3 parameters, mixed parameterized and plain benchmarks, supported parameter types, baselines, and significance grouping.
-- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - `[BenchmarkCase]` vs. `[BenchmarkCases]`, named-tuple display names, `--filter` by display name, the Suite vs. Harness comparison table.
-- [Suite mode: Run order](../usage-modes/suite-mode.md#run-order) - why declaration order is usually clearer for sweeps, and why randomization is the default for comparisons.
-- [Configuration: Iterations](../reference/configuration.md#iterations) - pinning the run for reproducible sweeps across CI and local.
-- [Reading Your Results](../getting-started/reading-your-results.md) - the full column reference, including how the `Ratio` column behaves for single-method vs. multi-method sweeps.
+For more information, see the following pages:
+
+- [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) - Details on `WithParameter`, supported parameter types, and significance grouping.
+- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - Details on `[BenchmarkCase]` vs. `[BenchmarkCases]` and filtering by display name.
+- [Suite mode: Run order](../usage-modes/suite-mode.md#run-order) - Why declaration order is clearer for sweeps.
+- [Configuration: Iterations](../reference/configuration.md#iterations) - Pinning the run for reproducible sweeps.
+- [Reading Your Results](../getting-started/reading-your-results.md) - The full column reference and the behavior of the `Ratio` column.

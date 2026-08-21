@@ -8,9 +8,9 @@
 
 **Straightforward benchmarking for .NET.**
 
-Benchmarking sounds simple - run it, time it, compare. In practice the numbers are easy to get wrong: the JIT is still optimizing your method during the first runs, the timer can cost more than a fast method, one GC pause skews an average, and the 2% improvement you were sure you measured can be noise.
+Benchmarking sounds simple: run it, time it, and compare. In practice, you can easily get the numbers wrong. The JIT might still be optimizing your method during the first runs, the timer can cost more than a fast method, a single GC pause can skew an average, and a small improvement might just be noise.
 
-NBenchmark handles that for you. One line gives you a calibrated, warmed-up, outlier-trimmed result with a confidence interval.
+NBenchmark handles these issues for you. One line of code provides a calibrated, warmed-up, and outlier-trimmed result with a confidence interval.
 
 ```csharp
 var result = Benchmark.Run(() => MandelbrotCalculation());
@@ -21,11 +21,11 @@ result.Print();
 
 ## Why NBenchmark?
 
-- **No setup.** One static call. No attributes, no class structure, no dedicated project.
-- **No numbers to guess.** Warmup, batch size, and sample count all resolve themselves.
-- **Clean process by default.** Your numbers reflect your code, not your process's history.
-- **Real statistics.** Confidence intervals and significance testing, not just an average.
-- **Zero dependencies.** The core package is BCL-only.
+- **No setup.** Use one static call. You don't need attributes, a specific class structure, or a dedicated project.
+- **No guessing.** Warmup, batch size, and sample count resolve automatically.
+- **Clean processes by default.** Results reflect your code rather than the history of your process.
+- **Real statistics.** Use confidence intervals and significance testing instead of simple averages.
+- **Zero dependencies.** The core package uses only the BCL.
 
 ## Installation
 
@@ -46,20 +46,18 @@ dotnet add package NBenchmark
 
 ## Four modes, one engine
 
-### 1. Single mode
+### Single mode
 
-The fastest way to get a reliable number.
+Single mode is the fastest way to get a reliable number.
 
 ```csharp
-var result = Benchmark.Run(() => int.Parse("12345"));
-Console.WriteLine($"P95: {result.GetPercentile(0.95)} ns, Alloc: {result.MeanAllocatedBytes} B");
-
-var result = await Benchmark.RunAsync(async () => await FetchDataAsync());
+var result = Benchmark.Run(() => MyMethod());
+var result = await Benchmark.RunAsync(async () => await FetchAsync());
 ```
 
-### 2. Suite mode
+### Suite mode
 
-Compare multiple implementations with a fluent API.
+Use suite mode to compare implementations side-by-side with ratios and significance testing.
 
 ```csharp
 var results = await new BenchmarkSuite("string concat")
@@ -72,9 +70,9 @@ var results = await new BenchmarkSuite("string concat")
 
 The output includes a **Ratio** column and a **✓** in the **Sig** column when the speed difference is statistically significant.
 
-### 3. Harness mode
+### Harness mode
 
-Attribute-based discovery with a CLI, for dedicated benchmark projects.
+Harness mode provides attribute-based discovery with a built-in CLI for dedicated benchmark projects.
 
 ```csharp
 public class StringBenchmarks
@@ -98,9 +96,9 @@ dotnet run -- --dry-run                         # Validate wiring without runnin
 dotnet run -- --reporter json                   # Output results for CI/CD
 ```
 
-### 4. Global tool
+### Global tool
 
-Install once, benchmark any assembly with `[Benchmark]` methods - no project needed.
+Install the global tool once to benchmark any assembly with `[Benchmark]` methods without needing a project.
 
 ```bash
 dotnet tool install -g NBenchmark.Tool
@@ -112,28 +110,30 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--thr
 
 ## Features
 
-| Feature | What it does | |
+| Feature | Description | Link |
 | --- | --- | --- |
-| Isolated runs | Measures in a fresh worker process so earlier work can't bias the numbers. On by default. | [→](./docs/features/isolated-runs.md) |
+| Isolated runs | Measures in a fresh worker process to prevent earlier work from biasing the numbers. On by default. | [→](./docs/features/isolated-runs.md) |
 | Parameterized benchmarks | Runs one body across many input values to show how it scales. | [→](./docs/features/parameterized-suite.md) |
-| Categories | Tags benchmarks and includes or excludes groups from a run. | [→](./docs/features/categories.md) |
-| Multi-runtime | Runs the same benchmarks on net8, net9, and net10 side-by-side. | [→](./docs/features/multi-runtime.md) |
+| Categories | Tags benchmarks to include or exclude groups from a run. | [→](./docs/features/categories.md) |
+| Multi-runtime | Runs the same benchmarks on .NET 8, .NET 9, and .NET 10 side-by-side. | [→](./docs/features/multi-runtime.md) |
 | Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [→](./docs/features/multiple-launches.md) |
-| Environment control | Pins CPU affinity and process priority - process and measuring thread alike - to cut noise at the source. | [→](./docs/features/environment-control.md) |
-| Interference rejection | Discards samples the OS is known to have preempted, using the measuring thread's own CPU occupancy - a fact, not a guess. On by default. | [→](./docs/statistics/outliers.md#evidence-based-interference-rejection) |
+| Environment control | Pins CPU affinity and process priority for the process and measuring thread to reduce noise. | [→](./docs/features/environment-control.md) |
+| Interference rejection | Discards samples that the OS preempted using the measuring thread's CPU occupancy. On by default. | [→](./docs/statistics/outliers.md#evidence-based-interference-rejection) |
 | Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [→](./docs/test-integration/index.md) |
-| CI regression gate | Fails the run when a benchmark regresses past a percentage. | [→](./docs/reference/cli.md) |
+| CI regression gate | Fails the run when a benchmark regresses past a specified percentage. | [→](./docs/reference/cli.md) |
 | Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [→](./docs/statistics/diagnostics.md) |
 | Live telemetry | Streams per-sample events to an observer or to OpenTelemetry. | [→](./docs/reference/observers.md) |
 | Compile-time analysis | Catches benchmark authoring mistakes as build-time diagnostics. | [→](./docs/reference/analyzers.md) |
-| Pluggable statistics | Swaps in your own outlier detector or significance test. | [→](./docs/guides/custom-statistics.md) |
+| Pluggable statistics | Allows you to swap in your own outlier detector or significance test. | [→](./docs/guides/custom-statistics.md) |
 
 ## Built on real statistics
 
-- **Adaptive measurement.** Samples stream until the confidence interval is tight enough, then stop. Warmup ends when the timings plateau and the JIT has settled - not after a guessed count. ([Measurement](./docs/statistics/measurement.md))
-- **Error bars that survive trimming.** Discarding an outlier does not narrow the confidence interval: a discarded sample still counts as an observation, so the reported margin describes the run that happened rather than the samples that survived it. ([Outlier trimming](./docs/statistics/outliers.md))
-- **Non-parametric significance testing.** Benchmark timings are not normally distributed, so the built-in tests are rank-based. A ✓ in the `Sig` column means "real, and at least a small effect", not merely `p < 0.05`. ([Significance testing](./docs/statistics/significance.md))
-- **Verified against SciPy and NumPy.** Every statistical primitive is dependency-free and cross-validated on each build. ([Validation](./docs/statistics/validation.md))
+NBenchmark doesn't use a simple average of a fixed loop.
+
+- **Adaptive measurement.** Samples stream until the confidence interval is tight enough and then stop. Warmup ends when the timings plateau and the JIT settles, rather than after a guessed count. ([Measurement](./docs/statistics/measurement.md))
+- **Error bars that survive trimming.** Discarding an outlier doesn't narrow the confidence interval. A discarded sample still counts as an observation, so the reported margin describes the run that occurred rather than only the samples that survived. ([Outlier trimming](./docs/statistics/outliers.md))
+- **Non-parametric significance testing.** Benchmark timings are not normally distributed, so the built-in tests are rank-based. A checkmark (✓) in the `Sig` column means the effect is real and at least small, not merely that `p < 0.05`. ([Significance testing](./docs/statistics/significance.md))
+- **Cross-validated results.** Every statistical primitive is dependency-free and cross-validated on each build against SciPy and NumPy. ([Validation](./docs/statistics/validation.md))
 
 ---
 

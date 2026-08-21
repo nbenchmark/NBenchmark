@@ -6,17 +6,15 @@ order: 10
 
 # Samples
 
-The repository includes several sample projects in the `samples/` directory that demonstrate each usage mode. Run any of them with `dotnet run`.
+The `samples/` directory contains several sample projects that demonstrate each usage mode. Run a sample project using `dotnet run`.
 
-## PreparedState - benchmarking over input you have to build
+## Benchmarking prepared state
 
 **`samples/PreparedState/`**
 
-Runs the same work two ways - closing over prepared data, and passing the preparation as its own
-delegate - and prints where each was measured. Both are isolated: an `int[]` is sent to the worker by
-value. The third row is a capture that cannot be sent (a `Stream`), measured here on purpose with
-`Benchmark.RunInProcess`, because a refusal is an error rather than a silent downgrade. Also shows
-`BenchmarkSuite.Over` for a suite.
+This sample runs the same work in two ways: closing over prepared data and passing the preparation as its own delegate. Both methods are isolated, and NBenchmark sends the `int[]` to the worker by value.
+
+The sample also measures a capture that cannot be sent, such as a `Stream`, using `Benchmark.RunInProcess`. This demonstrates that a refusal to isolate results in an error rather than a silent downgrade. The sample also demonstrates `BenchmarkSuite.Over` for a suite.
 
 ```bash
 cd samples/PreparedState
@@ -36,11 +34,11 @@ Benchmark.Run(
     "prepared");
 ```
 
-## Single - Single mode
+## Single mode sample
 
 **`samples/Single/`**
 
-The simplest possible benchmark: `Benchmark.Run` on a tight loop, followed by `Print()` and `PrintAsync()`.
+This is the simplest possible benchmark: `Benchmark.Run` on a tight loop, followed by `Print()` and `PrintAsync()`.
 
 ```bash
 cd samples/Single
@@ -60,7 +58,7 @@ result.Print();
 await result.PrintAsync();
 ```
 
-What to look at:
+Key observations:
 
 - The plain-text output from `result.Print()` (core package only).
 - The Spectre.Console table from `result.PrintAsync()` (requires `NBenchmark.Reporters.Console`).
@@ -68,11 +66,11 @@ What to look at:
 
 ---
 
-## Suite - Suite mode
+## Suite mode sample
 
 **`samples/Suite/`**
 
-A `BenchmarkSuite` comparing bubble sort versus LINQ sorting on a 100-element array, with a short iteration count for a fast demo run.
+This sample uses a `BenchmarkSuite` to compare bubble sort and LINQ sorting on a 100-element array. The sample uses a short iteration count for a fast demonstration.
 
 ```bash
 cd samples/Suite
@@ -102,19 +100,19 @@ var results = await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-What to look at:
+Key observations:
 
-- The comparison table with Ratio and Sig columns.
+- The comparison table includes Ratio and Sig columns.
 - The bar chart rendered below the table.
-- The significance indicator (✓ or ✗) - does the difference appear real?
+- The significance indicator (✓ or ✗) showing whether the difference appears real.
 
 ---
 
-## Harness - Harness mode
+## Harness mode sample
 
 **`samples/Harness/`**
 
-A `BenchmarkHarness` with two attribute-based benchmarks: a fast `Compute` method and a slower `Baseline`.
+This sample uses a `BenchmarkHarness` with two attribute-based benchmarks: a fast `Compute` method and a slower `Baseline` method.
 
 ```bash
 cd samples/Harness
@@ -146,20 +144,20 @@ public class HostBenchmarks
 }
 ```
 
-What to look at:
+Key observations:
 
-- How `--list` shows discovered benchmarks before running.
-- How `--filter` narrows the run to one benchmark.
-- The Markdown file written by `--reporter markdown`.
-- How `--confidence 0.99` widens the Error column compared to the default 95%.
+- The `--list` flag shows discovered benchmarks before the run starts.
+- The `--filter` flag narrows the run to a single benchmark.
+- The `--reporter markdown` flag writes a Markdown file.
+- The `--confidence 0.99` flag widens the Error column compared to the default 95% confidence level.
 
 ---
 
-## DependencyInjection - Harness mode with DI
+## Harness mode with dependency injection
 
 **`samples/DependencyInjection/`**
 
-A `BenchmarkHarness` setup where the benchmark class has **constructor dependencies** resolved from a `Microsoft.Extensions.DependencyInjection` container. Demonstrates the `NBenchmark.DependencyInjection` companion package and `UseDependencyInjection<T>`.
+This sample uses a `BenchmarkHarness` where the benchmark class has constructor dependencies resolved from a `Microsoft.Extensions.DependencyInjection` container. It demonstrates the `NBenchmark.DependencyInjection` package and the `UseDependencyInjection<T>` method.
 
 ```bash
 cd samples/DependencyInjection
@@ -173,8 +171,8 @@ using NBenchmark;
 using NBenchmark.Reporters.Console;
 using NBenchmark.DependencyInjection;
 
-// Pass the container as a factory, not a built provider, so the worker can rebuild it
-// and the run stays isolated.
+// Pass the container as a factory instead of a built provider.
+// This allows the worker to rebuild the container and ensures the run remains isolated.
 await BenchmarkHarness.Create(args)
     .UseDependencyInjection<DependencyInjectionBenchmarks>(BuildServices)
     .WithReporter(new ConsoleReporter())
@@ -194,20 +192,22 @@ public sealed class DependencyInjectionBenchmarks(OrderRepository repository)
 }
 ```
 
-What to look at:
+Key observations:
 
-- The benchmark class takes an `OrderRepository` in its primary constructor - no parameterless constructor anywhere.
+- The benchmark class takes an `OrderRepository` in its primary constructor and does not require a parameterless constructor.
 - `UseDependencyInjection<T>` combines assembly discovery and DI wiring in one call.
-- `BuildServices` is a static factory; the worker runs it in its own process, so the run is isolated.
-- A scoped variant (`UseScopedDependencyInjection<T>(BuildServices)`) is also available for `DbContext`-style lifetimes.
+- `BuildServices` is a static factory; the worker runs it in its own process to ensure the run is isolated.
+- For `DbContext`-style lifetimes, use the scoped variant: `UseScopedDependencyInjection<T>(BuildServices)`.
 
 ---
 
-## ExtensibleStats - Custom statistics
+## Custom statistics sample
 
 **`samples/ExtensibleStats/`**
 
-A `BenchmarkSuite` comparing three hash algorithms (`SHA256`, `SHA1`, `MD5`) twice. The first run uses the built-in Median Absolute Deviation outlier mode; because there are three groups it automatically reports a **Kruskal-Wallis** omnibus verdict. The second run swaps in a custom `IOutlierDetector` and a custom `ISignificanceTest`.
+This sample uses a `BenchmarkSuite` to compare three hash algorithms (`SHA256`, `SHA1`, and `MD5`) in two different runs.
+
+The first run uses the built-in Median Absolute Deviation outlier mode. Because the suite contains three groups, NBenchmark automatically reports a Kruskal-Wallis omnibus verdict. The second run uses a custom `IOutlierDetector` and a custom `ISignificanceTest`.
 
 ```bash
 cd samples/ExtensibleStats
@@ -241,31 +241,31 @@ await new BenchmarkSuite("hashing-custom")
     .RunAsync();
 ```
 
-What to look at:
+Key observations:
 
-- The `Outliers: MAD` header on the first run and the `Omnibus Kruskal-Wallis across 3 groups: H(2) = ... → significant` line below the table.
-- The custom detector's name (`keep fastest 90%`) in the header and the custom test's name (`median ratio (>25%)`) in the footer of the second run.
-- The `KeepFastestDetector : IOutlierDetector` and `MedianRatioSignificanceTest : ISignificanceTest` implementations in `Program.cs` - templates for your own statistics.
+- Observe the `Outliers: MAD` header in the first run and the Kruskal-Wallis omnibus verdict line below the table.
+- Observe the custom detector's name (`keep fastest 90%`) in the header and the custom test's name (`median ratio (>25%)`) in the footer of the second run.
+- The `KeepFastestDetector` and `MedianRatioSignificanceTest` implementations in `Program.cs` serve as templates for custom statistics.
 
-See [Custom outlier detectors](./statistics/outliers.md#custom-outlier-detectors) and [Custom significance tests](./statistics/significance.md#custom-significance-tests).
+For more information, see [Custom outlier detectors](./statistics/outliers.md#custom-outlier-detectors) and [Custom significance tests](./statistics/significance.md#custom-significance-tests).
 
 ---
 
-## IsolatedRuns - Advanced isolation sample
+## Advanced isolation sample
 
 **`samples/IsolatedRuns/`**
 
-Demonstrates process isolation:
+This sample demonstrates process isolation.
 
-- Single mode is isolated by default (`Benchmark.Run`), with `Benchmark.RunInProcess` as the deliberate opt-out.
-- Suite mode measures in a single clean worker process, with a `[BenchmarkPlan]` factory for suites that hold live state.
+- Single mode is isolated by default when using `Benchmark.Run`. Use `Benchmark.RunInProcess` to opt out of isolation.
+- Suite mode measures in a single clean worker process. Use a `[BenchmarkPlan]` factory for suites that maintain live state.
 
 ```bash
 cd samples/IsolatedRuns
 dotnet run
 ```
 
-What to look at:
+Key observations:
 
 - The quick in-process result.
 - The isolated suite comparison, where the whole suite runs in one fresh worker.
@@ -273,11 +273,11 @@ What to look at:
 
 ---
 
-## MultiLaunch - Cross-launch aggregation
+## Cross-launch aggregation sample
 
 **`samples/MultiLaunch/`**
 
-Demonstrates the `--launch-count` / `WithLaunchCount()` / `[Benchmark(LaunchCount)]` feature for running each benchmark multiple times as independent launches, with cross-launch aggregation statistics.
+This sample demonstrates how to run each benchmark multiple times as independent launches using the `--launch-count` flag, the `WithLaunchCount()` method, or the `[Benchmark(LaunchCount)]` attribute. It also shows cross-launch aggregation statistics.
 
 ```bash
 cd samples/MultiLaunch
@@ -302,20 +302,20 @@ await new BenchmarkSuite("sleep")
     .RunAsync();
 ```
 
-What to look at:
+Key observations:
 
-- The "Launch Aggregation" table below the main results, showing cross-launch mean, stddev, median, and CI when `LaunchCount > 1`.
-- The primary result fields are the **average across launches**, and the reported interval comes from the spread between them - so a benchmark whose launches disagree shows a wide interval rather than one launch's tight one.
-- How `--launch-count 5` on the CLI overrides the programmatic count.
-- How the per-method `[Benchmark(LaunchCount = 3)]` attribute specifies different counts per benchmark.
+- The "Launch Aggregation" table below the main results shows the cross-launch mean, standard deviation, median, and confidence interval when the launch count is greater than one.
+- The primary results are the average across launches. The reported interval reflects the spread between launches; if launches disagree, the interval is wider.
+- The `--launch-count 5` CLI flag overrides the programmatic count.
+- The `[Benchmark(LaunchCount = 3)]` attribute specifies a different launch count for a specific benchmark.
 
 ---
 
-## MultiRuntimeSuite - Suite mode multi-runtime
+## Suite mode multi-runtime sample
 
 **`samples/MultiRuntimeSuite/`**
 
-A `BenchmarkSuite` comparing three string concatenation methods across .NET 8, 9, and 10. Demonstrates `WithRuntimes` for cross-runtime comparison.
+This sample uses a `BenchmarkSuite` to compare three string concatenation methods across .NET 8, .NET 9, and .NET 10. It demonstrates the `WithRuntimes` method for cross-runtime comparison.
 
 ```bash
 cd samples/MultiRuntimeSuite
@@ -339,20 +339,20 @@ var results = await new BenchmarkSuite("string-concat")
     .RunAsync();
 ```
 
-What to look at:
+Key observations:
 
-- The "Runtime" column in the comparison table, showing results grouped by target framework.
-- How the same benchmark body produces different timings across runtimes.
-- The Ratio column showing how each runtime compares to the net8 baseline.
-- The project must target all runtimes in its `.csproj` (`<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>`).
+- The "Runtime" column in the comparison table groups results by target framework.
+- Observe how the same benchmark body produces different timings across runtimes.
+- The Ratio column compares each runtime to the .NET 8 baseline.
+- The project must target all runtimes in the `.csproj` file using the `<TargetFrameworks>` element.
 
 ---
 
-## MultiRuntimeHarness - Harness mode multi-runtime
+## Harness mode multi-runtime sample
 
 **`samples/MultiRuntimeHarness/`**
 
-A `BenchmarkHarness` with attribute-based benchmarks that can be run across multiple .NET runtimes via the `--runtimes` CLI flag.
+This sample uses a `BenchmarkHarness` with attribute-based benchmarks that you can run across multiple .NET runtimes using the `--runtimes` CLI flag.
 
 ```bash
 cd samples/MultiRuntimeHarness
@@ -387,20 +387,20 @@ public class StringBenchmarks
 }
 ```
 
-What to look at:
+Key observations:
 
-- How `--runtimes net8,net9,net10` triggers cross-runtime builds and execution.
-- The "Runtime" column in the console output.
-- How the host builds the project for each TFM, runs benchmarks in workers, and aggregates results.
-- Combining `--runtimes` with other CLI flags like `--iterations`, `--reporter`, and `--output`.
+- The `--runtimes net8,net9,net10` flag triggers cross-runtime builds and execution.
+- Observe the "Runtime" column in the console output.
+- The host builds the project for each target framework, runs benchmarks in workers, and aggregates the results.
+- You can combine the `--runtimes` flag with other CLI flags, such as `--iterations`, `--reporter`, and `--output`.
 
 ---
 
-## ReportDetail - Simple, Standard, and Advanced output
+## Report detail levels sample
 
 **`samples/ReportDetail/`**
 
-Runs the same sorting benchmark three times with `.WithDetail(ReportDetail.Simple)`, `.Standard`, and `.Advanced` so you can see exactly what each detail level adds.
+This sample runs the same sorting benchmark three times using `ReportDetail.Simple`, `ReportDetail.Standard`, and `ReportDetail.Advanced` to demonstrate the differences between detail levels.
 
 ```bash
 cd samples/ReportDetail
@@ -443,23 +443,21 @@ await new BenchmarkSuite("sorting-advanced")
     .RunAsync();
 ```
 
-What to look at:
+Key observations:
 
-- **Simple** (the default): a single table - Benchmark, Median, Ops/s, Ratio, Sig, Alloc/op - plus a counts-only footer. No statistical jargon.
-- **Standard**: adds the Precision & Tail Latency table, a full Interpretation block (omnibus verdict, significance test, outlier detector, measurement profile), and auto-tune summary lines.
-- **Advanced**: adds a per-benchmark Distribution Details block with quartiles, fences, skewness, kurtosis, MAD, Cliff's delta, and allocation breakdown.
+- **Simple** (default): Displays a single table with Benchmark, Median, Ops/s, Ratio, Sig, and Alloc/op, plus a counts-only footer. It contains no statistical jargon.
+- **Standard**: Adds the Precision & Tail Latency table, a full Interpretation block (including the omnibus verdict, significance test, outlier detector, and measurement profile), and auto-tune summary lines.
+- **Advanced**: Adds a per-benchmark Distribution Details block containing quartiles, fences, skewness, kurtosis, MAD, Cliff's delta, and an allocation breakdown.
 
-See [Report Detail Levels](./output/report-detail-levels.md) for the full column reference.
+For more information, see [Report Detail Levels](./output/report-detail-levels.md) for the full column reference.
 
 ---
 
-## Telemetry - OpenTelemetry export to Grafana
+## Telemetry sample
 
 **`samples/Telemetry/`**
 
-A `BenchmarkHarness` exporting OTLP to a Grafana stack in Docker via
-`NBenchmark.Exporters.OpenTelemetry`. The run is isolated, the way harness mode normally runs, and
-the telemetry from every `nbworker` child lands in a single trace with the harness's own.
+This sample uses a `BenchmarkHarness` to export OTLP telemetry to a Grafana stack in Docker using the `NBenchmark.Exporters.OpenTelemetry` package. The run is isolated, and telemetry from every `nbworker` child is aggregated into a single trace with the harness trace.
 
 ```bash
 cd samples/Telemetry
@@ -477,21 +475,13 @@ await BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-Even that call is optional - referencing the package and passing `--otlp-endpoint` is enough, since
-the exporter self-registers and attaches to any run that has an endpoint to export to.
+The programmatic call is optional. If you reference the package and pass the `--otlp-endpoint` flag, the exporter self-registers and attaches to any run with an export endpoint.
 
-What to look at:
+Key observations:
 
-- The one trace a run produces: `benchmark.suite` in the harness, an `nbenchmark.worker` span per
-  measuring process, then `benchmark.run` and the four `nbenchmark.phase.*` spans beneath it - 106
-  spans for a default four-benchmark, five-launch run.
-- The span events (`warmup.plateau_reached`, `measurement.ci_target_met`) that explain why each
-  phase ended, and how much longer warmup runs than measurement.
-- Why the dashboard aggregates over the time range rather than using `rate()`: a worker lives a
-  second or two, which is two to four points per series before the process is gone.
-- Why the project multi-targets `net8.0` as well as `net10.0` - the `net8.0` run is a regression
-  test for the worker's `System.Diagnostics.DiagnosticSource` unification, which is the difference
-  between a complete trace and no worker telemetry at all.
+- A single run produces one trace. This trace includes a `benchmark.suite` span in the harness, one `nbenchmark.worker` span per measuring process, and `benchmark.run` spans with four `nbenchmark.phase.*` spans beneath each. A default run with four benchmarks and five launches produces 106 spans.
+- Observe the span events, such as `warmup.plateau_reached` and `measurement.ci_target_met`, to understand why each phase ended and how warmup duration compares to measurement duration.
+- The dashboard aggregates over the time range instead of using `rate()` because a worker only exists for a few seconds, providing only a few data points per series.
+- The project targets both `.NET 8.0` and `.NET 10.0`. The `.NET 8.0` run serves as a regression test for `System.Diagnostics.DiagnosticSource` unification in the worker, which is required for complete worker telemetry.
 
-See [BCL Instrumentation](./reference/bcl-instrumentation.md) for the full instrument, span, and
-resource-attribute reference.
+For more information, see [BCL Instrumentation](./reference/bcl-instrumentation.md) for the full instrument, span, and resource-attribute reference.

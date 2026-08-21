@@ -8,13 +8,15 @@ order: 6
 
 ## Scenario
 
-You already run a unit test suite in CI. You don't want a separate benchmark project, a separate CI step, or a separate `--threshold-pct` invocation - you want a perf regression to fail a test the same way any other assertion failure fails a test, visible in the same test report and the same PR check.
+If you already run a unit test suite in CI, you may want to detect performance regressions without creating a separate benchmark project, a separate CI step, or a separate `--threshold-pct` invocation. Instead, you can make a performance regression fail a test the same way any other assertion failure does, making it visible in your standard test reports and pull request checks.
 
-NBenchmark's test-integration packages attach to xUnit, NUnit, and MSTest and run the benchmark as part of the test method. Thresholds can be absolute (a hard SLA: "this method must complete in under 500 µs") or relative (a regression gate: "this method must not be more than 5x slower than a reference"), and a relative threshold largely absorbs a change of machine, because both sides scale with machine speed.
+NBenchmark provides test-integration packages for xUnit, NUnit, and MSTest that run benchmarks as part of a test method. You can set thresholds as either absolute (a hard SLA, such as "this method must complete in under 500 µs") or relative (a regression gate, such as "this method must not be more than 5x slower than a reference"). Relative thresholds are generally preferred because they absorb changes in machine speed, as both the candidate and reference scale together.
 
 ## Complete example
 
 ### Absolute threshold (SLA-style)
+
+Use an absolute threshold when you have a hard performance requirement:
 
 ```csharp
 [PerformanceFact(MaxMeanNs = 500_000)]
@@ -25,16 +27,20 @@ If the measured mean exceeds 500,000 ns (500 µs), the test fails with a message
 
 ### Relative threshold (regression gate, zero config)
 
+Use a relative threshold to detect regressions without needing a reference method:
+
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 5.0)]
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-Without a `ReferenceMethod`, the test runs a built-in CPU-bound calibration benchmark alongside your method. The ratio between your method and the calibration is stable across hardware for CPU-bound work - both scale with machine speed. The test fails only when the slowdown is **both** statistically significant (p < 0.05) **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
+Without a `ReferenceMethod`, the test runs a built-in CPU-bound calibration benchmark alongside your method. The ratio between your method and the calibration is stable across hardware for CPU-bound work. The test fails only when the slowdown is **both** statistically significant (p < 0.05) **and** practically meaningful (the ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown or a large-but-noisy slowdown will pass.
 
-**The calibration is measured wherever your method is.** When the test is measured in an isolated worker, the worker measures the calibration too, in the same process and under the same runtime configuration. If the worker cannot produce a calibration, the gate falls back to the host's own and says so in the test output - treat that ratio as a rough hardware-scaled bound rather than a code comparison.
+The calibration is measured in the same environment as your method. If the test is measured in an isolated worker, the worker performs the calibration in the same process and under the same runtime configuration. If the worker cannot produce a calibration, it falls back to the host's calibration and notes this in the test output.
 
-### Relative threshold with a reference method (compare two implementations)
+### Relative threshold with a reference method
+
+Compare two specific implementations to ensure an optimized version meets a target:
 
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse))]
@@ -43,18 +49,20 @@ public void OptimizedParse() => OptimizedParser.Parse(Payload);
 private static void NaiveParse() => NaiveParser.Parse(Payload);
 ```
 
-The candidate must not exceed 1.2x the reference. The reference can be private and runs with the same measurement options as the candidate (same iterations, warmup, outlier mode), so the comparison is apples-to-apples - and, when both sides isolate, in the *same* worker process, so the ratio has that worker's core draw and memory layout divided out rather than left in it.
+The candidate must not exceed 1.2x the reference. The reference can be private and runs with the same measurement options (iterations, warmup, and outlier mode) as the candidate. When both are isolated, they run in the same worker process, which removes the worker's core draw and memory layout from the ratio.
 
-What that ratio does not have, at the default `LaunchCount = 1`, is an interval: it is one quotient, and nothing about it says whether a re-run would agree. Add replicates when the gate decides a build:
+At the default `LaunchCount = 1`, this produces a single quotient. For higher reliability in CI, add replicates:
 
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(NaiveParse), LaunchCount = 3)]
 public void OptimizedParse() => OptimizedParser.Parse(Payload);
 ```
 
-Three workers, each measuring the pair, each producing its own ratio. The gate then applies the threshold to the combined estimate and fails only when the interval excludes `1.00x` - so a failure means the slowdown is larger than the difference between two runs of the same code. See [replicates and the paired ratio](../test-integration/index.md#replicates-and-the-paired-ratio).
+With three launches, each worker measures the pair and produces its own ratio. The gate then applies the threshold to the combined estimate and fails only when the interval excludes `1.00x`. This ensures that a failure indicates a real slowdown rather than a difference between two runs of the same code. For more information, see [replicates and the paired ratio](../test-integration/index.md#replicates-and-the-paired-ratio).
 
-### NUnit / MSTest equivalents
+### NUnit and MSTest equivalents
+
+The same functionality is available in NUnit and MSTest:
 
 ```csharp
 // NUnit
@@ -66,7 +74,9 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-### Assert pattern (measure one part of a larger test)
+### Assert pattern
+
+Use `PerformanceAssert.Run` to measure a specific part of a larger test. This is available in NUnit and MSTest:
 
 ```csharp
 [Test]
@@ -80,51 +90,45 @@ public void Repository_Query_Is_Fast_Enough()
 }
 ```
 
-`PerformanceAssert.Run` is available in NUnit and MSTest and supports calibration mode only (no `ReferenceMethod`).
+`PerformanceAssert.Run` supports calibration mode only (it does not support `ReferenceMethod`).
 
 ## What's happening
 
-- **Attribute pattern** - replace the test attribute on a test method. The entire method body becomes the benchmark. Thresholds are set as named arguments on the attribute. Available in all three frameworks.
+- **Attribute pattern**: Replace the standard test attribute on a method. The entire method body becomes the benchmark, and thresholds are set as named arguments. This is available in xUnit, NUnit, and MSTest.
+- **Assert pattern**: Call `PerformanceAssert.Run` from inside any test. The benchmark runs inline, and violations fail the test immediately. This is available in NUnit and MSTest.
+- **Absolute thresholds** (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`): These act as hard SLAs. Because they are susceptible to shared-runner noise, prefer `MaxSlowdownRatio` for regression gates. You can use `MaxAbsoluteThresholdTolerance` to relax absolute thresholds when a shared runner or high-jitter host is detected (e.g., `1.25` for a 25% relaxation).
+- **Relative thresholds** (`MaxSlowdownRatio`): These act as regression gates. By comparing two bodies measured in the same session, the engine cancels out the speed of the machine. A quick development box and a slow CI runner will agree on the ratio. Start with a loose ratio (e.g., `10.0`) and tighten it based on observed CI runs. The test fails only when the slowdown is both statistically significant and exceeds the ratio.
+- **Statistical gating**: This mirrors the [practical-significance gate](../statistics/significance.md#practical-significance-gate) used in suite and harness modes. A test fails only when the slowdown is both real and practically meaningful.
 
-- **Assert pattern** - call `PerformanceAssert.Run` from inside any test. The benchmark runs inline and violations fail the test immediately. Useful when you want to measure just one part of a larger test. Available in NUnit and MSTest.
+The definition of "real" depends on `LaunchCount`. With one launch, it is based on a Mann-Whitney U p-value. With two or more launches, it is based on whether the paired ratio interval excludes `1.00x`, which is a stronger claim about reproducibility.
 
-- **Absolute thresholds** (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) - hard SLAs. Susceptible to shared-runner noise; prefer `MaxSlowdownRatio` for regression gates. Set `MaxAbsoluteThresholdTolerance` to relax absolute thresholds when a shared runner or high-jitter host is detected (e.g. `1.25` for 25% relaxation).
+## Measurement location
 
-- **Relative thresholds** (`MaxSlowdownRatio`) - regression gates. Comparing two bodies measured in the same session cancels out how *fast the machine is*, so a quick dev box and a slow CI runner agree on the ratio, with no stored baselines or environment matching. The ratio cancels the machine, not the runtime state the host happens to be in - set it loosely enough to survive that (start around `10.0` and tighten from observed CI runs), and lean on the statistical gate rather than the ratio alone. The test fails only when the slowdown is both statistically significant and exceeds the ratio.
+Performance tests are measured in a **worker process**, not in the test host. This isolation is necessary because JIT tiering, dynamic PGO, and GC flavor are fixed when a process starts.
 
-- **Statistical gating** - the test fails only when the slowdown is **both** real **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). A significant-but-small slowdown passes; a large-but-noisy slowdown passes. This mirrors the [practical-significance gate](../statistics/significance.md#practical-significance-gate) in the suite / harness flow.
+The worker builds your test class, which requires the class to be constructible without arguments. If a class cannot be isolated, NBenchmark runs it in the test host and reports the reason.
 
-  What counts as *real* depends on `LaunchCount`. At the default of one launch it is a Mann-Whitney U p-value below the significance level, computed on the samples of that single measurement. At two or more it is the paired ratio interval excluding `1.00x`, which is a statement about reproducibility rather than about sample count - and the stronger claim, because a pooled sample count grants statistical power regardless of whether the difference survives a re-run.
-
-## Where your test is measured
-
-Performance tests are measured in a **worker process**, not in the test host - the same isolation the rest of NBenchmark uses, for the same reason: JIT tiering, dynamic PGO and GC flavour are fixed when a process starts, and a test host's are whatever the preceding tests left behind.
-
-The worker builds your test class itself, so this works when the class can be constructed from nothing. It cannot cover a class the test framework injects into, and NBenchmark says so rather than guessing:
-
-| Situation | Where it runs | Reported as |
+| Situation | Measurement Location | Reported As |
 | --- | --- | --- |
-| Plain test class, simple or no arguments | Worker | `Isolated` |
+| Plain test class with simple or no arguments | Worker | `Isolated` |
 | Static test class or method | Worker | `Isolated` |
-| `IClassFixture`, `ITestOutputHelper`, constructor injection | Test host | `InProcessLiveFixture` |
-| An argument that is an object graph or mock | Test host | `InProcessLiveFixture` |
+| `IClassFixture`, `ITestOutputHelper`, or constructor injection | Test host | `InProcessLiveFixture` |
+| Argument is an object graph or mock | Test host | `InProcessLiveFixture` |
 | No worker deployed | Test host | `InProcessNoWorker` |
 
-The reason is printed with the test's metrics, naming the specific parameter or dependency. Those results are still produced and still gated on absolute thresholds; what changes is the **ratio** gate.
+### Ratio gate enforcement
 
-### When a ratio gate is enforced
-
-| Candidate | Reference | Ratio gate |
+| Candidate | Reference | Ratio Gate Status |
 | --- | --- | --- |
-| Worker | Worker | **Enforced.** With `LaunchCount >= 2`, only when the paired interval excludes `1.00x`; the reason is logged when it does not. |
-| Test host | Test host | Not enforced, and the reason is logged. Add `[AllowInProcessGate]` to enforce it anyway. |
-| Worker | Test host (or the reverse) | **Never enforced.** No opt-in covers it. |
+| Worker | Worker | **Enforced.** With `LaunchCount >= 2`, it fails only when the paired interval excludes `1.00x`. |
+| Test host | Test host | Not enforced. Add `[AllowInProcessGate]` to enforce it. |
+| Worker | Test host (or vice versa) | **Never enforced.** |
 
-The middle row exists because two bodies measured in the same test host share its JIT tiering and PGO state - whatever the preceding tests left behind - so a ratio between them can report the host's history rather than the code. The bottom row is refused outright: a ratio spanning a process boundary is dominated by the difference between the two runtime configurations. Making both sides isolatable - usually by moving injected state into the method - is the fix.
+Ratios between two measurements in the same test host may report the host's state rather than the code's performance. Ratios spanning a process boundary are dominated by the difference between runtime configurations. To fix this, make both sides isolatable by moving injected state into the method.
 
 ### `[AllowInProcessGate]`
 
-Applies to a method, a class, or a whole assembly. It says: this test cannot be isolated, and a noisy ratio is more useful to me than none.
+Use `[AllowInProcessGate]` on a method, class, or assembly when a test cannot be isolated, but a noisy ratio is still useful.
 
 ```csharp
 [AllowInProcessGate]
@@ -135,37 +139,27 @@ public class ParserTests : IClassFixture<ParserFixture>
 }
 ```
 
-The gate then runs on host measurements and the result carries a note saying so. Treat a marginal outcome as inconclusive rather than as evidence.
+The gate then runs on host measurements, and the result includes a note stating so. Treat marginal outcomes as inconclusive.
 
-### Isolation is required by default
+### Isolation requirements
 
-The same attribute is also the *only* opt-out from the isolation requirement. A performance gate fails when its measurement was not taken in a worker process:
+By default, a performance gate fails if the measurement was not taken in a worker process. This prevents labeled-but-passing tests from hiding the fact that isolation was lost (e.g., due to a fixture argument or a deployment failure on a build agent). `[AllowInProcessGate]` waives both the isolation requirement and the ratio-gate restriction.
 
-```csharp
-// Fails if this ends up measured in the test host - no configuration needed.
-[PerformanceFact(MaxMeanNs = 500_000)]
-public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
-```
+Simple values (such as `int`, `string`, `bool`, `enum`, `decimal`, `DateTime`, and `Guid`) reach the worker intact, so `[InlineData]` and `[DataRow]` cases isolate normally. Object arguments are refused because the engine cannot guarantee a correct reconstruction.
 
-That default is deliberate. Isolation can be lost quietly - somebody adds a fixture argument, or the worker fails to deploy on a build agent - and a labeled-but-passing test is indistinguishable from a healthy one, because CI does not read output. Failing is the conservative direction: the message names the reason and its remedy. `[AllowInProcessGate]` waives both the isolation requirement and the ratio-gate restriction above, because both are the same judgement.
+> [!TIP] Absolute vs. relative thresholds
+> Use **absolute** thresholds only for hard SLAs. Use **relative** thresholds for regression gates, as they tolerate changes in machine hardware. Start `MaxSlowdownRatio` loosely (e.g., `10.0`) and tighten it based on several runs in your CI environment.
 
-There is deliberately no `RequireIsolation = false` on the attributes - xUnit reads attribute values as named arguments, where an absent argument and an explicit `false` are indistinguishable. The `PerformanceAssert` option bags do expose it, because they are ordinary objects.
+## Run the tests
 
-Simple values reach the worker intact: `int`, `string`, `bool`, `enum`, `decimal`, `DateTime`, `Guid` and the like, so `[InlineData]` and `[DataRow]` cases isolate normally. Object arguments are refused rather than reconstructed, because a reconstruction that is usually right is worse than one that declines.
-
-> [!TIP] Absolute vs. relative - which to use?
-> Use **absolute** thresholds only when you have a hard SLA ("parse must complete in under 500 µs"). Use **relative** thresholds for regression gates ("this PR must not regress the parser"). Relative thresholds tolerate a change of machine, which absolute ones do not. Start `MaxSlowdownRatio` loose (e.g. `10.0`) and tighten from several runs in your own CI environment.
-
-## Run it
-
-The test runs as part of your normal test suite - no special invocation needed:
+Performance tests run as part of your normal test suite:
 
 ```bash
 dotnet test
 dotnet test --filter "FullyQualifiedName~ParseJson"
 ```
 
-To pin the measurement (e.g. for reproducibility in CI), set `Iterations` and `WarmupIterations` on the attribute:
+To ensure reproducibility in CI, set `Iterations` and `WarmupIterations` on the attribute:
 
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 5.0, Iterations = 200, WarmupIterations = 20)]
@@ -190,25 +184,27 @@ PerformanceAssert: slowdown ratio 6.2x exceeded MaxSlowdownRatio 5.0
   p = 0.0003 (significant)  Cliff's delta = 0.92 (large)
 ```
 
-The `p` and Cliff's delta values tell you whether the slowdown is real and how large. See [Reading Your Results](../getting-started/reading-your-results.md) for every column the underlying benchmark reports.
+The `p` and Cliff's delta values indicate whether the slowdown is real and how large it is. For more information, see [Reading Your Results](../getting-started/reading-your-results.md).
 
-## How this differs from `--threshold-pct`
+## Comparison with `--threshold-pct`
 
-| | Test-integration packages | Harness `--threshold-pct` |
+| Feature | Test-integration packages | Harness `--threshold-pct` |
 | --- | --- | --- |
-| Lives in | Your existing test suite | A dedicated benchmark project |
+| Location | Existing test suite | Dedicated benchmark project |
 | Trigger | `dotnet test` | `dotnet run -- --threshold-pct 10` |
-| Comparison | Your method vs. a calibration / `ReferenceMethod` (same session) | Each benchmark vs. the suite baseline (same session) |
-| Survives a change of machine | Yes (relative thresholds) | No (absolute medians) |
-| Exit code | Test failure | `Environment.ExitCode = 1` |
-| Best for | "Don't regress this hot path" | "Don't regress any benchmark in the suite" |
+| Comparison | Method vs. calibration / `ReferenceMethod` | Benchmark vs. suite baseline |
+| Hardware Portability | Yes (relative thresholds) | No (absolute medians) |
+| Outcome | Test failure | `Environment.ExitCode = 1` |
+| Best Use Case | "Don't regress this hot path" | "Don't regress any benchmark in the suite" |
 
-Both are valid; they serve different scopes. The test-integration packages are per-method and live where your tests live; `--threshold-pct` is per-suite and lives where your benchmarks live. See [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) for the `--threshold-pct` path.
+The test-integration packages are per-method and reside with your tests; `--threshold-pct` is per-suite and resides with your benchmarks. For more information on the `--threshold-pct` approach, see [Tuning for CI/CD pipelines](./ci-cd-pipelines.md).
 
-## When to go deeper
+## Next steps
 
-- [Test integration](../test-integration/index.md) - the full threshold reference, the attribute vs. assert patterns, calibration vs. `ReferenceMethod`, and `MaxAbsoluteThresholdTolerance` for shared runners.
-- [xUnit integration](../test-integration/xunit.md) / [NUnit integration](../test-integration/nunit.md) / [MSTest integration](../test-integration/mstest.md) - per-framework setup and examples.
-- [Significance Testing](../statistics/significance.md) - how the Mann-Whitney U test and Cliff's delta underpin the statistical gating.
-- [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) - the `--threshold-pct` alternative and the noise-reduction stack that applies to both.
-- [Configuration](../reference/configuration.md) - the underlying `MeasurementOptions` that the integration attributes expose.
+For more information, see the following pages:
+
+- [Test integration](../test-integration/index.md) - Full threshold reference and the `MaxAbsoluteThresholdTolerance` setting.
+- [xUnit integration](../test-integration/xunit.md) / [NUnit integration](../test-integration/nunit.md) / [MSTest integration](../test-integration/mstest.md) - Per-framework setup.
+- [Significance Testing](../statistics/significance.md) - How Mann-Whitney U and Cliff's delta underpin the statistical gating.
+- [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) - The noise-reduction stack and the `--threshold-pct` alternative.
+- [Configuration](../reference/configuration.md) - Underlying `MeasurementOptions` exposed by the attributes.

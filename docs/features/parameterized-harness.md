@@ -8,7 +8,7 @@ order: 4
 
 Parameterized benchmarks run the same method body across multiple input values, producing one benchmark entry per parameter combination. This is useful for comparing algorithms at different scales, testing multiple configurations, or sweeping a parameter space.
 
-In Harness mode, parameterized benchmarks use the `[BenchmarkCase]` and `[BenchmarkCases]` attributes. The method must accept parameters matching the argument types.
+In Harness mode, parameterized benchmarks use the `[BenchmarkCase]` and `[BenchmarkCases]` attributes. The method must accept parameters that match the argument types.
 
 ## `[BenchmarkCase]` - inline literal cases
 
@@ -31,7 +31,7 @@ public class SortingBenchmarks
 }
 ```
 
-Each case becomes a separate benchmark entry named `Sort(n=10)`, `Sort(n=1000)`, `Sort(n=100000)`. Multi-parameter methods use method-parameter names in the display name:
+Each case becomes a separate benchmark entry named `Sort(n=10)`, `Sort(n=1000)`, and `Sort(n=100000)`. For methods with multiple parameters, the engine uses the method-parameter names in the display name:
 
 ```csharp
 [BenchmarkCase(100, "asc")]
@@ -73,23 +73,23 @@ public static IEnumerable<(int Count, string Order)> SortCases()
 }
 ```
 
-When the tuple elements are named (e.g. `(int Count, string Order)`), the display name uses those names: `Sort(Count=10, Order=asc)`. Unnamed tuples fall back to the method's own parameter names: `Sort(count=10, order=asc)`.
+If the tuple elements are named (such as `(int Count, string Order)`), the display name uses those names: `Sort(Count=10, Order=asc)`. Unnamed tuples fall back to the method's own parameter names: `Sort(count=10, order=asc)`.
 
-The source method can be `static` or instance, `public` or `non-public`. A static source is recommended since instance sources receive a bare `Activator.CreateInstance` result at discovery time.
+The source method can be `static` or instance, and `public` or `non-public`. Using a static source is recommended because instance sources receive a bare `Activator.CreateInstance` result at discovery time.
 
-## Choosing between the two
+## Choosing an attribute
 
 | Use case | Attribute |
 | --- | --- |
 | Small literal list (2-5 values) | `[BenchmarkCase]` |
-| Generated values, file/database-backed inputs, parameter sweeps, large lists | `[BenchmarkCases]` |
+| Generated values, file/database-backed inputs, parameter sweeps, or large lists | `[BenchmarkCases]` |
 | Named display names for readability in reports | `[BenchmarkCases]` with named tuples |
 
-The two attributes are mutually exclusive on a method. Use one or the other.
+The two attributes are mutually exclusive on a method; use only one.
 
 ## Baselines in harness mode
 
-When `[Benchmark(Baseline = true)]` is applied to a parameterized method, **all** expanded cases from that method are marked as baseline:
+When `[Benchmark(Baseline = true)]` is applied to a parameterized method, the engine marks **all** expanded cases from that method as baselines:
 
 ```csharp
 [BenchmarkCase(10)]
@@ -105,21 +105,23 @@ public void BinarySearch(int size) => Search(size);
 
 ## Significance in harness mode
 
-Harness mode computes significance **per class**. When a class has parameterized results, comparisons are grouped by `ParameterSet`, so each parameter combination is tested independently. Non-parameterized results in the same class form their own group.
+Harness mode computes significance **per class**. When a class has parameterized results, the engine groups comparisons by `ParameterSet`, so each parameter combination is tested independently. Non-parameterized results in the same class form their own group.
 
 ## Harness mode filtering
 
-Use `--filter` on the CLI to select specific cases by display name:
+Use the `--filter` flag on the CLI to select specific cases by display name:
 
 ```bash
-dotnet run -- --filter "Sort*100*"   # runs Sort(n=100) and Sort(n=100000)
+dotnet run -- --filter "Sort*100*"   # Runs Sort(n=100) and Sort(n=100000)
 ```
 
 ## Reading the report
 
-Console and Markdown reporters consolidate a parameterized benchmark into a **single comparison table** - one table per class in harness mode. Each parameter becomes its own column, and the `Benchmark` column shows the base method name without its parameter suffix. The table shape, the per-parameter-group baseline/ratio/significance rules, and the single-method sweep ranking are identical to Suite mode - see [Reading the report](./parameterized-suite.md#reading-the-report) for the full explanation and examples. The only difference is the grouping: one table per class rather than one table for the whole suite.
+Console and Markdown reporters consolidate a parameterized benchmark into a **single comparison table** - one table per class in harness mode. Each parameter becomes its own column, and the `Benchmark` column shows the base method name without its parameter suffix. 
 
-CSV and JSON reporters keep one record per result, each carrying its full `ParameterSet`, for machine consumption.
+The table shape, the per-parameter-group baseline/ratio/significance rules, and the single-method sweep ranking are identical to Suite mode. For a full explanation and examples, see [Reading the report](./parameterized-suite.md#reading-the-report). The only difference is the grouping: one table per class rather than one table for the whole suite.
+
+CSV and JSON reporters provide one record per result, each carrying its full `ParameterSet`.
 
 ## Accessing results
 
@@ -133,7 +135,7 @@ var results = await BenchmarkHarness.Create(args)
 foreach (var r in results)
 {
     Console.WriteLine($"{r.Name}: {r.Median:F0} ns");
-    // Names like "Sort(n=10)", "Sort(n=1000)", "Sort(n=100000)"
+    // Names: "Sort(n=10)", "Sort(n=1000)", "Sort(n=100000)"
     // r.ParameterSet carries the parsed parameter names and values.
 }
 ```
@@ -153,7 +155,9 @@ foreach (var r in results)
 
 ## See also
 
-- [Parameterized benchmarks: Suite mode](./parameterized-suite.md) - the `WithParameter` fluent API
-- [Harness mode](../usage-modes/harness-mode.md) - attribute-based discovery and CLI
-- [Categories](./categories.md) - tag and filter benchmarks
-- [Configuration](../reference/configuration.md) - all measurement options
+For more information, see the following pages:
+
+- [Parameterized benchmarks: Suite mode](./parameterized-suite.md) - The `WithParameter` fluent API.
+- [Harness mode](../usage-modes/harness-mode.md) - Attribute-based discovery and CLI.
+- [Categories](./categories.md) - How to tag and filter benchmarks.
+- [Configuration](../reference/configuration.md) - All measurement options.

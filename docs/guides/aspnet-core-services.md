@@ -8,11 +8,11 @@ order: 1
 
 ## Scenario
 
-You have a service or repository method that hits a database (EF Core, Dapper, or a raw connection) and you want to measure it under realistic conditions: real query plans, real serialization, parameterized inputs, and real DI lifetimes. The benchmark needs a scoped `DbContext` per method, multiple input sizes, and a way to group related benchmarks together.
+If you have a service or repository method that interacts with a database (such as EF Core, Dapper, or a raw connection), you may want to measure it under realistic conditions. This includes using real query plans, real serialization, parameterized inputs, and actual dependency injection (DI) lifetimes. To do this, your benchmark requires a scoped `DbContext` per method, support for multiple input sizes, and a way to group related benchmarks.
 
 ## Complete example
 
-This is a complete `Program.cs` for a dedicated benchmark project that targets a real ASP.NET Core service. It uses Harness mode for attribute-based discovery, scoped DI so each `[Benchmark]` method gets a fresh `DbContext`, parameterized cases to sweep input sizes, and categories to keep the suite navigable.
+The following `Program.cs` example demonstrates how to target an ASP.NET Core service using harness mode. This setup uses attribute-based discovery, scoped DI to provide a fresh `DbContext` for each `[Benchmark]` method, parameterized cases to sweep input sizes, and categories to organize the suite.
 
 ```csharp
 await BenchmarkHarness.Create(args)
@@ -47,57 +47,59 @@ public sealed class OrderBenchmarks(BenchDbContext db)
 
 ## What's happening
 
-- **`UseScopedDependencyInjection<T>(BuildServices)`** does three things in one call: discovers `T`'s assembly, configures instances to be resolved from a container built by your factory, and creates a fresh DI scope per `[Benchmark]` method. The scope is disposed in per-method teardown, so any `IDisposable` / `IAsyncDisposable` services (`DbContext`, `HttpClient`, etc.) are cleaned up. See [Dependency Injection](../features/dependency-injection.md).
+- **`UseScopedDependencyInjection<T>(BuildServices)`**: This method performs three actions: it discovers the assembly for `T`, configures instances to be resolved from a container built by your factory, and creates a fresh DI scope per `[Benchmark]` method. The engine disposes of the scope during per-method teardown, ensuring that any `IDisposable` or `IAsyncDisposable` services (such as `DbContext` or `HttpClient`) are cleaned up. For more information, see [Dependency Injection](../features/dependency-injection.md).
 
-- **Pass the factory, not a built provider.** There is no overload taking a built container - a container is live code, holding singletons, open connections and closures, so it cannot cross a process boundary, and handing one over is a **compile error**. A factory is a *recipe*, and a recipe is addressable: the worker runs `BuildServices` in its own process and resolves from the container it built there. The container is a different instance from any built here, and that is the point rather than a caveat - a benchmark resolved from a container this process already warmed up is partly measuring that warmth. The factory may close over an ordinary value such as a connection string, which travels with it; what it may not do is hand over the container itself.
+- **Using a factory instead of a provider**: You must pass a factory rather than a pre-built `IServiceProvider`. Because a container is live code containing singletons and open connections, it cannot cross a process boundary; attempting to pass a built container results in a compile error. A factory serves as a recipe that the worker process executes in its own process to build its own container. This ensures that the benchmark does not measure the "warmth" of a container created in the host process. The factory can capture values like connection strings, but it must not return the container itself.
 
-- **`AddDbContext` + `UseScopedDependencyInjection`** gives each benchmark method a fresh `DbContext`. With `PerMethod` lifetime (the default), method A cannot warm the entity cache that method B reads. See the [lifetime and disposal table](../features/dependency-injection.md#lifetime-and-disposal-semantics) for the full matrix.
+- **`AddDbContext` and `UseScopedDependencyInjection`**: This combination provides each benchmark method with a fresh `DbContext`. With the default `PerMethod` lifetime, one method cannot warm the entity cache for another. For a full overview, see the [lifetime and disposal table](../features/dependency-injection.md#lifetime-and-disposal-semantics).
 
-- **`[BenchmarkCase(...)]`** expands the method into one benchmark per case. The display name carries the parameter: `ListRecentOrders(limit=10)`, `ListRecentOrders(limit=100)`, `ListRecentOrders(limit=1_000)`. Significance is grouped by parameter set, so the `limit=100` benchmarks are compared against each other, not against `limit=1_000`. See [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
+- **`[BenchmarkCase(...)]`**: This attribute expands a single method into multiple benchmarks, one for each case. The display name includes the parameter, such as `ListRecentOrders(limit=10)`. The engine groups significance testing by parameter set, meaning benchmarks with `limit=100` are compared against each other rather than against benchmarks with `limit=1_000`. For more information, see [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
 
-- **`[BenchmarkCategory(...)]`** tags benchmarks for filtering. Run only the read path with `dotnet run -- --category Read`, or exclude writes with `dotnet run -- --exclude-category Write`. See [Categories](../features/categories.md).
+- **`[BenchmarkCategory(...)]`**: This attribute tags benchmarks for easier filtering. For example, you can run only the read path using `dotnet run -- --category Read`, or exclude writes using `dotnet run -- --exclude-category Write`. For more information, see [Categories](../features/categories.md).
 
 > [!WARNING] Shared state breaks statistical independence
-> If you pair `UseScopedDependencyInjection` with `[InstanceLifetime(InstanceLifetime.PerClass)]`, one instance and one `DbContext` would serve every `[Benchmark]` method in the class: the cache warms across methods, method B's timings become linked to method A running first, and the significance test's independence assumption is violated. The lifetime therefore resolves to `PerMethod` - a fresh instance and a fresh scope per method - and the results say so. Implement `IStateReset` to keep `PerClass`, or add `[SharedState]` if the carry-over is the thing you are measuring. The **NB0011 analyzer** reports the same combination at build time. See [State isolation](../features/state-isolation.md).
+> Pairing `UseScopedDependencyInjection` with `[InstanceLifetime(InstanceLifetime.PerClass)]` causes a single instance and `DbContext` to be shared by every `[Benchmark]` method in the class. This allows the cache to warm across methods, linking the timings of one method to another and violating the independence assumption of the significance test. To prevent this, the engine resolves the lifetime to `PerMethod` (a fresh instance and scope per method) and attaches a warning to the results. To maintain `PerClass` lifetime, implement `IStateReset` or add `[SharedState]` if the carry-over is the subject of your measurement. The **NB0011 analyzer** also reports this combination at build time. For more information, see [State isolation](../features/state-isolation.md).
 
-## Run it
+## Run the benchmark
 
-From the benchmark project directory:
+Execute the following commands from the benchmark project directory:
 
 ```bash
-# Everything
+# Run all benchmarks
 dotnet run -c Release
 
-# Just the read benchmarks, at the two larger sizes
+# Run only the read benchmarks for the two larger sizes
 dotnet run -c Release -- --category Read --filter "*limit=100*" --filter "*limit=1_000*"
 
-# Smoke test: run the body once, no warmup, no measurement
+# Perform a smoke test (runs the body once without warmup or measurement)
 dotnet run -c Release -- --dry-run
 dotnet run -c Release -- --iterations 1 --warmup 0
 
-# Publish JSON for the CI dashboard
+# Export results to JSON for a CI dashboard
 dotnet run -c Release -- --reporter json --output ./results
 ```
 
-The harness is **isolated by default**: each benchmark class runs in its own freshly spawned worker, so JIT, GC, and thread-pool state from one class cannot bias another. See [Isolated runs](../features/isolated-runs.md).
+The harness is **isolated by default**. Each benchmark class runs in its own freshly spawned worker process, ensuring that JIT, GC, and thread-pool state from one class cannot bias another. For more information, see [Isolated runs](../features/isolated-runs.md).
 
 ## Read the results
 
-The console reporter prints one comparison table per class, grouped by parameter set. The columns you care about:
+The console reporter prints one comparison table per class, grouped by parameter set. Pay attention to the following columns:
 
-- **Median** - the middle timing. Compare this across the parameter values to see scaling.
-- **Ratio** - speed relative to the baseline. `0.75x` = 25% faster; `2.0x` = twice as slow.
-- **Sig** - **✓** means the difference from the baseline is statistically real (p < 0.05); **✗** means the measurements are too noisy to tell.
-- **Magnitude** - how large the difference is (Negligible / Small / Medium / Large). A ✓ with a Negligible magnitude is real but too small to act on.
-- **Alloc/op** - mean heap allocation per operation. EF Core query materialization is allocation-heavy; this column is often the most actionable signal.
+- **Median**: The middle timing. Use this to observe scaling across parameter values.
+- **Ratio**: The speed relative to the baseline. A value of `0.75x` indicates the implementation is 25% faster, while `2.0x` indicates it is twice as slow.
+- **Sig**: A **✓** indicates the difference from the baseline is statistically significant (p < 0.05); an **✗** indicates the measurements are too noisy to determine a result.
+- **Magnitude**: The size of the difference (Negligible, Small, Medium, or Large). A **✓** with a Negligible magnitude is real but likely too small to be meaningful.
+- **Alloc/op**: The mean heap allocation per operation. Because EF Core query materialization is often allocation-heavy, this column provides an actionable signal for optimization.
 
-See [Reading Your Results](../getting-started/reading-your-results.md) for every column, indicator, and warning.
+For a full explanation of every column, indicator, and warning, see [Reading Your Results](../getting-started/reading-your-results.md).
 
-## When to go deeper
+## Next steps
 
-- [Harness mode: BenchmarkHarness](../usage-modes/harness-mode.md) - the full attribute reference (`[BenchmarkSetup]`, `[BenchmarkIterationSetup]`, `[IsolatedProcess]`, `[Runtimes]`, etc.).
-- [Dependency Injection](../features/dependency-injection.md) - scoped vs. root provider, multiple assemblies, non-Microsoft containers, the `WithInstanceFactory` escape hatch.
-- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - `[BenchmarkCases]` for generated or file-backed inputs, named-tuple display names.
-- [State isolation](../features/state-isolation.md) - `IStateReset` for `PerClass` classes that share state intentionally.
-- [Analyzers](../reference/analyzers.md) - the NB0001-NB0014 Roslyn diagnostics, including NB0011 (PerClass + scoped service).
-- [Performance gates in your test suite](./performance-gates.md) - if you want this comparison to fail a PR on regression instead of just printing a table.
+For more information, see the following pages:
+
+- [Harness mode: BenchmarkHarness](../usage-modes/harness-mode.md) - Full attribute reference, including `[BenchmarkSetup]`, `[BenchmarkIterationSetup]`, `[IsolatedProcess]`, and `[Runtimes]`.
+- [Dependency Injection](../features/dependency-injection.md) - Details on scoped vs. root providers, multiple assemblies, non-Microsoft containers, and the `WithInstanceFactory` method.
+- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - Using `[BenchmarkCases]` for generated or file-backed inputs.
+- [State isolation](../features/state-isolation.md) - Using `IStateReset` for classes that intentionally share state.
+- [Analyzers](../reference/analyzers.md) - The NB0001-NB0014 Roslyn diagnostics, including NB0011.
+- [Performance gates in your test suite](./performance-gates.md) - How to fail a pull request on regression instead of printing a table.

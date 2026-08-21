@@ -6,59 +6,59 @@ order: 5
 
 # Report Detail Levels
 
-NBenchmark supports three report detail levels that control how much statistical information reporters display. **Simple** is the default; **Standard** adds the full multi-section output; **Advanced** adds a per-benchmark stats block with the full distribution summary.
+NBenchmark supports three report detail levels that control how much statistical information reporters display. **Simple** is the default; **Standard** adds full multi-section output; and **Advanced** adds a per-benchmark stats block with a full distribution summary.
 
 ## Simple mode (default)
 
-Simple mode shows a compact table with the essential information an average developer needs to know whether their code performs well or how it compares to other implementations:
+Simple mode shows a compact table with the essential information you need to determine if your code performs well or how it compares to other implementations:
 
 | Column | Description |
 | --- | --- |
-| **Benchmark** | Benchmark name. |
-| **Median** | Median timing. |
+| **Benchmark** | The benchmark name. |
+| **Median** | The median timing. |
 | **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). |
-| **Ratio** | Visual bar plus ratio relative to the baseline. |
-| **Sig** | ✓ = significant, ✗ = not significant, - = not applicable. |
-| **Alloc/op** | Mean bytes allocated per iteration, or - if not measured. |
+| **Ratio** | A visual bar and ratio relative to the baseline. |
+| **Sig** | `✓` = significant, `✗` = not significant, `-` = not applicable. |
+| **Alloc/op** | Mean bytes allocated per iteration, or `-` if not measured. |
 
-A one-line footer shows the benchmark count, total duration, and confidence level. No statistical jargon, no auxiliary tables.
+A one-line footer shows the benchmark count, total duration, and confidence level. This mode avoids statistical jargon and auxiliary tables.
 
 ## Standard mode
 
-Standard mode shows the same comparison table with additional columns (Mean, Mag, Description) plus several auxiliary sections:
+Standard mode shows the comparison table with additional columns (Mean, Mag, Description) and several auxiliary sections:
 
-- **Precision & Tail Latency** table: Error (±CI), StdDev, CV, and upper-tail percentiles (P95, P99, etc.).
-- **Diagnostics** table (when diagnostics are enabled): GC Gen0/Gen1/Gen2 collection counts, heap info, CPU/wall ratio, and exceptions per op. See [Diagnostics](../statistics/diagnostics.md).
-- **Launch Aggregation** table (when `LaunchCount > 1`): cross-launch mean, stddev, median, and CI.
-- **Interpretation** block: omnibus verdict, significance test name, outlier detector, effect metric summary, and measurement profile.
-- **Auto-tune summary** lines: resolved warmup, sample count, ops-per-sample, and achieved CI half-width.
-- **Warnings** (when present).
+- **Precision & Tail Latency table**: Displays Error (±CI), StdDev, CV, and upper-tail percentiles (such as P95, P99, etc.).
+- **Diagnostics table**: Displays GC Gen0/Gen1/Gen2 collection counts, heap info, CPU/wall ratio, and exceptions per op when diagnostics are enabled. For more information, see [Diagnostics](../statistics/diagnostics.md).
+- **Launch Aggregation table**: Displays cross-launch mean, stddev, median, and CI when `LaunchCount > 1`.
+- **Interpretation block**: Includes the omnibus verdict, significance test name, outlier detector, effect metric summary, and measurement profile.
+- **Auto-tune summary lines**: Displays resolved warmup, sample count, ops-per-sample, and achieved CI half-width.
+- **Warnings**: Displays warnings when present.
 
-This is the level for practitioners who want to understand variability and the statistical rigour behind the results.
+Use this level if you need to understand variability and the statistical rigour behind your results.
 
 ## Advanced mode
 
-Advanced mode shows everything in Standard **plus** a per-benchmark stats block. The console reporter prints each stats block below its row; the Markdown reporter emits a dedicated details section after the table. The stats block includes:
+Advanced mode shows everything in Standard mode plus a per-benchmark stats block. The `ConsoleReporter` prints each stats block below its row, while the `MarkdownReporter` emits a dedicated details section after the table. The stats block includes:
 
-- **Outliers:** count of removed samples and the trimming method.
-- **Range:** Min to Max spread.
-- **Quartiles:** Q1, Q3, and IQR.
-- **Fences:** Lower and upper fences (only for `IqrFence` mode).
-- **Iterations:** pre-trim and post-trim sample counts and warmup count.
-- **Confidence interval:** full CI bounds and margin percent of mean.
-- **CV:** coefficient of variation as a percentage.
-- **Skewness and Kurtosis:** shape of the distribution.
-- **MAD:** median absolute deviation (scaled).
-- **Percentiles:** the full set of configured percentile values (e.g. P50, P95, P99, P99.9, Max).
-- **N:** post-trim sample count.
-- **Allocation breakdown** (when `MeasureAllocations = true`): median, P95, and max allocation per iteration.
-- **Diagnostics breakdown** (when diagnostics are enabled): GC collection counts, heap committed and fragmented bytes, CPU time and CPU/wall ratio, and exceptions per operation.
+- **Outliers**: The count of removed samples and the trimming method.
+- **Range**: The Min to Max spread.
+- **Quartiles**: Q1, Q3, and IQR.
+- **Fences**: Lower and upper fences (only for `IqrFence` mode).
+- **Iterations**: Pre-trim and post-trim sample counts and the warmup count.
+- **Confidence interval**: Full CI bounds and the margin percent of the mean.
+- **CV**: The coefficient of variation as a percentage.
+- **Skewness and Kurtosis**: The shape of the distribution.
+- **MAD**: The scaled median absolute deviation.
+- **Percentiles**: The full set of configured percentile values (such as P50, P95, P99, P99.9, and Max).
+- **N**: The post-trim sample count.
+- **Allocation breakdown**: Median, P95, and max allocation per iteration when `MeasureAllocations = true`.
+- **Diagnostics breakdown**: GC collection counts, heap committed and fragmented bytes, CPU time, CPU/wall ratio, and exceptions per operation when diagnostics are enabled.
 
 ## Setting the detail level
 
-### `WithDetail()` (Harness and Suite modes)
+### Using `WithDetail()` (Harness and Suite modes)
 
-Both `BenchmarkHarness` and `BenchmarkSuite` expose a `WithDetail(ReportDetail)` method. The detail level is stamped onto all registered reporters, so calling `WithDetail` before or after `WithReporter` works in either order.
+Both `BenchmarkHarness` and `BenchmarkSuite` expose a `WithDetail(ReportDetail)` method. This detail level is applied to all registered reporters. You can call `WithDetail` either before or after `WithReporter`.
 
 ```csharp
 // Harness mode
@@ -74,7 +74,9 @@ suite.WithDetail(ReportDetail.Standard)
      .RunAsync();
 ```
 
-### `--detail` flag (Harness mode)
+### Using the `--detail` flag (Harness mode)
+
+You can set the detail level from the CLI:
 
 ```bash
 dotnet run -- --detail advanced
@@ -84,36 +86,35 @@ dotnet run -- --detail simple
 
 | Value | Behavior |
 | --- | --- |
-| `simple` | Compact table with the essential statistics. **(default)** |
-| `standard` | Full comparison table plus Precision & Tail Latency, auto-tune, and Interpretation sections. |
-| `advanced` | Same as standard plus a per-benchmark stats block with quartiles, fences, confidence interval, skewness, kurtosis, MAD, configured percentiles, and allocation breakdown. |
+| `simple` | Displays a compact table with essential statistics. **(default)** |
+| `standard` | Displays the full comparison table plus Precision & Tail Latency, auto-tune, and Interpretation sections. |
+| `advanced` | Displays everything in standard mode plus a per-benchmark stats block including quartiles, fences, confidence interval, skewness, kurtosis, MAD, configured percentiles, and allocation breakdown. |
 
-The `--detail` flag affects all registered reporters. JSON always emits the full record regardless of detail level.
+The `--detail` flag affects all registered reporters. Note that JSON always emits the full record regardless of the detail level.
 
-### Single mode
+### Using Single mode
 
-Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) has no `WithDetail()` - there is no builder to
-call it on. Pass the level to `Print` instead:
+Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) does not have a builder to call `WithDetail` on. Instead, pass the level directly to the `Print` method:
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
 
 result.Print();                            // Simple (default) - Median and Ops/s
-result.Print(ReportDetail.Standard);       // adds Mean, percentiles, StdDev, Error, CI
-result.Print(ReportDetail.Advanced);       // adds quartiles, fences, shape, allocation breakdown
+result.Print(ReportDetail.Standard);       // Adds Mean, percentiles, StdDev, Error, and CI
+result.Print(ReportDetail.Advanced);       // Adds quartiles, fences, shape, and allocation breakdown
 ```
 
 ## Reporter behavior
 
 | Reporter | Simple | Standard | Advanced |
 | --- | --- | --- | --- |
-| **Console** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation + auto-tune | Standard + per-benchmark stats block (incl. diagnostics breakdown) |
-| **Markdown** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation | Standard + dedicated details section (incl. diagnostics breakdown) |
-| **CSV** | 17 core columns (incl. GC counts) | 33 core columns (incl. GC counts) | 68 columns including quartiles, fences, shape stats, and full diagnostics |
+| **Console** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation + auto-tune | Standard + per-benchmark stats block (including diagnostics breakdown) |
+| **Markdown** | 6-column table + counts footer | Full table + Precision & Tail Latency + Diagnostics + Interpretation | Standard + dedicated details section (including diagnostics breakdown) |
+| **CSV** | 19 core columns (including GC counts) | 35 core columns (including GC counts) | 70 columns including quartiles, fences, shape stats, and full diagnostics |
 | **JSON** | Full record (always) | Full record (always) | Full record (always) |
 
 ## See also
 
-- [Reporters](./index.md) - available reporters and how to attach them
-- [CLI Reference: `--detail`](../reference/cli.md#--detail-level) - full flag documentation
-- [Descriptive Statistics](../statistics/descriptive.md) - what each field measures
+- [Reporters](./index.md) - Available reporters and how to attach them.
+- [CLI Reference: `--detail`](../reference/cli.md#output) - Full flag documentation.
+- [Descriptive Statistics](../statistics/descriptive.md) - Information on what each field measures.

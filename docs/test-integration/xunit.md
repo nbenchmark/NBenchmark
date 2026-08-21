@@ -6,7 +6,7 @@ order: 1
 
 # xUnit integration
 
-`NBenchmark.Integration.xUnit` lets you enforce performance thresholds on xUnit tests. Replace `[Fact]` with `[PerformanceFact]` or `[Theory]` with `[PerformanceTheory]` and set threshold properties as named arguments. If any threshold is exceeded the test fails.
+`NBenchmark.Integration.xUnit` allows you to enforce performance thresholds on xUnit tests. To use it, replace `[Fact]` with `[PerformanceFact]` or `[Theory]` with `[PerformanceTheory]` and set threshold properties as named arguments. If any threshold is exceeded, the test fails.
 
 ## Installation
 
@@ -14,7 +14,7 @@ order: 1
 dotnet add package NBenchmark.Integration.xUnit
 ```
 
-This automatically pulls in `NBenchmark` and `NBenchmark.Integration.Abstractions`.
+This command automatically installs `NBenchmark` and `NBenchmark.Integration.Abstractions`.
 
 ## Quick start
 
@@ -31,11 +31,11 @@ public class SerializationTests
 }
 ```
 
-`PerformanceFact` discovers this test through xUnit's extensibility API. The method body is run as a benchmark (warmup + measured iterations) and the measured mean is compared to `MaxMeanNs`. If the mean exceeds 500 µs the test fails.
+`PerformanceFact` discovers this test through the xUnit extensibility API. NBenchmark runs the method body as a benchmark (including warmup and measured iterations) and compares the measured mean to `MaxMeanNs`. If the mean exceeds 500 $\mu$s, the test fails.
 
 ## [PerformanceFact]
 
-`PerformanceFact` extends `FactAttribute`. Every `[Fact]` property (`DisplayName`, `Skip`, etc.) continues to work. Add any threshold properties as named arguments.
+`PerformanceFact` extends `FactAttribute`. All standard `[Fact]` properties - such as `DisplayName` and `Skip` - continue to work. You can add any threshold properties as named arguments.
 
 ```csharp
 [PerformanceFact(
@@ -52,6 +52,8 @@ public void ProcessMessage()
 
 ### Async tests
 
+`PerformanceFact` supports both `Task` and `ValueTask` return types:
+
 ```csharp
 [PerformanceFact(MaxMeanNs = 2_000_000)]
 public async Task FetchFromCache_Is_Fast_Enough()
@@ -60,11 +62,9 @@ public async Task FetchFromCache_Is_Fast_Enough()
 }
 ```
 
-Both `Task` and `ValueTask` return types are supported.
-
 ## [PerformanceTheory]
 
-`PerformanceTheory` extends `TheoryAttribute`. Use it together with any standard xUnit data source (`[InlineData]`, `[MemberData]`, `[ClassData]`). The benchmark runs once per data row and each row is reported as a separate test case.
+`PerformanceTheory` extends `TheoryAttribute`. Use it with any standard xUnit data source, such as `[InlineData]`, `[MemberData]`, or `[ClassData]`. NBenchmark runs the benchmark once per data row and reports each row as a separate test case.
 
 ```csharp
 [PerformanceTheory(MaxMeanNs = 1_000_000)]
@@ -79,13 +79,13 @@ public void Sort_Scales_Reasonably(int size)
 ```
 
 > [!NOTE]
-> Thresholds apply to every data row. If you need different limits per row, split the test into separate `[PerformanceFact]` methods.
+> Thresholds apply to every data row. If you require different limits per row, split the test into separate `[PerformanceFact]` methods.
 >
-> `LaunchCount` is also spent per data row: a theory with eight rows and `LaunchCount = 3` launches twenty-four workers.
+> `LaunchCount` is also spent per data row. For example, a theory with eight rows and `LaunchCount = 3` launches 24 workers.
 
 ## Threshold properties
 
-See the [thresholds reference](./index.md#thresholds-reference) for the complete list. All properties are `init`-only.
+For a complete list, see the [thresholds reference](./index.md#thresholds-reference). All properties are `init`-only.
 
 ```csharp
 [PerformanceFact(
@@ -106,7 +106,7 @@ private static void ReferenceImpl() { /* ... */ }
 
 ## Failure output
 
-When a threshold is violated the test fails with a `PerformanceAssertException`. The message lists every violated threshold:
+When a threshold is violated, the test fails with a `PerformanceAssertException`. The error message lists every violated threshold:
 
 ```text
 Performance thresholds exceeded for 'CriticalPath':
@@ -116,7 +116,7 @@ Performance thresholds exceeded for 'CriticalPath':
 
 ## Inline assertions from a plain [Fact]
 
-If you need to benchmark only part of a test and you want to stay within a regular `[Fact]`, use `Benchmark.Run` from the core package and inspect the result:
+To benchmark only a part of a test while remaining within a regular `[Fact]`, use `Benchmark.Run` from the core package and inspect the result:
 
 ```csharp
 using NBenchmark;
@@ -139,4 +139,4 @@ public void Critical_Section_Is_Fast()
 }
 ```
 
-`BenchmarkAssert.Validate` is in `NBenchmark.Integration.Abstractions`, which is already a transitive dependency of `NBenchmark.Integration.xUnit`.
+`BenchmarkAssert.Validate` is provided by `NBenchmark.Integration.Abstractions`, which is a transitive dependency of `NBenchmark.Integration.xUnit`.

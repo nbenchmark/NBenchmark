@@ -8,11 +8,18 @@ order: 2
 
 ## Scenario
 
-You run your benchmark suite on a shared CI runner. Other builds steal CPU cycles, the disk thrashes, and memory is contested. Your local numbers look clean, but CI reports a different median every run - sometimes 30% apart - and the significance column flips between ✓ and ✗ across commits that didn't touch the code under test. You want to (a) reduce the noise at the source, (b) get an honest signal when you can't, and (c) fail the build only when a regression is real.
+When you run your benchmark suite on a shared CI runner, other builds may steal CPU cycles, the disk may thrash, and memory can be contested. This often leads to inconsistent results: your local numbers are clean, but the CI environment reports different medians for each run - sometimes varying by as much as 30%. Consequently, the significance column may flip between **✓** and **✗** across commits that did not modify the code under test.
 
-The mental model is a measurement in a noisy room: you can shut the doors and turn off the AC (environment control), put the scale under a glass dome (process isolation), or accept that the room is noisy and weigh the grain many times to estimate the spread (launch count). What you cannot do is weigh a single grain once during a hurricane and trust the number.
+To resolve this, you need to:
+1. Reduce noise at the source.
+2. Obtain an honest signal when noise is unavoidable.
+3. Fail the build only when a regression is statistically real.
+
+Think of this as measuring an object in a noisy room. You can shut the doors and turn off the air conditioning (environment control), place the scale under a glass dome (process isolation), or accept the noise and weigh the object many times to estimate the spread (launch count). You cannot trust a single measurement taken during a hurricane.
 
 ## Complete example
+
+The following `BenchmarkHarness` configuration reduces noise and enforces a performance gate:
 
 ```csharp
 await BenchmarkHarness.Create(args)
@@ -24,8 +31,9 @@ await BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
+Use the following CLI invocation for a full CI run:
+
 ```bash
-# The full CI invocation
 dotnet run -c Release -- \
   --cpu-affinity 2,3 \
   --priority high \
@@ -37,31 +45,33 @@ dotnet run -c Release -- \
 
 ## What's happening
 
-- **Isolated runs** (Harness mode default). Each discovered class runs in its own freshly spawned worker, so JIT, GC, and thread-pool state from one class cannot bias another. You don't configure anything - `BenchmarkHarness.Create(args)...RunAsync()` already isolates per class. For a single benchmark that needs its own clean room, add `[IsolatedProcess]` to that method. See [Isolated runs](../features/isolated-runs.md).
+- **Isolated runs**: By default, harness mode runs each discovered class in its own freshly spawned worker process. This ensures that JIT, GC, and thread-pool state from one class cannot bias another. If a specific benchmark requires its own clean environment, add the `[IsolatedProcess]` attribute to that method. For more information, see [Isolated runs](../features/isolated-runs.md).
 
-- **CPU affinity** (`--cpu-affinity 2,3`). Pins the benchmark process to specific cores so the OS scheduler cannot migrate the thread to a cold-cache core mid-measurement. Choose cores away from core 0 (OS driver interrupt handling). Propagates to isolated workers automatically.
+- **CPU affinity** (`--cpu-affinity 2,3`): This pins the benchmark process to specific cores, preventing the OS scheduler from migrating the thread to a cold-cache core mid-measurement. It is recommended to choose cores other than core 0, as that core typically handles OS driver interrupts. This setting propagates to isolated workers automatically.
 
-- **Process priority** (`--priority high`). Reduces preemption by unrelated OS work. A refused elevation (common on locked-down runners) is a warning, not an error - the run proceeds at whatever priority the host allows. Restored when the run completes.
+- **Process priority** (`--priority high`): This reduces preemption by unrelated OS tasks. If the runner denies the priority elevation (which is common on locked-down runners), the engine issues a warning, but the run proceeds at the priority allowed by the host. The priority is restored once the run completes.
 
-- **Dedicated-host guidance** (`--dedicated-host-guidance`). A non-fatal pre-run probe that warns when the host looks noisy (low core count, unraisable priority, macOS thermal/frequency scaling). Guidance, not a gate - the run still proceeds. See [Environment control](../features/environment-control.md).
+- **Dedicated-host guidance** (`--dedicated-host-guidance`): This is a non-fatal pre-run probe that warns you if the host appears noisy (e.g., low core count, unraisable priority, or macOS thermal/frequency scaling). It provides guidance rather than acting as a gate. For more information, see [Environment control](../features/environment-control.md).
 
-- **Launch count** (`--launch-count 5`). Runs each benchmark 5 times as independent launches and reports cross-launch aggregation. On a contested host the per-launch medians will disagree, and that disagreement **is the honest signal**: it tells you the noise is real, not hidden behind a single lucky launch. The reported number is the average across launches and the reported interval is the spread between them; significance reads the samples pooled across all of them. See [Multiple launches](../features/multiple-launches.md).
+- **Launch count** (`--launch-count 5`): The engine runs each benchmark five times as independent launches and reports the cross-launch aggregation. On a contested host, per-launch medians will likely disagree. This disagreement is the "honest signal" that indicates noise is present. The reported number is the average across launches, the interval represents the spread between them, and significance is computed using samples pooled from all launches. For more information, see [Multiple launches](../features/multiple-launches.md).
 
-- **Threshold gate** (`--threshold-pct 10`). After all results are collected, the harness compares each non-baseline result's median against the baseline. If any exceeds `baseline * (1 + 10/100)`, the harness sets `Environment.ExitCode = 1` and prints the regressed names to stderr. In multi-runtime mode the check is grouped within each runtime. See the [CLI reference](../reference/cli.md).
+- **Threshold gate** (`--threshold-pct 10`): After collecting all results, the harness compares the median of each non-baseline result against the baseline. If any result exceeds `baseline * (1 + 10/100)`, the harness sets `Environment.ExitCode = 1` and prints the names of the regressed benchmarks to stderr. In multi-runtime mode, the check is grouped within each runtime. For more information, see the [CLI reference](../reference/cli.md).
 
-> [!IMPORTANT] Order matters
-> Isolation and environment control reduce noise at the source. The threshold gate then decides on the cleaned numbers. If you add `--threshold-pct` without any noise reduction, expect false positives on a shared runner - the gate fires on noise, not regressions. Always pair the gate with at least one of: isolation, environment control, or `--launch-count` so the gate has something honest to decide on.
+> [!IMPORTANT] Order of operations
+> Isolation and environment control reduce noise at the source, and the threshold gate then decides based on those cleaned numbers. If you use `--threshold-pct` without noise reduction, you may encounter false positives on shared runners because the gate will fire on noise rather than actual regressions. Always pair the gate with isolation, environment control, or `--launch-count`.
 
-## Run it
+## Run the benchmark
 
-Locally, on a quiet dev machine:
+### Local development
+On a quiet development machine, use these flags for faster iteration:
 
 ```bash
-# Sanity check - fast, in-process, no gate
+# Sanity check: fast, in-process, no gate
 dotnet run -c Release -- --in-process --auto-tune quick
 ```
 
-On the CI runner, with the full noise-reduction stack:
+### CI runner
+On a CI runner, use the full noise-reduction stack:
 
 ```bash
 dotnet run -c Release -- \
@@ -71,21 +81,21 @@ dotnet run -c Release -- \
   --reporter json --output ./benchmark-results
 ```
 
-`--in-process` is for local iteration speed; never use it for a CI gate. `--auto-tune quick` shortens the run for development but loosens the CI target - leave it off in CI.
+Use `--in-process` only for local speed; never use it for a CI gate. Similarly, avoid `--auto-tune quick` in CI, as it shortens the run but loosens the target.
 
 ## Read the results
 
-On a noisy runner, look at three things:
+When using a noisy runner, monitor these three indicators:
 
-1. **The auto-tune line** (Advanced detail). If `jitter` is above 0.10, the host is contested - the loop auto-switched the outlier detector from IQR fence to MAD. That's expected on a shared runner; the warning is informational.
-2. **The launch aggregation table** (when `--launch-count > 1`). If the per-launch medians span a wide range, the variance is the finding. A single launch would have reported one of those medians with a tight error bar and looked authoritative.
-3. **The threshold check**. If the run exits non-zero, the stderr output names the regressed benchmarks. If it exits zero, no benchmark regressed beyond 10% against its baseline.
+1. **The auto-tune line (Advanced detail)**: If `jitter` is above 0.10, the host is contested. In this case, the engine automatically switches the outlier detector from an IQR fence to MAD. This is expected on shared runners.
+2. **The launch aggregation table (when `--launch-count > 1`)**: If per-launch medians span a wide range, this variance is the primary finding. A single launch would have reported one of those medians with a tight error bar, which would be misleading.
+3. **The threshold check**: If the process exits with a non-zero code, stderr will list the regressed benchmarks. If it exits with zero, no benchmark regressed beyond the 10% threshold.
 
-A tight Error column next to a `maxCeiling` stop on a shared runner is **not** evidence the measurement converged. The CI-width stop rule ran on the raw stream; the Error is computed on the trimmed set. Read the `autoTune.sampleStop` field before the margin. See [Raw vs. trimmed statistics](../statistics/measurement.md#raw-vs-trimmed-statistics) and the [Troubleshooting guide](../troubleshooting.md).
+A tight error column next to a `maxCeiling` stop on a shared runner does not necessarily mean the measurement converged. The CI-width stop rule runs on the raw stream, while the error is computed on the trimmed set. Check the `autoTune.sampleStop` field before trusting the margin. For more information, see [Raw vs. trimmed statistics](../statistics/measurement.md#raw-vs-trimmed-statistics) and the [Troubleshooting guide](../troubleshooting.md).
 
 ## GitHub Actions snippet
 
-A minimal job that runs the benchmarks on a quiet runner and fails the build on regression:
+The following minimal job runs benchmarks on a quiet runner and fails the build upon regression:
 
 ```yaml
 name: Benchmarks
@@ -111,13 +121,15 @@ jobs:
 ```
 
 > [!TIP]
-> GitHub-hosted runners are shared-tenant VMs. `--dedicated-host-guidance` will warn about low effective isolation; that's expected. For a publication-grade gate, run on a self-hosted runner with `--cpu-affinity` on dedicated cores. The `MaxAbsoluteThresholdTolerance` knob on the [test-integration packages](../test-integration/index.md) is the equivalent escape hatch when you embed thresholds in your unit tests instead of using `--threshold-pct`.
+> GitHub-hosted runners are shared-tenant VMs. You should expect `--dedicated-host-guidance` to warn about low effective isolation. For a publication-grade gate, use a self-hosted runner with `--cpu-affinity` on dedicated cores. If you prefer to embed thresholds in your unit tests instead of using `--threshold-pct`, use the `MaxAbsoluteThresholdTolerance` setting in the [test-integration packages](../test-integration/index.md).
 
-## When to go deeper
+## Next steps
 
-- [Environment control](../features/environment-control.md) - the full model for CPU affinity, process priority, dedicated-host guidance, and how they propagate to isolated workers.
-- [Isolated runs](../features/isolated-runs.md) - per-class vs. per-benchmark isolation, `[InProcess]` opt-out, the worker dispatch model.
-- [Multiple launches](../features/multiple-launches.md) - cross-launch aggregation, the `[Benchmark(LaunchCount = n)]` per-method attribute, and how launch count interacts with isolation.
-- [Configuration: AutoTune](../reference/configuration.md#autotune) - the `Quick` / `Default` / `Thorough` presets and when to use each.
-- [Performance gates in your test suite](./performance-gates.md) - the in-test alternative to `--threshold-pct`, for projects that already run a unit test suite in CI.
-- [Troubleshooting](../troubleshooting.md) - the symptom-to-fix index for noisy CI environments.
+For more information, see the following pages:
+
+- [Environment control](../features/environment-control.md) - Detailed information on CPU affinity, process priority, and dedicated-host guidance.
+- [Isolated runs](../features/isolated-runs.md) - Per-class vs. per-benchmark isolation and the worker dispatch model.
+- [Multiple launches](../features/multiple-launches.md) - Cross-launch aggregation and the `[Benchmark(LaunchCount = n)]` attribute.
+- [Configuration: AutoTune](../reference/configuration.md#autotune) - When to use the `Quick`, `Default`, or `Thorough` presets.
+- [Performance gates in your test suite](./performance-gates.md) - An alternative to `--threshold-pct` for projects that already run a unit test suite in CI.
+- [Troubleshooting](../troubleshooting.md) - A symptom-to-fix index for noisy CI environments.

@@ -8,7 +8,7 @@ order: 3
 
 Parameterized benchmarks run the same method body across multiple input values, producing one benchmark entry per parameter combination. This is useful for comparing algorithms at different scales, testing multiple configurations, or sweeping a parameter space.
 
-In Suite mode, parameterized benchmarks use `WithParameter` plus a typed `Add` lambda.
+In Suite mode, parameterized benchmarks use `WithParameter` along with a typed `Add` lambda.
 
 ## `WithParameter`
 
@@ -84,7 +84,7 @@ suite.Add("db", (int poolSize) => QueryDb(poolSize),
 
 ## Mixed parameterized and non-parameterized benchmarks
 
-A suite can contain both plain `Add` calls and parameterized `Add` calls. Plain benchmarks run once; parameterized benchmarks expand per parameter combination. All benchmarks share the same `MeasurementOptions`:
+A suite can contain both plain `Add` calls and parameterized `Add` calls. Plain benchmarks run once, while parameterized benchmarks expand per parameter combination. All benchmarks share the same `MeasurementOptions`:
 
 ```csharp
 var results = await new BenchmarkSuite("mixed")
@@ -110,11 +110,11 @@ suite.WithParameter("mode", FileMode.Read, FileMode.Write);
 suite.WithParameter("count", 1, 10, 100);
 ```
 
-The following types are supported: `bool`, `byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, `decimal`, `char`, `string`, and any `enum`. Passing an unsupported type (e.g. a custom class) throws `ArgumentException`.
+The engine supports the following types: `bool`, `byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, `decimal`, `char`, `string`, and any `enum`. Passing an unsupported type (such as a custom class) throws an `ArgumentException`.
 
 ## Baselines with parameters
 
-`WithBaseline` uses the **original** benchmark name (before expansion), and the baseline flag applies to every expanded variant:
+`WithBaseline` uses the original benchmark name (before expansion), and the baseline flag applies to every expanded variant:
 
 ```csharp
 var results = await new BenchmarkSuite("search")
@@ -132,7 +132,7 @@ var results = await new BenchmarkSuite("search")
 
 Significance testing groups results by parameter set. Each group is compared independently, so results for `size=10` are only compared against other `size=10` benchmarks, not against `size=100` benchmarks. Non-parameterized benchmarks in the same suite form a single group.
 
-This means a parameterized suite with `N` parameter combinations and `M` benchmark methods produces `N` separate significance comparisons, each over `M` benchmarks - rather than one flat comparison over `N * M` results.
+This means a parameterized suite with `N` parameter combinations and `M` benchmark methods produces `N` separate significance comparisons, each over `M` benchmarks, rather than one flat comparison over `N * M` results.
 
 ## Categories with parameters
 
@@ -149,11 +149,11 @@ var results = await new BenchmarkSuite("search")
 // Only runs "binary(size=10)" and "binary(size=100)"
 ```
 
-Categories on parameterized benchmarks work identically to categories on non-parameterized benchmarks. See [Categories](./categories.md) for the full filtering model.
+Categories on parameterized benchmarks work identically to categories on non-parameterized benchmarks. For more information, see [Categories](./categories.md).
 
 ## Unique names after expansion
 
-Each expanded name must be unique. Duplicate parameter values produce duplicate names and throw `ArgumentException` at run time:
+Each expanded name must be unique. Duplicate parameter values produce duplicate names and throw an `ArgumentException` at run time:
 
 ```csharp
 // This throws ArgumentException: "sort(size=10)" appears twice
@@ -163,7 +163,7 @@ suite.WithParameter("size", 10, 10)
 
 ## Run order with parameters
 
-When `RunOrder.Random` is used with parameterized benchmarks, the suite shuffles benchmarks **within each parameter group** while keeping groups together. This ensures that results for the same parameter set stay comparable. Non-parameterized benchmarks are shuffled independently by `SuiteRunner` as usual. `RunOrder.Declaration` preserves the expansion order.
+When `RunOrder.Random` is used with parameterized benchmarks, the suite shuffles benchmarks **within each parameter group** while keeping groups together. This ensures that results for the same parameter set stay comparable. Non-parameterized benchmarks are shuffled independently by `SuiteRunner`. `RunOrder.Declaration` preserves the expansion order.
 
 ```csharp
 // Random order shuffles within each parameter group:
@@ -177,7 +177,7 @@ await new BenchmarkSuite("search")
 
 ## Process isolation
 
-Isolated runs always execute in declaration order, regardless of `WithRunOrder`. See [Isolated Runs](./isolated-runs.md) for the full model.
+Isolated runs always execute in declaration order, regardless of `WithRunOrder`. For more information, see [Isolated runs](./isolated-runs.md).
 
 ## Reading the report
 
@@ -193,7 +193,7 @@ binary    |  100 | 250.0 ns | 252.1 ns |  4,000,000 | ███████ base
 linear    |  100 | 300.0 ns | 305.7 ns |  3,333,333 | █████████ 1.20x   |  ✓  | large |    24 B
 ```
 
-Rows are grouped by parameter set in expansion order and sorted by median within each group. To leave room for the parameter columns, parametric tables use the compact labels `Ratio`, `Sig` and `Mag`. When a parameter group holds competing benchmarks, the baseline, ratio, significance (`Sig`) and effect magnitude are computed independently **per parameter group**, so every comparison stays within a single parameter combination.
+Rows are grouped by parameter set in expansion order and sorted by median within each group. To leave room for the parameter columns, parametric tables use the compact labels `Ratio`, `Sig`, and `Mag`. When a parameter group holds competing benchmarks, the baseline, ratio, significance (`Sig`), and effect magnitude are computed independently per parameter group.
 
 When a single method is swept across parameter values, every parameter group holds just one benchmark, so there is no within-group comparison. The table instead ranks every row against its fastest point: the `Ratio` column reports each point's scaling factor (the fastest point is the `baseline`), while `Sig` and `Mag` stay `-`, because the engine does not test different workloads against one another. This makes scaling trends easy to read:
 
@@ -208,7 +208,7 @@ LinearSearch |  1000 |  1.40 µs |  1.27 µs |    789,515 | ██████�
 
 In a mixed suite, a non-parameterized benchmark shows `-` in every parameter column; when no parameter group has a within-group comparison, it joins the table-wide ranking against the fastest row.
 
-CSV and JSON reporters keep one record per result, each carrying its full `ParameterSet`, for machine consumption.
+CSV and JSON reporters provide one record per result, each carrying its full `ParameterSet`.
 
 ## Accessing results
 
@@ -230,7 +230,9 @@ foreach (var r in results)
 
 ## See also
 
-- [Parameterized benchmarks: Harness mode](./parameterized-harness.md) - the `[BenchmarkCase]` / `[BenchmarkCases]` attribute API
-- [Suite mode](../usage-modes/suite-mode.md) - the full fluent API
-- [Categories](./categories.md) - tag and filter benchmarks
-- [Configuration](../reference/configuration.md) - all measurement options
+For more information, see the following pages:
+
+- [Parameterized benchmarks: Harness mode](./parameterized-harness.md) - The `[BenchmarkCase]` / `[BenchmarkCases]` attribute API.
+- [Suite mode](../usage-modes/suite-mode.md) - The full fluent API.
+- [Categories](./categories.md) - How to tag and filter benchmarks.
+- [Configuration](../reference/configuration.md) - All measurement options.

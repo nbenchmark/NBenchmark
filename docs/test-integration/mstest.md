@@ -6,10 +6,10 @@ order: 3
 
 # MSTest integration
 
-`NBenchmark.Integration.MSTest` lets you enforce performance thresholds on MSTest tests. There are two ways to use it:
+`NBenchmark.Integration.MSTest` allows you to enforce performance thresholds on MSTest tests. You can use it in two ways:
 
-- **`[PerformanceTestMethod]` attribute** - the entire test method is run as a benchmark.
-- **`PerformanceAssert`** - benchmark a specific piece of code inline from any test.
+- **`[PerformanceTestMethod]` attribute**: Runs the entire test method as a benchmark.
+- **`PerformanceAssert`**: Benchmarks a specific piece of code inline from any test.
 
 ## Installation
 
@@ -17,11 +17,11 @@ order: 3
 dotnet add package NBenchmark.Integration.MSTest
 ```
 
-This automatically pulls in `NBenchmark` and `NBenchmark.Integration.Abstractions`.
+This command automatically installs `NBenchmark` and `NBenchmark.Integration.Abstractions`.
 
 ## [PerformanceTestMethod]
 
-Add `[PerformanceTestMethod]` in place of `[TestMethod]`. The method body is run as a benchmark and the result is checked against the configured thresholds. If a threshold is exceeded the test fails.
+Add `[PerformanceTestMethod]` in place of `[TestMethod]`. NBenchmark runs the method body as a benchmark and checks the result against the configured thresholds. If a threshold is exceeded, the test fails.
 
 ```csharp
 using NBenchmark.Integration.MSTest;
@@ -40,6 +40,8 @@ public class SerializationTests
 
 ### Async tests
 
+`PerformanceTestMethod` supports both `Task` and `Task<T>` return types:
+
 ```csharp
 [PerformanceTestMethod(MaxMeanNs = 2_000_000)]
 public async Task FetchFromCache_Is_Fast_Enough()
@@ -47,8 +49,6 @@ public async Task FetchFromCache_Is_Fast_Enough()
     await _cache.GetAsync("key");
 }
 ```
-
-Both `Task` and `Task<T>` return types are supported.
 
 ### Data-driven tests
 
@@ -66,14 +66,14 @@ public void Sort_Scales_Reasonably(int size)
 }
 ```
 
-Each data row is benchmarked independently and reported as a separate test case.
+NBenchmark benchmarks each data row independently and reports it as a separate test case.
 
 > [!NOTE]
-> Thresholds apply to every data row. If you need different limits per row, split into separate methods or use `PerformanceAssert` (see below) for per-row control.
+> Thresholds apply to every data row. If you require different limits per row, split the test into separate methods or use `PerformanceAssert` for per-row control.
 
 ## Threshold properties
 
-See the [thresholds reference](./index.md#thresholds-reference) for the complete list. All properties are `init`-only.
+For a complete list, see the [thresholds reference](./index.md#thresholds-reference). All properties are `init`-only.
 
 ```csharp
 [PerformanceTestMethod(
@@ -94,9 +94,9 @@ private static void ReferenceImpl() { /* ... */ }
 
 ## PerformanceAssert
 
-Use `PerformanceAssert` when you want to benchmark a specific piece of code inside an existing test, rather than benchmarking the entire test method.
+Use `PerformanceAssert` to benchmark a specific piece of code inside an existing test rather than benchmarking the entire test method.
 
-### Synchronous
+### Synchronous benchmarks
 
 ```csharp
 [TestMethod]
@@ -109,12 +109,12 @@ public void Repository_Query_Is_Fast_Enough()
         new PerformanceAssertionOptions { MaxMeanNs = 2_000_000 },
         name: "GetRecentOrders");
 
-    // result is a BenchmarkResult - inspect it further if needed
+    // result is a BenchmarkResult; you can inspect it further if needed
     Assert.IsTrue(result.Mean < 3_000_000);
 }
 ```
 
-### Async
+### Async benchmarks
 
 ```csharp
 [TestMethod]
@@ -126,7 +126,7 @@ public async Task Cache_Lookup_Is_Fast_Enough()
 }
 ```
 
-### Validate an existing BenchmarkResult
+### Validating an existing BenchmarkResult
 
 If you already have a `BenchmarkResult` from `Benchmark.Run`, call `PerformanceAssert.Validate` to assert against it:
 
@@ -146,7 +146,7 @@ public void Manually_Measured_Code_Meets_Threshold()
 
 ### PerformanceAssertionOptions reference
 
-`PerformanceAssertionOptions` exposes the same properties as the `[PerformanceTestMethod]` attribute. All properties are optional; omitting them disables the corresponding check.
+`PerformanceAssertionOptions` exposes the same properties as the `[PerformanceTestMethod]` attribute. All properties are optional; omitting a property disables the corresponding check.
 
 ```csharp
 new PerformanceAssertionOptions
@@ -165,7 +165,7 @@ new PerformanceAssertionOptions
 
 ## Failure output
 
-When a threshold is violated the test fails with a `PerformanceAssertException` (which extends `AssertFailedException`). The message lists every violated threshold:
+When a threshold is violated, the test fails with a `PerformanceAssertException` (which extends `AssertFailedException`). The error message lists every violated threshold:
 
 ```text
 Performance thresholds exceeded for 'GetRecentOrders':

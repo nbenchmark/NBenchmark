@@ -34,7 +34,7 @@ var results = await new BenchmarkSuite("string-concat")
 
 ## Harness mode: `--runtimes` CLI flag
 
-Pass the runtimes on the command line. Both short (`net8`) and full (`net8.0`) forms are accepted:
+Pass the runtimes on the command line. The engine accepts both short (`net8`) and full (`net8.0`) forms:
 
 ```bash
 dotnet run -- --runtimes net8,net9,net10
@@ -42,11 +42,11 @@ dotnet run -- --runtimes net8.0,net10.0
 dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output ./results
 ```
 
-When `--runtimes` is specified, NBenchmark builds the project for each target framework via `dotnet build -f <tfm>`, measures the benchmarks in **that build's own worker process**, and aggregates the results. A worker is framework-dependent, so only the net8.0 worker can load a net8.0 build - the build targets already deploy the right one beside each build's assemblies, which makes worker selection a lookup rather than a guess.
+When you specify `--runtimes`, NBenchmark builds the project for each target framework via `dotnet build -f <tfm>`, measures the benchmarks in that build's own worker process, and aggregates the results. Because a worker is framework-dependent, only the net8.0 worker can load a net8.0 build. The build targets deploy the correct worker beside each build's assemblies, so worker selection is a simple lookup.
 
 ## Harness mode: `[Runtimes]` attribute
 
-Instead of passing `--runtimes` on the CLI, you can declare the runtimes on the benchmark class itself:
+Instead of using the `--runtimes` flag, you can declare the runtimes on the benchmark class:
 
 ```csharp
 using NBenchmark.Attributes;
@@ -60,13 +60,13 @@ public class StringBenchmarks
 ```
 
 ```bash
-# No --runtimes flag needed - the attribute drives the build
+# No --runtimes flag is needed; the attribute drives the build
 dotnet run --project samples/MultiRuntimeHarness
 ```
 
-### How `--runtimes` and `[Runtimes]` interact
+### Interaction between `--runtimes` and `[Runtimes]`
 
-When `--runtimes` is passed on the CLI, the CLI list wins and `[Runtimes]` is ignored. When multiple classes declare `[Runtimes]`, the host uses the union of all declared lists (preserving declaration order, deduplicating). A class filtered out by `--filter` does not contribute its runtimes.
+If you pass `--runtimes` on the CLI, the CLI list takes precedence and the `[Runtimes]` attribute is ignored. When multiple classes declare `[Runtimes]`, the engine uses the union of all declared lists (preserving declaration order and deduplicating). A class filtered out by `--filter` does not contribute its runtimes.
 
 | `--runtimes` flag | `[Runtimes]` attribute | Runtimes used |
 |-------------------|------------------------|---------------|
@@ -76,9 +76,9 @@ When `--runtimes` is passed on the CLI, the CLI list wins and `[Runtimes]` is ig
 
 ## How it works
 
-`WithRuntimes` and `--runtimes` always isolate: each runtime is measured in a freshly spawned worker, so JIT, GC and thread-pool state from one runtime cannot bias another. `--runtimes` overrides `--in-process`, because a comparison across runtimes measured in one process would not be a comparison across runtimes at all.
+`WithRuntimes` and `--runtimes` always isolate. Each runtime is measured in a freshly spawned worker, ensuring JIT, GC, and thread-pool state from one runtime doesn't bias another. The `--runtimes` flag overrides `--in-process`, as a comparison across runtimes measured in a single process would be invalid.
 
-In **Suite mode**, multi-runtime needs a `[BenchmarkPlan]` factory rather than an inline suite:
+In **Suite mode**, multi-runtime comparison requires a `[BenchmarkPlan]` factory instead of an inline suite:
 
 ```csharp
 await BenchmarkSuite.RunPlanAsync(BuildSuite);
@@ -90,20 +90,24 @@ static BenchmarkSuite BuildSuite() =>
         .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net10);
 ```
 
-Measuring another target framework means measuring a *different build* of your code, and a suite body is located by a build-specific address that changes when the code is recompiled. A factory is located by name, which is stable across builds, so each runtime's worker constructs the suite from that runtime's own assemblies. An inline suite with `WithRuntimes` says so rather than measuring the wrong thing. (For the addressing detail - how bodies are located across a process boundary, by build-specific token or by stable name - see [Isolation internals: by token, or by name](../deep-dives/isolation-internals.md#by-token-or-by-name).)
+Measuring another target framework means measuring a different build of your code. A suite body is located by a build-specific address that changes during recompilation. However, a factory is located by name, which remains stable across builds. Each runtime's worker constructs the suite from that runtime's own assemblies. An inline suite with `WithRuntimes` throws rather than measuring the wrong thing. For more information on how bodies are located across a process boundary, see [Isolation internals: token and name addressing](../deep-dives/isolation-internals.md#token-and-name-addressing).
 
-Harness mode needs no change: it already addresses benchmark classes by name.
+Harness mode requires no changes because it already addresses benchmark classes by name.
 
 The console and markdown reporters add a "Runtime" column when results span multiple runtimes. Significance testing is performed within each runtime (net8 results are compared against the net8 baseline, not the net10 one). The first runtime in the list is the implicit baseline for ratio calculations.
 
 ## Samples
 
-- [MultiRuntimeSuite sample](../samples.md#multiruntimesuite---suite-mode-multi-runtime) - Suite mode multi-runtime
-- [MultiRuntimeHarness sample](../samples.md#multiruntimeharness---harness-mode-multi-runtime) - Harness mode multi-runtime
+For complete working examples, see:
+
+- [MultiRuntimeSuite sample](../samples.md#suite-mode-multi-runtime-sample) - Suite mode multi-runtime.
+- [MultiRuntimeHarness sample](../samples.md#harness-mode-multi-runtime-sample) - Harness mode multi-runtime.
 
 ## See also
 
-- [Suite mode](../usage-modes/suite-mode.md) - the full fluent API
-- [Harness mode](../usage-modes/harness-mode.md) - attribute-based discovery and CLI
-- [Isolated runs](./isolated-runs.md) - the underlying process isolation model
-- [CLI reference](../reference/cli.md) - all `BenchmarkHarness` flags
+For more information, see the following pages:
+
+- [Suite mode](../usage-modes/suite-mode.md) - The full fluent API.
+- [Harness mode](../usage-modes/harness-mode.md) - Attribute-based discovery and CLI.
+- [Isolated runs](./isolated-runs.md) - The underlying process isolation model.
+- [CLI reference](../reference/cli.md) - All `BenchmarkHarness` flags.

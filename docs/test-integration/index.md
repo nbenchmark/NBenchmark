@@ -6,23 +6,23 @@ order: 7
 
 # Test integration
 
-NBenchmark's integration packages connect it to the rest of your toolchain. The current integrations focus on test frameworks, letting you enforce performance thresholds directly inside your existing test suite - no separate benchmark project or CI step required.
+NBenchmark's integration packages connect the engine to your existing toolchain. These integrations allow you to enforce performance thresholds directly inside your test suite, removing the need for a separate benchmark project or CI step.
 
 ## Test framework packages
 
 | Package | Framework |
-| --- | --- |
+|---|---|
 | `NBenchmark.Integration.xUnit` | xUnit v2 |
 | `NBenchmark.Integration.NUnit` | NUnit 3 / 4 |
 | `NBenchmark.Integration.MSTest` | MSTest v2 / v3 |
 
-Each package has **no opinion on your test runner** - it slots into whichever framework you already use. All three packages depend on `NBenchmark` (the core package) and on a shared `NBenchmark.Integration.Abstractions` package that is pulled in automatically.
+These packages are agnostic to your test runner and integrate with whichever framework you use. All three packages depend on `NBenchmark` (the core package) and a shared `NBenchmark.Integration.Abstractions` package, which is included automatically.
 
-## Two usage patterns
+## Usage patterns
 
 ### Attribute pattern
 
-Replace the test attribute on a test method. The entire method body becomes the benchmark. Thresholds are set as named arguments on the attribute.
+Replace the standard test attribute on a method to make the entire method body a benchmark. You set thresholds as named arguments on the attribute.
 
 ```csharp
 // xUnit
@@ -38,11 +38,11 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-If the measured mean exceeds `500_000 ns` (500 us), the test fails with a message describing the violation.
+If the measured mean exceeds 500,000 ns (500 $\mu$s), the test fails with a message describing the violation.
 
-### Assert pattern (NUnit and MSTest)
+### Assert pattern for NUnit and MSTest
 
-Call `PerformanceAssert.Run` from inside any test. The benchmark runs inline and violations fail the test immediately. This is useful when you want to measure just one part of a larger test.
+Call `PerformanceAssert.Run` from inside any test to run a benchmark inline. If a violation occurs, the test fails immediately. Use this pattern to measure a specific part of a larger test.
 
 ```csharp
 // NUnit
@@ -70,15 +70,17 @@ public void Repository_Query_Is_Fast_Enough()
 
 ## Relative regression checks
 
-Regression checks compare your benchmark against a reference point measured in the same run, so a fast developer machine and a slow CI runner produce a similar ratio. No stored files, no environment mismatch, no CI workflow setup.
+Regression checks compare your benchmark against a reference point measured during the same run. This ensures that a fast developer machine and a slow CI runner produce a similar ratio, eliminating the need for stored baseline files or complex CI workflows.
 
-Both sides are measured in worker processes when they can be, and the ratio gate is only enforced when they were - two measurements sharing a test host also share its JIT tiering state, which does not cancel between them. See [when a ratio gate is enforced](../guides/performance-gates.md#when-a-ratio-gate-is-enforced), `[AllowInProcessGate]`, and `RequireIsolation`.
+NBenchmark measures both sides in worker processes whenever possible. The ratio gate is only enforced when isolation is achieved; if two measurements share a test host, they also share the host's JIT tiering state, which prevents the ratio from being accurate. For more information, see [ratio gate enforcement](../guides/performance-gates.md#ratio-gate-enforcement), `[AllowInProcessGate]`, and `RequireIsolation`.
 
-### Calibration mode (zero config)
+### Calibration mode
 
-When you set `MaxSlowdownRatio` without `ReferenceMethod`, the test runs a built-in CPU-bound calibration benchmark alongside your method. The ratio between your method and the calibration is stable across hardware for CPU-bound work - both scale with machine speed. For allocation-heavy or I/O-bound benchmarks, the ratio to a CPU calibration loop is less stable across hardware; use `ReferenceMethod` to compare against a method with a similar resource profile, or use absolute thresholds with `MaxAbsoluteThresholdTolerance`.
+When you set `MaxSlowdownRatio` without specifying a `ReferenceMethod`, NBenchmark runs a built-in CPU-bound calibration benchmark alongside your method. For CPU-bound work, the ratio between your method and the calibration remains stable across different hardware because both scale with machine speed.
 
-The calibration is measured in the same place as the method it divides into. When your test runs in an isolated worker the worker measures the calibration too, so both sides of the ratio share a runtime configuration. When the worker cannot produce one, the gate falls back to a host-measured calibration and adds a note to the test output saying the ratio spans two configurations.
+For allocation-heavy or I/O-bound benchmarks, the ratio to a CPU calibration loop is less stable. In these cases, use a `ReferenceMethod` to compare against a method with a similar resource profile, or use absolute thresholds with `MaxAbsoluteThresholdTolerance`.
+
+NBenchmark measures the calibration in the same environment as the benchmark method. If your test runs in an isolated worker, the worker measures the calibration as well, ensuring both sides of the ratio share the same runtime configuration. If the worker cannot produce one, the gate falls back to a host-measured calibration and adds a note to the test output.
 
 ```csharp
 // xUnit
@@ -94,13 +96,13 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-The test fails when the slowdown is **both** real **and** practically meaningful (ratio exceeds `MaxSlowdownRatio`). What counts as "real" depends on whether the test asked for replicates - see [Replicates and the paired ratio](#replicates-and-the-paired-ratio). With the default single launch it is a Mann-Whitney U p-value below the significance level. A significant-but-small slowdown passes (noise); a large-but-noisy slowdown passes (not enough evidence).
+The test fails when the slowdown is both statistically significant and practically meaningful (i.e., the ratio exceeds `MaxSlowdownRatio`). Whether a result is "real" depends on whether the test uses replicates - see [replicates and the paired ratio](#replicates-and-the-paired-ratio). With the default single launch, NBenchmark uses a Mann-Whitney U p-value below the significance level. A significant but small slowdown passes as noise, and a large but noisy slowdown passes due to insufficient evidence.
 
-Failure output includes ratio and significance details (`ratio`, `p`, and Cliff's delta) when a slowdown breaches the gate. A practical tuning workflow is to start with a loose value (for example `MaxSlowdownRatio = 10.0`) and tighten it based on several runs in your CI environment.
+If a slowdown breaches the gate, the failure output includes ratio and significance details (`ratio`, `p`, and Cliff's delta). To tune this, start with a loose value (such as `MaxSlowdownRatio = 10.0`) and tighten it based on several runs in your CI environment.
 
-### ReferenceMethod mode (compare two implementations)
+### ReferenceMethod mode
 
-When you have two implementations to compare, point `ReferenceMethod` at the baseline implementation. The candidate must not exceed `MaxSlowdownRatio` relative to the reference; both are measured the same way, in matching worker processes when they isolate.
+To compare two implementations, set `ReferenceMethod` to the name of your baseline implementation. The candidate must not exceed `MaxSlowdownRatio` relative to the reference. NBenchmark measures both in matching worker processes when isolation is available.
 
 ```csharp
 // xUnit
@@ -110,17 +112,17 @@ public void OptimizedParse() => OptimizedParser.Parse(Payload);
 private static void NaiveParse() => NaiveParser.Parse(Payload);
 ```
 
-The reference method can be private. It runs with the same measurement options as the candidate (iterations, warmup, outlier mode, confidence level). This keeps the comparison apples-to-apples: if the candidate uses `Iterations = 300`, the reference also runs 300 iterations. Wall-clock cost for the test is therefore candidate + reference durations.
+The reference method can be private. It uses the same measurement options as the candidate (iterations, warmup, outlier mode, and confidence level) to ensure an apples-to-apples comparison. For example, if the candidate uses `Iterations = 300`, the reference also runs 300 iterations. The total wall-clock cost for the test is the combined duration of the candidate and the reference.
 
-**Both run in the same worker process.** The candidate and its reference are measured co-resident, one worker per replicate, so their ratio has that worker's core draw, thermal state and address-space layout divided out of it rather than left in the numerator and denominator independently. This is the same rule the engine applies to a comparison group, and it is why the pair is a single measurement request rather than two.
+The candidate and its reference are measured co-resident in one worker process per replicate. This ensures their ratio excludes the worker's core draw, thermal state, and address-space layout. This pairing is why the pair is handled as a single measurement request.
 
-`ReferenceMethod` is only available in the attribute pattern. The assert pattern (`PerformanceAssert.Run`) supports calibration mode only.
+`ReferenceMethod` is only available in the attribute pattern; the assert pattern (`PerformanceAssert.Run`) only supports calibration mode.
 
-See [Statistics: Significance Testing](../statistics/significance.md) for how the comparison is performed.
+For more information on how the comparison is performed, see [statistics: significance testing](../statistics/significance.md).
 
 ## Replicates and the paired ratio
 
-A ratio gate decides a build, so the question that matters is not "is this number above the threshold" but "would it still be tomorrow". A single measurement cannot answer it. `LaunchCount` is how you ask.
+Because a ratio gate can fail a build, you need to know if a result is reproducible rather than just whether it exceeds a threshold. You use the `LaunchCount` property to verify reproducibility.
 
 ```csharp
 [PerformanceFact(
@@ -130,59 +132,54 @@ A ratio gate decides a build, so the question that matters is not "is this numbe
 public void OptimizedParse() => OptimizedParser.Parse(Payload);
 ```
 
-That measures the pair in **three separate worker processes**. Each one produces its own candidate/reference ratio, and the three are combined on the log scale into a geometric mean with a confidence interval - the same estimator the engine's `Ratio CI` column uses. See [Ratios](../statistics/ratios.md).
+This configuration measures the pair in **three separate worker processes**. Each worker produces its own candidate/reference ratio, and NBenchmark combines them on a log scale into a geometric mean with a confidence interval - the same estimator used by the engine's `Ratio CI` column. For more details, see [ratios](../statistics/ratios.md).
 
-What changes when the interval exists:
+The following table shows how the gate changes when an interval exists:
 
-| | `LaunchCount = 1` (default) | `LaunchCount >= 2` |
-| --- | --- | --- |
-| ratio gated on | candidate mean / reference mean | geometric mean of the per-launch ratios |
-| "is the difference real?" | Mann-Whitney U on pooled samples | does the interval exclude `1.00x`? |
-| worker launches | 1 | one per replicate - the pair shares each |
-| test output | mean, P95, allocations, iterations | the above plus a `Launches:` line with the run-to-run spread |
+| Metric | `LaunchCount = 1` (default) | `LaunchCount >= 2` |
+|---|---|---|
+| Ratio gated on | Candidate mean / reference mean | Geometric mean of per-launch ratios |
+| "Is the difference real?" | Mann-Whitney U on pooled samples | Does the interval exclude `1.00x`? |
+| Worker launches | One | One per replicate (pair shares each) |
+| Test output | Mean, P95, allocations, iterations | Above, plus a `Launches:` line with the run-to-run spread |
 
-The p-value is still computed and reported at `LaunchCount >= 2`, but it is no longer what the gate
-turns on: pooling samples across launches multiplies statistical power without improving
-reproducibility, so a difference far below the run-to-run noise can read as overwhelmingly
-significant. The interval over per-replicate ratios is the run-to-run spread, and that is the
-quantity a gate must survive. See [Ratios](../statistics/ratios.md#when-sig-and-the-ratio-interval-disagree).
+Although NBenchmark still computes and reports the p-value for `LaunchCount >= 2`, the gate no longer relies on it. Pooling samples across launches increases statistical power without improving reproducibility; a difference far below the run-to-run noise can appear overwhelmingly significant. A gate must survive the interval over per-replicate ratios. For more information, see [ratios: when sig and the ratio interval disagree](../statistics/ratios.md#when-sig-and-the-ratio-interval-disagree).
 
-Two consequences worth knowing before you set it:
+Consider these two factors before setting `LaunchCount`:
+- **Resource cost.** `LaunchCount = 3` uses three worker launches per test instead of one. `[PerformanceTheory]` tests spend these launches per test case. Only increase this value for comparisons that decide a build. Two is the minimum for an interval; three is generally sufficient.
+- **Noise handling.** When a point estimate exceeds the gate but the interval spans `1.00x`, the gate is **not** enforced. This prevents tests from failing due to noise when the run cannot distinguish between the two bodies. The test output explicitly notes this. Increasing `LaunchCount` narrows the interval; if it remains wide, the difference is smaller than the machine's run-to-run variation.
 
-- **It costs launches.** `LaunchCount = 3` spends three worker launches on that test instead of one, and a `[PerformanceTheory]` spends them per test case. Raise it on the comparisons that decide a build, not across the suite. Two is the smallest value that produces an interval; three is enough for the interval to be worth reading.
-- **A noisy comparison stops failing.** When the point estimate is past the gate but the interval spans `1.00x`, the gate is **not** enforced - the run cannot distinguish the two bodies, and failing on that is failing on noise. The test output says so explicitly rather than passing in silence. Raising `LaunchCount` narrows the interval; if it stays wide, the difference is smaller than your machine's run-to-run variation and no threshold can honestly detect it.
+A failure at `LaunchCount = 1` includes a note stating that the ratio is a point estimate with no interval. This is the limit of what a single-launch measurement can support.
 
-Conversely, a failure at `LaunchCount = 1` now carries a note saying the ratio is a point estimate with no interval behind it. That is not a defect in the gate; it is the most the single-launch measurement supports.
-
-`LaunchCount` applies to calibration mode too: each replicate's worker measures the calibration standard after its own benchmark work, so those medians pair by launch exactly as a reference method's do.
+`LaunchCount` also applies to calibration mode. Each replicate's worker measures the calibration standard after its own benchmark work, pairing the medians by launch exactly as it does for a reference method.
 
 ## Thresholds reference
 
-All three packages share the same set of threshold properties. A threshold of `-1` (double) or `-1` (long) means the check is disabled. Omitting a property is equivalent to `-1`.
+All three integration packages share the same threshold properties. A value of `-1` (double or long) disables the check. Omitting a property is equivalent to setting it to `-1`.
 
 | Property | Type | Default | Description |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | `MaxMeanNs` | `double` | -1 (disabled) | Maximum allowed mean execution time in nanoseconds. |
-| `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles` (the default set includes `0.95`). If P95 was not computed, a clear error message guides you to check the configuration. |
+| `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles`. |
 | `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
-| `MaxSlowdownRatio` | `double` | 0 (disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g. `5.0` = 5x the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
-| `ReferenceMethod` | `string?` | null | Name of a method on the same class to use as the reference for ratio comparison. When null, calibration mode runs (built-in CPU-bound benchmark). |
-| `Iterations` | `int` | 0 (use default) | Override the number of measured samples. `0` uses the framework default (auto-resolved). |
-| `WarmupIterations` | `int` | 0 (use default) | Override the number of warmup samples. `0` uses the framework default (auto-detected). |
+| `MaxSlowdownRatio` | `double` | 0 (disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g., `5.0` = 5$\times$ the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
+| `ReferenceMethod` | `string?` | null | Name of a method on the same class to use as the reference. When null, calibration mode runs. |
+| `Iterations` | `int` | 0 (default) | Number of measured samples. `0` uses the framework default. |
+| `WarmupIterations` | `int` | 0 (default) | Number of warmup samples. `0` uses the framework default. |
 | `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
-| `RequireIsolation` | `bool` | **true** | Fail the test when the measurement was taken in the test host rather than a worker process. On by default, because isolation can be lost quietly when a fixture argument is added or a worker fails to deploy, and a labeled-but-passing test is indistinguishable from a healthy one in CI. Opt out with `[AllowInProcessGate]` on the method, class or assembly. Settable only on the `PerformanceAssert` option bags - not on the attributes, where an absent named argument could not be told apart from an explicit `false`. |
-| `LaunchCount` | `int` | 1 | Worker processes to measure this test in. Two or more turn the ratio gate into a paired per-replicate estimate with a confidence interval, at the cost of a worker launch each. See [Replicates and the paired ratio](#replicates-and-the-paired-ratio). |
+| `RequireIsolation` | `bool` | **true** | Fails the test if the measurement occurs in the test host rather than a worker process. Opt out with `[AllowInProcessGate]` on the method, class, or assembly. This is settable only via `PerformanceAssert` options. |
+| `LaunchCount` | `int` | 1 | Number of worker processes to measure this test in. Two or more enable the paired per-replicate estimate with a confidence interval. |
 | `OutlierMode` | `OutlierMode` | `IqrFence` | Outlier removal strategy applied before statistics are computed. |
 | `ConfidenceLevel` | `double` | 0.95 | Confidence level for the margin-of-error calculation. |
-| `MaxAbsoluteThresholdTolerance` | `double` | 1.0 | Multiplier applied to absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) when a shared runner or high-jitter host is detected. Set to e.g. `1.25` for 25% relaxation on shared CI runners. |
+| `MaxAbsoluteThresholdTolerance` | `double` | 1.0 | Multiplier applied to absolute thresholds when a shared runner or high-jitter host is detected. For example, `1.25` provides a 25% relaxation. |
 
-See [Configuration](../reference/configuration.md) for a full explanation of each option.
+For a full explanation of each option, see [configuration](../reference/configuration.md).
 
 ## SLA-style hard limits
 
-Absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) are susceptible to shared-runner noise in CI. Prefer `MaxSlowdownRatio` (calibration or `ReferenceMethod`) for regression gates; use absolute thresholds only when you have a hard SLA.
+Absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) are susceptible to noise from shared CI runners. Use `MaxSlowdownRatio` (calibration or `ReferenceMethod`) for regression gates and reserve absolute thresholds for hard SLAs.
 
-On shared CI runners, set `MaxAbsoluteThresholdTolerance` to relax absolute thresholds for jitter:
+To relax absolute thresholds for jitter on shared CI runners, set `MaxAbsoluteThresholdTolerance`:
 
 ```csharp
 [PerformanceFact(
@@ -191,7 +188,7 @@ On shared CI runners, set `MaxAbsoluteThresholdTolerance` to relax absolute thre
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-When a shared runner or high-jitter host is detected, the effective threshold becomes `500_000 x 1.25 = 625_000 ns`. On a dedicated host, the original `500_000 ns` threshold applies.
+If NBenchmark detects a shared runner or high-jitter host, the effective threshold becomes $500,000 \times 1.25 = 625,000$ ns. On a dedicated host, the original 500,000 ns threshold applies.
 
 ## Per-framework reference
 

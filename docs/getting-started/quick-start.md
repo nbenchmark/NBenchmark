@@ -8,7 +8,7 @@ order: 3
 
 ## Your first benchmark
 
-Call `Benchmark.Run` anywhere - no special project structure, no configuration.
+Use the `Benchmark.Run` method to measure a method. This requires no special project structure or configuration.
 
 ```csharp
 using NBenchmark;
@@ -21,7 +21,7 @@ var result = Benchmark.Run(() =>
 result.Print();
 ```
 
-Run it with `dotnet run` and you'll see:
+Run the project with `dotnet run` to see output similar to the following:
 
 ```text
   ┌─ Benchmark ─────────────────────────────────────
@@ -34,17 +34,17 @@ Run it with `dotnet run` and you'll see:
   └─────────────────────────────────────────────────
 ```
 
-That's it. Your code was warmed up until the timings settled, sampled until the result was precise
-enough, trimmed of outliers, and measured in a fresh process so nothing your program did earlier
-could affect it.
+The engine warms up your code until the timings settle, samples it until the result is sufficiently precise, trims outliers, and measures it in a fresh process to ensure that previous program state does not affect the results.
 
-## Want more numbers?
+## View more detailed results
 
-Pass a detail level to `Print` for the full statistical picture:
+Pass a detail level to the `Print` method to view a full statistical picture:
 
 ```csharp
 result.Print(ReportDetail.Standard);
 ```
+
+The output is similar to the following:
 
 ```text
   ┌─ Benchmark ─────────────────────────────────────
@@ -62,10 +62,11 @@ result.Print(ReportDetail.Standard);
   └─────────────────────────────────────────────────
 ```
 
-`ReportDetail.Advanced` adds quartiles, fences, and distribution shape. See
-[Report detail levels](../output/report-detail-levels.md).
+Use `ReportDetail.Advanced` to include quartiles, fences, and distribution shape. For more information, see [Report detail levels](../output/report-detail-levels.md).
 
-## Measuring async code
+## Measure async code
+
+Use `Benchmark.RunAsync` to measure asynchronous code:
 
 ```csharp
 var result = await Benchmark.RunAsync(async () =>
@@ -76,19 +77,18 @@ var result = await Benchmark.RunAsync(async () =>
 result.Print();
 ```
 
-## Measuring a return value
+## Measure a return value
 
-If your benchmark returns a value, use the generic overload. This stops the compiler optimizing the
-call away:
+If your benchmark returns a value, use the generic overload to prevent the compiler from optimizing the call away:
 
 ```csharp
 var result = Benchmark.Run(() => int.Parse("12345"));
 result.Print();
 ```
 
-## Comparing two implementations
+## Compare two implementations
 
-To compare approaches side-by-side, use `BenchmarkSuite`:
+Use `BenchmarkSuite` to compare multiple approaches side-by-side:
 
 ```csharp
 using NBenchmark;
@@ -104,35 +104,38 @@ var results = await new BenchmarkSuite("sorting")
 
 [![NBenchmark console output showing a suite comparison table with ratio and significance columns](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)
 
-The **Ratio** column shows speed relative to the baseline. The **Sig** column shows **✓** when the
-difference is statistically real and **✗** when it isn't.
+The **Ratio** column shows speed relative to the baseline. The **Sig** column shows **✓** when the difference is statistically significant and **✗** when it is not.
 
-## Saving results to a file
+## Save results to a file
+
+You can export results to various file formats:
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
 
 await result.ToMarkdownAsync("results.md");
 await result.ToCsvAsync("results.csv");
-await result.ToJsonAsync("results/");   // directory
+await result.ToJsonAsync("results/");   // specifies a directory
 ```
 
-## What the numbers mean
+## Understand the numbers
 
-**Median** is the number to quote - the middle measurement, unmoved by outliers. **Ops/s** is the
-same thing as a rate. **Error** says how precise the mean is. **Ratio** and **Sig** appear when you
-compare: `0.75x` means 25% faster, and **✓** means the difference is real rather than noise.
+- **Median**: The middle measurement, which is not affected by outliers. Use this number for quoting results.
+- **Ops/s**: The measurement rate.
+- **Error**: Indicates how precise the mean is.
+- **Ratio**: Appears during comparisons. A value of `0.75x` means the implementation is 25% faster than the baseline.
+- **Sig**: Appears during comparisons. A **✓** indicates the difference is statistically real rather than noise.
 
-[Reading your results](./reading-your-results.md) covers every column, indicator, and warning.
+For a detailed explanation of every column, indicator, and warning, see [Reading your results](./reading-your-results.md).
 
 > [!NOTE]
-> Your benchmark ran in a separate process. That's the default in every mode, needs no
-> configuration, and is what makes the numbers reproducible - JIT and GC settings can only be chosen
-> for a process that hasn't started yet. See [Isolated runs](../features/isolated-runs.md).
+> By default, your benchmark runs in a separate process. This ensures reproducibility because JIT and GC settings can only be configured for a process before it starts. For more information, see [Isolated runs](../features/isolated-runs.md).
 
 ## Next steps
 
-1. **[Reading your results](./reading-your-results.md)** - what the output is telling you
-2. **[Key concepts](./key-concepts.md)** - warmup, outliers, and confidence, in plain English
-3. **[Usage modes](../usage-modes/)** - suite mode, harness mode, and the global tool
-4. **[Guides](../guides/)** - complete recipes for CI gates, refactor comparisons, and more
+For more information, see the following pages:
+
+1. [Reading your results](./reading-your-results.md) - Understand what the output is telling you.
+2. [Key concepts](./key-concepts.md) - Learn about warmup, outliers, and confidence.
+3. [Usage modes](../usage-modes/) - Explore suite mode, harness mode, and the global tool.
+4. [Guides](../guides/) - Find complete recipes for CI gates, refactor comparisons, and more.

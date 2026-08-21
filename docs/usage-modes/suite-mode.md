@@ -6,9 +6,10 @@ order: 2
 
 # Suite mode: BenchmarkSuite
 
-> **Advanced features:** [Parameterized benchmarks](../features/parameterized-suite.md), [categories](../features/categories.md), [isolated runs](../features/isolated-runs.md), [multi-runtime comparison](../features/multi-runtime.md), and [multiple launches](../features/multiple-launches.md) are covered in the Features section.
+> [!TIP]
+> For advanced features, see the Features section: [Parameterized benchmarks](../features/parameterized-suite.md), [categories](../features/categories.md), [isolated runs](../features/isolated-runs.md), [multi-runtime comparison](../features/multi-runtime.md), and [multiple launches](../features/multiple-launches.md).
 
-`BenchmarkSuite` is a fluent builder for running several benchmarks in the same run and comparing them. It handles run ordering, significance testing, setup and teardown, and reporter output automatically.
+`BenchmarkSuite` is a fluent builder for running and comparing several benchmarks in a single run. It automatically handles run ordering, significance testing, setup and teardown, and reporter output.
 
 ## Minimal example
 
@@ -33,16 +34,16 @@ var results = await new BenchmarkSuite("sorting")
 
 ## Adding benchmarks
 
-### Synchronous
+### Synchronous benchmarks
 
 ```csharp
 suite.Add("name", () => DoWork());
 
-// Return a value - prevents dead-code elimination
+// Return a value to prevent dead-code elimination
 suite.Add("name", () => ComputeHash(data));
 ```
 
-### Async
+### Async benchmarks
 
 ```csharp
 suite.Add("name", async () => await FetchDataAsync());
@@ -51,7 +52,7 @@ suite.Add("name", async () => await FetchDataAsync());
 suite.Add("name", async () => await ComputeAsync(input));
 ```
 
-### With per-benchmark setup and teardown
+### Per-benchmark setup and teardown
 
 The optional `setup` and `teardown` callbacks run before and after **each iteration**:
 
@@ -65,11 +66,11 @@ suite.Add(
 ```
 
 > [!WARNING]
-> Setup and teardown time is **not** included in the measurement. Only the `action` is timed.
+> Setup and teardown time is **not** included in the measurement. NBenchmark only times the `action`.
 
-### With categories
+### Using categories
 
-Tag a benchmark with categories and filter the suite before running. See [Categories](../features/categories.md) for the full filtering model.
+Tag a benchmark with categories and filter the suite before running. For the full filtering model, see [Categories](../features/categories.md).
 
 ```csharp
 var results = await new BenchmarkSuite("sorting")
@@ -90,9 +91,9 @@ await new BenchmarkSuite("string")
     .RunAsync();
 ```
 
-### Benchmark names must be unique
+### Unique benchmark names
 
-Each name within a suite must be distinct. The significance test keys raw samples by name, so duplicates would corrupt the results.
+Every name within a suite must be distinct. The significance test keys raw samples by name; duplicate names corrupt the results and cause an `ArgumentException`.
 
 ```csharp
 // This throws ArgumentException:
@@ -101,40 +102,42 @@ suite.Add("sort", SortA).Add("sort", SortB);
 
 ## Fluent configuration
 
-All configuration methods return `this`, so they can be chained:
+Configuration methods return `this`, allowing you to chain them:
 
 ```csharp
 await new BenchmarkSuite("name")
     .Add(...)
     .Add(...)
-    .WithBaseline("name")           // which benchmark is the 1.00x reference
-    .WithParameter("size", 10, 100) // expand parameterized benchmarks across values
-    .WithIterations(200)            // pin measured samples (default: auto)
-    .WithWarmup(25)                 // pin warmup samples (default: auto)
-    .WithLaunchCount(3)             // repeat each benchmark 3 times as separate launches (default: 1)
-    .WithAllocations()              // enable allocation tracking
-    .WithOutlierMode(OutlierMode.IqrFence)   // default
-    .WithOutlierDetector(new MyDetector())   // custom IOutlierDetector (overrides WithOutlierMode)
-    .WithConfidenceLevel(0.99)      // default: 0.95
-    .WithSignificanceLevel(0.05)    // alpha for the significance test; default: 0.05
-    .WithSignificance(false)        // disable significance testing
-    .WithSignificanceTest(new MyTest())   // custom ISignificanceTest
-    .WithRunOrder(RunOrder.Declaration)   // default: RunOrder.Random
-    .WithSeed(1234)                 // pin the shuffle seed for a reproducible order
-    .WithSuiteSetup(() => { })      // runs once before all benchmarks
-    .WithSuiteTeardown(() => { })   // runs once after all benchmarks
-    .WithIsolation(false)           // measure in this process; the default is a worker
+    .WithBaseline("name")           // Specifies the 1.00x reference benchmark
+    .WithParameter("size", 10, 100) // Expands parameterized benchmarks across values
+    .WithIterations(200)            // Sets measured samples (default: auto)
+    .WithWarmup(25)                 // Sets warmup samples (default: auto)
+    .WithLaunchCount(3)             // Repeats each benchmark 3 times as separate launches (default: 1)
+    .WithAllocations()              // Enables allocation tracking
+    .WithOutlierMode(OutlierMode.IqrFence)   // Default outlier mode
+    .WithOutlierDetector(new MyDetector())   // Uses a custom IOutlierDetector (overrides WithOutlierMode)
+    .WithConfidenceLevel(0.99)      // Default: 0.95
+    .WithSignificanceLevel(0.05)    // Sets alpha for the significance test; default: 0.05
+    .WithSignificance(false)        // Disables significance testing
+    .WithSignificanceTest(new MyTest())   // Uses a custom ISignificanceTest
+    .WithRunOrder(RunOrder.Declaration)   // Default: RunOrder.Random
+    .WithSeed(1234)                 // Pins the shuffle seed for a reproducible order
+    .WithSuiteSetup(() => { })      // Runs once before all benchmarks
+    .WithSuiteTeardown(() => { })   // Runs once after all benchmarks
+    .WithIsolation(false)           // Measures in the host process; the default is a worker
     .WithReporter(new ConsoleReporter())
     .WithReporter(new MarkdownReporter("results/"))
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 ```
 
-See [Configuration](../reference/configuration.md) for details on every option.
+For more details on every option, see [Configuration](../reference/configuration.md).
 
 ## Custom statistics
 
-The suite uses the same pluggable statistics as the rest of the engine. By default it trims outliers with the IQR fence and tests significance with `DefaultSignificanceTest` - Mann-Whitney U for two benchmarks, the Kruskal-Wallis omnibus test (followed by post-hoc pairwise Mann-Whitney U with Holm-Bonferroni correction) for three or more. Override either when your data needs it:
+The suite uses the same pluggable statistics as the rest of the engine. By default, it trims outliers with the IQR fence and tests significance with `DefaultSignificanceTest` - using Mann-Whitney U for two benchmarks, and the Kruskal-Wallis omnibus test (followed by post-hoc pairwise Mann-Whitney U with Holm-Bonferroni correction) for three or more.
+
+You can override these when your data requires a different approach:
 
 ```csharp
 using NBenchmark.Stats;
@@ -143,22 +146,22 @@ await new BenchmarkSuite("latency")
     .Add("a", RunA)
     .Add("b", RunB)
     .Add("c", RunC)
-    .WithOutlierDetector(new KeepFastestDetector(0.90))   // custom trimming
-    .WithSignificanceTest(new MedianRatioSignificanceTest(25))   // custom significance rule
+    .WithOutlierDetector(new KeepFastestDetector(0.90))   // Custom trimming
+    .WithSignificanceTest(new MedianRatioSignificanceTest(25))   // Custom significance rule
     .RunAsync();
 ```
 
-`WithOutlierDetector` takes priority over `WithOutlierMode`. See [Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors) and [Custom significance tests](../statistics/significance.md#custom-significance-tests) for the interfaces and contracts.
+`WithOutlierDetector` takes priority over `WithOutlierMode`. For the interfaces and contracts, see [Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors) and [Custom significance tests](../statistics/significance.md#custom-significance-tests).
 
 ## Setting a baseline
 
-Call `WithBaseline("name")` to designate one benchmark as the reference point. The **Ratio** column in the output shows how fast each other benchmark is relative to the baseline, and significance is tested against it.
+Call `WithBaseline("name")` to designate one benchmark as the reference point. The **Ratio** column in the output shows the speed of each other benchmark relative to the baseline, and NBenchmark tests significance against this reference.
 
-If no baseline is set, NBenchmark uses the benchmark with the lowest median as the implicit baseline for ratio calculations.
+If you do not set a baseline, NBenchmark uses the benchmark with the lowest median as the implicit baseline for ratio calculations.
 
 ## Suite setup and teardown
 
-`WithSuiteSetup` and `WithSuiteTeardown` run once around the entire suite - useful for starting a server, opening a connection, or initializing shared state:
+`WithSuiteSetup` and `WithSuiteTeardown` run once around the entire suite. Use these for starting a server, opening a connection, or initializing shared state:
 
 ```csharp
 await new BenchmarkSuite("http")
@@ -169,15 +172,15 @@ await new BenchmarkSuite("http")
     .RunAsync();
 ```
 
-Once suite setup has succeeded, suite teardown is **guaranteed to run** - even when the run is canceled through a `CancellationToken` - so resources opened in setup are always released.
+Once suite setup succeeds, NBenchmark guarantees that suite teardown runs - even if the run is canceled through a `CancellationToken`. This ensures that resources opened in setup are always released.
 
 ## Multi-runtime comparison
 
-Use `WithRuntimes` to run the same benchmarks across multiple .NET runtimes and compare results side-by-side. See [Multi-runtime comparison](../features/multi-runtime.md) for the full guide.
+Use `WithRuntimes` to run the same benchmarks across multiple .NET runtimes and compare the results side-by-side. For the full guide, see [Multi-runtime comparison](../features/multi-runtime.md).
 
 ## Process isolation
 
-Suites are measured in a dedicated worker process by default - no configuration, no change to how you write them:
+Suites are measured in a dedicated worker process by default. This requires no configuration and no changes to how you write your benchmarks:
 
 ```csharp
 await new BenchmarkSuite("sorting")
@@ -187,38 +190,30 @@ await new BenchmarkSuite("sorting")
     .RunAsync();
 ```
 
-The whole suite shares one worker, which keeps every ratio between its benchmarks a paired,
-within-process comparison. Three options cover the common variations:
+The whole suite shares one worker, which keeps every ratio between its benchmarks a paired, within-process comparison. Use the following options for common variations:
 
-- **`BenchmarkSuite.Over("name", () => BuildData())`** - the worker builds the state itself, which is
-  the answer for prepared data that is large, live (a `Stream`, a `DbConnection`), or otherwise
-  cannot be copied. It also types each body's parameter:
+- **`BenchmarkSuite.Over("name", () => BuildData())`**: The worker builds the state itself. Use this for prepared data that is large, live (such as a `Stream` or a `DbConnection`), or otherwise cannot be copied. This method also types each body's parameter:
 
   ```csharp
-  await BenchmarkSuite.Over("sorting", () => BuildData())   // built once per benchmark, in the worker
+  await BenchmarkSuite.Over("sorting", () => BuildData())   // Built once per benchmark, in the worker
       .Add("array", d => Array.Sort(d))
       .Add("linq",  d => d.OrderBy(x => x).ToArray())
       .RunAsync();
   ```
 
-- **`AddInProcess(name, body)`** - measures one benchmark in the host process on purpose while the
-  rest of the suite stays in a worker. Use it when a single body holds something that cannot cross,
-  such as a live handle or a warm cache the benchmark is *about*.
+- **`AddInProcess(name, body)`**: Measures one benchmark in the host process while the rest of the suite stays in a worker. Use this when a single body holds an object that cannot cross process boundaries, such as a live handle or a warm cache.
 
-- **`WithIsolation(false)`** - opts the whole suite back into the host process.
+- **`WithIsolation(false)`**: Opts the entire suite into the host process.
 
-A benchmark that asked for a worker and cannot have one **fails the run** rather than quietly
-becoming a host-process measurement. See
-[Isolated runs](../features/isolated-runs.md#when-isolation-is-refused) for the short list of what
-cannot cross and the one-line remedy for each.
+If a benchmark requires a worker but cannot have one, NBenchmark fails the run rather than quietly falling back to a host-process measurement. For a list of what cannot cross process boundaries and the corresponding remedies, see [Isolated runs](../features/isolated-runs.md#when-isolation-is-refused).
 
 ## Multiple launches
 
-Use `WithLaunchCount(n)` to run each benchmark in the suite N times as independent launches. See [Multiple launches](../features/multiple-launches.md) for the full guide.
+Use `WithLaunchCount(n)` to run each benchmark in the suite $N$ times as independent launches. For the full guide, see [Multiple launches](../features/multiple-launches.md).
 
 ## Parameterized benchmarks
 
-Use `WithParameter` and typed `Add` overloads to run the same benchmark body across multiple input values. Each parameter combination produces a separate benchmark entry with a distinct name like `"sort(size=10)"`. See [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) for the full guide.
+Use `WithParameter` and typed `Add` overloads to run the same benchmark body across multiple input values. Each parameter combination produces a separate benchmark entry with a distinct name, such as `"sort(size=10)"`. For the full guide, see [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md).
 
 ```csharp
 var results = await new BenchmarkSuite("sorting")
@@ -234,16 +229,16 @@ var results = await new BenchmarkSuite("sorting")
 
 ## Run order
 
-By default benchmarks run in a **random** order (Fisher-Yates shuffle). This guards against systematic bias where the first benchmark always benefits from a warm CPU cache.
+By default, benchmarks run in a **random** order using a Fisher-Yates shuffle. This prevents systematic bias where the first benchmark always benefits from a warm CPU cache.
 
 ```csharp
-.WithRunOrder(RunOrder.Declaration)   // run in the order Add() was called
-.WithRunOrder(RunOrder.Random)        // default
+.WithRunOrder(RunOrder.Declaration)   // Run in the order Add() was called
+.WithRunOrder(RunOrder.Random)        // Default
 ```
 
 ## Multiple reporters
 
-You can attach any number of reporters. They all receive the same results:
+You can attach any number of reporters. Each reporter receives the same results:
 
 ```csharp
 suite
@@ -260,7 +255,7 @@ suite
 .WithProgress(new ConsoleBenchmarkProgress())
 ```
 
-Pass the same values you gave to `WithIterations` and `WithWarmup` so the progress display is accurate.
+Pass the same values you provide to `WithIterations` and `WithWarmup` to ensure the progress display is accurate.
 
 ## Return value
 
@@ -273,14 +268,14 @@ foreach (var result in results.Where(r => !r.Errored))
     Console.WriteLine($"{result.Name}: {result.Median:F0} ns median");
 ```
 
-Errored benchmarks have `result.Errored == true` and a message in `result.ErrorMessage`. They are included in the list so reporters can display them.
+Errored benchmarks have `result.Errored == true` and a message in `result.ErrorMessage`. NBenchmark includes them in the list so reporters can display them.
 
 ## Next steps
 
-- [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) - run benchmarks across multiple input values
-- [Multi-runtime comparison](../features/multi-runtime.md) - compare across .NET runtimes
-- [Multiple launches](../features/multiple-launches.md) - measure run-to-run variance
-- [Isolated runs](../features/isolated-runs.md) - run in a clean worker
-- [Harness mode: BenchmarkHarness](./harness-mode.md) - attribute-based discovery and CLI control
-- [Configuration](../reference/configuration.md) - full options reference
-- [Reporters](../output/index.md) - all available reporters
+- [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) - Run benchmarks across multiple input values
+- [Multi-runtime comparison](../features/multi-runtime.md) - Compare across .NET runtimes
+- [Multiple launches](../features/multiple-launches.md) - Measure run-to-run variance
+- [Isolated runs](../features/isolated-runs.md) - Run in a clean worker
+- [Harness mode: BenchmarkHarness](./harness-mode.md) - Attribute-based discovery and CLI control
+- [Configuration](../reference/configuration.md) - Full options reference
+- [Reporters](../output/index.md) - All available reporters

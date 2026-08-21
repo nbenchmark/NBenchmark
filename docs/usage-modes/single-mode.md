@@ -6,7 +6,7 @@ order: 1
 
 # Single mode: Benchmark
 
-`Benchmark` is the entry point for one-off measurements. It requires no class structure, no attributes, and no project setup beyond adding the NuGet reference. Use it anywhere you want a quick, reliable number.
+`Benchmark` is the entry point for one-off measurements. It requires no class structure, attributes, or project setup beyond adding the NuGet reference. Use it whenever you need a quick, reliable measurement.
 
 ## Basic usage
 
@@ -20,11 +20,11 @@ var result = Benchmark.Run(() =>
 });
 ```
 
-`Benchmark.Run` warms up until the timings plateau, collects measured samples until the confidence interval is tight enough, trims outliers using the IQR fence rule, and returns a `BenchmarkResult`.
+`Benchmark.Run` warms up the code until the timings plateau and collects measured samples until the confidence interval is sufficiently tight. It then trims outliers using the IQR fence rule and returns a `BenchmarkResult`.
 
 ## Overloads
 
-### Synchronous
+### Synchronous benchmarks
 
 ```csharp
 // Action - for code with no return value
@@ -34,7 +34,7 @@ var result = Benchmark.Run(() => DoWork());
 var result = Benchmark.Run(() => Fibonacci(20));
 ```
 
-### Async
+### Async benchmarks
 
 ```csharp
 // Func<Task>
@@ -46,7 +46,7 @@ var result = await Benchmark.RunAsync(async () => await ComputeAsync(input));
 
 ### Prepared state
 
-For a benchmark over data that must be built once, pass the preparation as its own delegate. `prepare` runs once before warmup - in the worker, on an isolated run - and the body receives its result:
+If you are benchmarking code that uses data that must be built once, pass the preparation as its own delegate. The `prepare` delegate runs once before warmup in the worker on an isolated run, and the body receives the result:
 
 ```csharp
 var result = Benchmark.Run(
@@ -54,7 +54,9 @@ var result = Benchmark.Run(
     body:    d => Sort(d));
 ```
 
-The same shape is available as `RunAsync` (for a `Task`-returning body) and as `RunRaw` / `RunRawAsync` (to keep the raw sample array). Optional `setup:` and `teardown:` hooks receive the state and run outside the timed window - per iteration, before and after the body - so a body that mutates its state can be reset between iterations:
+This pattern is also available as `RunAsync` (for a `Task`-returning body) and as `RunRaw` / `RunRawAsync` (to keep the raw sample array). 
+
+Optional `setup:` and `teardown:` hooks receive the state and run outside the timed window - per iteration, before and after the body. This allows you to reset state for a body that mutates its data between iterations:
 
 ```csharp
 var result = Benchmark.Run(
@@ -63,9 +65,7 @@ var result = Benchmark.Run(
     setup:   d => Shuffle(d));
 ```
 
-A `prepare` delegate may capture locals of its own - `prepare: () => BuildData(size)` sends the
-`size` and builds the data in the worker, which is the point. If you would rather name the input
-explicitly, the parameterized overload takes it as an argument:
+A `prepare` delegate can capture its own locals. For example, `prepare: () => BuildData(size)` sends the `size` and builds the data in the worker. If you prefer to name the input explicitly, use the parameterized overload:
 
 ```csharp
 var result = Benchmark.Run(
@@ -76,7 +76,7 @@ var result = Benchmark.Run(
 
 ### Raw outcome
 
-`Benchmark.RunRaw` returns a `MeasurementOutcome` which includes both the `BenchmarkResult` and the raw per-iteration sample array. Use this if you need the underlying data.
+`Benchmark.RunRaw` returns a `MeasurementOutcome` which includes both the `BenchmarkResult` and the raw per-iteration sample array. Use this if you need the underlying data:
 
 ```csharp
 var outcome = Benchmark.RunRaw(() => DoWork());
@@ -100,11 +100,11 @@ var options = new MeasurementOptions
 var result = Benchmark.Run(() => MyMethod(), options: options);
 ```
 
-See [Configuration](../reference/configuration.md) for the full list of options.
+For a full list of options, see [Configuration](../reference/configuration.md).
 
 ## Naming the benchmark
 
-The `name` parameter sets the label used in output and file reporters:
+Use the `name` parameter to set the label used in output and file reporters:
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod(), name: "MyMethod with 1000-item input");
@@ -114,11 +114,13 @@ var result = Benchmark.Run(() => MyMethod(), name: "MyMethod with 1000-item inpu
 
 ### Plain text (core package)
 
-`Print()` defaults to `ReportDetail.Simple`:
+Calling `Print()` defaults to `ReportDetail.Simple`:
 
 ```csharp
 result.Print();
 ```
+
+The output is similar to the following:
 
 ```text
   ┌─ Benchmark ─────────────────────────────────────
@@ -131,11 +133,13 @@ result.Print();
   └─────────────────────────────────────────────────
 ```
 
-Pass a detail level for the full distribution:
+Pass a detail level to see the full distribution:
 
 ```csharp
 result.Print(ReportDetail.Standard);
 ```
+
+The output is similar to the following:
 
 ```text
   ┌─ Benchmark ─────────────────────────────────────
@@ -153,8 +157,7 @@ result.Print(ReportDetail.Standard);
   └─────────────────────────────────────────────────
 ```
 
-`ReportDetail.Advanced` adds sample counts, quartiles, fences, skewness, kurtosis, MAD, and an
-allocation breakdown.
+`ReportDetail.Advanced` adds sample counts, quartiles, fences, skewness, kurtosis, MAD, and an allocation breakdown.
 
 ### Rich console table (NBenchmark.Reporters.Console)
 
@@ -164,7 +167,7 @@ using NBenchmark.Reporters.Console;
 await result.PrintAsync();
 ```
 
-This runs the result through `ConsoleReporter` and renders a Spectre.Console table.
+This method runs the result through `ConsoleReporter` and renders a Spectre.Console table.
 
 ### File reporters
 
@@ -176,7 +179,7 @@ await result.ToJsonAsync("results/");   // output directory
 
 ## Accessing result fields directly
 
-`BenchmarkResult` is a plain record - access any field directly:
+`BenchmarkResult` is a plain record. You can access any field directly:
 
 ```csharp
 Console.WriteLine($"Median:  {result.Median} ns");
@@ -191,36 +194,29 @@ if (result.MeanAllocatedBytes.HasValue)
     Console.WriteLine($"Alloc:   {result.MeanAllocatedBytes.Value} bytes/op");
 ```
 
-## Where it measures
+## Where measurements occur
 
-`Benchmark.Run` measures the body in a dedicated worker process by default - no configuration
-needed. That is what makes the number reproducible; the same body measured in the host process can
-read more than 20x wrong until the JIT happens to promote it.
+By default, `Benchmark.Run` measures the body in a dedicated worker process. This ensures the result is reproducible; measuring the same body in the host process can read more than 20x wrong until the JIT promotes the method.
 
-Ordinary captured data - an `int`, a string, an `int[]`, a record of those - travels to the worker
-by value, so most bodies isolate with no rewrite. For state the worker should *build* rather than be
-sent, use the `prepare:` / `body:` overload above.
+Ordinary captured data - such as an `int`, a `string`, an `int[]`, or a record containing these - is sent to the worker by value. Most bodies isolate without requiring a rewrite. For state that the worker should build rather than receive, use the `prepare:` / `body:` overload.
 
-`Benchmark.RunInProcess` measures in the current process on purpose, which is the right choice when
-that process *is* the subject - cold-start cost, or a body that must observe host state such as a
-warm cache or an open connection:
+Use `Benchmark.RunInProcess` to measure in the current process. This is the correct choice when the process itself is the subject, such as measuring cold-start costs or observing host state like a warm cache or an open connection:
 
 ```csharp
 var cold = Benchmark.RunInProcess(() => ColdStartSensitivePath(), name: "cold path");
 ```
 
-`Benchmark.Warmup()` optionally starts a worker in the background so your first measured call does
-not pay the roughly 70 ms launch.
+You can optionally call `Benchmark.Warmup()` to start a worker in the background so your first measured call does not incur the launch delay (approximately 70 ms).
 
-See [Isolated runs](../features/isolated-runs.md) for the full model.
+For more information, see [Isolated runs](../features/isolated-runs.md).
 
 ## What Benchmark does not do
 
-- **It does not compare benchmarks.** Use [BenchmarkSuite](./suite-mode.md) for A/B comparisons.
-- **It does not run significance testing** between multiple results. Significance testing requires paired raw samples and is handled by `BenchmarkSuite` and `BenchmarkHarness`.
+- **Compare benchmarks**: Use [Suite mode: BenchmarkSuite](./suite-mode.md) for A/B comparisons.
+- **Run significance testing** between multiple results: Significance testing requires paired raw samples and is handled by `BenchmarkSuite` and `BenchmarkHarness`.
 
 ## Next steps
 
-- [Suite mode: BenchmarkSuite](./suite-mode.md) - compare two or more implementations
-- [Configuration](../reference/configuration.md) - full options reference
-- [Reporters](../output/index.md) - save results to files
+- [Suite mode: BenchmarkSuite](./suite-mode.md) - Compare two or more implementations
+- [Configuration](../reference/configuration.md) - Full options reference
+- [Reporters](../output/index.md) - Save results to files

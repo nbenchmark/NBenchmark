@@ -8,13 +8,9 @@ order: 0
 
 **Straightforward benchmarking for .NET.**
 
-Benchmarking sounds simple - run it, time it, compare. In practice the numbers are easy to get
-wrong: the JIT is still optimizing your method during the first runs, the timer can cost more than
-a fast method, one GC pause skews an average, and the 2% improvement you were sure you measured can
-be noise.
+Benchmarking sounds simple: run it, time it, and compare. In practice, you can easily get the numbers wrong. The JIT might still be optimizing your method during the first runs, the timer can cost more than a fast method, a single GC pause can skew an average, and a small improvement might just be noise.
 
-NBenchmark handles that for you. One line gives you a calibrated, warmed-up, outlier-trimmed result
-with a confidence interval.
+NBenchmark handles these issues for you. One line of code provides a calibrated, warmed-up, and outlier-trimmed result with a confidence interval.
 
 ```csharp
 var result = Benchmark.Run(() => MandelbrotCalculation());
@@ -25,30 +21,28 @@ result.Print();
 
 ## Why NBenchmark?
 
-- **No setup.** One static call. No attributes, no class structure, no dedicated project.
-- **No numbers to guess.** Warmup, batch size, and sample count all resolve themselves.
-- **Clean process by default.** Your numbers reflect your code, not your process's history.
-- **Real statistics.** Confidence intervals and significance testing, not just an average.
-- **Zero dependencies.** The core package is BCL-only.
+- **No setup.** Use one static call. You don't need attributes, a specific class structure, or a dedicated project.
+- **No guessing.** Warmup, batch size, and sample count resolve automatically.
+- **Clean processes by default.** Results reflect your code rather than the history of your process.
+- **Real statistics.** Use confidence intervals and significance testing instead of simple averages.
+- **Zero dependencies.** The core package uses only the BCL.
 
-**New here?** [Install it](./getting-started/installation.md), then
-[Quick Start](./getting-started/quick-start.md) gets you a first benchmark in 60 seconds. Not sure
-which API you want? [Choose your path](./getting-started/choose-your-path.md).
+To get started, install NBenchmark and use the [Quick Start](./getting-started/quick-start.md) guide to create your first benchmark in 60 seconds. If you're not sure which API to use, [choose your path](./getting-started/choose-your-path.md).
 
 ## Four modes, one engine
 
-### 1. Single mode
+### Single mode
 
-The fastest way to get a reliable number.
+Single mode is the fastest way to get a reliable number.
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
 var result = await Benchmark.RunAsync(async () => await FetchAsync());
 ```
 
-### 2. Suite mode
+### Suite mode
 
-Compare implementations side-by-side, with ratios and significance testing.
+Use suite mode to compare implementations side-by-side with ratios and significance testing.
 
 ```csharp
 var results = await new BenchmarkSuite("sorting")
@@ -61,9 +55,9 @@ var results = await new BenchmarkSuite("sorting")
 
 [![NBenchmark console output showing a suite comparison table with ratio and significance columns](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-suite.png)
 
-### 3. Harness mode
+### Harness mode
 
-Attribute-based discovery with a built-in CLI, for dedicated benchmark projects.
+Harness mode provides attribute-based discovery with a built-in CLI for dedicated benchmark projects.
 
 ```csharp
 public class StringBenchmarks
@@ -83,75 +77,64 @@ await BenchmarkHarness.Create(args).AddFromAssembly<StringBenchmarks>().RunAsync
 
 [![NBenchmark console output showing a harness run with per-class comparison tables](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-harness.png)](https://raw.githubusercontent.com/nbenchmark/nbenchmark/main/assets/output-harness.png)
 
-### 4. Global tool
+### Global tool
 
-Install once, benchmark any assembly with `[Benchmark]` methods - no project needed.
+Install the global tool once to benchmark any assembly with `[Benchmark]` methods without needing a project.
 
 ```bash
 dotnet tool install -g NBenchmark.Tool
 dotnet benchmark --project ./MyApp.Benchmarks
 ```
 
-All harness CLI flags pass through. See [Global tool](./usage-modes/global-tool.md).
+All harness CLI flags pass through. For more information, see [Global tool](./usage-modes/global-tool.md).
 
 ## Features
 
-| Feature | What it does | |
+| Feature | Description | Link |
 | --- | --- | --- |
-| Isolated runs | Measures in a fresh worker process so earlier work can't bias the numbers. On by default. | [→](./features/isolated-runs.md) |
+| Isolated runs | Measures in a fresh worker process to prevent earlier work from biasing the numbers. On by default. | [→](./features/isolated-runs.md) |
 | Parameterized benchmarks | Runs one body across many input values to show how it scales. | [→](./features/parameterized-suite.md) |
-| Categories | Tags benchmarks and includes or excludes groups from a run. | [→](./features/categories.md) |
-| Multi-runtime | Runs the same benchmarks on net8, net9, and net10 side-by-side. | [→](./features/multi-runtime.md) |
+| Categories | Tags benchmarks to include or exclude groups from a run. | [→](./features/categories.md) |
+| Multi-runtime | Runs the same benchmarks on .NET 8, .NET 9, and .NET 10 side-by-side. | [→](./features/multi-runtime.md) |
 | Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [→](./features/multiple-launches.md) |
-| Environment control | Pins CPU affinity and process priority - process and measuring thread alike - to cut noise at the source. | [→](./features/environment-control.md) |
-| Host drift canary | Times fixed control work between benchmarks, so a machine that drifted mid-run says so. On by default. | [→](./statistics/measurement.md#the-host-drift-canary) |
-| Interference rejection | Discards samples the OS is known to have preempted, using the measuring thread's own CPU occupancy - a fact, not a guess. On by default. | [→](./statistics/outliers.md#evidence-based-interference-rejection) |
+| Environment control | Pins CPU affinity and process priority for the process and measuring thread to reduce noise. | [→](./features/environment-control.md) |
+| Host drift canary | Times fixed control work between benchmarks to detect if the machine drifted mid-run. On by default. | [→](./statistics/measurement.md#the-host-drift-canary) |
+| Interference rejection | Discards samples that the OS preempted using the measuring thread's CPU occupancy. On by default. | [→](./statistics/outliers.md#evidence-based-interference-rejection) |
 | Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [→](./test-integration/index.md) |
-| CI regression gate | Fails the run when a benchmark regresses past a percentage. | [→](./reference/cli.md) |
+| CI regression gate | Fails the run when a benchmark regresses past a specified percentage. | [→](./reference/cli.md) |
 | Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [→](./statistics/diagnostics.md) |
 | Live telemetry | Streams per-sample events to an observer or to OpenTelemetry. | [→](./reference/observers.md) |
 | Compile-time analysis | Catches benchmark authoring mistakes as build-time diagnostics. | [→](./reference/analyzers.md) |
-| Pluggable statistics | Swaps in your own outlier detector or significance test. | [→](./guides/custom-statistics.md) |
+| Pluggable statistics | Allows you to swap in your own outlier detector or significance test. | [→](./guides/custom-statistics.md) |
 
 ## Built on real statistics
 
-The numbers are not an average of a fixed loop.
+NBenchmark doesn't use a simple average of a fixed loop.
 
-- **Adaptive measurement.** Samples stream until the confidence interval is tight enough, then stop.
-  Warmup ends when the timings plateau and the JIT has settled - not after a guessed count.
-  ([Measurement](./statistics/measurement.md))
-- **Error bars that survive trimming.** Discarding an outlier does not narrow the confidence
-  interval: a discarded sample still counts as an observation, so the reported margin describes the
-  run that happened rather than the samples that survived it.
-  ([Outlier trimming](./statistics/outliers.md))
-- **A control workload that catches a drifting host.** Fixed work is timed at every benchmark
-  boundary, so a machine that got slower mid-run says so - and a comparison smaller than the drift
-  that separated its two rows is flagged rather than reported as a result.
-  ([Measurement](./statistics/measurement.md#the-host-drift-canary))
-- **Non-parametric significance testing.** Benchmark timings are not normally distributed, so the
-  built-in tests are rank-based. A ✓ in the `Sig` column means "real, and at least a small effect",
-  not merely `p < 0.05`. ([Significance testing](./statistics/significance.md))
-- **Verified against SciPy and NumPy.** Every statistical primitive is dependency-free and
-  cross-validated on each build. ([Validation](./statistics/validation.md))
+- **Adaptive measurement.** Samples stream until the confidence interval is tight enough and then stop. Warmup ends when the timings plateau and the JIT settles, rather than after a guessed count. ([Measurement](./statistics/measurement.md))
+- **Error bars that survive trimming.** Discarding an outlier doesn't narrow the confidence interval. A discarded sample still counts as an observation, so the reported margin describes the run that occurred rather than only the samples that survived. ([Outlier trimming](./statistics/outliers.md))
+- **Host drift detection.** Fixed work is timed at every benchmark boundary. If a machine gets slower mid-run, NBenchmark detects it. A comparison smaller than the drift that separated its two rows is flagged rather than reported as a result. ([Measurement](./statistics/measurement.md#the-host-drift-canary))
+- **Non-parametric significance testing.** Benchmark timings are not normally distributed, so the built-in tests are rank-based. A checkmark (✓) in the `Sig` column means the effect is real and at least small, not merely that `p < 0.05`. ([Significance testing](./statistics/significance.md))
+- **Cross-validated results.** Every statistical primitive is dependency-free and cross-validated on each build against SciPy and NumPy. ([Validation](./statistics/validation.md))
 
 ## Packages
 
 | Package | Purpose |
 | --- | --- |
-| `NBenchmark` | Zero-dependency core engine and statistics |
+| `NBenchmark` | Core engine and statistics |
 | `NBenchmark.Analyzers` | Compile-time checks for benchmark correctness |
 | `NBenchmark.DependencyInjection` | Constructor injection for benchmark classes |
-| `NBenchmark.Tool` | dotnet global tool - run benchmarks from the CLI without a project |
-| `NBenchmark.Reporters.Console` | Rich terminal tables via Spectre.Console |
+| `NBenchmark.Tool` | .NET global tool to run benchmarks from the CLI |
+| `NBenchmark.Reporters.Console` | Terminal tables via Spectre.Console |
 | `NBenchmark.Integration.xUnit` | xUnit performance assertions |
 | `NBenchmark.Integration.NUnit` | NUnit performance assertions |
 | `NBenchmark.Integration.MSTest` | MSTest performance assertions |
 
-## Where to next
+## Next steps
 
-- **[Usage modes](./usage-modes/)** - walkthroughs for each of the four modes
-- **[Guides](./guides/)** - workflow recipes: CI/CD tuning, refactor comparison, ASP.NET services
-- **[Features](./features/)** - isolated runs, parameters, categories, multi-runtime, launches, DI
-- **[Statistics](./statistics/)** - how every number is calculated
-- **[Reference](./reference/)** - configuration, CLI flags, and analyzer diagnostics
-- **[Deep dives](./deep-dives/)** - the engineering internals
+- **[Usage modes](./usage-modes/)** - Walkthroughs for each of the four modes
+- **[Guides](./guides/)** - Workflow recipes for CI/CD tuning, refactor comparison, and ASP.NET services
+- **[Features](./features/)** - Details on isolated runs, parameters, categories, multi-runtime, launches, and DI
+- **[Statistics](./statistics/)** - Explanations of how every number is calculated
+- **[Reference](./reference/)** - Configuration, CLI flags, and analyzer diagnostics
+- **[Deep dives](./deep-dives/)** - Engineering internals

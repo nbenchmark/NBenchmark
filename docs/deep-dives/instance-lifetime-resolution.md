@@ -4,40 +4,42 @@ description: How long a benchmark instance lives, who decides, and why the answe
 order: 3
 ---
 
-# Instance Lifetime Resolution
+# Instance lifetime resolution
 
-The [State isolation](../features/state-isolation.md) page describes the user-facing contract: `IStateReset`, `[SharedState]`, and the automatic fallback for container-resolved classes. This page is the engineering underneath: who decides how long an instance lives, why the decision is made exactly once, and how it travels to the process that measures.
+The [State isolation](../features/state-isolation.md) page describes the user-facing contract: `IStateReset`, `[SharedState]`, and the automatic fallback for container-resolved classes. This page describes the engineering internals: how the engine determines instance lifetime, why that decision is made once, and how it's passed to the measuring process.
 
-## The two questions
+## How the engine resolves lifetime
 
-`Engine/InstanceIndependence` answers **how long a benchmark instance lives**, from facts about the class: its declared lifetime, whether it resets itself, whether it carries `[SharedState]`, and whether its instances come from a container. A PerClass class whose instances are container- or factory-resolved and which declares neither resolves to `PerMethod`, with the reason attached to its rows.
+`Engine/InstanceIndependence` determines the benchmark instance lifetime based on several factors: the declared lifetime, whether the class implements `IStateReset`, whether it uses `[SharedState]`, and whether instances are provided by a container. If a class is marked as `PerClass` but its instances are resolved by a container or factory, and it doesn't declare a specific lifetime, the engine resolves it to `PerMethod` and attaches the reason to the results.
 
-This is decided in the same function as **which process measures it**, and the second answer swallows the first: the global in-process guard returns before the lifetime rule can run, so the rule is unreachable for every run that cannot isolate, and its own condition is true only for harnesses with no instance source - meaning it fires exactly where dependence is impossible and never where a container is handing out scoped `DbContext`s. Two questions, two functions: `InstanceIndependence.ResolveLifetime` and `BenchmarkHarness.ResolveGranularity`.
+The engine determines the lifetime and the measuring process in the same logic path. The global in-process guard returns before the lifetime rule executes, making the rule unreachable for runs that cannot isolate. The rule only triggers for harnesses without an instance source, meaning it executes where dependence is impossible and not when a container provides scoped objects, such as a `DbContext`. This logic is split between `InstanceIndependence.ResolveLifetime` and `BenchmarkHarness.ResolveGranularity`.
 
-## The answer travels with the run
+## Propagating the lifetime decision
 
-The resolved lifetime travels on the wire as `RunGroupPayload.InstanceLifetimeOverride`, which beats both the class attribute and `DefaultInstanceLifetime` in the worker. It cannot ride on the default, because the attribute beats a default - a class carrying `[InstanceLifetime(PerClass)]` would go on sharing its instance however the coordinator had resolved it.
+The engine transmits the resolved lifetime as `RunGroupPayload.InstanceLifetimeOverride`. This value takes precedence over both the class attribute and the `DefaultInstanceLifetime` in the worker. Using a default value wouldn't work because a class attribute overrides the default; for example, a class with `[InstanceLifetime(PerClass)]` would continue sharing its instance regardless of how the coordinator resolved it.
 
-The rule is evaluated once, on the coordinator, for the reason `DiscoveredGroupExecutor` is one implementation: a rule evaluated twice can disagree with itself, and an isolated and an in-process number differing by instance lifetime differ for a reason unrelated to the process boundary.
+The coordinator evaluates the rule once because `DiscoveredGroupExecutor` is a single implementation. Evaluating the rule twice could lead to inconsistent results. If an isolated run and an in-process run differ due to instance lifetime, the difference is unrelated to the process boundary.
 
-The dependence warning is raised from `DiscoveredGroupExecutor` and the coordinator's in-process path both, so a shared instance says so wherever it was measured - not only on the coordinator's in-process path, which a default Harness run never takes.
+Both `DiscoveredGroupExecutor` and the coordinator's in-process path can raise dependence warnings. This ensures that shared instances are flagged regardless of where they were measured, including paths that a default harness run doesn't use.
 
-## Launches build their own
+## Independence across multiple launches
 
-With `LaunchCount > 1` every launch constructs a new instance and re-runs `[BenchmarkSetup]`, on every path. `LaunchAggregator` derives the reported `StandardError`/`MarginOfError` from the between-launch spread, and launches sharing one object, one scope and one setup are not independent measurements of anything - the field documented a reproducibility figure and carried the opposite. It also settles the reset question at the launch boundary by construction: there is no carried state there for `IStateReset` to be asked to clean.
+When `LaunchCount` is greater than 1, every launch constructs a new instance and re-runs `[BenchmarkSetup]` on every path. `LaunchAggregator` calculates the `StandardError` or `MarginOfError` based on the spread between launches. Launches that share a single object, scope, or setup are not independent measurements of anything - the field documented a reproducibility figure and carried the opposite. This approach also resolves the state reset question at the launch boundary: because each launch starts fresh, there is no carried state for `IStateReset` to clean.
 
-## Instance sources
+## Instance sources and providers
 
-`Workers/InstanceSource` is how a measuring process obtains the instances a benchmark class's methods are invoked on. Four kinds: `Constructed` (the type's own constructor - the default, and the only one needing no recipe), `ServiceProvider`, `ScopedServiceProvider`, and `InstanceFactory`. The source carries three things together - the kind, the addressable recipe a worker can follow, and the host-side resolver for the in-process path - and that grouping is the point. The kind and the resolver travel as one unit, so "this is scoped" and "this factory is addressable" are expressible together; without the grouping, a `Func<Type, InstanceHandle>` says "cannot isolate" and a `Func<IServiceProvider>` says the opposite, with nothing tying them together, and every DI API except one specific overload loses the run its isolation regardless of how the factory is written.
+`Workers/InstanceSource` determines how a measuring process obtains instances for a benchmark class. The engine supports four types: `Constructed` (the default, using the type's own constructor), `ServiceProvider`, `ScopedServiceProvider`, and `InstanceFactory`. The source groups the type, the addressable recipe for the worker, and the host-side resolver for in-process paths. This grouping allows the engine to express both the scope and the addressability of the factory. Without this, different DI APIs (like `Func<Type, InstanceHandle>` versus `Func<IServiceProvider>`) would provide conflicting isolation signals, and every DI API except one specific overload - `WithServiceProvider(Func<IServiceProvider>)` - loses the run its isolation regardless of how the factory is written.
 
-The kind travels on the wire because the worker cannot infer it: `ServiceProvider` and `ScopedServiceProvider` are both `Func<IServiceProvider>` and differ only in what the worker does afterwards. Resolving a scoped registration off the root container throws under `ValidateScopes` and, without it, silently shares one instance across every benchmark method - which is exactly the dependence the significance test assumes is absent.
+The engine transmits the source type because the worker cannot infer it. Both `ServiceProvider` and `ScopedServiceProvider` use `Func<IServiceProvider>` and differ only in the worker's subsequent actions. Resolving a scoped registration from the root container throws an exception when `ValidateScopes` is enabled. Without this validation, the engine would silently share one instance across every benchmark method, creating the exact dependence that the significance test assumes is absent.
 
-`NBenchmark.Worker/ServiceScopes` creates the per-instance scope by reflecting over `IServiceScopeFactory`, resolved through the **target's** load context rather than the worker's. Neither core NBenchmark nor `nbworker` references `Microsoft.Extensions.DependencyInjection.Abstractions` - that is why the DI integration is a separate package - and referencing it to call one extension method would put it in every worker's graph, including the majority of runs that use no container. The types are certainly reachable from the target: a run only gets here because the user called `WithScopedServiceProvider`.
+`NBenchmark.Worker/ServiceScopes` creates the per-instance scope by reflecting over `IServiceScopeFactory`. It resolves this through the target's load context instead of the worker's. Core NBenchmark and `nbworker` do not reference `Microsoft.Extensions.DependencyInjection.Abstractions` to avoid adding unnecessary dependencies to the worker graph for runs that don't use a container; this is why DI integration is provided as a separate package. These types are reachable because the user explicitly called `WithScopedServiceProvider`.
 
-Host-side resolvers are **deferred**. The coordinator's container is only wanted if this process ends up measuring, and on an isolated run it never does, so building one at configuration time opened a database and constructed an EF model in a process with no benchmark in it.
+The engine defers host-side resolvers. The coordinator only needs its container if it performs the measurement. Since isolated runs never do this, building the container at configuration time would unnecessarily open databases or construct EF models in a process that doesn't run any benchmarks.
 
 ## See also
 
-- [State isolation](../features/state-isolation.md) - the user-facing contract
-- [Dependency injection](../features/dependency-injection.md) - the DI surface this resolution applies to
-- [Multiple launches](../features/multiple-launches.md) - why each launch builds its own instance
+For more information, see the following pages:
+
+- [State isolation](../features/state-isolation.md) - The user-facing contract
+- [Dependency injection](../features/dependency-injection.md) - The DI surface this resolution applies to
+- [Multiple launches](../features/multiple-launches.md) - Why each launch builds its own instance

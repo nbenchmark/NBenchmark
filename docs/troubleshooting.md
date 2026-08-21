@@ -6,276 +6,281 @@ order: 11
 
 # Troubleshooting
 
-Each entry leads with the literal fix and then explains the why.
+This guide provides symptoms, causes, and fixes for common measurement problems. Each entry leads with a quick fix followed by a detailed explanation.
 
 ## Measurement variability
 
-### Numbers are uniformly slow and not production-representative
+### Numbers are uniformly slow
 
 > [!CAUTION] Quick fix
-> Rebuild with `dotnet run -c Release` (or set the configuration to Release in your IDE) and detach the debugger.
+> Rebuild your project with `dotnet run -c Release` (or set the configuration to Release in your IDE) and detach the debugger.
 
-The entry assembly was built in `Debug` configuration (common with `dotnet run` without `-c Release`), or a debugger is attached. Both defeat JIT inlining and tier-1 optimization. If measuring Debug behavior is intentional, suppress the warning with `NBENCHMARK_SUPPRESS_DEBUG_WARNING=1` or `new MeasurementOptions { Environment = new EnvironmentOptions { SuppressBuildConfigurationWarning = true } }`.
+If the entry assembly is built in `Debug` configuration or a debugger is attached, JIT inlining and tier-1 optimization are disabled. If you intentionally want to measure Debug behavior, suppress the warning by setting `NBENCHMARK_SUPPRESS_DEBUG_WARNING=1` or using `new MeasurementOptions { Environment = new EnvironmentOptions { SuppressBuildConfigurationWarning = true } }`.
 
-### Large Error (wide confidence interval)
+### Large error (wide confidence interval)
 
 > [!CAUTION] Pick one based on the cause
-> **Demand a tighter target:** `.WithAutoTune(AutoTunePreset.Thorough)` or `--ci-target 0.01`
-> **Raise the sample ceiling:** `--max-samples <n>` and `--max-tuning-time <s>` if the loop is stopping on a cap
-> **Reduce OS scheduling noise:** switch outlier mode to `.WithOutlierMode(OutlierMode.IqrFence)` (the default; if you changed it, change it back)
-> **Stabilise a hot laptop:** `--warmup 50` to let the CPU stabilise, and run plugged in
+> - **Demand a tighter target:** Use `.WithAutoTune(AutoTunePreset.Thorough)` or `--ci-target 0.01`.
+> - **Raise the sample ceiling:** Use `--max-samples <n>` and `--max-tuning-time <s>` if the loop stops at a cap.
+> - **Reduce OS scheduling noise:** Use `.WithOutlierMode(OutlierMode.IqrFence)` (the default).
+> - **Stabilize a hot laptop:** Use `--warmup 50` to let the CPU stabilize and ensure the laptop is plugged in.
 
-A wide confidence interval means genuinely variable timings. In auto-sampling mode NBenchmark keeps collecting samples until the Error meets the precision target, so a wide interval usually points to real run-to-run variability rather than too few samples. The right remedy depends on the cause: a tight target for slow-but-stable bodies, a higher sample ceiling for fast-but-noisy ones, an outlier-mode change for OS noise, or a longer warmup for thermal ramps.
+A wide confidence interval indicates genuinely variable timings. In auto-sampling mode, NBenchmark collects samples until the Error meets the precision target. Therefore, a wide interval usually points to real run-to-run variability rather than an insufficient sample size.
 
-See [Configuration: AutoTune](./reference/configuration.md#autotune) for the `Thorough` preset and [Configuration: OutlierMode](./reference/configuration.md#outliermode) for the outlier modes.
+The correct remedy depends on the cause:
+- Use a tight target for slow but stable bodies.
+- Use a higher sample ceiling for fast but noisy bodies.
+- Change the outlier mode for OS noise.
+- Use a longer warmup for thermal ramps.
 
-### Same benchmark, a different median each run, and every run reports a tight Error
+For more information, see [Configuration: AutoTune](./reference/configuration.md#autotune) for the `Thorough` preset and [Configuration: OutlierMode](./reference/configuration.md#outliermode) for outlier modes.
+
+### Median differs between runs with tight error
 
 > [!CAUTION] Quick fix
-> Run with `--launch-count 5` or higher (the Harness default) and read the `Error` column, which then describes reproducibility rather than one process's precision. Do **not** reach for more samples or longer warmup first - neither addresses the usual cause.
+> Run with `--launch-count 5` or higher (the Harness default). Read the `Error` column, which then describes reproducibility rather than the precision of a single process. Do not increase the sample count or warmup time first, as these do not address the usual cause.
 
-Three different things produce this symptom, and they need different fixes. Diagnose before treating, in this order - the first two are the ones you can fix, and both are rare with default settings.
+Three different issues can produce this symptom. Diagnose them in the following order:
 
-**1. Warmup ended before the JIT finished tiering up.** The run measured pre-tier-1 (unoptimized) code, which can read several times slow. Each run is internally consistent, which is why the margin looks trustworthy.
+**1. Warmup ended before the JIT finished tiering up.**
+The run measured unoptimized code, which can be several times slower. Each run is internally consistent, so the margin appears trustworthy.
 
-Check `autoTune.warmupTimeFloorMet` in the JSON (or `warmup cut short` on the console summary), plus `autoTune.jitQuiescenceAchieved` and `autoTune.splitHalfDrift`. `autoTune.warmupCurve` shows whether the body was still speeding up when warmup ended, and `autoTune.jitLastChangeAtNs` against `warmupElapsedNs` shows how much quiet time followed the last compilation. Fix by raising `--min-warmup-time <ms>` (default 500) and `--max-warmup <n>` if the ceiling is what cut warmup short.
+Check `autoTune.warmupTimeFloorMet` in the JSON (or `warmup cut short` on the console summary), as well as `autoTune.jitQuiescenceAchieved` and `autoTune.splitHalfDrift`. The `autoTune.warmupCurve` shows whether the body was still speeding up when warmup ended. `autoTune.jitLastChangeAtNs` compared to `warmupElapsedNs` shows how much quiet time followed the last compilation. To fix this, raise `--min-warmup-time <ms>` (default 500) and `--max-warmup <n>` if the ceiling cut warmup short.
 
-**2. The measurement is finer than the clock can resolve.** Check `autoTune.sampleQuantizationFraction` against the reported margin. If one timer step is a larger fraction of the sample than the margin is, the digits are describing the clock's step grid rather than your code - within a run every sample lands on the same step, and between runs a tiny shift moves them all to the next one. NBenchmark warns when it detects this. The default `MinQuantaPerSample` floor prevents it, so it generally only appears with a small pinned `--ops-per-sample` on a fast body; raise it so each sample spans hundreds of steps. See [Timer resolution](./statistics/measurement.md#timer-resolution).
+**2. The measurement is finer than the clock can resolve.**
+Compare `autoTune.sampleQuantizationFraction` against the reported margin. If one timer step is a larger fraction of the sample than the margin is, the results describe the clock's step grid rather than your code. Within a run, every sample lands on the same step; between runs, a tiny shift moves them all to the next one. NBenchmark warns you when it detects this. The default `MinQuantaPerSample` floor prevents this, so it generally only appears if you use a small pinned `--ops-per-sample` on a fast body. Raise the value so each sample spans hundreds of steps. For more information, see [Timer resolution](./statistics/measurement.md#timer-resolution).
 
-**3. Neither - the number genuinely does not reproduce that precisely.** This is the common case on a healthy run, and there is nothing to fix in the measurement. A single process cannot see it: within-run sampling estimates how precisely *that process* measured, and drives the margin toward zero as `1/√n`, while the between-process component - code and heap layout, scheduler placement, CPU frequency and thermal state - is fixed inside a process and completely untouched by it. **More samples make the margin narrower without making it more honest, and longer warmup does not change it at all.**
+**3. The number genuinely does not reproduce that precisely.**
+This is the common case for a healthy run, and there is nothing to fix in the measurement. A single process cannot detect this because within-run sampling estimates how precisely *that process* measured, and the margin narrows as `1/√n`. The between-process component (code and heap layout, scheduler placement, CPU frequency, and thermal state) is fixed inside a process. Increasing the sample count makes the margin narrower without making it more honest, and longer warmup does not change it.
 
-Only replication across processes can measure it. Run `--launch-count 5` (or more) and read `launchStatistics`: `betweenLaunchDispersion` is the run-to-run spread, and `processVarianceRatio` is how far the single-process margin was understating it. On a nanosecond-scale body a ratio of 30-60 is ordinary. See [Reading the reproducibility warning](./features/multiple-launches.md#reading-the-reproducibility-warning).
+Only replication across processes can measure this. Run `--launch-count 5` (or more) and read `launchStatistics`. The `betweenLaunchDispersion` is the run-to-run spread, and `processVarianceRatio` is how much the single-process margin understated it. On a nanosecond-scale body, a ratio of 30-60 is ordinary. For more information, see [Reading the reproducibility warning](./features/multiple-launches.md#reading-the-reproducibility-warning).
 
-To actually *reduce* that spread you have to work outside the statistics - [environment controls](./features/environment-control.md) for CPU affinity and process priority, or a quieter, less thermally constrained host. CPU affinity is unavailable on macOS at either scope, so an Apple Silicon laptop with performance and efficiency cores will still show more run-to-run spread than a pinned Linux box; NBenchmark asks the scheduler for a performance core where macOS permits it, and [says so when it cannot](./features/environment-control.md#macos-and-apple-silicon).
+To reduce this spread, use [environment controls](./features/environment-control.md) for CPU affinity and process priority, or use a quieter, less thermally constrained host. CPU affinity is unavailable on macOS. An Apple Silicon laptop with performance and efficiency cores will show more run-to-run spread than a pinned Linux box. NBenchmark requests a performance core when macOS permits it and [reports when it cannot](./features/environment-control.md#macos-and-apple-silicon).
 
-### Tight Error next to a `maxCeiling` stop, or next to a Max hundreds of times the median
-
-> [!CAUTION] Pick one
-> **Accept the variance as the finding:** `--launch-count 5` (the honest signal of run-to-run spread across launches)
-> **Chase precision:** raise `--max-samples` and loosen `--ci-target` (e.g. `--ci-target 0.05`)
-
-The reported Error describes the **trimmed** mean while the loop's stop rule ran on the **raw** stream. The Error already accounts for how many samples the fence removed - it is a Winsorized interval, so a discarded sample still counts as an observation - but not for how *far out* they were, because an interval on the trimmed mean cannot. A benchmark can show `MarginOfError` at ±1.3% of its mean while `autoTune.achievedRelativeCiWidth` is `1.05` (±105%). Neither number is wrong; they describe different sample sets.
-
-Read `autoTune.sampleStop` before the Error column: a tight margin is evidence the measurement *converged* only when it reads `ciTargetMet`. Compare `autoTune.achievedRelativeCiWidth` against `marginOfError / mean`, and check `outliersRemoved` against the pre-trim sample count.
-
-See [Raw vs. trimmed statistics](./statistics/measurement.md#raw-vs-trimmed-statistics) for the full mechanism.
-
-### Result reports a `driftUnresolved` stop
+### Tight error with max ceiling stop or high max values
 
 > [!CAUTION] Pick one
-> **Land the transition during warmup instead:** `--min-warmup-time <ms>` (raise it; the default is 500 ms)
-> **Accept non-stationarity as the finding:** `--launch-count 5` to measure the across-launch spread, which is the honest signal
+> - **Accept the variance as the finding:** Use `--launch-count 5` to get an honest signal of run-to-run spread across launches.
+> - **Chase precision:** Raise `--max-samples` and loosen `--ci-target` (for example, `--ci-target 0.05`).
 
-The measured timings kept moving while they were being collected, so the interval describes a moving target. Usually a JIT tier-up or dynamic-PGO re-optimization landing inside measurement; otherwise a thermal ramp, a filling cache, or a growing data structure.
+The reported Error describes the **trimmed** mean, while the loop's stop rule runs on the **raw** stream. The Error accounts for how many samples the fence removed (it is a Winsorized interval), but not for how far out they were. A benchmark can show `MarginOfError` at ±1.3% of its mean while `autoTune.achievedRelativeCiWidth` is `1.05` (±105%). Both numbers are correct; they describe different sample sets.
 
-See [Measurement: Steady-state (drift) gate](./statistics/measurement.md#phase-c---measurement-ci-width-target) for the drift detection mechanism and the restart limit.
+Read `autoTune.sampleStop` before the Error column. A tight margin is evidence the measurement converged only when it reads `ciTargetMet`. Compare `autoTune.achievedRelativeCiWidth` against `marginOfError / mean`, and check `outliersRemoved` against the pre-trim sample count.
 
-### A row warns that host drift exceeds the difference being reported
+For more information, see [Raw vs. trimmed statistics](./statistics/measurement.md#raw-vs-trimmed-statistics).
+
+### Result reports a drift unresolved stop
 
 > [!CAUTION] Pick one
-> **Measure the two co-resident, several times over:** `--launch-count 5`
-> **Take the machine out of it:** `--cpu-affinity 2,3 --priority high` on a host you control
-> **Re-run just the pair:** `--filter 'Baseline|Candidate' --order declaration` on a quiet machine
+> - **Land the transition during warmup instead:** Raise `--min-warmup-time <ms>` (the default is 500 ms).
+> - **Accept non-stationarity as the finding:** Use `--launch-count 5` to measure the across-launch spread.
 
-Between the moment the baseline was measured and the moment the candidate was, the host's effective speed moved by more than the difference the table is reporting between them. The machine drifted - a laptop warming up, a build starting in another terminal, a co-tenant arriving on the runner - and the row you are looking at cannot separate that from your code.
+The measured timings continued to move while they were being collected, so the interval describes a moving target. This is usually caused by a JIT tier-up or dynamic-PGO re-optimization during measurement. Other causes include thermal ramps, filling caches, or growing data structures.
 
-Nothing is wrong with either measurement. Each one is internally consistent, which is exactly why the per-benchmark drift gate did not fire: it looks inside a single benchmark's samples, and drift *between* benchmarks is invisible there. What caught it is the control workload NBenchmark runs at every benchmark boundary; the readings either side of each row are on `hostTimeline` in the JSON, and `hostTimeline.relativeToRunStart` is what the two rows disagree about.
+For more information, see [Measurement: Steady-state (drift) gate](./statistics/measurement.md#phase-c---measurement-ci-width-target) for the drift detection mechanism and the restart limit.
 
-Raising `--launch-count` is the straightest fix: each launch measures the pair close together, so the drift becomes something the replicates average over rather than something one ordering baked in.
+### Host drift exceeds reported difference
 
-See [The host drift canary](./statistics/measurement.md#the-host-drift-canary) for the mechanism, and [`--no-drift-canary`](./reference/cli.md#--no-drift-canary) to switch the check off.
+> [!CAUTION] Pick one
+> - **Measure the two co-resident, several times over:** Use `--launch-count 5`.
+> - **Control the machine:** Use `--cpu-affinity 2,3 --priority high` on a host you control.
+> - **Re-run just the pair:** Use `--filter 'Baseline|Candidate' --order declaration` on a quiet machine.
+
+Between the moment the baseline was measured and the moment the candidate was measured, the host's effective speed changed by more than the reported difference. The machine drifted due to a laptop warming up, a build starting in another terminal, or a co-tenant arriving on the runner.
+
+Each measurement is internally consistent, which is why the per-benchmark drift gate did not fire. The drift occurs *between* benchmarks. The control workload NBenchmark runs at every benchmark boundary detects this.
+
+The most direct fix is to raise `--launch-count`. Each launch measures the pair close together, so the drift is averaged over the replicates rather than baked into one ordering.
+
+For more information, see [The host drift canary](./statistics/measurement.md#the-host-drift-canary) for the mechanism, and [`--no-drift-canary`](./reference/cli.md#diagnostics) to disable the check.
 
 ### Sample count varies between runs
 
 > [!CAUTION] Quick fix
-> Expected - this is auto-sampling working as designed. Pin `.WithIterations(n)` / `--iterations n` for a fixed, reproducible sample count (e.g. in CI).
+> This is expected behavior. Auto-sampling works as designed. To get a fixed, reproducible sample count (for example, in CI), use `.WithIterations(n)` or `--iterations n`.
 
-Each run collects exactly enough samples to hit the CI target. Pin a fixed count only when you need reproducibility across runs (CI dashboards, regression baselines).
+Each run collects enough samples to hit the CI target. Use a fixed count only when you need reproducibility across runs for CI dashboards or regression baselines.
 
-See [Configuration: Iterations](./reference/configuration.md#iterations).
+For more information, see [Configuration: Iterations](./reference/configuration.md#iterations).
 
-### High StdDev
+### High standard deviation
 
 > [!CAUTION] Pick one
-> **Diagnose allocation pressure:** enable allocation tracking with `.WithAllocations()` and read the `Alloc/op` column
-> **Isolate iterations from GC noise:** switch to the `Independent` profile (`--profile independent`) to force per-iteration GC
+> - **Diagnose allocation pressure:** Enable allocation tracking with `.WithAllocations()` and read the `Alloc/op` column.
+> - **Isolate iterations from GC noise:** Use the `Independent` profile (`--profile independent`) to force per-iteration GC.
 
-A high standard deviation means timings are inconsistent. Under the default `Realistic` profile, natural GC pauses are included in the timing; allocation pressure from the body produces a noisy tail. The `Independent` profile forces a Gen0 GC before every iteration so GC pauses are deterministic rather than random, which removes them from the variance (at the cost of ecological validity).
+A high standard deviation indicates inconsistent timings. Under the default `Realistic` profile, natural GC pauses are included in the timing, and allocation pressure from the body produces a noisy tail. The `Independent` profile forces a Gen0 GC before every iteration, making GC pauses deterministic and removing them from the variance (at the cost of ecological validity).
 
-See [Measurement Profiles](./statistics/measurement.md#measurement-profiles) for the worked example and [Configuration: MeasureAllocations](./reference/configuration.md#measureallocations).
+For more information, see [Measurement Profiles](./statistics/measurement.md#measurement-profiles) and [Configuration: MeasureAllocations](./reference/configuration.md#measureallocations).
 
-### Bimodal-distribution warning
-
-> [!CAUTION] Quick fix
->
-> 1. **Check the body** for **lock contention** or **cache misses** - the cluster centre in the warning names the extra cost the slow path pays.
-> 2. **If you suspect GC:** `dotnet run -- --profile independent` (forces per-iteration Gen0 collection, making GC pauses deterministic rather than bimodal).
-
-The outlier detector found a tight secondary cluster of slow timings rather than scattered noise - a real, repeatable slow path in the code. The reported median describes the fast path; the cluster centre describes a latency a real user will also hit. The warning is non-fatal: the benchmark still completes and reports statistics on the trimmed (fast-cluster) set.
-
-Do not silence it. Read the tail metrics as-is - by default the histogram and P99/P99.9/Max are computed from the full pre-trim distribution, so the cluster is still visible there. Investigate the cause with a profiler, and reduce noise at the source with [environment control](./features/environment-control.md) if OS scheduling contributed to the spread.
-
-See [Outlier Trimming: Bimodal-distribution warning](./statistics/outliers.md#bimodal-distribution-warning) for the detector, the common-cause table, and the interaction with each outlier mode.
-
-### A warning names samples "confirmed preempted by the OS"
+### Bimodal distribution warning
 
 > [!CAUTION] Quick fix
->
-> 1. **Read it as good news, not a bug report.** These samples were removed on direct evidence (the measuring thread's own CPU occupancy), not inferred from the timing - the reported numbers are more trustworthy for having them gone.
-> 2. **If the rejected fraction is high** ("this host is too noisy to trust"), get off the shared host or re-run once background load clears, the same remedy as a high jitter metric.
+> 1. **Check the body** for lock contention or cache misses. The cluster center in the warning names the extra cost of the slow path.
+> 2. **If you suspect GC:** Use `dotnet run -- --profile independent` to force per-iteration Gen0 collection.
 
-This is [evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection): a pre-stage that runs before the statistical outlier detector and discards a sample only when the OS is *known* to have preempted it, rather than when the timing merely looks slow. The two discard counts - confirmed preempted vs. statistical outlier - are reported together in one message so nothing is counted twice.
+The outlier detector found a tight secondary cluster of slow timings rather than scattered noise, indicating a real, repeatable slow path in the code. The reported median describes the fast path, and the cluster center describes a latency a real user will encounter. The warning is non-fatal; the benchmark still completes and reports statistics on the trimmed (fast-cluster) set.
 
-It is on by default and needs no action on a normal run: a quiet host rejects nothing and the reported numbers are unaffected. To leave only the statistical detector trimming the sample stream, pass `--no-interference-filter`.
+Do not silence this warning. Read the tail metrics as-is; by default, the histogram and P99/P99.9/Max are computed from the full pre-trim distribution. Investigate the cause with a profiler and reduce noise at the source with [environment control](./features/environment-control.md) if OS scheduling contributed to the spread.
 
-See [Outlier Trimming: Evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection) for the statistic and the graceful-degradation cases below.
+For more information, see [Outlier Trimming: Bimodal-distribution warning](./statistics/outliers.md#bimodal-distribution-warning).
 
-### `autoTune.interferenceDisabledReason` is set
+### Samples confirmed preempted by the OS
 
 > [!CAUTION] Quick fix
->
-> This is informational, not an error - the timings are unaffected either way.
+> 1. **Read this as good news.** These samples were removed based on direct evidence (the measuring thread's own CPU occupancy), not inferred from the timing. The reported numbers are more trustworthy because these samples were removed.
+> 2. **If the rejected fraction is high** ("this host is too noisy to trust"), move to a less noisy host or re-run once background load clears.
 
-The interference filter could not run for this benchmark and says why on `AutoTuneDiagnostic.InterferenceDisabledReason` (visible at `--detail advanced`). The three causes:
+This is [evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection). This pre-stage runs before the statistical outlier detector and discards a sample only when the OS is known to have preempted it. The confirmed preempted and statistical outlier counts are reported together.
 
-| Reason | What it means |
+This is on by default and requires no action on a normal run. To use only the statistical detector, pass `--no-interference-filter`.
+
+For more information, see [Outlier Trimming: Evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection).
+
+### Interference disabled reason is set
+
+> [!CAUTION] Quick fix
+> This is informational, not an error. Timings are unaffected.
+
+The interference filter could not run for this benchmark. The reason is listed in `AutoTuneDiagnostic.InterferenceDisabledReason` (visible with `--detail advanced`).
+
+| Reason | Meaning |
 | --- | --- |
-| Thread-CPU clock unavailable | The host platform has no thread-CPU-time API the engine knows about. |
-| Probe cost exceeded its budget | Two clock reads would have cost more than `InterferenceOptions.ProbeCostBudgetFraction` of the sample-duration target, so the probe was never armed for this run. |
-| Too few samples with a known occupancy reading | Usually an async body whose continuations mostly resumed on a different thread - a thread-CPU-time delta from that sample would be reading the wrong thread's clock, so it is reported as unknown rather than wrong, and there was not enough other evidence to trust a median. |
+| Thread-CPU clock unavailable | The host platform has no thread-CPU-time API that the engine supports. |
+| Probe cost exceeded its budget | Two clock reads would have cost more than `InterferenceOptions.ProbeCostBudgetFraction` of the sample-duration target. |
+| Too few samples with a known occupancy reading | Usually an async body whose continuations mostly resumed on a different thread. |
 
-Nothing you need to fix unless you specifically want the interference evidence back: for the async case, a body whose `await` points resume on the original thread (rare in general-purpose async code) would restore it.
+You do not need to fix this unless you specifically want interference evidence. For the async case, a body whose `await` points resume on the original thread would restore it.
 
 ## Zero or unexpected results
 
-### Result shows `0 ns`
+### Result shows 0 ns
 
 > [!CAUTION] Quick fix
-> Use the `Func<T>` overload that returns a value: `Benchmark.Run(() => ComputeHash(data))`. Or add a side effect to the body.
+> Use the `Func<T>` overload that returns a value: `Benchmark.Run(() => ComputeHash(data))`. Alternatively, add a side effect to the body.
 
-Dead code elimination - the compiler removed your benchmark body because it has no observable side effects. A returning overload writes the return value to a static field so the JIT cannot elide the call.
+The compiler removed your benchmark body because it has no observable side effects (dead code elimination). A returning overload writes the return value to a static field so the JIT cannot elide the call.
 
-See [FAQ: `0 ns`](./faq.md#my-benchmark-produces-0-ns-whats-happening).
+For more information, see [FAQ: `0 ns`](./faq.md#my-benchmark-produces-0-ns-whats-happening).
 
-### All results zeroed
-
-> [!CAUTION] Quick fix
-> Remove the `--dry-run` flag, or set `Iterations` > 0.
-
-Dry-run mode is active (`--dry-run`, or `Iterations=0` and `WarmupIterations=0`). The body is not invoked and no measurements are taken. `--dry-run` validates discovery and wiring; to run the body exactly once for a smoke test, use `--iterations 1 --warmup 0`.
-
-### `MarginOfError` is `±0 ns`
+### All results are zero
 
 > [!CAUTION] Quick fix
-> Unpin `Iterations` to use auto mode (collects at least `AutoTune.MinSamples`), or pin a larger count.
+> Remove the `--dry-run` flag or set `Iterations` > 0.
 
-Either only one sample was collected (`n < 2`, from a pinned `Iterations = 1`) or all measurements were identical (timer resolution coarser than the benchmark duration). For a fast body, auto ops-per-sample calibration amortizes a coarse timer - note that calibration is skipped when setup/teardown is set, and bypassed when `OpsPerSample` is pinned.
+Dry-run mode is active (`--dry-run`, or `Iterations=0` and `WarmupIterations=0`). The body is not invoked, and no measurements are taken. Use `--dry-run` to validate discovery and wiring. To run the body exactly once for a smoke test, use `--iterations 1 --warmup 0`.
 
-Identical measurements are the extreme of the quantization case above: every sample landed on the same clock step. Compare `autoTune.clockResolutionNs` against `autoTune.sampleDurationNs` - if a sample spans only a step or two, the timer cannot distinguish your samples from each other. See [Timer resolution](./statistics/measurement.md#timer-resolution).
+### Margin of error is ±0 ns
 
-### `Sig` column is blank
+> [!CAUTION] Quick fix
+> Unpin `Iterations` to use auto mode (which collects at least `AutoTune.MinSamples`), or pin a larger count.
+
+This happens if only one sample was collected (`n < 2`) or all measurements were identical (timer resolution is coarser than the benchmark duration). For a fast body, auto ops-per-sample calibration amortizes a coarse timer. Note that calibration is skipped when setup/teardown is set and bypassed when `OpsPerSample` is pinned.
+
+Identical measurements occur when every sample lands on the same clock step. Compare `autoTune.clockResolutionNs` against `autoTune.sampleDurationNs`. If a sample spans only one or two steps, the timer cannot distinguish samples. For more information, see [Timer resolution](./statistics/measurement.md#timer-resolution).
+
+### Significance column is blank
 
 > [!CAUTION] Quick fix
 > Increase iterations or combine more runs: `--iterations <n>` or `--min-samples <n>`.
 
-Too few samples for the significance test (requires ≥2 per group), **or** the Kruskal-Wallis omnibus was not significant (three-plus benchmarks compared, no post-hoc ran). In the second case the blank is correct - the omnibus gate refused to run pairwise comparisons because the groups look the same.
+This happens if there are too few samples for the significance test (which requires at least two per group), or if the Kruskal-Wallis omnibus test was not significant. In the second case, the blank is correct; the omnibus gate refused to run pairwise comparisons because the groups appear the same.
 
-See [FAQ: significance](./faq.md#why-is-significance-sometimes-blank) and [Significance Testing](./statistics/significance.md) for the omnibus gate.
+For more information, see [FAQ: significance](./faq.md#why-is-significance-sometimes-blank) and [Significance Testing](./statistics/significance.md).
 
 ## Discovery and setup errors
 
-### `[Benchmark]` method not discovered
+### [Benchmark] method is not discovered
 
 > [!CAUTION] Quick fix
-> Run `dotnet run -- --list` to verify what the host finds, then check the class is public, not abstract, and the method is an instance method (not static).
+> Run `dotnet run -- --list` to verify what the host finds. Ensure the class is public and not abstract, and the method is an instance method (not static).
 
 The host scans for public instance methods marked `[Benchmark]` on public, non-abstract classes. Static methods, abstract classes, and assemblies not registered with `AddFromAssembly` are not discovered.
 
-See [Harness mode: listing benchmarks without running](./usage-modes/harness-mode.md#listing-benchmarks-without-running).
+For more information, see [Harness mode: listing benchmarks without running](./usage-modes/harness-mode.md#listing-benchmarks-without-running).
 
-### "Could not instantiate MyClass"
-
-> [!CAUTION] Pick one
-> **Add a public parameterless constructor** to the benchmark class (simplest fix if the class has no real dependencies)
-> **Install `NBenchmark.Analyzers`** for compile-time detection of NB0001 (missing parameterless constructor)
-> **Use dependency injection:** add the `NBenchmark.DependencyInjection` package and `UseDependencyInjection<T>(BuildServices)` with a static `IServiceProvider BuildServices()` factory, so the worker rebuilds the container and the run stays isolated
-
-The host uses `Activator.CreateInstance`, which requires a public parameterless constructor. Benchmark classes with real dependencies (a repository, a logger, an `HttpClient`, a `DbContext`) need the DI companion package.
-
-See [Dependency Injection](./features/dependency-injection.md) for the full API and [FAQ: instantiation](./faq.md#the-host-throws-could-not-instantiate-myclass-how-do-i-fix-it).
-
-### "cannot be sent to another process" - the run fails instead of measuring
+### Could not instantiate benchmark class
 
 > [!CAUTION] Pick one
-> **Build the value in the worker** with a prepare delegate: `Benchmark.Run(prepare: () => BuildIt(), body: v => Use(v))`, or `BenchmarkSuite.Over(name, () => BuildIt())` in Suite mode
-> **Mark your own type `[BenchmarkState]`** if its measured behavior really is fully determined by its serialized contents
-> **`AddInProcess(name, body)`** to keep just that one benchmark here, with the rest of the suite still in a worker
-> **`WithRequireIsolation(false)`** to accept a labeled host-process number everywhere - right for a scratchpad, wrong for anything comparative
+> - **Add a public parameterless constructor** to the benchmark class.
+> - **Install `NBenchmark.Analyzers`** for compile-time detection of NB0001 (missing parameterless constructor).
+> - **Use dependency injection:** Add the `NBenchmark.DependencyInjection` package and use `UseDependencyInjection<T>(BuildServices)` with a static `IServiceProvider BuildServices()` factory.
 
-`RequireIsolation` defaults to `true`, so a benchmark that asked for a worker and cannot have one **fails the run** rather than being measured here and stamped. The message names the benchmark and the value.
+The host uses `Activator.CreateInstance`, which requires a public parameterless constructor. Benchmark classes with real dependencies (such as a repository, a logger, an `HttpClient`, or a `DbContext`) require the DI companion package.
 
-Ordinary captured data is sent and the body stays isolated - an `int`, a `string`, an `int[]`, a `List<T>` or `Dictionary<K,V>` with its default comparer, a record of those. What reaches this error is a value whose behavior is not carried by its contents:
+For more information, see [Dependency Injection](./features/dependency-injection.md) and [FAQ: instantiation](./faq.md#the-host-throws-could-not-instantiate-myclass-how-do-i-fix-it).
 
-| Message says | Why | Fix |
+### Benchmark cannot be sent to another process
+
+> [!CAUTION] Pick one
+> - **Build the value in the worker** with a prepare delegate: `Benchmark.Run(prepare: () => BuildIt(), body: v => Use(v))`, or `BenchmarkSuite.Over(name, () => BuildIt())` in Suite mode.
+> - **Mark your own type `[BenchmarkState]`** if its measured behavior is fully determined by its serialized contents.
+> - **Use `AddInProcess(name, body)`** to keep a specific benchmark in the host process while others run in a worker.
+> - **Use `WithRequireIsolation(false)`** to accept a labeled host-process measurement.
+
+`RequireIsolation` defaults to `true`. A benchmark that requires a worker but cannot be sent to one fails the run.
+
+Ordinary captured data (such as `int`, `string`, `int[]`, `List<T>`, `Dictionary<K,V>` with default comparers, or records of those) is sent and stays isolated. This error occurs for values whose behavior is not carried by their contents:
+
+| Message | Cause | Fix |
 | --- | --- | --- |
-| *is not one of the types whose measured behavior is fully determined by its contents* | A `Stream`, `HttpClient`, `DbConnection`, mock or similar | A prepare delegate - build it in the worker |
-| *was built with a custom comparer* | The dictionary's comparer is neither the default nor one this can reproduce - a custom type with a threshold or a locale baked into a field, say. A named framework singleton (`StringComparer.OrdinalIgnoreCase` and friends) or a comparer with no fields of its own isolates instead of hitting this | Mark the comparer type `[BenchmarkState]` with no instance fields, or a prepare delegate so the comparer is applied there |
-| *carries a private field* / *a get-only property* | On a `[BenchmarkState]` type. The serializer writes those and cannot read them back, so they would arrive at their defaults | Make the member a public field, or a property with a setter |
-| *holds a `X` where a `Y` was declared* | A collection of a base type holding a subclass; it would arrive as base instances with the override gone | A prepare delegate, or make the element type exact |
-| *pushing the captured state past N MiB once encoded* | Past `MaxTransferredStateBytes` (8 MiB default). The message says whether raising it (up to the 32 MiB ceiling) would actually let this through | A prepare delegate, or raise `MaxTransferredStateBytes` when the message says it would fit - see [configuration](./reference/configuration.md#maxtransferredstatebytes) |
-| *something else in this group already refers to the same object* | Two benchmarks share one array through different closures; rebuilding would make two arrays where your program has one | Build the shared state in one prepare delegate the bodies share |
+| *is not one of the types whose measured behavior is fully determined by its contents* | `Stream`, `HttpClient`, `DbConnection`, mock, or similar | Use a prepare delegate to build it in the worker |
+| *was built with a custom comparer* | The dictionary's comparer is neither the default nor reproducible | Mark the comparer type `[BenchmarkState]` or use a prepare delegate |
+| *carries a private field* / *a get-only property* | On a `[BenchmarkState]` type; the serializer cannot read these back | Make the member a public field or a property with a setter |
+| *holds a `X` where a `Y` was declared* | A collection of a base type holding a subclass; overrides are lost upon arrival | Use a prepare delegate or make the element type exact |
+| *pushing the captured state past N MiB once encoded* | Exceeds `MaxTransferredStateBytes` (8 MiB default) | Use a prepare delegate or raise `MaxTransferredStateBytes` |
+| *something else in this group already refers to the same object* | Two benchmarks share one array through different closures | Build shared state in one prepare delegate |
 
-A suite is measured by one worker, so the message names **every** offending benchmark at once rather than the first.
+A suite is measured by one worker, so the message names every offending benchmark.
 
-See [Isolated Runs](./features/isolated-runs.md#when-isolation-is-refused).
+For more information, see [Isolated Runs](./features/isolated-runs.md#when-isolation-is-refused).
 
-### "Could not load file or assembly" from an ASP.NET Core or WPF project
-
-> [!CAUTION] Quick fix
-> Rebuild, so the `runtimeconfig.json` beside the assembly under test is present and current. That file is how the worker learns which shared frameworks to ask for.
-
-Benchmarks that live in a `Microsoft.NET.Sdk.Web` (or WinForms/WPF) project run in an assembly whose dependency graph reaches a shared framework - `Microsoft.AspNetCore.App` or `Microsoft.WindowsDesktop.App`. Those assemblies ship with the framework rather than in your output directory, so they are absent from your project's `deps.json` and are expected to be supplied by the process. The measurement worker is a plain console application, so on its own it supplies only `Microsoft.NETCore.App`, and the load fails with a message naming an assembly that is not actually missing from disk - `Microsoft.Extensions.Hosting.Abstractions` is the usual one.
-
-The framework set is extended automatically: before launching the worker, NBenchmark reads the `runtimeconfig.json` beside the assembly under test and adds any framework the worker does not already declare. `dotnet benchmark` does the same thing for itself - unlike every other mode it loads the target into its own process to discover benchmarks, so it restarts once under the right framework set before reading anything. Nothing needs configuring, and nothing changes for an ordinary console benchmark project.
-
-Two cases remain:
-
-- **No `runtimeconfig.json` beside the assembly**, or a stale one. Rebuild the project. The fault message names the frameworks the worker was actually started with, so it is clear when this is what happened.
-- **A self-contained (`--self-contained`) target.** Its framework lives in its own output directory, so there is no shared framework to request. Build the benchmark project framework-dependent, or pass `--in-process` and accept host-fidelity numbers.
-
-### Benchmarks run in a different order each time
+### Could not load file or assembly in ASP.NET Core or WPF
 
 > [!CAUTION] Quick fix
-> `--order declaration` or `.WithRunOrder(RunOrder.Declaration)` for source order.
+> Rebuild your project to ensure the `runtimeconfig.json` beside the assembly under test is present and current. The worker uses this file to identify required shared frameworks.
 
-Random order is the default and prevents systematic bias (the first benchmark always benefits from a warm CPU cache). Pin declaration order for reproducibility across CI and local, or use `--seed <n>` for a reproducible shuffle.
+Benchmarks in a `Microsoft.NET.Sdk.Web` (or WinForms/WPF) project depend on shared frameworks like `Microsoft.AspNetCore.App` or `Microsoft.WindowsDesktop.App`. These are supplied by the process rather than the output directory. The measurement worker is a plain console application that only supplies `Microsoft.NETCore.App` by default.
 
-See [Configuration: ForceGcBetweenBenchmarks](./reference/configuration.md#forcegcbetweenbenchmarks) (the run-order option lives in the same reference).
+NBenchmark extends the framework set automatically by reading the `runtimeconfig.json` beside the assembly under test. `dotnet benchmark` also performs this action.
+
+Two cases may still cause failure:
+- **Missing or stale `runtimeconfig.json`:** Rebuild the project.
+- **Self-contained target:** The framework is in the output directory, so there is no shared framework to request. Build the benchmark project as framework-dependent, or use `--in-process`.
+
+### Benchmarks run in a different order
+
+> [!CAUTION] Quick fix
+> Use `--order declaration` or `.WithRunOrder(RunOrder.Declaration)` for source order.
+
+Random order is the default to prevent systematic bias, such as the first benchmark benefiting from a warm CPU cache. Use declaration order for reproducibility across CI and local environments, or use `--seed <n>` for a reproducible shuffle.
+
+For more information, see [Configuration: ForceGcBetweenBenchmarks](./reference/configuration.md#forcegcbetweenbenchmarks).
 
 ## Quick reference: Outlier modes
 
 | Mode | When to use |
 | --- | --- |
-| `IqrFence` (default) | General-purpose. The [IQR](https://en.wikipedia.org/wiki/Interquartile_range)-based fence adapts to your data's spread, trimming spikes from OS scheduling interrupts without discarding clean samples. |
-| `RemoveTop5Percent` | When you want a fixed quota - always removes the slowest 5% of iterations. |
-| `RemoveTopAndBottom5Percent` | When very fast outliers (e.g. cache hits after warmup) also skew results. |
+| `IqrFence` (default) | General-purpose. The [IQR](https://en.wikipedia.org/wiki/Interquartile_range)-based fence adapts to data spread and trims spikes from OS scheduling interrupts. |
+| `RemoveTop5Percent` | When you want a fixed quota; always removes the slowest 5% of iterations. |
+| `RemoveTopAndBottom5Percent` | When very fast outliers (such as cache hits after warmup) also skew results. |
 | `None` | When every sample matters (latency-tail analysis). |
 
-### The run says my measurement thread's quality of service could not be raised
+### Measurement thread quality of service could not be raised
 
 > [!CAUTION] Quick fix
-> Nothing to fix - this is a note, not a failure. The run is valid. To silence it, `--no-thread-control`.
+> This is a note, not a failure. The run is valid. To silence it, use `--no-thread-control`.
 
-On Apple Silicon the quality-of-service class is what asks the scheduler for a performance core rather than an efficiency core several times slower. macOS refuses the change on any thread that carries an explicit scheduling priority, and the .NET runtime gives one to every thread it creates - so the elevation lands on the process main thread (Single mode, an in-process suite) and is refused for a measurement running on the thread pool, which includes the default isolated-worker path.
+On Apple Silicon, the quality-of-service class requests a performance core instead of an efficiency core. macOS refuses this change on any thread with an explicit scheduling priority. The .NET runtime gives a priority to every thread it creates. Consequently, the elevation works on the process main thread but is refused for measurements on the thread pool, which includes the default isolated-worker path.
 
-A refused thread is left at an *unspecified* class, which is eligible for a performance core rather than banned from one - it is not the background class. The residual risk is that the scheduler uses an efficiency core under load, which presents as a [bimodal distribution](./statistics/outliers.md#bimodal-distribution-warning) rather than as a uniformly slower number, so watch for that warning and for a [host drift](./statistics/measurement.md#the-host-drift-canary) warning on the row.
+A refused thread is left at an unspecified class, which is still eligible for a performance core. The residual risk is that the scheduler uses an efficiency core under load, which appears as a [bimodal distribution](./statistics/outliers.md#bimodal-distribution-warning) or [host drift](./statistics/measurement.md#the-host-drift-canary).
 
-See [macOS and Apple Silicon](./features/environment-control.md#macos-and-apple-silicon) for the mechanism.
+For more information, see [macOS and Apple Silicon](./features/environment-control.md#macos-and-apple-silicon).
 
 ## Still stuck?
 
-- [Configuration](./reference/configuration.md) - full options reference
-- [CLI Reference](./reference/cli.md) - all command-line flags
-- [Key Concepts](./getting-started/key-concepts.md) - how warmup, outliers, and CIs work
-- [Guides](./guides/) - real-world workflow recipes, including [Tuning for CI/CD pipelines](./guides/ci-cd-pipelines.md)
-- [FAQ](./faq.md) - frequently asked questions
+- [Configuration](./reference/configuration.md) - Full options reference
+- [CLI Reference](./reference/cli.md) - All command-line flags
+- [Key Concepts](./getting-started/key-concepts.md) - Explanations of warmup, outliers, and CIs
+- [Guides](./guides/) - Real-world workflow recipes, including [Tuning for CI/CD pipelines](./guides/ci-cd-pipelines.md)
+- [FAQ](./faq.md) - Frequently asked questions

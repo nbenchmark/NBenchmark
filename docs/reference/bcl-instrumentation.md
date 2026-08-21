@@ -4,9 +4,9 @@ description: First-class System.Diagnostics Meter and ActivitySource instrumenta
 order: 4
 ---
 
-# BCL Instrumentation (Meter + ActivitySource)
+# BCL Instrumentation
 
-NBenchmark emits first-class `System.Diagnostics` BCL instrumentation from the same emit points that feed `IMeasurementObserver`. No NuGet packages are required -- `Meter` and `ActivitySource` are part of the .NET BCL since .NET 8. When no OpenTelemetry SDK or listener is attached, the BCL internal checks ensure near-zero overhead.
+NBenchmark emits first-class `System.Diagnostics` BCL instrumentation from the same emit points that feed `IMeasurementObserver`. No NuGet packages are required, as `Meter` and `ActivitySource` have been part of the .NET BCL since .NET 8. When no OpenTelemetry SDK or listener is attached, the BCL internal checks ensure near-zero overhead.
 
 ## Instrument naming
 
@@ -42,13 +42,13 @@ benchmark.suite                      the coordinator
               └── nbenchmark.phase.measurement
 ```
 
-- `benchmark.suite` (root): created at `OnSuiteStarting`, tags include `nbenchmark.suite.name`, `nbenchmark.suite.benchmark_count`, `nbenchmark.profile`, `nbenchmark.runtime`, `nbenchmark.seed`, `nbenchmark.run_order`; stopped at `OnSuiteCompleted` with `nbenchmark.suite.result_count`.
-- `nbenchmark.worker` (per measuring process): opened as a worker's session begins, parented to the coordinator's span through the `TRACEPARENT` it inherited; tagged `nbenchmark.worker.pid` plus the run's resource attributes. It is what keeps an isolated run in one trace instead of one trace per process, and it renders worker startup as the gap before the first phase. An `--in-process` run has no such process and no such span.
-- `benchmark.run` (per-benchmark): created at `OnBenchmarkRunStarting`, tags include `nbenchmark.name`, `nbenchmark.class`, `nbenchmark.baseline`, `nbenchmark.parameter_set`; stopped at `OnBenchmarkRunCompleted` with `nbenchmark.result.median_ns`, `nbenchmark.result.mean_ns`, `nbenchmark.result.sample_count`, `nbenchmark.result.outliers_removed`.
+- `benchmark.suite` (root): Created at `OnSuiteStarting`. Tags include `nbenchmark.suite.name`, `nbenchmark.suite.benchmark_count`, `nbenchmark.profile`, `nbenchmark.runtime`, `nbenchmark.seed`, and `nbenchmark.run_order`. It stops at `OnSuiteCompleted` with `nbenchmark.suite.result_count`.
+- `nbenchmark.worker` (per measuring process): Opened as a worker's session begins. It is parented to the coordinator's span through the `TRACEPARENT` it inherited and is tagged with `nbenchmark.worker.pid` plus the run's resource attributes. This span ensures an isolated run appears as a single trace rather than one trace per process, and it renders worker startup as the gap before the first phase. An `--in-process` run has no such process or span.
+- `benchmark.run` (per-benchmark): Created at `OnBenchmarkRunStarting`. Tags include `nbenchmark.name`, `nbenchmark.class`, `nbenchmark.baseline`, and `nbenchmark.parameter_set`. It stops at `OnBenchmarkRunCompleted` with `nbenchmark.result.median_ns`, `nbenchmark.result.mean_ns`, `nbenchmark.result.sample_count`, and `nbenchmark.result.outliers_removed`.
 
 ### Phase spans
 
-Each phase transition creates an Activity span named `nbenchmark.phase.<phase>` where `<phase>` is one of `jitter`, `calibration`, `warmup`, or `measurement`. Phase spans nest under their parent `benchmark.run` span. Tags include:
+Each phase transition creates an `Activity` span named `nbenchmark.phase.<phase>`, where `<phase>` is one of `jitter`, `calibration`, `warmup`, or `measurement`. Phase spans nest under their parent `benchmark.run` span.
 
 | Tag | Set on | Value |
 | --- | --- | --- |
@@ -63,11 +63,11 @@ Each phase transition creates an Activity span named `nbenchmark.phase.<phase>` 
 
 ### Span events
 
-Span events are discrete annotations on a phase span that explain *why* a phase ended. A trace UI renders these as markers on the flame-graph row, making the autotune decision visible at a glance:
+Span events are discrete annotations on a phase span that explain why a phase ended. A trace UI renders these as markers on the flame-graph row, making the autotune decision visible.
 
 | Event | Parent span | Fired when | Key tags |
 | --- | --- | --- | --- |
-| `detector.switched` | `nbenchmark.phase.jitter` | The outlier detector auto-switched IQR -> MAD | `nbenchmark.from`, `nbenchmark.to`, `nbenchmark.jitter_metric` |
+| `detector.switched` | `nbenchmark.phase.jitter` | The outlier detector auto-switched IQR $\rightarrow$ MAD | `nbenchmark.from`, `nbenchmark.to`, `nbenchmark.jitter_metric` |
 | `warmup.plateau_reached` | `nbenchmark.phase.warmup` | Warmup stopped because the body settled (plateau rule) | - |
 | `measurement.ci_target_met` | `nbenchmark.phase.measurement` | Measurement stopped because the CI half-width target was met | `nbenchmark.achieved_ci_width`, `nbenchmark.ci_target` |
 | `phase.cap_hit` | `nbenchmark.phase.warmup` / `nbenchmark.phase.measurement` | A phase ended early at the wall-clock tuning cap | - |
@@ -80,13 +80,13 @@ Install the exporter package:
 dotnet add package NBenchmark.Exporters.OpenTelemetry
 ```
 
-Then point it at a collector - on the command line:
+Then point the exporter at a collector. You can do this from the command line:
 
 ```bash
 dotnet run -- --otlp-endpoint http://localhost:4317
 ```
 
-or in code:
+Or in code:
 
 ```csharp
 using NBenchmark.Exporters.OpenTelemetry;
@@ -97,15 +97,15 @@ await BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-That is the whole integration. The package builds and owns the OpenTelemetry SDK, subscribes it to the `NBenchmark` `Meter` and `ActivitySource`, applies histogram buckets suited to per-op durations, and flushes when the run ends - in the harness **and inside every isolated worker process**, which is the part that is difficult to do by hand (see [Cross-process streaming](#cross-process-streaming)).
+The package manages the OpenTelemetry SDK, subscribes it to the `NBenchmark` `Meter` and `ActivitySource`, applies histogram buckets suited to per-op durations, and flushes when the run ends. Crucially, it does this in the harness **and inside every isolated worker process**.
 
-With no endpoint configured - not on the command line, not in code, not in `OTEL_EXPORTER_OTLP_ENDPOINT` - the exporter declines to build and nothing connects. Referencing the package is not on its own a request to export.
+If no endpoint is configured (via command line, code, or `OTEL_EXPORTER_OTLP_ENDPOINT`), the exporter declines to build and nothing connects. Referencing the package alone does not request an export.
 
-`samples/Telemetry/` is a runnable version, with a Docker Compose file that starts Grafana, Prometheus and Tempo and a provisioned dashboard for the instruments on this page. See [Samples](../samples.md#telemetry---opentelemetry-export-to-grafana).
+For a runnable version with a Docker Compose file for Grafana, Prometheus, and Tempo, see [Samples](../samples.md#telemetry-sample).
 
 ### Configuration
 
-`WithOpenTelemetry(...)` accepts the transport settings, each of which maps onto the OTel-standard environment variable of the same meaning:
+The `WithOpenTelemetry(...)` method accepts transport settings, which map to the corresponding OTel-standard environment variables:
 
 | Option | Environment variable |
 | --- | --- |
@@ -116,13 +116,13 @@ With no endpoint configured - not on the command line, not in code, not in `OTEL
 | `ServiceName` | `OTEL_SERVICE_NAME` |
 | `ResourceAttributes` | `OTEL_RESOURCE_ATTRIBUTES` |
 
-The mapping is not incidental. A worker process runs none of your code, so the environment is the only channel that reaches it, and configuration that cannot be expressed as a variable cannot cross the boundary - which is why the package exposes no `Action<TracerProviderBuilder>`. An option that applied in the harness and silently vanished in the process doing the measuring would be worse than one that does not exist.
+Configuration must be expressed as environment variables because a worker process runs none of your code. The environment is the only channel that reaches the worker.
 
-Instrument shaping - histogram bucket boundaries and the metric export interval - is exempt, because it is not configuration crossing the boundary: it is the same package code running on both sides, applying the same defaults.
+Instrument shaping (such as histogram bucket boundaries and the metric export interval) is handled by the package code on both sides, applying the same defaults.
 
 ### Subscribing without the package
 
-The instrumentation is plain BCL and needs no package at all. A host that runs NBenchmark in-process can attach its own listener:
+Because the instrumentation is plain BCL, you can attach your own listener if you run NBenchmark in-process:
 
 ```csharp
 using var meterProvider = Sdk.CreateMeterProviderBuilder()
@@ -136,13 +136,13 @@ using var tracerProvider = Sdk.CreateTracerProviderBuilder()
     .Build();
 ```
 
-All NBenchmark instruments are picked up when a `Meter` or `ActivitySource` named `NBenchmark` is subscribed to. This is enough for an `--in-process` run, and it is what a `MeterListener`-based UI would do to avoid an OTLP round trip. It is *not* enough for an isolated run - the section below is why.
+All NBenchmark instruments are picked up when a `Meter` or `ActivitySource` named `NBenchmark` is subscribed to. This is sufficient for an `--in-process` run, but not for isolated runs, as the SDK would need to be constructed inside the worker process.
 
 ## Resource attributes
 
-Every `benchmark.suite` span is stamped with resource attributes that identify the run across commit, branch, CI pipeline, and machine. A downstream backend (Grafana, Jaeger, Honeycomb) can join on these to render cross-commit trend lines and regression alarms without NBenchmark shipping its own storage layer.
+Every `benchmark.suite` span is stamped with resource attributes that identify the run across commits, branches, CI pipelines, and machines. This allows backends (such as Grafana, Jaeger, or Honeycomb) to render cross-commit trend lines and regression alarms.
 
-The attributes are read once per process from environment variables and cached for the process lifetime.
+Attributes are read once per process from environment variables and cached.
 
 ### CI identification
 
@@ -160,9 +160,9 @@ The attributes are read once per process from environment variables and cached f
 | Attribute | Source env vars | Fallback |
 | --- | --- | --- |
 | `nbenchmark.commit_sha` | `GITHUB_SHA`, `CI_COMMIT_SHA`, `GIT_COMMIT` | `git rev-parse --short HEAD` |
-| `nbenchmark.branch` | `GITHUB_HEAD_REF`, `CI_COMMIT_BRANCH`, `GIT_BRANCH` | `git rev-parse --abbrev-ref HEAD` (detached HEAD produces no branch attribute) |
+| `nbenchmark.branch` | `GITHUB_HEAD_REF`, `CI_COMMIT_BRANCH`, `GIT_BRANCH` | `git rev-parse --abbrev-ref HEAD` |
 
-CI-sourced values take precedence over the git CLI fallback. When no CI or git env vars are present and the git CLI is unavailable (or outside a repo), the commit and branch attributes are omitted.
+CI-sourced values take precedence over the git CLI fallback.
 
 ### Host identification
 
@@ -171,44 +171,41 @@ CI-sourced values take precedence over the git CLI fallback. When no CI or git e
 | `nbenchmark.host.machine_name` | `Environment.MachineName` |
 | `nbenchmark.host.os` | `windows`, `macos`, or `linux` |
 | `nbenchmark.host.arch` | `arm64`, `x64`, `x86`, etc. |
-| `nbenchmark.host.runtime` | `RuntimeInformation.FrameworkDescription` (e.g. `.NET 8.0.22`) |
+| `nbenchmark.host.runtime` | `RuntimeInformation.FrameworkDescription` (e.g., `.NET 8.0.22`) |
 
 ### OpenTelemetry-standard env vars
 
-`OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` are honored verbatim. `OTEL_RESOURCE_ATTRIBUTES` is parsed as a comma-separated `key=value` list (the OTel convention) and each pair is copied onto the span. `OTEL_SERVICE_NAME` is mapped to `service.name`. A user who has already configured these for the rest of their service does not need to repeat themselves.
+NBenchmark honors `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` verbatim. `OTEL_RESOURCE_ATTRIBUTES` is parsed as a comma-separated `key=value` list and copied onto the span. `OTEL_SERVICE_NAME` maps to `service.name`.
 
 ## Cross-process streaming
 
-Benchmarks are measured in a separate `nbworker` process by default. Your own `IMeasurementObserver` and `IBenchmarkProgress` instances still fire: the worker streams its phase and progress events back over its pipe and your process replays them into the live objects you registered, so no OTLP configuration is needed to observe an isolated run.
-
-What OTLP adds is a channel to something *outside* both processes - a collector, a tracing backend, a dashboard. For that the worker needs its own exporter configuration, which it inherits from your process's environment.
+By default, benchmarks are measured in a separate `nbworker` process. While your registered `IMeasurementObserver` and `IBenchmarkProgress` instances still fire via a pipe, OTLP requires its own channel to a collector.
 
 ### Building the SDK inside the worker
 
-An SDK constructed in your `Main` is constructed in the wrong process. The phase spans and per-sample metrics are emitted by the measurement loop, so in an isolated run they are emitted inside the worker - and the worker never runs your entry point. It loads your assembly and invokes the benchmark methods directly. Only the root `benchmark.suite` span, which the coordinator owns, would reach your collector.
+An SDK constructed in your `Main` method is in the wrong process. Because phase spans and per-sample metrics are emitted inside the worker, the SDK must also be constructed there.
 
-`NBenchmark.Exporters.OpenTelemetry` handles this, and it is the reason to prefer the package over wiring the SDK yourself. Three things have to line up, none of which are obvious:
-
-1. **The exporter registers from a `[ModuleInitializer]`**, and the worker runs that initializer explicitly after loading the `NBenchmark.*` packages your benchmark assembly references. Loading is not sufficient on its own: a module initializer runs before the first *access* to something in the module, and nothing in a worker accesses these types by name.
-2. **Configuration arrives as environment variables**, because a worker has no other channel - see [Configuration](#configuration).
-3. **`System.Diagnostics.DiagnosticSource` is unified with the worker's default load context.** `ActivitySource` and `Meter` publish to static state inside that assembly; a second copy loaded from the target's output means the SDK subscribes to one registry while the engine publishes to the other, and the run exports nothing with no error anywhere. This is framework-dependent - under `net10.0` the shared framework supplies the version the SDK wants and the question never arises, while under `net8.0` and `net9.0` NuGet copies its own - so it is exactly the kind of defect that passes a single-TFM test matrix.
+`NBenchmark.Exporters.OpenTelemetry` handles this by ensuring:
+1. **The exporter registers from a `[ModuleInitializer]`**, which the worker runs after loading the necessary packages.
+2. **Configuration arrives as environment variables**, as this is the only channel that reaches the worker.
+3. **`System.Diagnostics.DiagnosticSource` is unified**. The SDK and the engine must subscribe to the same registry to avoid missing events.
 
 ### Env-var forwarding
 
-`MeasurementBudget.ApplyTelemetryEnvironment` writes the following environment variables into every worker's environment block before it starts:
+`MeasurementBudget.ApplyTelemetryEnvironment` writes the following variables into every worker's environment block before it starts:
 
 | Env var | Purpose |
 | --- | --- |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP exporter endpoint |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | OTLP transport (`grpc` or `http/protobuf`) |
-| `OTEL_EXPORTER_OTLP_HEADERS` | OTLP exporter headers (e.g. auth) |
+| `OTEL_EXPORTER_OTLP_HEADERS` | OTLP exporter headers (such as auth) |
 | `OTEL_EXPORTER_OTLP_TIMEOUT` | OTLP export timeout |
 | `OTEL_RESOURCE_ATTRIBUTES` | Resource attributes (passed through) |
 | `OTEL_SERVICE_NAME` | Service name (passed through) |
-| `NBENCHMARK_OTEL_ENDPOINT` | NBenchmark-specific endpoint mirror (see `--otlp-endpoint` CLI flag) |
-| `TRACEPARENT` | W3C trace context of the coordinator's current span, so the worker's spans join the run's trace rather than rooting one of their own |
+| `NBENCHMARK_OTEL_ENDPOINT` | NBenchmark-specific endpoint mirror |
+| `TRACEPARENT` | W3C trace context of the coordinator's span, allowing worker spans to join the run's trace |
 
-When `NBENCHMARK_OTEL_ENDPOINT` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is not, the mirror is applied so an SDK wired only against the standard variable picks it up without extra configuration.
+If `NBENCHMARK_OTEL_ENDPOINT` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is not, NBenchmark applies the mirror so that the SDK picks it up.
 
 ### `--otlp-endpoint` CLI flag
 
@@ -216,13 +213,13 @@ When `NBENCHMARK_OTEL_ENDPOINT` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is not,
 dotnet run -- --otlp-endpoint http://localhost:4317
 ```
 
-The harness mirrors this into `OTEL_EXPORTER_OTLP_ENDPOINT` before spawning isolated workers, so workers stream to the same collector as the host. When the user has already set `OTEL_EXPORTER_OTLP_ENDPOINT` explicitly, the CLI flag does not override it.
+The harness mirrors this into `OTEL_EXPORTER_OTLP_ENDPOINT` before spawning isolated workers. If `OTEL_EXPORTER_OTLP_ENDPOINT` is already set, the CLI flag does not override it.
 
 ### Observer forwarding
 
-Auto-attached observers fire in a worker as well as in the coordinator: the worker loads the `NBenchmark.*` packages the target assembly references, runs their module initializers, and resolves `ObserverRegistry`'s auto-attach list once per session, disposing it when the session ends. That is the mechanism the OTLP exporter activates through.
+Auto-attached observers fire in both the worker and the coordinator. The worker resolves the `ObserverRegistry` auto-attach list once per session.
 
-Explicit `--observer <name>` selections are **not** forwarded to workers today - the name list does not cross the protocol - so a named observer fires in the coordinator only. Programmatic observers added via `WithObserver(IMeasurementObserver)` are live objects and cannot cross a process boundary at all; what crosses for those is the event stream, which the coordinator replays into your instance (see [Cross-process streaming](#cross-process-streaming) above).
+Explicit observers (via `--observer <name>`) are **not** forwarded to workers; they fire in the coordinator only. Programmatic observers (`WithObserver`) are live objects and cannot cross the process boundary; the coordinator replays the event stream into your instance.
 
 ### Topology
 
@@ -236,10 +233,10 @@ Isolated / CI:
   Collector -> Grafana / Jaeger / Honeycomb
 ```
 
-In-process and isolated runs look identical to the dashboard: both are OTLP producers, and both produce a single trace.
+Both modes produce a single trace and look identical to a dashboard.
 
 ## See also
 
-- [Measurement Observer](./observers.md) - the `IMeasurementObserver` interface and event types.
-- [CLI Reference](./cli.md) - the `--otlp-endpoint` CLI flag.
-- [Diagnostics](../statistics/diagnostics.md) - runtime diagnostics counters (GC, heap, exceptions, CPU).
+- [Measurement Observer](./observers.md) - The `IMeasurementObserver` interface and event types.
+- [CLI Reference](./cli.md) - The `--otlp-endpoint` CLI flag.
+- [Diagnostics](../statistics/diagnostics.md) - Runtime diagnostics counters.

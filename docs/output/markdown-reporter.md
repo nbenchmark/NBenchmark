@@ -6,11 +6,13 @@ order: 2
 
 # MarkdownReporter
 
-`MarkdownReporter` writes results to a `.md` file as a formatted table. It is part of the core `NBenchmark` package with no additional dependencies.
+`MarkdownReporter` writes results to a `.md` file as a formatted table. It is part of the core `NBenchmark` package and has no additional dependencies.
 
-Markdown output is a good choice for committing results to source control, attaching to pull requests, or including in documentation.
+Markdown output is an ideal choice for committing results to source control, attaching them to pull requests, or including them in documentation.
 
 ## Setup
+
+Attach the reporter to your benchmark suite:
 
 ```csharp
 using NBenchmark.Reporters;
@@ -31,12 +33,12 @@ using NBenchmark.Reporters;
 MarkdownReporter(string outputDirectory = ".", string? fileName = null)
 ```
 
-- `outputDirectory` - The directory to write the file to. Created automatically if it does not exist. Must be under the current working directory.
-- `fileName` - When `null` (the default), the reporter generates a timestamped filename to avoid overwriting previous runs. When specified, the exact filename is used (no counter or timestamp is appended).
+- `outputDirectory`: The directory where the file is written. NBenchmark creates this directory automatically if it does not exist. The path must be under the current working directory.
+- `fileName`: If `null` (the default), the reporter generates a timestamped filename to avoid overwriting previous runs. If specified, the reporter uses that exact filename without appending a counter or timestamp.
 
 ### Auto-naming
 
-When `fileName` is not provided, the reporter generates a filename that includes the UTC timestamp and a per-process counter:
+When you don't provide a `fileName`, the reporter generates a filename that includes the UTC timestamp and a per-process counter:
 
 ```text
 benchmark-results-20260606-034000-001.md
@@ -44,15 +46,15 @@ benchmark-results-20260606-034000-001.md
 
 The counter increments each time `ReportAsync` is called within the same process, so multiple suite runs produce separate files instead of overwriting each other.
 
-### Explicit filename
+### Explicit filenames
 
-Pass a `fileName` when you want a stable output path (e.g. for CI scripts that expect a known filename):
+Pass a `fileName` when you need a stable output path, such as for CI scripts that expect a known filename:
 
 ```csharp
 new MarkdownReporter("results/", "BENCHMARKS.md")
 ```
 
-When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overwrite the same file.
+When you provide an explicit `fileName`, subsequent calls to `ReportAsync` overwrite the same file.
 
 ## Output format
 
@@ -79,8 +81,6 @@ When an explicit `fileName` is provided, subsequent calls to `ReportAsync` overw
 | Compute | ±16.2 ns (5.89%) | 85.9 ns | 31.22% | 500.0 ns | 500.0 ns |
 | Baseline | ±21.6 ns (5.75%) | 114.3 ns | 30.43% | 500.0 ns | 900.0 ns |
 
-Percentile columns (P95, P99, etc.) are dynamic -- they appear only when the corresponding percentiles are configured via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set of `[0.50, 0.95, 0.99, 0.999, 1.0]`, columns P95 and P99 are emitted in the tail-latency table (P50 is already shown as Median; Max appears as a separate stat).
-
 ---
 
 ### Interpretation
@@ -92,35 +92,39 @@ Percentile columns (P95, P99, etc.) are dynamic -- they appear only when the cor
 - Effect metric: Cliff's δ (Romano neg/small/med/large labels)
 ```
 
-When **three or more** benchmarks are compared, the Sig column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected) and the **Interpretation** section includes an omnibus line summarizing the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
+When three or more benchmarks are compared, the **Sig** column shows the post-hoc pairwise verdict (candidate versus baseline, Holm-Bonferroni corrected). NBenchmark also includes an omnibus line in the **Interpretation** section summarizing the [Kruskal-Wallis](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test) verdict across all groups:
 
 ```markdown
 **Omnibus (Kruskal-Wallis)** across 3 groups: H(2) = 7.20, p = 0.027 → significant
 ```
 
+Percentile columns (such as P95, P99, etc.) are dynamic. They appear only when you configure the corresponding percentiles via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set (`[0.50, 0.95, 0.99, 0.999, 1.0]`), NBenchmark emits columns P95 and P99 in the tail-latency table. P50 is already shown as Median, and Max appears as a separate statistic.
+
 ## Columns
 
 | Column | Description |
 | --- | --- |
-| **Benchmark** | Benchmark name. |
-| **Median** | Median timing. |
-| **Mean** | Arithmetic mean. |
-| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). `-` for errored or dry-run results. |
-| **Ratio** | Speed relative to the baseline. |
-| **Scale** | Visual bar scaled to the slowest successful benchmark. |
+| **Benchmark** | The benchmark name. |
+| **Median** | The median timing. |
+| **Mean** | The arithmetic mean. |
+| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). A `-` indicates errored or dry-run results. |
+| **Ratio** | The speed relative to the baseline. |
+| **Scale** | A visual bar scaled to the slowest successful benchmark. |
 | **Sig** | `✓` = significant, `✗` = not significant, `-` = not applicable. |
-| **Magnitude** | Strategy-defined qualitative effect label. With the built-in Mann-Whitney tests this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `small` (< 0.33), `med` (< 0.474), `large` (≥ 0.474). `-` for the baseline or when significance is not tested. See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
+| **Magnitude** | A qualitative effect label. For built-in Mann-Whitney tests, this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `small` (< 0.33), `med` (< 0.474), and `large` (≥ 0.474). See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
 | **Alloc/op** | Mean bytes allocated per iteration, or `-` if not measured. |
 
 ## Notes
 
-- Results are sorted by median (fastest first).
-- For [parameterized benchmarks](../features/parameterized-suite.md#reading-the-report), one column per parameter appears after **Benchmark** (which shows the base method name). When a single method is swept across parameter values, the **Ratio** column reports each point's scaling factor relative to the fastest point (the reference, shown as `baseline`), while **Sig** and **Magnitude** stay `-`. When a parameter group holds competing benchmarks, **Sig** and **Magnitude** carry the usual within-group significance and effect.
-- Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, and StdDev columns show `0.0 ns`. Percentile columns show empty cells.
-- The output directory is created automatically if it does not exist.
+- NBenchmark sorts results by median (fastest first).
+- For [parameterized benchmarks](../features/parameterized-suite.md#reading-the-report), NBenchmark adds one column per parameter after the **Benchmark** column.
+    - When a single method is swept across parameter values, the **Ratio** column reports each point's scaling factor relative to the fastest point (the reference, shown as `baseline`), while **Sig** and **Magnitude** are `-`.
+    - When a parameter group holds competing benchmarks, **Sig** and **Magnitude** show the usual within-group significance and effect.
+- Errored benchmarks are listed with a `-` in the Error, Ratio, and Sig columns. The Median, Mean, and StdDev columns show `0.0 ns`, and percentile columns remain empty.
+- NBenchmark creates the output directory automatically if it does not exist.
 - The report order is: Comparison -> Precision & Tail Latency -> (optional) Distribution Details -> Interpretation -> (optional) Warnings.
-- In Standard mode (`--detail standard` or `WithDetail(ReportDetail.Standard)`), the full multi-section output is shown: comparison table, Precision & Tail Latency, and Interpretation.
-- In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), a per-benchmark details section is appended after the table showing quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown, followed by an `auto-tuned: …` line summarizing the adaptive loop's decisions (resolved samples × ops-per-sample, warmup length, achieved CI half-width).
+- In Standard mode (`--detail standard` or `WithDetail(ReportDetail.Standard)`), NBenchmark shows the full multi-section output: the comparison table, Precision & Tail Latency, and Interpretation.
+- In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), NBenchmark appends a per-benchmark details section after the table. This section shows quartiles, fences, CI, margin percent, CV, skewness, kurtosis, MAD, and allocation breakdown, followed by an `auto-tuned: …` line summarizing the adaptive loop's decisions.
 
 ## Using with Benchmark (Single mode)
 
@@ -137,4 +141,4 @@ dotnet run -- --reporter markdown
 dotnet run -- --reporter markdown --output ./results
 ```
 
-When `--output` is specified, files are written inside that directory.
+When you specify `--output`, NBenchmark writes the files inside that directory.

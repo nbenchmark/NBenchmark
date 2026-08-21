@@ -202,6 +202,6 @@ Hardware performance counters (instructions retired, cache misses, branch mispre
 ## See also
 
 - [Configuration: Diagnostics](../reference/configuration.md#diagnostics) - the `DiagnosticsOptions` surface
-- [CLI Reference: `--diagnostics`](../reference/cli.md#--diagnostics-mode) - the CLI flag
+- [CLI Reference: `--diagnostics`](../reference/cli.md#diagnostics) - the CLI flag
 - [Allocation Measurement](./allocations.md) - how per-iteration heap allocation is sampled
 - [Report Detail Levels](../output/report-detail-levels.md) - how the Diagnostics table fits into each detail tier

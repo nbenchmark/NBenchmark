@@ -8,15 +8,15 @@ order: 1
 
 ## Requirements
 
-NBenchmark targets **net8.0**, **net9.0**, and **net10.0**. You need the [.NET 8 SDK](https://dotnet.microsoft.com/download) or later.
+NBenchmark targets `net8.0`, `net9.0`, and `net10.0`. You need the [.NET 8 SDK](https://dotnet.microsoft.com/download) or a later version.
 
 ## Packages
 
-NBenchmark ships as separate NuGet packages. Install only what you need.
+NBenchmark provides several NuGet packages. Install only the packages you need for your project.
 
 ### Core package
 
-The core package contains all measurement, statistics, and file-based reporters (JSON, Markdown, CSV). It has **no NuGet dependencies** - only the .NET BCL.
+The core package includes all measurement and statistics features, as well as file-based reporters for JSON, Markdown, and CSV. This package has no NuGet dependencies and relies only on the .NET Base Class Library (BCL).
 
 ```bash
 dotnet add package NBenchmark
@@ -24,17 +24,17 @@ dotnet add package NBenchmark
 
 ### Analyzers package (recommended)
 
-The analyzers package adds compile-time diagnostics that catch common NBenchmark configuration errors - missing parameterless constructors, static benchmark methods, out-of-range settings, and more.
+The analyzers package provides compile-time diagnostics to catch common NBenchmark configuration errors, such as missing parameterless constructors or static benchmark methods.
 
 ```bash
 dotnet add package NBenchmark.Analyzers
 ```
 
-The analyzers run automatically in the IDE and during `dotnet build`. See the [Analyzers](../reference/analyzers.md) page for the full diagnostic reference.
+The analyzers run automatically in your IDE and during `dotnet build`. For a complete list of diagnostics, see the [Analyzers](../reference/analyzers.md) page.
 
-## Verify the installation
+## Verify your installation
 
-Create a new console project and add a quick sanity check:
+To verify your installation, create a new console project and run a simple benchmark:
 
 ```bash
 dotnet new console -n MyBenchmarks
@@ -42,7 +42,7 @@ cd MyBenchmarks
 dotnet add package NBenchmark
 ```
 
-Replace the contents of `Program.cs`:
+Replace the contents of `Program.cs` with the following code:
 
 ```csharp
 using NBenchmark;
@@ -55,13 +55,13 @@ var result = Benchmark.Run(() =>
 result.Print();
 ```
 
-Run it:
+Run the project:
 
 ```bash
 dotnet run
 ```
 
-You should see output similar to:
+The output is similar to the following:
 
 ```text
   ┌─ Benchmark ─────────────────────────────────────
@@ -74,37 +74,37 @@ You should see output similar to:
   └─────────────────────────────────────────────────
 ```
 
-If you see numbers, everything is working.
+If the output displays measurement data, the installation is successful.
 
 ## Optional packages
 
 ### Console package
 
-The console package adds a rich terminal table with color-coded results and an optional progress display. It depends on [Spectre.Console](https://spectreconsole.net/).
+The console package adds a formatted terminal table with color-coded results and an optional progress display. This package depends on [Spectre.Console](https://spectreconsole.net/).
 
 ```bash
 dotnet add package NBenchmark.Reporters.Console
 ```
 
-You only need `NBenchmark.Reporters.Console` if you want output in the terminal. File reporters (JSON, Markdown, CSV) work without it.
+Use `NBenchmark.Reporters.Console` only if you want to output results directly to the terminal. File reporters (JSON, Markdown, and CSV) work without this package.
 
-### Dependency Injection package
+### Dependency injection package
 
-The DI package lets `[Benchmark]` classes have **constructor dependencies** that are resolved from an `IServiceProvider`. Without it, benchmark classes must have a public parameterless constructor. See the [Dependency Injection guide](../features/dependency-injection.md) for full details.
+The dependency injection (DI) package allows `[Benchmark]` classes to use constructor dependencies resolved from an `IServiceProvider`. Without this package, benchmark classes must have a public parameterless constructor. For more information, see the [Dependency Injection guide](../features/dependency-injection.md).
 
 ```bash
 dotnet add package NBenchmark.DependencyInjection
 ```
 
+If you also need the concrete `Microsoft.Extensions.DependencyInjection` implementation (such as `ServiceCollection` or `BuildServiceProvider`), install the following package:
+
 ```bash
-# Or, if you also want the concrete Microsoft.Extensions.DependencyInjection
-# implementation (ServiceCollection, BuildServiceProvider, etc.):
 dotnet add package Microsoft.Extensions.DependencyInjection
 ```
 
 ### Test framework integration packages
 
-The integration packages let you enforce performance thresholds as ordinary test assertions inside your existing test project. When a threshold is exceeded, the test fails.
+The integration packages allow you to enforce performance thresholds as test assertions within your existing test project. The test fails if a benchmark exceeds a defined threshold.
 
 ```bash
 dotnet add package NBenchmark.Integration.xUnit    # xUnit v2
@@ -112,19 +112,21 @@ dotnet add package NBenchmark.Integration.NUnit    # NUnit 3 / 4
 dotnet add package NBenchmark.Integration.MSTest   # MSTest v2 / v3
 ```
 
-Each package pulls in `NBenchmark` automatically, so you don't need a separate `NBenchmark` reference. See the [Test integration](../test-integration/index.md) guide for usage.
+These packages automatically include the core `NBenchmark` package. For usage details, see the [Test integration](../test-integration/index.md) guide.
 
 ## Global tool
 
-The global tool lets you run benchmarks from the command line without creating a project. Install it once, then point it at any assembly with `[Benchmark]` methods.
+The global tool allows you to run benchmarks from the command line without creating a separate project. After installation, you can run the tool against any assembly that contains `[Benchmark]` methods.
 
 ```bash
 dotnet tool install -g NBenchmark.Tool
 ```
 
-After installation, run `dotnet benchmark --help` to verify. See the [Global Tool guide](../usage-modes/global-tool.md) for usage.
+After installation, run `dotnet benchmark --help` to verify the tool is working. For more information, see the [Global Tool guide](../usage-modes/global-tool.md).
 
 ## Next steps
 
-- **[Choose your path](./choose-your-path.md)** - match what you want to do to the right API
-- **[Quick Start](./quick-start.md)** - your first benchmark in 60 seconds
+For more information, see the following pages:
+
+- [Choose your path](./choose-your-path.md) - Match your goals to the appropriate API.
+- [Quick start](./quick-start.md) - Write your first benchmark.

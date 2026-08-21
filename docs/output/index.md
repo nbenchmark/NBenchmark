@@ -6,23 +6,23 @@ order: 5
 
 # Output
 
-Reporters consume the finished `BenchmarkResult` list and produce output - terminal tables, Markdown files, CSVs, or JSON. You can attach as many reporters as you like to a single run.
+Reporters process the finished `BenchmarkResult` list and produce output, such as terminal tables, Markdown files, CSVs, or JSON. You can attach multiple reporters to a single run.
 
-> Looking for what the numbers mean rather than how to emit them? See
-> [Reading your results](../getting-started/reading-your-results.md).
+> [!TIP]
+> For more information about interpreting your results, see [Reading your results](../getting-started/reading-your-results.md).
 
 ## In this section
 
-- **[Console Reporter](./console-reporter.md)** - rich terminal table with color and a bar chart.
-- **[Markdown Reporter](./markdown-reporter.md)** - `.md` file with a formatted results table.
-- **[CSV Reporter](./csv-reporter.md)** - `.csv` file with all statistics, suitable for post-processing.
-- **[JSON Reporter](./json-reporter.md)** - `.json` file with full structured results.
-- **[Report Detail Levels](./report-detail-levels.md)** - Simple, Standard, and Advanced detail modes.
-- **[Custom Reporters](./custom-reporters.md)** - implement and register your own reporter.
+- [Console Reporter](./console-reporter.md) - A rich terminal table with color and a bar chart.
+- [Markdown Reporter](./markdown-reporter.md) - A `.md` file with a formatted results table.
+- [CSV Reporter](./csv-reporter.md) - A `.csv` file with all statistics, suitable for post-processing.
+- [JSON Reporter](./json-reporter.md) - A `.json` file with full structured results.
+- [Report Detail Levels](./report-detail-levels.md) - Simple, Standard, and Advanced detail modes.
+- [Custom Reporters](./custom-reporters.md) - How to implement and register your own reporter.
 
 ## How reporters work
 
-All reporters implement `IReporter`:
+Every reporter implements the `IReporter` interface:
 
 ```csharp
 public interface IReporter
@@ -33,13 +33,15 @@ public interface IReporter
 }
 ```
 
-The `Name` property identifies the reporter for the `--reporter` CLI flag and the `--output` directory rewriting. Built-in reporters return their canonical name (`"json"`, `"markdown"`, `"csv"`, `"console"`). Custom reporters may return any unique string.
+The `Name` property identifies the reporter for the `--reporter` CLI flag and for output directory rewriting. Built-in reporters return their canonical name (such as `json`, `markdown`, `csv`, or `console`). Custom reporters can return any unique string.
 
-Reporters are called after all benchmarks in the run have completed. They receive the full result list including any errored benchmarks.
+NBenchmark calls reporters after all benchmarks in the run complete. Reporters receive the full result list, including any benchmarks that errored.
 
 ## Attaching reporters
 
-### BenchmarkSuite (Suite mode)
+### Using BenchmarkSuite (Suite mode)
+
+Use the `WithReporter` method to add reporters to your suite:
 
 ```csharp
 await new BenchmarkSuite("name")
@@ -49,7 +51,9 @@ await new BenchmarkSuite("name")
     .RunAsync();
 ```
 
-### BenchmarkHarness (Harness mode)
+### Using BenchmarkHarness (Harness mode)
+
+Add reporters to your harness during creation:
 
 ```csharp
 BenchmarkHarness.Create(args)
@@ -58,7 +62,9 @@ BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-### Benchmark (Single mode) - extension methods
+### Using Benchmark (Single mode)
+
+Single mode benchmarks provide extension methods to emit reports directly from the result:
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
@@ -72,14 +78,14 @@ await result.ToJsonAsync("results/");
 
 | Reporter | Package | Output |
 | --- | --- | --- |
-| [ConsoleReporter](./console-reporter.md) | `NBenchmark.Reporters.Console` | Rich terminal table with color and a bar chart |
-| [MarkdownReporter](./markdown-reporter.md) | `NBenchmark` | `.md` file with a formatted results table |
-| [CsvReporter](./csv-reporter.md) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |
-| [JsonReporter](./json-reporter.md) | `NBenchmark` | `.json` file with full structured results |
+| [`ConsoleReporter`](./console-reporter.md) | `NBenchmark.Reporters.Console` | Rich terminal table with color and a bar chart |
+| [`MarkdownReporter`](./markdown-reporter.md) | `NBenchmark` | `.md` file with a formatted results table |
+| [`CsvReporter`](./csv-reporter.md) | `NBenchmark` | `.csv` file with all statistics, suitable for post-processing |
+| [`JsonReporter`](./json-reporter.md) | `NBenchmark` | `.json` file with full structured results |
 
 ## Output path validation
 
-File reporters validate that the output directory is **under the current working directory**. Paths outside the CWD (e.g. `/tmp/results` or `../../other-project`) are rejected with an `ArgumentException`. This prevents accidental writes outside the project directory.
+File reporters validate that the output directory is located under the current working directory (CWD). NBenchmark rejects paths outside the CWD (such as `/tmp/results` or `../../other-project`) with an `ArgumentException` to prevent accidental writes outside the project directory.
 
 ```csharp
 // Works - relative path under CWD
@@ -89,62 +95,57 @@ new MarkdownReporter("results/")
 new MarkdownReporter("/tmp/results/")
 ```
 
-The output directory is created automatically if it does not exist.
+NBenchmark creates the output directory automatically if it does not exist.
 
 ## Using the CLI reporter flag
 
-With `BenchmarkHarness`, the `--reporter` CLI flag adds reporters by name:
+When using `BenchmarkHarness`, you can add reporters by name using the `--reporter` flag:
 
 ```bash
 dotnet run -- --reporter markdown --output ./results
 dotnet run -- --reporter csv
 dotnet run -- --reporter json
-dotnet run -- --reporter console   # works when NBenchmark.Reporters.Console is referenced
+dotnet run -- --reporter console   # Requires NBenchmark.Reporters.Console reference
 ```
 
-The `--reporter` flag constructs reporters through `ReporterRegistry.TryCreate`, which handles both built-in reporters (`json`/`markdown`/`csv`) and any reporters self-registered by external packages.
+The `--reporter` flag constructs reporters using `ReporterRegistry.TryCreate`, which handles both built-in reporters and any reporters registered by external packages.
 
-External packages (like `NBenchmark.Reporters.Console`) self-register via `[ModuleInitializer]` + `ReporterRegistry.Register()`. The `--reporter flag` discovers available reporters automatically - no per-reporter code changes needed in `BenchmarkHarness`.
+External packages (such as `NBenchmark.Reporters.Console`) register themselves via `[ModuleInitializer]` and `ReporterRegistry.Register()`. The `--reporter` flag discovers these reporters automatically, so you don't need to change your `BenchmarkHarness` code.
 
-If you reference an unknown reporter name, the host prints the list of available reporters plus a hint about the `console` package.
+If you provide an unknown reporter name, the host prints a list of available reporters and a hint about the `console` package.
 
 ## Detail levels
 
-Reporters support three detail levels - **Simple** (default), **Standard**, and **Advanced** - that control how much statistical information is included in the output. Set the level via `WithDetail(ReportDetail.Standard)` on both `BenchmarkHarness` and `BenchmarkSuite`, or via the `--detail standard` CLI flag in harness mode. See the [Report Detail Levels guide](./report-detail-levels.md) for the full column reference.
+Reporters support three detail levels that control how much statistical information appears in the output: **Simple** (default), **Standard**, and **Advanced**.
+
+Set the level using `WithDetail(ReportDetail.Standard)` on `BenchmarkHarness` or `BenchmarkSuite`, or use the `--detail standard` CLI flag in harness mode. For a full reference of columns, see the [Report Detail Levels guide](./report-detail-levels.md).
 
 ## Writing a custom reporter
 
-See the [Custom Reporters](./custom-reporters.md) page for a step-by-step guide to implementing `IReporter`, registering it with `ReporterRegistry`, and using `BenchmarkTable` for comparison output. That page also documents **auto-attached reporters** (`ReporterRegistry.RegisterAutoAttach`) - side-effect reporters that fire on every run after the user's explicit reporters, with no opt-in required.
+For a step-by-step guide to implementing `IReporter`, registering it with `ReporterRegistry`, and using `BenchmarkTable` for comparison output, see [Custom Reporters](./custom-reporters.md).
+
+That page also documents **auto-attached reporters** (`ReporterRegistry.RegisterAutoAttach`). These are side-effect reporters that run on every run after the user's explicit reporters, with no opt-in required.
 
 ## Report format versioning
 
-Every file-writing reporter stamps its output with two independent numbers. They exist for whoever
-stores NBenchmark output over time - a CI trend dashboard, a regression script, a spreadsheet.
-NBenchmark itself never reads its own reports back.
+Every file-writing reporter stamps its output with two independent numbers. These stamps allow external tools - such as CI trend dashboards, regression scripts, or spreadsheets - to track changes over time. NBenchmark does not read its own reports.
 
-| Stamp | Question it answers | Bumped when |
+| Stamp | Purpose | Bumped when |
 | --- | --- | --- |
-| `schemaVersion` | Can my parser still read this file? | A field is renamed, removed, or changes type; the envelope is restructured. **Not** bumped for added fields. |
-| `measurementEpoch` | Can I plot this number next to that one? | NBenchmark changes what a benchmark reports: harness overhead, the default runtime profile, or the definition of a reported statistic. |
+| `schemaVersion` | Determines if a parser can still read the file. | A field is renamed, removed, or changes type; or the envelope is restructured. Added fields do not trigger a bump. |
+| `measurementEpoch` | Determines if numbers from different runs are comparable. | NBenchmark changes what a benchmark reports, such as harness overhead, the default runtime profile, or the definition of a reported statistic. |
 
-The schema is at `1` and the measurement epoch is at `7`. They are separate because they move independently, and the case that proves it
-is the one that prompted them: replacing NBenchmark's boxing dispatch path with typed delegates
-moved the calibration standard from **9.34 ns / 24 B per op to 2.53 ns / 0 B** while leaving the
-JSON shape byte-for-byte identical. A schema version alone would have said nothing had changed. A
-dashboard would have drawn a 3.7x improvement that no application code earned.
+The current schema version is `1` and the measurement epoch is `7`. These versions move independently. For example, replacing the boxing dispatch path with typed delegates moved the calibration standard from **9.34 ns / 24 B per op to 2.53 ns / 0 B** while leaving the JSON shape identical. A schema version alone would not indicate this change, and a dashboard would report a 3.7x improvement that was not earned by application code.
 
-Where the stamps appear:
+Stamps appear in these locations:
 
-- **JSON** - `schemaVersion` and `measurementEpoch`, the first two fields of the envelope, so a
-  consumer can decide whether to read the rest without parsing the rest.
-- **CSV** - `SchemaVersion` and `MeasurementEpoch` columns, alongside `Detail`, `Profile`,
-  `RuntimeProfile` and `RuntimeKnobs`.
-- **Markdown** - a `> Format:` line in the header block.
+- **JSON**: `schemaVersion` and `measurementEpoch` are the first two fields of the envelope, allowing consumers to check compatibility before parsing the rest of the file.
+- **CSV**: `SchemaVersion` and `MeasurementEpoch` are columns alongside `Detail`, `Profile`, `RuntimeProfile`, and `RuntimeKnobs`.
+- **Markdown**: A `> Format:` line appears in the header block.
 
-### Consuming them
+### Consuming stamps
 
-Compare the epoch before comparing numbers, and treat a mismatch as a discontinuity rather than a
-result:
+Compare the epoch before comparing numbers. Treat a mismatch as a discontinuity rather than a result:
 
 ```python
 import json
@@ -152,8 +153,8 @@ import json
 with open("benchmarks.json") as f:
     report = json.load(f)
 
-# An absent stamp is not epoch 0. The file predates the concept, and nothing is known
-# about whether its numbers line up with anything - reject it rather than assume.
+# An absent stamp means the file predates the concept of epochs.
+# Reject it rather than assuming it is epoch 0.
 if "measurementEpoch" not in report:
     raise ValueError("report predates measurement epochs; not comparable")
 
@@ -164,6 +165,4 @@ if report["measurementEpoch"] != baseline_epoch:
     )
 ```
 
-The constants are `NBenchmark.Reporters.ReportFormat.SchemaVersion` and
-`ReportFormat.MeasurementEpoch` if you are writing a [custom reporter](./custom-reporters.md) and
-want to stamp it the same way.
+If you are writing a [custom reporter](./custom-reporters.md) and want to use these stamps, use the constants `NBenchmark.Reporters.ReportFormat.SchemaVersion` and `ReportFormat.MeasurementEpoch`.

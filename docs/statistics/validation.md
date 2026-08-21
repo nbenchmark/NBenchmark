@@ -6,19 +6,13 @@ order: 8
 
 # Validation & Accuracy
 
-NBenchmark's numerical core is dependency-free - it ships its own implementations
-of the [Student's t quantile](https://en.wikipedia.org/wiki/Student%27s_t-distribution), the normal quantile, percentiles, the
-[Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test), and the [Kruskal-Wallis test](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test). This page documents how those implementations are verified,
-and to what tolerance, so you can trust the numbers in the output.
+NBenchmark's numerical core is dependency-free. It provides its own implementations of the [Student's t quantile](https://en.wikipedia.org/wiki/Student%27s_t-distribution), the normal quantile, percentiles, the [Mann-Whitney U test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test), and the [Kruskal-Wallis test](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test).
 
-The verification lives in the test suite (`tests/NBenchmark.Tests`) and runs on
-every build. It has three layers.
+To ensure these implementations are reliable, NBenchmark verifies them in the test suite (`tests/NBenchmark.Tests`) using a three-layer approach.
 
-## 1. Property / brute-force recomputation
+## 1. Property and brute-force recomputation
 
-`StatsRecomputationTests` generates many random samples (sizes from 2 to 500
-across ten seeds) and, for each one, **recomputes every reported quantity from
-first principles inside the test**:
+`StatsRecomputationTests` generates numerous random samples (sizes ranging from 2 to 500 across ten seeds). For each set, it recomputes every reported quantity from first principles within the test to verify accuracy:
 
 | Quantity | Independent recomputation | Tolerance |
 |---|---|---|
@@ -26,37 +20,30 @@ first principles inside the test**:
 | Standard deviation | $\sqrt{\sum(x_i-\bar{x})^2/(n-1)}$ | 1e-9 relative |
 | Standard error | $s/\sqrt{n}$ | 1e-9 relative |
 | Margin of error | $t^{*} \times \text{SEM}$ | 1e-9 relative |
-| Winsorized standard error (trimmed sets) | Clamp, then $s_w\sqrt{n}/h$ | 1e-9 relative |
+| Winsorized standard error | Clamp, then $s_w\sqrt{n}/h$ | 1e-9 relative |
 | Coefficient of variation | $s/\bar{x}$ | 1e-9 relative |
-| Percentiles (P1–P99) | Nearest-rank `ceil(p·n)−1` | exact |
+| Percentiles (P1-P99) | Nearest-rank `ceil(p·n)−1` | Exact |
 
-Because this covers arbitrary inputs rather than a handful of hand-picked
-arrays, it is the strongest guard against a regression in the descriptive
-statistics.
+By using arbitrary inputs instead of a few hand-picked arrays, this layer provides a strong guard against regressions in descriptive statistics.
 
 ## 2. External cross-checks
 
-`StatsCrossCheckTests` and `MannWhitneyCrossCheckTests` pin NBenchmark's output
-against values pre-computed with **SciPy 1.17.1** and **NumPy 2.4.6**.
-`WinsorizedErrorCrossCheckTests` pins the one quantity neither package computes
-against the reference formula for it. The reference values are embedded as
-constants in the tests; the generators are listed below so they can be
-regenerated.
+`StatsCrossCheckTests` and `MannWhitneyCrossCheckTests` pin NBenchmark's output against values pre-computed with **SciPy 1.17.1** and **NumPy 2.4.6**. `WinsorizedErrorCrossCheckTests` pins the Winsorized standard error - a quantity not computed by those packages - against its reference formula.
 
 | NBenchmark | Reference | Agreement |
 |---|---|---|
-| `StatsSummary` mean / stddev / SEM | `numpy.mean`, `numpy.std(ddof=1)` | ≤ 1e-9 relative |
-| `Percentile.Compute` | `numpy.percentile(method='inverted_cdf')` | exact |
-| `StudentT.CriticalValue` (df = 1, 2) | `scipy.stats.t.ppf` | ≤ 1e-9 relative |
-| `StudentT.CriticalValue` (df ≥ 3) | `scipy.stats.t.ppf` | < 1% (worst ≈ 0.79% at df = 3, 99%) |
-| `StudentT.NormalQuantile` | `scipy.stats.norm.ppf` | ≤ 1.15e-8 absolute |
-| `MannWhitneyU.Test` (small, tie-free, combined n ≤ 20) | `scipy.stats.mannwhitneyu(method='exact')` | ≤ 1e-9 relative |
+| `StatsSummary` mean / stddev / SEM | `numpy.mean`, `numpy.std(ddof=1)` | $\le$ 1e-9 relative |
+| `Percentile.Compute` | `numpy.percentile(method='inverted_cdf')` | Exact |
+| `StudentT.CriticalValue` (df = 1, 2) | `scipy.stats.t.ppf` | $\le$ 1e-9 relative |
+| `StudentT.CriticalValue` (df $\ge$ 3) | `scipy.stats.t.ppf` | < 1% (worst $\approx$ 0.79% at df = 3, 99%) |
+| `StudentT.NormalQuantile` | `scipy.stats.norm.ppf` | $\le$ 1.15e-8 absolute |
+| `MannWhitneyU.Test` (small, tie-free, $n \le 20$) | `scipy.stats.mannwhitneyu(method='exact')` | $\le$ 1e-9 relative |
 | `MannWhitneyU.Test` (otherwise) | `scipy.stats.mannwhitneyu(method='asymptotic', use_continuity=True)` | < 1e-6 absolute |
-| `ChiSquared.SurvivalFunction` | Closed forms (df = 2: $e^{-x/2}$; df = 4) and `scipy.stats.chi2.sf` | \u2264 1e-9 on closed forms; \u2264 1e-4 on spot values |
-| `KruskalWallis.Test` (H, p) | `scipy.stats.kruskal` (with tie correction) | H \u2264 1e-9; p \u2264 1e-6 |
-| `WinsorizedError.Compute` (Winsorized SEM) | Yuen's formula; equals R's `WRS2::trimse` on a symmetric trim | \u2264 1e-9 relative |
+| `ChiSquared.SurvivalFunction` | Closed forms and `scipy.stats.chi2.sf` | $\le$ 1e-9 (closed); $\le$ 1e-4 (spot) |
+| `KruskalWallis.Test` (H, p) | `scipy.stats.kruskal` (with tie correction) | $H \le$ 1e-9; $p \le$ 1e-6 |
+| `WinsorizedError.Compute` | Yuen's formula / R's `WRS2::trimse` | $\le$ 1e-9 relative |
 
-Reference values were generated with:
+Reference values are generated using the following Python logic:
 
 ```python
 import numpy as np
@@ -65,84 +52,48 @@ from scipy import stats
 np.mean(x)                                   # mean
 np.std(x, ddof=1)                            # sample standard deviation
 np.percentile(x, q, method='inverted_cdf')  # nearest-rank percentile
-stats.t.ppf((1 + cl) / 2, df)                # two-tailed [t critical value](https://en.wikipedia.org/wiki/Student%27s_t-distribution)
-stats.norm.ppf(p)                            # [normal quantile](https://en.wikipedia.org/wiki/Normal_distribution)
-stats.mannwhitneyu(a, b, alternative='two-sided',
-                   method='exact')                          # exact p-value (small samples)
-stats.mannwhitneyu(a, b, alternative='two-sided',
-                   method='asymptotic', use_continuity=True)  # [p-value](https://en.wikipedia.org/wiki/P-value) (large samples)
+stats.t.ppf((1 + cl) / 2, df)                # two-tailed t critical value
+stats.norm.ppf(p)                            # normal quantile
+stats.mannwhitneyu(a, b, alternative='two-sided', method='exact') # exact p-value
+stats.mannwhitneyu(a, b, alternative='two-sided', method='asymptotic', use_continuity=True) # asymptotic p-value
 stats.chi2.sf(x, df)                         # chi-squared survival function
 stats.kruskal(*groups)                       # Kruskal-Wallis H and p-value
 ```
 
 ### The Winsorized (Yuen) standard error
 
-SciPy has no reference for this one: `scipy.stats.trim_mean` returns a location estimate and no
-standard error at all. The reference is Wilcox's Winsorized standard error - the quantity R's
-`WRS2::trimse` computes - written out from its definition, so the generator is self-contained and
-does not depend on either package:
+Since SciPy does not provide a reference for the Winsorized standard error, NBenchmark uses a self-contained generator based on Wilcox's definition (matching R's `WRS2::trimse`):
 
 ```python
 import math
 
 def winsorized_standard_error(x, g_low, g_high):
-    """Yuen's standard error of the trimmed mean. g_low / g_high are trim COUNTS, not a proportion:
-    a fence-based detector discards whatever falls past the fence, asymmetrically."""
     xs = sorted(x)
     n = len(xs)
-    h = n - g_low - g_high                      # samples kept
-    lo, hi = xs[g_low], xs[n - g_high - 1]      # the innermost retained order statistics
-    w = [lo] * g_low + xs[g_low:n - g_high] + [hi] * g_high   # clamp, never drop
+    h = n - g_low - g_high
+    lo, hi = xs[g_low], xs[n - g_high - 1]
+    w = [lo] * g_low + xs[g_low:n - g_high] + [hi] * g_high
     mean = sum(w) / n
     s_w = math.sqrt(sum((v - mean) ** 2 for v in w) / (n - 1))
-    return s_w * math.sqrt(n) / h               # rescaled onto the trimmed mean; df = h - 1
+    return s_w * math.sqrt(n) / h
 ```
 
-`WinsorizedErrorCrossCheckTests` pins the output of this generator and additionally asserts the
-`WRS2::trimse` identity: for a symmetric trim where `tr·n` is a whole number,
-`sqrt(winvar(x, tr)) / ((1 − 2·tr)·sqrt(n))` and `s_w·sqrt(n)/h` are the same number written two
-ways. `StatsRecomputationTests` recomputes the same formula from first principles over the random
-sample sets, and asserts the reduction property - with `g_low = g_high = 0` the result is
-bit-identical to `s/sqrt(n)`, so a run that trimmed nothing reports exactly what it reported before
-the estimator existed.
+`WinsorizedErrorCrossCheckTests` pins the output of this generator. Additionally, `StatsRecomputationTests` asserts the reduction property: when no samples are trimmed (`g_low = g_high = 0`), the result is bit-identical to $s/\sqrt{n}$.
 
 ### Exact vs. approximate Mann-Whitney U
 
-For small, tie-free samples (combined `n ≤ 20`) NBenchmark computes the **exact**
-[permutation](https://en.wikipedia.org/wiki/Permutation_test) p-value, matching
-`scipy.stats.mannwhitneyu(method='exact')` to 1e-9. `MannWhitneyCrossCheckTests`
-verifies this against both SciPy and an independent in-process rank-assignment
-enumerator. For larger samples NBenchmark falls back to the tie- and
-continuity-corrected normal approximation, which matches SciPy's asymptotic
-method (`use_continuity=True`) to better than 1e-6:
+For small, tie-free samples (combined $n \le 20$), NBenchmark computes the **exact** [permutation](https://en.wikipedia.org/wiki/Permutation_test) p-value, matching `scipy.stats.mannwhitneyu(method='exact')` to 1e-9. For larger samples, it uses a tie- and continuity-corrected normal approximation that matches SciPy's asymptotic method to better than 1e-6.
 
-> Using the exact test on small samples removes the up-to-**≈ 0.05** gap that a
-> normal approximation alone would have versus the exact permutation p-value.
-> For larger samples the approximation is accurate and the difference is
-> negligible.
-
-The significance test requires at least two samples per group.
+Using the exact test on small samples removes a potential gap of up to $\approx$ 0.05 that a normal approximation would introduce.
 
 ## 3. End-to-end measurement loop sanity
 
-`TimingSanityTests.Engine_MinimumSample_Is_Near_Known_BusyWait_Floor` runs the
-full measurement engine against a CPU-bound busy-wait of known duration and
-asserts that the **minimum** sample lands near the target (within 0.9–3.0×).
+`TimingSanityTests.Engine_MinimumSample_Is_Near_Known_BusyWait_Floor` runs the full measurement engine against a CPU-bound busy-wait of a known duration. It asserts that the **minimum** sample lands near the target (within 0.9-3.0$\times$).
 
-Unlike mean-based assertions (which absorb all scheduler preemption spikes), the
-minimum is stable:
+Because a CPU-bound busy-wait has a hard floor and preemption only adds time, the minimum is more stable than the mean. This test catches critical bugs that deterministic statistical tests might miss, such as unit errors (ns vs ms) or an incorrectly wired timer.
 
-- A CPU-bound busy-wait has a hard floor - the minimum cannot be materially
-  *below* the target.
-- Preemption only ever adds time, pushing the mean around but barely affecting
-  the minimum.
-- This catches a class of bugs the deterministic statistical tests cannot detect:
-  unit errors (ns vs ms), a broken measurement loop, or the timer wired up wrong.
+## Limitations of assertions
 
-## What is *not* asserted to ground truth
-
-- **Allocation tracking** is a smoke test (a 64 KiB allocation reports ≥ 1 KiB),
-  not an exact byte comparison, because framework allocations can appear between
-  the before/after allocation counter reads.
-- **Absolute timing accuracy** depends on the platform's `Stopwatch` resolution
-  and scheduler; the timing tests bound it coarsely rather than precisely.
+Some metrics are not asserted against an exact ground truth:
+- **Allocation tracking** is treated as a smoke test (e.g., a 64 KiB allocation must report $\ge$ 1 KiB) rather than an exact byte comparison, as framework allocations can occur between counter reads.
+- **Absolute timing accuracy** depends on the platform's `Stopwatch` resolution and the OS scheduler; timing tests bound this coarsely rather than precisely.

@@ -6,27 +6,25 @@ order: 8
 
 # Tuning recipes
 
-Five configuration recipes for situations you are likely to hit. Each shows the code and the CLI
-equivalent, explains why the settings work together, and links to the property definitions in the
-[configuration reference](../reference/configuration.md).
+This page provides configuration recipes for common benchmarking scenarios. Each recipe includes the fluent API and CLI equivalents, an explanation of why the settings work together, and links to the [configuration reference](../reference/configuration.md).
 
 ## Tuning for noisy CI environments
 
-**When to use:** Your benchmark runs on a shared CI runner (GitHub Actions, Azure Pipelines, etc.) where CPU cycles, memory bandwidth, and scheduler time are shared with other containers. Results are noisy and comparisons are unreliable.
+**When to use**: Use this recipe when running benchmarks on a shared CI runner (such as GitHub Actions or Azure Pipelines). In these environments, CPU cycles, memory bandwidth, and scheduler time are shared with other containers, often leading to noisy results and unreliable comparisons.
 
-**What to combine:**
+**Recommended settings**:
 
-| Setting | Why |
+| Setting | Purpose |
 | --- | --- |
-| `Environment.ProcessPriority = High` | Reduces preemption by unrelated OS work. The benchmark thread is less likely to be paused mid-sample - on Windows the measuring thread's own priority is raised to match. |
-| Thread control (on by default) | The measuring thread takes the affinity you pinned rather than only the process taking it, so the runtime's own threads stop competing for the same core. Leave it on. |
-| Evidence-based interference rejection (on by default) | This is the setting that matters most on a shared runner: it discards a sample the OS is *known* to have preempted (the measuring thread's own CPU occupancy, not an inference from the timing) before the statistical detector runs. Leave it on; see [Evidence-based interference rejection](../statistics/outliers.md#evidence-based-interference-rejection). |
-| `OutlierMode.MedianAbsoluteDeviation` | More robust than the default IQR fence for whatever preempted samples the evidence-based filter did not have enough signal to catch. MAD has a 50% breakdown point. |
-| `.WithLaunchCount(3)` | Runs the benchmark 3 times as independent launches, one worker process each. The reported number is the average across them and the interval is the spread between them, so it describes reproducibility rather than one process's precision. |
-| `AutoTune.CapBehavior = Error` | If the wall-clock cap is hit before the CI target is met, the benchmark errors instead of silently reporting a wide interval. |
-| The drift canary (on by default) | A shared runner's speed moves during a run. The canary times fixed work at each benchmark boundary, so a comparison smaller than the drift that separated its two rows is flagged instead of reported as a result. Leave it on here of all places. |
+| `Environment.ProcessPriority = High` | Reduces preemption by unrelated OS tasks. This makes it less likely that the benchmark thread is paused mid-sample. On Windows, the measuring thread's priority is raised to match. |
+| Thread control (enabled by default) | Ensures the measuring thread takes the pinned affinity rather than only the process. This prevents the runtime's own threads from competing for the same core. |
+| Evidence-based interference rejection (enabled by default) | Discards samples that the OS is known to have preempted based on CPU occupancy rather than timing inference. See [Evidence-based interference rejection](../statistics/outliers.md#evidence-based-interference-rejection). |
+| `OutlierMode.MedianAbsoluteDeviation` | Provides more robustness than the default IQR fence for preempted samples that the evidence-based filter misses. MAD has a 50% breakdown point. |
+| `.WithLaunchCount(3)` | Runs the benchmark as three independent launches in separate worker processes. The reported number is the average across launches, and the interval describes reproducibility rather than single-process precision. |
+| `AutoTune.CapBehavior = Error` | Causes the benchmark to error if the wall-clock cap is hit before the CI target is met, preventing the silent reporting of wide intervals. |
+| The drift canary (enabled by default) | Monitors host speed shifts during a run by timing fixed work at benchmark boundaries. If the host drift is larger than the difference between two rows, the result is flagged. |
 
-**Fluent API:**
+**Fluent API**:
 
 ```csharp
 await new BenchmarkSuite("ci-suite")
@@ -38,14 +36,13 @@ await new BenchmarkSuite("ci-suite")
     .RunAsync();
 ```
 
-**CLI:**
+**CLI**:
 
 ```bash
 dotnet run -- --priority high --outlier mad --launch-count 3 --autotune-cap-behavior error
 ```
 
-**See also:**
-
+**See also**:
 - [Environment](../reference/configuration.md#environment)
 - [OutlierMode](../reference/configuration.md#outliermode)
 - [LaunchCount](../reference/configuration.md#launchcount)
@@ -56,18 +53,18 @@ dotnet run -- --priority high --outlier mad --launch-count 3 --autotune-cap-beha
 
 ## Fast feedback during development
 
-**When to use:** You are iterating on code and need a quick signal - seconds, not minutes. Precision is less important than turnaround time.
+**When to use**: Use this recipe when iterating on code and you need a quick signal in seconds rather than minutes. Turnaround time is prioritized over precision.
 
-**What to combine:**
+**Recommended settings**:
 
-| Setting | Why |
+| Setting | Purpose |
 | --- | --- |
 | `AutoTune = AutoTuneOptions.Quick` | Lowers the CI target to ±5%, reduces minimum samples to 15, and minimum warmup to 4. |
-| `WarmupIterations = 4` | Pins a short warmup instead of auto-detecting. |
-| `Iterations = 20` | Pins a small measured sample count. |
-| `ConfidenceLevel = 0.90` | A 90% CI is narrower and requires fewer samples to satisfy. |
+| `WarmupIterations = 4` | Sets a short, fixed warmup instead of using auto-detection. |
+| `Iterations = 20` | Sets a small, fixed measured sample count. |
+| `ConfidenceLevel = 0.90` | Uses a 90% confidence interval, which is narrower and requires fewer samples. |
 
-**Fluent API:**
+**Fluent API**:
 
 ```csharp
 await new BenchmarkSuite("fast-feedback")
@@ -79,14 +76,13 @@ await new BenchmarkSuite("fast-feedback")
     .RunAsync();
 ```
 
-**CLI:**
+**CLI**:
 
 ```bash
 dotnet run -- --auto-tune quick --warmup 4 --iterations 20 --confidence 0.90
 ```
 
-**See also:**
-
+**See also**:
 - [AutoTune](../reference/configuration.md#autotune)
 - [WarmupIterations](../reference/configuration.md#warmupiterations)
 - [Iterations](../reference/configuration.md#iterations)
@@ -96,18 +92,18 @@ dotnet run -- --auto-tune quick --warmup 4 --iterations 20 --confidence 0.90
 
 ## Publication-grade precision
 
-**When to use:** You are publishing benchmark results, comparing across commits in a blog post, or establishing a baseline that others will rely on. Accuracy matters more than run time.
+**When to use**: Use this recipe when publishing results, comparing across commits for a blog post, or establishing a baseline for others to rely on. Accuracy is prioritized over run time.
 
-**What to combine:**
+**Recommended settings**:
 
-| Setting | Why |
+| Setting | Purpose |
 | --- | --- |
 | `AutoTune = AutoTuneOptions.Thorough` | Raises the CI target to ±1%, minimum samples to 100, and minimum warmup to 16. |
-| `ConfidenceLevel = 0.99` | A 99% CI is wider and more conservative. |
-| `.WithLaunchCount(5)` | Multiple independent launches let you report cross-launch statistics and an interval that reflects run-to-run variance. |
-| `EnableHistogram = true` | The latency histogram gives you the full distribution, not just summary statistics. |
+| `ConfidenceLevel = 0.99` | Uses a 99% confidence interval, which is wider and more conservative. |
+| `.WithLaunchCount(5)` | Performs multiple independent launches to report cross-launch statistics and run-to-run variance. |
+| `EnableHistogram = true` | Provides the full latency distribution rather than just summary statistics. |
 
-**Fluent API:**
+**Fluent API**:
 
 ```csharp
 await new BenchmarkSuite("publication")
@@ -118,14 +114,13 @@ await new BenchmarkSuite("publication")
     .RunAsync();
 ```
 
-**CLI:**
+**CLI**:
 
 ```bash
 dotnet run -- --auto-tune thorough --confidence 0.99 --launch-count 5
 ```
 
-**See also:**
-
+**See also**:
 - [AutoTune](../reference/configuration.md#autotune)
 - [ConfidenceLevel](../reference/configuration.md#confidencelevel)
 - [LaunchCount](../reference/configuration.md#launchcount)
@@ -135,16 +130,16 @@ dotnet run -- --auto-tune thorough --confidence 0.99 --launch-count 5
 
 ## Pure CPU measurement
 
-**When to use:** You want to measure CPU time only, excluding GC pressure, allocation overhead, and cache effects. Suitable for cryptographic algorithms, numeric kernels, and other CPU-bound work.
+**When to use**: Use this recipe when you want to measure CPU time only, excluding GC pressure, allocation overhead, and cache effects. This is suitable for cryptographic algorithms, numeric kernels, and other CPU-bound work.
 
-**What to combine:**
+**Recommended settings**:
 
-| Setting | Why |
+| Setting | Purpose |
 | --- | --- |
-| `Profile = Independent` | Forces Gen0 GC before every iteration, full GC between benchmarks, and disables allocation tracking. |
-| `OpsPerSample = 1` | Each sample is a single invocation. Calibration is skipped when per-iteration GC is on, so K stays 1 by default - pin it explicitly if you want a different value. |
+| `Profile = Independent` | Forces a Gen0 GC before every iteration, a full GC between benchmarks, and disables allocation tracking. |
+| `OpsPerSample = 1` | Sets each sample to a single invocation. Calibration is skipped when per-iteration GC is enabled, so the value stays 1 by default. |
 
-**Fluent API:**
+**Fluent API**:
 
 ```csharp
 await new BenchmarkSuite("cpu-only")
@@ -153,14 +148,13 @@ await new BenchmarkSuite("cpu-only")
     .RunAsync();
 ```
 
-**CLI:**
+**CLI**:
 
 ```bash
 dotnet run -- --profile independent
 ```
 
-**See also:**
-
+**See also**:
 - [Profile](../reference/configuration.md#profile)
 - [ForceGcBeforeEachIteration](../reference/configuration.md#forcegcbeforeeachiteration)
 - [MeasureAllocations](../reference/configuration.md#measureallocations)
@@ -170,18 +164,18 @@ dotnet run -- --profile independent
 
 ## Debugging unstable results
 
-**When to use:** Your benchmark produces wildly different numbers across runs, the Error column is large, or you see a bimodal-distribution warning and want to understand why.
+**When to use**: Use this recipe when your benchmark produces widely different numbers across runs, the error column is large, or you see a bimodal-distribution warning.
 
-**What to combine:**
+**Recommended settings**:
 
-| Setting | Why |
+| Setting | Purpose |
 | --- | --- |
-| `Diagnostics = DiagnosticsOptions.All` | Enables GC collection counts, heap info, exception tracking, and CPU time. Lets you correlate timing spikes with GC pauses or CPU throttling. |
-| `OutlierMode = MedianAbsoluteDeviation` | More robust to heavy-tailed distributions. If the default IQR fence is being distorted by a long tail, MAD gives a clearer picture. |
-| `Detail = Advanced` | Shows the auto-tune diagnostic line (K, warmup, samples, CI half-width, jitter metric) and the outlier fence values. |
-| `.WithLaunchCount(5)` or higher | The only setting that distinguishes "noisy measurement" from "number that does not reproduce". Without replicates across processes the interval describes one process's precision, and no other knob changes that. |
+| `Diagnostics = DiagnosticsOptions.All` | Enables GC collection counts, heap info, exception tracking, and CPU time to correlate spikes with GC pauses or throttling. |
+| `OutlierMode = MedianAbsoluteDeviation` | Provides more robustness for heavy-tailed distributions. Use this if the default IQR fence is distorted by a long tail. |
+| `Detail = Advanced` | Displays the auto-tune diagnostic line (K, warmup, samples, CI half-width, jitter metric) and the outlier fence values. |
+| `.WithLaunchCount(5)` or higher | Distinguishes "noisy measurements" from results that do not reproduce across processes. |
 
-**Fluent API:**
+**Fluent API**:
 
 ```csharp
 await new BenchmarkSuite("debug")
@@ -192,35 +186,36 @@ await new BenchmarkSuite("debug")
     .RunAsync();
 ```
 
-**CLI:**
+**CLI**:
 
 ```bash
 dotnet run -- --diagnostics all --outlier mad --detail advanced --launch-count 5
 ```
 
-**What to look for:**
+### Indicators to monitor
 
-- High jitter metric (> 0.10) in the auto-tune diagnostic: the host is noisy. Consider [environment controls](../features/environment-control.md).
-- On an Apple Silicon Mac, a note that the quality-of-service class could not be raised: the measurement is running on a thread macOS will not let NBenchmark place, so the scheduler may put it on an efficiency core several times slower. See [macOS and Apple Silicon](../features/environment-control.md#macos-and-apple-silicon).
-- GC collection counts that correlate with slow samples: GC pressure is affecting your timings. Try `--profile independent`.
-- A bimodal-distribution warning: investigate the cause (lock contention, cache misses, GC pauses) rather than silencing it.
-- A message naming samples "confirmed preempted by the OS": [evidence-based interference rejection](../statistics/outliers.md#evidence-based-interference-rejection) found direct proof, not an inference - a high rejected fraction means the host itself is too noisy to trust right now, not that your code is unstable.
-- `autoTune.interferenceDisabledReason` set on Advanced detail: the filter could not run for this benchmark (unsupported platform, too expensive relative to the sample duration, or an async body whose continuations mostly hopped threads) - the timings are unaffected, but the OS-preemption evidence this section relies on is unavailable.
-- A host-drift warning on a row: the machine moved further between that row and the baseline than the difference between them. See [The host drift canary](../statistics/measurement.md#the-host-drift-canary).
-- `outliersRemoved` as a fraction of the sample count: this is how much of the run the fence threw away, and it is visible in the Error column too - a run that trimmed heavily reports a wider margin than one that trimmed nothing, because [a discarded sample still counts as an observation](../statistics/outliers.md).
+- **High jitter metric (> 0.10)**: Shown in the auto-tune diagnostic. This indicates the host is noisy. Consider using [environment controls](../features/environment-control.md).
+- **Quality-of-service class warnings (macOS)**: On Apple Silicon Macs, a note may appear stating the QoS class could not be raised. This means the scheduler may place the benchmark on an efficiency core. See [macOS and Apple Silicon](../features/environment-control.md#macos-and-apple-silicon).
+- **GC correlation**: If GC collection counts correlate with slow samples, GC pressure is affecting timings. Try using `--profile independent`.
+- **Bimodal-distribution warning**: Investigate the cause (such as lock contention, cache misses, or GC pauses) rather than silencing the warning.
+- **Confirmed preemption**: If samples are "confirmed preempted by the OS," the host is too noisy to trust. This is detected via [evidence-based interference rejection](../statistics/outliers.md#evidence-based-interference-rejection).
+- **Interference disabled**: If `autoTune.interferenceDisabledReason` is set, the filter could not run (e.g., unsupported platform or async body). Timings are unaffected, but OS-preemption evidence is unavailable.
+- **Host-drift warning**: Indicates the machine speed moved significantly between the row and the baseline. See [The host drift canary](../statistics/measurement.md#the-host-drift-canary).
+- **Trimmed fraction**: A high `outliersRemoved` fraction indicates the fence removed many samples. This is reflected in the Error column as a wider margin. See [discarded samples](../statistics/outliers.md).
 
-If each individual run reports a *tight* interval and only the runs disagree with each other, the cause is not noise and none of the above will find it. Three separate things produce that, each with its own field:
+### Analyzing non-reproducible results
 
-- `autoTune.warmupTimeFloorMet` is `false` - warmup ended before tiered compilation finished, so the body was measured on unoptimized code.
-- `autoTune.sampleQuantizationFraction` exceeds the reported margin - the measurement is finer than the timer can resolve, so the digits describe the clock's step grid. See [Timer resolution](../statistics/measurement.md#timer-resolution).
-- Neither, and `launchStatistics.processVarianceRatio` is high - the number genuinely does not reproduce that precisely. Nothing inside one process can fix this; see [Reading the reproducibility warning](../features/multiple-launches.md#reading-the-reproducibility-warning).
+If individual runs report tight intervals but the runs disagree with each other, check these three fields:
 
-**See also:**
+- **`autoTune.warmupTimeFloorMet` is `false`**: Warmup ended before tiered compilation finished, meaning the body was measured on unoptimized code.
+- **`autoTune.sampleQuantizationFraction` exceeds the margin**: The measurement is finer than the timer resolution. See [Timer resolution](../statistics/measurement.md#timer-resolution).
+- **`launchStatistics.processVarianceRatio` is high**: The result genuinely does not reproduce across processes. See [Reading the reproducibility warning](../features/multiple-launches.md#reading-the-reproducibility-warning).
 
+**See also**:
 - [Diagnostics](../reference/configuration.md#diagnostics)
 - [OutlierMode](../reference/configuration.md#outliermode)
 - [LaunchCount](../reference/configuration.md#launchcount)
 - [Reading Your Results](../getting-started/reading-your-results.md)
-- [Troubleshooting](../troubleshooting.md#same-benchmark-a-different-median-each-run-and-every-run-reports-a-tight-error)
+- [Troubleshooting](../troubleshooting.md#median-differs-between-runs-with-tight-error)
 
 ---

@@ -6,11 +6,10 @@ order: 3
 
 # Harness mode: BenchmarkHarness
 
-> **Tip:** Prefer not to create a project? Install the [global tool](./global-tool.md) once and run `dotnet benchmark` against any assembly with `[Benchmark]` methods.
->
-> **Advanced features:** [Parameterized benchmarks](../features/parameterized-harness.md), [categories](../features/categories.md), [isolated runs](../features/isolated-runs.md), [dependency injection](../features/dependency-injection.md), [multi-runtime comparison](../features/multi-runtime.md), and [multiple launches](../features/multiple-launches.md) are covered in the Features section.
+> [!TIP]
+> If you prefer not to create a separate project, install the [global tool](./global-tool.md) once and run `dotnet benchmark` against any assembly with `[Benchmark]` methods.
 
-`BenchmarkHarness` discovers benchmarks by scanning assemblies for `[Benchmark]`-decorated methods. It also parses command-line arguments, so you can filter, configure, and drive runs entirely from the terminal without recompiling.
+`BenchmarkHarness` discovers benchmarks by scanning assemblies for `[Benchmark]`-decorated methods. It also parses command-line arguments, allowing you to filter, configure, and drive runs from the terminal without recompiling.
 
 This mode is designed for **dedicated benchmark projects** - a separate console project that you run against your library.
 
@@ -56,7 +55,7 @@ await BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-### 4. Run
+### 4. Run the benchmarks
 
 ```bash
 dotnet run
@@ -66,9 +65,9 @@ dotnet run -- --reporter markdown --output ./results
 
 ## Benchmark attributes
 
-### `[Benchmark]`
+### [Benchmark]
 
-Marks a public instance method for measurement.
+Mark a public instance method for measurement.
 
 ```csharp
 [Benchmark]
@@ -84,12 +83,12 @@ public async Task<int> MyAsyncMethodWithResult() => await ComputeAsync();
 **Properties:**
 
 | Property | Type | Description |
-|---|---|---|---|
-| `Baseline` | `bool` | Marks this method as the baseline for ratio/significance calculations. |
-| `Description` | `string?` | Optional label shown in output when descriptions are present. |
-| `Iterations` | `int?` | Override the default iteration count for this method only. |
-| `WarmupIterations` | `int?` | Override the default warmup count for this method only. |
-| `LaunchCount` | `int` | Override the default launch count for this method only. |
+|---|---|---|
+| `Baseline` | `bool` | Marks this method as the baseline for ratio and significance calculations. |
+| `Description` | `string?` | An optional label shown in output when descriptions are present. |
+| `Iterations` | `int?` | Overrides the default iteration count for this method only. |
+| `WarmupIterations` | `int?` | Overrides the default warmup count for this method only. |
+| `LaunchCount` | `int` | Overrides the default launch count for this method only. |
 
 ```csharp
 [Benchmark(Baseline = true, Description = "current production implementation")]
@@ -99,9 +98,9 @@ public string CurrentImpl() => Production.DoWork();
 public string NewImpl() => Candidate.DoWork();
 ```
 
-### `[BenchmarkCategory]`
+### [BenchmarkCategory]
 
-Tags a benchmark (or an entire class) with one or more categories. Categories can be used to include or exclude benchmarks from a run. Multiple categories are declared by applying the attribute multiple times.
+Tag a benchmark (or an entire class) with one or more categories. You can use categories to include or exclude benchmarks from a run. Apply the attribute multiple times to declare multiple categories.
 
 ```csharp
 [BenchmarkCategory("String")]
@@ -123,13 +122,13 @@ public class StringBenchmarks
 }
 ```
 
-Class-level categories are unioned with method-level categories, so `ManyConcat` above is tagged with both `String` and `Slow`.
+NBenchmark unions class-level categories with method-level categories. In the example above, `ManyConcat` is tagged with both `String` and `Slow`.
 
-See [Categories](../features/categories.md) for the full filtering model (CLI flags, programmatic filtering, and how the two compose).
+For the full filtering model (including CLI flags and programmatic filtering), see [Categories](../features/categories.md).
 
-### `[BenchmarkCase]` and `[BenchmarkCases]`
+### [BenchmarkCase] and [BenchmarkCases]
 
-Run the benchmark once for each case (argument set). The method must accept parameters matching the argument types.
+Run the benchmark once for each case (argument set). The method must accept parameters that match the argument types.
 
 ```csharp
 [BenchmarkCase(10)]
@@ -145,16 +144,18 @@ public void Sort(int n)
 
 Each case becomes a separate benchmark entry in the output, named `MethodName(name=value, ...)` using the method's parameter names. For programmatic case sources, generated values, or large parameter sweeps, use `[BenchmarkCases]` with a source method that yields named value tuples.
 
-See [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) for the full API, display name rules, baselines, significance, filtering, and a comparison with suite mode.
+For the full API, display name rules, baselines, significance, filtering, and a comparison with suite mode, see [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
 
 ### Lifecycle attributes
 
-These attributes control setup and teardown at the class and iteration level. All decorated methods must have no parameters. By default, the lifetime is `PerMethod` - both the instance and the lifecycle methods fire once per `[Benchmark]` method. Add `[InstanceLifetime(InstanceLifetime.PerClass)]` on the class to run setup/teardown once for the class.
+These attributes control setup and teardown at the class and iteration level. All decorated methods must have no parameters.
 
-| Attribute | Runs | Timing |
+By default, the lifetime is `PerMethod` - both the instance and the lifecycle methods fire once per `[Benchmark]` method. To run setup and teardown once for the entire class, add `[InstanceLifetime(InstanceLifetime.PerClass)]` to the class.
+
+| Attribute | When it runs | Timing |
 | --- | --- | --- |
-| `[BenchmarkSetup]` | Once before each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
-| `[BenchmarkTeardown]` | Once after each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
+| `[BenchmarkSetup]` | Before each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
+| `[BenchmarkTeardown]` | After each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
 | `[BenchmarkIterationSetup]` | Before each individual iteration | Not measured |
 | `[BenchmarkIterationTeardown]` | After each individual iteration | Not measured |
 
@@ -180,7 +181,7 @@ public class DatabaseBenchmarks
 }
 ```
 
-If your `[BenchmarkSetup]` is expensive and you want to share the resulting state across all `[Benchmark]` methods in the class, opt the class into `PerClass`:
+If your `[BenchmarkSetup]` is expensive and you want to share the resulting state across all `[Benchmark]` methods in the class, use `PerClass`:
 
 ```csharp
 [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -192,14 +193,14 @@ public class DatabaseBenchmarks
 }
 ```
 
-### `[IsolatedProcess]`
+### [IsolatedProcess]
 
-Harness mode is **isolated by default**: every benchmark class runs in its own freshly spawned worker, so it is not influenced by JIT, GC, or thread-pool state warmed up by other classes. You don't need any attribute to get this behavior.
+Harness mode is **isolated by default**: every benchmark class runs in its own freshly spawned worker. This ensures the benchmark is not influenced by JIT, GC, or thread-pool state warmed up by other classes.
 
-Use the isolation attributes to change the granularity:
+Use isolation attributes to change the granularity:
 
-- **`[IsolatedProcess]`** on a method gives that single benchmark its **own dedicated** worker - the finest granularity, isolated even from sibling benchmarks in the same class.
-- **`[InProcess]`** on a method (or class) opts that benchmark back into the **host process**.
+- **`[IsolatedProcess]`** on a method gives that single benchmark its **own dedicated** worker. This is the finest granularity, isolating the benchmark even from sibling benchmarks in the same class.
+- **`[InProcess]`** on a method or class opts that benchmark back into the **host process**.
 
 ```csharp
 public class StartupBenchmarks
@@ -217,13 +218,13 @@ public class StartupBenchmarks
 }
 ```
 
-To disable isolation for the **whole run**, pass `--in-process` on the command line or call `WithIsolation(false)` in code. `--dry-run` also always runs in-process.
+To disable isolation for the **entire run**, pass `--in-process` on the command line or call `WithIsolation(false)` in code. The `--dry-run` flag also always runs in-process.
 
-See [Isolated Runs](../features/isolated-runs.md) for the full isolation model across all modes, including how mixed `[IsolatedProcess]` / `[InProcess]` classes are dispatched.
+For the full isolation model across all modes, including how mixed `[IsolatedProcess]` and `[InProcess]` classes are dispatched, see [Isolated Runs](../features/isolated-runs.md).
 
 ## Class requirements
 
-NBenchmark instantiates benchmark classes using `Activator.CreateInstance`. The class must have a **public parameterless constructor** (the default for any class without explicit constructors).
+NBenchmark instantiates benchmark classes using `Activator.CreateInstance`. The class must have a **public parameterless constructor**.
 
 ```csharp
 // Works - implicit parameterless constructor
@@ -241,7 +242,7 @@ public class MyBenchmarks(IDatabase db) { ... }
 
 ### Benchmark classes with dependencies
 
-If you want benchmark classes to have **constructor dependencies** (a repository, a logger, an `HttpClient`, a `DbContext`, etc.), add the optional `NBenchmark.DependencyInjection` companion package:
+To use **constructor dependencies** (such as a repository, logger, `HttpClient`, or `DbContext`), add the optional `NBenchmark.DependencyInjection` companion package:
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
@@ -263,11 +264,11 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-Pass the factory, not a built container, so the worker can rebuild it and the run stays isolated. See the [Dependency Injection guide](../features/dependency-injection.md) for the full API, lifetime semantics, scoped variants, and how to plug in containers other than `Microsoft.Extensions.DependencyInjection`.
+Pass the factory rather than a built container so the worker can rebuild it and the run remains isolated. For the full API, lifetime semantics, scoped variants, and how to plug in containers other than `Microsoft.Extensions.DependencyInjection`, see the [Dependency Injection guide](../features/dependency-injection.md).
 
 ## Scanning multiple assemblies
 
-Call `AddFromAssembly` once per assembly:
+Call `AddFromAssembly` once for each assembly:
 
 ```csharp
 BenchmarkHarness.Create(args)
@@ -295,15 +296,15 @@ BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-CLI flags like `--iterations` always override `WithOptions` values.
+CLI flags, such as `--iterations`, always override `WithOptions` values.
 
-By default benchmarks run in **random** order to reduce systematic bias. Call `WithRunOrder(RunOrder.Declaration)` (or pass `--order declaration`) to run them in declaration order instead.
+By default, benchmarks run in **random** order to reduce systematic bias. Call `WithRunOrder(RunOrder.Declaration)` or pass `--order declaration` to run them in declaration order.
 
 ## Cross-class significance
 
-By default, Harness mode computes significance **per class**: each discovered class gets its own baseline, and `Sig` / `Magnitude` are relative to that class's baseline. The console reporter renders one comparison table per class.
+By default, Harness mode computes significance **per class**: each discovered class has its own baseline, and `Sig` and `Magnitude` are relative to that class's baseline. The console reporter renders one comparison table per class.
 
-When comparing implementations that live in separate classes (e.g. a legacy version and a refactored version), pass `--cross-class` on the CLI or call `WithCrossClassSignificance()` in code to compute significance across all classes in a single comparison table. The baseline is chosen from the whole group, and the reporter adds a `Class` column so rows can be distinguished.
+When comparing implementations that live in separate classes (for example, a legacy version and a refactored version), pass `--cross-class` on the CLI or call `WithCrossClassSignificance()` in code to compute significance across all classes in a single comparison table. In this mode, NBenchmark chooses a baseline from the entire group, and the reporter adds a `Class` column to distinguish rows.
 
 ```csharp
 await BenchmarkHarness.Create(args)
@@ -311,19 +312,19 @@ await BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-Cross-class mode is opt-in because mixing unrelated benchmark classes into one significance table produces a baseline that may be semantically meaningless.
+Cross-class mode is opt-in because mixing unrelated benchmark classes into one significance table can produce a baseline that is semantically meaningless.
 
 ## Multi-runtime comparison
 
-Use the `--runtimes` CLI flag (or the `[Runtimes]` attribute) to run the same benchmarks across multiple .NET runtimes and compare results side-by-side. See [Multi-runtime comparison](../features/multi-runtime.md) for the full guide, including the `[Runtimes]` attribute and how it interacts with `--runtimes`.
+Use the `--runtimes` CLI flag or the `[Runtimes]` attribute to run the same benchmarks across multiple .NET runtimes and compare the results side-by-side. For the full guide, including the `[Runtimes]` attribute and its interaction with `--runtimes`, see [Multi-runtime comparison](../features/multi-runtime.md).
 
 ## Multiple launches
 
-Use `--launch-count <n>` on the CLI (or `WithLaunchCount(n)` in code) to run each benchmark N times as independent launches. See [Multiple launches](../features/multiple-launches.md) for the full guide, including per-method attribute overrides and isolation interaction.
+Use `--launch-count <n>` on the CLI or `WithLaunchCount(n)` in code to run each benchmark $N$ times as independent launches. For the full guide, including per-method attribute overrides and isolation interaction, see [Multiple launches](../features/multiple-launches.md).
 
 ## Category filtering
 
-When benchmarks are tagged with `[BenchmarkCategory]`, you can include or exclude them from the run using the `--category` and `--exclude-category` CLI flags, or `WithCategoryFilter` in code. See [Categories](../features/categories.md) for the full filtering model.
+When you tag benchmarks with `[BenchmarkCategory]`, you can include or exclude them from the run using the `--category` and `--exclude-category` CLI flags, or `WithCategoryFilter` in code. For the full filtering model, see [Categories](../features/categories.md).
 
 ## Listing benchmarks without running
 
@@ -331,7 +332,7 @@ When benchmarks are tagged with `[BenchmarkCategory]`, you can include or exclud
 dotnet run -- --list
 ```
 
-Output:
+The output is similar to the following:
 
 ```text
 ── StringBenchmarks ──
@@ -343,23 +344,23 @@ Output:
 
 ## Dry run
 
-Validates that all benchmarks compile, discover, and wire up correctly - without invoking the body:
+A dry run validates that all benchmarks compile, discover, and wire up correctly without invoking the body:
 
 ```bash
 dotnet run -- --dry-run
 ```
 
-`--dry-run` is implemented as `--iterations 0 --warmup 0`. The body is not invoked, and no measurements are taken. Use it to confirm discovery, setup, and instantiation work before a full run. To run the body exactly once for a smoke test, use `--iterations 1 --warmup 0`.
+The `--dry-run` flag is implemented as `--iterations 0 --warmup 0`. The body is not invoked, and no measurements are taken. Use this to confirm discovery, setup, and instantiation work before a full run. To run the body exactly once for a smoke test, use `--iterations 1 --warmup 0`.
 
 ## Return value
 
-`RunAsync` returns `IReadOnlyList<BenchmarkResult>` with all results, including errored benchmarks. Exit code is 0 on success.
+`RunAsync` returns `IReadOnlyList<BenchmarkResult>` containing all results, including errored benchmarks. The exit code is 0 on success.
 
 ## Next steps
 
 - [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - `[BenchmarkCase]` and `[BenchmarkCases]` in depth
-- [Multi-runtime comparison](../features/multi-runtime.md) - compare across .NET runtimes
-- [Multiple launches](../features/multiple-launches.md) - measure run-to-run variance
-- [CLI Reference](../reference/cli.md) - all command-line flags
-- [Configuration](../reference/configuration.md) - options reference
-- [Reporters](../output/index.md) - all available reporters
+- [Multi-runtime comparison](../features/multi-runtime.md) - Compare across .NET runtimes
+- [Multiple launches](../features/multiple-launches.md) - Measure run-to-run variance
+- [CLI Reference](../reference/cli.md) - All command-line flags
+- [Configuration](../reference/configuration.md) - Options reference
+- [Reporters](../output/index.md) - All available reporters
