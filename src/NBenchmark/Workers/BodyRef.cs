@@ -17,7 +17,7 @@ internal enum WorkGroupKind
     DiscoveredClass = 0,
 
     /// <summary>
-    ///     Simple mode and inline suites. Each benchmark is a delegate addressed by
+    ///     Single mode and inline suites. Each benchmark is a delegate addressed by
     ///     <see cref="BodyRef" /> and re-created in the worker from the already-compiled method.
     /// </summary>
     Lambdas = 1,

@@ -60,7 +60,7 @@ public sealed class WorkerRunPlanTests
     ///     The failure this prevents is the quietest one available: the body is measured perfectly in a
     ///     worker and then scored with the built-in detector instead of the one the caller pinned, with
     ///     nothing in the output saying so. Only the inline-suite path used to check; the harness,
-    ///     Simple mode and the test integrations all discarded the refusal.
+    ///     Single mode and the test integrations all discarded the refusal.
     /// </remarks>
     [Fact]
     public void ForDiscoveredClass_RefusesWhenAStrategyCannotBeRebuilt()

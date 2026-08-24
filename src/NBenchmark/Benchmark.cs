@@ -607,13 +607,13 @@ public static class Benchmark
         string name,
         IBenchmarkProgress? progress,
         CancellationToken cancellationToken) where TDelegate : Delegate
-        // Simple mode has always returned synchronously and continues to. The wait is on a worker
+        // Single mode has always returned synchronously and continues to. The wait is on a worker
         // handshake rather than on measurement scheduling, but from the caller's side nothing about
         // the contract changed.
         => MeasureAsync(action, options, name, progress, cancellationToken).GetAwaiter().GetResult();
 
     /// <summary>
-    ///     The per-iteration hooks for one Simple-mode benchmark, in both the forms the two paths need.
+    ///     The per-iteration hooks for one Single-mode benchmark, in both the forms the two paths need.
     /// </summary>
     /// <remarks>
     ///     Two forms of the same pair, because the two paths need different things from them. The
@@ -968,10 +968,10 @@ public static class Benchmark
     ///     Builds the spec for a measurement taken in <b>this</b> process.
     ///     <para>
     ///         The generic runtime-profile guidance is suppressed here, because by the time this is
-    ///         reached Simple mode has already decided - and explained - why the host is being used:
+    ///         reached Single mode has already decided - and explained - why the host is being used:
     ///         either the caller asked for it via <c>RunInProcess</c>, in which case a warning is
     ///         noise, or the body could not be addressed, in which case
-    ///         <see cref="SimpleModeGuidance" /> has said so in far more actionable terms. Two
+    ///         <see cref="SingleModeGuidance" /> has said so in far more actionable terms. Two
     ///         messages about the same fact teach people to read neither.
     ///     </para>
     ///     <para>

@@ -23,7 +23,7 @@ public sealed class SuitePlanIsolationTests : IDisposable
     public SuitePlanIsolationTests()
     {
         WorkerLauncher.Current = new RealWorkerLauncher(WorkerLocatorForTests.WorkerAssemblyPath());
-        SimpleModeGuidance.ResetForTesting();
+        SingleModeGuidance.ResetForTesting();
         ProbeDetector.Reset();
     }
 
@@ -269,7 +269,7 @@ public sealed class SuitePlanIsolationTests : IDisposable
     public async Task RunPlanAsync_WithNoWorkerDeployed_FallsBackAndSaysSo()
     {
         using var _ = FakeWorkerLauncher.InstallUnavailable();
-        SimpleModeGuidance.ResetForTesting();
+        SingleModeGuidance.ResetForTesting();
 
         using var stderr = new StringWriter();
         var priorError = Console.Error;

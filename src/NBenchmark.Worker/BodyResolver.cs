@@ -1066,7 +1066,7 @@ internal static class BodyResolver
     ///         Reconstructing the precise <c>Func&lt;T&gt;</c> rather than adapting through a
     ///         <c>Func&lt;object&gt;</c> matters: boxing the return value of a value-typed body adds
     ///         both time and a per-operation allocation that the report would attribute to the
-    ///         user's code. Simple mode measures unboxed today and must keep doing so once it runs
+    ///         user's code. Single mode measures unboxed today and must keep doing so once it runs
     ///         in a worker.
     ///     </para>
     /// </summary>

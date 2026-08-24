@@ -21,7 +21,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     public InlineSuiteIsolationTests()
     {
         WorkerLauncher.Current = new RealWorkerLauncher(WorkerLocatorForTests.WorkerAssemblyPath());
-        SimpleModeGuidance.ResetForTesting();
+        SingleModeGuidance.ResetForTesting();
     }
 
     public void Dispose() => WorkerLauncher.Current = _prior;
@@ -713,7 +713,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     ///     A suite over prepared state is isolated, and the state is built in the worker.
     /// </summary>
     /// <remarks>
-    ///     This is the suite-shaped counterpart to the Simple-mode prepared-state path, and the reason it
+    ///     This is the suite-shaped counterpart to the Single-mode prepared-state path, and the reason it
     ///     matters more here: one worker measures the whole suite, so a single capturing body takes every
     ///     sibling in-process with it. Naming the preparation keeps the entire set isolated.
     /// </remarks>

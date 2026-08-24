@@ -8,9 +8,9 @@ order: 5
 
 NBenchmark supports three report detail levels that control how much statistical information reporters display. **Simple** is the default; **Standard** adds full multi-section output; and **Advanced** adds a per-benchmark stats block with a full distribution summary.
 
-## Simple mode (default)
+## Simple detail (default)
 
-Simple mode shows a compact table with the essential information you need to determine if your code performs well or how it compares to other implementations:
+Simple detail shows a compact table with the essential information you need to determine if your code performs well or how it compares to other implementations:
 
 | Column | Description |
 | --- | --- |

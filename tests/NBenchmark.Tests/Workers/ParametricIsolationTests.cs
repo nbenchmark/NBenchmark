@@ -34,7 +34,7 @@ public sealed class ParametricIsolationTests : IDisposable
     public ParametricIsolationTests()
     {
         WorkerLauncher.Current = new RealWorkerLauncher(WorkerLocatorForTests.WorkerAssemblyPath());
-        SimpleModeGuidance.ResetForTesting();
+        SingleModeGuidance.ResetForTesting();
     }
 
     public void Dispose() => WorkerLauncher.Current = _prior;

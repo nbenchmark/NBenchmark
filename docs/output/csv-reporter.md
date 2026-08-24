@@ -78,7 +78,7 @@ The `EffectMetric`, `EffectValue`, and `Magnitude` columns reflect the active si
 
 ## Column reference
 
-### Single mode (19 columns)
+### Simple detail mode (19 columns)
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -171,7 +171,7 @@ Advanced mode adds the following columns to the standard set:
 - NBenchmark sorts results by median (fastest first).
 - NBenchmark creates the output directory automatically if it does not exist.
 - For names containing double-quotes, NBenchmark uses standard CSV escaping by doubling the quote character.
-- Simple mode CSV has 19 fixed columns. Standard mode has 35 non-percentile columns plus one per configured tail-latency percentile. Advanced mode adds 35 further fields.
+- Simple detail CSV has 19 fixed columns. Standard mode has 35 non-percentile columns plus one per configured tail-latency percentile. Advanced mode adds 35 further fields.
 
 ## Using with Benchmark (Single mode)
 

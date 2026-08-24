@@ -1495,7 +1495,7 @@ public class BenchmarkSuite(string name)
             // factory capturing a local is refused while the non-capturing bodies it wires up are
             // not. So this says what was refused and stops there, rather than announcing an outcome
             // that has not happened yet.
-            SimpleModeGuidance.EmitPlanRefusal(local.Name, outcome.Status, outcome.Refusal);
+            SingleModeGuidance.EmitPlanRefusal(local.Name, outcome.Status, outcome.Refusal);
 
             // Deliberately not gated on RequireIsolation, unlike every other refusal site. The plan
             // being unaddressable does not mean the suite is: RunCoreAsync addresses the bodies
@@ -1661,7 +1661,7 @@ public class BenchmarkSuite(string name)
         {
             IsolationAudit.ThrowIfRequired(_options, Name, decision.Status, decision.Explanation);
 
-            SimpleModeGuidance.EmitOnce(Name, decision.Status, decision.Explanation);
+            SingleModeGuidance.EmitOnce(Name, decision.Status, decision.Explanation);
             _inProcessStatus = decision.Status;
 
             return null;
@@ -1715,7 +1715,7 @@ public class BenchmarkSuite(string name)
             // request for isolated ones - so it has to reach the same gate.
             IsolationAudit.ThrowIfRequired(_options, Name, IsolationStatus.InProcessNoWorker, fault);
 
-            SimpleModeGuidance.EmitOnce(Name, IsolationStatus.InProcessNoWorker, fault);
+            SingleModeGuidance.EmitOnce(Name, IsolationStatus.InProcessNoWorker, fault);
 
             _inProcessStatus = IsolationStatus.InProcessNoWorker;
 

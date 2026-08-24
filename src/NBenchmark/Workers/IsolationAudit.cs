@@ -133,7 +133,7 @@ internal static class IsolationAudit
     /// </summary>
     private const string OptOut =
         " To measure in this process deliberately, use [InProcess] (Harness mode), "
-        + "Benchmark.RunInProcess (Simple mode), or BenchmarkSuite.AddInProcess / WithIsolation(false) "
+        + "Benchmark.RunInProcess (Single mode), or BenchmarkSuite.AddInProcess / WithIsolation(false) "
         + "(Suite mode) - or set MeasurementOptions.RequireIsolation = false to accept labelled "
         + "fallbacks everywhere.";
 

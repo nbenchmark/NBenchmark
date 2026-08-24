@@ -32,7 +32,7 @@ public sealed class InstanceSourceIsolationTests : IDisposable
     public InstanceSourceIsolationTests()
     {
         WorkerLauncher.Current = new RealWorkerLauncher(WorkerLocatorForTests.WorkerAssemblyPath());
-        SimpleModeGuidance.ResetForTesting();
+        SingleModeGuidance.ResetForTesting();
     }
 
     public void Dispose() => WorkerLauncher.Current = _prior;

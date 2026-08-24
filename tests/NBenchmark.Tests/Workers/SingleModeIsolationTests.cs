@@ -4,9 +4,9 @@ using Xunit;
 namespace NBenchmark.Tests.Workers;
 
 /// <summary>
-///     Simple mode measured in a real worker process.
+///     Single mode measured in a real worker process.
 ///     <para>
-///         Simple mode is the entry point people reach for first, and historically the least
+///         Single mode is the entry point people reach for first, and historically the least
 ///         trustworthy: a lambda measured in whatever process happened to be running inherits that
 ///         process's JIT tiering. These tests prove that a lambda written here is located, bound and
 ///         measured in another process - and, just as importantly, that one which cannot be is
@@ -14,17 +14,17 @@ namespace NBenchmark.Tests.Workers;
 ///     </para>
 /// </summary>
 [Collection(nameof(RealWorkerCollection))]
-public sealed class SimpleModeIsolationTests : IDisposable
+public sealed class SingleModeIsolationTests : IDisposable
 {
     private readonly IWorkerLauncher _prior = WorkerLauncher.Current;
 
-    public SimpleModeIsolationTests()
+    public SingleModeIsolationTests()
     {
         // The test host has no deployed worker beside it, so discovery would correctly report none.
         // Pointing at the built worker exercises everything except locator discovery, which is
         // covered separately.
         WorkerLauncher.Current = new RealWorkerLauncher(WorkerLocatorForTests.WorkerAssemblyPath());
-        SimpleModeGuidance.ResetForTesting();
+        SingleModeGuidance.ResetForTesting();
     }
 
     public void Dispose() => WorkerLauncher.Current = _prior;
@@ -87,7 +87,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
 
     /// <summary>
     ///     A non-capturing lambda is measured in a worker under the default profile. This is the
-    ///     behaviour change that makes Simple mode trustworthy: nothing about the call site moved.
+    ///     behaviour change that makes Single mode trustworthy: nothing about the call site moved.
     /// </summary>
     [Fact]
     public void Run_NonCapturingLambda_IsMeasuredInAWorker()
@@ -193,7 +193,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
         var message = stderr.ToString();
         Assert.Contains("stream", message);
         Assert.Contains("captured", message);
-        Assert.Contains(SimpleModeGuidance.SuppressEnvVar, message);
+        Assert.Contains(SingleModeGuidance.SuppressEnvVar, message);
     }
 
     /// <summary>
@@ -204,7 +204,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
     ///     <c>Benchmark.Run</c> calls - fifteen of them refused for the same reason - printed one line
     ///     naming the first. A reader would fix the benchmark they were told about and have no reason
     ///     to think the other fourteen were affected, because nothing else in the output says so:
-    ///     Simple mode returns a <see cref="BenchmarkResult" /> rather than rendering a table with an
+    ///     Single mode returns a <see cref="BenchmarkResult" /> rather than rendering a table with an
     ///     isolation column.
     /// </remarks>
     [Fact]
@@ -259,7 +259,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
             Console.SetError(priorError);
         }
 
-        Assert.Equal(1, stderr.ToString().Split(SimpleModeGuidance.SuppressEnvVar).Length - 1);
+        Assert.Equal(1, stderr.ToString().Split(SingleModeGuidance.SuppressEnvVar).Length - 1);
     }
 
     /// <summary>
@@ -325,14 +325,14 @@ public sealed class SimpleModeIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     With no worker deployed at all, Simple mode still works - less accurately - and says why.
+    ///     With no worker deployed at all, Single mode still works - less accurately - and says why.
     ///     A packaging problem must not fail a measurement outright.
     /// </summary>
     [Fact]
     public void Run_WithNoWorkerDeployed_FallsBackAndSaysSo()
     {
         using var _ = FakeWorkerLauncher.InstallUnavailable();
-        SimpleModeGuidance.ResetForTesting();
+        SingleModeGuidance.ResetForTesting();
 
         using var stderr = new StringWriter();
         var priorError = Console.Error;
@@ -454,7 +454,7 @@ public sealed class SimpleModeIsolationTests : IDisposable
     public void Run_WithPreparedState_AndNoWorker_BuildsStateOnceHere()
     {
         using var _ = FakeWorkerLauncher.InstallUnavailable();
-        SimpleModeGuidance.ResetForTesting();
+        SingleModeGuidance.ResetForTesting();
 
         var builds = 0;
 

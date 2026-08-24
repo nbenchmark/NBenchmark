@@ -588,7 +588,7 @@ public record MeasurementOptions
     ///         <c>WithIsolation(false)</c> and <c>BenchmarkSuite.AddInProcess</c> all remain legal and
     ///         produce <see cref="IsolationStatus.InProcessRequested" />. Set this to <c>false</c> to go
     ///         back to a labelled fallback everywhere - which is still the right setting for the
-    ///         scratchpad use Simple mode exists for, where a number measured in this process and clearly
+    ///         scratchpad use Single mode exists for, where a number measured in this process and clearly
     ///         stamped beats no number at all.
     ///     </para>
     ///     <para>

@@ -82,7 +82,7 @@ internal readonly record struct Refusal(RefusalReason Reason, string Message, in
     /// <param name="structural">
     ///     What to call a refusal that is <i>not</i> about a value in this process. Supplied by the
     ///     caller because the honest name differs by mode: an inline suite's structural refusal is
-    ///     answered by a <c>[BenchmarkPlan]</c> factory, and Simple mode has no plan to point at.
+    ///     answered by a <c>[BenchmarkPlan]</c> factory, and Single mode has no plan to point at.
     /// </param>
     public IsolationStatus ToStatus(IsolationStatus structural) => Reason switch
     {

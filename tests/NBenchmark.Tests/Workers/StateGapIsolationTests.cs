@@ -30,7 +30,7 @@ public sealed class StateGapIsolationTests : IDisposable
     public StateGapIsolationTests()
     {
         WorkerLauncher.Current = new RealWorkerLauncher(WorkerLocatorForTests.WorkerAssemblyPath());
-        SimpleModeGuidance.ResetForTesting();
+        SingleModeGuidance.ResetForTesting();
     }
 
     public void Dispose() => WorkerLauncher.Current = _prior;

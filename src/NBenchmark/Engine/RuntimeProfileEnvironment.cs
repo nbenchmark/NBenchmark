@@ -59,7 +59,7 @@ internal static class RuntimeProfileEnvironment
     ///     process was not launched with one - which is the case for every in-process run, since
     ///     the knobs are read at startup.
     ///     <para>
-    ///         This is guidance rather than a per-result warning on purpose. Simple mode is always
+    ///         This is guidance rather than a per-result warning on purpose. Single mode is always
     ///         in-process, so a per-result warning would attach to every single
     ///         <c>Benchmark.Run</c> and train people to ignore warnings. It follows the same
     ///         once-per-process, warn-and-proceed pattern as the Debug-build guidance in

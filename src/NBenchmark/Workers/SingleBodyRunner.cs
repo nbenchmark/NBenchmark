@@ -3,10 +3,10 @@ using NBenchmark.Engine;
 namespace NBenchmark.Workers;
 
 /// <summary>
-///     Runs one Simple-mode body in a worker when it can be addressed, and in the host process when
+///     Runs one Single-mode body in a worker when it can be addressed, and in the host process when
 ///     it cannot.
 ///     <para>
-///         Simple mode is the entry point people reach for first - a lambda and a name - and
+///         Single mode is the entry point people reach for first - a lambda and a name - and
 ///         historically it was the least trustworthy mode in the library, because a lambda measured
 ///         in whatever process happened to be running inherits that process's JIT tiering. On bodies
 ///         of provably identical cost that produced a 3.27x spread and a 2.80x fabricated difference,
@@ -53,7 +53,7 @@ internal static class SingleBodyRunner
                 out var bodyRef, out var receivers, out var status, out var refusal))
         {
             IsolationAudit.ThrowIfRequired(options, name, status, refusal);
-            SimpleModeGuidance.EmitOnce(name, status, refusal);
+            SingleModeGuidance.EmitOnce(name, status, refusal);
 
             return (await measureInProcess().ConfigureAwait(false), status);
         }
@@ -113,7 +113,7 @@ internal static class SingleBodyRunner
         // for the failures that can be predicted and not for the ones that cannot.
         IsolationAudit.ThrowIfRequired(options, name, IsolationStatus.InProcessNoWorker, fault);
 
-        SimpleModeGuidance.EmitOnce(name, IsolationStatus.InProcessNoWorker, fault);
+        SingleModeGuidance.EmitOnce(name, IsolationStatus.InProcessNoWorker, fault);
 
         var fallback = await measureInProcess().ConfigureAwait(false);
 
@@ -249,11 +249,11 @@ internal static class SingleBodyRunner
 }
 
 /// <summary>
-///     The once-per-process note explaining why a Simple-mode benchmark was not isolated.
+///     The once-per-process note explaining why a Single-mode benchmark was not isolated.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Once per <i>offender</i> and per distinct reason, rather than once per call. Simple mode is
+///         Once per <i>offender</i> and per distinct reason, rather than once per call. Single mode is
 ///         used in loops and scripts; a message on every <c>Benchmark.Run</c> would be noise, and
 ///         noise is how a warning stops being read.
 ///     </para>
@@ -266,7 +266,7 @@ internal static class SingleBodyRunner
 ///         <see cref="MaxReported" /> so a genuinely large loop still cannot flood stderr.
 ///     </para>
 /// </remarks>
-internal static class SimpleModeGuidance
+internal static class SingleModeGuidance
 {
     internal const string SuppressEnvVar = "NBENCHMARK_SUPPRESS_ISOLATION_WARNING";
 

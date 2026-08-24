@@ -3,14 +3,14 @@ using Xunit;
 namespace NBenchmark.Tests;
 
 /// <summary>
-///     Simple mode's measurement contract - names, sample counts, raw samples - independent of where
+///     Single mode's measurement contract - names, sample counts, raw samples - independent of where
 ///     the measurement ran.
 /// </summary>
 /// <remarks>
 ///     Every options record here sets <c>RequireIsolation = false</c>, which is not incidental. This
 ///     test project deliberately deploys no <c>nbworker</c> beside itself, so every measurement it
 ///     takes is a refused one; the tests that care about that fact live in
-///     <see cref="Workers.RequiredIsolationTests" /> and <see cref="Workers.SimpleModeIsolationTests" />
+///     <see cref="Workers.RequiredIsolationTests" /> and <see cref="Workers.SingleModeIsolationTests" />
 ///     and assert the throw. These are about the numbers, so they opt out of the gate rather than
 ///     asserting an exception they are not testing.
 /// </remarks>

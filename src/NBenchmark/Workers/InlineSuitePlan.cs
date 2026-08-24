@@ -13,7 +13,7 @@ namespace NBenchmark.Workers;
 ///         This exists so isolation costs nothing in ergonomics. Requiring a
 ///         <c>[BenchmarkPlan]</c> factory to get accurate numbers would make the accurate path the
 ///         inconvenient one, and people would reasonably keep writing the inconvenient-to-avoid,
-///         quietly-wrong one. Each benchmark body is addressed individually, exactly as Simple mode
+///         quietly-wrong one. Each benchmark body is addressed individually, exactly as Single mode
 ///         addresses a lambda, and the whole set is measured in one worker.
 ///     </para>
 ///     <para>

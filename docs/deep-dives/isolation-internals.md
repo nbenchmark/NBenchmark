@@ -198,7 +198,7 @@ The `Iso` column in reports keys on refusals rather than just `!IsIsolated()`. K
 
 Errored rows have no provenance because they were not measured. This prevents errored rows from incorrectly flagging a run as non-isolated.
 
-Provenance is communicated through five channels: the stderr refusal at the moment of refusal (`SimpleModeGuidance` for Single/Suite/Plan, deduped per offender and bounded; `BenchmarkHarness.EmitIsolationRefusal` per class), the per-row stamp, the Console/Markdown `Iso` column with its remedy footer, a `Isolation` column in CSV at every detail level, and `BenchmarkResult.Print()`. JSON serializes the full record.
+Provenance is communicated through five channels: the stderr refusal at the moment of refusal (`SingleModeGuidance` for Single/Suite/Plan, deduped per offender and bounded; `BenchmarkHarness.EmitIsolationRefusal` per class), the per-row stamp, the Console/Markdown `Iso` column with its remedy footer, a `Isolation` column in CSV at every detail level, and `BenchmarkResult.Print()`. JSON serializes the full record.
 
 If a user explicitly requests isolation via `[IsolatedProcess]` and it is refused, the engine names the benchmarks that asked and adds a warning to their rows.
 
