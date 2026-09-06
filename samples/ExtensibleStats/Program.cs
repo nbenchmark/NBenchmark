@@ -97,9 +97,9 @@ internal sealed class KeepFastestDetector(double fraction) : IOutlierDetector
 {
     public string Name => $"keep fastest {fraction * 100:0.#}%";
 
-    public OutlierClassification Classify(double[] sortedSamples)
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
-        // sortedSamples is provided sorted ascending and must not be mutated.
+        // sortedSamples is a read-only view of the engine's own buffer, sorted ascending.
         var keep = (int)Math.Floor(sortedSamples.Length * fraction);
 
         if (keep <= 0 || keep >= sortedSamples.Length)
@@ -107,8 +107,8 @@ internal sealed class KeepFastestDetector(double fraction) : IOutlierDetector
 
         return new OutlierClassification
         {
-            Kept = sortedSamples[..keep],
-            Discarded = sortedSamples[keep..],
+            Kept = sortedSamples[..keep].ToArray(),
+            Discarded = sortedSamples[keep..].ToArray(),
             UpperFenceNs = sortedSamples[keep],
         };
     }
@@ -144,9 +144,9 @@ internal sealed class MedianRatioSignificanceTest(double thresholdPercent) : ISi
         return new SignificanceReport { Pairwise = pairwise };
     }
 
-    private static double Median(double[] samples)
+    private static double Median(ReadOnlyMemory<double> samples)
     {
-        var sorted = (double[])samples.Clone();
+        var sorted = samples.ToArray();
         Array.Sort(sorted);
         var mid = sorted.Length / 2;
 

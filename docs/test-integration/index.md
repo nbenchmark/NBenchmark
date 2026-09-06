@@ -155,17 +155,26 @@ A failure at `LaunchCount = 1` includes a note stating that the ratio is a point
 
 ## Thresholds reference
 
-All three integration packages share the same threshold properties. A value of `-1` (double or long) disables the check. Omitting a property is equivalent to setting it to `-1`.
+All three integration packages share the same threshold properties. Each numeric threshold is disabled by `IPerformanceThresholds.Unset` (`-1`), which is also its default, so omitting a property leaves the check off. Sample counts use `IPerformanceThresholds.AutoSampleCount` (`0`) instead - "as many as it takes" is zero explicit samples rather than minus one.
+
+The sentinels exist because these thresholds live on attributes, and an attribute argument cannot be a `Nullable<T>`. Name them rather than writing the numbers:
+
+```csharp
+[PerformanceFact(MaxMeanNs = 200_000)]                       // gate on the mean
+[PerformanceFact(MaxMeanNs = IPerformanceThresholds.Unset)]  // explicitly no gate
+```
+
+The `PerformanceThresholds` option bag used by `BenchmarkAssert.Validate` is an ordinary object rather than attribute metadata, so it uses `double?` and `long?` and needs no sentinel.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `MaxMeanNs` | `double` | -1 (disabled) | Maximum allowed mean execution time in nanoseconds. |
-| `MaxP95Ns` | `double` | -1 (disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles`. |
-| `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
-| `MaxSlowdownRatio` | `double` | 0 (disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g., `5.0` = 5$\times$ the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
+| `MaxMeanNs` | `double` | `Unset` (-1, disabled) | Maximum allowed mean execution time in nanoseconds. |
+| `MaxP95Ns` | `double` | `Unset` (-1, disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles`. |
+| `MaxAllocatedBytes` | `long` | `UnsetBytes` (-1, disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
+| `MaxSlowdownRatio` | `double` | `Unset` (-1, disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g., `5.0` = 5$\times$ the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
 | `ReferenceMethod` | `string?` | null | Name of a method on the same class to use as the reference. When null, calibration mode runs. |
-| `Samples` | `int` | 0 (default) | Number of measured samples. `0` uses the framework default. |
-| `WarmupSamples` | `int` | 0 (default) | Number of warmup samples. `0` uses the framework default. |
+| `Samples` | `int` | `AutoSampleCount` (0) | Number of measured samples. `0` uses the framework default. |
+| `WarmupSamples` | `int` | `AutoSampleCount` (0) | Number of warmup samples. `0` uses the framework default. |
 | `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
 | `RequireIsolation` | `bool` | **true** | Fails the test if the measurement occurs in the test host rather than a worker process. Opt out with `[AllowInProcessGate]` on the method, class, or assembly. This is settable only via `PerformanceAssert` options. |
 | `LaunchCount` | `int` | 1 | Number of worker processes to measure this test in. Two or more enable the paired per-replicate estimate with a confidence interval. |

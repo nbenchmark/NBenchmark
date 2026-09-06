@@ -343,7 +343,7 @@ public sealed class MarkdownReporter : IReporter
 
                 if (!isSimple)
                 {
-                    var magnitudeText = row.Result.Effect?.Magnitude ?? "-";
+                    var magnitudeText = row.Result.Effect?.Magnitude?.ToShortString() ?? "-";
                     line.Append($" {magnitudeText} |");
                 }
             }

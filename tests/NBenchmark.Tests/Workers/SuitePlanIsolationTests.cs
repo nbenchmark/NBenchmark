@@ -344,7 +344,7 @@ public sealed class SuitePlanIsolationTests : IDisposable
     [Fact]
     public void RunPlansAsync_NonStaticPlan_ThrowsRatherThanSkipping()
     {
-        var ex = Assert.Throws<InvalidOperationException>(
+        var ex = Assert.Throws<BenchmarkConfigurationException>(
             () => BenchmarkPlanDiscovery.Find(typeof(BadPlans)));
 
         Assert.Contains("not static", ex.Message);
@@ -354,7 +354,7 @@ public sealed class SuitePlanIsolationTests : IDisposable
     [Fact]
     public async Task RunPlansAsync_TypeWithNoPlans_Throws()
     {
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<BenchmarkConfigurationException>(
             () => BenchmarkSuite.RunPlansAsync<SuitePlanIsolationTests>());
 
         Assert.Contains("no benchmark plans", ex.Message);
@@ -439,7 +439,7 @@ internal sealed class ProbeDetector(int sentinel) : IOutlierDetector
 
     public string Name => NameFor(sentinel);
 
-    public OutlierClassification Classify(double[] sortedSamples) =>
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples) =>
         OutlierClassification.KeepAll(sortedSamples);
 }
 

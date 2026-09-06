@@ -79,7 +79,8 @@ public static class PerformanceAssert
         Assert.Fail(BuildFailureMessage(result, violations));
     }
 
-    public static void Validate(BenchmarkResult result, double[] rawSamples, PerformanceAssertionOptions? options = null)
+    public static void Validate(
+        BenchmarkResult result, IReadOnlyList<double> rawSamples, PerformanceAssertionOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(rawSamples);
@@ -93,7 +94,8 @@ public static class PerformanceAssert
         Assert.Fail(BuildFailureMessage(result, violations));
     }
 
-    private static List<string> CollectViolations(BenchmarkResult result, double[] rawSamples, PerformanceAssertionOptions options)
+    private static List<string> CollectViolations(
+        BenchmarkResult result, IReadOnlyList<double> rawSamples, PerformanceAssertionOptions options)
     {
         var violations = new List<string>();
 

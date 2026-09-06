@@ -54,7 +54,7 @@ internal static class DelegateDispatch
                 ? await BenchmarkRunner.Instance
                     .RunAsync(name, untyped, spec, cancellationToken)
                     .ConfigureAwait(false)
-                : throw new InvalidOperationException(
+                : throw new BenchmarkConfigurationException(
                     $"Benchmark body '{name}' has delegate type {body.GetType().Name}, which the "
                     + "engine cannot measure. Wrap it as an Action, a Func<T>, or a Func<Task<T>>.");
         }
@@ -74,7 +74,7 @@ internal static class DelegateDispatch
         if (resultType == typeof(ValueTask)
             || (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(ValueTask<>)))
         {
-            throw new InvalidOperationException(AwaitableResult.Refusal(name, resultType));
+            throw new BenchmarkConfigurationException(AwaitableResult.Refusal(name, resultType));
         }
 
         // Checked before the Func<Task> cast above would have matched it: Func<T> is covariant in

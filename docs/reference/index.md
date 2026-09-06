@@ -15,3 +15,4 @@ Technical reference for NBenchmark.
 - [Analyzers](./analyzers.md) - Compile-time Roslyn diagnostics (NB0001-NB0014).
 - [Measurement Observer](./observers.md) - The live-telemetry callback surface for streaming measurement events.
 - [BCL Instrumentation](./bcl-instrumentation.md) - Built-in `System.Diagnostics` Meter/ActivitySource telemetry.
+- [Exceptions](./exceptions.md) - The exception types NBenchmark raises, and what each one means.

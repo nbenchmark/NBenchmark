@@ -430,9 +430,3 @@ internal sealed class WorkerHost : IAsyncDisposable
         }
     }
 }
-
-/// <summary>
-///     Thrown when a worker cannot be started or cannot be trusted. Callers treat this as "fall
-///     back and say why", never as a reason to report a measurement.
-/// </summary>
-internal sealed class WorkerStartException(string message) : Exception(message);

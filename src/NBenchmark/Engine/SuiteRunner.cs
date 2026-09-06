@@ -50,7 +50,8 @@ internal static class SuiteRunner
                 Observer = observer ?? NullMeasurementObserver.Instance,
             };
 
-            await progress.OnBenchmarkStarting(envelope.Name, startIndex + index + 1, totalBenchmarks).ConfigureAwait(false);
+            await progress.OnBenchmarkStartingAsync(
+                envelope.Name, startIndex + index + 1, totalBenchmarks, cancellationToken).ConfigureAwait(false);
 
             NBenchmarkDiagnostics.OnBenchmarkRunStarting(envelope.Name, envelope.ClassName, envelope.IsBaseline, envelope.ParameterSet);
 
@@ -110,7 +111,7 @@ internal static class SuiteRunner
                 throw;
             }
 
-            await progress.OnBenchmarkCompleted(completedResult).ConfigureAwait(false);
+            await progress.OnBenchmarkCompletedAsync(completedResult, cancellationToken).ConfigureAwait(false);
 
             if (ShouldForceGcBetweenBenchmarks(spec.Options, completedResult))
                 GcControl.ForceFullGc();
@@ -121,7 +122,7 @@ internal static class SuiteRunner
             canary?.Take();
 
             // PerClass shared-instance reset hook: fired once per gap, after this method's
-            // completion + inter-benchmark GC and before the next method's OnBenchmarkStarting.
+            // completion + inter-benchmark GC and before the next method's OnBenchmarkStartingAsync.
             // N-1 fires for N envelopes (no fire after the last benchmark; the first method sees
             // a fresh instance with setup already run). Null in per-method, per-benchmark, and
             // suite-mode paths.

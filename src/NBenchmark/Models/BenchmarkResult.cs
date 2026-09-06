@@ -369,11 +369,12 @@ public record BenchmarkResult
     ///         feeds the test-integration comparison path with honest numbers.
     ///     </para>
     /// </summary>
-    public static BenchmarkResult FromCalibration(string name, double mean, double median, double[] samples)
+    public static BenchmarkResult FromCalibration(
+        string name, double mean, double median, IReadOnlyList<double> samples)
     {
         ArgumentNullException.ThrowIfNull(samples);
 
-        if (samples.Length == 0)
+        if (samples.Count == 0)
         {
             return new BenchmarkResult
             {
@@ -401,14 +402,17 @@ public record BenchmarkResult
         // histogram and reported percentiles - FromCalibration is not a measured run, so the
         // result carries no histogram and the default percentile set is left empty to match the
         // previous behaviour and avoid surprising the test-integration comparison path.
-        var stats = StatsSummary.Compute(samples, enableHistogram: false, reportedPercentiles: []);
+        // A copy the caller cannot reach, so nothing downstream depends on a list the caller may
+        // still be mutating - and the sort below has an array to work on either way.
+        var values = samples.ToArray();
+        var stats = StatsSummary.Compute(values, enableHistogram: false, reportedPercentiles: []);
 
         // Quartiles use the same nearest-rank convention the stats pipeline uses for the raw
         // sample set (OutlierTrim computes Q1Ns/Q3Ns on the raw, pre-trim array). StatsSummary
         // does not surface Q1Ns/Q3Ns, so compute them on the sorted samples StatsSummary already
         // normalised internally. Build a sorted copy so the public FromCalibration contract
-        // (the input array is never mutated) holds.
-        var sorted = (double[])samples.Clone();
+        // (the caller's samples are never reordered) holds.
+        var sorted = (double[])values.Clone();
         Array.Sort(sorted);
 
         var q1 = Percentile.Compute(sorted, 0.25);
@@ -429,7 +433,7 @@ public record BenchmarkResult
             Q3Ns = q3,
             InterquartileRangeNs = q3 - q1,
             OutliersRemoved = 0,
-            SampleCount = samples.Length,
+            SampleCount = values.Length,
             Skewness = stats.Skewness,
             Kurtosis = stats.Kurtosis,
             MedianAbsoluteDeviationNs = stats.MedianAbsoluteDeviationNs,

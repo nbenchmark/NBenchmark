@@ -74,6 +74,8 @@ Once you reference the package in the benchmark project, the reporter runs on ev
 
 ### Deduplication with explicit reporters
 
+`--reporter <name>` resolves a name in the explicit list first and then in the auto-attached list, so an auto-attached reporter can also be named explicitly - which is what the `--reporter` help line advertises. This mirrors `--observer <name>` on the observer side.
+
 If you add an auto-attached reporter as an explicit reporter (via `--reporter <name>` or `.WithReporter(...)`), NBenchmark skips the auto-attached version for that run to prevent the reporter from firing twice. Deduplication is based on the canonical name (case-insensitive).
 
 ### Resilience

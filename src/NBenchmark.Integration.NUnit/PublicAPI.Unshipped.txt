@@ -3,8 +3,6 @@ NBenchmark.Integration.NUnit.PerformanceAssert
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ConfidenceLevel.get -> double
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ConfidenceLevel.init -> void
-NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Samples.get -> int
-NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Samples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAbsoluteThresholdTolerance.get -> double
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAbsoluteThresholdTolerance.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAllocatedBytes.get -> long
@@ -24,6 +22,8 @@ NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ReferenceMethod.get -> 
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ReferenceMethod.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.RequireIsolation.get -> bool
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.RequireIsolation.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Samples.get -> int
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Samples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.WarmupSamples.get -> int
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.WarmupSamples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute
@@ -31,8 +31,6 @@ NBenchmark.Integration.NUnit.PerformanceAttribute.ApplyToTest(NUnit.Framework.In
 NBenchmark.Integration.NUnit.PerformanceAttribute.BuildFrom(NUnit.Framework.Interfaces.IMethodInfo! method, NUnit.Framework.Internal.Test? suite) -> NUnit.Framework.Internal.TestMethod!
 NBenchmark.Integration.NUnit.PerformanceAttribute.ConfidenceLevel.get -> double
 NBenchmark.Integration.NUnit.PerformanceAttribute.ConfidenceLevel.init -> void
-NBenchmark.Integration.NUnit.PerformanceAttribute.Samples.get -> int
-NBenchmark.Integration.NUnit.PerformanceAttribute.Samples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.LaunchCount.get -> int
 NBenchmark.Integration.NUnit.PerformanceAttribute.LaunchCount.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.MaxAbsoluteThresholdTolerance.get -> double
@@ -52,6 +50,8 @@ NBenchmark.Integration.NUnit.PerformanceAttribute.OutlierMode.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.PerformanceAttribute() -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.ReferenceMethod.get -> string?
 NBenchmark.Integration.NUnit.PerformanceAttribute.ReferenceMethod.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.Samples.get -> int
+NBenchmark.Integration.NUnit.PerformanceAttribute.Samples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.WarmupSamples.get -> int
 NBenchmark.Integration.NUnit.PerformanceAttribute.WarmupSamples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.Wrap(NUnit.Framework.Internal.Commands.TestCommand! command) -> NUnit.Framework.Internal.Commands.TestCommand!
@@ -63,4 +63,4 @@ static NBenchmark.Integration.NUnit.PerformanceAssert.Run<T>(System.Func<T>! act
 static NBenchmark.Integration.NUnit.PerformanceAssert.RunAsync(System.Func<System.Threading.Tasks.Task!>! action, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
 static NBenchmark.Integration.NUnit.PerformanceAssert.RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>!>! action, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
 static NBenchmark.Integration.NUnit.PerformanceAssert.Validate(NBenchmark.BenchmarkResult! result, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null) -> void
-static NBenchmark.Integration.NUnit.PerformanceAssert.Validate(NBenchmark.BenchmarkResult! result, double[]! rawSamples, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null) -> void
+static NBenchmark.Integration.NUnit.PerformanceAssert.Validate(NBenchmark.BenchmarkResult! result, System.Collections.Generic.IReadOnlyList<double>! rawSamples, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null) -> void

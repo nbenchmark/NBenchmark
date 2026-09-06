@@ -164,9 +164,9 @@ public sealed class KeepFastestDetector(double fraction) : IOutlierDetector
 {
     public string Name => $"keep fastest {fraction * 100:0.#}%";
 
-    public OutlierClassification Classify(double[] sortedSamples)
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
-        // Input is sorted ascending and must NOT be mutated.
+        // The input is a read-only view of the engine's samples, sorted ascending.
         var keep = (int)Math.Floor(sortedSamples.Length * fraction);
 
         if (keep <= 0 || keep >= sortedSamples.Length)
@@ -174,8 +174,8 @@ public sealed class KeepFastestDetector(double fraction) : IOutlierDetector
 
         return new OutlierClassification
         {
-            Kept = sortedSamples[..keep],
-            Discarded = sortedSamples[keep..],
+            Kept = sortedSamples[..keep].ToArray(),
+            Discarded = sortedSamples[keep..].ToArray(),
             UpperFenceNs = sortedSamples[keep],
         };
     }
@@ -195,7 +195,8 @@ new MeasurementOptions { OutlierDetector = static () => new KeepFastestDetector(
 A custom `OutlierDetector` takes priority over `OutlierMode`.
 
 **The contract:**
-- `sortedSamples` arrives **sorted ascending**; do not mutate it.
+- `sortedSamples` arrives **sorted ascending** as a `ReadOnlySpan<double>` over the engine's own buffer, so a detector reads the samples without being able to reorder or rescale them.
+- `Kept` and `Discarded` are `ReadOnlyMemory<double>`; a span slice becomes one with `.ToArray()`, and an array converts implicitly.
 - Return `Kept` sorted ascending.
 - **Never discard every sample.** Return `OutlierClassification.KeepAll(sortedSamples)` if your rule would empty the set.
 - Set `LowerFenceNs` and `UpperFenceNs` only for fence-based rules.

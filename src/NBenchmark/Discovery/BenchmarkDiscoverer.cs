@@ -138,7 +138,7 @@ internal sealed class BenchmarkDiscoverer
 
         if (caseAttributes.Length > 0 && casesAttribute is not null)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has both "
                 + "[Arguments] and [ArgumentsSource]. Use one or the other.");
         }
@@ -147,14 +147,14 @@ internal sealed class BenchmarkDiscoverer
         {
             if (caseAttributes.Length > 0)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has [Arguments] "
                     + "but takes no parameters.");
             }
 
             if (casesAttribute is not null)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has [ArgumentsSource] "
                     + "but takes no parameters.");
             }
@@ -182,7 +182,7 @@ internal sealed class BenchmarkDiscoverer
         {
             if (parameters.Length > 0)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' declares "
                     + $"{parameters.Length} parameter(s) but has no [Arguments] or [ArgumentsSource]. "
                     + "Add one [Arguments(...)] per argument set, or remove the parameters.");
@@ -202,7 +202,7 @@ internal sealed class BenchmarkDiscoverer
 
             if (rawArgs.Length != parameters.Length)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' expects "
                     + $"{parameters.Length} argument(s) but a [Arguments] attribute supplied "
                     + $"{rawArgs.Length}.");
@@ -251,21 +251,21 @@ internal sealed class BenchmarkDiscoverer
 
         if (source is null)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"Benchmark '{declaringType.Name}.{method.Name}' has [ArgumentsSource(\"{attr.SourceName}\")] "
                 + $"but no member named '{attr.SourceName}' was found on type '{declaringType.Name}'.");
         }
 
         if (source.IsGenericMethod)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"Benchmark '{declaringType.Name}.{method.Name}' references source method "
                 + $"'{source.Name}' via [ArgumentsSource], but the source method must not be generic.");
         }
 
         if (source.GetParameters().Length > 0)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"Benchmark '{declaringType.Name}.{method.Name}' references source method "
                 + $"'{source.Name}' via [ArgumentsSource], but the source method must have no parameters.");
         }
@@ -274,7 +274,7 @@ internal sealed class BenchmarkDiscoverer
 
         if (!returnType.IsGenericType)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"Benchmark '{declaringType.Name}.{method.Name}' references source method "
                 + $"'{source.Name}' which returns '{returnType.Name}', but the source must return "
                 + $"IEnumerable<(ValueTuple<...>)>.");
@@ -291,7 +291,7 @@ internal sealed class BenchmarkDiscoverer
 
             if (enumerableInterface is null)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"Benchmark '{declaringType.Name}.{method.Name}' references source method "
                     + $"'{source.Name}' which returns '{returnType.Name}', but the source must return "
                     + $"IEnumerable<(ValueTuple<...>)>.");
@@ -302,7 +302,7 @@ internal sealed class BenchmarkDiscoverer
 
         if (!elementType.IsValueType || !IsValueTupleType(elementType))
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"Benchmark '{declaringType.Name}.{method.Name}' references source method "
                 + $"'{source.Name}' which returns IEnumerable<{elementType.Name}>, "
                 + "but the element type must be a ValueTuple.");
@@ -374,7 +374,7 @@ internal sealed class BenchmarkDiscoverer
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"Cannot create an instance of '{declaringType.Name}' to invoke the "
                     + $"[ArgumentsSource] source method '{source.Name}': {ex.Message}. "
                     + (factoryResolvedInstances
@@ -394,7 +394,7 @@ internal sealed class BenchmarkDiscoverer
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"Failed to invoke [ArgumentsSource] source method '{declaringType.Name}.{source.Name}': "
                 + $"{ex.InnerException?.Message ?? ex.Message}", ex);
         }
@@ -407,7 +407,7 @@ internal sealed class BenchmarkDiscoverer
 
         if (enumerableInterface is null)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' "
                 + $"returned '{enumerableType.Name}', which is not IEnumerable<T>. The source must "
                 + "yield IEnumerable<ValueTuple<...>>.");
@@ -422,7 +422,7 @@ internal sealed class BenchmarkDiscoverer
         {
             if (element is null)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' yielded "
                     + "a null element. ValueTuple elements must not be null.");
             }
@@ -431,7 +431,7 @@ internal sealed class BenchmarkDiscoverer
 
             if (!IsValueTupleType(elementTupleType))
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' yielded "
                     + $"a non-ValueTuple element of type '{elementTupleType.Name}'. "
                     + "All elements must be ValueTuples.");
@@ -441,7 +441,7 @@ internal sealed class BenchmarkDiscoverer
 
             if (arity != benchmarkParams.Length)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' yields "
                     + $"ValueTuple with {arity} element(s), but benchmark method "
                     + $"'{method.DeclaringType!.Name}.{method.Name}' expects {benchmarkParams.Length} parameter(s).");
@@ -449,7 +449,7 @@ internal sealed class BenchmarkDiscoverer
 
             if (arity > 7)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' yields "
                     + $"a ValueTuple with {arity} element(s). NBenchmark supports at most 7 "
                     + "parameters for [ArgumentsSource] sources.");
@@ -554,7 +554,7 @@ internal sealed class BenchmarkDiscoverer
 
             if (method.DeclaringType != declaringType)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"'{method.Name}' is declared by '{method.DeclaringType?.FullName}' but the suite is "
                     + $"built around '{declaringType.FullName}'. A co-resident group shares one instance "
                     + "type.");

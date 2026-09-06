@@ -31,7 +31,7 @@ public class MagnitudeLabelTests
 
         Assert.Equal(EffectMetrics.CliffsDelta, effect.Metric);
         Assert.Equal(0.62, effect.Value);
-        Assert.Equal("large", effect.Magnitude);
+        Assert.Equal(MagnitudeLabel.Large, effect.Magnitude);
         Assert.Equal(EffectDirection.CandidateHigher, effect.Direction);
         Assert.Equal(0.62, effect.PracticalValue);
     }

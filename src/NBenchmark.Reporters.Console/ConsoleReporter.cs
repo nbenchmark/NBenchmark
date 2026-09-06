@@ -857,32 +857,24 @@ public sealed class ConsoleReporter : IReporter
         if (effect is not { } value)
             return "[dim]-[/]";
 
-        var magnitude = string.IsNullOrWhiteSpace(value.Magnitude)
-            ? value.Value?.ToString("F3") ?? "-"
-            : value.Magnitude;
+        // A strategy that does not band its statistic leaves Magnitude null; show the raw value
+        // rather than an empty cell, so the column still says something about the effect.
+        if (value.Magnitude is not { } magnitude)
+            return $"[cyan]{Esc(value.Value?.ToString("F3") ?? "-")}[/]";
 
-        if (string.Equals(magnitude, "neg", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(magnitude, "negligible", StringComparison.OrdinalIgnoreCase))
-            return "[dim]neg[/]";
-
-        if (string.Equals(magnitude, "small", StringComparison.OrdinalIgnoreCase))
-            return "[yellow]sml[/]";
-
-        if (string.Equals(magnitude, "med", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(magnitude, "medium", StringComparison.OrdinalIgnoreCase))
-            return "[orange1]med[/]";
-
-        if (string.Equals(magnitude, "large", StringComparison.OrdinalIgnoreCase))
+        return magnitude switch
         {
-            return value.Direction switch
+            MagnitudeLabel.Negligible => "[dim]neg[/]",
+            MagnitudeLabel.Small => "[yellow]sml[/]",
+            MagnitudeLabel.Medium => "[orange1]med[/]",
+            MagnitudeLabel.Large => value.Direction switch
             {
                 EffectDirection.CandidateHigher => "[bold red]lrg[/]",
                 EffectDirection.CandidateLower => "[bold green]lrg[/]",
                 _ => "[bold]lrg[/]",
-            };
-        }
-
-        return $"[cyan]{Esc(magnitude)}[/]";
+            },
+            _ => $"[cyan]{Esc(magnitude.ToShortString())}[/]",
+        };
     }
 
     private static readonly char[] SparkBlocks =

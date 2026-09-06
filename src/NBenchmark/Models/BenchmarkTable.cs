@@ -534,7 +534,7 @@ public sealed record BenchmarkTable
 
         if (row.Result.Effect is { } effect && string.Equals(effect.Metric, EffectMetrics.CliffsDelta, StringComparison.Ordinal))
         {
-            var magnitudeText = effect.Magnitude ?? "?";
+            var magnitudeText = effect.Magnitude?.ToShortString() ?? "?";
             var deltaText = effect.Value.HasValue ? effect.Value.Value.ToString("F4") : "?";
 
             var directionText = effect.Direction switch
@@ -549,7 +549,7 @@ public sealed record BenchmarkTable
         else if (row.Result.Effect is { } genericEffect)
         {
             var valueText = genericEffect.Value.HasValue ? genericEffect.Value.Value.ToString("F4") : "?";
-            var magnitudeText = string.IsNullOrWhiteSpace(genericEffect.Magnitude) ? "?" : genericEffect.Magnitude;
+            var magnitudeText = genericEffect.Magnitude?.ToShortString() ?? "?";
             lines.Add($"Effect ({genericEffect.Metric}): {valueText} ({magnitudeText})");
         }
 

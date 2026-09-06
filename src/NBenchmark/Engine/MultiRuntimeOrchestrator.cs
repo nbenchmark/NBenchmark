@@ -175,7 +175,7 @@ internal static class MultiRuntimeOrchestrator
             slnDir = Directory.GetParent(slnDir)?.FullName;
         }
 
-        throw new InvalidOperationException(
+        throw new BenchmarkExecutionException(
             "Could not locate a .csproj or .sln file. Run the benchmark from within a project directory.");
     }
 

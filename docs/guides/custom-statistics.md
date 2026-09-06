@@ -28,7 +28,7 @@ public sealed class KeepFastestDetector(double fraction) : IOutlierDetector
 {
     public string Name => $"keep fastest {fraction * 100:0.#}%";
 
-    public OutlierClassification Classify(double[] sortedSamples)
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
         var keep = (int)Math.Floor(sortedSamples.Length * fraction);
 
@@ -37,8 +37,8 @@ public sealed class KeepFastestDetector(double fraction) : IOutlierDetector
 
         return new OutlierClassification
         {
-            Kept = sortedSamples[..keep],
-            Discarded = sortedSamples[keep..],
+            Kept = sortedSamples[..keep].ToArray(),
+            Discarded = sortedSamples[keep..].ToArray(),
             UpperFenceNs = sortedSamples[keep],
         };
     }
@@ -75,10 +75,10 @@ public sealed class MedianRatioSignificanceTest(double thresholdPercent) : ISign
                     Value: deltaPercent,
                     Magnitude: deltaPercent switch
                     {
-                        < 5 => "neg",
-                        < 15 => "small",
-                        < 30 => "med",
-                        _ => "large",
+                        < 5 => MagnitudeLabel.Negligible,
+                        < 15 => MagnitudeLabel.Small,
+                        < 30 => MagnitudeLabel.Medium,
+                        _ => MagnitudeLabel.Large,
                     },
                     Direction: EffectDirection.None,
                     PracticalValue: Math.Min(1.0, deltaPercent / 100.0))));
@@ -87,9 +87,10 @@ public sealed class MedianRatioSignificanceTest(double thresholdPercent) : ISign
         return new SignificanceReport { Pairwise = pairwise };
     }
 
-    private static double Median(double[] samples)
+    private static double Median(ReadOnlyMemory<double> samples)
     {
-        var sorted = samples.OrderBy(x => x).ToArray();
+        var sorted = samples.ToArray();
+        Array.Sort(sorted);
         return sorted.Length % 2 == 0
             ? (sorted[sorted.Length / 2 - 1] + sorted[sorted.Length / 2]) / 2.0
             : sorted[sorted.Length / 2];
@@ -124,9 +125,9 @@ new MeasurementOptions
 
 ## What's happening
 
-- **`IOutlierDetector`**: This interface receives a sorted-ascending sample array and returns an `OutlierClassification` containing `Kept`, `Discarded`, and optional `LowerFenceNs` or `UpperFenceNs` values. The contract requires that the detector never discards every sample (return `KeepAll` if the rule would empty the set), does not mutate the input, and returns the `Kept` array sorted ascending. A custom `OutlierDetector` takes priority over the `OutlierMode` setting. The detector's `Name` appears in the report header. For more information, see [Outlier Trimming: Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors).
+- **`IOutlierDetector`**: This interface receives the samples sorted ascending as a `ReadOnlySpan<double>` and returns an `OutlierClassification` whose `Kept` and `Discarded` are `ReadOnlyMemory<double>`, plus optional `LowerFenceNs` or `UpperFenceNs` values. The samples arrive read-only because they are the engine's own buffer, which every other strategy in the same run also reads. The contract requires that the detector never discards every sample (return `KeepAll` if the rule would empty the set) and returns `Kept` sorted ascending. A custom `OutlierDetector` takes priority over the `OutlierMode` setting. The detector's `Name` appears in the report header. For more information, see [Outlier Trimming: Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors).
 
-- **`ISignificanceTest`**: This interface receives a `SignificanceContext` (including the comparable `Groups`, the `BaselineIndex`, the `Baseline` group, the non-baseline `Candidates`, and the `SignificanceLevel`) and returns a `SignificanceReport`. The report contains `Pairwise` comparisons, optional `Effect` metadata, an optional `Shift` estimate, and an optional `Omnibus` verdict. Use `PValue: null` for rules that do not produce a p-value. For more information, see [Significance Testing: Custom significance tests](../statistics/significance.md#custom-significance-tests).
+- **`ISignificanceTest`**: This interface receives a `SignificanceContext` (including the comparable `Groups`, whose `Samples` are `ReadOnlyMemory<double>` over the engine's buffers, the `BaselineIndex`, the `Baseline` group, the non-baseline `Candidates`, and the `SignificanceLevel`) and returns a `SignificanceReport`. The report contains `Pairwise` comparisons, optional `Effect` metadata, an optional `Shift` estimate, and an optional `Omnibus` verdict. Use `PValue: null` for rules that do not produce a p-value. For more information, see [Significance Testing: Custom significance tests](../statistics/significance.md#custom-significance-tests).
 
 - **The `MinimumPracticalEffect` gate**: The engine enforces this gate in `Significance.ApplyReport` after the test runs. If a custom test returns an `EffectSize` with a `PracticalValue`, it is gated automatically. Tests that do not return a practical value are unaffected. For more information, see [Significance Testing: Practical-significance gate](../statistics/significance.md#practical-significance-gate).
 

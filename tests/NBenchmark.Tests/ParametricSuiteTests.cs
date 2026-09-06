@@ -165,7 +165,7 @@ public class ParametricSuiteTests
         var suite = new BenchmarkSuite("missing").WithIsolation(Isolation.Preferred)
             .Add("bench", (int size) => size);
 
-        Assert.Throws<InvalidOperationException>(() => suite.RunAsync().GetAwaiter().GetResult());
+        Assert.Throws<BenchmarkConfigurationException>(() => suite.RunAsync().GetAwaiter().GetResult());
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public class ParametricSuiteTests
             .Add("plain", () => { })
             .WithParameter("size", 10);
 
-        Assert.Throws<InvalidOperationException>(() => suite.RunAsync().GetAwaiter().GetResult());
+        Assert.Throws<BenchmarkConfigurationException>(() => suite.RunAsync().GetAwaiter().GetResult());
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public class ParametricSuiteTests
             .WithParameter("x", 1)
             .Add("bench", (string x) => x.Length);
 
-        Assert.Throws<InvalidOperationException>(() => suite.RunAsync().GetAwaiter().GetResult());
+        Assert.Throws<BenchmarkConfigurationException>(() => suite.RunAsync().GetAwaiter().GetResult());
     }
 
     [Fact]
@@ -262,18 +262,20 @@ public class ParametricSuiteTests
     {
         public List<BenchmarkResult> BenchmarkCompletions { get; } = [];
 
-        public Task OnSuiteStarting(IReadOnlyList<string> names, int count) => Task.CompletedTask;
-        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
-        public Task OnWarmupCompleted(string name) => Task.CompletedTask;
-        public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
-        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
+        public Task OnSuiteStartingAsync(IReadOnlyList<string> names, int count) => Task.CompletedTask;
+        public Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnWarmupCompletedAsync(string name, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnSampleCompletedAsync(
+        string name, int sample, int totalSamples, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task OnBenchmarkCompleted(BenchmarkResult result)
+        public Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken cancellationToken)
         {
             BenchmarkCompletions.Add(result);
             return Task.CompletedTask;
         }
 
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) => Task.CompletedTask;
+        public Task OnSuiteCompletedAsync(
+        IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

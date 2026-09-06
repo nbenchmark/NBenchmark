@@ -425,13 +425,13 @@ public sealed class BenchmarkHarness
         // resolve instances from several threads and building the container twice would give two
         // sets of singletons.
         var provider = new Lazy<IServiceProvider>(
-            () => factory() ?? throw new InvalidOperationException(
+            () => factory() ?? throw new BenchmarkConfigurationException(
                 "The service provider factory returned null."));
 
         return type =>
         {
             var instance = provider.Value.GetService(type)
-                           ?? throw new InvalidOperationException(
+                           ?? throw new BenchmarkConfigurationException(
                                $"No service of type '{type.FullName}' is registered in the service provider.");
 
             return InstanceHandle.NoTeardown(instance);
@@ -957,7 +957,7 @@ public sealed class BenchmarkHarness
         // second SuiteStarting..SuiteCompleted stream for results that are never published and was then
         // disposed twice - a double-finalise for any observer whose Dispose closes out a session.
         //
-        // Strictly before OnSuiteStarting below. An observer may be the thing that attaches a
+        // Strictly before OnSuiteStartingAsync below. An observer may be the thing that attaches a
         // listener to the ActivitySource - that is exactly what the OTLP exporter is - and
         // StartActivity returns null when nothing is listening yet. Resolving second cost the run
         // its root span, and with it the parent that every benchmark, phase and worker span in the
@@ -983,7 +983,7 @@ public sealed class BenchmarkHarness
 
         try
         {
-            await progress.OnSuiteStarting(allNames, totalBenchmarks).ConfigureAwait(false);
+            await progress.OnSuiteStartingAsync(allNames, totalBenchmarks, cancellationToken).ConfigureAwait(false);
 
             var runningIndex = 0;
 
@@ -1073,7 +1073,7 @@ public sealed class BenchmarkHarness
                 }
             }
 
-            await progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
+            await progress.OnSuiteCompletedAsync(allResults, cancellationToken).ConfigureAwait(false);
 
             // SuiteCompleted sentinel: emit on the success path with Succeeded = true. A
             // live-streaming observer treats this as the authoritative run-end signal.
@@ -2106,7 +2106,7 @@ public sealed class BenchmarkHarness
                 var message = $"Isolated child did not return a result for '{name}'.";
 
                 result = OutcomeBuilder.Build(
-                    new RunOutcome.Errored(new InvalidOperationException(message), message),
+                    new RunOutcome.Errored(new BenchmarkExecutionException(message), message),
                     name, qualifiedClassName, benchmark.Attribute.Description, benchmark.IsBaseline,
                     _options, TimeSpan.Zero, TimeSpan.Zero, 0, null,
                     benchmark.Categories).Result;
@@ -2117,7 +2117,7 @@ public sealed class BenchmarkHarness
             allResults.Add(result);
             rawSamples[name] = raw;
 
-            await progress.OnBenchmarkCompleted(result).ConfigureAwait(false);
+            await progress.OnBenchmarkCompletedAsync(result, cancellationToken).ConfigureAwait(false);
             observer.OnResult(result);
         }
     }
@@ -2199,7 +2199,7 @@ public sealed class BenchmarkHarness
         var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
 
         return OutcomeBuilder.Build(
-            new RunOutcome.Errored(new InvalidOperationException(message), message),
+            new RunOutcome.Errored(new BenchmarkExecutionException(message), message),
             BenchmarkEnvelope.QualifiedDiscoveredBenchmarkName(suite.Type, benchmark.DisplayName),
             qualifiedClassName,
             benchmark.Attribute.Description,
@@ -2423,7 +2423,7 @@ public sealed class BenchmarkHarness
                 aggregated.Add(new IsolatedResultItem
                 {
                     Result = OutcomeBuilder.Build(
-                        new RunOutcome.Errored(new InvalidOperationException(message), message),
+                        new RunOutcome.Errored(new BenchmarkExecutionException(message), message),
                         name, qualifiedClassName, benchmark.Attribute.Description, benchmark.IsBaseline,
                         new MeasurementOptions(), TimeSpan.Zero, TimeSpan.Zero, 0, null,
                         benchmark.Categories).Result,

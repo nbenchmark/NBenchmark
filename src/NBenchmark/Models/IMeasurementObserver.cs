@@ -72,7 +72,9 @@ public interface IMeasurementObserver : IDisposable
     ///     - starting or completed - with the phase's resolved outcome where applicable
     ///     (jitter metric, resolved K, warmup stop reason, sample stop reason, success flag).
     /// </summary>
-    public void OnPhase(in MeasurementPhaseEvent e);
+    public void OnPhase(in MeasurementPhaseEvent e)
+    {
+    }
 
     /// <summary>
     ///     Reports one timed sample. Called between samples, after the per-op nanoseconds are
@@ -80,7 +82,9 @@ public interface IMeasurementObserver : IDisposable
     ///     <see cref="SampleEvent.Warmup" /> flag distinguishes calibration/warmup samples from
     ///     measured samples so a consumer can plot the warmup-settling curve live.
     /// </summary>
-    public void OnSample(in SampleEvent e);
+    public void OnSample(in SampleEvent e)
+    {
+    }
 
     /// <summary>
     ///     Reports a snapshot of the running detector state: running mean, sample standard
@@ -88,15 +92,19 @@ public interface IMeasurementObserver : IDisposable
     ///     (<c>K</c>). Emitted after a detector update so a consumer can plot the autotune
     ///     convergence curve live.
     /// </summary>
-    public void OnDetector(in DetectorStateEvent e);
+    public void OnDetector(in DetectorStateEvent e)
+    {
+    }
 
     /// <summary>
     ///     Reports the post-trim summary result for one benchmark, mirroring
-    ///     <see cref="IBenchmarkProgress.OnBenchmarkCompleted" />. Fires after the runner builds
+    ///     <see cref="IBenchmarkProgress.OnBenchmarkCompletedAsync" />. Fires after the runner builds
     ///     the <see cref="BenchmarkResult" /> - for success, dry-run, and errored outcomes - so a
     ///     consumer sees every benchmark in the run.
     /// </summary>
-    public void OnResult(BenchmarkResult result);
+    public void OnResult(BenchmarkResult result)
+    {
+    }
 }
 
 /// <summary>
@@ -106,25 +114,10 @@ public interface IMeasurementObserver : IDisposable
 /// </summary>
 public sealed class NullMeasurementObserver : IMeasurementObserver
 {
+    /// <summary>The shared instance the engine compares against on the hot path.</summary>
     public static readonly NullMeasurementObserver Instance = new();
 
     private NullMeasurementObserver()
-    {
-    }
-
-    public void OnPhase(in MeasurementPhaseEvent e)
-    {
-    }
-
-    public void OnSample(in SampleEvent e)
-    {
-    }
-
-    public void OnDetector(in DetectorStateEvent e)
-    {
-    }
-
-    public void OnResult(BenchmarkResult result)
     {
     }
 }

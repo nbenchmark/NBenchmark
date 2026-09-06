@@ -114,7 +114,7 @@ internal static class WinsorizedError
 /// <param name="SortedAll">The full pre-trim sample set, sorted ascending. Never mutated.</param>
 /// <param name="TrimmedLow">Samples discarded from the fast end (<c>g_L</c>).</param>
 /// <param name="TrimmedHigh">Samples discarded from the slow end (<c>g_U</c>).</param>
-public readonly record struct TrimContext(double[] SortedAll, int TrimmedLow, int TrimmedHigh)
+internal readonly record struct TrimContext(double[] SortedAll, int TrimmedLow, int TrimmedHigh)
 {
     /// <summary>Whether any sample was trimmed at all. When false the Winsorized estimator reduces to the plain one.</summary>
     public bool IsTrimmed => TrimmedLow > 0 || TrimmedHigh > 0;

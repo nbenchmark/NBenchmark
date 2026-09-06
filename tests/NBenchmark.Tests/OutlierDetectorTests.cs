@@ -24,9 +24,9 @@ public class OutlierDetectorTests
 
         var classification = new MadOutlierDetector().Classify(values);
 
-        Assert.Equal([200d], classification.Discarded);
+        Assert.Equal([200d], classification.Discarded.ToArray());
         Assert.Equal(9, classification.Kept.Length);
-        Assert.Equal(26d, classification.Kept[^1]);
+        Assert.Equal(26d, classification.Kept.Span[^1]);
         Assert.NotNull(classification.LowerFenceNs);
         Assert.NotNull(classification.UpperFenceNs);
         Numerics.AssertRelativeClose(41.239, classification.UpperFenceNs!.Value, 1e-4);
@@ -40,7 +40,7 @@ public class OutlierDetectorTests
 
         var classification = new MadOutlierDetector().Classify(values);
 
-        Assert.Empty(classification.Discarded);
+        Assert.True(classification.Discarded.IsEmpty);
         Assert.Equal(values.Length, classification.Kept.Length);
     }
 
@@ -51,7 +51,7 @@ public class OutlierDetectorTests
 
         var classification = new MadOutlierDetector().Classify(values);
 
-        Assert.Empty(classification.Discarded);
+        Assert.True(classification.Discarded.IsEmpty);
     }
 
     [Fact]
@@ -132,10 +132,10 @@ public class OutlierDetectorTests
     {
         public string Name => $"threshold ({cutoff})";
 
-        public OutlierClassification Classify(double[] sortedSamples)
+        public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
         {
-            var kept = sortedSamples.Where(v => v <= cutoff).ToArray();
-            var discarded = sortedSamples.Where(v => v > cutoff).ToArray();
+            var kept = sortedSamples.ToArray().Where(v => v <= cutoff).ToArray();
+            var discarded = sortedSamples.ToArray().Where(v => v > cutoff).ToArray();
 
             return kept.Length == 0
                 ? OutlierClassification.KeepAll(sortedSamples)

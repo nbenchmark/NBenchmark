@@ -89,7 +89,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         var first = Stream.Null;
         var second = new StringWriter();
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var ex = await Assert.ThrowsAsync<BenchmarkIsolationException>(() =>
             Fast(new BenchmarkSuite("many-offenders")
                     .Add("clean", static () => Thread.SpinWait(200))
                     .Add("holds-a-stream", () => first.Length)
@@ -296,7 +296,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     {
         var stream = Stream.Null;
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var ex = await Assert.ThrowsAsync<BenchmarkIsolationException>(() =>
             Fast(new BenchmarkSuite("captures")
                     .Add("clean", () => Thread.SpinWait(200))
                     .Add("dirty", () => stream.Length))
@@ -819,7 +819,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     {
         var spins = 200;
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var ex = await Assert.ThrowsAsync<BenchmarkIsolationException>(() =>
             Fast(new BenchmarkSuite("strict")
                     .Add("dirty", () => Thread.SpinWait(spins)))
                 .WithIsolation(Isolation.Required)

@@ -5,9 +5,6 @@ namespace NBenchmark.Integration.xUnit;
 
 internal static class PerformanceAttributeParser
 {
-    private const double UnsetDouble = -1;
-    private const long UnsetLong = -1;
-    private const double DefaultMaxSlowdownRatio = 0;
     private const double DefaultConfidenceLevel = 0.95;
 
     internal static IPerformanceThresholds Parse(IAttributeInfo attribute)
@@ -90,15 +87,15 @@ internal static class PerformanceAttributeParser
         return raw;
     }
 
-    private static double NormalizeThreshold(double value) => value > 0 ? value : UnsetDouble;
+    private static double NormalizeThreshold(double value) => value > 0 ? value : IPerformanceThresholds.Unset;
 
-    private static long NormalizeThreshold(long value) => value > 0 ? value : UnsetLong;
+    private static long NormalizeThreshold(long value) => value > 0 ? value : IPerformanceThresholds.UnsetBytes;
 
     private static string? NormalizeReferenceMethod(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
-    private static int NormalizeSamples(int value) => value > 0 ? value : 0;
+    private static int NormalizeSamples(int value) => value > 0 ? value : IPerformanceThresholds.AutoSampleCount;
 
-    private static double NormalizeSlowdownRatio(double value) => value > 0 ? value : DefaultMaxSlowdownRatio;
+    private static double NormalizeSlowdownRatio(double value) => value > 0 ? value : IPerformanceThresholds.Unset;
 
     private static double NormalizeConfidenceLevel(double value) => value is > 0 and <= 1 ? value : DefaultConfidenceLevel;
 
@@ -127,13 +124,13 @@ internal static class PerformanceAttributeParser
 
     private sealed class ParsedThresholds : IPerformanceThresholds
     {
-        public double MaxMeanNs { get; init; } = -1;
-        public double MaxP95Ns { get; init; } = -1;
-        public long MaxAllocatedBytes { get; init; } = -1;
+        public double MaxMeanNs { get; init; } = IPerformanceThresholds.Unset;
+        public double MaxP95Ns { get; init; } = IPerformanceThresholds.Unset;
+        public long MaxAllocatedBytes { get; init; } = IPerformanceThresholds.UnsetBytes;
         public string? ReferenceMethod { get; init; }
-        public double MaxSlowdownRatio { get; init; }
-        public int Samples { get; init; }
-        public int WarmupSamples { get; init; }
+        public double MaxSlowdownRatio { get; init; } = IPerformanceThresholds.Unset;
+        public int Samples { get; init; } = IPerformanceThresholds.AutoSampleCount;
+        public int WarmupSamples { get; init; } = IPerformanceThresholds.AutoSampleCount;
         public bool MeasureAllocations { get; init; }
         public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
         public double ConfidenceLevel { get; init; } = 0.95;

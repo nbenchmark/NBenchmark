@@ -212,7 +212,7 @@ public class OutlierTrimTests
     {
         public string Name => "Discard two 20s";
 
-        public OutlierClassification Classify(double[] sortedSamples)
+        public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
         {
             // sortedSamples is sorted ascending: [10, 20, 20, 20, 30].
             // Keep [10, 20, 30]; discard two of the 20s.
@@ -231,7 +231,7 @@ public class OutlierTrimTests
     {
         public string Name => "Deduplicating";
 
-        public OutlierClassification Classify(double[] sortedSamples)
+        public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
         {
             // sortedSamples is sorted ascending: [10, 20, 30, 100, 100].
             // "Discard" the value 100 but only report it once (deduplicating).

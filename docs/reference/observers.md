@@ -11,16 +11,19 @@ The `IMeasurementObserver` interface provides a live-telemetry callback surface 
 ## Contract
 
 ```csharp
-public interface IMeasurementObserver
+public interface IMeasurementObserver : IDisposable
 {
-    void OnPhase(in MeasurementPhaseEvent e);
-    void OnSample(in SampleEvent e);
-    void OnDetector(in DetectorStateEvent e);
-    void OnResult(BenchmarkResult result);
+    void OnPhase(in MeasurementPhaseEvent e) { }
+    void OnSample(in SampleEvent e) { }
+    void OnDetector(in DetectorStateEvent e) { }
+    void OnResult(BenchmarkResult result) { }
 }
 ```
 
-All four methods return `void`. You must follow this contract: **return immediately, never block, and never allocate on the hot path.** The observer must not throw; doing so is undefined behavior, as the engine does not catch observer exceptions on the hot path.
+Every member has a no-op default, so implement only the events you react to - a live histogram implements `OnSample` and nothing else. All four methods return `void`. You must follow this contract: **return immediately, never block, and never allocate on the hot path.** The observer must not throw; doing so is undefined behavior, as the engine does not catch observer exceptions on the hot path.
+
+> [!NOTE]
+> The defaults are default interface implementations, so they are visible through the interface rather than on the implementing type. Call them through an `IMeasurementObserver`-typed reference, which is how the engine invokes them.
 
 ## Setup
 
@@ -197,6 +200,7 @@ Example of a custom observer that logs phase transitions and samples:
 ```csharp
 using NBenchmark;
 
+// Implements all four events. An observer that only needs one declares only that one.
 public class LoggingObserver : IMeasurementObserver
 {
     public void OnPhase(in MeasurementPhaseEvent e)
@@ -223,9 +227,35 @@ public class LoggingObserver : IMeasurementObserver
 }
 ```
 
-**Important**: All four methods must return immediately and never allocate on the hot path. To persist telemetry, buffer it (using a pre-allocated ring buffer or a `System.Threading.Channels.Channel<T>`) and flush it asynchronously.
+**Important**: Every method you implement must return immediately and never allocate on the hot path. To persist telemetry, buffer it (using a pre-allocated ring buffer or a `System.Threading.Channels.Channel<T>`) and flush it asynchronously.
+
+## Progress callbacks
+
+`IBenchmarkProgress` is the lifecycle seam beside the observer: it reports which benchmark started, how far warmup and measurement have got, and what each one produced, with no per-sample measurement payload.
+
+```csharp
+public interface IBenchmarkProgress
+{
+    Task OnSuiteStartingAsync(IReadOnlyList<string> benchmarkNames, int total, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task OnWarmupCompletedAsync(string name, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task OnSampleCompletedAsync(string name, int sample, int totalSamples, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task OnSuiteCompletedAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+```
+
+- Every member has a no-op default, so a progress bar that only needs "benchmark *n* of *m*" implements `OnBenchmarkStartingAsync` alone.
+- Every member is awaited and takes the run's `CancellationToken`, which is why the names carry the `Async` suffix - the same convention as `IReporter.ReportAsync`.
+- The engine awaits these, so a slow implementation slows the run down. Hand real work to another thread and return. For per-sample telemetry with a non-blocking contract, implement `IMeasurementObserver` instead.
+- Attach one with `WithProgress(...)`. `NullBenchmarkProgress.Instance` is the default and is also how you silence a progress display you would otherwise inherit.
+
+> [!WARNING]
+> Because the defaults are default interface implementations, a member declared with the wrong signature does not fail the build - it becomes a new method and the interface keeps the no-op. If a callback stops firing, check its signature against the contract above.
 
 ## See also
 
 - [BCL instrumentation](./bcl-instrumentation.md) - The `System.Diagnostics` Meter/ActivitySource instrumentation.
+- [Exceptions](./exceptions.md) - The exception types NBenchmark raises.
 - [Configuration](./configuration.md) - The `MeasurementOptions` surface.

@@ -156,6 +156,8 @@ Most data crosses to the worker automatically: ordinary data (such as `int`, `st
 
 The engine names every offending benchmark in a suite at once so you can fix all of them before re-running.
 
+The refusal is a `BenchmarkIsolationException`, which carries the `IsolationStatus` and the remedy as properties as well as in the message - so a test adapter or a CI reporter can act on it without parsing text. See [Exceptions](../reference/exceptions.md).
+
 To accept labeled host-process measurements - which is reasonable for scratchpad use - turn the requirement off:
 
 ```csharp
@@ -188,5 +190,6 @@ For more information, see the following pages:
 
 - [Isolation internals](../deep-dives/isolation-internals.md) - How the engine finds and launches workers, what crosses the wire, and how refusals are classified.
 - [Harness mode](../usage-modes/harness-mode.md#isolationisolationrequired) - The `[Isolation(Isolation.Required)]` and `[Isolation(Isolation.Off)]` attributes.
+- [Exceptions](../reference/exceptions.md) - `BenchmarkIsolationException` and the rest of the hierarchy.
 - [Suite mode](../usage-modes/suite-mode.md) - The full `BenchmarkSuite` API.
 - [Samples](../samples.md) - A runnable isolated-runs sample project.

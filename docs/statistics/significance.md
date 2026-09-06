@@ -55,7 +55,7 @@ If a result is statistically significant (**✓**) but has a **Negligible** magn
 
 `MeasurementOptions.MinimumPracticalEffect` requires a minimum practical-effect score in $[0, 1]$ for a comparison to be meaningful. It defaults to `0.147` (the boundary between negligible and small effects). Consequently, a **✓** verdict by default means the difference is statistically real **and** at least a small effect.
 
-- Comparisons with a practical effect below the threshold are reported as `Magnitude = neg`.
+- Comparisons with a practical effect below the threshold are reported as `Magnitude = MagnitudeLabel.Negligible`.
 - The `Sig` verdict is downgraded from `Significant` to `NotSignificant` even if the p-value is below $\alpha$. A warning records this downgrade in the reports.
 - Set the value to `0` (`--min-practical-effect 0`) to restore p-value-only verdicts, or set it to `null` in code to disable the gate.
 
@@ -154,7 +154,7 @@ where $a$ represents baseline samples and $b$ represents candidate samples. It r
 - **0**: The two distributions overlap completely.
 - **-1**: Every baseline sample exceeds every candidate sample (candidate is uniformly faster).
 
-NBenchmark uses the [Romano et al. (2006)](https://en.wikipedia.org/wiki/Effect_size) thresholds to classify $|\delta|$ into Magnitude labels (Negligible, Small, Medium, Large).
+NBenchmark uses the [Romano et al. (2006)](https://en.wikipedia.org/wiki/Effect_size) thresholds to classify $|\delta|$ into Magnitude labels (Negligible, Small, Medium, Large). `EffectSize.Magnitude` carries that band as a `MagnitudeLabel`, or `null` when the strategy does not band its statistic; `MagnitudeLabel.ToShortString()` renders the abbreviations the reports show.
 
 ## Technical detail: Hodges-Lehmann shift
 
@@ -209,10 +209,10 @@ public sealed class MedianRatioSignificanceTest(double thresholdPercent) : ISign
                     Value: deltaPercent,
                     Magnitude: deltaPercent switch
                     {
-                        < 5 => "neg",
-                        < 15 => "small",
-                        < 30 => "med",
-                        _ => "large",
+                        < 5 => MagnitudeLabel.Negligible,
+                        < 15 => MagnitudeLabel.Small,
+                        < 30 => MagnitudeLabel.Medium,
+                        _ => MagnitudeLabel.Large,
                     },
                     Direction: EffectDirection.None,
                     PracticalValue: Math.Min(1.0, deltaPercent / 100.0))));
@@ -221,7 +221,7 @@ public sealed class MedianRatioSignificanceTest(double thresholdPercent) : ISign
         return new SignificanceReport { Pairwise = pairwise };
     }
 
-    private static double Median(double[] samples) { /* implementation */ }
+    private static double Median(ReadOnlyMemory<double> samples) { /* implementation */ }
 }
 ```
 

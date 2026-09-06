@@ -489,7 +489,7 @@ public class ReporterTests
                 Effect = new EffectSize(
                     "median-ratio",
                     0.42,
-                    "small",
+                    MagnitudeLabel.Small,
                     EffectDirection.CandidateHigher,
                     0.42),
             };

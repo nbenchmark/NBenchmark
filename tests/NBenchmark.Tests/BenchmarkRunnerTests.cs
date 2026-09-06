@@ -854,13 +854,14 @@ public class BenchmarkRunnerTests
         public string? WarmupStartingName;
         public int WarmupStartingTotal;
 
-        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
+        public Task OnSuiteStartingAsync(
+        IReadOnlyList<string> benchmarkNames, int total, CancellationToken cancellationToken)
         {
             SuiteStartingCount++;
             return Task.CompletedTask;
         }
 
-        public Task OnWarmupStarting(string name, int totalWarmupSamples)
+        public Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken cancellationToken)
         {
             WarmupStartingCount++;
             WarmupStartingName = name;
@@ -868,27 +869,29 @@ public class BenchmarkRunnerTests
             return Task.CompletedTask;
         }
 
-        public Task OnWarmupCompleted(string name)
+        public Task OnWarmupCompletedAsync(string name, CancellationToken cancellationToken)
         {
             WarmupCompletedCount++;
             return Task.CompletedTask;
         }
 
-        public Task OnBenchmarkStarting(string name, int index, int total)
+        public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken)
         {
             BenchmarkStartingCount++;
             return Task.CompletedTask;
         }
 
-        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
+        public Task OnSampleCompletedAsync(
+        string name, int sample, int totalSamples, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task OnBenchmarkCompleted(BenchmarkResult result)
+        public Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken cancellationToken)
         {
             BenchmarkCompletedCount++;
             return Task.CompletedTask;
         }
 
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
+        public Task OnSuiteCompletedAsync(
+        IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
         {
             SuiteCompletedCount++;
             return Task.CompletedTask;

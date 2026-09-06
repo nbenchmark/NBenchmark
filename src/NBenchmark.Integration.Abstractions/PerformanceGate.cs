@@ -98,9 +98,9 @@ internal static class PerformanceGate
     /// </param>
     public static Outcome Evaluate(
         BenchmarkResult result,
-        double[]? rawSamples,
+        IReadOnlyList<double>? rawSamples,
         BenchmarkResult? referenceResult,
-        double[]? referenceSamples,
+        IReadOnlyList<double>? referenceSamples,
         IPerformanceThresholds thresholds,
         bool allowInProcessGate = false,
         CalibrationResult? workerCalibration = null,

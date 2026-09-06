@@ -10,7 +10,7 @@ namespace NBenchmark;
 ///     improving reproducibility, which is the failure mode <see cref="LaunchMedians" /> exists to
 ///     measure instead.
 /// </param>
-public sealed record CalibrationResult(double MeanNs, double MedianNs, double[] Samples)
+public sealed record CalibrationResult(double MeanNs, double MedianNs, IReadOnlyList<double> Samples)
 {
     /// <summary>
     ///     The median measured in each launch, <b>indexed by launch index</b>, when the caller measured

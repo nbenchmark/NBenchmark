@@ -188,11 +188,15 @@ public class MannWhitneyUTests
         Assert.Equal(0.0, result.CliffsDelta, 10);
     }
 
+    /// <summary>
+    ///     The test takes spans, so "no samples" is an empty span rather than a null array - and an
+    ///     empty group is not testable, which is a NaN p-value rather than an exception.
+    /// </summary>
     [Fact]
-    public void Null_Sample_Throws_ArgumentNullException()
+    public void Empty_Sample_Is_NotTestable()
     {
-        Assert.Throws<ArgumentNullException>(() => MannWhitneyU.Test(null!, new double[] { 1, 2 }));
-        Assert.Throws<ArgumentNullException>(() => MannWhitneyU.Test(new double[] { 1, 2 }, null!));
+        Assert.True(double.IsNaN(MannWhitneyU.Test([], new double[] { 1, 2 }).PValue));
+        Assert.True(double.IsNaN(MannWhitneyU.Test(new double[] { 1, 2 }, []).PValue));
     }
 
     private static void ShuffleInPlace(double[] values, Random rng)

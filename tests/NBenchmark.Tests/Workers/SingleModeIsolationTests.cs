@@ -78,7 +78,7 @@ public sealed class SingleModeIsolationTests : IDisposable
     {
         var stream = Stream.Null;
 
-        var error = Assert.Throws<InvalidOperationException>(
+        var error = Assert.Throws<BenchmarkIsolationException>(
             () => Benchmark.Run(() => stream.Length, FastOptions, name: "captured-strict"));
 
         Assert.Contains("captured-strict", error.Message, StringComparison.Ordinal);

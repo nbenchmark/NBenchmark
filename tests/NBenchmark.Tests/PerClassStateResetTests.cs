@@ -75,7 +75,7 @@ public class PerClassStateResetTests
     [Fact]
     public async Task SuiteRunner_Hook_Fires_After_Completed_Before_Next_Starting()
     {
-        // The hook must fire after OnBenchmarkCompleted and before the next OnBenchmarkStarting.
+        // The hook must fire after OnBenchmarkCompletedAsync and before the next OnBenchmarkStartingAsync.
         // We track the order of events: a-start, a-complete, [hook], b-start, b-complete.
         var progress = new CapturingProgress();
 
@@ -169,25 +169,28 @@ public class PerClassStateResetTests
         public Action<string, int, int>? OnBenchmarkStartingHandler { get; set; }
         public Action<string>? OnBenchmarkCompletedHandler { get; set; }
 
-        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) => Task.CompletedTask;
-        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
-        public Task OnWarmupCompleted(string name) => Task.CompletedTask;
+        public Task OnSuiteStartingAsync(
+        IReadOnlyList<string> benchmarkNames, int total, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnWarmupCompletedAsync(string name, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task OnBenchmarkStarting(string name, int index, int total)
+        public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken)
         {
             OnBenchmarkStartingHandler?.Invoke(name, index, total);
             return Task.CompletedTask;
         }
 
-        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
+        public Task OnSampleCompletedAsync(
+        string name, int sample, int totalSamples, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task OnBenchmarkCompleted(BenchmarkResult result)
+        public Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken cancellationToken)
         {
             OnBenchmarkCompletedHandler?.Invoke(result.Name);
             return Task.CompletedTask;
         }
 
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) => Task.CompletedTask;
+        public Task OnSuiteCompletedAsync(
+        IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
 

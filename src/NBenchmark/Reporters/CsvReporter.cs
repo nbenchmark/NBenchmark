@@ -1,4 +1,5 @@
 using System.Text;
+using NBenchmark.Stats;
 
 namespace NBenchmark.Reporters;
 
@@ -90,7 +91,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? fileName =
             var safeName = row.Result.Name.Replace("\"", "\"\"");
             var safeSig = sig.Replace("\"", "\"\"");
             var safeEffectMetric = (row.Result.Effect?.Metric ?? string.Empty).Replace("\"", "\"\"");
-            var safeMagnitude = (row.Result.Effect?.Magnitude ?? string.Empty).Replace("\"", "\"\"");
+            var safeMagnitude = row.Result.Effect?.Magnitude?.ToShortString() ?? string.Empty;
 
             // Where the row was measured. Present at every detail level, because a CSV-driven
             // dashboard had no way at all to tell a clean-room row from a host one - JSON carries the

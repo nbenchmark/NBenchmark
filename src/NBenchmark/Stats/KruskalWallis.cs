@@ -36,7 +36,7 @@ internal static class KruskalWallis
     ///     test is not defined (fewer than two groups, an empty group, or fewer than two
     ///     total observations).
     /// </summary>
-    public static KruskalWallisResult Test(IReadOnlyList<double[]> groups)
+    public static KruskalWallisResult Test(IReadOnlyList<ReadOnlyMemory<double>> groups)
     {
         var k = groups.Count;
 
@@ -61,7 +61,7 @@ internal static class KruskalWallis
 
         for (var g = 0; g < k; g++)
         {
-            foreach (var value in groups[g])
+            foreach (var value in groups[g].Span)
             {
                 combined[index++] = (value, g);
             }

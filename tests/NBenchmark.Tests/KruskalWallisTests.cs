@@ -10,7 +10,7 @@ public class KruskalWallisTests
     {
         // Groups {1,2,3}, {4,5,6}, {7,8,9} have rank sums 6, 15, 24.
         // H = 12/(9·10)·(6²+15²+24²)/3 − 3·10 = 7.2 ; p = e^(−3.6) ≈ 0.0273.
-        var groups = new[]
+        var groups = new ReadOnlyMemory<double>[]
         {
             new double[] { 1, 2, 3 },
             new double[] { 4, 5, 6 },
@@ -31,7 +31,7 @@ public class KruskalWallisTests
     {
         // {1,2} vs {2,3}: the shared 2's get mid-rank 2.5.
         // Uncorrected H = 1.35; tie factor C = 1 − 6/60 = 0.9; corrected H = 1.5.
-        var groups = new[]
+        var groups = new ReadOnlyMemory<double>[]
         {
             new double[] { 1, 2 },
             new double[] { 2, 3 },
@@ -47,7 +47,7 @@ public class KruskalWallisTests
     [Fact]
     public void AllIdenticalValues_AreNotSignificant()
     {
-        var groups = new[]
+        var groups = new ReadOnlyMemory<double>[]
         {
             new double[] { 5, 5, 5 },
             new double[] { 5, 5, 5 },
@@ -64,7 +64,7 @@ public class KruskalWallisTests
     [Fact]
     public void ClearlySeparatedGroups_YieldSmallPValue()
     {
-        var groups = new[]
+        var groups = new ReadOnlyMemory<double>[]
         {
             new double[] { 10, 11, 12, 13, 14 },
             new double[] { 50, 51, 52, 53, 54 },
@@ -103,7 +103,7 @@ public class KruskalWallisTests
     [Fact]
     public void EmptyGroup_IsNotValid()
     {
-        var result = KruskalWallis.Test([new double[] { 1, 2, 3 }, []]);
+        var result = KruskalWallis.Test([new double[] { 1, 2, 3 }, ReadOnlyMemory<double>.Empty]);
 
         Assert.False(result.IsValid);
     }

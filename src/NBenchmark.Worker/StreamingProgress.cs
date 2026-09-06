@@ -45,7 +45,7 @@ internal sealed class StreamingProgress(
 
     /// <summary>
     ///     Minimum gap between forwarded per-sample progress ticks. The engine calls
-    ///     <see cref="OnSampleCompleted" /> once per sample and can take thousands of samples per
+    ///     <see cref="OnSampleCompletedAsync" /> once per sample and can take thousands of samples per
     ///     benchmark; forwarding each one would put tens of milliseconds of frame encoding into a
     ///     run whose whole point is measuring milliseconds. A progress bar cannot show more than
     ///     this anyway.
@@ -134,29 +134,35 @@ internal sealed class StreamingProgress(
 
     // Suite-level callbacks are the coordinator's own business - it knows the full benchmark list
     // and a worker only ever sees one group of it, so a worker's view would be wrong.
-    public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) => Task.CompletedTask;
+    // The run's token is a parameter on every member of the interface; these send a frame and
+    // return, so none of them observes it - the session token this class was constructed with is
+    // what guards the writes.
+    public Task OnSuiteStartingAsync(
+        IReadOnlyList<string> benchmarkNames, int total, CancellationToken runCancellation) => Task.CompletedTask;
 
-    public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) => Task.CompletedTask;
+    public Task OnSuiteCompletedAsync(
+        IReadOnlyList<BenchmarkResult> results, CancellationToken runCancellation) => Task.CompletedTask;
 
-    public Task OnWarmupStarting(string name, int totalWarmupSamples)
+    public Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken runCancellation)
     {
         Send(ProgressCallback.WarmupStarting, name, 0, totalWarmupSamples);
         return Task.CompletedTask;
     }
 
-    public Task OnWarmupCompleted(string name)
+    public Task OnWarmupCompletedAsync(string name, CancellationToken runCancellation)
     {
         Send(ProgressCallback.WarmupCompleted, name, 0, 0);
         return Task.CompletedTask;
     }
 
-    public Task OnBenchmarkStarting(string name, int index, int total)
+    public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken runCancellation)
     {
         Send(ProgressCallback.BenchmarkStarting, name, index, total);
         return Task.CompletedTask;
     }
 
-    public Task OnSampleCompleted(string name, int sample, int totalSamples)
+    public Task OnSampleCompletedAsync(
+        string name, int sample, int totalSamples, CancellationToken runCancellation)
     {
         var now = Stopwatch.GetTimestamp();
         var last = Volatile.Read(ref _lastSampleTick);
@@ -194,7 +200,7 @@ internal sealed class StreamingProgress(
     ///     at runtime (<see cref="NBenchmark.Engine.OutcomeBuilder" /> shares one array between the outcome and the
     ///     result), so the cast avoids a copy in the common case.
     /// </remarks>
-    public Task OnBenchmarkCompleted(BenchmarkResult result)
+    public Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken runCancellation)
     {
         // The measured name is the engine's convention; the test-method path renames it to what the
         // caller asked for. Applied here, on the single result, because the incremental send means

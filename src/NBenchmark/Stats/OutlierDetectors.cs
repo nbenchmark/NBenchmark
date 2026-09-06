@@ -37,7 +37,7 @@ public static class OutlierDetectors
     ///     Order is preserved, so both output arrays remain sorted ascending.
     /// </summary>
     internal static OutlierClassification Partition(
-        double[] sorted, Func<double, bool> keep, double? lowerFence, double? upperFence)
+        ReadOnlySpan<double> sorted, Func<double, bool> keep, double? lowerFence, double? upperFence)
     {
         var keptCount = 0;
 
@@ -49,7 +49,15 @@ public static class OutlierDetectors
 
         // Never discard everything - the engine always needs samples to summarize.
         if (keptCount == 0 || keptCount == sorted.Length)
-            return new OutlierClassification { Kept = sorted, Discarded = [], LowerFenceNs = lowerFence, UpperFenceNs = upperFence };
+        {
+            return new OutlierClassification
+            {
+                Kept = sorted.ToArray(),
+                Discarded = ReadOnlyMemory<double>.Empty,
+                LowerFenceNs = lowerFence,
+                UpperFenceNs = upperFence,
+            };
+        }
 
         var kept = new double[keptCount];
         var discarded = new double[sorted.Length - keptCount];
@@ -73,7 +81,7 @@ public sealed class NoOutlierDetector : IOutlierDetector
 {
     public string Name => "none";
 
-    public OutlierClassification Classify(double[] sortedSamples) =>
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples) =>
         OutlierClassification.KeepAll(sortedSamples);
 }
 
@@ -90,7 +98,7 @@ public sealed class TopPercentileOutlierDetector(double fraction = 0.05) : IOutl
 
     public string Name => $"top {_fraction * 100:0.#}%";
 
-    public OutlierClassification Classify(double[] sortedSamples)
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
         var keep = (int)Math.Floor(sortedSamples.Length * (1.0 - _fraction));
 
@@ -99,8 +107,8 @@ public sealed class TopPercentileOutlierDetector(double fraction = 0.05) : IOutl
 
         return new OutlierClassification
         {
-            Kept = sortedSamples[..keep],
-            Discarded = sortedSamples[keep..],
+            Kept = sortedSamples[..keep].ToArray(),
+            Discarded = sortedSamples[keep..].ToArray(),
         };
     }
 }
@@ -117,7 +125,7 @@ public sealed class TwoSidedPercentileOutlierDetector(double fraction = 0.05) : 
 
     public string Name => $"top & bottom {_fraction * 100:0.#}%";
 
-    public OutlierClassification Classify(double[] sortedSamples)
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
         var trimEach = (int)Math.Floor(sortedSamples.Length * _fraction);
 
@@ -130,10 +138,10 @@ public sealed class TwoSidedPercentileOutlierDetector(double fraction = 0.05) : 
             return OutlierClassification.KeepAll(sortedSamples);
 
         var discarded = new double[trimEach * 2];
-        Array.Copy(sortedSamples, 0, discarded, 0, trimEach);
-        Array.Copy(sortedSamples, sortedSamples.Length - trimEach, discarded, trimEach, trimEach);
+        sortedSamples[..trimEach].CopyTo(discarded);
+        sortedSamples[(sortedSamples.Length - trimEach)..].CopyTo(discarded.AsSpan(trimEach));
 
-        return new OutlierClassification { Kept = kept, Discarded = discarded };
+        return new OutlierClassification { Kept = kept.ToArray(), Discarded = discarded };
     }
 }
 
@@ -149,7 +157,7 @@ public sealed class IqrFenceOutlierDetector(double k = 1.5) : IOutlierDetector
 
     public string Name => $"IQR fence ({_k:0.#}×)";
 
-    public OutlierClassification Classify(double[] sortedSamples)
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
         if (sortedSamples.Length == 0)
             return OutlierClassification.KeepAll(sortedSamples);
@@ -188,7 +196,7 @@ public sealed class MadOutlierDetector(double threshold = 3.0) : IOutlierDetecto
 
     public string Name => $"MAD ({_threshold:0.#}×)";
 
-    public OutlierClassification Classify(double[] sortedSamples)
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
         if (sortedSamples.Length < 3)
             return OutlierClassification.KeepAll(sortedSamples);

@@ -1,3 +1,4 @@
+using NBenchmark.Integration.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -16,7 +17,7 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(-1, parsed.MaxP95Ns);
         Assert.Equal(-1, parsed.MaxAllocatedBytes);
         Assert.Null(parsed.ReferenceMethod);
-        Assert.Equal(0, parsed.MaxSlowdownRatio);
+        Assert.Equal(IPerformanceThresholds.Unset, parsed.MaxSlowdownRatio);
         Assert.Equal(0, parsed.Samples);
         Assert.Equal(0, parsed.WarmupSamples);
         Assert.False(parsed.MeasureAllocations);
@@ -78,7 +79,7 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(-1, parsed.MaxP95Ns);
         Assert.Equal(-1, parsed.MaxAllocatedBytes);
         Assert.Null(parsed.ReferenceMethod);
-        Assert.Equal(0, parsed.MaxSlowdownRatio);
+        Assert.Equal(IPerformanceThresholds.Unset, parsed.MaxSlowdownRatio);
         Assert.Equal(0, parsed.Samples);
         Assert.Equal(0, parsed.WarmupSamples);
         Assert.False(parsed.MeasureAllocations);

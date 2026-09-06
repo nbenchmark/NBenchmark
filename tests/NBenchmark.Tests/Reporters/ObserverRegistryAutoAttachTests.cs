@@ -29,7 +29,7 @@ public class ObserverRegistryAutoAttachTests : IDisposable
     {
         ObserverRegistry.RegisterAutoAttach("auto", "first", () => new StubObserver("auto"));
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ObserverRegistry.RegisterAutoAttach("AUTO", "second", () => new StubObserver("auto")));
     }
 
@@ -38,7 +38,7 @@ public class ObserverRegistryAutoAttachTests : IDisposable
     {
         ObserverRegistry.RegisterAutoAttach("auto", "auto", () => new StubObserver("auto"));
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ObserverRegistry.Register("auto", "explicit", () => new StubObserver("auto")));
     }
 
@@ -47,7 +47,7 @@ public class ObserverRegistryAutoAttachTests : IDisposable
     {
         ObserverRegistry.Register("explicit", "explicit", () => new StubObserver("explicit"));
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ObserverRegistry.RegisterAutoAttach("explicit", "auto", () => new StubObserver("explicit")));
     }
 
@@ -175,7 +175,7 @@ public class ObserverRegistryAutoAttachTests : IDisposable
         // runtime. This test documents the invariant: only one list can hold a given name.
         ObserverRegistry.Register("explicit", "explicit", () => new StubObserver("explicit"));
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ObserverRegistry.RegisterAutoAttach("explicit", "auto", () => new StubObserver("explicit")));
 
         // TryCreate still resolves the explicit entry.

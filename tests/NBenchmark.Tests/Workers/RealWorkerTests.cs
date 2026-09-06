@@ -213,7 +213,7 @@ public sealed class RealWorkerTests
         // Completion callbacks are deliberately not raised here. A group can be measured by several
         // replicate workers, and the result a consumer should see is the aggregate across them - so
         // the caller that owns the aggregation raises them, exactly once, from the final result.
-        Assert.DoesNotContain(nameof(IBenchmarkProgress.OnBenchmarkCompleted), progress.Calls);
+        Assert.DoesNotContain(nameof(IBenchmarkProgress.OnBenchmarkCompletedAsync), progress.Calls);
         Assert.Empty(observer.Results);
 
         // The suite-completed sentinel belongs to the whole run and must not be emitted per worker.
@@ -391,22 +391,25 @@ public sealed class RealWorkerTests
     {
         public List<string> Calls { get; } = [];
 
-        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) => Record(nameof(OnSuiteStarting));
+        public Task OnSuiteStartingAsync(
+        IReadOnlyList<string> benchmarkNames, int total, CancellationToken cancellationToken) => Record(nameof(OnSuiteStartingAsync));
 
-        public Task OnWarmupStarting(string name, int totalWarmupSamples)
+        public Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken cancellationToken)
             => Record(ProgressCallback.WarmupStarting.ToString());
 
-        public Task OnWarmupCompleted(string name) => Record(ProgressCallback.WarmupCompleted.ToString());
+        public Task OnWarmupCompletedAsync(string name, CancellationToken cancellationToken) => Record(ProgressCallback.WarmupCompleted.ToString());
 
-        public Task OnBenchmarkStarting(string name, int index, int total)
+        public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken)
             => Record(ProgressCallback.BenchmarkStarting.ToString());
 
-        public Task OnSampleCompleted(string name, int sample, int totalSamples)
+        public Task OnSampleCompletedAsync(
+        string name, int sample, int totalSamples, CancellationToken cancellationToken)
             => Record(ProgressCallback.SampleCompleted.ToString());
 
-        public Task OnBenchmarkCompleted(BenchmarkResult result) => Record(nameof(OnBenchmarkCompleted));
+        public Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken cancellationToken) => Record(nameof(OnBenchmarkCompletedAsync));
 
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) => Record(nameof(OnSuiteCompleted));
+        public Task OnSuiteCompletedAsync(
+        IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken) => Record(nameof(OnSuiteCompletedAsync));
 
         private Task Record(string call)
         {

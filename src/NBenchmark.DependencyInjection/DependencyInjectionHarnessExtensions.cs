@@ -78,7 +78,7 @@ public static class DependencyInjectionHarnessExtensions
     private static Func<Type, InstanceHandle> ScopedResolver(Func<IServiceProvider> factory)
     {
         var provider = new Lazy<IServiceProvider>(
-            () => factory() ?? throw new InvalidOperationException(
+            () => factory() ?? throw new BenchmarkConfigurationException(
                 "The service provider factory returned null."));
 
         return type =>

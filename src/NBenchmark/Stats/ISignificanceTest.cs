@@ -28,8 +28,15 @@ public interface ISignificanceTest
     public SignificanceReport Analyze(SignificanceContext context);
 }
 
-/// <summary>A named set of raw measurements for one benchmark.</summary>
-public readonly record struct SampleGroup(string Name, double[] Samples, bool IsBaseline);
+/// <summary>
+///     A named set of raw measurements for one benchmark.
+///     <para>
+///         <paramref name="Samples" /> is read-only memory over the engine's own buffer: a
+///         strategy reads it (<c>Samples.Span</c>) or copies it, but cannot reorder or rescale the
+///         samples every other strategy in the same comparison is judging.
+///     </para>
+/// </summary>
+public readonly record struct SampleGroup(string Name, ReadOnlyMemory<double> Samples, bool IsBaseline);
 
 /// <summary>
 ///     The input to <see cref="ISignificanceTest.Analyze" />: all comparable groups, the
@@ -95,9 +102,9 @@ public enum EffectDirection
 ///     <para>
 ///         <see cref="Metric" /> identifies the statistic (for example, Cliff's delta,
 ///         Vargha-Delaney A12, rank-biserial correlation, or a domain-specific score).
-///         <see cref="Magnitude" /> is a strategy-defined qualitative label (for example,
-///         <c>small</c>, <c>large</c>, or <c>strong</c>), and <see cref="Direction" />
-///         conveys whether the candidate tends to be higher or lower than the baseline.
+///         <see cref="Magnitude" /> is the qualitative band the value falls in, or <c>null</c>
+///         when the strategy does not band its statistic, and <see cref="Direction" /> conveys
+///         whether the candidate tends to be higher or lower than the baseline.
 ///     </para>
 ///     <para>
 ///         <see cref="PracticalValue" /> is an optional normalized [0, 1] value used by
@@ -108,7 +115,7 @@ public enum EffectDirection
 public readonly record struct EffectSize(
     string Metric,
     double? Value,
-    string? Magnitude = null,
+    MagnitudeLabel? Magnitude = null,
     EffectDirection Direction = EffectDirection.None,
     double? PracticalValue = null);
 
@@ -119,12 +126,10 @@ internal static class EffectSizeFactory
     /// </summary>
     public static EffectSize ForCliffsDelta(double cliffsDelta)
     {
-        var magnitude = MagnitudeLabelExtensions.Classify(Math.Abs(cliffsDelta)).ToShortString();
-
         return new EffectSize(
             EffectMetrics.CliffsDelta,
             cliffsDelta,
-            magnitude,
+            MagnitudeLabelExtensions.Classify(Math.Abs(cliffsDelta)),
             cliffsDelta switch
             {
                 > 0 => EffectDirection.CandidateHigher,

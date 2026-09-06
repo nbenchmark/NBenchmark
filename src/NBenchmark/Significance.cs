@@ -1,4 +1,5 @@
 using NBenchmark.Engine;
+using NBenchmark.Stats;
 
 namespace NBenchmark.Stats;
 
@@ -192,7 +193,7 @@ internal static class Significance
                             downgradedPractical = true;
                         }
 
-                        effect = comparison.Effect.Value with { Magnitude = "neg" };
+                        effect = comparison.Effect.Value with { Magnitude = MagnitudeLabel.Negligible };
                     }
 
                     if (minimumRelativeShift.HasValue

@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace NBenchmark.Stats;
 
 /// <summary>
@@ -71,17 +73,19 @@ internal static class OutlierTrim
         var iqr = q3 - q1;
 
         var classification = detector.Classify(sorted);
+        var kept = AsArray(classification.Kept);
+        var discarded = AsArray(classification.Discarded);
 
         // Recover the original ordinals of every discarded sample. The detector returns
         // Discarded as a sorted subset of `sorted`; because `indices` is sorted in the
         // same order as `sorted`, we can walk both arrays in lockstep: each discarded
         // value matches the next un-consumed sorted value, and its original ordinal is
         // indices[that position]. This is O(n + d) rather than O(n*d).
-        var trimmedOrdinals = RecoverDiscardedOrdinals(sorted, indices, classification.Discarded);
+        var trimmedOrdinals = RecoverDiscardedOrdinals(sorted, indices, discarded);
 
         return new TrimResult(
-            classification.Kept,
-            classification.Discarded,
+            kept,
+            discarded,
             q1,
             q3,
             iqr,
@@ -90,6 +94,20 @@ internal static class OutlierTrim
             trimmedOrdinals,
             sorted);
     }
+
+    /// <summary>
+    ///     Recovers the underlying array behind a detector's output. Every built-in detector returns
+    ///     memory wrapping a whole array, so this is a cast rather than a copy; a third-party
+    ///     detector that returns a slice pays one copy per trim, which happens once per benchmark
+    ///     and never inside the timed region.
+    /// </summary>
+    private static double[] AsArray(ReadOnlyMemory<double> memory) =>
+        MemoryMarshal.TryGetArray(memory, out var segment)
+        && segment.Array is { } array
+        && segment.Offset == 0
+        && segment.Count == array.Length
+            ? array
+            : memory.ToArray();
 
     private static int[] RecoverDiscardedOrdinals(double[] sortedValues, int[] sortedIndices, double[] discarded)
     {
@@ -156,7 +174,7 @@ internal static class OutlierTrim
 ///     statistics that must describe the whole distribution - percentiles, min, max, histogram -
 ///     are computed from this so the tail the fence trimmed out is still reported.
 /// </param>
-public readonly record struct TrimResult(
+internal readonly record struct TrimResult(
     double[] Kept,
     double[] Discarded,
     double Q1Ns,

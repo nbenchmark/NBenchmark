@@ -58,7 +58,7 @@ internal static class IsolationAudit
         if (!options.RequiresIsolation || !status.IsRefusal())
             return;
 
-        throw new InvalidOperationException(Explain(name, status, refusal));
+        throw new BenchmarkIsolationException(Explain(name, status, refusal), status);
     }
 
     /// <summary>
@@ -100,7 +100,9 @@ internal static class IsolationAudit
             return;
 
         if (offenders.Count == 1)
-            throw new InvalidOperationException(Explain(offenders[0].Name, offenders[0].Status, offenders[0].Explanation));
+            throw new BenchmarkIsolationException(
+                Explain(offenders[0].Name, offenders[0].Status, offenders[0].Explanation),
+                offenders[0].Status);
 
         var message = new StringBuilder();
 
@@ -119,7 +121,9 @@ internal static class IsolationAudit
 
         message.Append(OptOut.TrimStart());
 
-        throw new InvalidOperationException(message.ToString());
+        // Several offenders, each with its own status: no single status describes the run, so the
+        // exception carries the first refusal's status and the message carries them all.
+        throw new BenchmarkIsolationException(message.ToString(), offenders[0].Status);
     }
 
     private const string UnaddressableFallback = "it could not be addressed across a process boundary.";

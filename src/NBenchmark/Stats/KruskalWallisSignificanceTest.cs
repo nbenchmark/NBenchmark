@@ -18,7 +18,7 @@ public sealed class KruskalWallisSignificanceTest : ISignificanceTest
     public SignificanceReport Analyze(SignificanceContext context)
     {
         var groups = context.Groups;
-        var samples = new double[groups.Count][];
+        var samples = new ReadOnlyMemory<double>[groups.Count];
 
         for (var i = 0; i < groups.Count; i++)
         {

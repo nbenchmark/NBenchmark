@@ -26,15 +26,16 @@ public interface IOutlierDetector
     ///     Partitions <paramref name="sortedSamples" /> into kept (inlier) and discarded
     ///     (outlier) sets.
     ///     <para>
-    ///         <paramref name="sortedSamples" /> is provided already sorted ascending and
-    ///         <b>must not be mutated</b>. Implementations must return
+    ///         <paramref name="sortedSamples" /> is provided already sorted ascending, and is a
+    ///         <see cref="ReadOnlySpan{T}" /> over the engine's own buffer so a detector cannot
+    ///         reorder or rescale the samples it was asked to judge. Implementations must return
     ///         <see cref="OutlierClassification.Kept" /> sorted ascending as well (filtering
     ///         a sorted input preserves order, so simply keeping a subset is sufficient).
     ///         If a rule would discard every sample, return all samples unchanged so the
     ///         engine always has data to summarize.
     ///     </para>
     /// </summary>
-    public OutlierClassification Classify(double[] sortedSamples);
+    public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples);
 }
 
 /// <summary>
@@ -45,10 +46,10 @@ public interface IOutlierDetector
 public sealed record OutlierClassification
 {
     /// <summary>The inlier samples to feed into the statistics summary, sorted ascending.</summary>
-    public required double[] Kept { get; init; }
+    public required ReadOnlyMemory<double> Kept { get; init; }
 
     /// <summary>The samples rejected as outliers, sorted ascending.</summary>
-    public required double[] Discarded { get; init; }
+    public required ReadOnlyMemory<double> Discarded { get; init; }
 
     /// <summary>The lower rejection boundary, when the detector is fence-based; otherwise <c>null</c>.</summary>
     public double? LowerFenceNs { get; init; }
@@ -57,6 +58,6 @@ public sealed record OutlierClassification
     public double? UpperFenceNs { get; init; }
 
     /// <summary>Convenience factory that keeps every sample (no trimming).</summary>
-    public static OutlierClassification KeepAll(double[] sortedSamples) =>
-        new() { Kept = sortedSamples, Discarded = [] };
+    public static OutlierClassification KeepAll(ReadOnlySpan<double> sortedSamples) =>
+        new() { Kept = sortedSamples.ToArray(), Discarded = ReadOnlyMemory<double>.Empty };
 }

@@ -24,12 +24,26 @@ public class ReporterRegistryAutoAttachTests : IDisposable
     [Fact]
     public void AutoAttached_Starts_Empty_After_Reset() => Assert.Empty(ReporterRegistry.AutoAttached);
 
+    /// <summary>
+    ///     <c>--reporter &lt;name&gt;</c> resolves an auto-attached reporter, the way
+    ///     <c>--observer &lt;name&gt;</c> resolves an auto-attached observer. Without this the flag's
+    ///     help line advertises a name the flag then refuses.
+    /// </summary>
+    [Fact]
+    public void TryCreate_Resolves_An_AutoAttached_Name()
+    {
+        ReporterRegistry.RegisterAutoAttach("auto", "Auto-attached fake", (_, _) => new StubReporter());
+
+        Assert.True(ReporterRegistry.TryCreate("AUTO", null, ReportDetail.Standard, out var reporter));
+        Assert.NotNull(reporter);
+    }
+
     [Fact]
     public void RegisterAutoAttach_Throws_On_Duplicate_Name_Case_Insensitive()
     {
         ReporterRegistry.RegisterAutoAttach("auto", "first", (_, _) => new StubReporter());
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ReporterRegistry.RegisterAutoAttach("AUTO", "second", (_, _) => new StubReporter()));
     }
 
@@ -38,7 +52,7 @@ public class ReporterRegistryAutoAttachTests : IDisposable
     {
         ReporterRegistry.RegisterAutoAttach("auto", "auto", (_, _) => new StubReporter());
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ReporterRegistry.Register("auto", "explicit", (_, _) => new StubReporter()));
     }
 
@@ -47,7 +61,7 @@ public class ReporterRegistryAutoAttachTests : IDisposable
     {
         ReporterRegistry.Register("explicit", "explicit", (_, _) => new StubReporter());
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ReporterRegistry.RegisterAutoAttach("explicit", "auto", (_, _) => new StubReporter()));
     }
 

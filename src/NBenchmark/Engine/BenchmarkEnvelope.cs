@@ -134,7 +134,7 @@ internal sealed record BenchmarkEnvelope(
         var sampleSetupDel = method.SampleSetupDelegate;
         var sampleTeardownDel = method.SampleTeardownDelegate;
         var bodyFactory = method.BodyFactory
-                          ?? throw new InvalidOperationException(
+                          ?? throw new BenchmarkConfigurationException(
                               $"Benchmark '{method.DisplayName}' carries no body factory, so there is "
                               + "nothing to measure. Definitions must come from BenchmarkDiscoverer.");
 

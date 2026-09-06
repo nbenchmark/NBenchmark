@@ -51,7 +51,7 @@ public class BenchmarkSuiteTests
             .Add("a", () => { })
             .WithBaseline("missing");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => suite.RunAsync());
+        await Assert.ThrowsAsync<BenchmarkConfigurationException>(() => suite.RunAsync());
     }
 
     [Fact]
@@ -298,19 +298,22 @@ public class BenchmarkSuiteTests
             _onSuiteCompleted = onSuiteCompleted;
         }
 
-        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
+        public Task OnSuiteStartingAsync(
+        IReadOnlyList<string> benchmarkNames, int total, CancellationToken cancellationToken)
         {
             _onSuiteStarting();
             return Task.CompletedTask;
         }
 
-        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
-        public Task OnWarmupCompleted(string name) => Task.CompletedTask;
-        public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
-        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
-        public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
+        public Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnWarmupCompletedAsync(string name, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnSampleCompletedAsync(
+        string name, int sample, int totalSamples, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
+        public Task OnSuiteCompletedAsync(
+        IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
         {
             _onSuiteCompleted();
             return Task.CompletedTask;
@@ -323,27 +326,30 @@ public class BenchmarkSuiteTests
         public List<int> SuiteStartings { get; } = [];
         public List<int> SuiteCompletions { get; } = [];
 
-        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
+        public Task OnSuiteStartingAsync(
+        IReadOnlyList<string> benchmarkNames, int total, CancellationToken cancellationToken)
         {
             SuiteStartings.Add(total);
             return Task.CompletedTask;
         }
 
-        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
+        public Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task OnWarmupCompleted(string name) => Task.CompletedTask;
+        public Task OnWarmupCompletedAsync(string name, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task OnBenchmarkStarting(string name, int index, int total)
+        public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken)
         {
             BenchmarkStarts.Add((name, index, total));
             return Task.CompletedTask;
         }
 
-        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
+        public Task OnSampleCompletedAsync(
+        string name, int sample, int totalSamples, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
+        public Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
+        public Task OnSuiteCompletedAsync(
+        IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
         {
             SuiteCompletions.Add(results.Count);
             return Task.CompletedTask;

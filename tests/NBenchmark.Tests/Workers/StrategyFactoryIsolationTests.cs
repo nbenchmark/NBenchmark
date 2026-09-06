@@ -186,18 +186,16 @@ public sealed class StrategyFactoryIsolationTests : IDisposable
 
         public string Name => NameFor(fraction);
 
-        public OutlierClassification Classify(double[] sortedSamples)
+        public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
         {
-            ArgumentNullException.ThrowIfNull(sortedSamples);
-
             // Trims the slowest fraction. The behaviour is incidental; what matters is that the
             // fraction came from the constructor, so the name identifies which instance was used.
             var trim = (int)(sortedSamples.Length * fraction);
 
             return new OutlierClassification
             {
-                Kept = sortedSamples[..(sortedSamples.Length - trim)],
-                Discarded = sortedSamples[(sortedSamples.Length - trim)..],
+                Kept = sortedSamples[..(sortedSamples.Length - trim)].ToArray(),
+                Discarded = sortedSamples[(sortedSamples.Length - trim)..].ToArray(),
             };
         }
     }

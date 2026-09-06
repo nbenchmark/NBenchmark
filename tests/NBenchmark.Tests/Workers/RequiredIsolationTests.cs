@@ -74,13 +74,28 @@ public sealed class RequiredIsolationTests
     [Fact]
     public void ThrowIfRequired_Refusal_NamesTheBenchmark_TheReason_TheRemedyAndTheOptOut()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => IsolationAudit.ThrowIfRequired(
+        var error = Assert.Throws<BenchmarkIsolationException>(() => IsolationAudit.ThrowIfRequired(
             Required, "sorter", IsolationStatus.InProcessCapturedState, "it captures 'comparer'."));
 
         Assert.Contains("sorter", error.Message, StringComparison.Ordinal);
         Assert.Contains("captures 'comparer'", error.Message, StringComparison.Ordinal);
         Assert.Contains(IsolationStatus.InProcessCapturedState.ToRemedy()!, error.Message, StringComparison.Ordinal);
         Assert.Contains("RunInProcess", error.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     The refusal is carried as data, not only as prose: a test adapter or a CI reporter reads
+    ///     the status and the remedy off the exception rather than parsing the message.
+    /// </summary>
+    [Fact]
+    public void ThrowIfRequired_Refusal_CarriesTheStatusAndTheRemedyAsProperties()
+    {
+        var error = Assert.Throws<BenchmarkIsolationException>(() => IsolationAudit.ThrowIfRequired(
+            Required, "sorter", IsolationStatus.InProcessCapturedState, "it captures 'comparer'."));
+
+        Assert.Equal(IsolationStatus.InProcessCapturedState, error.Status);
+        Assert.Equal(IsolationStatus.InProcessCapturedState.ToRemedy(), error.Remedy);
+        Assert.IsAssignableFrom<BenchmarkException>(error);
     }
 
     /// <summary>Off, and a refusal is a labelled fallback again.</summary>
@@ -104,7 +119,7 @@ public sealed class RequiredIsolationTests
     [Fact]
     public void ThrowIfRequired_ManyRefusals_NamesEveryOne()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => IsolationAudit.ThrowIfRequired(
+        var error = Assert.Throws<BenchmarkIsolationException>(() => IsolationAudit.ThrowIfRequired(
             Required,
             [
                 new IsolationRefusal("First", IsolationStatus.InProcessCapturedState, "it captures 'a'."),
@@ -191,7 +206,7 @@ public sealed class RequiredIsolationTests
 
         try
         {
-            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => harness.RunAsync());
+            var error = await Assert.ThrowsAsync<BenchmarkIsolationException>(() => harness.RunAsync());
 
             // Both classes named, from the one pass - not one class per run.
             Assert.Contains(nameof(GateFixtureOne), error.Message, StringComparison.Ordinal);

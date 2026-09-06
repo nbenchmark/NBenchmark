@@ -33,7 +33,7 @@ internal static class BenchmarkPlanDiscovery
         {
             if (!method.IsStatic)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"'{declaringType.Name}.{method.Name}' is marked [BenchmarkPlan] but is not static. "
                     + "A plan must be static, because a worker builds the suite in its own process and "
                     + "has no instance of your type to call it on.");
@@ -41,14 +41,14 @@ internal static class BenchmarkPlanDiscovery
 
             if (method.GetParameters().Length != 0)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"'{declaringType.Name}.{method.Name}' is marked [BenchmarkPlan] but takes "
                     + $"{method.GetParameters().Length} parameter(s). A plan must be parameterless.");
             }
 
             if (!typeof(BenchmarkSuite).IsAssignableFrom(method.ReturnType))
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"'{declaringType.Name}.{method.Name}' is marked [BenchmarkPlan] but returns "
                     + $"{method.ReturnType.Name} rather than {nameof(BenchmarkSuite)}.");
             }

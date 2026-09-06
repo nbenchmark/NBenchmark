@@ -2,16 +2,68 @@ namespace NBenchmark.Integration.Abstractions;
 
 public interface IPerformanceThresholds
 {
+    /// <summary>
+    ///     The value every optional numeric threshold carries when it was not set.
+    ///     <para>
+    ///         The thresholds live on attributes, and an attribute argument cannot be a
+    ///         <see cref="Nullable{T}" /> - so "unset" has to be a value in range rather than the
+    ///         absence of one. Every threshold on this interface uses this one sentinel, and every
+    ///         gate reads it as "do not check this": a negative maximum duration, byte count or
+    ///         slowdown ratio has no other meaning.
+    ///     </para>
+    /// </summary>
+    public const double Unset = -1;
+
+    /// <summary>The <see cref="Unset" /> sentinel for <see cref="MaxAllocatedBytes" />.</summary>
+    public const long UnsetBytes = -1;
+
+    /// <summary>
+    ///     The value <see cref="Samples" /> and <see cref="WarmupSamples" /> carry when they were not
+    ///     set: the engine chooses the count adaptively. Zero rather than <see cref="Unset" /> because
+    ///     a count is a natural number - "as many as it takes" is zero explicit samples, not minus one.
+    /// </summary>
+    public const int AutoSampleCount = 0;
+
+    /// <summary>Maximum mean time per operation in nanoseconds, or <see cref="Unset" />.</summary>
     public double MaxMeanNs { get; }
+
+    /// <summary>Maximum 95th-percentile time per operation in nanoseconds, or <see cref="Unset" />.</summary>
     public double MaxP95Ns { get; }
+
+    /// <summary>Maximum mean bytes allocated per operation, or <see cref="UnsetBytes" />.</summary>
     public long MaxAllocatedBytes { get; }
+
+    /// <summary>
+    ///     The name of the method to measure alongside this one as the denominator of
+    ///     <see cref="MaxSlowdownRatio" />, or <c>null</c> when there is no comparison.
+    /// </summary>
     public string? ReferenceMethod { get; }
+
+    /// <summary>
+    ///     Maximum ratio of this measurement to <see cref="ReferenceMethod" />'s, or
+    ///     <see cref="Unset" />. Reads as "no more than N times slower than the reference".
+    /// </summary>
     public double MaxSlowdownRatio { get; }
+
+    /// <summary>Measured samples to take, or <see cref="AutoSampleCount" />.</summary>
     public int Samples { get; }
+
+    /// <summary>Warmup samples to take before measuring, or <see cref="AutoSampleCount" />.</summary>
     public int WarmupSamples { get; }
+
+    /// <summary>Whether to measure allocations as well as time.</summary>
     public bool MeasureAllocations { get; }
+
+    /// <summary>Which samples to trim before the statistics are computed.</summary>
     public OutlierMode OutlierMode { get; }
+
+    /// <summary>The confidence level for the reported interval, e.g. <c>0.95</c>.</summary>
     public double ConfidenceLevel { get; }
+
+    /// <summary>
+    ///     How far past an absolute threshold a measurement may land before the gate fails, as a
+    ///     multiplier of the threshold. <c>1.0</c> fails at the threshold exactly.
+    /// </summary>
     public double MaxAbsoluteThresholdTolerance { get; }
 
     /// <summary>

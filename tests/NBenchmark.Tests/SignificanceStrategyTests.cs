@@ -194,7 +194,7 @@ public class SignificanceStrategyTests
             [
                 new SampleGroup("a", Cluster(10), true),
                 new SampleGroup("b", Cluster(50), false),
-                new SampleGroup("c", [1.0], false), // too few for Mann-Whitney U
+                new SampleGroup("c", new double[] { 1.0 }, false), // too few for Mann-Whitney U
             ],
             BaselineIndex = 0,
             SignificanceLevel = 0.05,
@@ -364,8 +364,8 @@ public class SignificanceStrategyTests
         {
             Groups =
             [
-                new SampleGroup("baseline", [1], true),
-                new SampleGroup("candidate", [2], false),
+                new SampleGroup("baseline", new double[] { 1 }, true),
+                new SampleGroup("candidate", new double[] { 2 }, false),
             ],
             BaselineIndex = 0,
             SignificanceLevel = 0.05,
@@ -410,7 +410,7 @@ public class SignificanceStrategyTests
 
         var candidateResult = results.Single(r => r.Name == "candidate");
         Assert.Equal(SignificanceVerdict.NotSignificant, candidateResult.SignificanceVerdict);
-        Assert.Equal("neg", candidateResult.Effect?.Magnitude);
+        Assert.Equal(MagnitudeLabel.Negligible, candidateResult.Effect?.Magnitude);
 
         // The downgrade is recorded as a discoverable warning (not silently swallowed).
         Assert.Contains(
@@ -445,7 +445,7 @@ public class SignificanceStrategyTests
 
         var candidateResult = results.Single(r => r.Name == "candidate");
         Assert.Equal(SignificanceVerdict.Significant, candidateResult.SignificanceVerdict);
-        Assert.Equal("neg", candidateResult.Effect?.Magnitude);
+        Assert.Equal(MagnitudeLabel.Negligible, candidateResult.Effect?.Magnitude);
     }
 
     [Fact]
@@ -476,7 +476,7 @@ public class SignificanceStrategyTests
 
         var candidate = results.Single(r => r.Name == "candidate");
         Assert.Equal(SignificanceVerdict.Significant, candidate.SignificanceVerdict);
-        Assert.Equal("large", candidate.Effect?.Magnitude);
+        Assert.Equal(MagnitudeLabel.Large, candidate.Effect?.Magnitude);
     }
 
     /// <summary>
@@ -794,7 +794,7 @@ public class SignificanceStrategyTests
                     new EffectSize(
                         "custom-delta",
                         delta,
-                        MagnitudeLabelExtensions.Classify(Math.Abs(delta)).ToShortString(),
+                        MagnitudeLabelExtensions.Classify(Math.Abs(delta)),
                         delta switch
                         {
                             > 0 => EffectDirection.CandidateHigher,

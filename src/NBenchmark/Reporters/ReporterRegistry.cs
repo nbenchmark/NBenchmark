@@ -89,7 +89,7 @@ public static class ReporterRegistry
         lock (_lock)
         {
             if (ContainsName(_entries, name) || ContainsName(_autoAttachEntries, name))
-                throw new InvalidOperationException($"Reporter '{name}' is already registered.");
+                throw new BenchmarkConfigurationException($"Reporter '{name}' is already registered.");
 
             _entries.Add(new Entry(name, description, factory));
             _availableCache = null;
@@ -113,7 +113,7 @@ public static class ReporterRegistry
         lock (_lock)
         {
             if (ContainsName(_entries, name) || ContainsName(_autoAttachEntries, name))
-                throw new InvalidOperationException($"Reporter '{name}' is already registered.");
+                throw new BenchmarkConfigurationException($"Reporter '{name}' is already registered.");
 
             _autoAttachEntries.Add(new Entry(name, description, factory));
             _autoAttachedCache = null;
@@ -138,6 +138,13 @@ public static class ReporterRegistry
         }
     }
 
+    /// <summary>
+    ///     Tries to create a reporter by name, looking in the explicit opt-in list
+    ///     (<see cref="Register" />) and then the auto-attached list
+    ///     (<see cref="RegisterAutoAttach" />) - so <c>--reporter &lt;name&gt;</c> resolves an
+    ///     auto-attached reporter the same way <c>--observer &lt;name&gt;</c> does on the observer
+    ///     side. The dedup in <see cref="InvokeReportersAsync" /> keeps it from firing twice.
+    /// </summary>
     public static bool TryCreate(string name, string? outputDir, ReportDetail detail, [NotNullWhen(true)] out IReporter? reporter)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -148,7 +155,8 @@ public static class ReporterRegistry
 
         lock (_lock)
         {
-            entry = _entries.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
+            entry = _entries.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase))
+                    ?? _autoAttachEntries.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
         }
 
         if (entry is not null)
@@ -268,8 +276,12 @@ public static class ReporterRegistry
             {
                 Assembly.Load(reference);
             }
-            catch
+            catch (Exception ex)
             {
+                // A misconfigured extension (missing file, bad image, security) would otherwise
+                // surface as a silently-absent reporter with no diagnostic. Traced rather than
+                // printed so benchmark output stays clean; matches ObserverRegistry.
+                Trace.TraceWarning("NBenchmark: failed to load extension assembly '{0}': {1}", reference.Name, ex.Message);
             }
         }
     }
@@ -285,6 +297,10 @@ public static class ReporterRegistry
             _autoAttachEntries = new List<Entry>(_autoAttachInitialState);
             _availableCache = null;
             _autoAttachedCache = null;
+
+            // Re-arm the extension-load latch so a test that triggered EnsureExtensionsLoaded can be
+            // re-run from a clean slate. Mirrors ObserverRegistry.Reset.
+            Interlocked.Exchange(ref _extensionsLoaded, 0);
         }
     }
 

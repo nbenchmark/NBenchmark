@@ -133,7 +133,7 @@ internal static class WorkerGroupRunner
                 {
                     case WorkerFrameKind.Progress when frame.Progress is not null:
                         lastActivity = DescribeProgress(frame.Progress);
-                        await ReplayProgressAsync(frame.Progress, progress).ConfigureAwait(false);
+                        await ReplayProgressAsync(frame.Progress, progress, cancellationToken).ConfigureAwait(false);
                         break;
 
                     case WorkerFrameKind.ObserverPhase when frame.ObserverPhase is not null:
@@ -178,7 +178,7 @@ internal static class WorkerGroupRunner
                         results.Add(payload.Result with { IsolationStatus = IsolationStatus.Isolated });
                         samples[payload.Result.Name] = payload.RawSamples;
 
-                        // Deliberately no OnBenchmarkCompleted / OnResult here. A group may be
+                        // Deliberately no OnBenchmarkCompletedAsync / OnResult here. A group may be
                         // measured by several replicate workers, and the result a consumer should
                         // see is the aggregate across them - not one per replicate. Only the caller
                         // knows when it holds the final result, so the caller raises it.
@@ -230,15 +230,15 @@ internal static class WorkerGroupRunner
         catch (Exception ex) when (ex is IOException
                                        or JsonException
                                        or InvalidDataException
-                                       or InvalidOperationException)
+                                       or BenchmarkExecutionException)
         {
             // A torn or unreadable frame: the worker died while writing, or the stream desynchronized.
             // <see cref="FrameChannel.ReadAsync" /> throws <see cref="EndOfStreamException" /> (an
             // <see cref="IOException" />) when the pipe dies mid-frame, <see cref="InvalidDataException" />
             // on a bad length prefix, and <see cref="JsonException" /> on a corrupt payload.
             //
-            // <see cref="InvalidOperationException" /> is the one that comes from *this* side: writing
-            // a frame past the protocol's size ceiling. Every other transport failure in this method is
+            // <see cref="BenchmarkExecutionException" /> is the one that comes from *this* side:
+            // writing a frame past the protocol's size ceiling. Every other transport failure in this method is
             // turned into a fault, and that one was not - so it escaped here, escaped the launcher, and
             // took down the benchmark program over a frame that could simply have been reported. None of
             // these is the user's fault or something a retry of this group would fix, and none should take down
@@ -289,15 +289,18 @@ internal static class WorkerGroupRunner
             _ => $"'{payload.Name}' reported {payload.Callback}",
         };
 
-    private static Task ReplayProgressAsync(ProgressPayload payload, IBenchmarkProgress progress)
+    private static Task ReplayProgressAsync(
+        ProgressPayload payload, IBenchmarkProgress progress, CancellationToken cancellationToken)
         => payload.Callback switch
         {
-            ProgressCallback.WarmupStarting => progress.OnWarmupStarting(payload.Name, payload.Total),
-            ProgressCallback.WarmupCompleted => progress.OnWarmupCompleted(payload.Name),
+            ProgressCallback.WarmupStarting =>
+                progress.OnWarmupStartingAsync(payload.Name, payload.Total, cancellationToken),
+            ProgressCallback.WarmupCompleted =>
+                progress.OnWarmupCompletedAsync(payload.Name, cancellationToken),
             ProgressCallback.BenchmarkStarting =>
-                progress.OnBenchmarkStarting(payload.Name, payload.Index, payload.Total),
+                progress.OnBenchmarkStartingAsync(payload.Name, payload.Index, payload.Total, cancellationToken),
             ProgressCallback.SampleCompleted =>
-                progress.OnSampleCompleted(payload.Name, payload.Index, payload.Total),
+                progress.OnSampleCompletedAsync(payload.Name, payload.Index, payload.Total, cancellationToken),
             _ => Task.CompletedTask,
         };
 

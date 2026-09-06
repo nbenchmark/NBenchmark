@@ -128,7 +128,7 @@ internal sealed class FrameChannel : IDisposable
 
         if (payload.Length > WorkerProtocol.MaxFrameBytes)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkExecutionException(
                 $"A {frame.Kind} frame serialized to {payload.Length} bytes, above the "
                 + $"{WorkerProtocol.MaxFrameBytes}-byte frame ceiling.");
         }

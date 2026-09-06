@@ -393,7 +393,7 @@ internal static class AdaptiveLoop
                 ResolvedWarmup: resolvedWarmup, WarmupStop: warmupStop));
         }
 
-        progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
+        progress.OnWarmupCompletedAsync(name, ct).GetAwaiter().GetResult();
 
         // Pre-measurement full GC is intentionally profile-gated: the Independent profile clears
         // warmup garbage so it cannot trigger a collection mid-measurement, while the default
@@ -481,7 +481,7 @@ internal static class AdaptiveLoop
                 }
 
                 if (sampleCount % progressInterval == 0)
-                    progress.OnSampleCompleted(name, sampleCount, reportedTotal).GetAwaiter().GetResult();
+                    progress.OnSampleCompletedAsync(name, sampleCount, reportedTotal, ct).GetAwaiter().GetResult();
 
                 if (ci is null)
                 {
@@ -1001,7 +1001,7 @@ internal static class AdaptiveLoop
                 ResolvedWarmup: resolvedWarmup, WarmupStop: warmupStop));
         }
 
-        await progress.OnWarmupCompleted(name).ConfigureAwait(false);
+        await progress.OnWarmupCompletedAsync(name, ct).ConfigureAwait(false);
 
         // Pre-measurement full GC is intentionally profile-gated: the Independent profile clears
         // warmup garbage so it cannot trigger a collection mid-measurement, while the default
@@ -1092,7 +1092,7 @@ internal static class AdaptiveLoop
                 }
 
                 if (sampleCount % progressInterval == 0)
-                    await progress.OnSampleCompleted(name, sampleCount, reportedTotal).ConfigureAwait(false);
+                    await progress.OnSampleCompletedAsync(name, sampleCount, reportedTotal, ct).ConfigureAwait(false);
 
                 if (ci is null)
                 {

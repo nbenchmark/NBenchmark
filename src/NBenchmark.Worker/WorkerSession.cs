@@ -26,7 +26,7 @@ internal sealed class WorkerSession(FrameChannel channel)
 
     /// <summary>
     ///     The sample budget and seed for the group in flight, held here because every path that
-    ///     produces results forwards them through <see cref="StreamingProgress.OnBenchmarkCompleted" />
+    ///     produces results forwards them through <see cref="StreamingProgress.OnBenchmarkCompletedAsync" />
     /// and none of the call sites carry the request that far.
     /// </summary>
     private int _maxRawSamples = MeasurementOptions.DefaultMaxRawSamples;
@@ -607,7 +607,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         }
 
         // Results were sent incrementally as each benchmark completed (above, via
-        // progress.OnBenchmarkCompleted), so there is nothing to batch here.
+        // progress.OnBenchmarkCompletedAsync), so there is nothing to batch here.
     }
 
     /// <summary>
@@ -821,7 +821,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         instanceFactory = type =>
         {
             var instance = provider.GetService(type)
-                           ?? throw new InvalidOperationException(
+                           ?? throw new BenchmarkConfigurationException(
                                $"No service of type '{type.FullName}' is registered in the service "
                                + "provider built by the factory. The worker builds its own container "
                                + "from your factory, so a registration added outside it is not present.");
@@ -874,7 +874,7 @@ internal sealed class WorkerSession(FrameChannel channel)
             // errored rows the user reads, and the factory's own exception is more useful there than
             // anything this could wrap it in.
             var instance = invoke([type])
-                           ?? throw new InvalidOperationException(
+                           ?? throw new BenchmarkConfigurationException(
                                $"{source.Factory.Role} returned null for '{type.FullName}'.");
 
             return InstanceHandle.NoTeardown(instance);
@@ -986,7 +986,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         }
 
         // Results were sent incrementally as each benchmark completed (above, via
-        // progress.OnBenchmarkCompleted), so there is nothing to batch here.
+        // progress.OnBenchmarkCompletedAsync), so there is nothing to batch here.
     }
 
     /// <summary>
@@ -1030,7 +1030,7 @@ internal sealed class WorkerSession(FrameChannel channel)
         }
 
         // The suite measures itself and forwards each result as it completes (above, via
-        // progress.OnBenchmarkCompleted), so the returned outcome is not needed here - nothing is
+        // progress.OnBenchmarkCompletedAsync), so the returned outcome is not needed here - nothing is
         // batched to group end.
         await suite
             .MeasureInWorkerAsync(
@@ -1069,7 +1069,8 @@ internal sealed class WorkerSession(FrameChannel channel)
                 cancellationToken.ThrowIfCancellationRequested();
 
                 await progress
-                    .OnBenchmarkStarting(body.DisplayName, request.StartIndex + index + 1, request.TotalBenchmarks)
+                    .OnBenchmarkStartingAsync(
+                        body.DisplayName, request.StartIndex + index + 1, request.TotalBenchmarks, cancellationToken)
                     .ConfigureAwait(false);
 
                 if (!BodyResolver.TryResolve(
@@ -1110,12 +1111,12 @@ internal sealed class WorkerSession(FrameChannel channel)
                     .MeasureAsync(body.DisplayName, resolved, spec, cancellationToken)
                     .ConfigureAwait(false);
 
-                // The lambda path does not flow through SuiteRunner, so OnBenchmarkCompleted is not
+                // The lambda path does not flow through SuiteRunner, so OnBenchmarkCompletedAsync is not
                 // raised for it automatically the way it is for the discovered, plan, and test-method
                 // paths. Sending here - one result, as soon as it is measured - is the same contract:
                 // the result is on the wire before the next body starts, so a crash on a later body can
                 // no longer lose this one.
-                await progress.OnBenchmarkCompleted(outcome.Result).ConfigureAwait(false);
+                await progress.OnBenchmarkCompletedAsync(outcome.Result, cancellationToken).ConfigureAwait(false);
 
                 index++;
             }
@@ -1384,7 +1385,7 @@ internal sealed class WorkerSession(FrameChannel channel)
             {
                 MeanNs = calibration.MeanNs,
                 MedianNs = calibration.MedianNs,
-                Samples = calibration.Samples,
+                Samples = [.. calibration.Samples],
             };
         }
         catch (Exception ex)

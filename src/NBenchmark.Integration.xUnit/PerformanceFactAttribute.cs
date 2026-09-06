@@ -9,13 +9,13 @@ namespace NBenchmark.Integration.xUnit;
     "NBenchmark.Integration.xUnit")]
 public sealed class PerformanceFactAttribute : FactAttribute, IPerformanceThresholds
 {
-    public double MaxMeanNs { get; init; } = -1;
-    public double MaxP95Ns { get; init; } = -1;
-    public long MaxAllocatedBytes { get; init; } = -1;
+    public double MaxMeanNs { get; init; } = IPerformanceThresholds.Unset;
+    public double MaxP95Ns { get; init; } = IPerformanceThresholds.Unset;
+    public long MaxAllocatedBytes { get; init; } = IPerformanceThresholds.UnsetBytes;
     public string? ReferenceMethod { get; init; }
-    public double MaxSlowdownRatio { get; init; } = 0;
-    public int Samples { get; init; }
-    public int WarmupSamples { get; init; }
+    public double MaxSlowdownRatio { get; init; } = IPerformanceThresholds.Unset;
+    public int Samples { get; init; } = IPerformanceThresholds.AutoSampleCount;
+    public int WarmupSamples { get; init; } = IPerformanceThresholds.AutoSampleCount;
     public bool MeasureAllocations { get; init; }
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; init; } = 0.95;

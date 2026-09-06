@@ -92,7 +92,7 @@ public static class ObserverRegistry
         lock (_lock)
         {
             if (ContainsName(_entries, name) || ContainsName(_autoAttachEntries, name))
-                throw new InvalidOperationException($"Observer '{name}' is already registered.");
+                throw new BenchmarkConfigurationException($"Observer '{name}' is already registered.");
 
             _entries.Add(new Entry(name, description, factory));
             _availableCache = null;
@@ -118,7 +118,7 @@ public static class ObserverRegistry
         lock (_lock)
         {
             if (ContainsName(_entries, name) || ContainsName(_autoAttachEntries, name))
-                throw new InvalidOperationException($"Observer '{name}' is already registered.");
+                throw new BenchmarkConfigurationException($"Observer '{name}' is already registered.");
 
             _autoAttachEntries.Add(new Entry(name, description, factory));
             _autoAttachedCache = null;

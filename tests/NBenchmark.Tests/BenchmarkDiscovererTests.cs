@@ -254,7 +254,7 @@ public class BenchmarkDiscovererTests
     [Fact]
     public void Source_Method_Must_Return_IEnumerable_Of_ValueTuple()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() =>
+        var ex = Assert.Throws<BenchmarkConfigurationException>(() =>
             new BenchmarkDiscoverer().Discover(typeof(InvalidReturnTypeCasesBenchmarks)));
 
         Assert.Contains("ValueTuple", ex.Message);
@@ -263,7 +263,7 @@ public class BenchmarkDiscovererTests
     [Fact]
     public void Source_Tuple_Arity_Must_Match_Method_Arity()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() =>
+        var ex = Assert.Throws<BenchmarkConfigurationException>(() =>
             new BenchmarkDiscoverer().Discover(typeof(ArityMismatchCasesBenchmarks)));
 
         Assert.Contains("parameter", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -274,7 +274,7 @@ public class BenchmarkDiscovererTests
     [Fact]
     public void Source_Must_Be_Parameterless()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() =>
+        var ex = Assert.Throws<BenchmarkConfigurationException>(() =>
             new BenchmarkDiscoverer().Discover(typeof(ParamSourceCasesBenchmarks)));
 
         Assert.Contains("no parameters", ex.Message);
@@ -328,7 +328,7 @@ public class BenchmarkDiscovererTests
     [Fact]
     public void BenchmarkCase_And_BenchmarkCases_Cannot_Coexist()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() =>
+        var ex = Assert.Throws<BenchmarkConfigurationException>(() =>
             new BenchmarkDiscoverer().Discover(typeof(ConflictCasesBenchmarks)));
 
         Assert.Contains("both", ex.Message, StringComparison.OrdinalIgnoreCase);

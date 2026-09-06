@@ -35,9 +35,9 @@ internal static class RelativeComparison
     /// </summary>
     public static IReadOnlyList<string> Check(
         BenchmarkResult candidateResult,
-        double[] candidateSamples,
+        IReadOnlyList<double> candidateSamples,
         BenchmarkResult referenceResult,
-        double[] referenceSamples,
+        IReadOnlyList<double> referenceSamples,
         double maxSlowdownRatio,
         double significanceLevel = 0.05,
         RatioEstimate? pairedRatio = null)
@@ -78,9 +78,9 @@ internal static class RelativeComparison
     /// </param>
     public static RelativeComparisonVerdict CheckStructured(
         BenchmarkResult candidateResult,
-        double[] candidateSamples,
+        IReadOnlyList<double> candidateSamples,
         BenchmarkResult referenceResult,
-        double[] referenceSamples,
+        IReadOnlyList<double> referenceSamples,
         double maxSlowdownRatio,
         double significanceLevel = 0.05,
         RatioEstimate? pairedRatio = null)
@@ -98,7 +98,7 @@ internal static class RelativeComparison
             return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false, pairedRatio);
         }
 
-        if (candidateSamples is null || candidateSamples.Length == 0)
+        if (candidateSamples is null || candidateSamples.Count == 0)
         {
             violations.Add(
                 "Current run produced no raw samples; cannot run significance test. " +
@@ -107,7 +107,7 @@ internal static class RelativeComparison
             return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false, pairedRatio);
         }
 
-        if (referenceSamples is null || referenceSamples.Length == 0)
+        if (referenceSamples is null || referenceSamples.Count == 0)
         {
             violations.Add(
                 "Reference produced no raw samples; cannot run significance test. " +
@@ -128,7 +128,10 @@ internal static class RelativeComparison
                 violations, double.NaN, double.NaN, double.NaN, violations.Count > 0, pairedRatio);
         }
 
-        var mwu = MannWhitneyU.Test(referenceSamples, candidateSamples);
+        // The samples arrive as read-only lists - the caller's own buffers, which this comparison
+        // must not reorder - so hand the test a span over an array it owns when they are not
+        // already arrays.
+        var mwu = MannWhitneyU.Test(AsSpan(referenceSamples), AsSpan(candidateSamples));
 
         // The paired estimate when the measurement produced one, on both counts: the ratio the gate
         // applies its threshold to, and the test of whether the two differ at all. See the parameter
@@ -159,6 +162,9 @@ internal static class RelativeComparison
 
         return new RelativeComparisonVerdict(violations, ratio, mwu.PValue, mwu.CliffsDelta, isRegression, pairedRatio);
     }
+
+    private static ReadOnlySpan<double> AsSpan(IReadOnlyList<double> samples) =>
+        samples as double[] ?? [.. samples];
 }
 
 /// <summary>

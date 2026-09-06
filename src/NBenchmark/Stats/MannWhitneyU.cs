@@ -29,11 +29,8 @@ internal static class MannWhitneyU
     /// <summary>Minimum samples required in each group to attempt the test.</summary>
     private const int MinPerGroup = 2;
 
-    public static MannWhitneyUResult Test(double[] sampleA, double[] sampleB)
+    public static MannWhitneyUResult Test(ReadOnlySpan<double> sampleA, ReadOnlySpan<double> sampleB)
     {
-        ArgumentNullException.ThrowIfNull(sampleA);
-        ArgumentNullException.ThrowIfNull(sampleB);
-
         var n1 = sampleA.Length;
         var n2 = sampleB.Length;
 

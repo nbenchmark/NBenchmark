@@ -56,7 +56,7 @@ public class ObserverRegistryTests : IDisposable
     {
         ObserverRegistry.Register("test", "First", () => new StubObserver("test"));
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ObserverRegistry.Register("test", "Duplicate", () => new StubObserver("test")));
     }
 
@@ -65,7 +65,7 @@ public class ObserverRegistryTests : IDisposable
     {
         ObserverRegistry.Register("test", "First", () => new StubObserver("test"));
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ObserverRegistry.Register("TEST", "Duplicate uppercase", () => new StubObserver("test")));
     }
 

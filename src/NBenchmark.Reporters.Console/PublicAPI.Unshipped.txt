@@ -1,13 +1,13 @@
 #nullable enable
 NBenchmark.Reporters.Console.ConsoleBenchmarkProgress
 NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.ConsoleBenchmarkProgress() -> void
-NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnBenchmarkCompleted(NBenchmark.BenchmarkResult! result) -> System.Threading.Tasks.Task!
-NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnBenchmarkStarting(string! name, int index, int total) -> System.Threading.Tasks.Task!
-NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnSampleCompleted(string! name, int sample, int totalSamples) -> System.Threading.Tasks.Task!
-NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnSuiteCompleted(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results) -> System.Threading.Tasks.Task!
-NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnSuiteStarting(System.Collections.Generic.IReadOnlyList<string!>! benchmarkNames, int total) -> System.Threading.Tasks.Task!
-NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnWarmupCompleted(string! name) -> System.Threading.Tasks.Task!
-NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnWarmupStarting(string! name, int totalWarmupSamples) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnBenchmarkCompletedAsync(NBenchmark.BenchmarkResult! result, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnBenchmarkStartingAsync(string! name, int index, int total, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnSampleCompletedAsync(string! name, int sample, int totalSamples, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnSuiteCompletedAsync(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnSuiteStartingAsync(System.Collections.Generic.IReadOnlyList<string!>! benchmarkNames, int total, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnWarmupCompletedAsync(string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.Console.ConsoleBenchmarkProgress.OnWarmupStartingAsync(string! name, int totalWarmupSamples, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 NBenchmark.Reporters.Console.ConsoleBenchmarkResultExtensions
 NBenchmark.Reporters.Console.ConsoleReporter
 NBenchmark.Reporters.Console.ConsoleReporter.ConsoleReporter(NBenchmark.Reporters.ReportDetail detail = NBenchmark.Reporters.ReportDetail.Simple) -> void

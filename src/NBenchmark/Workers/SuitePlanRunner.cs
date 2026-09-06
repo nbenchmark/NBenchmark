@@ -151,7 +151,7 @@ internal static class SuitePlanRunner
 
         if (!AddressedFactory.TryCreateByName(plan, PlanRole(plan), out var planRef, out var refusal))
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"The benchmark plan cannot run across runtimes: {refusal} Each runtime's worker "
                 + "locates it by name in that runtime's own build.");
         }
@@ -238,7 +238,7 @@ internal static class SuitePlanRunner
             }
         }
 
-        await progress.OnSuiteCompleted(allResults).ConfigureAwait(false);
+        await progress.OnSuiteCompletedAsync(allResults, cancellationToken).ConfigureAwait(false);
 
         observer.OnPhase(new MeasurementPhaseEvent(
             string.Empty, MeasurementPhase.SuiteCompleted, PhaseTransition.Completed, Succeeded: true));

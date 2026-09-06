@@ -40,11 +40,9 @@ internal static class HodgesLehmann
     /// <param name="baseline">Baseline raw samples (group A).</param>
     /// <param name="candidate">Candidate raw samples (group B).</param>
     /// <param name="confidenceLevel">Target coverage of the interval, strictly between 0 and 1.</param>
-    public static ShiftEstimate? Estimate(double[] baseline, double[] candidate, double confidenceLevel)
+    public static ShiftEstimate? Estimate(
+        ReadOnlySpan<double> baseline, ReadOnlySpan<double> candidate, double confidenceLevel)
     {
-        ArgumentNullException.ThrowIfNull(baseline);
-        ArgumentNullException.ThrowIfNull(candidate);
-
         if (baseline.Length < MinPerGroup || candidate.Length < MinPerGroup
             || confidenceLevel is <= 0 or >= 1)
         {
@@ -94,7 +92,7 @@ internal static class HodgesLehmann
     }
 
     /// <summary>The mid-averaged median of a sorted array (mean of the two central values for even length).</summary>
-    private static double MidMedian(double[] sorted)
+    private static double MidMedian(ReadOnlySpan<double> sorted)
     {
         var n = sorted.Length;
 
@@ -108,15 +106,15 @@ internal static class HodgesLehmann
     ///     <c>n₁n₂/12 · [(N + 1) − Σ(tᵢ³ − tᵢ) / (N(N − 1))]</c>, where the tie blocks are computed
     ///     over the combined sample.
     /// </summary>
-    private static double TieCorrectedVariance(double[] a, double[] b)
+    private static double TieCorrectedVariance(ReadOnlySpan<double> a, ReadOnlySpan<double> b)
     {
         var n1 = a.Length;
         var n2 = b.Length;
         var total = n1 + n2;
 
         var combined = new double[total];
-        Array.Copy(a, 0, combined, 0, n1);
-        Array.Copy(b, 0, combined, n1, n2);
+        a.CopyTo(combined);
+        b.CopyTo(combined.AsSpan(n1));
         Array.Sort(combined);
 
         var tieCorrection = 0.0;

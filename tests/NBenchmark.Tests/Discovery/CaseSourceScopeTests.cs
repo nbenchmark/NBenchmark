@@ -91,7 +91,7 @@ public sealed class CaseSourceScopeTests
     {
         var discoverer = new BenchmarkDiscoverer(InstanceLifetime.PerMethod, factoryResolvedInstances: true);
 
-        var error = Assert.Throws<InvalidOperationException>(
+        var error = Assert.Throws<BenchmarkConfigurationException>(
             () => discoverer.Discover(typeof(InjectedCaseSourceBenchmarks)));
 
         Assert.Contains("factory or service provider", error.Message, StringComparison.Ordinal);
@@ -106,7 +106,7 @@ public sealed class CaseSourceScopeTests
     [Fact]
     public void Discover_WithoutAFactory_ReportsThePlainConstructionFailure()
     {
-        var error = Assert.Throws<InvalidOperationException>(
+        var error = Assert.Throws<BenchmarkConfigurationException>(
             () => new BenchmarkDiscoverer().Discover(typeof(InjectedCaseSourceBenchmarks)));
 
         Assert.DoesNotContain("factory or service provider", error.Message, StringComparison.Ordinal);

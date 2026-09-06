@@ -10,11 +10,60 @@ public class MeasurementObserverEventsTests
     {
         Assert.Same(NullMeasurementObserver.Instance, NullMeasurementObserver.Instance);
 
-        var observer = NullMeasurementObserver.Instance;
+        // The members are default interface implementations, so they are reachable only through
+        // the interface - which is how the engine calls them.
+        IMeasurementObserver observer = NullMeasurementObserver.Instance;
         observer.OnPhase(new MeasurementPhaseEvent("b", MeasurementPhase.Jitter, PhaseTransition.Starting));
         observer.OnSample(new SampleEvent("b", 0, 1.0, 1, 0, false));
         observer.OnDetector(new DetectorStateEvent("b", MeasurementPhase.Measurement, 0, 0.0, 0.0, 0.0, 1));
         observer.OnResult(null!);
+    }
+
+    /// <summary>
+    ///     Every member of both extension interfaces has a no-op default, so an implementation
+    ///     declares only the events it reacts to.
+    /// </summary>
+    [Fact]
+    public async Task Partial_Implementations_Compile_And_Only_The_Declared_Member_Fires()
+    {
+        IMeasurementObserver observer = new SampleOnlyObserver();
+
+        observer.OnPhase(new MeasurementPhaseEvent("b", MeasurementPhase.Jitter, PhaseTransition.Starting));
+        observer.OnSample(new SampleEvent("b", 0, 1.0, 1, 0, false));
+        observer.OnDetector(new DetectorStateEvent("b", MeasurementPhase.Measurement, 0, 0.0, 0.0, 0.0, 1));
+        observer.OnResult(null!);
+
+        Assert.Equal(1, ((SampleOnlyObserver)observer).Samples);
+
+        IBenchmarkProgress progress = new BenchmarkStartedOnlyProgress();
+
+        await progress.OnSuiteStartingAsync([], 0, CancellationToken.None);
+        await progress.OnWarmupStartingAsync("b", 1, CancellationToken.None);
+        await progress.OnWarmupCompletedAsync("b", CancellationToken.None);
+        await progress.OnBenchmarkStartingAsync("b", 1, 1, CancellationToken.None);
+        await progress.OnSampleCompletedAsync("b", 1, 1, CancellationToken.None);
+        await progress.OnBenchmarkCompletedAsync(null!, CancellationToken.None);
+        await progress.OnSuiteCompletedAsync([], CancellationToken.None);
+
+        Assert.Equal(1, ((BenchmarkStartedOnlyProgress)progress).Started);
+    }
+
+    private sealed class SampleOnlyObserver : IMeasurementObserver
+    {
+        public int Samples { get; private set; }
+
+        public void OnSample(in SampleEvent e) => Samples++;
+    }
+
+    private sealed class BenchmarkStartedOnlyProgress : IBenchmarkProgress
+    {
+        public int Started { get; private set; }
+
+        public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken)
+        {
+            Started++;
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]

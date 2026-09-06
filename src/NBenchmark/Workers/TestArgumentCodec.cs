@@ -101,7 +101,7 @@ internal static class TestArgumentCodec
         {
             if (underlying == parameterType && parameterType.IsValueType)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"A null argument cannot be bound to non-nullable parameter type '{parameterType.Name}'.");
             }
 

@@ -4,7 +4,6 @@ NBenchmark.Integration.Abstractions.AllowInProcessGateAttribute.AllowInProcessGa
 NBenchmark.Integration.Abstractions.BenchmarkAssert
 NBenchmark.Integration.Abstractions.IPerformanceThresholds
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.ConfidenceLevel.get -> double
-NBenchmark.Integration.Abstractions.IPerformanceThresholds.Samples.get -> int
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.LaunchCount.get -> int
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.MaxAbsoluteThresholdTolerance.get -> double
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.MaxAllocatedBytes.get -> long
@@ -15,10 +14,9 @@ NBenchmark.Integration.Abstractions.IPerformanceThresholds.MeasureAllocations.ge
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.OutlierMode.get -> NBenchmark.OutlierMode
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.ReferenceMethod.get -> string?
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.RequireIsolation.get -> bool
+NBenchmark.Integration.Abstractions.IPerformanceThresholds.Samples.get -> int
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.WarmupSamples.get -> int
 NBenchmark.Integration.Abstractions.PerformanceThresholds
-NBenchmark.Integration.Abstractions.PerformanceThresholds.Samples.get -> int
-NBenchmark.Integration.Abstractions.PerformanceThresholds.Samples.init -> void
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxAbsoluteThresholdTolerance.get -> double
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxAbsoluteThresholdTolerance.init -> void
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxAllocatedBytes.get -> long?
@@ -27,9 +25,8 @@ NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxMeanNs.get -> doubl
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxMeanNs.init -> void
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxP95Ns.get -> double?
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxP95Ns.init -> void
-NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxSlowdownRatio.get -> double
-NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxSlowdownRatio.init -> void
 NBenchmark.Integration.Abstractions.PerformanceThresholds.PerformanceThresholds() -> void
-NBenchmark.Integration.Abstractions.PerformanceThresholds.WarmupSamples.get -> int
-NBenchmark.Integration.Abstractions.PerformanceThresholds.WarmupSamples.init -> void
+const NBenchmark.Integration.Abstractions.IPerformanceThresholds.AutoSampleCount = 0 -> int
+const NBenchmark.Integration.Abstractions.IPerformanceThresholds.Unset = -1 -> double
+const NBenchmark.Integration.Abstractions.IPerformanceThresholds.UnsetBytes = -1 -> long
 static NBenchmark.Integration.Abstractions.BenchmarkAssert.Validate(NBenchmark.BenchmarkResult! result, NBenchmark.Integration.Abstractions.PerformanceThresholds! thresholds) -> System.Collections.Generic.IReadOnlyList<string!>!

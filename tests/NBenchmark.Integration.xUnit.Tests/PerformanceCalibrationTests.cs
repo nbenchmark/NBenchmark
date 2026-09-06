@@ -57,7 +57,7 @@ public sealed class PerformanceCalibrationTests
         var direct = CalibrationStandard.Measure();
         var viaHost = PerformanceCalibration.Run();
 
-        Assert.Equal(direct.Samples.Length, viaHost.Samples.Length);
+        Assert.Equal(direct.Samples.Count, viaHost.Samples.Count);
     }
 
     [Fact]

@@ -23,7 +23,7 @@ public sealed class MannWhitneyUSignificanceTest : ISignificanceTest
 
         foreach (var candidate in context.Candidates)
         {
-            var result = MannWhitneyU.Test(baseline.Samples, candidate.Samples);
+            var result = MannWhitneyU.Test(baseline.Samples.Span, candidate.Samples.Span);
 
             if (double.IsNaN(result.PValue))
             {
@@ -41,7 +41,7 @@ public sealed class MannWhitneyUSignificanceTest : ISignificanceTest
                 effect = EffectSizeFactory.ForCliffsDelta(result.CliffsDelta);
 
             var shift = HodgesLehmann.Estimate(
-                baseline.Samples, candidate.Samples, 1.0 - context.SignificanceLevel);
+                baseline.Samples.Span, candidate.Samples.Span, 1.0 - context.SignificanceLevel);
 
             pairwise.Add(new PairwiseComparison(candidate.Name, result.PValue, verdict, effect, shift));
         }

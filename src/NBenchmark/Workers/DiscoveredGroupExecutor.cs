@@ -105,7 +105,7 @@ internal static class DiscoveredGroupExecutor
             // The shared-instance independence warning is a property of the suite, not of any one
             // result, so it is known before the first benchmark starts. Computing it here - before
             // the run, rather than after - is what gets it onto the wire. W-44 sends each result as it
-            // completes (via StreamingProgress.OnBenchmarkCompleted), so a warning attached to the
+            // completes (via StreamingProgress.OnBenchmarkCompletedAsync), so a warning attached to the
             // local results list after the run would land on objects that had already crossed the
             // process boundary without it. The decorator below stamps it on each result ahead of the
             // inner sink, which is the moment a worker puts it on the wire. The post-run Attach
@@ -128,11 +128,11 @@ internal static class DiscoveredGroupExecutor
                 results = setupErrors!.ToList();
 
                 // Setup threw before any benchmark ran, so SuiteRunner never raised
-                // OnBenchmarkCompleted for these errored rows. Send them through the same sink so
+                // OnBenchmarkCompletedAsync for these errored rows. Send them through the same sink so
                 // they reach the coordinator the way measured results do - without this, the only
                 // copy lived in the local list the worker no longer batches and ships at group end.
                 foreach (var error in results)
-                    await reported.OnBenchmarkCompleted(error).ConfigureAwait(false);
+                    await reported.OnBenchmarkCompletedAsync(error, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -208,7 +208,7 @@ internal static class DiscoveredGroupExecutor
                 // the same point in the same loop has always produced errored rows and continued, and
                 // there was never a reason for two adjacent user-code failures to differ.
                 var uninstantiable = OutcomeBuilder.Build(
-                    new RunOutcome.Errored(new InvalidOperationException(failure), failure!),
+                    new RunOutcome.Errored(new BenchmarkExecutionException(failure!), failure!),
                     BenchmarkEnvelope.QualifiedDiscoveredBenchmarkName(suite.Type, benchmark.DisplayName),
                     qualifiedClassName,
                     benchmark.Attribute.Description,
@@ -219,7 +219,7 @@ internal static class DiscoveredGroupExecutor
 
                 results.Add(uninstantiable);
 
-                await progress.OnBenchmarkCompleted(uninstantiable).ConfigureAwait(false);
+                await progress.OnBenchmarkCompletedAsync(uninstantiable, cancellationToken).ConfigureAwait(false);
 
                 continue;
             }
@@ -234,14 +234,14 @@ internal static class DiscoveredGroupExecutor
 
                 if (!setupSuccess)
                 {
-                    // Setup threw, so SuiteRunner never ran and never raised OnBenchmarkCompleted for
+                    // Setup threw, so SuiteRunner never ran and never raised OnBenchmarkCompletedAsync for
                     // these errored rows. Send them through the same sink so they reach the
                     // coordinator the way measured results do - without this, the only copy lived in
                     // the local list the worker no longer batches and ships at group end.
                     foreach (var error in setupErrors!)
                     {
                         results.Add(error);
-                        await progress.OnBenchmarkCompleted(error).ConfigureAwait(false);
+                        await progress.OnBenchmarkCompletedAsync(error, cancellationToken).ConfigureAwait(false);
                     }
 
                     continue;
@@ -283,7 +283,7 @@ internal static class DiscoveredGroupExecutor
     ///         A worker sends each result the moment it completes (W-44), not in a batch at group end,
     ///         so a warning attached to the local results list <i>after</i> the run would never reach
     ///         the coordinator - the result it should have been stamped on is already gone. This
-    ///         decorator stamps it on the result inside <see cref="OnBenchmarkCompleted" />, ahead of
+    ///         decorator stamps it on the result inside <see cref="OnBenchmarkCompletedAsync" />, ahead of
     ///         the inner sink, which is the exact moment a worker puts the result on the wire.
     ///     </para>
     ///     <para>
@@ -296,22 +296,26 @@ internal static class DiscoveredGroupExecutor
     private sealed class IndependenceWarningProgress(IBenchmarkProgress inner, string warning)
         : IBenchmarkProgress
     {
-        public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
-            => inner.OnSuiteStarting(benchmarkNames, total);
+        // Every member forwards. A decorator that left one to the interface's no-op default would
+        // silently swallow that event instead of passing it to the inner sink.
+        public Task OnSuiteStartingAsync(
+            IReadOnlyList<string> benchmarkNames, int total, CancellationToken cancellationToken)
+            => inner.OnSuiteStartingAsync(benchmarkNames, total, cancellationToken);
 
-        public Task OnWarmupStarting(string name, int totalWarmupSamples)
-            => inner.OnWarmupStarting(name, totalWarmupSamples);
+        public Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken cancellationToken)
+            => inner.OnWarmupStartingAsync(name, totalWarmupSamples, cancellationToken);
 
-        public Task OnWarmupCompleted(string name)
-            => inner.OnWarmupCompleted(name);
+        public Task OnWarmupCompletedAsync(string name, CancellationToken cancellationToken)
+            => inner.OnWarmupCompletedAsync(name, cancellationToken);
 
-        public Task OnBenchmarkStarting(string name, int index, int total)
-            => inner.OnBenchmarkStarting(name, index, total);
+        public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken)
+            => inner.OnBenchmarkStartingAsync(name, index, total, cancellationToken);
 
-        public Task OnSampleCompleted(string name, int sample, int totalSamples)
-            => inner.OnSampleCompleted(name, sample, totalSamples);
+        public Task OnSampleCompletedAsync(
+            string name, int sample, int totalSamples, CancellationToken cancellationToken)
+            => inner.OnSampleCompletedAsync(name, sample, totalSamples, cancellationToken);
 
-        public Task OnBenchmarkCompleted(BenchmarkResult result)
+        public Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken cancellationToken)
         {
             // The same attachment InstanceIndependence.Attach applies to a list, applied to one
             // result: append the warning, preserving anything already there.
@@ -322,10 +326,11 @@ internal static class DiscoveredGroupExecutor
                     : [warning],
             };
 
-            return inner.OnBenchmarkCompleted(warned);
+            return inner.OnBenchmarkCompletedAsync(warned, cancellationToken);
         }
 
-        public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
-            => inner.OnSuiteCompleted(results);
+        public Task OnSuiteCompletedAsync(
+            IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
+            => inner.OnSuiteCompletedAsync(results, cancellationToken);
     }
 }

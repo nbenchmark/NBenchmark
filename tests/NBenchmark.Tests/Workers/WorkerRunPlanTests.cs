@@ -98,7 +98,7 @@ public sealed class WorkerRunPlanTests
     {
         public string Name => $"needs-arguments ({value})";
 
-        public OutlierClassification Classify(double[] sortedSamples)
+        public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
             => OutlierClassification.KeepAll(sortedSamples);
     }
 
@@ -106,7 +106,7 @@ public sealed class WorkerRunPlanTests
     {
         public string Name => "rebuildable";
 
-        public OutlierClassification Classify(double[] sortedSamples)
+        public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
             => OutlierClassification.KeepAll(sortedSamples);
     }
 

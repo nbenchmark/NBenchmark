@@ -2,7 +2,7 @@ namespace NBenchmark.Stats;
 
 internal static class Percentile
 {
-    public static double Compute(double[] sorted, double p)
+    public static double Compute(ReadOnlySpan<double> sorted, double p)
     {
         if (sorted.Length == 0)
             return 0;

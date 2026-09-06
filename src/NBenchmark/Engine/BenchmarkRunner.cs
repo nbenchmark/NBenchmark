@@ -72,13 +72,13 @@ internal sealed class BenchmarkRunner
 
         try
         {
-            progress.OnWarmupStarting(name, PlannedWarmup(options)).GetAwaiter().GetResult();
+            progress.OnWarmupStartingAsync(name, PlannedWarmup(options), ct).GetAwaiter().GetResult();
 
             if (options.Samples is 0)
             {
                 RunFixedWarmupSync(body, spec, ct);
                 var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
-                progress.OnWarmupCompleted(name).GetAwaiter().GetResult();
+                progress.OnWarmupCompletedAsync(name, ct).GetAwaiter().GetResult();
                 NBenchmarkDiagnostics.RecordResult(dryRun.Result);
                 observer.OnResult(dryRun.Result);
                 return dryRun;
@@ -119,13 +119,13 @@ internal sealed class BenchmarkRunner
 
         try
         {
-            await progress.OnWarmupStarting(name, PlannedWarmup(options)).ConfigureAwait(false);
+            await progress.OnWarmupStartingAsync(name, PlannedWarmup(options), ct).ConfigureAwait(false);
 
             if (options.Samples is 0)
             {
                 await RunFixedWarmupAsync(body, spec, ct).ConfigureAwait(false);
                 var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
-                await progress.OnWarmupCompleted(name).ConfigureAwait(false);
+                await progress.OnWarmupCompletedAsync(name, ct).ConfigureAwait(false);
                 NBenchmarkDiagnostics.RecordResult(dryRun.Result);
                 observer.OnResult(dryRun.Result);
                 return dryRun;
@@ -217,7 +217,7 @@ internal sealed class BenchmarkRunner
                 || adaptive.Diagnostic.SampleStop == SampleStopReason.GraceCapExhausted
                 || adaptive.Diagnostic.WarmupStop == WarmupStopReason.WallClockCap))
         {
-            var ex = new InvalidOperationException(
+            var ex = new BenchmarkExecutionException(
                 FormatCapError(adaptive.Diagnostic, spec.Options.AutoTune.MaxTuningTime));
 
             return BuildErroredOutcome(name, spec, totalStartTimestamp, ex);

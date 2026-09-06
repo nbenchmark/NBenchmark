@@ -50,13 +50,13 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
         // and apply Holm-Bonferroni over the tested candidates.
         var baseline = context.Baseline;
         var order = new List<string>(candidateCount);
-        var candidateSamples = new List<double[]>(candidateCount);
+        var candidateSamples = new List<ReadOnlyMemory<double>>(candidateCount);
 
         var rawResults = new List<MannWhitneyUResult>(candidateCount);
 
         foreach (var candidate in context.Candidates)
         {
-            rawResults.Add(MannWhitneyU.Test(baseline.Samples, candidate.Samples));
+            rawResults.Add(MannWhitneyU.Test(baseline.Samples.Span, candidate.Samples.Span));
             order.Add(candidate.Name);
             candidateSamples.Add(candidate.Samples);
         }
@@ -86,7 +86,7 @@ public sealed class DefaultSignificanceTest : ISignificanceTest
                 effect = EffectSizeFactory.ForCliffsDelta(mwResult.CliffsDelta);
 
             var shift = HodgesLehmann.Estimate(
-                baseline.Samples, candidateSamples[i], 1.0 - context.SignificanceLevel);
+                baseline.Samples.Span, candidateSamples[i].Span, 1.0 - context.SignificanceLevel);
 
             // Report the p the verdict was decided from. The verdict above uses the Holm-adjusted
             // p, so the value stored on the comparison (and written onto BenchmarkResult.PValue)

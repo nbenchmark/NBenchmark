@@ -130,14 +130,14 @@ public class ReporterRegistryTests : IDisposable
     [Fact]
     public void Register_Throws_On_Duplicate_Name()
     {
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ReporterRegistry.Register("json", "Duplicate", (_, _) => new JsonReporter()));
     }
 
     [Fact]
     public void Register_Is_Case_Insensitive_For_Duplicate_Check()
     {
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<BenchmarkConfigurationException>(() =>
             ReporterRegistry.Register("JSON", "Duplicate uppercase", (_, _) => new JsonReporter()));
     }
 

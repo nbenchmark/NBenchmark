@@ -1348,7 +1348,7 @@ public class BenchmarkSuite(string name)
         // Built here as well as in the worker. The coordinator needs the reporters, the baseline and
         // the runtime profile to launch under - and building it is cheap, because a factory only
         // wires delegates up rather than running them.
-        var local = plan() ?? throw new InvalidOperationException(
+        var local = plan() ?? throw new BenchmarkConfigurationException(
             $"The benchmark plan '{plan.Method.Name}' returned null.");
 
         local.ValidateBaseline();
@@ -1397,7 +1397,7 @@ public class BenchmarkSuite(string name)
         var results = outcome.Results.ToList();
         var rawSamples = outcome.RawSamples.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
 
-        await local._progress.OnSuiteCompleted(results).ConfigureAwait(false);
+        await local._progress.OnSuiteCompletedAsync(results, cancellationToken).ConfigureAwait(false);
 
         observer.OnPhase(new MeasurementPhaseEvent(
             string.Empty, MeasurementPhase.SuiteCompleted, PhaseTransition.Completed, Succeeded: true));
@@ -1438,7 +1438,7 @@ public class BenchmarkSuite(string name)
 
         if (plans.Count == 0)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"'{declaringType.Name}' declares no benchmark plans. A plan is a static, "
                 + $"parameterless method returning {nameof(BenchmarkSuite)} and marked "
                 + "[BenchmarkPlan].");
@@ -1479,7 +1479,7 @@ public class BenchmarkSuite(string name)
 
         if (_runtimes.Count > 0)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"Suite '{Name}' asks for multiple runtimes, which needs a static [BenchmarkPlan] "
                 + "factory: run it with BenchmarkSuite.RunPlanAsync(BuildSuite).\n\n"
                 + "Measuring another target framework means measuring a different build of your "
@@ -1661,7 +1661,7 @@ public class BenchmarkSuite(string name)
             results = ReorderByDeclaration(results, benchmarks);
         }
 
-        await _progress.OnSuiteCompleted(results).ConfigureAwait(false);
+        await _progress.OnSuiteCompletedAsync(results, cancellationToken).ConfigureAwait(false);
 
         observer.OnPhase(new MeasurementPhaseEvent(
             string.Empty, MeasurementPhase.SuiteCompleted, PhaseTransition.Completed, Succeeded: true));
@@ -1693,7 +1693,7 @@ public class BenchmarkSuite(string name)
 
         try
         {
-            await progress.OnSuiteStarting(envelopeNames, filteredBenchmarks.Count).ConfigureAwait(false);
+            await progress.OnSuiteStartingAsync(envelopeNames, filteredBenchmarks.Count, cancellationToken).ConfigureAwait(false);
 
             Dictionary<string, double[]> rawSamples;
 
@@ -1701,7 +1701,7 @@ public class BenchmarkSuite(string name)
                     filteredBenchmarks, order, progress, observer, 0, filteredBenchmarks.Count, cancellationToken)
                 .ConfigureAwait(false);
 
-            await progress.OnSuiteCompleted(results).ConfigureAwait(false);
+            await progress.OnSuiteCompletedAsync(results, cancellationToken).ConfigureAwait(false);
 
             // SuiteCompleted sentinel: emit on the success path with Succeeded = true. A
             // live-streaming observer treats this as the authoritative run-end signal.
@@ -2015,7 +2015,7 @@ public class BenchmarkSuite(string name)
         {
             if (_parameterizedFactories.Count > 0)
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     "Parameterized benchmarks were registered but no WithParameter call was made. " +
                     "Add parameter values with WithParameter before running the suite, " +
                     "or register benchmarks without typed lambda parameters.");
@@ -2026,7 +2026,7 @@ public class BenchmarkSuite(string name)
 
         if (_parameterizedFactories.Count == 0)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 "WithParameter was called but no parameterized benchmarks (Add with typed lambda) were registered.");
         }
 
@@ -2044,7 +2044,7 @@ public class BenchmarkSuite(string name)
 
             if (!AreTypesCompatible(factory.ParamTypes, parameterTypes))
             {
-                throw new InvalidOperationException(
+                throw new BenchmarkConfigurationException(
                     $"Benchmark '{factory.Name}' parameter types ({string.Join(", ", factory.ParamTypes.Select(t => t.Name))}) " +
                     $"do not match the registered WithParameter types ({string.Join(", ", _parameterDefs.Select(d => d.Type.Name))}).");
             }
@@ -2119,7 +2119,7 @@ public class BenchmarkSuite(string name)
 
         if (expanded.Count == 0)
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 "No benchmarks matched the registered parameters. " +
                 "Ensure the typed lambda parameters match the WithParameter type arguments.");
         }
@@ -2354,7 +2354,7 @@ public class BenchmarkSuite(string name)
 
         if (!allNames.Contains(_baselineName))
         {
-            throw new InvalidOperationException(
+            throw new BenchmarkConfigurationException(
                 $"Baseline '{_baselineName}' was not found in the suite. Registered names: " +
                 string.Join(", ", allNames));
         }
