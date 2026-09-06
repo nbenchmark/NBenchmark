@@ -21,6 +21,13 @@ public sealed class PerformanceAttribute : NUnitAttribute, ISimpleTestBuilder, I
     }
 
     public double MaxMeanNs { get; init; } = IPerformanceThresholds.Unset;
+
+    /// <summary>
+    ///     Maximum median time per operation in nanoseconds. The median is the statistic the reports
+    ///     lead with; prefer it over <see cref="MaxMeanNs" /> unless the average is what is meant.
+    ///     See <see cref="IPerformanceThresholds.MaxMedianNs" />.
+    /// </summary>
+    public double MaxMedianNs { get; init; } = IPerformanceThresholds.Unset;
     public double MaxP95Ns { get; init; } = IPerformanceThresholds.Unset;
     public long MaxAllocatedBytes { get; init; } = IPerformanceThresholds.UnsetBytes;
     public string? ReferenceMethod { get; init; }

@@ -21,9 +21,9 @@ public static class ReporterRegistry
 {
     private static readonly Entry[] _seed =
     [
-        new("json", "JSON file output (one file per run)", (dir, detail) => new JsonReporter(dir ?? ".", null, detail)),
-        new("markdown", "Markdown table output", (dir, detail) => new MarkdownReporter(dir ?? ".", null, detail)),
-        new("csv", "CSV file output", (dir, detail) => new CsvReporter(dir ?? ".", null, detail)),
+        new("json", "JSON file output (one file per run)", dir => new JsonReporter(dir)),
+        new("markdown", "Markdown table output", dir => new MarkdownReporter(dir)),
+        new("csv", "CSV file output", dir => new CsvReporter(dir)),
     ];
 
     private static readonly object _lock = new();
@@ -80,7 +80,7 @@ public static class ReporterRegistry
         }
     }
 
-    public static void Register(string name, string description, Func<string?, ReportDetail, IReporter> factory)
+    public static void Register(string name, string description, Func<string?, IReporter> factory)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(description);
@@ -104,7 +104,7 @@ public static class ReporterRegistry
     ///     <c>[ModuleInitializer]</c> calling this method, mirroring how <c>NBenchmark.Reporters.Console</c>
     ///     self-registers the <c>console</c> reporter via <see cref="Register" />.
     /// </summary>
-    public static void RegisterAutoAttach(string name, string description, Func<string?, ReportDetail, IReporter> factory)
+    public static void RegisterAutoAttach(string name, string description, Func<string?, IReporter> factory)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(description);
@@ -145,7 +145,7 @@ public static class ReporterRegistry
     ///     auto-attached reporter the same way <c>--observer &lt;name&gt;</c> does on the observer
     ///     side. The dedup in <see cref="InvokeReportersAsync" /> keeps it from firing twice.
     /// </summary>
-    public static bool TryCreate(string name, string? outputDir, ReportDetail detail, [NotNullWhen(true)] out IReporter? reporter)
+    public static bool TryCreate(string name, string? outputDir, [NotNullWhen(true)] out IReporter? reporter)
     {
         ArgumentNullException.ThrowIfNull(name);
 
@@ -161,7 +161,7 @@ public static class ReporterRegistry
 
         if (entry is not null)
         {
-            reporter = entry.Factory(outputDir, detail);
+            reporter = entry.Factory(outputDir);
             return true;
         }
 
@@ -176,7 +176,7 @@ public static class ReporterRegistry
     ///     each run gets fresh instances, mirroring how <see cref="TryCreate" /> is called per-run for
     ///     explicit reporters.
     /// </summary>
-    internal static IReadOnlyList<IReporter> CreateAutoAttachedReporters(ReportDetail detail, IReadOnlySet<string> explicitNames)
+    internal static IReadOnlyList<IReporter> CreateAutoAttachedReporters(IReadOnlySet<string> explicitNames)
     {
         EnsureExtensionsLoaded();
 
@@ -199,7 +199,7 @@ public static class ReporterRegistry
 
             try
             {
-                reporters.Add(entry.Factory(null, detail));
+                reporters.Add(entry.Factory(null));
             }
             catch (Exception ex)
             {
@@ -220,13 +220,13 @@ public static class ReporterRegistry
     /// </summary>
     internal static async Task InvokeReportersAsync(
         IReadOnlyList<IReporter> explicitReporters,
-        ReportDetail detail,
+        ReportContext context,
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken)
     {
         foreach (var reporter in explicitReporters)
         {
-            await reporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
+            await reporter.ReportAsync(results, context, cancellationToken).ConfigureAwait(false);
         }
 
         var explicitNames = new HashSet<string>(explicitReporters.Count, StringComparer.OrdinalIgnoreCase);
@@ -236,11 +236,11 @@ public static class ReporterRegistry
             explicitNames.Add(reporter.Name);
         }
 
-        foreach (var autoReporter in CreateAutoAttachedReporters(detail, explicitNames))
+        foreach (var autoReporter in CreateAutoAttachedReporters(explicitNames))
         {
             try
             {
-                await autoReporter.ReportAsync(results, cancellationToken).ConfigureAwait(false);
+                await autoReporter.ReportAsync(results, context, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -307,5 +307,5 @@ public static class ReporterRegistry
     private static bool ContainsName(List<Entry> entries, string name)
         => entries.Any(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
 
-    private sealed record Entry(string Name, string Description, Func<string?, ReportDetail, IReporter> Factory);
+    private sealed record Entry(string Name, string Description, Func<string?, IReporter> Factory);
 }

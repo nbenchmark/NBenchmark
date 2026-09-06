@@ -17,7 +17,7 @@ public class CliArgsTests
         Assert.False(result.ShowHelp);
         Assert.False(result.ListOnly);
         Assert.False(result.DryRun);
-        Assert.Null(result.ThresholdPct);
+        Assert.Null(result.MaxRegressionPercent);
         Assert.Null(result.Filter);
         Assert.Null(result.OutputDir);
         Assert.Null(result.Seed);
@@ -277,40 +277,40 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_ThresholdPct_Valid_SetsThresholdPct()
     {
-        var (result, errors) = CliArgs.ParseCore(["--threshold-pct", "5"]);
+        var (result, errors) = CliArgs.ParseCore(["--max-regression-percent", "5"]);
 
         Assert.Empty(errors);
-        Assert.Equal(5, result.ThresholdPct);
+        Assert.Equal(5, result.MaxRegressionPercent);
     }
 
     [Fact]
     public void ParseCore_ThresholdPct_NonNumeric_ReturnsError()
     {
-        var (result, errors) = CliArgs.ParseCore(["--threshold-pct", "abc"]);
+        var (result, errors) = CliArgs.ParseCore(["--max-regression-percent", "abc"]);
 
-        Assert.Null(result.ThresholdPct);
+        Assert.Null(result.MaxRegressionPercent);
         var error = Assert.Single(errors);
-        Assert.Contains("Invalid --threshold-pct", error);
+        Assert.Contains("Invalid --max-regression-percent", error);
     }
 
     [Fact]
     public void ParseCore_ThresholdPct_Negative_ReturnsError()
     {
-        var (result, errors) = CliArgs.ParseCore(["--threshold-pct", "-5"]);
+        var (result, errors) = CliArgs.ParseCore(["--max-regression-percent", "-5"]);
 
-        Assert.Null(result.ThresholdPct);
+        Assert.Null(result.MaxRegressionPercent);
         var error = Assert.Single(errors);
-        Assert.Contains("Invalid --threshold-pct", error);
+        Assert.Contains("Invalid --max-regression-percent", error);
     }
 
     [Fact]
     public void ParseCore_ThresholdPct_Zero_ReturnsError()
     {
-        var (result, errors) = CliArgs.ParseCore(["--threshold-pct", "0"]);
+        var (result, errors) = CliArgs.ParseCore(["--max-regression-percent", "0"]);
 
-        Assert.Null(result.ThresholdPct);
+        Assert.Null(result.MaxRegressionPercent);
         var error = Assert.Single(errors);
-        Assert.Contains("Invalid --threshold-pct", error);
+        Assert.Contains("Invalid --max-regression-percent", error);
     }
 
     [Fact]
@@ -412,7 +412,7 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_Category_AddsToInclude()
     {
-        var (result, errors) = CliArgs.ParseCore(["--category", "String"]);
+        var (result, errors) = CliArgs.ParseCore(["--include-category", "String"]);
         Assert.Empty(errors);
         Assert.Equal(["String"], result.CategoryFilterInclude);
         Assert.Empty(result.CategoryFilterExclude);
@@ -421,7 +421,7 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_MultipleCategories_Are_OR()
     {
-        var (result, errors) = CliArgs.ParseCore(["--category", "String", "--category", "Memory"]);
+        var (result, errors) = CliArgs.ParseCore(["--include-category", "String", "--include-category", "Memory"]);
         Assert.Empty(errors);
         Assert.Equal(["String", "Memory"], result.CategoryFilterInclude);
     }
@@ -429,7 +429,7 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_Category_Trims_And_Deduplicates_CaseInsensitive()
     {
-        var (result, errors) = CliArgs.ParseCore(["--category", " String ", "--category", "string"]);
+        var (result, errors) = CliArgs.ParseCore(["--include-category", " String ", "--include-category", "string"]);
         Assert.Empty(errors);
         Assert.Equal(["String"], result.CategoryFilterInclude);
     }
@@ -445,7 +445,7 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_Category_MissingValue_ReturnsError()
     {
-        var (_, errors) = CliArgs.ParseCore(["--category"]);
+        var (_, errors) = CliArgs.ParseCore(["--include-category"]);
         var error = Assert.Single(errors);
         Assert.Contains("Missing value", error);
     }
@@ -453,7 +453,7 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_Category_BlankValue_ReturnsError()
     {
-        var (result, errors) = CliArgs.ParseCore(["--category", "   "]);
+        var (result, errors) = CliArgs.ParseCore(["--include-category", "   "]);
 
         Assert.Empty(result.CategoryFilterInclude);
         var error = Assert.Single(errors);
@@ -503,7 +503,7 @@ public class CliArgsTests
     [InlineData("Error", AutoTuneCapBehavior.Error)]
     public void ParseCore_AutoTuneCapBehavior_Valid_SetsBehavior(string value, AutoTuneCapBehavior expected)
     {
-        var (result, errors) = CliArgs.ParseCore(["--autotune-cap-behavior", value]);
+        var (result, errors) = CliArgs.ParseCore(["--auto-tune-cap-behavior", value]);
         Assert.Empty(errors);
         Assert.Equal(expected, result.AutoTuneCapBehavior);
     }
@@ -518,17 +518,17 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_AutoTuneCapBehavior_Invalid_ReturnsError()
     {
-        var (result, errors) = CliArgs.ParseCore(["--autotune-cap-behavior", "bogus"]);
+        var (result, errors) = CliArgs.ParseCore(["--auto-tune-cap-behavior", "bogus"]);
 
         Assert.Null(result.AutoTuneCapBehavior);
         var error = Assert.Single(errors);
-        Assert.Contains("Invalid --autotune-cap-behavior", error);
+        Assert.Contains("Invalid --auto-tune-cap-behavior", error);
     }
 
     [Fact]
     public void ParseCore_AutoTuneCapBehavior_MissingValue_ReturnsError()
     {
-        var (_, errors) = CliArgs.ParseCore(["--autotune-cap-behavior"]);
+        var (_, errors) = CliArgs.ParseCore(["--auto-tune-cap-behavior"]);
 
         var error = Assert.Single(errors);
         Assert.Contains("Missing value", error);
@@ -1114,7 +1114,7 @@ public class CliArgsTests
     }
 
     /// <summary>
-    ///     One-way, like <c>--emit-raw</c>: the flag's absence must not switch the canary back on
+    ///     One-way, like <c>--full-raw-samples</c>: the flag's absence must not switch the canary back on
     ///     over a programmatic <c>WithDriftCanary(false)</c>.
     /// </summary>
     [Fact]
@@ -1242,19 +1242,19 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_NoSamples_Sets_NoSamples_Flag()
     {
-        var (result, errors) = CliArgs.ParseCore(["--no-samples"]);
+        var (result, errors) = CliArgs.ParseCore(["--no-raw-samples"]);
 
         Assert.Empty(errors);
-        Assert.True(result.NoSamples);
+        Assert.True(result.NoRawSamples);
     }
 
     [Fact]
     public void ParseCore_StreamSamples_Sets_StreamSamples_Flag()
     {
-        var (result, errors) = CliArgs.ParseCore(["--stream-samples"]);
+        var (result, errors) = CliArgs.ParseCore(["--stream-raw-samples"]);
 
         Assert.Empty(errors);
-        Assert.True(result.StreamSamples);
+        Assert.True(result.StreamRawSamples);
     }
 
     [Fact]
@@ -1263,11 +1263,11 @@ public class CliArgsTests
         var (result, errors) = CliArgs.ParseCore([]);
 
         Assert.Empty(errors);
-        Assert.False(result.StreamSamples);
+        Assert.False(result.StreamRawSamples);
     }
 
     /// <summary>
-    ///     One-way, like <c>--emit-raw</c>: the flag's absence must not switch off a programmatic
+    ///     One-way, like <c>--full-raw-samples</c>: the flag's absence must not switch off a programmatic
     ///     <c>WithOptions</c> that asked for the stream.
     /// </summary>
     [Fact]
@@ -1275,7 +1275,7 @@ public class CliArgsTests
     {
         var asked = MeasurementOptions.Default with { StreamSamples = true };
 
-        var withFlag = MeasurementOverrides.FromCliArgs(CliArgs.ParseCore(["--stream-samples"]).Args);
+        var withFlag = MeasurementOverrides.FromCliArgs(CliArgs.ParseCore(["--stream-raw-samples"]).Args);
         var without = MeasurementOverrides.FromCliArgs(CliArgs.ParseCore([]).Args);
 
         Assert.True(withFlag.Apply(MeasurementOptions.Default).StreamSamples);
@@ -1288,7 +1288,7 @@ public class CliArgsTests
     {
         var (result, _) = CliArgs.ParseCore([]);
 
-        Assert.False(result.NoSamples);
+        Assert.False(result.NoRawSamples);
     }
 
     [Fact]
@@ -1479,18 +1479,125 @@ public class CliArgsTests
         var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp());
 
         Assert.Contains("Usage:", stdout);
+        Assert.Contains("Selection:", stdout);
         Assert.Contains("--filter", stdout);
+        Assert.Contains("--version", stdout);
+        Assert.Contains("--no-color", stdout);
         Assert.Contains("--reporter", stdout);
         Assert.Contains("--seed", stdout);
-        Assert.Contains("--autotune-cap-behavior", stdout);
         Assert.Contains("--percentiles", stdout);
         Assert.Contains("--no-histogram", stdout);
         Assert.Contains("--no-drift-canary", stdout);
-        Assert.Contains("--no-samples", stdout);
+        Assert.Contains("--no-raw-samples", stdout);
         Assert.Contains("--cpu-affinity", stdout);
         Assert.Contains("--priority", stdout);
         Assert.Contains("--host-quality-warnings", stdout);
         Assert.Contains("--otlp-endpoint", stdout);
+    }
+
+    [Fact]
+    public void PrintHelp_Advanced_Prints_The_Tuning_Group_Only()
+    {
+        var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp("advanced"));
+
+        Assert.Contains("Advanced tuning:", stdout);
+        Assert.Contains("--auto-tune-cap-behavior", stdout);
+        Assert.Contains("--cap-grace-factor", stdout);
+        Assert.DoesNotContain("--filter", stdout);
+    }
+
+    [Fact]
+    public void ParseCore_Help_Advanced_Sets_The_Topic()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--help", "advanced"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.ShowHelp);
+        Assert.Equal("advanced", result.HelpTopic);
+    }
+
+    [Fact]
+    public void ParseCore_Help_Does_Not_Swallow_The_Next_Flag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--help", "--filter", "Foo*"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.ShowHelp);
+        Assert.Null(result.HelpTopic);
+        Assert.Equal("Foo*", result.Filter);
+    }
+
+    [Fact]
+    public void ParseCore_Version_SetsFlag()
+    {
+        var (result, errors) = CliArgs.ParseCore(["--version"]);
+
+        Assert.Empty(errors);
+        Assert.True(result.ShowVersion);
+    }
+
+    [Fact]
+    public void PrintVersion_Writes_The_Package_Version()
+    {
+        var stdout = CaptureConsoleOutput(CliArgs.PrintVersion);
+
+        Assert.StartsWith("NBenchmark ", stdout.Trim());
+    }
+
+    [Fact]
+    public void ParseCore_Short_Aliases_Match_Their_Long_Flags()
+    {
+        var (result, errors) = CliArgs.ParseCore(["-f", "Foo*", "-o", "out", "-l"]);
+
+        Assert.Empty(errors);
+        Assert.Equal("Foo*", result.Filter);
+        Assert.EndsWith("out", result.OutputDir);
+        Assert.True(result.ListOnly);
+    }
+
+    [Fact]
+    public void ParseCore_NoColor_SetsFlag_And_The_Environment_Variable()
+    {
+        var previous = Environment.GetEnvironmentVariable("NO_COLOR");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("NO_COLOR", null);
+
+            var (result, errors) = CliArgs.ParseCore(["--no-color"]);
+
+            Assert.Empty(errors);
+            Assert.True(result.NoColor);
+
+            // Set for the process, so it reaches the progress renderer and every worker launched from
+            // here - both of which run outside the report call that carries the flag.
+            Assert.Equal("1", Environment.GetEnvironmentVariable("NO_COLOR"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("NO_COLOR", previous);
+        }
+    }
+
+    [Fact]
+    public void ParseCore_NoColor_Follows_The_Environment_When_The_Flag_Is_Absent()
+    {
+        var previous = Environment.GetEnvironmentVariable("NO_COLOR");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("NO_COLOR", "1");
+
+            Assert.True(CliArgs.ParseCore([]).Args.NoColor);
+
+            Environment.SetEnvironmentVariable("NO_COLOR", null);
+
+            Assert.False(CliArgs.ParseCore([]).Args.NoColor);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("NO_COLOR", previous);
+        }
     }
 
     /// <summary>
@@ -1505,7 +1612,10 @@ public class CliArgsTests
     [Fact]
     public void PrintHelp_DocumentsEveryKnownFlag_AndNothingElse()
     {
-        var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp());
+        // Both sections, because the advanced tuning flags are documented under `--help advanced`
+        // rather than in the everyday list.
+        var stdout = CaptureConsoleOutput(() => CliArgs.PrintHelp())
+                     + CaptureConsoleOutput(() => CliArgs.PrintHelp("advanced"));
 
         var documented = Regex
             .Matches(stdout, @"--[a-z][a-z-]*")

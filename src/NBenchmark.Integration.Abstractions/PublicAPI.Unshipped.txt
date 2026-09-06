@@ -8,6 +8,7 @@ NBenchmark.Integration.Abstractions.IPerformanceThresholds.LaunchCount.get -> in
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.MaxAbsoluteThresholdTolerance.get -> double
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.MaxAllocatedBytes.get -> long
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.MaxMeanNs.get -> double
+NBenchmark.Integration.Abstractions.IPerformanceThresholds.MaxMedianNs.get -> double
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.MaxP95Ns.get -> double
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.MaxSlowdownRatio.get -> double
 NBenchmark.Integration.Abstractions.IPerformanceThresholds.MeasureAllocations.get -> bool
@@ -23,6 +24,8 @@ NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxAllocatedBytes.get 
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxAllocatedBytes.init -> void
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxMeanNs.get -> double?
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxMeanNs.init -> void
+NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxMedianNs.get -> double?
+NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxMedianNs.init -> void
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxP95Ns.get -> double?
 NBenchmark.Integration.Abstractions.PerformanceThresholds.MaxP95Ns.init -> void
 NBenchmark.Integration.Abstractions.PerformanceThresholds.PerformanceThresholds() -> void

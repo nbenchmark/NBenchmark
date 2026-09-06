@@ -4,7 +4,12 @@ public interface IReporter
 {
     public string Name { get; }
 
-    public ReportDetail Detail { get; set; }
-
-    public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default);
+    /// <summary>
+    ///     Reports <paramref name="results" /> at the detail level, and to the destination,
+    ///     <paramref name="context" /> describes.
+    /// </summary>
+    public Task ReportAsync(
+        IReadOnlyList<BenchmarkResult> results,
+        ReportContext context,
+        CancellationToken cancellationToken = default);
 }

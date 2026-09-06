@@ -12,6 +12,8 @@ NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxAllocatedBytes.get 
 NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxAllocatedBytes.init -> void
 NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxMeanNs.get -> double
 NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxMeanNs.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxMedianNs.get -> double
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxMedianNs.init -> void
 NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxP95Ns.get -> double
 NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxP95Ns.init -> void
 NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxSlowdownRatio.get -> double
@@ -40,6 +42,8 @@ NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxAllocatedBytes.g
 NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxAllocatedBytes.init -> void
 NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxMeanNs.get -> double
 NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxMeanNs.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxMedianNs.get -> double
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxMedianNs.init -> void
 NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxP95Ns.get -> double
 NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxP95Ns.init -> void
 NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxSlowdownRatio.get -> double

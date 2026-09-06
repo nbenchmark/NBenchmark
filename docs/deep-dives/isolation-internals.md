@@ -43,7 +43,7 @@ Coordination uses a duplex pair of anonymous pipes carrying length-prefixed UTF-
 A worker loads the assembly declaring your benchmarks into its own load context, performs attribute discovery, measures with the same engine as the host, and streams results back over the pipe. This has three key consequences:
 
 - **`Main` does not re-run.**
-- **Progress is live.** Warmup and measurement phases, detector snapshots, and results stream from the worker into your `IBenchmarkProgress` and `IMeasurementObserver` in real time. Per-sample observer events are the exception: they are only forwarded if `--stream-samples` is specified, as forwarding thousands of events would add measurable overhead. Full raw samples are included with each result. For more information, see the [Measurement Observer](../reference/observers.md#isolated-runs) table.
+- **Progress is live.** Warmup and measurement phases, detector snapshots, and results stream from the worker into your `IBenchmarkProgress` and `IMeasurementObserver` in real time. Per-sample observer events are the exception: they are only forwarded if `--stream-raw-samples` is specified, as forwarding thousands of events would add measurable overhead. Full raw samples are included with each result. For more information, see the [Measurement Observer](../reference/observers.md#isolated-runs) table.
 - **Results and samples arrive together.** The worker computes every statistic over the full sample array and ships the samples in the completion frame. This ensures `BenchmarkResult.RawSamples` is complete for significance testing.
 
 ### Budget ceilings
@@ -62,7 +62,7 @@ A worker cannot outlive the run that started it. It reads its inbound pipe conti
 
 ### Raw samples on the wire
 
-Raw samples are bounded by `Workers/SampleReservoir` (default 4096 via `MeasurementOptions.MaxRawSamples`; increased via `--emit-raw`). Because the worker computes statistics over the complete array, this cap only affects the sample dump, the console sparkline, and coordinator-side significance testing. The engine draws a subset uniformly at random (not as a prefix) and seeds it from the run seed to ensure reproducibility. `BenchmarkResult.TrimmedOrdinals` is remapped onto this reduced array to ensure correct rendering.
+Raw samples are bounded by `Workers/SampleReservoir` (default 4096 via `MeasurementOptions.MaxRawSamples`; increased via `--full-raw-samples`). Because the worker computes statistics over the complete array, this cap only affects the sample dump, the console sparkline, and coordinator-side significance testing. The engine draws a subset uniformly at random (not as a prefix) and seeds it from the run seed to ensure reproducibility. `BenchmarkResult.TrimmedOrdinals` is remapped onto this reduced array to ensure correct rendering.
 
 ## Addressing
 

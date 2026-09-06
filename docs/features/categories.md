@@ -46,24 +46,24 @@ The following flags control category filtering from the command line:
 
 | Flag | Description |
 | --- | --- |
-| `--category <name>` | Includes benchmarks tagged with this category. This flag is repeatable (OR logic). |
+| `--include-category <name>` | Includes benchmarks tagged with this category. This flag is repeatable (OR logic). |
 | `--exclude-category <name>` | Excludes benchmarks tagged with this category. This flag is repeatable (OR logic). |
 
 ```bash
 # Run all String benchmarks
-dotnet run -- --category String
+dotnet run -- --include-category String
 
 # Run fast string benchmarks only
-dotnet run -- --category String --exclude-category Slow
+dotnet run -- --include-category String --exclude-category Slow
 
 # Run benchmarks tagged String OR Memory
-dotnet run -- --category String --category Memory
+dotnet run -- --include-category String --include-category Memory
 
 # Combine with the glob filter
-dotnet run -- --category String --filter StringBenchmarks.Con*
+dotnet run -- --include-category String --filter StringBenchmarks.Con*
 ```
 
-If any `--category` flag is present, the engine excludes untagged benchmarks.
+If any `--include-category` flag is present, the engine excludes untagged benchmarks.
 
 ## Programmatic filtering
 
@@ -106,4 +106,4 @@ For more information, see the following pages:
 
 - [Parameterized benchmarks: Suite mode](./parameterized-suite.md) - How categories combine with parameter sweeps.
 - [Parameterized benchmarks: Harness mode](./parameterized-harness.md) - Using `[BenchmarkCategory]` on attribute-discovered methods.
-- [CLI Reference: `--category` / `--exclude-category`](../reference/cli.md#selection) - Details on the CLI filter flags.
+- [CLI Reference: `--include-category` / `--exclude-category`](../reference/cli.md#selection) - Details on the CLI filter flags.

@@ -16,7 +16,7 @@ These guides are **workflow-first**. Each guide begins with a concrete goal, suc
 Benchmark an EF Core query or ASP.NET service end-to-end. This guide covers harness mode, scoped dependency injection, parameterized cases, and categories. It also discusses the shared-state pitfall (using `PerClass` lifetime with a scoped `DbContext`) and how the NB0011 analyzer detects it.
 
 ### [Tuning for CI/CD pipelines](./ci-cd-pipelines.md)
-Get reliable numbers on a noisy shared runner and fail the build upon regression. This guide combines isolated runs, environment control (CPU affinity, process priority, and dedicated-host guidance), the `--threshold-pct` gate, and `--launch-count` to ensure an honest signal on contested hosts. It includes a minimal GitHub Actions snippet.
+Get reliable numbers on a noisy shared runner and fail the build upon regression. This guide combines isolated runs, environment control (CPU affinity, process priority, and dedicated-host guidance), the `--max-regression-percent` gate, and `--launch-count` to ensure an honest signal on contested hosts. It includes a minimal GitHub Actions snippet.
 
 ### [Comparing a refactor side-by-side](./refactor-comparison.md)
 Determine if a change to a hot path actually improved performance. This guide uses suite mode with a baseline, the Sig and Magnitude columns, and the practical-significance gate. It also covers cross-class significance when old and new implementations reside in separate classes.

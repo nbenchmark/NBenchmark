@@ -34,7 +34,7 @@ When two or more benchmarks are run, NBenchmark tests whether their differences 
 - A **✗** with a large Ratio (e.g., `1.5x`) indicates the measurements are too noisy to draw a conclusion. Try reducing noise (see [Tuning for noisy CI](../guides/tuning-recipes.md#tuning-for-noisy-ci-environments)) or collecting more samples.
 - A **✓** whose ratio interval spans `1.00x` (shown as `1.24x?` in the console) indicates a disagreement between the significance test and the ratio interval. In this case, trust the interval. See [Ratios](./ratios.md#when-sig-and-the-ratio-interval-disagree).
 
-You can configure the significance threshold ($\alpha$) via `MeasurementOptions.SignificanceLevel`, the `.WithSignificanceLevel(...)` fluent method, or the `--alpha` CLI flag.
+You can configure the significance threshold ($\alpha$) via `MeasurementOptions.SignificanceLevel`, the `.WithSignificanceLevel(...)` fluent method, or the `--significance-level` CLI flag.
 
 ### The Magnitude column
 

@@ -15,7 +15,7 @@ NBenchmark provides four primary ways to measure performance. You do not need to
 | Build a benchmark project with a CLI | `BenchmarkHarness` | [Harness mode](../usage-modes/harness-mode.md) |
 | Benchmark an existing assembly | `dotnet benchmark` | [Global tool](../usage-modes/global-tool.md) |
 | Fail tests when performance regresses | `[PerformanceFact]` | [Test integration](../test-integration/index.md) |
-| Fail CI builds on regression | `--threshold-pct` | [CI/CD guide](../guides/ci-cd-pipelines.md) |
+| Fail CI builds on regression | `--max-regression-percent` | [CI/CD guide](../guides/ci-cd-pipelines.md) |
 
 ## Overview of each approach
 

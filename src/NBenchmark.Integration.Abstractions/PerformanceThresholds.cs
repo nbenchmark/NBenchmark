@@ -23,6 +23,13 @@ public sealed class PerformanceThresholds
     /// <summary>Maximum mean time per operation in nanoseconds, or <c>null</c> to not check it.</summary>
     public double? MaxMeanNs { get; init; }
 
+    /// <summary>
+    ///     Maximum median time per operation in nanoseconds, or <c>null</c> to not check it. The
+    ///     median is what the reports lead with; prefer it over <see cref="MaxMeanNs" /> unless the
+    ///     average is genuinely what is being bounded.
+    /// </summary>
+    public double? MaxMedianNs { get; init; }
+
     /// <summary>Maximum 95th-percentile time per operation in nanoseconds, or <c>null</c> to not check it.</summary>
     public double? MaxP95Ns { get; init; }
 

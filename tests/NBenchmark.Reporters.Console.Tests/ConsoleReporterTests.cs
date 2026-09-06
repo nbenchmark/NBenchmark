@@ -11,7 +11,7 @@ public class ConsoleReporterTests
         await CaptureConsoleOutputAsyncVoid(async () =>
         {
             var reporter = new ConsoleReporter();
-            await reporter.ReportAsync([]);
+            await reporter.ReportAsync([], ReportContext.Default);
         });
     }
 
@@ -22,7 +22,7 @@ public class ConsoleReporterTests
         {
             var reporter = new ConsoleReporter();
             var result = MakeResult("test", 100);
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
         });
     }
 
@@ -57,7 +57,7 @@ public class ConsoleReporterTests
                 AllocatedBytesMax = null,
             };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
         });
     }
 
@@ -97,14 +97,14 @@ public class ConsoleReporterTests
                 Percentiles = [new PercentileEntry(0.95, 110), new PercentileEntry(0.99, 120)],
             };
 
-            await reporter.ReportAsync([errored, healthy]);
+            await reporter.ReportAsync([errored, healthy], ReportContext.Default);
         });
     }
 
     [Fact]
     public async Task ConsoleReporter_TimingDetail_Includes_Runtime_Column_When_MultiRuntime()
     {
-        var reporter = new ConsoleReporter(ReportDetail.Standard);
+        var reporter = new ConsoleReporter();
 
         var net8 = MakeResult("alpha", 100) with
         {
@@ -120,7 +120,7 @@ public class ConsoleReporterTests
 
         AnsiConsole.Record();
 
-        await reporter.ReportAsync([net8, net9]);
+        await reporter.ReportAsync([net8, net9], new ReportContext(ReportDetail.Standard));
 
         var output = AnsiConsole.ExportText();
 
@@ -165,7 +165,7 @@ public class ConsoleReporterTests
 
         AnsiConsole.Record();
 
-        await reporter.ReportAsync([baseline, candidate, inHost]);
+        await reporter.ReportAsync([baseline, candidate, inHost], ReportContext.Default);
 
         var output = AnsiConsole.ExportText();
 
@@ -184,7 +184,7 @@ public class ConsoleReporterTests
     [Fact]
     public async Task ConsoleReporter_Diagnostics_Leaves_Blank_For_Missing_CpuRatio()
     {
-        var reporter = new ConsoleReporter(ReportDetail.Standard);
+        var reporter = new ConsoleReporter();
 
         var gcOnly = MakeResult("gc", 100) with
         {
@@ -208,7 +208,7 @@ public class ConsoleReporterTests
 
         AnsiConsole.Record();
 
-        await reporter.ReportAsync([gcOnly, cpuOnly]);
+        await reporter.ReportAsync([gcOnly, cpuOnly], new ReportContext(ReportDetail.Standard));
 
         var output = AnsiConsole.ExportText();
         Assert.Contains("Diagnostics", output);
@@ -223,7 +223,7 @@ public class ConsoleReporterTests
     [Fact]
     public void Module_Initializer_Registers_Console_With_Global_Registry()
     {
-        var ok = ReporterRegistry.TryCreate("console", null, ReportDetail.Simple, out var reporter);
+        var ok = ReporterRegistry.TryCreate("console", null, out var reporter);
 
         Assert.True(ok);
         Assert.IsType<ConsoleReporter>(reporter);
@@ -232,11 +232,11 @@ public class ConsoleReporterTests
     [Fact]
     public async Task ConsoleReporter_Advanced_Accepts_Results_With_Categories()
     {
-        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var reporter = new ConsoleReporter();
         var result = MakeResult("tagged", 100) with { Categories = ["String", "Fast"] };
 
         // Does not throw; categories are surfaced only in advanced detail.
-        await reporter.ReportAsync([result]);
+        await reporter.ReportAsync([result], new ReportContext(ReportDetail.Advanced));
     }
 
     [Fact]
@@ -246,13 +246,13 @@ public class ConsoleReporterTests
         var result = MakeResult("tagged", 100) with { Categories = ["String"] };
 
         // Does not throw; categories are hidden in simple detail to keep the table narrow.
-        await reporter.ReportAsync([result]);
+        await reporter.ReportAsync([result], ReportContext.Default);
     }
 
     [Fact]
     public async Task ConsoleReporter_Advanced_Renders_Distribution_With_RawSamples()
     {
-        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var reporter = new ConsoleReporter();
         var result = MakeResult("with-samples", 100) with
         {
             RawSamples = [90.0, 95.0, 100.0, 105.0, 110.0, 200.0],
@@ -263,7 +263,7 @@ public class ConsoleReporterTests
 
         AnsiConsole.Record();
 
-        await reporter.ReportAsync([result]);
+        await reporter.ReportAsync([result], new ReportContext(ReportDetail.Advanced));
 
         var output = AnsiConsole.ExportText();
 
@@ -279,7 +279,7 @@ public class ConsoleReporterTests
     [Fact]
     public async Task ConsoleReporter_Advanced_Renders_Distribution_With_Empty_RawSamples()
     {
-        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var reporter = new ConsoleReporter();
 
         // No raw samples: the box-whisker strip falls back to drawing from the summary
         // statistics (Q1Ns/Q3Ns/median/min/max) alone, with no per-sample dots.
@@ -293,7 +293,7 @@ public class ConsoleReporterTests
 
         AnsiConsole.Record();
 
-        await reporter.ReportAsync([result]);
+        await reporter.ReportAsync([result], new ReportContext(ReportDetail.Advanced));
 
         var output = AnsiConsole.ExportText();
 
@@ -307,7 +307,7 @@ public class ConsoleReporterTests
     [Fact]
     public async Task ConsoleReporter_Advanced_Renders_Distribution_With_Null_Histogram()
     {
-        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var reporter = new ConsoleReporter();
         var result = MakeResult("no-histogram", 100) with
         {
             RawSamples = [90.0, 95.0, 100.0, 105.0, 110.0],
@@ -315,13 +315,13 @@ public class ConsoleReporterTests
         };
 
         // Does not throw; the box-whisker strip no longer depends on Histogram.
-        await reporter.ReportAsync([result]);
+        await reporter.ReportAsync([result], new ReportContext(ReportDetail.Advanced));
     }
 
     [Fact]
     public async Task ConsoleReporter_Advanced_Renders_Distribution_With_All_Zero_Range_Samples()
     {
-        var reporter = new ConsoleReporter(ReportDetail.Advanced);
+        var reporter = new ConsoleReporter();
         var result = MakeResult("flat", 100) with
         {
             RawSamples = [100.0, 100.0, 100.0, 100.0],
@@ -329,7 +329,7 @@ public class ConsoleReporterTests
         };
 
         // Does not throw; all-equal samples collapse the strip to a single "all samples ≈" marker.
-        await reporter.ReportAsync([result]);
+        await reporter.ReportAsync([result], new ReportContext(ReportDetail.Advanced));
     }
 
     private static BenchmarkResult MakeResult(string name, double median)

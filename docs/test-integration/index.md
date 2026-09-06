@@ -96,7 +96,7 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-The test fails when the slowdown is both statistically significant and practically meaningful (i.e., the ratio exceeds `MaxSlowdownRatio`). Whether a result is "real" depends on whether the test uses replicates - see [replicates and the paired ratio](#replicates-and-the-paired-ratio). With the default single launch, NBenchmark uses a Mann-Whitney U p-value below the significance level. A significant but small slowdown passes as noise, and a large but noisy slowdown passes due to insufficient evidence.
+The test fails when the slowdown is both statistically significant and practically meaningful (i.e., the ratio exceeds `MaxSlowdownRatio`). Whether a result is "real" depends on whether the test uses replicates - see [replicates and the paired ratio](#replicates-and-the-paired-ratio). With the default single launch, the ratio is the candidate median divided by the reference median, and NBenchmark uses a Mann-Whitney U p-value below the significance level. A significant but small slowdown passes as noise, and a large but noisy slowdown passes due to insufficient evidence.
 
 If a slowdown breaches the gate, the failure output includes ratio and significance details (`ratio`, `p`, and Cliff's delta). To tune this, start with a loose value (such as `MaxSlowdownRatio = 10.0`) and tighten it based on several runs in your CI environment.
 
@@ -169,6 +169,7 @@ The `PerformanceThresholds` option bag used by `BenchmarkAssert.Validate` is an 
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `MaxMeanNs` | `double` | `Unset` (-1, disabled) | Maximum allowed mean execution time in nanoseconds. |
+| `MaxMedianNs` | `double` | `Unset` (-1, disabled) | Maximum allowed median execution time in nanoseconds. The median is always computed, so this gate needs no percentile configuration. |
 | `MaxP95Ns` | `double` | `Unset` (-1, disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles`. |
 | `MaxAllocatedBytes` | `long` | `UnsetBytes` (-1, disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
 | `MaxSlowdownRatio` | `double` | `Unset` (-1, disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g., `5.0` = 5$\times$ the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
@@ -186,7 +187,26 @@ For a full explanation of each option, see [configuration](../reference/configur
 
 ## SLA-style hard limits
 
-Absolute thresholds (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`) are susceptible to noise from shared CI runners. Use `MaxSlowdownRatio` (calibration or `ReferenceMethod`) for regression gates and reserve absolute thresholds for hard SLAs.
+Absolute thresholds (`MaxMeanNs`, `MaxMedianNs`, `MaxP95Ns`, `MaxAllocatedBytes`) are susceptible to noise from shared CI runners. Use `MaxSlowdownRatio` (calibration or `ReferenceMethod`) for regression gates and reserve absolute thresholds for hard SLAs.
+
+### Choosing the statistic
+
+Each absolute threshold is named for the statistic it bounds, so pick the one that matches the limit you mean:
+
+- `MaxMedianNs` for an SLA-style limit on typical cost. The median is what the reports lead with and what significance is decided on, and it is the least sensitive to a single slow sample.
+- `MaxP95Ns` (or a higher percentile) for a latency SLO, where the tail is the thing being promised. This one needs `0.95` in `MeasurementOptions.ReportedPercentiles`; the median is always computed.
+- `MaxMeanNs` when the average is genuinely what is bounded - throughput budgets, or total time across a known number of operations. It is the most outlier-sensitive number in the report.
+
+### Writing thresholds at a readable scale
+
+Thresholds are nanoseconds, and an attribute argument cannot be a `TimeSpan`. `Nanoseconds` carries the scale factors so a millisecond-scale limit reads as one:
+
+```csharp
+[PerformanceFact(MaxMedianNs = 5 * Nanoseconds.PerMillisecond)]
+public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
+```
+
+`Nanoseconds.PerMicrosecond`, `Nanoseconds.PerMillisecond` and `Nanoseconds.PerSecond` are `const double`, so the multiplication is still a constant expression and remains a legal attribute argument.
 
 To relax absolute thresholds for jitter on shared CI runners, set `MaxAbsoluteThresholdTolerance`:
 

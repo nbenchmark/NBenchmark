@@ -19,7 +19,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
     public async Task AutoAttached_Reporter_Receives_Result_List()
     {
         var capturing = new CapturingAutoReporter("capture");
-        ReporterRegistry.RegisterAutoAttach("capture", "Captures results", (_, _) => capturing);
+        ReporterRegistry.RegisterAutoAttach("capture", "Captures results", _ => capturing);
 
         await CaptureConsoleOutputAsync(async () =>
         {
@@ -42,7 +42,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
         var order = new List<string>();
         var explicitReporter = new OrderTrackingReporter("explicit", order);
         var autoReporter = new OrderTrackingReporter("auto", order);
-        ReporterRegistry.RegisterAutoAttach("auto", "Auto", (_, _) => autoReporter);
+        ReporterRegistry.RegisterAutoAttach("auto", "Auto", _ => autoReporter);
 
         await CaptureConsoleOutputAsync(async () =>
         {
@@ -62,8 +62,8 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
     {
         var thrown = new ThrowingAutoReporter("throws");
         var captureAfter = new CapturingAutoReporter("after");
-        ReporterRegistry.RegisterAutoAttach("throws", "Throws", (_, _) => thrown);
-        ReporterRegistry.RegisterAutoAttach("after", "After", (_, _) => captureAfter);
+        ReporterRegistry.RegisterAutoAttach("throws", "Throws", _ => thrown);
+        ReporterRegistry.RegisterAutoAttach("after", "After", _ => captureAfter);
 
         await CaptureConsoleOutputAsync(async () =>
         {
@@ -83,9 +83,9 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
     public async Task Multiple_AutoAttached_Reporters_All_Fire_In_Registration_Order()
     {
         var order = new List<string>();
-        ReporterRegistry.RegisterAutoAttach("first", "1", (_, _) => new OrderTrackingReporter("first", order));
-        ReporterRegistry.RegisterAutoAttach("second", "2", (_, _) => new OrderTrackingReporter("second", order));
-        ReporterRegistry.RegisterAutoAttach("third", "3", (_, _) => new OrderTrackingReporter("third", order));
+        ReporterRegistry.RegisterAutoAttach("first", "1", _ => new OrderTrackingReporter("first", order));
+        ReporterRegistry.RegisterAutoAttach("second", "2", _ => new OrderTrackingReporter("second", order));
+        ReporterRegistry.RegisterAutoAttach("third", "3", _ => new OrderTrackingReporter("third", order));
 
         await CaptureConsoleOutputAsync(async () =>
         {
@@ -110,7 +110,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
         // reporter, the auto-attached one is skipped (not double-fired). This mirrors the case
         // where a user references NBenchmark.Studio (auto-attached "studio") and also calls
         // .WithReporter(new StudioReporter()) manually.
-        ReporterRegistry.RegisterAutoAttach("dedup", "auto", (_, _) => new CountingAutoReporter("dedup", () => callCount++));
+        ReporterRegistry.RegisterAutoAttach("dedup", "auto", _ => new CountingAutoReporter("dedup", () => callCount++));
 
         await CaptureConsoleOutputAsync(async () =>
         {
@@ -137,7 +137,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
             () => callCount++,
             results => observedResultCounts.Add(results.Count));
 
-        ReporterRegistry.RegisterAutoAttach("capture", "Captures", (_, _) => capturing);
+        ReporterRegistry.RegisterAutoAttach("capture", "Captures", _ => capturing);
 
         await CaptureConsoleOutputAsync(async () =>
         {
@@ -159,7 +159,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
     [Fact]
     public void Help_Output_Lists_AutoAttached_Reporters_In_Separate_Section()
     {
-        ReporterRegistry.RegisterAutoAttach("studio", "Studio inbox", (_, _) => new CountingAutoReporter("studio", () => { }));
+        ReporterRegistry.RegisterAutoAttach("studio", "Studio inbox", _ => new CountingAutoReporter("studio", () => { }));
 
         var stdout = CaptureConsoleOutput(() => { BenchmarkHarness.Create(["--help"]).RunAsync().GetAwaiter().GetResult(); });
 

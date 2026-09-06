@@ -43,6 +43,9 @@ public sealed class BenchmarkHarness
     private bool _progressExplicitlySet;
     private RunOrder _runOrder = RunOrder.Random;
 
+    /// <summary>The shuffle seed pinned by <see cref="WithSeed" />, or <c>null</c> for unseeded.</summary>
+    private int? _seed;
+
     /// <summary>
     ///     The one discovery pass this harness makes, and the configuration it was made under.
     /// </summary>
@@ -107,6 +110,13 @@ public sealed class BenchmarkHarness
             : _cliArgs.LaunchCount ?? _launchCount ?? LaunchCounts.HarnessDefault;
 
     /// <summary>
+    ///     The shuffle seed this run uses: <c>--seed</c> when it was passed, otherwise whatever
+    ///     <see cref="WithSeed" /> pinned, otherwise unseeded. The CLI wins for the same reason it wins
+    ///     for the run order - the flag is the later word on a run someone is launching by hand.
+    /// </summary>
+    private int? EffectiveSeed => _cliArgs.Seed ?? _seed;
+
+    /// <summary>
     ///     The options an isolated child should be launched under, with CLI overrides merged in.
     ///     Used by the child-request builders for the values the parent must resolve on the child's
     ///     behalf - the wall-clock timeout and the runtime profile, neither of which a child can
@@ -121,11 +131,11 @@ public sealed class BenchmarkHarness
         var harness = new BenchmarkHarness();
         harness._cliArgs = cliArgs;
         harness._detail = cliArgs.Detail;
-        harness._noSamples = cliArgs.NoSamples;
+        harness._noSamples = cliArgs.NoRawSamples;
 
         foreach (var name in cliArgs.ReporterNames)
         {
-            if (ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out var reporter))
+            if (ReporterRegistry.TryCreate(name, null, out var reporter))
                 harness._reporters.Add(reporter);
         }
 
@@ -154,7 +164,7 @@ public sealed class BenchmarkHarness
 
     public BenchmarkHarness WithReporter(IReporter reporter)
     {
-        reporter.Detail = _detail;
+        ArgumentNullException.ThrowIfNull(reporter);
 
         _reporters.Add(reporter);
         ApplyNoSamples();
@@ -196,14 +206,14 @@ public sealed class BenchmarkHarness
         return this;
     }
 
+    /// <summary>
+    ///     Sets how much of each result the reporters print. Detail belongs to the run rather than to
+    ///     any reporter object, so this is handed to every reporter at report time through
+    ///     <see cref="ReportContext" /> rather than written into the reporters as they are attached.
+    /// </summary>
     public BenchmarkHarness WithDetail(ReportDetail detail)
     {
         _detail = detail;
-
-        foreach (var reporter in _reporters)
-        {
-            reporter.Detail = detail;
-        }
 
         return this;
     }
@@ -588,6 +598,99 @@ public sealed class BenchmarkHarness
 
 
     /// <summary>
+    ///     Pins an exact measured-sample count, overriding the default confidence-interval-driven
+    ///     auto-detection. Pass <c>0</c> for a dry-run. <c>--samples</c> wins over this.
+    /// </summary>
+    public BenchmarkHarness WithSamples(int samples)
+    {
+        _options = _options with { Samples = samples };
+        return this;
+    }
+
+    /// <summary>
+    ///     Pins an exact warmup-sample count, overriding the default plateau-driven auto-detection.
+    ///     Pass <c>0</c> to skip warmup. <c>--warmup-samples</c> wins over this.
+    /// </summary>
+    public BenchmarkHarness WithWarmupSamples(int samples)
+    {
+        _options = _options with { WarmupSamples = samples };
+        return this;
+    }
+
+    /// <summary>Measures allocations as well as time.</summary>
+    public BenchmarkHarness WithAllocations(bool enabled = true)
+    {
+        _options = _options with { MeasureAllocations = enabled };
+        return this;
+    }
+
+    /// <summary>Which samples to trim before the statistics are computed.</summary>
+    public BenchmarkHarness WithOutlierMode(OutlierMode mode)
+    {
+        _options = _options with { OutlierMode = mode };
+        return this;
+    }
+
+    /// <inheritdoc cref="BenchmarkSuite.WithOutlierDetector" />
+    public BenchmarkHarness WithOutlierDetector(Func<IOutlierDetector> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        _options = _options with { OutlierDetector = factory };
+        return this;
+    }
+
+    /// <summary>The confidence level for the reported interval, for example <c>0.95</c>.</summary>
+    public BenchmarkHarness WithConfidenceLevel(double level)
+    {
+        _options = _options with { ConfidenceLevel = level };
+        return this;
+    }
+
+    /// <summary>Turns the significance comparison on or off. On by default.</summary>
+    public BenchmarkHarness WithSignificance(bool enabled = true)
+    {
+        _options = _options with { EnableSignificance = enabled };
+        return this;
+    }
+
+    /// <summary>The alpha a p-value must clear to count as significant. Defaults to <c>0.05</c>.</summary>
+    public BenchmarkHarness WithSignificanceLevel(double level)
+    {
+        _options = _options with { SignificanceLevel = level };
+        return this;
+    }
+
+    /// <inheritdoc cref="BenchmarkSuite.WithSignificanceTest" />
+    public BenchmarkHarness WithSignificanceTest(Func<ISignificanceTest> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        _options = _options with { SignificanceTest = factory };
+        return this;
+    }
+
+    /// <inheritdoc cref="BenchmarkSuite.WithSeed" />
+    /// <remarks><c>--seed</c> wins over this, the same way <c>--run-order</c> wins over
+    /// <see cref="WithRunOrder" />.</remarks>
+    public BenchmarkHarness WithSeed(int seed)
+    {
+        _seed = seed;
+        return this;
+    }
+
+    /// <inheritdoc cref="BenchmarkSuite.Configure" />
+    public BenchmarkHarness Configure(Func<MeasurementOptions, MeasurementOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+
+        _options = configure(_options) ?? throw new BenchmarkConfigurationException(
+            "Configure must return a MeasurementOptions instance; it returned null.");
+
+        return this;
+    }
+
+    /// <summary>
     ///     Tunes the adaptive measurement loop (warmup plateau, CI-width sample count, and
     ///     ops-per-sample calibration). Use <see cref="AutoTuneOptions.Quick" /> for fast feedback
     ///     or <see cref="AutoTuneOptions.Thorough" /> for tighter intervals.
@@ -686,7 +789,7 @@ public sealed class BenchmarkHarness
     ///     Filters discovered benchmarks by category. Include rules are OR: a benchmark runs if
     ///     it has any included category. Exclude rules are also OR: a benchmark is removed if it
     ///     has any excluded category. Untagged benchmarks are excluded when any include filter
-    ///     is set. This programmatic filter composes with the <c>--category</c> and
+    ///     is set. This programmatic filter composes with the <c>--include-category</c> and
     ///     <c>--exclude-category</c> CLI flags.
     /// </summary>
     public BenchmarkHarness FilterCategories(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
@@ -835,9 +938,15 @@ public sealed class BenchmarkHarness
         RunPass pass,
         CancellationToken cancellationToken)
     {
+        if (_cliArgs.ShowVersion)
+        {
+            CliArgs.PrintVersion();
+            return Array.Empty<BenchmarkResult>();
+        }
+
         if (_cliArgs.ShowHelp)
         {
-            CliArgs.PrintHelp();
+            CliArgs.PrintHelp(_cliArgs.HelpTopic);
             return Array.Empty<BenchmarkResult>();
         }
 
@@ -976,7 +1085,7 @@ public sealed class BenchmarkHarness
             totalBenchmarks,
             _options.GcBehavior.ToString(),
             _cliArgs.Runtimes is { Count: > 0 } runtimes ? string.Join(",", runtimes.Select(r => r.TargetFramework)) : null,
-            _cliArgs.Seed,
+            EffectiveSeed,
             (_cliArgs.RunOrder ?? _runOrder).ToString());
 
         var sentinelEmitted = false;
@@ -1117,11 +1226,11 @@ public sealed class BenchmarkHarness
         // reach them, so a sixth output added below is covered without anyone thinking about it.
         if (pass.Publishes)
         {
-            if (_cliArgs.ThresholdPct.HasValue
-                && ThresholdCheck.HasRegressionAcrossGroups(allResults, _cliArgs.ThresholdPct.Value) is (true, var regressed))
+            if (_cliArgs.MaxRegressionPercent.HasValue
+                && ThresholdCheck.HasRegressionAcrossGroups(allResults, _cliArgs.MaxRegressionPercent.Value) is (true, var regressed))
             {
                 Console.Error.WriteLine(
-                    $"Regression threshold exceeded ({_cliArgs.ThresholdPct.Value}%). "
+                    $"Regression threshold exceeded ({_cliArgs.MaxRegressionPercent.Value}%). "
                     + $"Regressed benchmarks: {string.Join(", ", regressed)}");
 
                 Environment.ExitCode = 1;
@@ -1156,9 +1265,6 @@ public sealed class BenchmarkHarness
         // screens of tables the user is being told not to trust.
         if (_cliArgs.StrictIsolation && !IsolationAudit.Enforce(allResults, Console.Error))
             Environment.ExitCode = 1;
-
-        if (!string.IsNullOrEmpty(_cliArgs.OutputDir))
-            ApplyOutputDirectory(_cliArgs.OutputDir);
 
         BenchmarkTable.CrossClassMode = _cliArgs.CrossClass || _crossClass;
 
@@ -1274,9 +1380,9 @@ public sealed class BenchmarkHarness
 
             ApplyPerClassSignificance(allResults, rawSamples, suiteOptions, _cliArgs.CrossClass || _crossClass);
 
-            if (_cliArgs.ThresholdPct.HasValue)
+            if (_cliArgs.MaxRegressionPercent.HasValue)
             {
-                var threshold = _cliArgs.ThresholdPct.Value;
+                var threshold = _cliArgs.MaxRegressionPercent.Value;
 
                 // Threshold comparisons only make sense within the same runtime and the same
                 // class - net8 will always look "slower" than net10, which would false-positive
@@ -1432,7 +1538,7 @@ public sealed class BenchmarkHarness
                 Options = options,
                 InstanceSource = _instanceSource?.ToPayload(receivers),
                 Order = _cliArgs.RunOrder ?? _runOrder,
-                Seed = _cliArgs.Seed,
+                Seed = EffectiveSeed,
                 DefaultInstanceLifetime = _defaultInstanceLifetime,
                 InstanceLifetimeOverride = lifetime,
                 TotalBenchmarks = displayNames.Count,
@@ -1758,7 +1864,7 @@ public sealed class BenchmarkHarness
                     : null;
 
                 var (results, samples) = await SuiteRunner.RunAsync(
-                    envelopes, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                    envelopes, _cliArgs.RunOrder ?? _runOrder, EffectiveSeed, suiteOptions,
                     startIndex, totalBenchmarks, launchProgress, cancellationToken,
                     betweenBenchmarksReset, launchObserver).ConfigureAwait(false);
 
@@ -1814,7 +1920,7 @@ public sealed class BenchmarkHarness
         CancellationToken cancellationToken)
     {
         var qualifiedClassName = BenchmarkEnvelope.QualifiedDiscoveredClassName(suite.Type);
-        var orderedBenchmarks = OrderBenchmarksForRun(suite.Benchmarks, _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed);
+        var orderedBenchmarks = OrderBenchmarksForRun(suite.Benchmarks, _cliArgs.RunOrder ?? _runOrder, EffectiveSeed);
 
         foreach (var benchmark in orderedBenchmarks)
         {
@@ -1866,7 +1972,7 @@ public sealed class BenchmarkHarness
                     var envelope = BenchmarkEnvelope.FromDiscovered(benchmark, qualifiedClassName, factory);
 
                     var (results, samples) = await SuiteRunner.RunAsync(
-                        [envelope], _cliArgs.RunOrder ?? _runOrder, _cliArgs.Seed, suiteOptions,
+                        [envelope], _cliArgs.RunOrder ?? _runOrder, EffectiveSeed, suiteOptions,
                         startIndex, totalBenchmarks, launchProgress, cancellationToken, null, launchObserver).ConfigureAwait(false);
 
                     perLaunchResults.AddRange(results);
@@ -2062,7 +2168,7 @@ public sealed class BenchmarkHarness
                 options,
                 _defaultInstanceLifetime,
                 _cliArgs.RunOrder ?? _runOrder,
-                _cliArgs.Seed,
+                EffectiveSeed,
                 replicate,
                 startIndex,
                 totalBenchmarks,
@@ -2487,17 +2593,6 @@ public sealed class BenchmarkHarness
         }
     }
 
-    private void ApplyOutputDirectory(string outputDir)
-    {
-        for (var i = 0; i < _reporters.Count; i++)
-        {
-            if (ReporterRegistry.TryCreate(_reporters[i].Name, outputDir, _detail, out var rebuilt))
-                _reporters[i] = rebuilt;
-        }
-
-        ApplyNoSamples();
-    }
-
     private static IReadOnlyList<double> ResolveResultRawSamples(IsolatedResultItem item)
     {
         return item.Result.RawSamples.Count > 0 ? item.Result.RawSamples : item.RawSamples;
@@ -2515,9 +2610,25 @@ public sealed class BenchmarkHarness
         }
     }
 
+    /// <summary>
+    ///     What the reporters are told about this run: the detail level, and the <c>--output</c>
+    ///     directory when one was given.
+    /// </summary>
+    /// <remarks>
+    ///     The directory travels here rather than being written into the reporters, which used to mean
+    ///     rebuilding every registry-created reporter from its name to change one string - and silently
+    ///     replacing any reporter the caller had configured by hand. A reporter constructed with a
+    ///     directory of its own keeps it; one constructed without takes this.
+    /// </remarks>
+    private ReportContext BuildReportContext() => new(_detail)
+    {
+        OutputDirectory = string.IsNullOrEmpty(_cliArgs.OutputDir) ? null : _cliArgs.OutputDir,
+        NoColor = _cliArgs.NoColor,
+    };
+
     private async Task InvokeReportersAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
     {
-        await ReporterRegistry.InvokeReportersAsync(_reporters, _detail, results, cancellationToken)
+        await ReporterRegistry.InvokeReportersAsync(_reporters, BuildReportContext(), results, cancellationToken)
             .ConfigureAwait(false);
     }
 

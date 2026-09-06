@@ -23,7 +23,7 @@ public class ReportFormatVersionTests
 
         try
         {
-            await new JsonReporter(dir, "out.json").ReportAsync([Result("alpha", 100)]);
+            await new JsonReporter(dir, "out.json").ReportAsync([Result("alpha", 100)], ReportContext.Default);
 
             using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "out.json")));
             var root = doc.RootElement;
@@ -48,7 +48,7 @@ public class ReportFormatVersionTests
 
         try
         {
-            await new JsonReporter(dir, "out.json").ReportAsync([Result("alpha", 100)]);
+            await new JsonReporter(dir, "out.json").ReportAsync([Result("alpha", 100)], ReportContext.Default);
 
             var json = await File.ReadAllTextAsync(Path.Combine(dir, "out.json"));
 
@@ -74,7 +74,7 @@ public class ReportFormatVersionTests
 
         try
         {
-            await new CsvReporter(dir, "out.csv", detail).ReportAsync([Result("alpha", 100)]);
+            await new CsvReporter(dir, "out.csv").ReportAsync([Result("alpha", 100)], new ReportContext(detail));
 
             var lines = await File.ReadAllLinesAsync(Path.Combine(dir, "out.csv"));
             var headers = lines[0].Split(',');
@@ -105,7 +105,7 @@ public class ReportFormatVersionTests
 
         try
         {
-            await new MarkdownReporter(dir, "out.md").ReportAsync([Result("alpha", 100)]);
+            await new MarkdownReporter(dir, "out.md").ReportAsync([Result("alpha", 100)], ReportContext.Default);
 
             var content = await File.ReadAllTextAsync(Path.Combine(dir, "out.md"));
 

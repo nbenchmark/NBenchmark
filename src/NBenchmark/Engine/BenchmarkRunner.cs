@@ -350,7 +350,7 @@ internal sealed class BenchmarkRunner
 
         return $"{phase} stopped at the wall-clock tuning cap ({BenchmarkFormatter.FormatDuration(maxTuningTime)}) "
                + "before reaching the requested precision. "
-               + "Use --autotune-cap-behavior warn to accept under-sampled results, "
+               + "Use --auto-tune-cap-behavior warn to accept under-sampled results, "
                + "or increase --max-tuning-time / pin --samples / pin --warmup-samples.";
     }
 

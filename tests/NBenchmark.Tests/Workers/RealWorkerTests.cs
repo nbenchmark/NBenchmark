@@ -456,7 +456,7 @@ public sealed class RealWorkerTests
     }
 
     /// <summary>
-    ///     <c>--emit-raw</c>: the cap lifts and the full series crosses, for a consumer that wants to
+    ///     <c>--full-raw-samples</c>: the cap lifts and the full series crosses, for a consumer that wants to
     ///     analyse the run itself.
     /// </summary>
     [Fact]

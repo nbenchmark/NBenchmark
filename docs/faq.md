@@ -136,7 +136,10 @@ public sealed class MyReporter : IReporter
 {
     public string Name => "my-reporter";
 
-    public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
+    public Task ReportAsync(
+        IReadOnlyList<BenchmarkResult> results,
+        ReportContext context,
+        CancellationToken cancellationToken = default)
     {
         foreach (var r in results.Where(r => !r.Errored))
             System.Console.WriteLine($"{r.Name}: {r.MedianNs:F0} ns");
@@ -148,7 +151,7 @@ public sealed class MyReporter : IReporter
 To make the reporter available via the `--reporter` CLI flag, register it with the global `ReporterRegistry`:
 
 ```csharp
-ReporterRegistry.Register("my-reporter", "Custom console output", (_, detail) => new MyReporter { Detail = detail });
+ReporterRegistry.Register("my-reporter", "Custom console output", _ => new MyReporter());
 ```
 
 Register the reporter in a `[ModuleInitializer]` in your package or at app startup before `BenchmarkHarness.Create(args)` is called.

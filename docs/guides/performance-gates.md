@@ -8,7 +8,7 @@ order: 6
 
 ## Scenario
 
-If you already run a unit test suite in CI, you may want to detect performance regressions without creating a separate benchmark project, a separate CI step, or a separate `--threshold-pct` invocation. Instead, you can make a performance regression fail a test the same way any other assertion failure does, making it visible in your standard test reports and pull request checks.
+If you already run a unit test suite in CI, you may want to detect performance regressions without creating a separate benchmark project, a separate CI step, or a separate `--max-regression-percent` invocation. Instead, you can make a performance regression fail a test the same way any other assertion failure does, making it visible in your standard test reports and pull request checks.
 
 NBenchmark provides test-integration packages for xUnit, NUnit, and MSTest that run benchmarks as part of a test method. You can set thresholds as either absolute (a hard SLA, such as "this method must complete in under 500 µs") or relative (a regression gate, such as "this method must not be more than 5x slower than a reference"). Relative thresholds are generally preferred because they absorb changes in machine speed, as both the candidate and reference scale together.
 
@@ -96,7 +96,7 @@ public void Repository_Query_Is_Fast_Enough()
 
 - **Attribute pattern**: Replace the standard test attribute on a method. The entire method body becomes the benchmark, and thresholds are set as named arguments. This is available in xUnit, NUnit, and MSTest.
 - **Assert pattern**: Call `PerformanceAssert.Run` from inside any test. The benchmark runs inline, and violations fail the test immediately. This is available in NUnit and MSTest.
-- **Absolute thresholds** (`MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`): These act as hard SLAs. Because they are susceptible to shared-runner noise, prefer `MaxSlowdownRatio` for regression gates. You can use `MaxAbsoluteThresholdTolerance` to relax absolute thresholds when a shared runner or high-jitter host is detected (e.g., `1.25` for a 25% relaxation).
+- **Absolute thresholds** (`MaxMedianNs`, `MaxMeanNs`, `MaxP95Ns`, `MaxAllocatedBytes`): These act as hard SLAs. Each is named for the statistic it bounds - use `MaxMedianNs` for a typical-cost limit, `MaxP95Ns` for a tail SLO, and `MaxMeanNs` only when the average is what is meant. Write millisecond-scale limits with the scale constants: `MaxMedianNs = 5 * Nanoseconds.PerMillisecond`. Because they are susceptible to shared-runner noise, prefer `MaxSlowdownRatio` for regression gates. You can use `MaxAbsoluteThresholdTolerance` to relax absolute thresholds when a shared runner or high-jitter host is detected (e.g., `1.25` for a 25% relaxation).
 - **Relative thresholds** (`MaxSlowdownRatio`): These act as regression gates. By comparing two bodies measured in the same session, the engine cancels out the speed of the machine. A quick development box and a slow CI runner will agree on the ratio. Start with a loose ratio (e.g., `10.0`) and tighten it based on observed CI runs. The test fails only when the slowdown is both statistically significant and exceeds the ratio.
 - **Statistical gating**: This mirrors the [practical-significance gate](../statistics/significance.md#practical-significance-gate) used in suite and harness modes. A test fails only when the slowdown is both real and practically meaningful.
 
@@ -186,18 +186,18 @@ PerformanceAssert: slowdown ratio 6.2x exceeded MaxSlowdownRatio 5.0
 
 The `p` and Cliff's delta values indicate whether the slowdown is real and how large it is. For more information, see [Reading Your Results](../getting-started/reading-your-results.md).
 
-## Comparison with `--threshold-pct`
+## Comparison with `--max-regression-percent`
 
-| Feature | Test-integration packages | Harness `--threshold-pct` |
+| Feature | Test-integration packages | Harness `--max-regression-percent` |
 | --- | --- | --- |
 | Location | Existing test suite | Dedicated benchmark project |
-| Trigger | `dotnet test` | `dotnet run -- --threshold-pct 10` |
+| Trigger | `dotnet test` | `dotnet run -- --max-regression-percent 10` |
 | Comparison | Method vs. calibration / `ReferenceMethod` | Benchmark vs. suite baseline |
 | Hardware Portability | Yes (relative thresholds) | No (absolute medians) |
 | Outcome | Test failure | `Environment.ExitCode = 1` |
 | Best Use Case | "Don't regress this hot path" | "Don't regress any benchmark in the suite" |
 
-The test-integration packages are per-method and reside with your tests; `--threshold-pct` is per-suite and resides with your benchmarks. For more information on the `--threshold-pct` approach, see [Tuning for CI/CD pipelines](./ci-cd-pipelines.md).
+The test-integration packages are per-method and reside with your tests; `--max-regression-percent` is per-suite and resides with your benchmarks. For more information on the `--max-regression-percent` approach, see [Tuning for CI/CD pipelines](./ci-cd-pipelines.md).
 
 ## Next steps
 
@@ -206,5 +206,5 @@ For more information, see the following pages:
 - [Test integration](../test-integration/index.md) - Full threshold reference and the `MaxAbsoluteThresholdTolerance` setting.
 - [xUnit integration](../test-integration/xunit.md) / [NUnit integration](../test-integration/nunit.md) / [MSTest integration](../test-integration/mstest.md) - Per-framework setup.
 - [Significance Testing](../statistics/significance.md) - How Mann-Whitney U and Cliff's delta underpin the statistical gating.
-- [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) - The noise-reduction stack and the `--threshold-pct` alternative.
+- [Tuning for CI/CD pipelines](./ci-cd-pipelines.md) - The noise-reduction stack and the `--max-regression-percent` alternative.
 - [Configuration](../reference/configuration.md) - Underlying `MeasurementOptions` exposed by the attributes.

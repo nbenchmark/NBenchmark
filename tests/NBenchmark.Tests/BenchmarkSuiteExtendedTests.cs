@@ -217,13 +217,14 @@ public class BenchmarkSuiteExtendedTests
             _callback = callback;
         }
 
-        public ReportDetail CapturedDetail => Detail;
+        /// <summary>The detail the run asked for, as it reached this reporter's last report call.</summary>
+        public ReportDetail CapturedDetail { get; private set; }
 
         public string Name => "stub";
-        public ReportDetail Detail { get; set; } = ReportDetail.Simple;
 
-        public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
+        public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, ReportContext context, CancellationToken cancellationToken = default)
         {
+            CapturedDetail = context.Detail;
             _callback(results);
             return Task.CompletedTask;
         }

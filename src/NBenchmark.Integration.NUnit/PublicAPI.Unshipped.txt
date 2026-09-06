@@ -9,6 +9,8 @@ NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAllocatedBytes.get -
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAllocatedBytes.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxMeanNs.get -> double
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxMeanNs.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxMedianNs.get -> double
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxMedianNs.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxP95Ns.get -> double
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxP95Ns.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxSlowdownRatio.get -> double
@@ -39,6 +41,8 @@ NBenchmark.Integration.NUnit.PerformanceAttribute.MaxAllocatedBytes.get -> long
 NBenchmark.Integration.NUnit.PerformanceAttribute.MaxAllocatedBytes.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.MaxMeanNs.get -> double
 NBenchmark.Integration.NUnit.PerformanceAttribute.MaxMeanNs.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxMedianNs.get -> double
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxMedianNs.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.MaxP95Ns.get -> double
 NBenchmark.Integration.NUnit.PerformanceAttribute.MaxP95Ns.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.MaxSlowdownRatio.get -> double

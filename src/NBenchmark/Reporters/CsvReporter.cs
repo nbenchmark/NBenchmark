@@ -3,15 +3,14 @@ using NBenchmark.Stats;
 
 namespace NBenchmark.Reporters;
 
-public sealed class CsvReporter(string outputDirectory = ".", string? fileName = null, ReportDetail detail = ReportDetail.Simple) : IReporter
+public sealed class CsvReporter(string? outputDirectory = null, string? fileName = null) : IReporter
 {
     private static int _fileCounter;
 
-    private readonly string _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
+    private readonly string? _outputDirectory =
+        outputDirectory is null ? null : PathValidation.ValidateOutputPath(outputDirectory);
 
     public string Name => "csv";
-
-    public ReportDetail Detail { get; set; } = detail;
 
     /// <summary>
     ///     The path of the file the last <see cref="ReportAsync" /> wrote.
@@ -25,18 +24,24 @@ public sealed class CsvReporter(string outputDirectory = ".", string? fileName =
 
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
+        ReportContext context,
         CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(_outputDirectory);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var directory = _outputDirectory ?? PathValidation.ValidateOutputPath(context.OutputDirectory ?? ".");
+        Directory.CreateDirectory(directory);
 
         var resolvedName = fileName
-                       ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.csv";
+                       ?? context.FileName
+                       ?? $"benchmark-results-{context.StartedUtc.UtcDateTime:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.csv";
 
-        var filePath = Path.Combine(_outputDirectory, resolvedName);
+        var filePath = Path.Combine(directory, resolvedName);
         LastWrittenPath = filePath;
 
         var sb = new StringBuilder();
-        var detail = Detail.ToString().ToLowerInvariant();
+        var reportDetail = context.Detail;
+        var detail = reportDetail.ToString().ToLowerInvariant();
 
         var tables = BenchmarkTable.BuildPerClass(results);
         var profile = tables[0].GcBehavior.ToString().ToLowerInvariant();
@@ -55,14 +60,14 @@ public sealed class CsvReporter(string outputDirectory = ".", string? fileName =
 
         var baseHeaders = "ClassName,Name,MedianNs";
 
-        if (Detail == ReportDetail.Simple)
+        if (reportDetail == ReportDetail.Simple)
         {
             baseHeaders += ",OpsPerSecond";
 
             sb.AppendLine(
                 $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,GcBehavior,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation");
         }
-        else if (Detail == ReportDetail.Standard)
+        else if (reportDetail == ReportDetail.Standard)
         {
             baseHeaders += ",MeanNs,OpsPerSecond";
 
@@ -108,7 +113,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? fileName =
                              $"\"{safeName}\"," +
                              $"{row.Result.MedianNs:F1}";
 
-            if (Detail == ReportDetail.Simple)
+            if (reportDetail == ReportDetail.Simple)
             {
                 var simpleDiag = row.Result.Diagnostics;
 
@@ -164,7 +169,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? fileName =
                                $"{(row.Result.ThreadControlEnabled ? "true" : "false")}," +
                                $"{(row.Result.InterferenceFilterEnabled ? "true" : "false")}";
 
-                if (Detail == ReportDetail.Standard)
+                if (reportDetail == ReportDetail.Standard)
                     sb.AppendLine($"{fullData},\"{safeIsolation}\"");
                 else
                 {

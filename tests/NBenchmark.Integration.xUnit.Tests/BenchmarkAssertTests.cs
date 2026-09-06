@@ -43,6 +43,46 @@ public sealed class BenchmarkAssertTests
     }
 
     [Fact]
+    public void Validate_Returns_Violation_When_Median_Exceeds_Threshold()
+    {
+        // CreateResult puts the median at 90% of the mean, so a median gate fails on a number the
+        // mean gate would not even see - which is the point of having both.
+        var result = CreateResult(1500);
+        var thresholds = new PerformanceThresholds { MaxMedianNs = 1000 };
+
+        var violations = BenchmarkAssert.Validate(result, thresholds);
+
+        Assert.Single(violations);
+        Assert.Contains("MedianNs 1350", violations[0]);
+        Assert.Contains("1000", violations[0]);
+    }
+
+    [Fact]
+    public void Validate_Gates_Median_Independently_Of_Mean()
+    {
+        // Mean 1500, median 1350: the median clears its threshold while the mean breaches its own.
+        var result = CreateResult(1500);
+
+        var violations = BenchmarkAssert.Validate(
+            result, new PerformanceThresholds { MaxMeanNs = 1000, MaxMedianNs = 1400 });
+
+        Assert.Single(violations);
+        Assert.Contains("MeanNs", violations[0]);
+    }
+
+    [Fact]
+    public void Validate_Accepts_A_Threshold_Written_With_Nanosecond_Scale_Constants()
+    {
+        var result = CreateResult(6 * Nanoseconds.PerMillisecond);
+
+        var violations = BenchmarkAssert.Validate(
+            result, new PerformanceThresholds { MaxMedianNs = 5 * Nanoseconds.PerMillisecond });
+
+        Assert.Single(violations);
+        Assert.Contains("5000000.00 ns", violations[0]);
+    }
+
+    [Fact]
     public void Validate_Returns_Violation_When_P95_Exceeds_Threshold()
     {
         var result = CreateResult(p95: 2000);

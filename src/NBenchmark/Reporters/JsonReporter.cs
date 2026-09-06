@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace NBenchmark.Reporters;
 
-public sealed class JsonReporter(string outputDirectory = ".", string? fileName = null, ReportDetail detail = ReportDetail.Simple) : IReporter
+public sealed class JsonReporter(string? outputDirectory = null, string? fileName = null) : IReporter
 {
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -13,11 +13,10 @@ public sealed class JsonReporter(string outputDirectory = ".", string? fileName 
     };
 
     private static int _fileCounter;
-    private readonly string _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
+    private readonly string? _outputDirectory =
+        outputDirectory is null ? null : PathValidation.ValidateOutputPath(outputDirectory);
 
     public string Name => "json";
-
-    public ReportDetail Detail { get; set; } = detail;
 
     /// <summary>
     ///     When <c>false</c>, raw per-sample arrays are omitted from the JSON output (serialized as
@@ -38,14 +37,19 @@ public sealed class JsonReporter(string outputDirectory = ".", string? fileName 
 
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
+        ReportContext context,
         CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(_outputDirectory);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var directory = _outputDirectory ?? PathValidation.ValidateOutputPath(context.OutputDirectory ?? ".");
+        Directory.CreateDirectory(directory);
 
         var resolvedName = fileName
-                       ?? $"benchmarks-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.json";
+                       ?? context.FileName
+                       ?? $"benchmarks-{context.StartedUtc.UtcDateTime:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.json";
 
-        var filePath = Path.Combine(_outputDirectory, resolvedName);
+        var filePath = Path.Combine(directory, resolvedName);
         LastWrittenPath = filePath;
 
         var serializedResults = IncludeSamples
@@ -57,7 +61,7 @@ public sealed class JsonReporter(string outputDirectory = ".", string? fileName 
             SchemaVersion = ReportFormat.SchemaVersion,
             MeasurementEpoch = ReportFormat.MeasurementEpoch,
             GeneratedAt = DateTimeOffset.UtcNow,
-            Detail = Detail,
+            Detail = context.Detail,
             GcBehavior = results.FirstOrDefault()?.GcBehavior ?? GcBehavior.Natural,
             Results = serializedResults,
         };

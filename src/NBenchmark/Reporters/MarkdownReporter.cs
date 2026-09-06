@@ -8,18 +8,15 @@ public sealed class MarkdownReporter : IReporter
     private const int BarWidth = 15;
     private static int _fileCounter;
     private readonly string? _fileName;
-    private readonly string _outputDirectory;
+    private readonly string? _outputDirectory;
 
-    public MarkdownReporter(string outputDirectory = ".", string? fileName = null, ReportDetail detail = ReportDetail.Simple)
+    public MarkdownReporter(string? outputDirectory = null, string? fileName = null)
     {
-        _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
+        _outputDirectory = outputDirectory is null ? null : PathValidation.ValidateOutputPath(outputDirectory);
         _fileName = fileName;
-        Detail = detail;
     }
 
     public string Name => "markdown";
-
-    public ReportDetail Detail { get; set; }
 
     /// <summary>
     ///     The path of the file the last <see cref="ReportAsync" /> wrote.
@@ -33,14 +30,20 @@ public sealed class MarkdownReporter : IReporter
 
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
+        ReportContext context,
         CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(_outputDirectory);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var directory = _outputDirectory ?? PathValidation.ValidateOutputPath(context.OutputDirectory ?? ".");
+        Directory.CreateDirectory(directory);
 
         var fileName = _fileName
-                       ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.md";
+                       ?? context.FileName
+                       ?? $"benchmark-results-{context.StartedUtc.UtcDateTime:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.md";
 
-        var filePath = Path.Combine(_outputDirectory, fileName);
+        var filePath = Path.Combine(directory, fileName);
+        var detail = context.Detail;
         LastWrittenPath = filePath;
 
         var sb = new StringBuilder();
@@ -119,9 +122,9 @@ public sealed class MarkdownReporter : IReporter
                 sb.AppendLine();
             }
 
-            RenderComparisonTable(sb, table, Detail);
+            RenderComparisonTable(sb, table, detail);
 
-            if (Detail == ReportDetail.Simple)
+            if (detail == ReportDetail.Simple)
             {
                 RenderSimpleFooter(sb, table);
                 RenderWarnings(sb, table);
@@ -131,7 +134,7 @@ public sealed class MarkdownReporter : IReporter
 
             RenderTimingDetail(sb, table);
             RenderDiagnostics(sb, table);
-            RenderDistributionDetails(sb, table, Detail);
+            RenderDistributionDetails(sb, table, detail);
             RenderInterpretation(sb, table);
             RenderWarnings(sb, table);
             sb.AppendLine();

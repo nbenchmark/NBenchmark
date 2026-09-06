@@ -61,7 +61,7 @@ internal static class RelativeComparison
     ///     The paired per-replicate ratio between the two, when they were measured co-resident in two
     ///     or more replicate workers. When present it <b>replaces both halves of the gate's test</b>:
     ///     the ratio compared against <paramref name="maxSlowdownRatio" /> is this estimate rather than
-    ///     the quotient of means, and the difference counts as real only when the interval excludes
+    ///     the quotient of medians, and the difference counts as real only when the interval excludes
     ///     <c>1.00x</c> rather than when the Mann-Whitney p-value clears
     ///     <paramref name="significanceLevel" />.
     ///     <para>
@@ -72,7 +72,7 @@ internal static class RelativeComparison
     ///         the run-to-run spread, and it is the quantity a gate that must survive a re-run needs.
     ///     </para>
     ///     <para>
-    ///         <c>null</c> keeps the pooled-sample test and the quotient of means, which is all a
+    ///         <c>null</c> keeps the pooled-sample test and the quotient of medians, which is all a
     ///         single-replicate measurement can support.
     ///     </para>
     /// </param>
@@ -116,12 +116,12 @@ internal static class RelativeComparison
             return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false, pairedRatio);
         }
 
-        if (referenceResult.MeanNs <= 0)
+        if (referenceResult.MedianNs <= 0)
         {
-            if (candidateResult.MeanNs > 0)
+            if (candidateResult.MedianNs > 0)
             {
                 violations.Add(
-                    $"Regression detected: mean {candidateResult.MeanNs:F2} ns exceeds non-positive reference {referenceResult.MeanNs:F2} ns.");
+                    $"Regression detected: median {candidateResult.MedianNs:F2} ns exceeds non-positive reference {referenceResult.MedianNs:F2} ns.");
             }
 
             return new RelativeComparisonVerdict(
@@ -136,7 +136,11 @@ internal static class RelativeComparison
         // The paired estimate when the measurement produced one, on both counts: the ratio the gate
         // applies its threshold to, and the test of whether the two differ at all. See the parameter
         // documentation for why the pooled p-value is reported but not gated on.
-        var ratio = pairedRatio?.Value ?? candidateResult.MeanNs / referenceResult.MeanNs;
+        //
+        // The unpaired fallback quotients medians rather than means, so the threshold bounds the same
+        // statistic at every launch count: the paired estimate is built from per-launch medians, and a
+        // gate whose statistic changed with LaunchCount would mean two different things.
+        var ratio = pairedRatio?.Value ?? candidateResult.MedianNs / referenceResult.MedianNs;
 
         var differenceIsReal = pairedRatio is { } estimate
             ? estimate.Lower > 1.0
@@ -155,7 +159,7 @@ internal static class RelativeComparison
                   + $"({paired.ConfidenceLevel:P0} interval). MedianNs {candidateResult.MedianNs:F2} ns vs "
                   + $"{referenceResult.MedianNs:F2} ns. Exceeds the {maxSlowdownRatio:F2}x ratio gate by more "
                   + "than run-to-run variation."
-                : $"Regression detected: mean {candidateResult.MeanNs:F2} ns vs reference '{referenceName}' {referenceResult.MeanNs:F2} ns " +
+                : $"Regression detected: median {candidateResult.MedianNs:F2} ns vs reference '{referenceName}' {referenceResult.MedianNs:F2} ns " +
                   $"(ratio {ratio:F2}x, p={mwu.PValue:F4}, Cliff's delta={mwu.CliffsDelta:F3}). " +
                   $"Significant slowdown exceeding {maxSlowdownRatio:F2}x ratio gate.");
         }
@@ -175,7 +179,7 @@ internal static class RelativeComparison
 /// <param name="Violations">Human-readable violation strings; empty when the comparison passed.</param>
 /// <param name="Ratio">
 ///     The ratio the gate applied its threshold to: the paired per-replicate estimate when
-///     <paramref name="Estimate" /> is present, otherwise candidate mean divided by reference mean.
+///     <paramref name="Estimate" /> is present, otherwise candidate median divided by reference median.
 ///     <c>NaN</c> when undefined.
 /// </param>
 /// <param name="PValue">

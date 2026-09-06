@@ -14,6 +14,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
 
     internal PerformanceTestData(
         double maxMeanNs,
+        double maxMedianNs,
         double maxP95Ns,
         long maxAllocatedBytes,
         string? referenceMethod,
@@ -29,6 +30,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         string? skipReason = null)
     {
         MaxMeanNs = maxMeanNs;
+        MaxMedianNs = maxMedianNs;
         MaxP95Ns = maxP95Ns;
         MaxAllocatedBytes = maxAllocatedBytes;
         ReferenceMethod = referenceMethod;
@@ -46,6 +48,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
 
     internal string? SkipReason { get; private set; }
     public double MaxMeanNs { get; private set; } = -1;
+    public double MaxMedianNs { get; private set; } = -1;
     public double MaxP95Ns { get; private set; } = -1;
     public long MaxAllocatedBytes { get; private set; } = -1;
     public string? ReferenceMethod { get; private set; }
@@ -62,6 +65,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     public void Serialize(IXunitSerializationInfo info)
     {
         info.AddValue(nameof(MaxMeanNs), MaxMeanNs);
+        info.AddValue(nameof(MaxMedianNs), MaxMedianNs);
         info.AddValue(nameof(MaxP95Ns), MaxP95Ns);
         info.AddValue(nameof(MaxAllocatedBytes), MaxAllocatedBytes);
         info.AddValue(nameof(ReferenceMethod), ReferenceMethod ?? NullSentinel);
@@ -80,6 +84,12 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     public void Deserialize(IXunitSerializationInfo info)
     {
         MaxMeanNs = info.GetValue<double>(nameof(MaxMeanNs));
+
+        // Defaulted rather than trusted, for the reason LaunchCount is below: a test case serialized
+        // by a build that predates this threshold carries no value, and the 0 that reads back is a
+        // threshold of zero nanoseconds rather than the absent one it really is.
+        var maxMedianNs = info.GetValue<double>(nameof(MaxMedianNs));
+        MaxMedianNs = maxMedianNs > 0 ? maxMedianNs : IPerformanceThresholds.Unset;
         MaxP95Ns = info.GetValue<double>(nameof(MaxP95Ns));
         MaxAllocatedBytes = info.GetValue<long>(nameof(MaxAllocatedBytes));
         var referenceMethod = info.GetValue<string>(nameof(ReferenceMethod));
@@ -104,6 +114,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     internal static PerformanceTestData FromThresholds(IPerformanceThresholds thresholds, string? skipReason = null) =>
         new(
             thresholds.MaxMeanNs,
+            thresholds.MaxMedianNs,
             thresholds.MaxP95Ns,
             thresholds.MaxAllocatedBytes,
             thresholds.ReferenceMethod,

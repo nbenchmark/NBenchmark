@@ -38,7 +38,7 @@ public class BenchmarkSuiteFluentParityTests
     {
         var expected = typeof(BenchmarkSuite)
             .GetMethods(Declared)
-            .Where(m => m.Name.StartsWith("With", StringComparison.Ordinal))
+            .Where(IsFluent)
             .Where(m => m.ReturnType == typeof(BenchmarkSuite))
             .Where(m => !NotApplicable.Contains(m.Name))
             .Select(Signature)
@@ -46,7 +46,7 @@ public class BenchmarkSuiteFluentParityTests
 
         var actual = typeof(BenchmarkSuite<>)
             .GetMethods(Declared)
-            .Where(m => m.Name.StartsWith("With", StringComparison.Ordinal))
+            .Where(IsFluent)
             .Select(Signature)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -69,7 +69,7 @@ public class BenchmarkSuiteFluentParityTests
     {
         var wrong = typeof(BenchmarkSuite<>)
             .GetMethods(Declared)
-            .Where(m => m.Name.StartsWith("With", StringComparison.Ordinal))
+            .Where(IsFluent)
             .Where(m => m.ReturnType != typeof(BenchmarkSuite<>).GetGenericArguments()[0].DeclaringType)
             .Select(Signature)
             .ToList();
@@ -79,6 +79,13 @@ public class BenchmarkSuiteFluentParityTests
             "these return the base rather than BenchmarkSuite<TState>:" + Environment.NewLine
             + string.Join(Environment.NewLine, wrong.Select(m => "  " + m)));
     }
+
+    /// <summary>
+    ///     The chainable configuration surface: every <c>With*</c> setter plus <c>Configure</c>, which
+    ///     is one of them in everything but name.
+    /// </summary>
+    private static bool IsFluent(MethodInfo method)
+        => method.Name.StartsWith("With", StringComparison.Ordinal) || method.Name == "Configure";
 
     /// <summary>Name plus parameter types, which is what makes an overload distinct.</summary>
     private static string Signature(MethodInfo method)

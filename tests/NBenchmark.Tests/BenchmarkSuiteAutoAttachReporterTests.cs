@@ -16,7 +16,7 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
     public async Task AutoAttached_Reporter_Receives_Result_List()
     {
         var capturing = new CapturingAutoReporter("capture");
-        ReporterRegistry.RegisterAutoAttach("capture", "Captures results", (_, _) => capturing);
+        ReporterRegistry.RegisterAutoAttach("capture", "Captures results", _ => capturing);
 
         var results = await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
@@ -39,7 +39,7 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
     {
         var order = new List<string>();
         var explicitReporter = new OrderTrackingReporter("explicit", order);
-        ReporterRegistry.RegisterAutoAttach("auto", "Auto", (_, _) => new OrderTrackingReporter("auto", order));
+        ReporterRegistry.RegisterAutoAttach("auto", "Auto", _ => new OrderTrackingReporter("auto", order));
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
@@ -57,8 +57,8 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
     {
         var thrown = new ThrowingAutoReporter("throws");
         var captureAfter = new CapturingAutoReporter("after");
-        ReporterRegistry.RegisterAutoAttach("throws", "Throws", (_, _) => thrown);
-        ReporterRegistry.RegisterAutoAttach("after", "After", (_, _) => captureAfter);
+        ReporterRegistry.RegisterAutoAttach("throws", "Throws", _ => thrown);
+        ReporterRegistry.RegisterAutoAttach("after", "After", _ => captureAfter);
 
         var results = await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
@@ -79,9 +79,9 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
     public async Task Multiple_AutoAttached_Reporters_All_Fire_In_Registration_Order()
     {
         var order = new List<string>();
-        ReporterRegistry.RegisterAutoAttach("first", "1", (_, _) => new OrderTrackingReporter("first", order));
-        ReporterRegistry.RegisterAutoAttach("second", "2", (_, _) => new OrderTrackingReporter("second", order));
-        ReporterRegistry.RegisterAutoAttach("third", "3", (_, _) => new OrderTrackingReporter("third", order));
+        ReporterRegistry.RegisterAutoAttach("first", "1", _ => new OrderTrackingReporter("first", order));
+        ReporterRegistry.RegisterAutoAttach("second", "2", _ => new OrderTrackingReporter("second", order));
+        ReporterRegistry.RegisterAutoAttach("third", "3", _ => new OrderTrackingReporter("third", order));
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
@@ -98,7 +98,7 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
     {
         var callCount = 0;
         var explicitInstance = new CountingAutoReporter("dedup", () => callCount++);
-        ReporterRegistry.RegisterAutoAttach("dedup", "auto", (_, _) => new CountingAutoReporter("dedup", () => callCount++));
+        ReporterRegistry.RegisterAutoAttach("dedup", "auto", _ => new CountingAutoReporter("dedup", () => callCount++));
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
@@ -116,7 +116,7 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
     public async Task AutoAttached_Reporter_Fires_Once_Per_RunAsync_Not_Per_Benchmark()
     {
         var callCount = 0;
-        ReporterRegistry.RegisterAutoAttach("count", "Counts calls", (_, _) => new CountingAutoReporter("count", () => callCount++));
+        ReporterRegistry.RegisterAutoAttach("count", "Counts calls", _ => new CountingAutoReporter("count", () => callCount++));
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
@@ -135,7 +135,7 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
     public async Task AutoAttached_Reporter_Fires_On_Isolated_Path()
     {
         var capturing = new CapturingAutoReporter("capture");
-        ReporterRegistry.RegisterAutoAttach("capture", "Captures", (_, _) => capturing);
+        ReporterRegistry.RegisterAutoAttach("capture", "Captures", _ => capturing);
 
         var results = await new BenchmarkSuite("isolated").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })

@@ -340,10 +340,10 @@ static void PrintToolHelp()
     Console.WriteLine();
     Console.WriteLine("All BenchmarkHarness flags pass through unchanged:");
     Console.WriteLine("  --filter, --samples, --warmup-samples, --reporter, --output, --confidence,");
-    Console.WriteLine("  --alpha, --outlier, --auto-tune, --ops-per-sample, --ci-target,");
+    Console.WriteLine("  --significance-level, --outlier, --auto-tune, --ops-per-sample, --ci-target,");
     Console.WriteLine("  --min-samples, --max-samples, --min-warmup-samples, --max-warmup-samples,");
     Console.WriteLine("  --max-tuning-time, --list, --dry-run, --in-process, --order, --seed,");
-    Console.WriteLine("  --detail, --threshold-pct, --gc, --force-gc, --no-allocations, --help");
+    Console.WriteLine("  --detail, --max-regression-percent, --gc, --force-gc, --no-allocations, --help");
     Console.WriteLine();
     Console.WriteLine("See https://docs.nbenchmark.net for the full CLI reference.");
 }

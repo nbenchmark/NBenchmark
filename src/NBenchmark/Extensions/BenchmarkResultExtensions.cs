@@ -129,7 +129,7 @@ public static class BenchmarkResultExtensions
         this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {
         var reporter = new MarkdownReporter(outputDir, fileName);
-        await reporter.ReportAsync([result]);
+        await reporter.ReportAsync([result], ReportContext.Default);
         return reporter.LastWrittenPath!;
     }
 
@@ -138,7 +138,7 @@ public static class BenchmarkResultExtensions
         this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {
         var reporter = new JsonReporter(outputDir, fileName);
-        await reporter.ReportAsync([result]);
+        await reporter.ReportAsync([result], ReportContext.Default);
         return reporter.LastWrittenPath!;
     }
 
@@ -147,7 +147,7 @@ public static class BenchmarkResultExtensions
         this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {
         var reporter = new CsvReporter(outputDir, fileName);
-        await reporter.ReportAsync([result]);
+        await reporter.ReportAsync([result], ReportContext.Default);
         return reporter.LastWrittenPath!;
     }
 }

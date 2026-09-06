@@ -33,7 +33,16 @@ MyApp.Benchmarks [options]
 | [`--output <directory>`](#output) | Specify where file reporters write their output. |
 | [`--detail <level>`](#output) | Control how much statistical detail reporters show. |
 | [`--launch-count <n>`](#measurement) | Repeat the run in N processes to measure run-to-run spread. |
-| [`--threshold-pct <n>`](#run-control) | Fail the run if a benchmark regresses past this percentage. |
+| [`--max-regression-percent <n>`](#run-control) | Fail the run if a benchmark regresses past this percentage. |
+
+## Flag naming
+
+Two rules run through the whole list:
+
+- A flag that can be given **more than once** is singular: `--reporter`, `--observer`, `--include-category`, `--exclude-category`.
+- A flag that takes **one comma-separated list** is plural: `--runtimes`, `--percentiles`.
+
+`--help` prints the flags grouped by the decision they belong to. The auto-tune internals live behind `--help advanced` so they do not bury the everyday ones.
 
 ## All options
 
@@ -41,10 +50,10 @@ MyApp.Benchmarks [options]
 
 | Flag | Description |
 | --- | --- |
-| `--filter <pattern>` | Run only benchmarks whose fully-qualified name (`ClassName.MethodName`) matches the glob pattern. Matching is case-insensitive. Use `*` as a wildcard. |
-| `--category <name>` | Include benchmarks tagged with the given category. Repeatable; multiple flags are combined with OR. Untagged benchmarks are excluded when any `--category` flag is present. |
+| `--filter <pattern>`, `-f` | Run only benchmarks whose fully-qualified name (`ClassName.MethodName`) matches the glob pattern. Matching is case-insensitive. Use `*` as a wildcard. |
+| `--include-category <name>` | Include benchmarks tagged with the given category. Repeatable; multiple flags are combined with OR. Untagged benchmarks are excluded when any `--include-category` flag is present. |
 | `--exclude-category <name>` | Exclude benchmarks tagged with the given category. Repeatable; multiple flags are combined with OR. |
-| `--list` | List all discovered benchmarks without running them. |
+| `--list`, `-l` | List all discovered benchmarks without running them. |
 
 ### Measurement
 
@@ -74,7 +83,7 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 | `--min-warmup-samples <n>` | `8` | The floor for auto-detected warmup samples. |
 | `--max-warmup-samples <n>` | `100000` | The ceiling for auto-detected warmup samples. |
 | `--max-tuning-time <s>` | `20` | Per-benchmark wall-clock safety cap (seconds) for the adaptive loop. |
-| `--autotune-cap-behavior <mode>` | `warn` | Action when wall-clock cap is hit: `warn` emits a warning; `error` marks the benchmark as errored. |
+| `--auto-tune-cap-behavior <mode>` | `warn` | Action when wall-clock cap is hit: `warn` emits a warning; `error` marks the benchmark as errored. |
 | `--warmup-budget-fraction <0-1>` | `0.4` | Max share of `--max-tuning-time` for calibration and warmup. |
 | `--cap-grace-factor <n>` | `1.5` | Multiplier for the measurement phase when chasing `--min-samples` after the cap fires. |
 | `--min-warmup-time <ms>` | `500` | Minimum in-body time auto-warmup must accumulate before it can settle. |
@@ -89,12 +98,13 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 | Flag | Description |
 | --- | --- |
 | `--confidence <value>` | Set the confidence level for the margin of error. Must be between 0 and 1. Default: `0.95`. |
-| `--alpha <value>` | Set the significance level (alpha). A benchmark is significant when `p < alpha`. Default: `0.05`. |
+| `--significance-level <value>` | Set the significance level (alpha). A benchmark is significant when `p < alpha`. Default: `0.05`. |
 | `--outlier <mode>` | Set the outlier-trimming mode (`none`, `top5`, `both5`, `iqr`, `mad`). Default: `iqr`. |
 | `--no-interference-filter` | Disable evidence-based interference rejection. |
 | `--tail-basis <basis>` | Set the sample set for order statistics (`raw` or `trimmed`). Default: `raw`. |
 | `--percentiles <list>` | Set the computed percentiles (comma-separated fractions). Default: `0.50,0.95,0.99,0.999,1.0`. |
 | `--min-practical-effect <0-1>` | Set the minimum practical effect required for a significant verdict. Default: `0.147`. |
+| `--min-relative-shift <0-1>` | Set the minimum relative median shift required for a significant verdict. Default: `0.01`; `0` disables the gate. |
 | `--cross-class` | Compute significance across all classes in a single table. |
 
 ### Output
@@ -102,11 +112,12 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 | Flag | Description |
 | --- | --- |
 | `--reporter <type>` | Add a reporter by name (e.g., `json`, `markdown`, `csv`, `console`). Repeatable. |
-| `--output <directory>` | Set the output directory for file reporters. Must be under the CWD. |
+| `--output <directory>`, `-o` | Set the output directory for file reporters. Must be under the CWD. A reporter you constructed with a directory of its own keeps it. |
+| `--no-color` | Print without colour or styling. A non-empty `NO_COLOR` environment variable does the same, and `--no-color` sets it for the process so worker output follows. |
 | `--detail <level>` | Set the report detail level (`simple`, `standard`, `advanced`). Default: `simple`. |
 | `--no-histogram` | Disable latency histogram computation. |
-| `--emit-raw` | Return every raw sample from isolated workers instead of a representative subset. |
-| `--no-samples` | Omit raw sample arrays from JSON output. |
+| `--full-raw-samples` | Return every raw sample from isolated workers instead of a representative subset. |
+| `--no-raw-samples` | Omit raw sample arrays from JSON output. |
 
 ### Isolation
 
@@ -133,7 +144,7 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 | `--diagnostics <mode>` | Control runtime diagnostics (`none`, `gc`, `gcandcpu`, `all`). Default: `gc`. |
 | `--no-drift-canary` | Disable the host drift canary. |
 | `--observer <type>` | Attach a measurement observer by name. Repeatable. |
-| `--stream-samples` | Forward the live per-sample observer stream from isolated workers. |
+| `--stream-raw-samples` | Forward the live per-sample observer stream from isolated workers. |
 | `--otlp-endpoint <url>` | Set the OTLP endpoint for OpenTelemetry export. |
 
 ### Run control
@@ -142,15 +153,16 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 | --- | --- |
 | `--order <mode>` | Control run order (`random` or `declaration`). Default: `random`. |
 | `--seed <n>` | Set a fixed integer seed for reproducible random ordering. |
-| `--threshold-pct <n>` | Fail the run (exit code 1) if a benchmark regresses past this percentage. |
-| `--help` / `-h` | Print help text and exit. |
+| `--max-regression-percent <n>` | Fail the run (exit code 1) if a benchmark regresses past this percentage. |
+| `--help` / `-h` `[advanced]` | Print help text and exit. `--help advanced` prints the auto-tune internals instead. |
+| `--version` | Print the NBenchmark version and exit. |
 
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
 | `0` | The run completed successfully. Errored benchmarks are recorded but are not fatal. |
-| `1` | A fatal error occurred. This includes argument parsing errors (unknown flags, out-of-range values), invalid formats, or a benchmark exceeding the `--threshold-pct` limit. |
+| `1` | A fatal error occurred. This includes argument parsing errors (unknown flags, out-of-range values), invalid formats, or a benchmark exceeding the `--max-regression-percent` limit. |
 
 When exit code `1` is set during argument parsing, the run still completes to allow you to see the results, but the non-zero code ensures CI pipelines catch the issue.
 

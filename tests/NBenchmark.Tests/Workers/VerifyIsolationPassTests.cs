@@ -168,7 +168,7 @@ public sealed class VerifyIsolationPassTests
 
         try
         {
-            await Harness("--verify-isolation", "--threshold-pct", "1").RunAsync();
+            await Harness("--verify-isolation", "--max-regression-percent", "1").RunAsync();
         }
         finally
         {
@@ -257,10 +257,10 @@ public sealed class VerifyIsolationPassTests
 
         public string Name => "counting";
 
-        public ReportDetail Detail { get; set; }
 
         public Task ReportAsync(
             IReadOnlyList<BenchmarkResult> results,
+            ReportContext context,
             CancellationToken cancellationToken = default)
         {
             ReportCount++;

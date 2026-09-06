@@ -109,7 +109,7 @@ public static class ReportFormat
     ///                             The ratio is the geometric mean of the <i>per-launch</i> ratios
     ///                             rather than the quotient of two aggregated medians. The two differ
     ///                             whenever the launches disagree, which is the case the pairing exists
-    ///                             for. <c>--threshold-pct</c> gates on the paired value, so a gate can
+    ///                             for. <c>--max-regression-percent</c> gates on the paired value, so a gate can
     ///                             change verdict on unchanged code.
     ///                         </description>
     ///                     </item>
@@ -164,7 +164,7 @@ public static class ReportFormat
     ///                 <para>
     ///                     Neither change alters what a statistic <i>means</i>, but both move stored
     ///                     numbers on most hosts, and the second moves the interval a
-    ///                     <c>--threshold-pct</c> gate reads.
+    ///                     <c>--max-regression-percent</c> gate reads.
     ///                 </para>
     ///             </description>
     ///         </item>
@@ -182,7 +182,7 @@ public static class ReportFormat
     ///                     <c>StandardErrorNs</c>, <c>MarginOfErrorNs</c> and everything derived from
     ///                     them - the confidence bounds, <c>MarginOfErrorPercent</c>,
     ///                     <c>StandardErrorPercent</c>, and the margins a
-    ///                     <c>MaxRegressionPercent</c> or <c>--threshold-pct</c> gate reads - widen on
+    ///                     <c>MaxRegressionPercent</c> or <c>--max-regression-percent</c> gate reads - widen on
     ///                     every benchmark that trimmed anything, which under the default
     ///                     <c>IqrFence</c> is most of them. The direction is always the same and the
     ///                     size scales with how much was trimmed. No other statistic moves, and a run

@@ -17,6 +17,7 @@ public sealed class MyReporter : IReporter
 
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
+        ReportContext context,
         CancellationToken cancellationToken = default)
     {
         foreach (var result in results.Where(r => !r.Errored))
@@ -29,13 +30,30 @@ public sealed class MyReporter : IReporter
 
 Attach the reporter to your harness or suite using `.WithReporter(new MyReporter())`.
 
+## What the ReportContext carries
+
+`ReportContext` describes the run being reported, not the reporter:
+
+| Member | Type | Description |
+|---|---|---|
+| `Detail` | `ReportDetail` | How much of each result to print. Set by `--detail` or `.WithDetail(...)`. |
+| `OutputDirectory` | `string?` | Where a file-writing reporter should write, when it was not constructed with a directory of its own. Set by `--output`. |
+| `FileName` | `string?` | The file name to use, when the reporter was not constructed with one. |
+| `StartedUtc` | `DateTimeOffset` | When the run started. The built-in file reporters stamp generated file names with this, so every file from one run shares a timestamp. |
+
+Detail arrives per run rather than living on the reporter, so a reporter instance is reusable and nothing rewrites it behind your back. Honor `context.Detail` when your format has more and less verbose forms, and read `context.OutputDirectory` before falling back to a directory of your own:
+
+```csharp
+var directory = _outputDirectory ?? context.OutputDirectory ?? ".";
+```
+
 If you want your custom reporter to be usable via the `--reporter` CLI flag, register it with the global `ReporterRegistry`:
 
 ```csharp
 using NBenchmark.Reporters;
 
 // In a static constructor or [ModuleInitializer]:
-ReporterRegistry.Register("my-reporter", "Custom output", (_, detail) => new MyReporter { Detail = detail });
+ReporterRegistry.Register("my-reporter", "Custom output", dir => new MyReporter(dir));
 ```
 
 After registration, the `--reporter my-reporter` flag works from the CLI.
@@ -66,7 +84,7 @@ internal static class MyReporterRegistration
         ReporterRegistry.RegisterAutoAttach(
             "my-sink",
             "Writes run results to a file inbox for MyTool to ingest",
-            (_, detail) => new MySinkReporter { Detail = detail });
+            dir => new MySinkReporter(dir));
 }
 ```
 
@@ -107,6 +125,7 @@ For reporters that produce comparison tables, use `BenchmarkTable.Build(results)
 ```csharp
 public async Task ReportAsync(
     IReadOnlyList<BenchmarkResult> results,
+    ReportContext context,
     CancellationToken cancellationToken = default)
 {
     var table = BenchmarkTable.Build(results);

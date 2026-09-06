@@ -848,6 +848,33 @@ public class BenchmarkSuite(string name)
     }
 
     /// <summary>
+    ///     Applies <paramref name="configure" /> to the suite's current
+    ///     <see cref="MeasurementOptions" /> and keeps the result.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The merging counterpart of <see cref="WithOptions" />, and the way to reach a setting
+    ///         that has no <c>With*</c> shortcut without discarding the ones that do:
+    ///     </para>
+    ///     <code>
+    ///     .Configure(o =&gt; o with { Samples = 200, ReportedPercentiles = [0.5, 0.95] })
+    ///     </code>
+    ///     <para>
+    ///         Every builder takes the same call with the same lambda, so a configuration helper
+    ///         written once applies to a suite and to a harness alike.
+    ///     </para>
+    /// </remarks>
+    public BenchmarkSuite Configure(Func<MeasurementOptions, MeasurementOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+
+        _options = configure(_options) ?? throw new BenchmarkConfigurationException(
+            "Configure must return a MeasurementOptions instance; it returned null.");
+
+        return this;
+    }
+
+    /// <summary>
     ///     Configures the host drift canary - the deterministic control workload measured at each
     ///     benchmark boundary, which is what lets a run say how much the host's effective speed
     ///     moved while it was running. On by default.
@@ -1121,19 +1148,20 @@ public class BenchmarkSuite(string name)
 
     public BenchmarkSuite WithReporter(IReporter reporter)
     {
-        reporter.Detail = _detail;
+        ArgumentNullException.ThrowIfNull(reporter);
+
         _reporters.Add(reporter);
         return this;
     }
 
+    /// <summary>
+    ///     Sets how much of each result the reporters print. Detail belongs to the run rather than to
+    ///     any reporter object, so this is handed to every reporter at report time through
+    ///     <see cref="ReportContext" /> rather than written into the reporters as they are attached.
+    /// </summary>
     public BenchmarkSuite WithDetail(ReportDetail detail)
     {
         _detail = detail;
-
-        foreach (var reporter in _reporters)
-        {
-            reporter.Detail = detail;
-        }
 
         return this;
     }
@@ -2229,7 +2257,9 @@ public class BenchmarkSuite(string name)
 
     private async Task InvokeReportersAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
     {
-        await ReporterRegistry.InvokeReportersAsync(_reporters, _detail, results, cancellationToken)
+        var context = new ReportContext(_detail) { NoColor = CliArgs.NoColorRequestedByEnvironment() };
+
+        await ReporterRegistry.InvokeReportersAsync(_reporters, context, results, cancellationToken)
             .ConfigureAwait(false);
     }
 

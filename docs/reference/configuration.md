@@ -43,9 +43,15 @@ await new BenchmarkSuite("name")
 
 ### In Harness mode
 
-Call `WithOptions` or use CLI flags. CLI flags always take priority over `WithOptions`:
+The same `With*` methods are available, or pass a whole options object to `WithOptions`. CLI flags always take priority over both:
 
 ```csharp
+BenchmarkHarness.Create(args)
+    .WithSamples(500)
+    .WithWarmupSamples(50)
+    .WithConfidenceLevel(0.99)
+    ...
+
 BenchmarkHarness.Create(args)
     .WithOptions(new MeasurementOptions { Samples = 500 })
     ...
@@ -54,6 +60,16 @@ BenchmarkHarness.Create(args)
 ```bash
 dotnet run -- --samples 500 --warmup-samples 50
 ```
+
+### Configure: merging into the current options
+
+`WithOptions` replaces the whole options object. `Configure` applies a function to the current one, which is how you reach a setting that has no `With*` shortcut without discarding the ones you already set:
+
+```csharp
+.Configure(o => o with { Samples = 200, ReportedPercentiles = [0.5, 0.95] })
+```
+
+`Configure` is the same call on `BenchmarkSuite`, `BenchmarkSuite<TState>` and `BenchmarkHarness`, so a helper written once configures any of them.
 
 ## Options reference
 
@@ -204,7 +220,7 @@ Select a preset using `.WithAutoTune(AutoTuneOptions.Thorough)` (suite/harness) 
 The interval's confidence level is set by `ConfidenceLevel` (see below).
 
 BenchmarkSuite/BenchmarkHarness fluent method: `.WithAutoTune(AutoTuneOptions.Quick)` or `.WithAutoTune(customOptions)`
-CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup-samples`, `--max-warmup-samples`, `--max-tuning-time`, `--autotune-cap-behavior`, `--warmup-budget-fraction`, `--cap-grace-factor`, `--min-warmup-time`, `--no-jit-quiescence`, `--jit-quiet-period`, `--min-measurement-time`, `--drift-tolerance`, `--max-drift-restarts`.
+CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup-samples`, `--max-warmup-samples`, `--max-tuning-time`, `--auto-tune-cap-behavior`, `--warmup-budget-fraction`, `--cap-grace-factor`, `--min-warmup-time`, `--no-jit-quiescence`, `--jit-quiet-period`, `--min-measurement-time`, `--drift-tolerance`, `--max-drift-restarts`.
 
 ### GcBehavior
 
@@ -610,7 +626,7 @@ SignificanceLevel = 0.05   // default
 
 The significance threshold (alpha) used to compare a result's p-value. A result is flagged as significant when `p < SignificanceLevel`. This must be a value strictly between 0 and 1. Lower this (e.g., `0.01`) to demand stronger evidence before marking a difference as real.
 
-CLI flag: `--alpha 0.01`
+CLI flag: `--significance-level 0.01`
 
 ### SignificanceTest
 

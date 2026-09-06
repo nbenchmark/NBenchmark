@@ -19,26 +19,25 @@ public sealed class ConsoleReporter : IReporter
     private const string MedianStyle = "bold yellow";
     private const string OutlierStyle = "indianred1";
 
-    public ConsoleReporter(ReportDetail detail = ReportDetail.Simple)
-    {
-        Detail = detail;
-    }
-
     public string Name => "console";
-
-    public ReportDetail Detail { get; set; }
 
     public Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
+        ReportContext context,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
+        ColorPreference.Apply(context.NoColor);
+
         if (results.Count == 0)
         {
             AnsiConsole.MarkupLine("[yellow]No results to display.[/]");
             return Task.CompletedTask;
         }
 
-        var showCategories = Detail == ReportDetail.Advanced && results.Any(r => r.Categories.Count > 0);
+        var detail = context.Detail;
+        var showCategories = detail == ReportDetail.Advanced && results.Any(r => r.Categories.Count > 0);
 
         if (results.All(r => r.Errored))
         {
@@ -53,7 +52,7 @@ public sealed class ConsoleReporter : IReporter
         var tables = BenchmarkTable.BuildPerClass(results);
         var firstTable = tables[0];
 
-        if (Detail == ReportDetail.Simple)
+        if (detail == ReportDetail.Simple)
         {
             foreach (var table in tables)
             {
@@ -61,7 +60,7 @@ public sealed class ConsoleReporter : IReporter
                     ? null
                     : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.Result.ClassName))?.Result.ClassName;
 
-                RenderComparisonTable(table, className, Detail);
+                RenderComparisonTable(table, className, detail);
                 AnsiConsole.WriteLine();
                 RenderSimpleFooter(table);
                 RenderWarnings(table);
@@ -80,7 +79,7 @@ public sealed class ConsoleReporter : IReporter
                 ? null
                 : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.Result.ClassName))?.Result.ClassName;
 
-            RenderComparisonTable(table, className, Detail);
+            RenderComparisonTable(table, className, detail);
             AnsiConsole.WriteLine();
             RenderTimingDetail(table);
             RenderDiagnostics(table);
@@ -89,7 +88,7 @@ public sealed class ConsoleReporter : IReporter
             RenderInterpretation(table, table.Rows.Count);
             RenderAutoTune(table);
 
-            if (Detail == ReportDetail.Advanced)
+            if (detail == ReportDetail.Advanced)
             {
                 AnsiConsole.WriteLine();
                 RenderAdvancedDetails(table);
@@ -1212,7 +1211,7 @@ public sealed class ConsoleReporter : IReporter
         ReporterRegistry.Register(
             "console",
             "Console output (Spectre.Console table + bar chart)",
-            (_, detail) => new ConsoleReporter(detail));
+            _ => new ConsoleReporter());
 
     private static string Esc(string? text) => Markup.Escape(text ?? "");
 }

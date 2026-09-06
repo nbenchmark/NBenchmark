@@ -154,24 +154,24 @@ By default, benchmarks are measured in a separate `nbworker` process, while the 
 | `OnPhase` | ✅ every transition | ✅ |
 | `OnDetector` | ✅ every snapshot | ✅ |
 | `OnResult` | ✅ once per benchmark | ✅ |
-| `OnSample` | ⬜ opt in with `--stream-samples` | ✅ |
+| `OnSample` | ⬜ opt in with `--stream-raw-samples` | ✅ |
 
 `OnSample` is off by default because of the high volume of events. Every other event is emitted only a few times per benchmark. `OnDetector` is not in this class because a benchmark emits only a few snapshots, and it crosses unconditionally to provide the live convergence curve.
 
 The result remains complete regardless of the flag. The worker computes all statistics over the full sample array and ships the samples on the completion frame, so `BenchmarkResult.RawSamples` is complete (subject to `MaxRawSamples`).
 
-### Using `--stream-samples`
+### Using `--stream-raw-samples`
 
 Turn on the per-sample stream for consumers that need live data (such as a streaming histogram or a live dashboard):
 
 ```bash
-dotnet run -- --observer live --stream-samples
+dotnet run -- --observer live --stream-raw-samples
 ```
 
 Or programmatically:
 
 ```csharp
-.WithOptions(o => o with { StreamSamples = true })
+.Configure(o => o with { StreamSamples = true })
 ```
 
 Your observer receives one `OnSample` call per sample, mirroring an in-process run. The worker batches these events (one frame per 128 samples or per 100 ms) for transport, but the callback remains per-sample.

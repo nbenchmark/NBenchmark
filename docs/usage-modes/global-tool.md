@@ -22,7 +22,7 @@ The tool replaces Harness mode when you want to benchmark an existing project wi
 | Benchmark a project you already built | `dotnet benchmark` in the output directory |
 | Build and benchmark in one step | `dotnet benchmark --project ./MyBenchmarks` |
 | Benchmark a specific assembly | `dotnet benchmark --assembly ./bin/Release/net10.0/MyLib.dll` |
-| Filter, configure output, or set thresholds | All `--filter`, `--reporter`, `--output`, and `--threshold-pct` flags |
+| Filter, configure output, or set thresholds | All `--filter`, `--reporter`, `--output`, and `--max-regression-percent` flags |
 
 ## Installation
 
@@ -85,7 +85,7 @@ dotnet benchmark --filter "*Sort*"
 dotnet benchmark --reporter json --output ./results
 dotnet benchmark --samples 500 --warmup-samples 50
 dotnet benchmark --detail advanced
-dotnet benchmark --threshold-pct 20
+dotnet benchmark --max-regression-percent 20
 dotnet benchmark --list
 dotnet benchmark --dry-run
 dotnet benchmark --in-process
@@ -136,7 +136,7 @@ dotnet benchmark --filter "*Parse*"
 ```bash
 dotnet benchmark --project ./MyApp.Benchmarks \
   --reporter json --output ./bench-results \
-  --threshold-pct 10
+  --max-regression-percent 10
 ```
 
 ### Compare two builds

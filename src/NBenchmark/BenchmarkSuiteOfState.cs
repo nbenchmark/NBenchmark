@@ -299,6 +299,10 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     public new BenchmarkSuite<TState> WithSignificanceTest(Func<ISignificanceTest> factory)
         => Chain(() => base.WithSignificanceTest(factory));
 
+    /// <inheritdoc cref="BenchmarkSuite.Configure" />
+    public new BenchmarkSuite<TState> Configure(Func<MeasurementOptions, MeasurementOptions> configure)
+        => Chain(() => base.Configure(configure));
+
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithSuppressedWarnings(BenchmarkWarnings warnings)
         => Chain(() => base.WithSuppressedWarnings(warnings));

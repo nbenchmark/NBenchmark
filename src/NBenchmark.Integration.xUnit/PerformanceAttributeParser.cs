@@ -15,6 +15,7 @@ internal static class PerformanceAttributeParser
         return new ParsedThresholds
         {
             MaxMeanNs = NormalizeThreshold(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxMeanNs))),
+            MaxMedianNs = NormalizeThreshold(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxMedianNs))),
             MaxP95Ns = NormalizeThreshold(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxP95Ns))),
             MaxAllocatedBytes = NormalizeThreshold(ParseLong(attribute, nameof(PerformanceFactAttribute.MaxAllocatedBytes))),
             ReferenceMethod = NormalizeReferenceMethod(ParseString(attribute, nameof(PerformanceFactAttribute.ReferenceMethod))),
@@ -42,6 +43,7 @@ internal static class PerformanceAttributeParser
         thresholds = new ParsedThresholds
         {
             MaxMeanNs = NormalizeThreshold(runtime.MaxMeanNs),
+            MaxMedianNs = NormalizeThreshold(runtime.MaxMedianNs),
             MaxP95Ns = NormalizeThreshold(runtime.MaxP95Ns),
             MaxAllocatedBytes = NormalizeThreshold(runtime.MaxAllocatedBytes),
             ReferenceMethod = NormalizeReferenceMethod(runtime.ReferenceMethod),
@@ -125,6 +127,7 @@ internal static class PerformanceAttributeParser
     private sealed class ParsedThresholds : IPerformanceThresholds
     {
         public double MaxMeanNs { get; init; } = IPerformanceThresholds.Unset;
+        public double MaxMedianNs { get; init; } = IPerformanceThresholds.Unset;
         public double MaxP95Ns { get; init; } = IPerformanceThresholds.Unset;
         public long MaxAllocatedBytes { get; init; } = IPerformanceThresholds.UnsetBytes;
         public string? ReferenceMethod { get; init; }

@@ -119,6 +119,7 @@ internal static class PerformanceGate
         violations.AddRange(BenchmarkAssert.Validate(result, new PerformanceThresholds
         {
             MaxMeanNs = thresholds.MaxMeanNs >= 0 ? thresholds.MaxMeanNs : null,
+            MaxMedianNs = thresholds.MaxMedianNs >= 0 ? thresholds.MaxMedianNs : null,
             MaxP95Ns = thresholds.MaxP95Ns >= 0 ? thresholds.MaxP95Ns : null,
             MaxAllocatedBytes = thresholds.MaxAllocatedBytes >= 0 ? thresholds.MaxAllocatedBytes : null,
             MaxAbsoluteThresholdTolerance = thresholds.MaxAbsoluteThresholdTolerance,

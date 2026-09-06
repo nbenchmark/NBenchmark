@@ -11,19 +11,19 @@ dotnet run
 ## Run only the fast string benchmarks
 
 ```bash
-dotnet run -- --category Fast
+dotnet run -- --include-category Fast
 ```
 
 ## Run all string benchmarks except the slow one
 
 ```bash
-dotnet run -- --category String --exclude-category Slow
+dotnet run -- --include-category String --exclude-category Slow
 ```
 
 ## Combine category filtering with a glob filter
 
 ```bash
-dotnet run -- --category String --filter CategorizedBenchmarks.Con*
+dotnet run -- --include-category String --filter CategorizedBenchmarks.Con*
 ```
 
 ## Show categories in the list output

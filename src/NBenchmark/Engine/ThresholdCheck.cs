@@ -6,7 +6,7 @@ namespace NBenchmark.Engine;
 ///     fastest by median when no baseline is declared) and flags any candidate whose median
 ///     exceeds the baseline by more than a configured percentage. Public so an external
 ///     consumer (for example NBenchmark.Studio) can reuse the same baseline-selection and
-///     ratio-gate logic that the engine uses for its <c>--threshold-pct</c> exit-code gate,
+///     ratio-gate logic that the engine uses for its <c>--max-regression-percent</c> exit-code gate,
 ///     instead of reimplementing a weaker version.
 /// </summary>
 internal static class ThresholdCheck
@@ -32,7 +32,7 @@ internal static class ThresholdCheck
     ///     <i>and</i> per benchmark class. A candidate is only ever flagged against a baseline
     ///     measured under the same runtime and runtime profile in the same class.
     ///     <para>
-    ///         This is the entry point the engine's <c>--threshold-pct</c> exit-code gate uses,
+    ///         This is the entry point the engine's <c>--max-regression-percent</c> exit-code gate uses,
     ///         because a run's <c>allResults</c> is the union of every class and (under
     ///         <c>--runtime-profile host</c> or a mixed isolated/in-process run) every
     ///         configuration. Feeding that list to <see cref="HasRegression" /> directly picks

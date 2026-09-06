@@ -27,6 +27,16 @@ public interface IPerformanceThresholds
     /// <summary>Maximum mean time per operation in nanoseconds, or <see cref="Unset" />.</summary>
     public double MaxMeanNs { get; }
 
+    /// <summary>
+    ///     Maximum median time per operation in nanoseconds, or <see cref="Unset" />.
+    ///     <para>
+    ///         The median is the statistic the reports lead with and the one significance is decided
+    ///         on, so it is the one most absolute limits mean. Prefer it over <see cref="MaxMeanNs" />
+    ///         unless the average is genuinely what is being bounded.
+    ///     </para>
+    /// </summary>
+    public double MaxMedianNs { get; }
+
     /// <summary>Maximum 95th-percentile time per operation in nanoseconds, or <see cref="Unset" />.</summary>
     public double MaxP95Ns { get; }
 

@@ -17,7 +17,7 @@ public class ReporterTests
             var reporter = new JsonReporter(tempDir);
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
             Assert.Single(files);
@@ -42,7 +42,7 @@ public class ReporterTests
             var reporter = new JsonReporter(tempDir, "custom.json");
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var filePath = Path.Combine(tempDir, "custom.json");
             Assert.True(File.Exists(filePath));
@@ -68,7 +68,7 @@ public class ReporterTests
             var reporter = new JsonReporter(tempDir);
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             Assert.True(Directory.Exists(tempDir));
             Assert.NotEmpty(Directory.GetFiles(tempDir));
@@ -89,7 +89,7 @@ public class ReporterTests
             var reporter = new JsonReporter(tempDir);
             var result = MakeResult("alpha", 100) with { RawSamples = [777.0, 888.0, 999.0] };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
             Assert.Single(files);
@@ -113,7 +113,7 @@ public class ReporterTests
             var reporter = new JsonReporter(tempDir) { IncludeSamples = false };
             var result = MakeResult("alpha", 100) with { RawSamples = [777.0, 888.0, 999.0] };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
             Assert.Single(files);
@@ -138,7 +138,7 @@ public class ReporterTests
             var reporter = new MarkdownReporter(tempDir, "out.md");
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var filePath = Path.Combine(tempDir, "out.md");
             Assert.True(File.Exists(filePath));
@@ -186,7 +186,7 @@ public class ReporterTests
                 RuntimeProfileName = RuntimeProfile.Host.Name,
             };
 
-            await reporter.ReportAsync([isolated, alsoIsolated, inHost]);
+            await reporter.ReportAsync([isolated, alsoIsolated, inHost], ReportContext.Default);
 
             var content = await File.ReadAllTextAsync(Path.Combine(tempDir, "out.md"));
 
@@ -211,10 +211,10 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Standard);
+            var reporter = new MarkdownReporter(tempDir, "out.md");
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], new ReportContext(ReportDetail.Standard));
 
             var filePath = Path.Combine(tempDir, "out.md");
             var content = await File.ReadAllTextAsync(filePath);
@@ -236,11 +236,11 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Standard);
+            var reporter = new MarkdownReporter(tempDir, "out.md");
             var net8 = MakeResult("alpha", 100, "net8.0", [new PercentileEntry(0.95, 110)]);
             var net9 = MakeResult("alpha", 80, "net9.0", [new PercentileEntry(0.95, 95)]);
 
-            await reporter.ReportAsync([net8, net9]);
+            await reporter.ReportAsync([net8, net9], new ReportContext(ReportDetail.Standard));
 
             var filePath = Path.Combine(tempDir, "out.md");
             var content = await File.ReadAllTextAsync(filePath);
@@ -262,7 +262,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Standard);
+            var reporter = new MarkdownReporter(tempDir, "out.md");
 
             var gcOnly = MakeResult("gc", 100) with
             {
@@ -284,7 +284,7 @@ public class ReporterTests
                 },
             };
 
-            await reporter.ReportAsync([gcOnly, cpuOnly]);
+            await reporter.ReportAsync([gcOnly, cpuOnly], new ReportContext(ReportDetail.Standard));
 
             var filePath = Path.Combine(tempDir, "out.md");
             var content = await File.ReadAllTextAsync(filePath);
@@ -306,11 +306,11 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Standard);
+            var reporter = new MarkdownReporter(tempDir, "out.md");
             var net8 = MakeResult("alpha", 100, "net8.0");
             var net9 = MakeResult("alpha", 80, "net9.0");
 
-            await reporter.ReportAsync([net8, net9]);
+            await reporter.ReportAsync([net8, net9], new ReportContext(ReportDetail.Standard));
 
             var filePath = Path.Combine(tempDir, "out.md");
             var content = await File.ReadAllTextAsync(filePath);
@@ -330,11 +330,11 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Advanced);
+            var reporter = new MarkdownReporter(tempDir, "out.md");
             var first = MakeResult("alpha", 100);
             var second = MakeResult("beta", 150);
 
-            await reporter.ReportAsync([first, second]);
+            await reporter.ReportAsync([first, second], new ReportContext(ReportDetail.Advanced));
 
             var filePath = Path.Combine(tempDir, "out.md");
             Assert.True(File.Exists(filePath));
@@ -361,11 +361,11 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md", detail);
+            var reporter = new MarkdownReporter(tempDir, "out.md");
             var first = MakeResult("alpha", 100);
             var second = MakeResult("beta", 150);
 
-            await reporter.ReportAsync([first, second]);
+            await reporter.ReportAsync([first, second], new ReportContext(detail));
 
             var content = await File.ReadAllTextAsync(Path.Combine(tempDir, "out.md"));
 
@@ -391,7 +391,7 @@ public class ReporterTests
             var reporter = new MarkdownReporter(tempDir);
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var files = Directory.GetFiles(tempDir, "benchmark-results-*.md");
             Assert.Single(files);
@@ -417,7 +417,7 @@ public class ReporterTests
             var reporter = new MarkdownReporter(tempDir);
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             Assert.True(Directory.Exists(tempDir));
             Assert.NotEmpty(Directory.GetFiles(tempDir));
@@ -435,10 +435,10 @@ public class ReporterTests
 
         try
         {
-            var reporter = new CsvReporter(tempDir, "out.csv", ReportDetail.Standard);
+            var reporter = new CsvReporter(tempDir, "out.csv");
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], new ReportContext(ReportDetail.Standard));
 
             var filePath = Path.Combine(tempDir, "out.csv");
             Assert.True(File.Exists(filePath));
@@ -460,10 +460,10 @@ public class ReporterTests
 
         try
         {
-            var reporter = new CsvReporter(tempDir, "out.csv", ReportDetail.Advanced);
+            var reporter = new CsvReporter(tempDir, "out.csv");
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], new ReportContext(ReportDetail.Advanced));
 
             var filePath = Path.Combine(tempDir, "out.csv");
             var lines = await File.ReadAllLinesAsync(filePath);
@@ -482,7 +482,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new CsvReporter(tempDir, "out.csv", ReportDetail.Standard);
+            var reporter = new CsvReporter(tempDir, "out.csv");
 
             var result = MakeResult("alpha", 100) with
             {
@@ -494,7 +494,7 @@ public class ReporterTests
                     0.42),
             };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], new ReportContext(ReportDetail.Standard));
 
             var filePath = Path.Combine(tempDir, "out.csv");
             var lines = await File.ReadAllLinesAsync(filePath);
@@ -515,7 +515,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new CsvReporter(tempDir, "out.csv", ReportDetail.Advanced);
+            var reporter = new CsvReporter(tempDir, "out.csv");
 
             var result = MakeResult("alpha", 100) with
             {
@@ -525,7 +525,7 @@ public class ReporterTests
                 },
             };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], new ReportContext(ReportDetail.Advanced));
 
             var filePath = Path.Combine(tempDir, "out.csv");
             var line = (await File.ReadAllLinesAsync(filePath))[1];
@@ -548,7 +548,7 @@ public class ReporterTests
             var reporter = new CsvReporter(tempDir);
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var files = Directory.GetFiles(tempDir, "benchmark-results-*.csv");
             Assert.Single(files);
@@ -574,7 +574,7 @@ public class ReporterTests
             var reporter = new CsvReporter(tempDir);
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             Assert.True(Directory.Exists(tempDir));
             Assert.NotEmpty(Directory.GetFiles(tempDir));
@@ -595,8 +595,8 @@ public class ReporterTests
             var reporter = new JsonReporter(tempDir);
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
             Assert.Equal(2, files.Length);
@@ -617,8 +617,8 @@ public class ReporterTests
             var reporter = new MarkdownReporter(tempDir);
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var files = Directory.GetFiles(tempDir, "benchmark-results-*.md");
             Assert.Equal(2, files.Length);
@@ -639,8 +639,8 @@ public class ReporterTests
             var reporter = new CsvReporter(tempDir);
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var files = Directory.GetFiles(tempDir, "benchmark-results-*.csv");
             Assert.Equal(2, files.Length);
@@ -661,7 +661,7 @@ public class ReporterTests
             var reporter = new MarkdownReporter(tempDir, "custom.md");
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var filePath = Path.Combine(tempDir, "custom.md");
             Assert.True(File.Exists(filePath));
@@ -685,7 +685,7 @@ public class ReporterTests
             var reporter = new CsvReporter(tempDir, "custom.csv");
             var result = MakeResult("alpha", 100);
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var filePath = Path.Combine(tempDir, "custom.csv");
             Assert.True(File.Exists(filePath));
@@ -745,7 +745,7 @@ public class ReporterTests
             var reporter = new JsonReporter(tempDir);
             var result = MakeResult("alpha", 100) with { Categories = ["String", "Fast"] };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var files = Directory.GetFiles(tempDir, "benchmarks-*.json");
             var content = await File.ReadAllTextAsync(files[0]);
@@ -766,10 +766,10 @@ public class ReporterTests
 
         try
         {
-            var reporter = new CsvReporter(tempDir, detail: ReportDetail.Advanced);
+            var reporter = new CsvReporter(tempDir);
             var result = MakeResult("alpha", 100) with { Categories = ["String", "Fast"] };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], new ReportContext(ReportDetail.Advanced));
 
             var files = Directory.GetFiles(tempDir, "*.csv");
             var lines = await File.ReadAllLinesAsync(files[0]);
@@ -801,14 +801,14 @@ public class ReporterTests
 
         try
         {
-            var reporter = new CsvReporter(tempDir, detail: detail);
+            var reporter = new CsvReporter(tempDir);
 
             var result = MakeResult("alpha", 100) with
             {
                 IsolationStatus = IsolationStatus.InProcessCapturedState,
             };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], new ReportContext(detail));
 
             var files = Directory.GetFiles(tempDir, "*.csv");
             var lines = await File.ReadAllLinesAsync(files[0]);
@@ -838,7 +838,7 @@ public class ReporterTests
 
         try
         {
-            var reporter = new CsvReporter(tempDir, detail: detail);
+            var reporter = new CsvReporter(tempDir);
 
             // Seeded to differ from each other, so a column that renders the wrong row field - or
             // hardcodes a value - fails rather than reading correct by coincidence.
@@ -848,7 +848,7 @@ public class ReporterTests
                 InterferenceFilterEnabled = false,
             };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], new ReportContext(detail));
 
             var files = Directory.GetFiles(tempDir, "*.csv");
             var lines = await File.ReadAllLinesAsync(files[0]);
@@ -912,10 +912,10 @@ public class ReporterTests
 
         try
         {
-            var reporter = new MarkdownReporter(tempDir, "out.md", ReportDetail.Advanced);
+            var reporter = new MarkdownReporter(tempDir, "out.md");
             var result = MakeResult("alpha", 100) with { Categories = ["String", "Fast"] };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], new ReportContext(ReportDetail.Advanced));
 
             var filePath = Path.Combine(tempDir, "out.md");
             var content = await File.ReadAllTextAsync(filePath);
@@ -938,7 +938,7 @@ public class ReporterTests
             var reporter = new MarkdownReporter(tempDir, "out.md");
             var result = MakeResult("alpha", 100) with { Categories = ["String"] };
 
-            await reporter.ReportAsync([result]);
+            await reporter.ReportAsync([result], ReportContext.Default);
 
             var filePath = Path.Combine(tempDir, "out.md");
             var content = await File.ReadAllTextAsync(filePath);
@@ -947,6 +947,51 @@ public class ReporterTests
         finally
         {
             Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task Reporter_Without_Its_Own_Directory_Writes_To_The_Context_Directory()
+    {
+        var tempDir = MakeSubDir("nb-ctx-dir");
+
+        try
+        {
+            var reporter = new JsonReporter();
+
+            await reporter.ReportAsync(
+                [MakeResult("alpha", 100)],
+                ReportContext.Default with { OutputDirectory = tempDir, FileName = "out.json" });
+
+            Assert.True(File.Exists(Path.Combine(tempDir, "out.json")));
+        }
+        finally
+        {
+            Cleanup(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task Reporter_Constructed_With_A_Directory_Ignores_The_Context_Directory()
+    {
+        var ownDir = MakeSubDir("nb-ctx-own");
+        var contextDir = MakeSubDir("nb-ctx-other");
+
+        try
+        {
+            var reporter = new JsonReporter(ownDir, "out.json");
+
+            await reporter.ReportAsync(
+                [MakeResult("alpha", 100)],
+                ReportContext.Default with { OutputDirectory = contextDir });
+
+            Assert.True(File.Exists(Path.Combine(ownDir, "out.json")));
+            Assert.Empty(Directory.GetFiles(contextDir));
+        }
+        finally
+        {
+            Cleanup(ownDir);
+            Cleanup(contextDir);
         }
     }
 

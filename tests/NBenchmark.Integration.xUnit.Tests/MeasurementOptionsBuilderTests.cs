@@ -44,6 +44,7 @@ public sealed class MeasurementOptionsBuilderTests
     private sealed class Thresholds : IPerformanceThresholds
     {
         public double MaxMeanNs => -1;
+        public double MaxMedianNs => -1;
         public double MaxP95Ns => -1;
         public long MaxAllocatedBytes => -1;
         public string? ReferenceMethod => null;

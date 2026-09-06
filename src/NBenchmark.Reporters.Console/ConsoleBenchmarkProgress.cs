@@ -24,6 +24,11 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         _completedBenchmarks = 0;
         _suiteStopwatch.Restart();
 
+        // Progress is the first thing printed, and it runs before any ReportContext exists, so the
+        // environment is the only place the preference can come from here. `--no-color` sets it while
+        // parsing arguments, which is before this.
+        ColorPreference.Apply();
+
         AnsiConsole.WriteLine();
         AnsiConsole.Write(new Rule($"[steelblue1]Running {total} benchmark(s)[/]").LeftJustified().RuleStyle(Style.Parse("grey")));
         AnsiConsole.WriteLine();

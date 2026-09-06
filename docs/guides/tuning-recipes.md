@@ -39,7 +39,7 @@ await new BenchmarkSuite("ci-suite")
 **CLI**:
 
 ```bash
-dotnet run -- --priority high --outlier mad --launch-count 3 --autotune-cap-behavior error
+dotnet run -- --priority high --outlier mad --launch-count 3 --auto-tune-cap-behavior error
 ```
 
 **See also**:

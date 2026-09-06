@@ -72,11 +72,11 @@ Pairing removes the worker's own CPU draw and memory layout from the ratio. Howe
 
 ## The threshold gate
 
-The `--threshold-pct` flag applies its percentage to the paired ratio when launches are available. This ensures the CI gate compares the code rather than the quietest core. `RegressionCandidate.Estimate` carries the interval, allowing consumers to report whether a failure is supported by the data.
+The `--max-regression-percent` flag applies its percentage to the paired ratio when launches are available. This ensures the CI gate compares the code rather than the quietest core. `RegressionCandidate.Estimate` carries the interval, allowing consumers to report whether a failure is supported by the data.
 
 ## Test-framework gates
 
-A `[Performance]` test measures one launch by default, resulting in a quotient with no interval. Setting `LaunchCount` on the attribute provides the same paired estimate the engine uses:
+A `[Performance]` test measures one launch by default, resulting in a quotient of medians with no interval. Setting `LaunchCount` on the attribute provides the same paired estimate the engine uses:
 
 ```csharp
 [PerformanceFact(MaxSlowdownRatio = 1.2, ReferenceMethod = nameof(Naive), LaunchCount = 3)]

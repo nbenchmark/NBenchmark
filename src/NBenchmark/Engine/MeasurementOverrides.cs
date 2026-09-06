@@ -56,7 +56,7 @@ internal sealed record MeasurementOverrides
     ///     <see cref="MeasurementOptions.Isolation" /> does and had no way to say so.
     /// </summary>
     /// <remarks>
-    ///     One-way, like <c>--emit-raw</c>: the flag turns the requirement on and its absence leaves
+    ///     One-way, like <c>--full-raw-samples</c>: the flag turns the requirement on and its absence leaves
     ///     whatever was configured alone. Without this mapping the flag could only ever take the
     ///     expensive path - measure everything, audit the results, set an exit code - even though the
     ///     early-throw mechanism it wanted already existed and the two are the same request phrased at
@@ -121,13 +121,13 @@ internal sealed record MeasurementOverrides
 
     /// <summary>
     ///     Lifts the cap on how many raw samples an isolated worker returns
-    ///     (<see cref="MeasurementOptions.MaxRawSamples" />), set by <c>--emit-raw</c>.
+    ///     (<see cref="MeasurementOptions.MaxRawSamples" />), set by <c>--full-raw-samples</c>.
     /// </summary>
     public bool? EmitRaw { get; init; }
 
     /// <summary>
     ///     Turns on live forwarding of the per-sample observer stream out of an isolated worker
-    ///     (<see cref="MeasurementOptions.StreamSamples" />), set by <c>--stream-samples</c>.
+    ///     (<see cref="MeasurementOptions.StreamSamples" />), set by <c>--stream-raw-samples</c>.
     /// </summary>
     public bool? StreamSamples { get; init; }
 
@@ -146,7 +146,7 @@ internal sealed record MeasurementOverrides
         WarmupSamples = cliArgs.WarmupSamples,
         OpsPerSample = cliArgs.OpsPerSample,
         ConfidenceLevel = cliArgs.ConfidenceLevel,
-        SignificanceLevel = cliArgs.Alpha,
+        SignificanceLevel = cliArgs.SignificanceLevel,
         OutlierMode = cliArgs.OutlierMode,
         TailMetricsBasis = cliArgs.TailMetricsBasis,
         GcBehavior = cliArgs.GcBehavior,
@@ -178,8 +178,8 @@ internal sealed record MeasurementOverrides
         NoDriftCanary = cliArgs.NoDriftCanary ? true : null,
         NoThreadControl = cliArgs.NoThreadControl ? true : null,
         NoInterferenceFilter = cliArgs.NoInterferenceFilter ? true : null,
-        EmitRaw = cliArgs.EmitRaw,
-        StreamSamples = cliArgs.StreamSamples ? true : null,
+        EmitRaw = cliArgs.FullRawSamples,
+        StreamSamples = cliArgs.StreamRawSamples ? true : null,
         Diagnostics = cliArgs.Diagnostics,
         Environment = BuildEnvironmentFromCli(cliArgs),
     };
@@ -336,7 +336,7 @@ internal sealed record MeasurementOverrides
         if (NoHistogram.HasValue && NoHistogram.Value)
             result = result with { EnableHistogram = false };
 
-        // One-way, like --emit-raw below: the flag asks for the canary to be off, and its absence
+        // One-way, like --full-raw-samples below: the flag asks for the canary to be off, and its absence
         // means "leave whatever was configured alone" rather than "impose the default", so a
         // programmatic WithDriftCanary(false) survives a parsed command line.
         if (NoDriftCanary is true)
@@ -348,7 +348,7 @@ internal sealed record MeasurementOverrides
         if (EmitRaw.HasValue && EmitRaw.Value)
             result = result with { MaxRawSamples = MeasurementOptions.UnboundedRawSamples };
 
-        // One-way for the same reason: --stream-samples asks for the stream, and its absence must
+        // One-way for the same reason: --stream-raw-samples asks for the stream, and its absence must
         // not switch off a programmatic WithOptions that asked for it.
         if (StreamSamples.HasValue && StreamSamples.Value)
             result = result with { StreamSamples = true };
@@ -391,7 +391,7 @@ internal sealed record MeasurementOverrides
     ///     The isolation the command line asked for, or <c>null</c> when it asked for nothing.
     /// </summary>
     /// <remarks>
-    ///     One-way, like <c>--emit-raw</c>: a flag names an isolation and its absence leaves whatever
+    ///     One-way, like <c>--full-raw-samples</c>: a flag names an isolation and its absence leaves whatever
     ///     was configured alone. <c>--in-process</c> wins over <c>--strict-isolation</c> because
     ///     turning isolation off is not a refusal, so there is nothing left for strictness to gate.
     /// </remarks>

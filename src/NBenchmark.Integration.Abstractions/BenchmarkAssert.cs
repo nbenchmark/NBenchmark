@@ -78,6 +78,24 @@ public static class BenchmarkAssert
             }
         }
 
+        if (thresholds.MaxMedianNs.HasValue)
+        {
+            var verdict = RegressionTolerance.Evaluate(
+                result.MedianNs, thresholds.MaxMedianNs.Value, toleranceMultiplier);
+
+            if (verdict.ExceedsThreshold)
+            {
+                var message = $"MedianNs {result.MedianNs:F2} ns exceeds maximum {thresholds.MaxMedianNs.Value:F2} ns";
+
+                if (verdict.Relaxed)
+                    message += $" (relaxed to {verdict.EffectiveThreshold:F2} ns for shared-runner jitter tolerance)";
+
+                message += $" (excess: {verdict.Excess:F2} ns)";
+
+                violations.Add(message);
+            }
+        }
+
         var p95 = result.GetPercentile(0.95);
 
         if (thresholds.MaxP95Ns.HasValue && p95.HasValue)

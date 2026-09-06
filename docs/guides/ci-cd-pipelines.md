@@ -39,7 +39,7 @@ dotnet run -c Release -- \
   --priority high \
   --host-quality-warnings \
   --launch-count 5 \
-  --threshold-pct 10 \
+  --max-regression-percent 10 \
   --reporter json --output ./benchmark-results
 ```
 
@@ -55,10 +55,10 @@ dotnet run -c Release -- \
 
 - **Launch count** (`--launch-count 5`): The engine runs each benchmark five times as independent launches and reports the cross-launch aggregation. On a contested host, per-launch medians will likely disagree. This disagreement is the "honest signal" that indicates noise is present. The reported number is the average across launches, the interval represents the spread between them, and significance is computed using samples pooled from all launches. For more information, see [Multiple launches](../features/multiple-launches.md).
 
-- **Threshold gate** (`--threshold-pct 10`): After collecting all results, the harness compares the median of each non-baseline result against the baseline. If any result exceeds `baseline * (1 + 10/100)`, the harness sets `Environment.ExitCode = 1` and prints the names of the regressed benchmarks to stderr. In multi-runtime mode, the check is grouped within each runtime. For more information, see the [CLI reference](../reference/cli.md).
+- **Threshold gate** (`--max-regression-percent 10`): After collecting all results, the harness compares the median of each non-baseline result against the baseline. If any result exceeds `baseline * (1 + 10/100)`, the harness sets `Environment.ExitCode = 1` and prints the names of the regressed benchmarks to stderr. In multi-runtime mode, the check is grouped within each runtime. For more information, see the [CLI reference](../reference/cli.md).
 
 > [!IMPORTANT] Order of operations
-> Isolation and environment control reduce noise at the source, and the threshold gate then decides based on those cleaned numbers. If you use `--threshold-pct` without noise reduction, you may encounter false positives on shared runners because the gate will fire on noise rather than actual regressions. Always pair the gate with isolation, environment control, or `--launch-count`.
+> Isolation and environment control reduce noise at the source, and the threshold gate then decides based on those cleaned numbers. If you use `--max-regression-percent` without noise reduction, you may encounter false positives on shared runners because the gate will fire on noise rather than actual regressions. Always pair the gate with isolation, environment control, or `--launch-count`.
 
 ## Run the benchmark
 
@@ -77,7 +77,7 @@ On a CI runner, use the full noise-reduction stack:
 dotnet run -c Release -- \
   --cpu-affinity 2,3 --priority high --host-quality-warnings \
   --launch-count 5 \
-  --threshold-pct 10 \
+  --max-regression-percent 10 \
   --reporter json --output ./benchmark-results
 ```
 
@@ -111,7 +111,7 @@ jobs:
       - run: dotnet build -c Release ./benchmarks/MyApp.Benchmarks.csproj
       - run: dotnet run --project ./benchmarks/MyApp.Benchmarks -c Release --no-build -- \
           --cpu-affinity 2,3 --priority high --host-quality-warnings \
-          --launch-count 5 --threshold-pct 10 \
+          --launch-count 5 --max-regression-percent 10 \
           --reporter json --output ./benchmark-results
       - uses: actions/upload-artifact@v4
         if: always()
@@ -121,7 +121,7 @@ jobs:
 ```
 
 > [!TIP]
-> GitHub-hosted runners are shared-tenant VMs. You should expect `--host-quality-warnings` to warn about low effective isolation. For a publication-grade gate, use a self-hosted runner with `--cpu-affinity` on dedicated cores. If you prefer to embed thresholds in your unit tests instead of using `--threshold-pct`, use the `MaxAbsoluteThresholdTolerance` setting in the [test-integration packages](../test-integration/index.md).
+> GitHub-hosted runners are shared-tenant VMs. You should expect `--host-quality-warnings` to warn about low effective isolation. For a publication-grade gate, use a self-hosted runner with `--cpu-affinity` on dedicated cores. If you prefer to embed thresholds in your unit tests instead of using `--max-regression-percent`, use the `MaxAbsoluteThresholdTolerance` setting in the [test-integration packages](../test-integration/index.md).
 
 ## Next steps
 
@@ -131,5 +131,5 @@ For more information, see the following pages:
 - [Isolated runs](../features/isolated-runs.md) - Per-class vs. per-benchmark isolation and the worker dispatch model.
 - [Multiple launches](../features/multiple-launches.md) - Cross-launch aggregation and the `[Benchmark(LaunchCount = n)]` attribute.
 - [Configuration: AutoTune](../reference/configuration.md#autotune) - When to use the `Quick`, `Default`, or `Thorough` presets.
-- [Performance gates in your test suite](./performance-gates.md) - An alternative to `--threshold-pct` for projects that already run a unit test suite in CI.
+- [Performance gates in your test suite](./performance-gates.md) - An alternative to `--max-regression-percent` for projects that already run a unit test suite in CI.
 - [Troubleshooting](../troubleshooting.md) - A symptom-to-fix index for noisy CI environments.

@@ -201,6 +201,7 @@ public sealed class PerformanceCommandTests
     private sealed class PerformanceTestThresholds : IPerformanceThresholds
     {
         public double MaxMeanNs { get; init; }
+        public double MaxMedianNs { get; init; } = -1;
         public double MaxP95Ns { get; init; }
         public long MaxAllocatedBytes { get; init; }
         public string? ReferenceMethod { get; init; }

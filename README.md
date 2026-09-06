@@ -106,7 +106,7 @@ dotnet benchmark --project ./MyApp.Benchmarks
 dotnet benchmark --assembly ./bin/Release/net10.0/MyLib.dll
 ```
 
-All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--threshold-pct`, etc.).
+All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--max-regression-percent`, etc.).
 
 ## Features
 

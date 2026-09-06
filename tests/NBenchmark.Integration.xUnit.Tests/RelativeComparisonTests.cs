@@ -106,7 +106,7 @@ public sealed class RelativeComparisonTests
     }
 
     [Fact]
-    public void Check_Handles_Non_Positive_Reference_Mean()
+    public void Check_Handles_Non_Positive_Reference_Median()
     {
         var candidate = CreateResult("Candidate", 500);
         var reference = CreateResult("Reference", 0);
@@ -235,7 +235,7 @@ public sealed class RelativeComparisonTests
     }
 
     [Fact]
-    public void CheckStructured_NonPositiveReferenceMean_RegressionWhenCandidatePositive_RatioNaN()
+    public void CheckStructured_NonPositiveReferenceMedian_RegressionWhenCandidatePositive_RatioNaN()
     {
         var candidate = CreateResult("Candidate", 500);
         var reference = CreateResult("Reference", 0);

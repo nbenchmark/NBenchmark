@@ -312,6 +312,7 @@ public sealed class PerformanceFactIntegrationTests
             500,
             -1,
             -1,
+            -1,
             null,
             0,
             0,
@@ -328,6 +329,7 @@ public sealed class PerformanceFactIntegrationTests
 
     private static PerformanceTestData NewDefaultData() =>
         new(
+            -1,
             -1,
             -1,
             -1,

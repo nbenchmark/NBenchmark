@@ -97,7 +97,7 @@ public class BenchmarkHarnessCliTests
             {
                 var harness = BenchmarkHarness.Create([
                     "--filter", "TestBenchmarks.*",
-                    "--threshold-pct", "999999",
+                    "--max-regression-percent", "999999",
                     "--samples", "20",
                     "--warmup-samples", "3",
                     "--launch-count", "1",
@@ -131,7 +131,7 @@ public class BenchmarkHarnessCliTests
                 {
                     var harness = BenchmarkHarness.Create([
                         "--filter", "SlowVsBaselineBenchmarks.*",
-                        "--threshold-pct", "1",
+                        "--max-regression-percent", "1",
                         "--samples", "20",
                         "--warmup-samples", "3",
                         "--launch-count", "1",
@@ -353,7 +353,7 @@ public class BenchmarkHarnessCliTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
+                    "--filter", "CategoryBenchmarks.*", "--include-category", "String", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
@@ -391,7 +391,7 @@ public class BenchmarkHarnessCliTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--exclude-category", "Slow", "--samples", "5", "--warmup-samples", "2",
+                    "--filter", "CategoryBenchmarks.*", "--include-category", "String", "--exclude-category", "Slow", "--samples", "5", "--warmup-samples", "2",
                     "--launch-count", "1",
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
@@ -409,7 +409,7 @@ public class BenchmarkHarnessCliTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
+                    "--filter", "CategoryBenchmarks.*", "--include-category", "String", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
                 .FilterCategories(["Fast"])
@@ -450,7 +450,7 @@ public class BenchmarkHarnessCliTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
+                    "--filter", "CategoryBenchmarks.*", "--include-category", "String", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
                 .FilterCategories(["Number"])
@@ -738,7 +738,7 @@ public class BenchmarkHarnessCliTests
     }
 
     [Fact]
-    public async Task WithDetail_Advanced_Propagates_To_Reporter_Without_Rebuilding()
+    public async Task WithDetail_Advanced_Reaches_The_Reporter_In_Its_ReportContext()
     {
         var customReporter = new CustomNamedReporter();
         var tempDir = Path.Combine(Directory.GetCurrentDirectory(), $"nb-harness-withdetail-{Guid.NewGuid():N}");
@@ -982,15 +982,10 @@ public class BenchmarkHarnessCliTests
         public ReportDetail CapturedDetail { get; private set; }
         public string Name => "custom";
 
-        public ReportDetail Detail
-        {
-            get => CapturedDetail;
-            set => CapturedDetail = value;
-        }
-
-        public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
+        public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, ReportContext context, CancellationToken cancellationToken = default)
         {
             ReportCount++;
+            CapturedDetail = context.Detail;
             return Task.CompletedTask;
         }
     }

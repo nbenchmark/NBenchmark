@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 using NBenchmark.Observers;
 using NBenchmark.Reporters;
 
@@ -8,9 +9,30 @@ namespace NBenchmark.Engine;
 internal sealed record CliArgs
 {
     public bool ShowHelp { get; init; }
+
+    /// <summary>
+    ///     The help section <c>--help</c> asked for: <c>null</c> for the everyday one, or
+    ///     <c>"advanced"</c> for the auto-tune internals that would otherwise bury it.
+    /// </summary>
+    public string? HelpTopic { get; init; }
+
+    /// <summary>When true, print the package version and run nothing.</summary>
+    public bool ShowVersion { get; init; }
+
+    /// <summary>
+    ///     When true, output is written without colour or styling: <c>--no-color</c>, or a non-empty
+    ///     <c>NO_COLOR</c> environment variable (https://no-color.org).
+    /// </summary>
+    /// <remarks>
+    ///     <c>--no-color</c> sets <c>NO_COLOR</c> for this process as it parses, so the setting reaches
+    ///     the progress renderer, any reporter that reads the convention directly, and every worker
+    ///     process launched from here - all of which run before, or outside, the report call that
+    ///     carries the same setting to the reporters.
+    /// </remarks>
+    public bool NoColor { get; init; }
     public bool ListOnly { get; init; }
     public bool DryRun { get; init; }
-    public int? ThresholdPct { get; init; }
+    public int? MaxRegressionPercent { get; init; }
     public string? Filter { get; init; }
     public string? OutputDir { get; init; }
     public int? Seed { get; init; }
@@ -18,7 +40,7 @@ internal sealed record CliArgs
     public int? Samples { get; init; }
     public int? WarmupSamples { get; init; }
     public double? ConfidenceLevel { get; init; }
-    public double? Alpha { get; init; }
+    public double? SignificanceLevel { get; init; }
     public OutlierMode? OutlierMode { get; init; }
     public TailMetricsBasis? TailMetricsBasis { get; init; }
     public IReadOnlyList<string> ReporterNames { get; init; } = [];
@@ -208,7 +230,7 @@ internal sealed record CliArgs
     ///     Samples are still collected for significance and the Console histogram;
     ///     this only controls whether they are serialized to file.
     /// </summary>
-    public bool NoSamples { get; init; }
+    public bool NoRawSamples { get; init; }
 
     /// <summary>
     ///     When true, an isolated worker sends back every raw sample it measured instead of a bounded
@@ -222,18 +244,18 @@ internal sealed record CliArgs
     ///     the full series for external analysis; it does not change any statistic NBenchmark itself
     ///     reports, because the worker computes those over the whole array either way.
     /// </remarks>
-    public bool EmitRaw { get; init; }
+    public bool FullRawSamples { get; init; }
 
     /// <summary>
     ///     When true, an isolated worker forwards its live per-sample observer stream back to the
-    ///     coordinator, set by <c>--stream-samples</c>.
+    ///     coordinator, set by <c>--stream-raw-samples</c>.
     /// </summary>
     /// <remarks>
     ///     Off by default because the volume scales with how fast the benchmarked code is - see
     ///     <see cref="MeasurementOptions.StreamSamples" />. Has no effect without an attached
     ///     observer, and none at all in-process, where the observer is called directly.
     /// </remarks>
-    public bool StreamSamples { get; init; }
+    public bool StreamRawSamples { get; init; }
 
     /// <summary>
     ///     Diagnostics mode controlling which runtime counters are collected.
@@ -289,7 +311,7 @@ internal sealed record CliArgs
         var showHelp = false;
         var listOnly = false;
         var dryRun = false;
-        int? thresholdPct = null;
+        int? maxRegressionPercent = null;
         string? filter = null;
         string? outputDir = null;
         int? seed = null;
@@ -303,7 +325,7 @@ internal sealed record CliArgs
         var categoryExclude = new List<string>();
         var detail = ReportDetail.Simple;
 
-        double? alpha = null;
+        double? significanceLevel = null;
         var inProcess = false;
         var strictIsolation = false;
         var verifyIsolation = false;
@@ -340,15 +362,19 @@ internal sealed record CliArgs
         var noDriftCanary = false;
         var noThreadControl = false;
         var noInterferenceFilter = false;
-        var noSamples = false;
-        var emitRaw = false;
-        var streamSamples = false;
+        var noRawSamples = false;
+        var fullRawSamples = false;
+        var streamRawSamples = false;
         var runtimes = new List<RuntimeMoniker>();
         IReadOnlyList<int>? cpuAffinity = null;
         ProcessPriorityClass? processPriority = null;
         var crossClass = false;
         var hostQualityWarnings = false;
         string? otlpEndpoint = null;
+
+        string? helpTopic = null;
+        var showVersion = false;
+        var noColor = NoColorRequestedByEnvironment();
 
         var errors = new List<string>();
 
@@ -358,8 +384,22 @@ internal sealed record CliArgs
             {
                 case "--help" or "-h":
                     showHelp = true;
+
+                    // `--help advanced` takes a topic rather than a value: an unrecognised word after
+                    // it is not consumed, so `--help --filter x` still prints help rather than eating
+                    // the next flag.
+                    if (i + 1 < args.Length && string.Equals(args[i + 1], "advanced", StringComparison.OrdinalIgnoreCase))
+                        helpTopic = args[++i].ToLowerInvariant();
+
                     break;
-                case "--filter" when i + 1 < args.Length:
+                case "--version":
+                    showVersion = true;
+                    break;
+                case "--no-color":
+                    noColor = true;
+                    Environment.SetEnvironmentVariable(NoColorVariable, "1");
+                    break;
+                case "--filter" or "-f" when i + 1 < args.Length:
                     filter = args[++i];
                     break;
                 case "--samples" when i + 1 < args.Length:
@@ -380,11 +420,11 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --warmup-samples value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupSamplesLimit}.");
 
                     break;
-                case "--output" when i + 1 < args.Length:
+                case "--output" or "-o" when i + 1 < args.Length:
                     outputDir = PathValidation.ValidateOutputPath(args[++i]);
                     break;
-                case "--category" when i + 1 < args.Length:
-                    AddCategory(args[++i], "--category", categoryInclude, errors);
+                case "--include-category" when i + 1 < args.Length:
+                    AddCategory(args[++i], "--include-category", categoryInclude, errors);
                     break;
                 case "--exclude-category" when i + 1 < args.Length:
                     AddCategory(args[++i], "--exclude-category", categoryExclude, errors);
@@ -403,12 +443,12 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --confidence value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.95).");
 
                     break;
-                case "--alpha" when i + 1 < args.Length:
+                case "--significance-level" when i + 1 < args.Length:
                     if (double.TryParse(args[++i], CultureInfo.InvariantCulture, out var a)
                         && a is > 0 and < 1)
-                        alpha = a;
+                        significanceLevel = a;
                     else
-                        errors.Add($"Invalid --alpha value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.05).");
+                        errors.Add($"Invalid --significance-level value '{args[i]}'. Must be a fraction strictly between 0 and 1 (e.g. 0.05).");
 
                     break;
                 case "--outlier" when i + 1 < args.Length:
@@ -442,12 +482,12 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --order value '{order}'. Must be 'random' or 'declaration'.");
 
                     break;
-                case "--threshold-pct" when i + 1 < args.Length:
+                case "--max-regression-percent" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var tPct)
                         && tPct > 0)
-                        thresholdPct = tPct;
+                        maxRegressionPercent = tPct;
                     else
-                        errors.Add($"Invalid --threshold-pct value '{args[i]}'. Must be a positive integer (1 or greater).");
+                        errors.Add($"Invalid --max-regression-percent value '{args[i]}'. Must be a positive integer (1 or greater).");
 
                     break;
                 case "--seed" when i + 1 < args.Length:
@@ -470,7 +510,7 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --detail value '{detailStr}'. Must be 'simple', 'standard', or 'advanced'.");
 
                     break;
-                case "--list":
+                case "--list" or "-l":
                     listOnly = true;
                     break;
                 case "--dry-run":
@@ -616,7 +656,7 @@ internal sealed record CliArgs
                         errors.Add($"Invalid --max-tuning-time value '{args[i]}'. Must be a positive number of seconds.");
 
                     break;
-                case "--autotune-cap-behavior" when i + 1 < args.Length:
+                case "--auto-tune-cap-behavior" when i + 1 < args.Length:
                     var capBehaviorStr = args[++i];
 
                     if (string.Equals(capBehaviorStr, "warn", StringComparison.OrdinalIgnoreCase))
@@ -624,7 +664,7 @@ internal sealed record CliArgs
                     else if (string.Equals(capBehaviorStr, "error", StringComparison.OrdinalIgnoreCase))
                         autoTuneCapBehavior = NBenchmark.AutoTuneCapBehavior.Error;
                     else
-                        errors.Add($"Invalid --autotune-cap-behavior value '{capBehaviorStr}'. Must be 'warn' or 'error'.");
+                        errors.Add($"Invalid --auto-tune-cap-behavior value '{capBehaviorStr}'. Must be 'warn' or 'error'.");
 
                     break;
                 case "--warmup-budget-fraction" when i + 1 < args.Length:
@@ -724,14 +764,14 @@ internal sealed record CliArgs
                 case "--no-interference-filter":
                     noInterferenceFilter = true;
                     break;
-                case "--no-samples":
-                    noSamples = true;
+                case "--no-raw-samples":
+                    noRawSamples = true;
                     break;
-                case "--emit-raw":
-                    emitRaw = true;
+                case "--full-raw-samples":
+                    fullRawSamples = true;
                     break;
-                case "--stream-samples":
-                    streamSamples = true;
+                case "--stream-raw-samples":
+                    streamRawSamples = true;
                     break;
                 case "--cpu-affinity" when i + 1 < args.Length:
                     var affinityRaw = args[++i];
@@ -788,12 +828,12 @@ internal sealed record CliArgs
                     }
 
                     break;
-                case "--filter" or "--samples" or "--warmup-samples" or "--output"
-                    or "--reporter" or "--observer" or "--category" or "--exclude-category" or "--confidence" or "--order"
-                    or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--tail-basis" or "--detail" or "--gc"
+                case "--filter" or "-f" or "--samples" or "--warmup-samples" or "--output" or "-o"
+                    or "--reporter" or "--observer" or "--include-category" or "--exclude-category" or "--confidence" or "--order"
+                    or "--max-regression-percent" or "--seed" or "--significance-level" or "--outlier" or "--tail-basis" or "--detail" or "--gc"
                     or "--runtime-profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
-                    or "--min-warmup-samples" or "--max-warmup-samples" or "--max-tuning-time" or "--autotune-cap-behavior"
+                    or "--min-warmup-samples" or "--max-warmup-samples" or "--max-tuning-time" or "--auto-tune-cap-behavior"
                     or "--warmup-budget-fraction" or "--cap-grace-factor" or "--min-warmup-time"
                     or "--jit-quiet-period" or "--min-measurement-time" or "--drift-tolerance"
                     or "--max-drift-restarts"
@@ -815,9 +855,12 @@ internal sealed record CliArgs
         return (new CliArgs
         {
             ShowHelp = showHelp,
+            HelpTopic = helpTopic,
+            ShowVersion = showVersion,
+            NoColor = noColor,
             ListOnly = listOnly,
             DryRun = dryRun,
-            ThresholdPct = thresholdPct,
+            MaxRegressionPercent = maxRegressionPercent,
             Filter = filter,
             OutputDir = outputDir,
             Seed = seed,
@@ -825,7 +868,7 @@ internal sealed record CliArgs
             Samples = samples,
             WarmupSamples = warmupSamples,
             ConfidenceLevel = confidenceLevel,
-            Alpha = alpha,
+            SignificanceLevel = significanceLevel,
             OutlierMode = outlierMode,
             TailMetricsBasis = tailMetricsBasis,
             ReporterNames = reporterNames,
@@ -868,9 +911,9 @@ internal sealed record CliArgs
             NoDriftCanary = noDriftCanary,
             NoThreadControl = noThreadControl,
             NoInterferenceFilter = noInterferenceFilter,
-            NoSamples = noSamples,
-            EmitRaw = emitRaw,
-            StreamSamples = streamSamples,
+            NoRawSamples = noRawSamples,
+            FullRawSamples = fullRawSamples,
+            StreamRawSamples = streamRawSamples,
             Runtimes = runtimes,
             CpuAffinity = cpuAffinity,
             ProcessPriority = processPriority,
@@ -890,7 +933,7 @@ internal sealed record CliArgs
 
         foreach (var name in cliArgs.ReporterNames)
         {
-            if (!ReporterRegistry.TryCreate(name, null, cliArgs.Detail, out _))
+            if (!ReporterRegistry.TryCreate(name, null, out _))
             {
                 allErrors.Add(
                     $"Unknown reporter: '{name}'. Valid: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}. (NBenchmark.Reporters.Console package provides 'console'.)");
@@ -1007,93 +1050,227 @@ internal sealed record CliArgs
     /// </remarks>
     internal static readonly string[] KnownFlags =
     [
-        "--alpha", "--auto-tune", "--autotune-cap-behavior", "--cap-grace-factor", "--category",
+        "--significance-level", "--auto-tune", "--auto-tune-cap-behavior", "--cap-grace-factor", "--include-category",
         "--ci-target", "--confidence", "--cpu-affinity", "--cross-class", "--detail",
-        "--diagnostics", "--drift-tolerance", "--dry-run", "--emit-raw", "--exclude-category",
+        "--diagnostics", "--drift-tolerance", "--dry-run", "--full-raw-samples", "--exclude-category",
         "--filter", "--force-gc", "--gc", "--help", "--host-quality-warnings", "--in-process",
         "--jit-quiet-period", "--launch-count", "--list", "--max-drift-restarts", "--max-samples",
         "--max-tuning-time", "--max-warmup-samples", "--min-measurement-time",
         "--min-practical-effect", "--min-relative-shift", "--min-samples", "--min-warmup-samples",
         "--min-warmup-time", "--no-allocations", "--no-drift-canary", "--no-gc-between-benchmarks",
-        "--no-histogram", "--no-interference-filter", "--no-jit-quiescence", "--no-samples",
+        "--no-histogram", "--no-interference-filter", "--no-jit-quiescence", "--no-raw-samples",
         "--no-thread-control", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint",
         "--outlier", "--output", "--percentiles", "--priority", "--reporter", "--runtime-profile",
-        "--runtimes", "--samples", "--seed", "--stream-samples", "--strict-isolation",
-        "--tail-basis", "--threshold-pct", "--verify-isolation", "--warmup-budget-fraction",
-        "--warmup-samples",
+        "--runtimes", "--samples", "--seed", "--stream-raw-samples", "--strict-isolation",
+        "--tail-basis", "--max-regression-percent", "--verify-isolation", "--warmup-budget-fraction",
+        "--warmup-samples", "--version", "--no-color",
     ];
 
-    internal static void PrintHelp()
-    {
-        Console.WriteLine($"Usage: {ProgramName()} [options]");
-        Console.WriteLine();
-        Console.WriteLine("Options:");
-        Console.WriteLine("  --filter <pattern>              Run suites/methods matching glob (e.g., String*, *.Contains*)");
-        Console.WriteLine("  --category <name>               Include benchmarks tagged with this category (repeatable, OR)");
-        Console.WriteLine("  --exclude-category <name>       Exclude benchmarks tagged with this category (repeatable, OR)");
-        Console.WriteLine("  --samples <n>                   Pin measured sample count (default: auto, CI-driven)");
-        Console.WriteLine("  --warmup-samples <n>            Pin warmup sample count (default: auto, plateau-driven)");
-        Console.WriteLine($"  --reporter <type>               Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}{FormatAutoAttached()}");
+    /// <summary>The environment variable the no-color convention (https://no-color.org) defines.</summary>
+    private const string NoColorVariable = "NO_COLOR";
 
-        Console.WriteLine($"  --observer <type>               Attach measurement observer: {FormatObservers()}");
-        Console.WriteLine("                                  (repeatable; multiple observers are composed into a fan-out)");
-        Console.WriteLine("  --output <dir>                  Set output directory for file-based reporters");
-        Console.WriteLine("  --confidence <0-1>              Confidence level for the interval on the mean (default: 0.95)");
-        Console.WriteLine("  --alpha <0-1>                   Significance level for the significance test (default: 0.05)");
-        Console.WriteLine("  --outlier <mode>                Outlier trimming: none, top5, both5, iqr (default), mad");
-        Console.WriteLine("  --tail-basis <basis>            Percentile/min/max/histogram source: raw (default), trimmed");
-        Console.WriteLine("  --auto-tune <preset>            Adaptive tuning preset: default, quick, or thorough");
-        Console.WriteLine("  --ops-per-sample <n>            Pin ops-per-sample K (default: auto-calibrated)");
-        Console.WriteLine("  --ci-target <0-1>               Target relative CI half-width for auto sampling (default: 0.025)");
-        Console.WriteLine("  --min-samples <n>               Minimum measured samples in auto mode (default: 30)");
-        Console.WriteLine("  --max-samples <n>               Maximum measured samples in auto mode (default: 5000)");
-        Console.WriteLine("  --min-warmup-samples <n>        Minimum warmup samples in auto mode (default: 8)");
-        Console.WriteLine("  --max-warmup-samples <n>        Maximum warmup samples in auto mode (default: 100000)");
-        Console.WriteLine("  --max-tuning-time <s>           Wall-clock cap per benchmark, in seconds (default: 20)");
-        Console.WriteLine("  --autotune-cap-behavior <mode>  Cap handling: warn (default) or error");
-        Console.WriteLine("  --warmup-budget-fraction <0-1>  Max share of --max-tuning-time for calibration + warmup (default: 0.4)");
-        Console.WriteLine("  --cap-grace-factor <n>          Multiplier on --max-tuning-time the measurement phase may reach while chasing --min-samples (default: 1.5)");
-        Console.WriteLine("  --min-warmup-time <ms>          Minimum warmup time before auto-warmup may settle, in ms (default: 500; 0 disables)");
-        Console.WriteLine("  --no-jit-quiescence             Disable the JIT-quiescence warmup gate (keep only the time floor)");
-        Console.WriteLine("  --jit-quiet-period <ms>         How long the JIT must stay quiet before auto-warmup may settle, in ms (default: 50; 0 disables the gate)");
-        Console.WriteLine("  --min-measurement-time <ms>     Minimum measurement time before the CI target may stop sampling, in ms (default: 100; 0 disables)");
-        Console.WriteLine("  --drift-tolerance <0-1>         Max first-half/second-half disagreement before the CI stop is refused (default: 0.1; 0 disables)");
-        Console.WriteLine("  --max-drift-restarts <n>        How many times drift may discard samples and restart measurement (default: 2)");
-        Console.WriteLine("  --launch-count <n>              Repeat each benchmark N times as separate launches (harness default: 5)");
-        Console.WriteLine("  --percentiles <list>            Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
-        Console.WriteLine("  --no-histogram                  Disable latency histogram computation");
-        Console.WriteLine("  --no-drift-canary               Disable the host drift canary (the control workload measured between benchmarks)");
-        Console.WriteLine("  --no-thread-control             Disable thread-level affinity, priority and (on macOS) performance-core placement");
-        Console.WriteLine("  --no-interference-filter        Disable evidence-based interference rejection (trim only on the statistical outlier detector)");
-        Console.WriteLine("  --no-samples                    Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
-        Console.WriteLine($"  --emit-raw                      Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset");
-        Console.WriteLine("  --stream-samples                Forward the live per-sample observer stream out of an isolated worker (needs --observer; costs fidelity)");
-        Console.WriteLine("  --list                          List discovered benchmarks without running");
-        Console.WriteLine("  --dry-run                       Run with 0 samples; no measurement, no body invocation");
-        Console.WriteLine("  --in-process                    Run every benchmark in the host process (disables isolation)");
-        Console.WriteLine("  --strict-isolation              Fail with exit code 1 if any benchmark could not be isolated");
-        Console.WriteLine("  --verify-isolation              Re-measure in this process and print how much isolation changed");
-        Console.WriteLine("  --cross-class                   Compute significance across all classes instead of per class");
-        Console.WriteLine("  --runtimes <list>               Runtimes to compare (comma-separated, e.g. net8,net9,net10)");
-        Console.WriteLine("  --order <mode>                  Run order: random (default) or declaration");
-        Console.WriteLine("  --seed <n>                      Seed for deterministic random ordering");
-        Console.WriteLine("  --detail <level>                Report detail: simple, standard, or advanced (default: simple)");
-        Console.WriteLine("  --threshold-pct <n>             Fail with exit code 1 if any benchmark regresses");
-        Console.WriteLine("                                  >N% vs baseline (median-based comparison; n >= 1).");
-        Console.WriteLine("  --gc <mode>                     GC behavior: natural (default) or per-sample-collect");
-        Console.WriteLine("  --runtime-profile <p>           Runtime config for isolated children: steady-state");
-        Console.WriteLine("                                  (default), production, server-gc, or host");
-        Console.WriteLine("  --force-gc                      Force Gen0 GC before every sample (overrides profile)");
-        Console.WriteLine("  --no-allocations                Disable allocation tracking (overrides profile)");
-        Console.WriteLine("  --no-gc-between-benchmarks      Disable the full GC between benchmarks (on by default for both profiles)");
-        Console.WriteLine("  --min-practical-effect <0-1>    Minimum practical effect for a significant verdict (default: 0.147; 0 = p-value only)");
-        Console.WriteLine("  --min-relative-shift <0-1>      Minimum relative median shift for a significant verdict (default: 0.01; 0 = off)");
-        Console.WriteLine("  --diagnostics <mode>            Runtime diagnostics: none, gc, gcandcpu, all (default: gc)");
-        Console.WriteLine("  --cpu-affinity <list>           Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)");
-        Console.WriteLine("  --priority <level>              Process priority: normal, idle, belownormal, abovenormal, high, realtime");
-        Console.WriteLine("  --host-quality-warnings         Warn when the host looks noisy (low core count, unraisable priority, macOS throttling)");
-        Console.WriteLine("  --otlp-endpoint <url>           OTLP endpoint for the OpenTelemetry SDK (http:// or https://); forwarded to isolated children");
-        Console.WriteLine("  --help, -h                      Show this help text");
+    /// <summary>
+    ///     Whether the environment asks for uncoloured output. Any non-empty value counts, which is
+    ///     what the convention specifies - <c>NO_COLOR=0</c> still means no colour.
+    /// </summary>
+    internal static bool NoColorRequestedByEnvironment()
+        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(NoColorVariable));
+
+    /// <summary>
+    ///     One documented flag: what to print in the left column, and what it does.
+    /// </summary>
+    private readonly record struct HelpEntry(string Syntax, string Description);
+
+    /// <summary>
+    ///     The width the descriptions start at. Wide enough for every flag but the handful that
+    ///     overflow, which wrap onto their own description line rather than pushing the column out for
+    ///     everyone else.
+    /// </summary>
+    private const int DescriptionColumn = 34;
+
+    /// <summary>
+    ///     The everyday flags, grouped by the decision they belong to. The auto-tune internals are not
+    ///     here - <c>--help advanced</c> prints those, because fifteen tuning knobs interleaved with
+    ///     <c>--filter</c> is how a flat sixty-two-flag list stops being readable at all.
+    /// </summary>
+    private static IEnumerable<(string Group, HelpEntry[] Entries)> HelpGroups() =>
+    [
+        ("Selection",
+        [
+            new("--filter, -f <pattern>", "Run suites/methods matching glob (e.g., String*, *.Contains*)"),
+            new("--include-category <name>", "Include benchmarks tagged with this category (repeatable, OR)"),
+            new("--exclude-category <name>", "Exclude benchmarks tagged with this category (repeatable, OR)"),
+            new("--list, -l", "List discovered benchmarks without running"),
+        ]),
+        ("Output",
+        [
+            new("--reporter <type>", $"Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}{FormatAutoAttached()}"),
+            new("--observer <type>", $"Attach measurement observer: {FormatObservers()} (repeatable; multiple observers are composed into a fan-out)"),
+            new("--output, -o <dir>", "Set output directory for file-based reporters"),
+            new("--detail <level>", "Report detail: simple, standard, or advanced (default: simple)"),
+            new("--percentiles <list>", "Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)"),
+            new("--no-histogram", "Disable latency histogram computation"),
+            new("--no-color", "Print without colour or styling (NO_COLOR is honoured too)"),
+            new("--no-raw-samples", "Omit raw per-sample arrays from file output (samples still feed significance and the console histogram)"),
+            new("--full-raw-samples", $"Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset"),
+            new("--stream-raw-samples", "Forward the live per-sample observer stream out of an isolated worker (needs --observer; costs fidelity)"),
+        ]),
+        ("Measurement",
+        [
+            new("--samples <n>", "Pin measured sample count (default: auto, CI-driven)"),
+            new("--warmup-samples <n>", "Pin warmup sample count (default: auto, plateau-driven)"),
+            new("--ops-per-sample <n>", "Pin ops-per-sample K (default: auto-calibrated)"),
+            new("--auto-tune <preset>", "Adaptive tuning preset: default, quick, or thorough"),
+            new("--launch-count <n>", "Repeat each benchmark N times as separate launches (harness default: 5)"),
+            new("--runtimes <list>", "Runtimes to compare (comma-separated, e.g. net8,net9,net10)"),
+            new("--runtime-profile <p>", "Runtime config for isolated children: steady-state (default), production, server-gc, or host"),
+            new("--order <mode>", "Run order: random (default) or declaration"),
+            new("--seed <n>", "Seed for deterministic random ordering"),
+            new("--dry-run", "Run with 0 samples; no measurement, no body invocation"),
+        ]),
+        ("Statistics",
+        [
+            new("--confidence <0-1>", "Confidence level for the interval on the mean (default: 0.95)"),
+            new("--significance-level <0-1>", "Significance level the p-value must clear (default: 0.05)"),
+            new("--outlier <mode>", "Outlier trimming: none, top5, both5, iqr (default), mad"),
+            new("--tail-basis <basis>", "Percentile/min/max/histogram source: raw (default), trimmed"),
+            new("--min-practical-effect <0-1>", "Minimum practical effect for a significant verdict (default: 0.147; 0 = p-value only)"),
+            new("--min-relative-shift <0-1>", "Minimum relative median shift for a significant verdict (default: 0.01; 0 = off)"),
+            new("--cross-class", "Compute significance across all classes instead of per class"),
+            new("--no-interference-filter", "Disable evidence-based interference rejection (trim only on the statistical outlier detector)"),
+        ]),
+        ("Isolation",
+        [
+            new("--in-process", "Run every benchmark in the host process (disables isolation)"),
+            new("--strict-isolation", "Fail with exit code 1 if any benchmark could not be isolated"),
+            new("--verify-isolation", "Re-measure in this process and print how much isolation changed"),
+        ]),
+        ("Environment",
+        [
+            new("--gc <mode>", "GC behavior: natural (default) or per-sample-collect"),
+            new("--force-gc", "Force Gen0 GC before every sample (overrides profile)"),
+            new("--no-allocations", "Disable allocation tracking (overrides profile)"),
+            new("--no-gc-between-benchmarks", "Disable the full GC between benchmarks (on by default for both profiles)"),
+            new("--no-drift-canary", "Disable the host drift canary (the control workload measured between benchmarks)"),
+            new("--no-thread-control", "Disable thread-level affinity, priority and (on macOS) performance-core placement"),
+            new("--cpu-affinity <list>", "Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)"),
+            new("--priority <level>", "Process priority: normal, idle, belownormal, abovenormal, high, realtime"),
+            new("--host-quality-warnings", "Warn when the host looks noisy (low core count, unraisable priority, macOS throttling)"),
+            new("--diagnostics <mode>", "Runtime diagnostics: none, gc, gcandcpu, all (default: gc)"),
+            new("--otlp-endpoint <url>", "OTLP endpoint for the OpenTelemetry SDK (http:// or https://); forwarded to isolated children"),
+        ]),
+        ("CI",
+        [
+            new("--max-regression-percent <n>", "Fail with exit code 1 if any benchmark regresses >N% vs baseline (median-based comparison; n >= 1)"),
+        ]),
+        ("Other",
+        [
+            new("--version", "Print the NBenchmark version and exit"),
+            new("--help, -h [advanced]", "Show this help text, or the advanced tuning flags"),
+        ]),
+    ];
+
+    /// <summary>
+    ///     The auto-tune internals, behind <c>--help advanced</c>. Every one of them is a real knob on
+    ///     <see cref="AutoTuneOptions" />; they are here rather than in the main list because a reader
+    ///     looking for <c>--filter</c> should not have to walk past fifteen of them.
+    /// </summary>
+    private static IEnumerable<(string Group, HelpEntry[] Entries)> AdvancedHelpGroups() =>
+    [
+        ("Advanced tuning",
+        [
+            new("--ci-target <0-1>", "Target relative CI half-width for auto sampling (default: 0.025)"),
+            new("--min-samples <n>", "Minimum measured samples in auto mode (default: 30)"),
+            new("--max-samples <n>", "Maximum measured samples in auto mode (default: 5000)"),
+            new("--min-warmup-samples <n>", "Minimum warmup samples in auto mode (default: 8)"),
+            new("--max-warmup-samples <n>", "Maximum warmup samples in auto mode (default: 100000)"),
+            new("--max-tuning-time <s>", "Wall-clock cap per benchmark, in seconds (default: 20)"),
+            new("--auto-tune-cap-behavior <mode>", "Cap handling: warn (default) or error"),
+            new("--warmup-budget-fraction <0-1>", "Max share of --max-tuning-time for calibration + warmup (default: 0.4)"),
+            new("--cap-grace-factor <n>", "Multiplier on --max-tuning-time the measurement phase may reach while chasing --min-samples (default: 1.5)"),
+            new("--min-warmup-time <ms>", "Minimum warmup time before auto-warmup may settle, in ms (default: 500; 0 disables)"),
+            new("--no-jit-quiescence", "Disable the JIT-quiescence warmup gate (keep only the time floor)"),
+            new("--jit-quiet-period <ms>", "How long the JIT must stay quiet before auto-warmup may settle, in ms (default: 50; 0 disables the gate)"),
+            new("--min-measurement-time <ms>", "Minimum measurement time before the CI target may stop sampling, in ms (default: 100; 0 disables)"),
+            new("--drift-tolerance <0-1>", "Max first-half/second-half disagreement before the CI stop is refused (default: 0.1; 0 disables)"),
+            new("--max-drift-restarts <n>", "How many times drift may discard samples and restart measurement (default: 2)"),
+        ]),
+    ];
+
+    /// <summary>
+    ///     Prints the help text for <paramref name="topic" />: the everyday flags by default, or the
+    ///     advanced tuning group for <c>"advanced"</c>.
+    /// </summary>
+    internal static void PrintHelp(string? topic = null)
+    {
+        var advanced = string.Equals(topic, "advanced", StringComparison.OrdinalIgnoreCase);
+
+        Console.WriteLine(advanced
+            ? $"Usage: {ProgramName()} [options]   (advanced tuning flags)"
+            : $"Usage: {ProgramName()} [options]");
+
+        foreach (var (group, entries) in advanced ? AdvancedHelpGroups() : HelpGroups())
+        {
+            Console.WriteLine();
+            Console.WriteLine($"{group}:");
+
+            foreach (var entry in entries)
+            {
+                WriteEntry(entry);
+            }
+        }
+
+        if (advanced)
+            return;
+
+        Console.WriteLine();
+        Console.WriteLine("Repeatable flags are singular (--reporter, --observer, --include-category);");
+        Console.WriteLine("flags taking one comma-separated list are plural (--runtimes, --percentiles).");
+        Console.WriteLine("Run --help advanced for the auto-tune internals.");
+    }
+
+    /// <summary>
+    ///     Writes one flag and its description, with the description starting at
+    ///     <see cref="DescriptionColumn" />. A syntax too long for the column takes the next line, so
+    ///     one long flag cannot push every description to the right of the terminal.
+    /// </summary>
+    private static void WriteEntry(HelpEntry entry)
+    {
+        var syntax = "  " + entry.Syntax;
+
+        if (syntax.Length >= DescriptionColumn)
+        {
+            Console.WriteLine(syntax);
+            Console.WriteLine(new string(' ', DescriptionColumn) + entry.Description);
+
+            return;
+        }
+
+        Console.WriteLine(syntax.PadRight(DescriptionColumn) + entry.Description);
+    }
+
+    /// <summary>
+    ///     Prints the version <c>--version</c> asks for: the informational version the package was
+    ///     built with, which is what a bug report needs to name.
+    /// </summary>
+    internal static void PrintVersion()
+    {
+        var assembly = typeof(CliArgs).Assembly;
+
+        var version = assembly
+                          .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                          .InformationalVersion
+                      ?? assembly.GetName().Version?.ToString()
+                      ?? "unknown";
+
+        // The build stamps a source-control hash onto the informational version ("1.0.0+abc123").
+        // Useful in a bug report, noise in a version line, so it is printed after the version rather
+        // than inside it.
+        var plus = version.IndexOf('+');
+
+        Console.WriteLine(plus < 0
+            ? $"NBenchmark {version}"
+            : $"NBenchmark {version[..plus]} ({version[(plus + 1)..]})");
     }
 
     /// <summary>

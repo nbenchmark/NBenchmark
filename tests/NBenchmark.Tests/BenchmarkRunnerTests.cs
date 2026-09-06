@@ -474,7 +474,7 @@ public class BenchmarkRunnerTests
         Assert.True(outcome.Result.Errored);
         Assert.NotNull(outcome.Result.ErrorMessage);
         Assert.Contains("Measurement stopped at the wall-clock tuning cap", outcome.Result.ErrorMessage);
-        Assert.Contains("--autotune-cap-behavior warn", outcome.Result.ErrorMessage);
+        Assert.Contains("--auto-tune-cap-behavior warn", outcome.Result.ErrorMessage);
         Assert.Equal(0, outcome.Result.MeanNs);
         Assert.Equal(0, outcome.Result.SampleCount);
     }

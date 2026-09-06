@@ -296,7 +296,17 @@ BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-CLI flags, such as `--samples`, always override `WithOptions` values.
+The individual `With*` methods - `WithSamples`, `WithWarmupSamples`, `WithAllocations`, `WithConfidenceLevel`, `WithSignificanceLevel`, `WithOutlierMode`, `WithSeed` and the rest - set the same values one at a time, and `Configure(o => o with { ... })` merges into what is already set rather than replacing it:
+
+```csharp
+BenchmarkHarness.Create(args)
+    .AddFromAssembly<MyBenchmarks>()
+    .Configure(o => o with { ReportedPercentiles = [0.5, 0.95, 0.99] })
+    .WithSamples(500)
+    .RunAsync();
+```
+
+CLI flags, such as `--samples`, always override values set in code.
 
 By default, benchmarks run in **random** order to reduce systematic bias. Call `WithRunOrder(RunOrder.Declaration)` or pass `--order declaration` to run them in declaration order.
 
@@ -324,7 +334,7 @@ Use `--launch-count <n>` on the CLI or `WithLaunchCount(n)` in code to run each 
 
 ## Category filtering
 
-When you tag benchmarks with `[BenchmarkCategory]`, you can include or exclude them from the run using the `--category` and `--exclude-category` CLI flags, or `FilterCategories` in code. For the full filtering model, see [Categories](../features/categories.md).
+When you tag benchmarks with `[BenchmarkCategory]`, you can include or exclude them from the run using the `--include-category` and `--exclude-category` CLI flags, or `FilterCategories` in code. For the full filtering model, see [Categories](../features/categories.md).
 
 ## Listing benchmarks without running
 
