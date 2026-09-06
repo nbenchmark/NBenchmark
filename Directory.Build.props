@@ -1,10 +1,18 @@
 <Project>
+
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <VersionPrefix>0.0.1</VersionPrefix>
+
+    <!--
+      Nothing packs unless it says so. A shipping project opts in with <IsPackable>true</IsPackable>
+      and imports Release.props for the metadata; samples, fixtures and test projects then never
+      evaluate packaging properties at all.
+    -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -14,34 +22,19 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
     <Deterministic>true</Deterministic>
-    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(IsPackable)' != 'false'">
-    <Authors>NBenchmark</Authors>
-    <Copyright>Copyright (c) NBenchmark</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://www.nbenchmark.net</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/nbenchmark/nbenchmark.git</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <PackageIcon>icon.png</PackageIcon>
-
-    <!-- Without this no NBenchmark.xml is produced, so none is packed, and every XML doc comment in
-         the repository is invisible in a consumer's IntelliSense. CS1591 (missing doc comment on a
-         public member) and CS1573 (a documented member with an undocumented parameter) stay
-         warnings rather than errors: together they are the inventory of what still needs
-         documenting before 1.0, not a reason nobody can build. Every other doc diagnostic - an
-         unresolvable cref, a paramref naming nothing, an ambiguous overload reference - is a
-         broken link in shipped IntelliSense and stays an error. -->
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1591;CS1573</WarningsNotAsErrors>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(IsPackable)' != 'false'">
-    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath=""/>
+  <!--
+    The public API gate. Inert until a shipping project opts in with
+    <IsShippingLibrary>true</IsShippingLibrary> and checks in PublicAPI.Shipped.txt /
+    PublicAPI.Unshipped.txt beside its csproj: from then on, changing the public surface means
+    updating the manifest, and the manifest diff is the review.
+  -->
+  <ItemGroup Condition="'$(IsShippingLibrary)' == 'true'">
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all"
+                      IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"/>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt"/>
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt"/>
   </ItemGroup>
+
 </Project>

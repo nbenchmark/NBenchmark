@@ -3,6 +3,10 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <RootNamespace>NBenchmark.Reporters.Console</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <IsShippingLibrary>true</IsShippingLibrary>
+
     <PackageId>NBenchmark.Reporters.Console</PackageId>
     <Description>Rich terminal table output for NBenchmark using Spectre.Console.</Description>
     <PackageTags>benchmark;performance;console;spectre</PackageTags>
@@ -11,11 +15,13 @@
 
   <ItemGroup>
     <PackageReference Include="Spectre.Console"/>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
   </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, XML docs. -->
+  <Import Project="../../Release.props"/>
 
 </Project>

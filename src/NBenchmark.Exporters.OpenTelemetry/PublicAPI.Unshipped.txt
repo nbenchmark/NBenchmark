@@ -1,0 +1,38 @@
+#nullable enable
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExporter
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExporter.Dispose() -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExporter.Name.get -> string?
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExporter.OnDetector(in NBenchmark.DetectorStateEvent detector) -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExporter.OnPhase(in NBenchmark.MeasurementPhaseEvent phase) -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExporter.OnResult(NBenchmark.BenchmarkResult! result) -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExporter.OnSample(in NBenchmark.SampleEvent sample) -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExporter.OpenTelemetryExporter(NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions! options) -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExtensions
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.AllocationBucketBoundaries.get -> double[]!
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.AllocationBucketBoundaries.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.DurationBucketBoundariesNs.get -> double[]!
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.DurationBucketBoundariesNs.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.EnableMetrics.get -> bool
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.EnableMetrics.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.EnableTraces.get -> bool
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.EnableTraces.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.Endpoint.get -> string?
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.Endpoint.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.Headers.get -> string?
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.Headers.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.MetricExportIntervalMilliseconds.get -> int
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.MetricExportIntervalMilliseconds.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.OpenTelemetryOptions() -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.Protocol.get -> string?
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.Protocol.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.ResourceAttributes.get -> string?
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.ResourceAttributes.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.ServiceName.get -> string?
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.ServiceName.set -> void
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.TimeoutMilliseconds.get -> int?
+NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.TimeoutMilliseconds.set -> void
+const NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExporter.ObserverName = "otlp" -> string!
+const NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions.DefaultServiceName = "nbenchmark" -> string!
+static NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExtensions.WithOpenTelemetry(this NBenchmark.BenchmarkHarness! harness, System.Action<NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions!>? configure = null) -> NBenchmark.BenchmarkHarness!
+static NBenchmark.Exporters.OpenTelemetry.OpenTelemetryExtensions.WithOpenTelemetry(this NBenchmark.BenchmarkSuite! suite, System.Action<NBenchmark.Exporters.OpenTelemetry.OpenTelemetryOptions!>? configure = null) -> NBenchmark.BenchmarkSuite!

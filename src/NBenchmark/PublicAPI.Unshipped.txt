@@ -1,0 +1,2208 @@
+#nullable enable
+NBenchmark.Attributes.BenchmarkAttribute
+NBenchmark.Attributes.BenchmarkAttribute.Baseline.get -> bool
+NBenchmark.Attributes.BenchmarkAttribute.Baseline.set -> void
+NBenchmark.Attributes.BenchmarkAttribute.BenchmarkAttribute() -> void
+NBenchmark.Attributes.BenchmarkAttribute.Description.get -> string?
+NBenchmark.Attributes.BenchmarkAttribute.Description.set -> void
+NBenchmark.Attributes.BenchmarkAttribute.HasIterationsOverride.get -> bool
+NBenchmark.Attributes.BenchmarkAttribute.HasLaunchCountOverride.get -> bool
+NBenchmark.Attributes.BenchmarkAttribute.HasWarmupIterationsOverride.get -> bool
+NBenchmark.Attributes.BenchmarkAttribute.Iterations.get -> int
+NBenchmark.Attributes.BenchmarkAttribute.Iterations.set -> void
+NBenchmark.Attributes.BenchmarkAttribute.LaunchCount.get -> int
+NBenchmark.Attributes.BenchmarkAttribute.LaunchCount.set -> void
+NBenchmark.Attributes.BenchmarkAttribute.WarmupIterations.get -> int
+NBenchmark.Attributes.BenchmarkAttribute.WarmupIterations.set -> void
+NBenchmark.Attributes.BenchmarkCaseAttribute
+NBenchmark.Attributes.BenchmarkCaseAttribute.Arguments.get -> object![]!
+NBenchmark.Attributes.BenchmarkCaseAttribute.BenchmarkCaseAttribute(params object![]! arguments) -> void
+NBenchmark.Attributes.BenchmarkCasesAttribute
+NBenchmark.Attributes.BenchmarkCasesAttribute.BenchmarkCasesAttribute(string! sourceName) -> void
+NBenchmark.Attributes.BenchmarkCasesAttribute.SourceName.get -> string!
+NBenchmark.Attributes.BenchmarkCategoryAttribute
+NBenchmark.Attributes.BenchmarkCategoryAttribute.BenchmarkCategoryAttribute(string! name) -> void
+NBenchmark.Attributes.BenchmarkCategoryAttribute.Name.get -> string!
+NBenchmark.Attributes.BenchmarkIterationSetupAttribute
+NBenchmark.Attributes.BenchmarkIterationSetupAttribute.BenchmarkIterationSetupAttribute() -> void
+NBenchmark.Attributes.BenchmarkIterationTeardownAttribute
+NBenchmark.Attributes.BenchmarkIterationTeardownAttribute.BenchmarkIterationTeardownAttribute() -> void
+NBenchmark.Attributes.BenchmarkPlanAttribute
+NBenchmark.Attributes.BenchmarkPlanAttribute.BenchmarkPlanAttribute() -> void
+NBenchmark.Attributes.BenchmarkSetupAttribute
+NBenchmark.Attributes.BenchmarkSetupAttribute.BenchmarkSetupAttribute() -> void
+NBenchmark.Attributes.BenchmarkStateAttribute
+NBenchmark.Attributes.BenchmarkStateAttribute.BenchmarkStateAttribute() -> void
+NBenchmark.Attributes.BenchmarkTeardownAttribute
+NBenchmark.Attributes.BenchmarkTeardownAttribute.BenchmarkTeardownAttribute() -> void
+NBenchmark.Attributes.InProcessAttribute
+NBenchmark.Attributes.InProcessAttribute.InProcessAttribute() -> void
+NBenchmark.Attributes.InstanceLifetimeAttribute
+NBenchmark.Attributes.InstanceLifetimeAttribute.InstanceLifetimeAttribute(NBenchmark.InstanceLifetime lifetime) -> void
+NBenchmark.Attributes.InstanceLifetimeAttribute.Lifetime.get -> NBenchmark.InstanceLifetime
+NBenchmark.Attributes.IsolatedProcessAttribute
+NBenchmark.Attributes.IsolatedProcessAttribute.IsolatedProcessAttribute() -> void
+NBenchmark.Attributes.RuntimesAttribute
+NBenchmark.Attributes.RuntimesAttribute.Runtimes.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.RuntimeMoniker>!
+NBenchmark.Attributes.RuntimesAttribute.RuntimesAttribute(params NBenchmark.RuntimeMoniker[]! runtimes) -> void
+NBenchmark.Attributes.SharedStateAttribute
+NBenchmark.Attributes.SharedStateAttribute.Intentional.get -> bool
+NBenchmark.Attributes.SharedStateAttribute.Intentional.init -> void
+NBenchmark.Attributes.SharedStateAttribute.SharedStateAttribute() -> void
+NBenchmark.AutoTuneCapBehavior
+NBenchmark.AutoTuneCapBehavior.Error = 1 -> NBenchmark.AutoTuneCapBehavior
+NBenchmark.AutoTuneCapBehavior.Warn = 0 -> NBenchmark.AutoTuneCapBehavior
+NBenchmark.AutoTuneDiagnostic
+NBenchmark.AutoTuneDiagnostic.<Clone>$() -> NBenchmark.AutoTuneDiagnostic!
+NBenchmark.AutoTuneDiagnostic.AchievedRelativeCiWidth.get -> double
+NBenchmark.AutoTuneDiagnostic.AchievedRelativeCiWidth.init -> void
+NBenchmark.AutoTuneDiagnostic.AutoTuneDiagnostic() -> void
+NBenchmark.AutoTuneDiagnostic.CiWidthSeries.get -> System.Collections.Generic.IReadOnlyList<double>!
+NBenchmark.AutoTuneDiagnostic.CiWidthSeries.init -> void
+NBenchmark.AutoTuneDiagnostic.ClockResolutionNs.get -> double
+NBenchmark.AutoTuneDiagnostic.ClockResolutionNs.init -> void
+NBenchmark.AutoTuneDiagnostic.Equals(NBenchmark.AutoTuneDiagnostic? other) -> bool
+NBenchmark.AutoTuneDiagnostic.InitialOpsPerSample.get -> int?
+NBenchmark.AutoTuneDiagnostic.InitialOpsPerSample.init -> void
+NBenchmark.AutoTuneDiagnostic.InterferenceDisabledReason.get -> string?
+NBenchmark.AutoTuneDiagnostic.InterferenceDisabledReason.init -> void
+NBenchmark.AutoTuneDiagnostic.InterferenceRejectedCount.get -> int
+NBenchmark.AutoTuneDiagnostic.InterferenceRejectedCount.init -> void
+NBenchmark.AutoTuneDiagnostic.JitLastChangeAtNs.get -> double
+NBenchmark.AutoTuneDiagnostic.JitLastChangeAtNs.init -> void
+NBenchmark.AutoTuneDiagnostic.JitQuiescenceAchieved.get -> bool
+NBenchmark.AutoTuneDiagnostic.JitQuiescenceAchieved.init -> void
+NBenchmark.AutoTuneDiagnostic.JitterMetric.get -> double?
+NBenchmark.AutoTuneDiagnostic.JitterMetric.init -> void
+NBenchmark.AutoTuneDiagnostic.MeasurementRestarts.get -> int
+NBenchmark.AutoTuneDiagnostic.MeasurementRestarts.init -> void
+NBenchmark.AutoTuneDiagnostic.MedianOccupancyRatio.get -> double?
+NBenchmark.AutoTuneDiagnostic.MedianOccupancyRatio.init -> void
+NBenchmark.AutoTuneDiagnostic.OpsPerSample.get -> int
+NBenchmark.AutoTuneDiagnostic.OpsPerSample.init -> void
+NBenchmark.AutoTuneDiagnostic.OutlierDetectorSwitched.get -> bool
+NBenchmark.AutoTuneDiagnostic.OutlierDetectorSwitched.init -> void
+NBenchmark.AutoTuneDiagnostic.ResolvedSamples.get -> int
+NBenchmark.AutoTuneDiagnostic.ResolvedSamples.init -> void
+NBenchmark.AutoTuneDiagnostic.ResolvedWarmup.get -> int
+NBenchmark.AutoTuneDiagnostic.ResolvedWarmup.init -> void
+NBenchmark.AutoTuneDiagnostic.SampleDurationNs.get -> double
+NBenchmark.AutoTuneDiagnostic.SampleDurationNs.init -> void
+NBenchmark.AutoTuneDiagnostic.SampleQuantizationFraction.get -> double
+NBenchmark.AutoTuneDiagnostic.SampleQuantizationFraction.init -> void
+NBenchmark.AutoTuneDiagnostic.SampleStop.get -> NBenchmark.SampleStopReason
+NBenchmark.AutoTuneDiagnostic.SampleStop.init -> void
+NBenchmark.AutoTuneDiagnostic.SplitHalfDrift.get -> double
+NBenchmark.AutoTuneDiagnostic.SplitHalfDrift.init -> void
+NBenchmark.AutoTuneDiagnostic.TargetSampleDurationNs.get -> double
+NBenchmark.AutoTuneDiagnostic.TargetSampleDurationNs.init -> void
+NBenchmark.AutoTuneDiagnostic.TotalBodyInvocations.get -> long
+NBenchmark.AutoTuneDiagnostic.TotalBodyInvocations.init -> void
+NBenchmark.AutoTuneDiagnostic.TuningWallClock.get -> System.TimeSpan
+NBenchmark.AutoTuneDiagnostic.TuningWallClock.init -> void
+NBenchmark.AutoTuneDiagnostic.WarmupCurve.get -> System.Collections.Generic.IReadOnlyList<double>!
+NBenchmark.AutoTuneDiagnostic.WarmupCurve.init -> void
+NBenchmark.AutoTuneDiagnostic.WarmupElapsedNs.get -> double
+NBenchmark.AutoTuneDiagnostic.WarmupElapsedNs.init -> void
+NBenchmark.AutoTuneDiagnostic.WarmupJitCompilationTime.get -> System.TimeSpan
+NBenchmark.AutoTuneDiagnostic.WarmupJitCompilationTime.init -> void
+NBenchmark.AutoTuneDiagnostic.WarmupJitCompiledIlBytes.get -> long
+NBenchmark.AutoTuneDiagnostic.WarmupJitCompiledIlBytes.init -> void
+NBenchmark.AutoTuneDiagnostic.WarmupJitCompiledMethods.get -> long
+NBenchmark.AutoTuneDiagnostic.WarmupJitCompiledMethods.init -> void
+NBenchmark.AutoTuneDiagnostic.WarmupSampleInterval.get -> int
+NBenchmark.AutoTuneDiagnostic.WarmupSampleInterval.init -> void
+NBenchmark.AutoTuneDiagnostic.WarmupStop.get -> NBenchmark.WarmupStopReason
+NBenchmark.AutoTuneDiagnostic.WarmupStop.init -> void
+NBenchmark.AutoTuneDiagnostic.WarmupTimeFloorMet.get -> bool
+NBenchmark.AutoTuneDiagnostic.WarmupTimeFloorMet.init -> void
+NBenchmark.AutoTuneOptions
+NBenchmark.AutoTuneOptions.<Clone>$() -> NBenchmark.AutoTuneOptions!
+NBenchmark.AutoTuneOptions.AutoTuneOptions() -> void
+NBenchmark.AutoTuneOptions.BatchSize.get -> int
+NBenchmark.AutoTuneOptions.BatchSize.init -> void
+NBenchmark.AutoTuneOptions.CapBehavior.get -> NBenchmark.AutoTuneCapBehavior
+NBenchmark.AutoTuneOptions.CapBehavior.init -> void
+NBenchmark.AutoTuneOptions.CapGraceFactor.get -> double
+NBenchmark.AutoTuneOptions.CapGraceFactor.init -> void
+NBenchmark.AutoTuneOptions.CiTarget.get -> double
+NBenchmark.AutoTuneOptions.CiTarget.init -> void
+NBenchmark.AutoTuneOptions.EnableJitterCalibration.get -> bool
+NBenchmark.AutoTuneOptions.EnableJitterCalibration.init -> void
+NBenchmark.AutoTuneOptions.Equals(NBenchmark.AutoTuneOptions? other) -> bool
+NBenchmark.AutoTuneOptions.JitQuietPeriod.get -> System.TimeSpan
+NBenchmark.AutoTuneOptions.JitQuietPeriod.init -> void
+NBenchmark.AutoTuneOptions.JitterAutoSwitchThreshold.get -> double
+NBenchmark.AutoTuneOptions.JitterAutoSwitchThreshold.init -> void
+NBenchmark.AutoTuneOptions.JitterCalibrationSamples.get -> int
+NBenchmark.AutoTuneOptions.JitterCalibrationSamples.init -> void
+NBenchmark.AutoTuneOptions.JitterCalibrationWorkPerSample.get -> int
+NBenchmark.AutoTuneOptions.JitterCalibrationWorkPerSample.init -> void
+NBenchmark.AutoTuneOptions.MaxOpsPerSample.get -> int
+NBenchmark.AutoTuneOptions.MaxOpsPerSample.init -> void
+NBenchmark.AutoTuneOptions.MaxSamples.get -> int
+NBenchmark.AutoTuneOptions.MaxSamples.init -> void
+NBenchmark.AutoTuneOptions.MaxTuningTime.get -> System.TimeSpan
+NBenchmark.AutoTuneOptions.MaxTuningTime.init -> void
+NBenchmark.AutoTuneOptions.MaxWarmup.get -> int
+NBenchmark.AutoTuneOptions.MaxWarmup.init -> void
+NBenchmark.AutoTuneOptions.MeasurementDriftTolerance.get -> double
+NBenchmark.AutoTuneOptions.MeasurementDriftTolerance.init -> void
+NBenchmark.AutoTuneOptions.MeasurementRestartLimit.get -> int
+NBenchmark.AutoTuneOptions.MeasurementRestartLimit.init -> void
+NBenchmark.AutoTuneOptions.MinMeasurementTime.get -> System.TimeSpan
+NBenchmark.AutoTuneOptions.MinMeasurementTime.init -> void
+NBenchmark.AutoTuneOptions.MinQuantaPerSample.get -> int
+NBenchmark.AutoTuneOptions.MinQuantaPerSample.init -> void
+NBenchmark.AutoTuneOptions.MinSamples.get -> int
+NBenchmark.AutoTuneOptions.MinSamples.init -> void
+NBenchmark.AutoTuneOptions.MinWarmup.get -> int
+NBenchmark.AutoTuneOptions.MinWarmup.init -> void
+NBenchmark.AutoTuneOptions.MinWarmupTime.get -> System.TimeSpan
+NBenchmark.AutoTuneOptions.MinWarmupTime.init -> void
+NBenchmark.AutoTuneOptions.PlateauPatience.get -> int
+NBenchmark.AutoTuneOptions.PlateauPatience.init -> void
+NBenchmark.AutoTuneOptions.RequireJitQuiescence.get -> bool
+NBenchmark.AutoTuneOptions.RequireJitQuiescence.init -> void
+NBenchmark.AutoTuneOptions.TargetSampleDurationNs.get -> double
+NBenchmark.AutoTuneOptions.TargetSampleDurationNs.init -> void
+NBenchmark.AutoTuneOptions.WarmupBudgetFraction.get -> double
+NBenchmark.AutoTuneOptions.WarmupBudgetFraction.init -> void
+NBenchmark.AutoTuneOptions.WarmupEpsilon.get -> double
+NBenchmark.AutoTuneOptions.WarmupEpsilon.init -> void
+NBenchmark.AutoTunePreset
+NBenchmark.AutoTunePreset.Default = 0 -> NBenchmark.AutoTunePreset
+NBenchmark.AutoTunePreset.Quick = 1 -> NBenchmark.AutoTunePreset
+NBenchmark.AutoTunePreset.Thorough = 2 -> NBenchmark.AutoTunePreset
+NBenchmark.Benchmark
+NBenchmark.BenchmarkFormatter
+NBenchmark.BenchmarkHarness
+NBenchmark.BenchmarkHarness.AddFromAssembly(System.Reflection.Assembly! assembly) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.AddFromAssembly<T>() -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.RunAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>!>!
+NBenchmark.BenchmarkHarness.WithAutoTune(NBenchmark.AutoTuneOptions! autoTune) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithAutoTune(NBenchmark.AutoTunePreset preset) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithCategoryFilter(System.Collections.Generic.IEnumerable<string!>? include = null, System.Collections.Generic.IEnumerable<string!>? exclude = null) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithCrossClassSignificance(bool enabled = true) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithDedicatedHostGuidance(bool enabled = true) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithDetail(NBenchmark.Reporters.ReportDetail detail) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithDiagnostics(NBenchmark.DiagnosticsMode mode) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithDiagnostics(NBenchmark.DiagnosticsOptions! diagnostics) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithDriftCanary(NBenchmark.DriftCanaryOptions! driftCanary) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithDriftCanary(bool enabled) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithHardwareAffinity(params int[]! cores) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithInstanceFactory(System.Func<System.Type!, object!>! factory) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithInstanceLifetime(NBenchmark.InstanceLifetime lifetime) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithInterferenceFilter(bool enabled = true) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithIsolation(bool enabled = true) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithLaunchCount(int count) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithMeasurementProfile(NBenchmark.MeasurementProfile profile) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithMinimumPracticalEffect(double minimumDelta) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithMinimumRelativeShift(double minimumRelativeShift) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithObserver(NBenchmark.IMeasurementObserver! observer) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithOpsPerSample(int opsPerSample) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithOptions(NBenchmark.MeasurementOptions! options) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithProcessPriority(System.Diagnostics.ProcessPriorityClass priority) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithProgress(NBenchmark.IBenchmarkProgress! progress) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithReporter(NBenchmark.Reporters.IReporter! reporter) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithRequireIsolation(bool required = true) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithRunOrder(NBenchmark.RunOrder order) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithRuntimeProfile(NBenchmark.RuntimeProfile! profile) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithServiceProvider(System.Func<System.IServiceProvider!>! factory) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithSuppressBuildConfigurationWarning(bool suppress = true) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkHarness.WithThreadControl(bool enabled = true) -> NBenchmark.BenchmarkHarness!
+NBenchmark.BenchmarkParameter
+NBenchmark.BenchmarkParameter.<Clone>$() -> NBenchmark.BenchmarkParameter!
+NBenchmark.BenchmarkParameter.BenchmarkParameter(string! Name, object? Value) -> void
+NBenchmark.BenchmarkParameter.Deconstruct(out string! Name, out object? Value) -> void
+NBenchmark.BenchmarkParameter.Equals(NBenchmark.BenchmarkParameter? other) -> bool
+NBenchmark.BenchmarkParameter.Name.get -> string!
+NBenchmark.BenchmarkParameter.Name.init -> void
+NBenchmark.BenchmarkParameter.Value.get -> object?
+NBenchmark.BenchmarkParameter.Value.init -> void
+NBenchmark.BenchmarkResult
+NBenchmark.BenchmarkResult.AllocMax.get -> long?
+NBenchmark.BenchmarkResult.AllocMax.init -> void
+NBenchmark.BenchmarkResult.AllocMedian.get -> long?
+NBenchmark.BenchmarkResult.AllocMedian.init -> void
+NBenchmark.BenchmarkResult.AllocP95.get -> long?
+NBenchmark.BenchmarkResult.AllocP95.init -> void
+NBenchmark.BenchmarkResult.AutoTune.get -> NBenchmark.AutoTuneDiagnostic?
+NBenchmark.BenchmarkResult.AutoTune.init -> void
+NBenchmark.BenchmarkResult.BenchmarkResult() -> void
+NBenchmark.BenchmarkResult.BenchmarkResult(NBenchmark.BenchmarkResult! original) -> void
+NBenchmark.BenchmarkResult.Categories.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NBenchmark.BenchmarkResult.Categories.init -> void
+NBenchmark.BenchmarkResult.ClassName.get -> string!
+NBenchmark.BenchmarkResult.ClassName.init -> void
+NBenchmark.BenchmarkResult.CoefficientOfVariation.get -> double
+NBenchmark.BenchmarkResult.CoefficientOfVariation.init -> void
+NBenchmark.BenchmarkResult.CoefficientOfVariationPercent.get -> double
+NBenchmark.BenchmarkResult.ConfidenceIntervalLower.get -> double
+NBenchmark.BenchmarkResult.ConfidenceIntervalUpper.get -> double
+NBenchmark.BenchmarkResult.ConfidenceLevel.get -> double
+NBenchmark.BenchmarkResult.ConfidenceLevel.init -> void
+NBenchmark.BenchmarkResult.Description.get -> string?
+NBenchmark.BenchmarkResult.Description.init -> void
+NBenchmark.BenchmarkResult.Diagnostics.get -> NBenchmark.DiagnosticsResult?
+NBenchmark.BenchmarkResult.Diagnostics.init -> void
+NBenchmark.BenchmarkResult.Effect.get -> NBenchmark.Stats.EffectSize?
+NBenchmark.BenchmarkResult.Effect.init -> void
+NBenchmark.BenchmarkResult.ErrorMessage.get -> string?
+NBenchmark.BenchmarkResult.ErrorMessage.init -> void
+NBenchmark.BenchmarkResult.Errored.get -> bool
+NBenchmark.BenchmarkResult.Errored.init -> void
+NBenchmark.BenchmarkResult.GetPercentile(double p) -> double?
+NBenchmark.BenchmarkResult.Histogram.get -> NBenchmark.LatencyHistogram?
+NBenchmark.BenchmarkResult.Histogram.init -> void
+NBenchmark.BenchmarkResult.HostTimeline.get -> NBenchmark.HostTimeline?
+NBenchmark.BenchmarkResult.HostTimeline.init -> void
+NBenchmark.BenchmarkResult.InterferenceFilterEnabled.get -> bool
+NBenchmark.BenchmarkResult.InterferenceFilterEnabled.init -> void
+NBenchmark.BenchmarkResult.InterquartileRange.get -> double
+NBenchmark.BenchmarkResult.InterquartileRange.init -> void
+NBenchmark.BenchmarkResult.IsBaseline.get -> bool
+NBenchmark.BenchmarkResult.IsBaseline.init -> void
+NBenchmark.BenchmarkResult.IsolationStatus.get -> NBenchmark.IsolationStatus
+NBenchmark.BenchmarkResult.IsolationStatus.init -> void
+NBenchmark.BenchmarkResult.Kurtosis.get -> double
+NBenchmark.BenchmarkResult.Kurtosis.init -> void
+NBenchmark.BenchmarkResult.LaunchBlockedVerdict.get -> NBenchmark.SignificanceVerdict
+NBenchmark.BenchmarkResult.LaunchBlockedVerdict.init -> void
+NBenchmark.BenchmarkResult.LaunchStatistics.get -> NBenchmark.LaunchStatistics?
+NBenchmark.BenchmarkResult.LaunchStatistics.init -> void
+NBenchmark.BenchmarkResult.LowerFence.get -> double?
+NBenchmark.BenchmarkResult.LowerFence.init -> void
+NBenchmark.BenchmarkResult.Mad.get -> double
+NBenchmark.BenchmarkResult.Mad.init -> void
+NBenchmark.BenchmarkResult.MarginOfError.get -> double
+NBenchmark.BenchmarkResult.MarginOfError.init -> void
+NBenchmark.BenchmarkResult.MarginPercent.get -> double
+NBenchmark.BenchmarkResult.Max.get -> double
+NBenchmark.BenchmarkResult.Max.init -> void
+NBenchmark.BenchmarkResult.Mean.get -> double
+NBenchmark.BenchmarkResult.Mean.init -> void
+NBenchmark.BenchmarkResult.MeanAllocatedBytes.get -> long?
+NBenchmark.BenchmarkResult.MeanAllocatedBytes.init -> void
+NBenchmark.BenchmarkResult.MeasuredDuration.get -> System.TimeSpan
+NBenchmark.BenchmarkResult.MeasuredDuration.init -> void
+NBenchmark.BenchmarkResult.MeasuredIterations.get -> int
+NBenchmark.BenchmarkResult.MeasuredIterations.init -> void
+NBenchmark.BenchmarkResult.Median.get -> double
+NBenchmark.BenchmarkResult.Median.init -> void
+NBenchmark.BenchmarkResult.MedianCiLower.get -> double?
+NBenchmark.BenchmarkResult.MedianCiLower.init -> void
+NBenchmark.BenchmarkResult.MedianCiUpper.get -> double?
+NBenchmark.BenchmarkResult.MedianCiUpper.init -> void
+NBenchmark.BenchmarkResult.MedianOperationsPerSecond.get -> double
+NBenchmark.BenchmarkResult.MedianOperationsPerSecond.init -> void
+NBenchmark.BenchmarkResult.MedianShift.get -> NBenchmark.Stats.ShiftEstimate?
+NBenchmark.BenchmarkResult.MedianShift.init -> void
+NBenchmark.BenchmarkResult.Min.get -> double
+NBenchmark.BenchmarkResult.Min.init -> void
+NBenchmark.BenchmarkResult.N.get -> int
+NBenchmark.BenchmarkResult.N.init -> void
+NBenchmark.BenchmarkResult.Name.get -> string!
+NBenchmark.BenchmarkResult.Name.init -> void
+NBenchmark.BenchmarkResult.NanosecondsPerOperation.get -> double
+NBenchmark.BenchmarkResult.Omnibus.get -> NBenchmark.OmnibusComparison?
+NBenchmark.BenchmarkResult.Omnibus.init -> void
+NBenchmark.BenchmarkResult.OperationsPerSecond.get -> double
+NBenchmark.BenchmarkResult.OperationsPerSecond.init -> void
+NBenchmark.BenchmarkResult.OutlierDetector.get -> string!
+NBenchmark.BenchmarkResult.OutlierDetector.init -> void
+NBenchmark.BenchmarkResult.OutlierMode.get -> NBenchmark.OutlierMode
+NBenchmark.BenchmarkResult.OutlierMode.init -> void
+NBenchmark.BenchmarkResult.OutliersRemoved.get -> int
+NBenchmark.BenchmarkResult.OutliersRemoved.init -> void
+NBenchmark.BenchmarkResult.PValue.get -> double?
+NBenchmark.BenchmarkResult.PValue.init -> void
+NBenchmark.BenchmarkResult.ParameterSet.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkParameter!>!
+NBenchmark.BenchmarkResult.ParameterSet.init -> void
+NBenchmark.BenchmarkResult.Percentiles.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.PercentileEntry>!
+NBenchmark.BenchmarkResult.Percentiles.init -> void
+NBenchmark.BenchmarkResult.Profile.get -> NBenchmark.MeasurementProfile
+NBenchmark.BenchmarkResult.Profile.init -> void
+NBenchmark.BenchmarkResult.Q1.get -> double
+NBenchmark.BenchmarkResult.Q1.init -> void
+NBenchmark.BenchmarkResult.Q3.get -> double
+NBenchmark.BenchmarkResult.Q3.init -> void
+NBenchmark.BenchmarkResult.Range.get -> double
+NBenchmark.BenchmarkResult.RawSamples.get -> System.Collections.Generic.IReadOnlyList<double>!
+NBenchmark.BenchmarkResult.RawSamples.init -> void
+NBenchmark.BenchmarkResult.RunAtUtc.get -> System.DateTimeOffset
+NBenchmark.BenchmarkResult.RunAtUtc.init -> void
+NBenchmark.BenchmarkResult.RuntimeKnobs.get -> string!
+NBenchmark.BenchmarkResult.RuntimeKnobs.init -> void
+NBenchmark.BenchmarkResult.RuntimeMoniker.get -> string!
+NBenchmark.BenchmarkResult.RuntimeMoniker.init -> void
+NBenchmark.BenchmarkResult.RuntimeProfileName.get -> string!
+NBenchmark.BenchmarkResult.RuntimeProfileName.init -> void
+NBenchmark.BenchmarkResult.SignificanceLevel.get -> double
+NBenchmark.BenchmarkResult.SignificanceLevel.init -> void
+NBenchmark.BenchmarkResult.SignificanceTestName.get -> string!
+NBenchmark.BenchmarkResult.SignificanceTestName.init -> void
+NBenchmark.BenchmarkResult.SignificanceVerdict.get -> NBenchmark.SignificanceVerdict
+NBenchmark.BenchmarkResult.SignificanceVerdict.init -> void
+NBenchmark.BenchmarkResult.Skewness.get -> double
+NBenchmark.BenchmarkResult.Skewness.init -> void
+NBenchmark.BenchmarkResult.StandardDeviation.get -> double
+NBenchmark.BenchmarkResult.StandardDeviation.init -> void
+NBenchmark.BenchmarkResult.StandardError.get -> double
+NBenchmark.BenchmarkResult.StandardError.init -> void
+NBenchmark.BenchmarkResult.StandardErrorPercent.get -> double
+NBenchmark.BenchmarkResult.TailMetricsBasis.get -> NBenchmark.TailMetricsBasis
+NBenchmark.BenchmarkResult.TailMetricsBasis.init -> void
+NBenchmark.BenchmarkResult.ThreadControlEnabled.get -> bool
+NBenchmark.BenchmarkResult.ThreadControlEnabled.init -> void
+NBenchmark.BenchmarkResult.TotalDuration.get -> System.TimeSpan
+NBenchmark.BenchmarkResult.TotalDuration.init -> void
+NBenchmark.BenchmarkResult.TotalOperations.get -> long
+NBenchmark.BenchmarkResult.TotalOperations.init -> void
+NBenchmark.BenchmarkResult.TrimmedOrdinals.get -> System.Collections.Generic.IReadOnlyList<int>!
+NBenchmark.BenchmarkResult.TrimmedOrdinals.init -> void
+NBenchmark.BenchmarkResult.UpperFence.get -> double?
+NBenchmark.BenchmarkResult.UpperFence.init -> void
+NBenchmark.BenchmarkResult.WarmupIterations.get -> int
+NBenchmark.BenchmarkResult.WarmupIterations.init -> void
+NBenchmark.BenchmarkResult.Warnings.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NBenchmark.BenchmarkResult.Warnings.init -> void
+NBenchmark.BenchmarkResultExtensions
+NBenchmark.BenchmarkRow
+NBenchmark.BenchmarkRow.AllocMax.get -> long?
+NBenchmark.BenchmarkRow.AllocMax.init -> void
+NBenchmark.BenchmarkRow.AllocMedian.get -> long?
+NBenchmark.BenchmarkRow.AllocMedian.init -> void
+NBenchmark.BenchmarkRow.AllocP95.get -> long?
+NBenchmark.BenchmarkRow.AllocP95.init -> void
+NBenchmark.BenchmarkRow.AutoTune.get -> NBenchmark.AutoTuneDiagnostic?
+NBenchmark.BenchmarkRow.AutoTune.init -> void
+NBenchmark.BenchmarkRow.BaseName.get -> string!
+NBenchmark.BenchmarkRow.BaseName.init -> void
+NBenchmark.BenchmarkRow.BenchmarkRow() -> void
+NBenchmark.BenchmarkRow.BenchmarkRow(NBenchmark.BenchmarkRow! original) -> void
+NBenchmark.BenchmarkRow.Categories.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NBenchmark.BenchmarkRow.Categories.init -> void
+NBenchmark.BenchmarkRow.ClassName.get -> string!
+NBenchmark.BenchmarkRow.ClassName.init -> void
+NBenchmark.BenchmarkRow.CoefficientOfVariation.get -> double
+NBenchmark.BenchmarkRow.CoefficientOfVariation.init -> void
+NBenchmark.BenchmarkRow.CoefficientOfVariationPercent.get -> double
+NBenchmark.BenchmarkRow.CoefficientOfVariationPercent.init -> void
+NBenchmark.BenchmarkRow.ConfidenceIntervalLower.get -> double
+NBenchmark.BenchmarkRow.ConfidenceIntervalLower.init -> void
+NBenchmark.BenchmarkRow.ConfidenceIntervalUpper.get -> double
+NBenchmark.BenchmarkRow.ConfidenceIntervalUpper.init -> void
+NBenchmark.BenchmarkRow.ConfidenceLevel.get -> double
+NBenchmark.BenchmarkRow.ConfidenceLevel.init -> void
+NBenchmark.BenchmarkRow.Description.get -> string?
+NBenchmark.BenchmarkRow.Description.init -> void
+NBenchmark.BenchmarkRow.Diagnostics.get -> NBenchmark.DiagnosticsResult?
+NBenchmark.BenchmarkRow.Diagnostics.init -> void
+NBenchmark.BenchmarkRow.Effect.get -> NBenchmark.Stats.EffectSize?
+NBenchmark.BenchmarkRow.Effect.init -> void
+NBenchmark.BenchmarkRow.ErrorMessage.get -> string?
+NBenchmark.BenchmarkRow.ErrorMessage.init -> void
+NBenchmark.BenchmarkRow.Errored.get -> bool
+NBenchmark.BenchmarkRow.Errored.init -> void
+NBenchmark.BenchmarkRow.GetPercentile(double p) -> double?
+NBenchmark.BenchmarkRow.Histogram.get -> NBenchmark.LatencyHistogram?
+NBenchmark.BenchmarkRow.Histogram.init -> void
+NBenchmark.BenchmarkRow.InterferenceFilterEnabled.get -> bool
+NBenchmark.BenchmarkRow.InterferenceFilterEnabled.init -> void
+NBenchmark.BenchmarkRow.InterquartileRange.get -> double
+NBenchmark.BenchmarkRow.InterquartileRange.init -> void
+NBenchmark.BenchmarkRow.IsBaseline.get -> bool
+NBenchmark.BenchmarkRow.IsBaseline.init -> void
+NBenchmark.BenchmarkRow.IsolationStatus.get -> NBenchmark.IsolationStatus
+NBenchmark.BenchmarkRow.IsolationStatus.init -> void
+NBenchmark.BenchmarkRow.Kurtosis.get -> double
+NBenchmark.BenchmarkRow.Kurtosis.init -> void
+NBenchmark.BenchmarkRow.LaunchBlockedVerdict.get -> NBenchmark.SignificanceVerdict
+NBenchmark.BenchmarkRow.LaunchBlockedVerdict.init -> void
+NBenchmark.BenchmarkRow.LaunchStatistics.get -> NBenchmark.LaunchStatistics?
+NBenchmark.BenchmarkRow.LaunchStatistics.init -> void
+NBenchmark.BenchmarkRow.LowerFence.get -> double?
+NBenchmark.BenchmarkRow.LowerFence.init -> void
+NBenchmark.BenchmarkRow.Mad.get -> double
+NBenchmark.BenchmarkRow.Mad.init -> void
+NBenchmark.BenchmarkRow.MarginOfError.get -> double
+NBenchmark.BenchmarkRow.MarginOfError.init -> void
+NBenchmark.BenchmarkRow.MarginPercent.get -> double
+NBenchmark.BenchmarkRow.MarginPercent.init -> void
+NBenchmark.BenchmarkRow.Max.get -> double
+NBenchmark.BenchmarkRow.Max.init -> void
+NBenchmark.BenchmarkRow.Mean.get -> double
+NBenchmark.BenchmarkRow.Mean.init -> void
+NBenchmark.BenchmarkRow.MeanAllocatedBytes.get -> long?
+NBenchmark.BenchmarkRow.MeanAllocatedBytes.init -> void
+NBenchmark.BenchmarkRow.Median.get -> double
+NBenchmark.BenchmarkRow.Median.init -> void
+NBenchmark.BenchmarkRow.MedianCiLower.get -> double?
+NBenchmark.BenchmarkRow.MedianCiLower.init -> void
+NBenchmark.BenchmarkRow.MedianCiUpper.get -> double?
+NBenchmark.BenchmarkRow.MedianCiUpper.init -> void
+NBenchmark.BenchmarkRow.MedianOperationsPerSecond.get -> double
+NBenchmark.BenchmarkRow.MedianOperationsPerSecond.init -> void
+NBenchmark.BenchmarkRow.MedianShift.get -> NBenchmark.Stats.ShiftEstimate?
+NBenchmark.BenchmarkRow.MedianShift.init -> void
+NBenchmark.BenchmarkRow.Min.get -> double
+NBenchmark.BenchmarkRow.Min.init -> void
+NBenchmark.BenchmarkRow.N.get -> int
+NBenchmark.BenchmarkRow.N.init -> void
+NBenchmark.BenchmarkRow.Name.get -> string!
+NBenchmark.BenchmarkRow.Name.init -> void
+NBenchmark.BenchmarkRow.OperationsPerSecond.get -> double
+NBenchmark.BenchmarkRow.OperationsPerSecond.init -> void
+NBenchmark.BenchmarkRow.OutliersRemoved.get -> int
+NBenchmark.BenchmarkRow.OutliersRemoved.init -> void
+NBenchmark.BenchmarkRow.ParameterSet.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkParameter!>!
+NBenchmark.BenchmarkRow.ParameterSet.init -> void
+NBenchmark.BenchmarkRow.Percentiles.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.PercentileEntry>!
+NBenchmark.BenchmarkRow.Percentiles.init -> void
+NBenchmark.BenchmarkRow.Q1.get -> double
+NBenchmark.BenchmarkRow.Q1.init -> void
+NBenchmark.BenchmarkRow.Q3.get -> double
+NBenchmark.BenchmarkRow.Q3.init -> void
+NBenchmark.BenchmarkRow.Range.get -> double
+NBenchmark.BenchmarkRow.Range.init -> void
+NBenchmark.BenchmarkRow.Ratio.get -> double
+NBenchmark.BenchmarkRow.Ratio.init -> void
+NBenchmark.BenchmarkRow.RatioEstimate.get -> NBenchmark.RatioEstimate?
+NBenchmark.BenchmarkRow.RatioEstimate.init -> void
+NBenchmark.BenchmarkRow.RatioSuppressed.get -> bool
+NBenchmark.BenchmarkRow.RatioSuppressed.init -> void
+NBenchmark.BenchmarkRow.RawSamples.get -> System.Collections.Generic.IReadOnlyList<double>!
+NBenchmark.BenchmarkRow.RawSamples.init -> void
+NBenchmark.BenchmarkRow.RuntimeMoniker.get -> string!
+NBenchmark.BenchmarkRow.RuntimeMoniker.init -> void
+NBenchmark.BenchmarkRow.RuntimeProfileName.get -> string!
+NBenchmark.BenchmarkRow.RuntimeProfileName.init -> void
+NBenchmark.BenchmarkRow.SignificanceLabel.get -> string!
+NBenchmark.BenchmarkRow.SignificanceLabel.init -> void
+NBenchmark.BenchmarkRow.Skewness.get -> double
+NBenchmark.BenchmarkRow.Skewness.init -> void
+NBenchmark.BenchmarkRow.StandardDeviation.get -> double
+NBenchmark.BenchmarkRow.StandardDeviation.init -> void
+NBenchmark.BenchmarkRow.StandardError.get -> double
+NBenchmark.BenchmarkRow.StandardError.init -> void
+NBenchmark.BenchmarkRow.StandardErrorPercent.get -> double
+NBenchmark.BenchmarkRow.StandardErrorPercent.init -> void
+NBenchmark.BenchmarkRow.ThreadControlEnabled.get -> bool
+NBenchmark.BenchmarkRow.ThreadControlEnabled.init -> void
+NBenchmark.BenchmarkRow.TrimmedOrdinals.get -> System.Collections.Generic.IReadOnlyList<int>!
+NBenchmark.BenchmarkRow.TrimmedOrdinals.init -> void
+NBenchmark.BenchmarkRow.UpperFence.get -> double?
+NBenchmark.BenchmarkRow.UpperFence.init -> void
+NBenchmark.BenchmarkRow.WarmupIterations.get -> int
+NBenchmark.BenchmarkRow.WarmupIterations.init -> void
+NBenchmark.BenchmarkRow.Warnings.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NBenchmark.BenchmarkRow.Warnings.init -> void
+NBenchmark.BenchmarkSuite
+NBenchmark.BenchmarkSuite.Add(string! name, System.Action! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add(string! name, System.Func<System.Threading.Tasks.Task!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T, TResult>(string! name, System.Func<T, System.Threading.Tasks.Task<TResult>!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T, TResult>(string! name, System.Func<T, TResult>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T1, T2, T3, TResult>(string! name, System.Func<T1, T2, T3, System.Threading.Tasks.Task<TResult>!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T1, T2, T3, TResult>(string! name, System.Func<T1, T2, T3, TResult>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T1, T2, T3>(string! name, System.Action<T1, T2, T3>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T1, T2, T3>(string! name, System.Func<T1, T2, T3, System.Threading.Tasks.Task!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T1, T2, TResult>(string! name, System.Func<T1, T2, System.Threading.Tasks.Task<TResult>!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T1, T2, TResult>(string! name, System.Func<T1, T2, TResult>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T1, T2>(string! name, System.Action<T1, T2>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T1, T2>(string! name, System.Func<T1, T2, System.Threading.Tasks.Task!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T>(string! name, System.Action<T>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T>(string! name, System.Func<System.Threading.Tasks.Task<T>!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T>(string! name, System.Func<T, System.Threading.Tasks.Task!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.Add<T>(string! name, System.Func<T>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.AddInProcess(string! name, System.Action! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.AddInProcess(string! name, System.Func<System.Threading.Tasks.Task!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.AddInProcess<T>(string! name, System.Func<System.Threading.Tasks.Task<T>!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.AddInProcess<T>(string! name, System.Func<T>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.BenchmarkSuite(string! name) -> void
+NBenchmark.BenchmarkSuite.Name.get -> string!
+NBenchmark.BenchmarkSuite.RunAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>!>!
+NBenchmark.BenchmarkSuite.WithAllocations(bool enabled = true) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithAutoTune(NBenchmark.AutoTuneOptions! autoTune) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithAutoTune(NBenchmark.AutoTunePreset preset) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithBaseline(string! name) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithCategories(params string![]! categories) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithCategoryFilter(System.Collections.Generic.IEnumerable<string!>? include = null, System.Collections.Generic.IEnumerable<string!>? exclude = null) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithConfidenceLevel(double level) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithDedicatedHostGuidance(bool enabled = true) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithDetail(NBenchmark.Reporters.ReportDetail detail) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithDiagnostics(NBenchmark.DiagnosticsMode mode) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithDiagnostics(NBenchmark.DiagnosticsOptions! diagnostics) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithDriftCanary(NBenchmark.DriftCanaryOptions! driftCanary) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithDriftCanary(bool enabled) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithHardwareAffinity(params int[]! cores) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithInterferenceFilter(bool enabled = true) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithIsolation(bool enabled = true) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithIterations(int iterations) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithLaunchCount(int count) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithMeasurementProfile(NBenchmark.MeasurementProfile profile) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithMinimumPracticalEffect(double minimumDelta) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithMinimumRelativeShift(double minimumRelativeShift) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithObserver(NBenchmark.IMeasurementObserver! observer) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithOpsPerSample(int opsPerSample) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithOptions(NBenchmark.MeasurementOptions! options) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithOutlierDetector(NBenchmark.Stats.IOutlierDetector! detector) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithOutlierDetector(System.Func<NBenchmark.Stats.IOutlierDetector!>! factory) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithOutlierMode(NBenchmark.OutlierMode mode) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithParameter<T1, T2, T3>(string! name1, T1[]! values1, string! name2, T2[]! values2, string! name3, T3[]! values3) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithParameter<T1, T2>(string! name1, T1[]! values1, string! name2, T2[]! values2) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithParameter<T>(string! name, params (string! Label, System.Func<T>! Recipe)[]! values) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithParameter<T>(string! name, params T[]! values) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithProcessPriority(System.Diagnostics.ProcessPriorityClass priority) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithProgress(NBenchmark.IBenchmarkProgress! progress) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithReporter(NBenchmark.Reporters.IReporter! reporter) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithRequireIsolation(bool required = true) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithRunOrder(NBenchmark.RunOrder order) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithRuntimeProfile(NBenchmark.RuntimeProfile! profile) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithRuntimes(params NBenchmark.RuntimeMoniker[]! runtimes) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithSeed(int seed) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithSignificance(bool enabled) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithSignificanceLevel(double level) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithSignificanceTest(NBenchmark.Stats.ISignificanceTest! test) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithSignificanceTest(System.Func<NBenchmark.Stats.ISignificanceTest!>! factory) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithSuiteSetup(System.Action! setup) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithSuiteTeardown(System.Action! teardown) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithSuppressBuildConfigurationWarning(bool suppress = true) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithThreadControl(bool enabled = true) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite.WithWarmup(int iterations) -> NBenchmark.BenchmarkSuite!
+NBenchmark.BenchmarkSuite<TState>
+NBenchmark.BenchmarkSuite<TState>.Add(string! name, System.Action<TState>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null, System.Func<TState>? prepare = null) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.Add<TResult>(string! name, System.Func<TState, TResult>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null, System.Func<TState>? prepare = null) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.AddAsync(string! name, System.Func<TState, System.Threading.Tasks.Task!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null, System.Func<TState>? prepare = null) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.AddAsync<TResult>(string! name, System.Func<TState, System.Threading.Tasks.Task<TResult>!>! action, System.Action? setup = null, System.Action? teardown = null, System.Collections.Generic.IReadOnlyList<string!>? categories = null, System.Func<TState>? prepare = null) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithAllocations(bool enabled = true) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithAutoTune(NBenchmark.AutoTuneOptions! autoTune) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithAutoTune(NBenchmark.AutoTunePreset preset) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithBaseline(string! name) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithCategories(params string![]! categories) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithCategoryFilter(System.Collections.Generic.IEnumerable<string!>? include = null, System.Collections.Generic.IEnumerable<string!>? exclude = null) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithConfidenceLevel(double level) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithDedicatedHostGuidance(bool enabled = true) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithDetail(NBenchmark.Reporters.ReportDetail detail) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithDiagnostics(NBenchmark.DiagnosticsMode mode) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithDiagnostics(NBenchmark.DiagnosticsOptions! diagnostics) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithDriftCanary(NBenchmark.DriftCanaryOptions! driftCanary) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithDriftCanary(bool enabled) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithHardwareAffinity(params int[]! cores) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithInterferenceFilter(bool enabled = true) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithIsolation(bool enabled = true) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithIterations(int iterations) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithLaunchCount(int count) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithMeasurementProfile(NBenchmark.MeasurementProfile profile) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithMinimumPracticalEffect(double minimumDelta) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithMinimumRelativeShift(double minimumRelativeShift) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithObserver(NBenchmark.IMeasurementObserver! observer) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithOpsPerSample(int opsPerSample) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithOptions(NBenchmark.MeasurementOptions! options) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithOutlierDetector(NBenchmark.Stats.IOutlierDetector! detector) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithOutlierDetector(System.Func<NBenchmark.Stats.IOutlierDetector!>! factory) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithOutlierMode(NBenchmark.OutlierMode mode) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithProcessPriority(System.Diagnostics.ProcessPriorityClass priority) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithProgress(NBenchmark.IBenchmarkProgress! progress) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithReporter(NBenchmark.Reporters.IReporter! reporter) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithRequireIsolation(bool required = true) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithRunOrder(NBenchmark.RunOrder order) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithRuntimeProfile(NBenchmark.RuntimeProfile! profile) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithRuntimes(params NBenchmark.RuntimeMoniker[]! runtimes) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithSeed(int seed) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithSignificance(bool enabled) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithSignificanceLevel(double level) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithSignificanceTest(NBenchmark.Stats.ISignificanceTest! test) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithSignificanceTest(System.Func<NBenchmark.Stats.ISignificanceTest!>! factory) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithSuiteSetup(System.Action! setup) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithSuiteTeardown(System.Action! teardown) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithSuppressBuildConfigurationWarning(bool suppress = true) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithThreadControl(bool enabled = true) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkSuite<TState>.WithWarmup(int iterations) -> NBenchmark.BenchmarkSuite<TState>!
+NBenchmark.BenchmarkTable
+NBenchmark.BenchmarkTable.<Clone>$() -> NBenchmark.BenchmarkTable!
+NBenchmark.BenchmarkTable.BenchmarkTable() -> void
+NBenchmark.BenchmarkTable.ConfidenceLevel.get -> double
+NBenchmark.BenchmarkTable.ConfidenceLevel.init -> void
+NBenchmark.BenchmarkTable.Equals(NBenchmark.BenchmarkTable? other) -> bool
+NBenchmark.BenchmarkTable.InProcessReasons.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.IsolationStatus>!
+NBenchmark.BenchmarkTable.InProcessReasons.init -> void
+NBenchmark.BenchmarkTable.MeasuredIterations.get -> int
+NBenchmark.BenchmarkTable.MeasuredIterations.init -> void
+NBenchmark.BenchmarkTable.MixedIsolationStatuses.get -> bool
+NBenchmark.BenchmarkTable.MixedIsolationStatuses.init -> void
+NBenchmark.BenchmarkTable.MixedRuntimeProfiles.get -> bool
+NBenchmark.BenchmarkTable.MixedRuntimeProfiles.init -> void
+NBenchmark.BenchmarkTable.Omnibus.get -> NBenchmark.OmnibusComparison?
+NBenchmark.BenchmarkTable.Omnibus.init -> void
+NBenchmark.BenchmarkTable.OutlierDetector.get -> string!
+NBenchmark.BenchmarkTable.OutlierDetector.init -> void
+NBenchmark.BenchmarkTable.ParameterNames.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NBenchmark.BenchmarkTable.ParameterNames.init -> void
+NBenchmark.BenchmarkTable.Profile.get -> NBenchmark.MeasurementProfile
+NBenchmark.BenchmarkTable.Profile.init -> void
+NBenchmark.BenchmarkTable.Rows.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkRow!>!
+NBenchmark.BenchmarkTable.Rows.init -> void
+NBenchmark.BenchmarkTable.RunAtUtc.get -> string!
+NBenchmark.BenchmarkTable.RunAtUtc.init -> void
+NBenchmark.BenchmarkTable.RuntimeKnobs.get -> string!
+NBenchmark.BenchmarkTable.RuntimeKnobs.init -> void
+NBenchmark.BenchmarkTable.RuntimeProfileName.get -> string!
+NBenchmark.BenchmarkTable.RuntimeProfileName.init -> void
+NBenchmark.BenchmarkTable.SignificanceLevel.get -> double
+NBenchmark.BenchmarkTable.SignificanceLevel.init -> void
+NBenchmark.BenchmarkTable.SignificanceTestName.get -> string!
+NBenchmark.BenchmarkTable.SignificanceTestName.init -> void
+NBenchmark.BenchmarkTable.TotalDuration.get -> System.TimeSpan
+NBenchmark.BenchmarkTable.TotalDuration.init -> void
+NBenchmark.BenchmarkTable.WarmupIterations.get -> int
+NBenchmark.BenchmarkTable.WarmupIterations.init -> void
+NBenchmark.CalibrationResult
+NBenchmark.CalibrationResult.<Clone>$() -> NBenchmark.CalibrationResult!
+NBenchmark.CalibrationResult.CalibrationResult(double Mean, double Median, double[]! Samples) -> void
+NBenchmark.CalibrationResult.Deconstruct(out double Mean, out double Median, out double[]! Samples) -> void
+NBenchmark.CalibrationResult.Equals(NBenchmark.CalibrationResult? other) -> bool
+NBenchmark.CalibrationResult.LaunchMedians.get -> System.Collections.Generic.IReadOnlyList<double>!
+NBenchmark.CalibrationResult.LaunchMedians.init -> void
+NBenchmark.CalibrationResult.Mean.get -> double
+NBenchmark.CalibrationResult.Mean.init -> void
+NBenchmark.CalibrationResult.Median.get -> double
+NBenchmark.CalibrationResult.Median.init -> void
+NBenchmark.CalibrationResult.Samples.get -> double[]!
+NBenchmark.CalibrationResult.Samples.init -> void
+NBenchmark.CalibrationStandard
+NBenchmark.DefaultConsoleProgress
+NBenchmark.DefaultConsoleProgress.DefaultConsoleProgress() -> void
+NBenchmark.DefaultConsoleProgress.OnBenchmarkCompleted(NBenchmark.BenchmarkResult! result) -> System.Threading.Tasks.Task!
+NBenchmark.DefaultConsoleProgress.OnBenchmarkStarting(string! name, int index, int total) -> System.Threading.Tasks.Task!
+NBenchmark.DefaultConsoleProgress.OnIterationCompleted(string! name, int iteration, int totalIterations) -> System.Threading.Tasks.Task!
+NBenchmark.DefaultConsoleProgress.OnSuiteCompleted(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results) -> System.Threading.Tasks.Task!
+NBenchmark.DefaultConsoleProgress.OnSuiteStarting(System.Collections.Generic.IReadOnlyList<string!>! benchmarkNames, int total) -> System.Threading.Tasks.Task!
+NBenchmark.DefaultConsoleProgress.OnWarmupCompleted(string! name) -> System.Threading.Tasks.Task!
+NBenchmark.DefaultConsoleProgress.OnWarmupStarting(string! name, int totalWarmupIterations) -> System.Threading.Tasks.Task!
+NBenchmark.DetectorStateEvent
+NBenchmark.DetectorStateEvent.BenchmarkName.get -> string!
+NBenchmark.DetectorStateEvent.BenchmarkName.init -> void
+NBenchmark.DetectorStateEvent.CiHalfWidth.get -> double
+NBenchmark.DetectorStateEvent.CiHalfWidth.init -> void
+NBenchmark.DetectorStateEvent.CurrentK.get -> int
+NBenchmark.DetectorStateEvent.CurrentK.init -> void
+NBenchmark.DetectorStateEvent.Deconstruct(out string! BenchmarkName, out NBenchmark.MeasurementPhase Phase, out int SampleCount, out double Mean, out double StdDev, out double CiHalfWidth, out int CurrentK) -> void
+NBenchmark.DetectorStateEvent.DetectorStateEvent() -> void
+NBenchmark.DetectorStateEvent.DetectorStateEvent(string! BenchmarkName, NBenchmark.MeasurementPhase Phase, int SampleCount, double Mean, double StdDev, double CiHalfWidth, int CurrentK) -> void
+NBenchmark.DetectorStateEvent.Equals(NBenchmark.DetectorStateEvent other) -> bool
+NBenchmark.DetectorStateEvent.Mean.get -> double
+NBenchmark.DetectorStateEvent.Mean.init -> void
+NBenchmark.DetectorStateEvent.Phase.get -> NBenchmark.MeasurementPhase
+NBenchmark.DetectorStateEvent.Phase.init -> void
+NBenchmark.DetectorStateEvent.SampleCount.get -> int
+NBenchmark.DetectorStateEvent.SampleCount.init -> void
+NBenchmark.DetectorStateEvent.StdDev.get -> double
+NBenchmark.DetectorStateEvent.StdDev.init -> void
+NBenchmark.Diagnostics.TelemetryResource
+NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsMode.All = NBenchmark.DiagnosticsMode.GcHeapInfo | NBenchmark.DiagnosticsMode.Exceptions | NBenchmark.DiagnosticsMode.GcAndCpu -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsMode.CpuTime = 8 -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsMode.Exceptions = 4 -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsMode.Gc = 1 -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsMode.GcAndCpu = NBenchmark.DiagnosticsMode.Gc | NBenchmark.DiagnosticsMode.CpuTime -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsMode.GcCollectionCounts = 1 -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsMode.GcHeapInfo = 2 -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsMode.None = 0 -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsOptions
+NBenchmark.DiagnosticsOptions.<Clone>$() -> NBenchmark.DiagnosticsOptions!
+NBenchmark.DiagnosticsOptions.Any.get -> bool
+NBenchmark.DiagnosticsOptions.CpuTime.get -> bool
+NBenchmark.DiagnosticsOptions.CpuTime.init -> void
+NBenchmark.DiagnosticsOptions.DiagnosticsOptions() -> void
+NBenchmark.DiagnosticsOptions.Equals(NBenchmark.DiagnosticsOptions? other) -> bool
+NBenchmark.DiagnosticsOptions.Exceptions.get -> bool
+NBenchmark.DiagnosticsOptions.Exceptions.init -> void
+NBenchmark.DiagnosticsOptions.GcCollectionCounts.get -> bool
+NBenchmark.DiagnosticsOptions.GcCollectionCounts.init -> void
+NBenchmark.DiagnosticsOptions.GcHeapInfo.get -> bool
+NBenchmark.DiagnosticsOptions.GcHeapInfo.init -> void
+NBenchmark.DiagnosticsOptions.ToMode() -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsResult
+NBenchmark.DiagnosticsResult.<Clone>$() -> NBenchmark.DiagnosticsResult!
+NBenchmark.DiagnosticsResult.CpuTimeNsPerOp.get -> double?
+NBenchmark.DiagnosticsResult.CpuTimeNsPerOp.init -> void
+NBenchmark.DiagnosticsResult.CpuWallRatio.get -> double?
+NBenchmark.DiagnosticsResult.CpuWallRatio.init -> void
+NBenchmark.DiagnosticsResult.DiagnosticsResult() -> void
+NBenchmark.DiagnosticsResult.Equals(NBenchmark.DiagnosticsResult? other) -> bool
+NBenchmark.DiagnosticsResult.ExceptionCountPerOp.get -> double?
+NBenchmark.DiagnosticsResult.ExceptionCountPerOp.init -> void
+NBenchmark.DiagnosticsResult.Gen0Collections.get -> long?
+NBenchmark.DiagnosticsResult.Gen0Collections.init -> void
+NBenchmark.DiagnosticsResult.Gen1Collections.get -> long?
+NBenchmark.DiagnosticsResult.Gen1Collections.init -> void
+NBenchmark.DiagnosticsResult.Gen2Collections.get -> long?
+NBenchmark.DiagnosticsResult.Gen2Collections.init -> void
+NBenchmark.DiagnosticsResult.HeapCommittedBytes.get -> long?
+NBenchmark.DiagnosticsResult.HeapCommittedBytes.init -> void
+NBenchmark.DiagnosticsResult.HeapFragmentedBytes.get -> long?
+NBenchmark.DiagnosticsResult.HeapFragmentedBytes.init -> void
+NBenchmark.DiagnosticsResult.Mode.get -> NBenchmark.DiagnosticsMode
+NBenchmark.DiagnosticsResult.Mode.init -> void
+NBenchmark.Discovery.BenchmarkDiscoverer
+NBenchmark.Discovery.BenchmarkDiscoverer.BenchmarkDiscoverer() -> void
+NBenchmark.Discovery.BenchmarkDiscoverer.BenchmarkDiscoverer(NBenchmark.InstanceLifetime defaultInstanceLifetime, bool factoryResolvedInstances = false) -> void
+NBenchmark.Discovery.BenchmarkDiscoverer.Discover(System.Reflection.Assembly! assembly) -> System.Collections.Generic.IReadOnlyList<NBenchmark.Discovery.BenchmarkSuiteDefinition!>!
+NBenchmark.Discovery.BenchmarkDiscoverer.Discover(System.Reflection.Assembly! assembly, string? typeFullName) -> System.Collections.Generic.IReadOnlyList<NBenchmark.Discovery.BenchmarkSuiteDefinition!>!
+NBenchmark.Discovery.BenchmarkDiscoverer.Discover(System.Type! type) -> System.Collections.Generic.IReadOnlyList<NBenchmark.Discovery.BenchmarkSuiteDefinition!>!
+NBenchmark.Discovery.BenchmarkMethodDefinition
+NBenchmark.Discovery.BenchmarkMethodDefinition.<Clone>$() -> NBenchmark.Discovery.BenchmarkMethodDefinition!
+NBenchmark.Discovery.BenchmarkMethodDefinition.Attribute.get -> NBenchmark.Attributes.BenchmarkAttribute!
+NBenchmark.Discovery.BenchmarkMethodDefinition.Attribute.init -> void
+NBenchmark.Discovery.BenchmarkMethodDefinition.BenchmarkMethodDefinition(System.Reflection.MethodInfo! Method, NBenchmark.Attributes.BenchmarkAttribute! Attribute) -> void
+NBenchmark.Discovery.BenchmarkMethodDefinition.Categories.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NBenchmark.Discovery.BenchmarkMethodDefinition.Categories.init -> void
+NBenchmark.Discovery.BenchmarkMethodDefinition.Deconstruct(out System.Reflection.MethodInfo! Method, out NBenchmark.Attributes.BenchmarkAttribute! Attribute) -> void
+NBenchmark.Discovery.BenchmarkMethodDefinition.DisplayName.get -> string!
+NBenchmark.Discovery.BenchmarkMethodDefinition.DisplayName.init -> void
+NBenchmark.Discovery.BenchmarkMethodDefinition.Equals(NBenchmark.Discovery.BenchmarkMethodDefinition? other) -> bool
+NBenchmark.Discovery.BenchmarkMethodDefinition.IsBaseline.get -> bool
+NBenchmark.Discovery.BenchmarkMethodDefinition.IsBaseline.init -> void
+NBenchmark.Discovery.BenchmarkMethodDefinition.IterationSetupDelegate.get -> System.Action<object!>?
+NBenchmark.Discovery.BenchmarkMethodDefinition.IterationSetupDelegate.init -> void
+NBenchmark.Discovery.BenchmarkMethodDefinition.IterationTeardownDelegate.get -> System.Action<object!>?
+NBenchmark.Discovery.BenchmarkMethodDefinition.IterationTeardownDelegate.init -> void
+NBenchmark.Discovery.BenchmarkMethodDefinition.Method.get -> System.Reflection.MethodInfo!
+NBenchmark.Discovery.BenchmarkMethodDefinition.Method.init -> void
+NBenchmark.Discovery.BenchmarkMethodDefinition.ParameterSet.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkParameter!>!
+NBenchmark.Discovery.BenchmarkMethodDefinition.ParameterSet.init -> void
+NBenchmark.Discovery.BenchmarkSuiteDefinition
+NBenchmark.Discovery.BenchmarkSuiteDefinition.<Clone>$() -> NBenchmark.Discovery.BenchmarkSuiteDefinition!
+NBenchmark.Discovery.BenchmarkSuiteDefinition.BenchmarkSuiteDefinition(System.Type! Type, System.Collections.Generic.IReadOnlyList<NBenchmark.Discovery.BenchmarkMethodDefinition!>! Benchmarks, System.Action<object!>? SetupDelegate = null, System.Action<object!>? TeardownDelegate = null) -> void
+NBenchmark.Discovery.BenchmarkSuiteDefinition.Benchmarks.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.Discovery.BenchmarkMethodDefinition!>!
+NBenchmark.Discovery.BenchmarkSuiteDefinition.Benchmarks.init -> void
+NBenchmark.Discovery.BenchmarkSuiteDefinition.Deconstruct(out System.Type! Type, out System.Collections.Generic.IReadOnlyList<NBenchmark.Discovery.BenchmarkMethodDefinition!>! Benchmarks, out System.Action<object!>? SetupDelegate, out System.Action<object!>? TeardownDelegate) -> void
+NBenchmark.Discovery.BenchmarkSuiteDefinition.Equals(NBenchmark.Discovery.BenchmarkSuiteDefinition? other) -> bool
+NBenchmark.Discovery.BenchmarkSuiteDefinition.Lifetime.get -> NBenchmark.InstanceLifetime
+NBenchmark.Discovery.BenchmarkSuiteDefinition.Lifetime.init -> void
+NBenchmark.Discovery.BenchmarkSuiteDefinition.SetupDelegate.get -> System.Action<object!>?
+NBenchmark.Discovery.BenchmarkSuiteDefinition.SetupDelegate.init -> void
+NBenchmark.Discovery.BenchmarkSuiteDefinition.TeardownDelegate.get -> System.Action<object!>?
+NBenchmark.Discovery.BenchmarkSuiteDefinition.TeardownDelegate.init -> void
+NBenchmark.Discovery.BenchmarkSuiteDefinition.Type.get -> System.Type!
+NBenchmark.Discovery.BenchmarkSuiteDefinition.Type.init -> void
+NBenchmark.DriftCanaryOptions
+NBenchmark.DriftCanaryOptions.<Clone>$() -> NBenchmark.DriftCanaryOptions!
+NBenchmark.DriftCanaryOptions.DriftCanaryOptions() -> void
+NBenchmark.DriftCanaryOptions.Enabled.get -> bool
+NBenchmark.DriftCanaryOptions.Enabled.init -> void
+NBenchmark.DriftCanaryOptions.Equals(NBenchmark.DriftCanaryOptions? other) -> bool
+NBenchmark.DriftCanaryOptions.MinimumReportableDrift.get -> double
+NBenchmark.DriftCanaryOptions.MinimumReportableDrift.init -> void
+NBenchmark.DriftCanaryOptions.Samples.get -> int
+NBenchmark.DriftCanaryOptions.Samples.init -> void
+NBenchmark.DriftCanaryOptions.WorkPerSample.get -> int
+NBenchmark.DriftCanaryOptions.WorkPerSample.init -> void
+NBenchmark.Engine.BenchmarkRunner
+NBenchmark.Engine.BenchmarkRunner.BenchmarkRunner() -> void
+NBenchmark.Engine.BenchmarkRunner.Run(string! name, System.Action! body, NBenchmark.Engine.RunSpec spec, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+NBenchmark.Engine.BenchmarkRunner.Run<T>(string! name, System.Func<T>! body, NBenchmark.Engine.RunSpec spec, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+NBenchmark.Engine.BenchmarkRunner.RunAsync(string! name, System.Func<System.Threading.Tasks.Task!>! body, NBenchmark.Engine.RunSpec spec, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+NBenchmark.Engine.BenchmarkRunner.RunAsync<T>(string! name, System.Func<System.Threading.Tasks.Task<T>!>! body, NBenchmark.Engine.RunSpec spec, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+NBenchmark.Engine.ChannelMeasurementObserver
+NBenchmark.Engine.ChannelMeasurementObserver.ChannelMeasurementObserver(int capacity = 1024) -> void
+NBenchmark.Engine.ChannelMeasurementObserver.Complete() -> void
+NBenchmark.Engine.ChannelMeasurementObserver.Dispose() -> void
+NBenchmark.Engine.ChannelMeasurementObserver.OnDetector(in NBenchmark.DetectorStateEvent e) -> void
+NBenchmark.Engine.ChannelMeasurementObserver.OnPhase(in NBenchmark.MeasurementPhaseEvent e) -> void
+NBenchmark.Engine.ChannelMeasurementObserver.OnResult(NBenchmark.BenchmarkResult! result) -> void
+NBenchmark.Engine.ChannelMeasurementObserver.OnSample(in NBenchmark.SampleEvent e) -> void
+NBenchmark.Engine.ChannelMeasurementObserver.Reader.get -> System.Threading.Channels.ChannelReader<NBenchmark.MeasurementEvent>!
+NBenchmark.Engine.ChannelMeasurementObserver.WantsSampleStream.get -> bool
+NBenchmark.Engine.CompositeMeasurementObserver
+NBenchmark.Engine.CompositeMeasurementObserver.CompositeMeasurementObserver(System.Collections.Generic.IEnumerable<NBenchmark.IMeasurementObserver!>! observers) -> void
+NBenchmark.Engine.CompositeMeasurementObserver.Dispose() -> void
+NBenchmark.Engine.CompositeMeasurementObserver.Observers.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.IMeasurementObserver!>!
+NBenchmark.Engine.CompositeMeasurementObserver.OnDetector(in NBenchmark.DetectorStateEvent e) -> void
+NBenchmark.Engine.CompositeMeasurementObserver.OnPhase(in NBenchmark.MeasurementPhaseEvent e) -> void
+NBenchmark.Engine.CompositeMeasurementObserver.OnResult(NBenchmark.BenchmarkResult! result) -> void
+NBenchmark.Engine.CompositeMeasurementObserver.OnSample(in NBenchmark.SampleEvent e) -> void
+NBenchmark.Engine.CompositeMeasurementObserver.WantsSampleStream.get -> bool
+NBenchmark.Engine.EnvironmentControl
+NBenchmark.Engine.HostAssessment
+NBenchmark.Engine.HostAssessment.CoreCount.get -> int
+NBenchmark.Engine.HostAssessment.CoreCount.init -> void
+NBenchmark.Engine.HostAssessment.Deconstruct(out int CoreCount, out bool IsMacOS, out bool IsSharedRunner, out int PerformanceCoreCount, out int EfficiencyCoreCount) -> void
+NBenchmark.Engine.HostAssessment.EfficiencyCoreCount.get -> int
+NBenchmark.Engine.HostAssessment.EfficiencyCoreCount.init -> void
+NBenchmark.Engine.HostAssessment.Equals(NBenchmark.Engine.HostAssessment other) -> bool
+NBenchmark.Engine.HostAssessment.HasCoreSplit.get -> bool
+NBenchmark.Engine.HostAssessment.HostAssessment() -> void
+NBenchmark.Engine.HostAssessment.HostAssessment(int CoreCount, bool IsMacOS, bool IsSharedRunner, int PerformanceCoreCount = 0, int EfficiencyCoreCount = 0) -> void
+NBenchmark.Engine.HostAssessment.IsMacOS.get -> bool
+NBenchmark.Engine.HostAssessment.IsMacOS.init -> void
+NBenchmark.Engine.HostAssessment.IsSharedRunner.get -> bool
+NBenchmark.Engine.HostAssessment.IsSharedRunner.init -> void
+NBenchmark.Engine.HostAssessment.PerformanceCoreCount.get -> int
+NBenchmark.Engine.HostAssessment.PerformanceCoreCount.init -> void
+NBenchmark.Engine.ProcessedMeasurements
+NBenchmark.Engine.ProcessedMeasurements.<Clone>$() -> NBenchmark.Engine.ProcessedMeasurements!
+NBenchmark.Engine.ProcessedMeasurements.Deconstruct(out NBenchmark.Stats.StatsSummary! Stats, out int MeasuredIterations, out long? MeanAllocatedBytes, out double Q1, out double Q3, out double InterquartileRange, out double? LowerFence, out double? UpperFence, out int OutliersRemoved, out long[]? RawAllocations, out int[]! TrimmedOrdinals) -> void
+NBenchmark.Engine.ProcessedMeasurements.DiagnosticsResult.get -> NBenchmark.DiagnosticsResult?
+NBenchmark.Engine.ProcessedMeasurements.DiagnosticsResult.init -> void
+NBenchmark.Engine.ProcessedMeasurements.Equals(NBenchmark.Engine.ProcessedMeasurements? other) -> bool
+NBenchmark.Engine.ProcessedMeasurements.InterferenceDisabledReason.get -> string?
+NBenchmark.Engine.ProcessedMeasurements.InterferenceDisabledReason.init -> void
+NBenchmark.Engine.ProcessedMeasurements.InterferenceRejectedCount.get -> int
+NBenchmark.Engine.ProcessedMeasurements.InterferenceRejectedCount.init -> void
+NBenchmark.Engine.ProcessedMeasurements.InterquartileRange.get -> double
+NBenchmark.Engine.ProcessedMeasurements.InterquartileRange.init -> void
+NBenchmark.Engine.ProcessedMeasurements.LowerFence.get -> double?
+NBenchmark.Engine.ProcessedMeasurements.LowerFence.init -> void
+NBenchmark.Engine.ProcessedMeasurements.MeanAllocatedBytes.get -> long?
+NBenchmark.Engine.ProcessedMeasurements.MeanAllocatedBytes.init -> void
+NBenchmark.Engine.ProcessedMeasurements.MeasuredIterations.get -> int
+NBenchmark.Engine.ProcessedMeasurements.MeasuredIterations.init -> void
+NBenchmark.Engine.ProcessedMeasurements.MedianOccupancyRatio.get -> double?
+NBenchmark.Engine.ProcessedMeasurements.MedianOccupancyRatio.init -> void
+NBenchmark.Engine.ProcessedMeasurements.OutliersRemoved.get -> int
+NBenchmark.Engine.ProcessedMeasurements.OutliersRemoved.init -> void
+NBenchmark.Engine.ProcessedMeasurements.ProcessedMeasurements(NBenchmark.Stats.StatsSummary! Stats, int MeasuredIterations, long? MeanAllocatedBytes, double Q1, double Q3, double InterquartileRange, double? LowerFence, double? UpperFence, int OutliersRemoved, long[]? RawAllocations, int[]! TrimmedOrdinals) -> void
+NBenchmark.Engine.ProcessedMeasurements.Q1.get -> double
+NBenchmark.Engine.ProcessedMeasurements.Q1.init -> void
+NBenchmark.Engine.ProcessedMeasurements.Q3.get -> double
+NBenchmark.Engine.ProcessedMeasurements.Q3.init -> void
+NBenchmark.Engine.ProcessedMeasurements.RawAllocations.get -> long[]?
+NBenchmark.Engine.ProcessedMeasurements.RawAllocations.init -> void
+NBenchmark.Engine.ProcessedMeasurements.Stats.get -> NBenchmark.Stats.StatsSummary!
+NBenchmark.Engine.ProcessedMeasurements.Stats.init -> void
+NBenchmark.Engine.ProcessedMeasurements.TrimmedOrdinals.get -> int[]!
+NBenchmark.Engine.ProcessedMeasurements.TrimmedOrdinals.init -> void
+NBenchmark.Engine.ProcessedMeasurements.UpperFence.get -> double?
+NBenchmark.Engine.ProcessedMeasurements.UpperFence.init -> void
+NBenchmark.Engine.ProcessedMeasurements.Warnings.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NBenchmark.Engine.ProcessedMeasurements.Warnings.init -> void
+NBenchmark.Engine.RegressionCandidate
+NBenchmark.Engine.RegressionCandidate.<Clone>$() -> NBenchmark.Engine.RegressionCandidate!
+NBenchmark.Engine.RegressionCandidate.BaselineMedian.get -> double
+NBenchmark.Engine.RegressionCandidate.BaselineMedian.init -> void
+NBenchmark.Engine.RegressionCandidate.CandidateMedian.get -> double
+NBenchmark.Engine.RegressionCandidate.CandidateMedian.init -> void
+NBenchmark.Engine.RegressionCandidate.Deconstruct(out string! Name, out double CandidateMedian, out double BaselineMedian, out double Ratio, out double DeltaNs, out NBenchmark.RatioEstimate? Estimate) -> void
+NBenchmark.Engine.RegressionCandidate.DeltaNs.get -> double
+NBenchmark.Engine.RegressionCandidate.DeltaNs.init -> void
+NBenchmark.Engine.RegressionCandidate.Equals(NBenchmark.Engine.RegressionCandidate? other) -> bool
+NBenchmark.Engine.RegressionCandidate.Estimate.get -> NBenchmark.RatioEstimate?
+NBenchmark.Engine.RegressionCandidate.Estimate.init -> void
+NBenchmark.Engine.RegressionCandidate.Name.get -> string!
+NBenchmark.Engine.RegressionCandidate.Name.init -> void
+NBenchmark.Engine.RegressionCandidate.Ratio.get -> double
+NBenchmark.Engine.RegressionCandidate.Ratio.init -> void
+NBenchmark.Engine.RegressionCandidate.RegressionCandidate(string! Name, double CandidateMedian, double BaselineMedian, double Ratio, double DeltaNs, NBenchmark.RatioEstimate? Estimate = null) -> void
+NBenchmark.Engine.RegressionTolerance
+NBenchmark.Engine.RegressionVerdict
+NBenchmark.Engine.RegressionVerdict.<Clone>$() -> NBenchmark.Engine.RegressionVerdict!
+NBenchmark.Engine.RegressionVerdict.BaselineName.get -> string!
+NBenchmark.Engine.RegressionVerdict.BaselineName.init -> void
+NBenchmark.Engine.RegressionVerdict.Deconstruct(out bool HasRegression, out string! BaselineName, out System.Collections.Generic.IReadOnlyList<NBenchmark.Engine.RegressionCandidate!>! RegressedCandidates, out System.Collections.Generic.IReadOnlyList<string!>! RegressedNames) -> void
+NBenchmark.Engine.RegressionVerdict.Equals(NBenchmark.Engine.RegressionVerdict? other) -> bool
+NBenchmark.Engine.RegressionVerdict.HasRegression.get -> bool
+NBenchmark.Engine.RegressionVerdict.HasRegression.init -> void
+NBenchmark.Engine.RegressionVerdict.RegressedCandidates.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.Engine.RegressionCandidate!>!
+NBenchmark.Engine.RegressionVerdict.RegressedCandidates.init -> void
+NBenchmark.Engine.RegressionVerdict.RegressedNames.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NBenchmark.Engine.RegressionVerdict.RegressedNames.init -> void
+NBenchmark.Engine.RegressionVerdict.RegressionVerdict(bool HasRegression, string! BaselineName, System.Collections.Generic.IReadOnlyList<NBenchmark.Engine.RegressionCandidate!>! RegressedCandidates, System.Collections.Generic.IReadOnlyList<string!>! RegressedNames) -> void
+NBenchmark.Engine.RunSpec
+NBenchmark.Engine.RunSpec.Categories.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NBenchmark.Engine.RunSpec.Categories.init -> void
+NBenchmark.Engine.RunSpec.ClassName.get -> string!
+NBenchmark.Engine.RunSpec.ClassName.init -> void
+NBenchmark.Engine.RunSpec.Description.get -> string?
+NBenchmark.Engine.RunSpec.Description.init -> void
+NBenchmark.Engine.RunSpec.Equals(NBenchmark.Engine.RunSpec other) -> bool
+NBenchmark.Engine.RunSpec.IsBaseline.get -> bool
+NBenchmark.Engine.RunSpec.IsBaseline.init -> void
+NBenchmark.Engine.RunSpec.IterationSetup.get -> System.Action?
+NBenchmark.Engine.RunSpec.IterationSetup.init -> void
+NBenchmark.Engine.RunSpec.IterationTeardown.get -> System.Action?
+NBenchmark.Engine.RunSpec.IterationTeardown.init -> void
+NBenchmark.Engine.RunSpec.Observer.get -> NBenchmark.IMeasurementObserver!
+NBenchmark.Engine.RunSpec.Observer.init -> void
+NBenchmark.Engine.RunSpec.Options.get -> NBenchmark.MeasurementOptions!
+NBenchmark.Engine.RunSpec.Options.init -> void
+NBenchmark.Engine.RunSpec.Progress.get -> NBenchmark.IBenchmarkProgress!
+NBenchmark.Engine.RunSpec.Progress.init -> void
+NBenchmark.Engine.RunSpec.RunSpec() -> void
+NBenchmark.Engine.StatsPipeline
+NBenchmark.Engine.ThreadEnvironmentControl
+NBenchmark.Engine.ThresholdCheck
+NBenchmark.Engine.ToleranceVerdict
+NBenchmark.Engine.ToleranceVerdict.<Clone>$() -> NBenchmark.Engine.ToleranceVerdict!
+NBenchmark.Engine.ToleranceVerdict.ConfiguredThreshold.get -> double
+NBenchmark.Engine.ToleranceVerdict.ConfiguredThreshold.init -> void
+NBenchmark.Engine.ToleranceVerdict.Deconstruct(out double MeasuredValue, out double ConfiguredThreshold, out double ToleranceMultiplier, out double EffectiveThreshold, out bool ExceedsThreshold, out double Excess, out bool Relaxed) -> void
+NBenchmark.Engine.ToleranceVerdict.EffectiveThreshold.get -> double
+NBenchmark.Engine.ToleranceVerdict.EffectiveThreshold.init -> void
+NBenchmark.Engine.ToleranceVerdict.Equals(NBenchmark.Engine.ToleranceVerdict? other) -> bool
+NBenchmark.Engine.ToleranceVerdict.ExceedsThreshold.get -> bool
+NBenchmark.Engine.ToleranceVerdict.ExceedsThreshold.init -> void
+NBenchmark.Engine.ToleranceVerdict.Excess.get -> double
+NBenchmark.Engine.ToleranceVerdict.Excess.init -> void
+NBenchmark.Engine.ToleranceVerdict.MeasuredValue.get -> double
+NBenchmark.Engine.ToleranceVerdict.MeasuredValue.init -> void
+NBenchmark.Engine.ToleranceVerdict.Relaxed.get -> bool
+NBenchmark.Engine.ToleranceVerdict.Relaxed.init -> void
+NBenchmark.Engine.ToleranceVerdict.ToleranceMultiplier.get -> double
+NBenchmark.Engine.ToleranceVerdict.ToleranceMultiplier.init -> void
+NBenchmark.Engine.ToleranceVerdict.ToleranceVerdict(double MeasuredValue, double ConfiguredThreshold, double ToleranceMultiplier, double EffectiveThreshold, bool ExceedsThreshold, double Excess, bool Relaxed) -> void
+NBenchmark.EnvironmentOptions
+NBenchmark.EnvironmentOptions.CpuAffinity.get -> System.Collections.Generic.IReadOnlyList<int>?
+NBenchmark.EnvironmentOptions.CpuAffinity.init -> void
+NBenchmark.EnvironmentOptions.DedicatedHostGuidance.get -> bool
+NBenchmark.EnvironmentOptions.DedicatedHostGuidance.init -> void
+NBenchmark.EnvironmentOptions.EnvironmentOptions() -> void
+NBenchmark.EnvironmentOptions.EnvironmentOptions(NBenchmark.EnvironmentOptions! original) -> void
+NBenchmark.EnvironmentOptions.ProcessPriority.get -> System.Diagnostics.ProcessPriorityClass?
+NBenchmark.EnvironmentOptions.ProcessPriority.init -> void
+NBenchmark.EnvironmentOptions.SuppressBuildConfigurationWarning.get -> bool
+NBenchmark.EnvironmentOptions.SuppressBuildConfigurationWarning.init -> void
+NBenchmark.EnvironmentOptions.ThreadControl.get -> bool
+NBenchmark.EnvironmentOptions.ThreadControl.init -> void
+NBenchmark.GcMode
+NBenchmark.GcMode.Server = 1 -> NBenchmark.GcMode
+NBenchmark.GcMode.Workstation = 0 -> NBenchmark.GcMode
+NBenchmark.HistogramBucket
+NBenchmark.HistogramBucket.Count.get -> int
+NBenchmark.HistogramBucket.Count.init -> void
+NBenchmark.HistogramBucket.Deconstruct(out double Lower, out double Upper, out int Count) -> void
+NBenchmark.HistogramBucket.Equals(NBenchmark.HistogramBucket other) -> bool
+NBenchmark.HistogramBucket.HistogramBucket() -> void
+NBenchmark.HistogramBucket.HistogramBucket(double Lower, double Upper, int Count) -> void
+NBenchmark.HistogramBucket.Lower.get -> double
+NBenchmark.HistogramBucket.Lower.init -> void
+NBenchmark.HistogramBucket.Upper.get -> double
+NBenchmark.HistogramBucket.Upper.init -> void
+NBenchmark.HostTimeline
+NBenchmark.HostTimeline.<Clone>$() -> NBenchmark.HostTimeline!
+NBenchmark.HostTimeline.AfterNs.get -> double
+NBenchmark.HostTimeline.AfterNs.init -> void
+NBenchmark.HostTimeline.BeforeNs.get -> double
+NBenchmark.HostTimeline.BeforeNs.init -> void
+NBenchmark.HostTimeline.Equals(NBenchmark.HostTimeline? other) -> bool
+NBenchmark.HostTimeline.HostTimeline() -> void
+NBenchmark.HostTimeline.Position.get -> double
+NBenchmark.HostTimeline.Position.init -> void
+NBenchmark.HostTimeline.RelativeToRunStart.get -> double
+NBenchmark.HostTimeline.RelativeToRunStart.init -> void
+NBenchmark.IBenchmarkProgress
+NBenchmark.IBenchmarkProgress.OnBenchmarkCompleted(NBenchmark.BenchmarkResult! result) -> System.Threading.Tasks.Task!
+NBenchmark.IBenchmarkProgress.OnBenchmarkStarting(string! name, int index, int total) -> System.Threading.Tasks.Task!
+NBenchmark.IBenchmarkProgress.OnIterationCompleted(string! name, int iteration, int totalIterations) -> System.Threading.Tasks.Task!
+NBenchmark.IBenchmarkProgress.OnSuiteCompleted(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results) -> System.Threading.Tasks.Task!
+NBenchmark.IBenchmarkProgress.OnSuiteStarting(System.Collections.Generic.IReadOnlyList<string!>! benchmarkNames, int total) -> System.Threading.Tasks.Task!
+NBenchmark.IBenchmarkProgress.OnWarmupCompleted(string! name) -> System.Threading.Tasks.Task!
+NBenchmark.IBenchmarkProgress.OnWarmupStarting(string! name, int totalWarmupIterations) -> System.Threading.Tasks.Task!
+NBenchmark.IMeasurementObserver
+NBenchmark.IMeasurementObserver.Name.get -> string?
+NBenchmark.IMeasurementObserver.OnDetector(in NBenchmark.DetectorStateEvent e) -> void
+NBenchmark.IMeasurementObserver.OnPhase(in NBenchmark.MeasurementPhaseEvent e) -> void
+NBenchmark.IMeasurementObserver.OnResult(NBenchmark.BenchmarkResult! result) -> void
+NBenchmark.IMeasurementObserver.OnSample(in NBenchmark.SampleEvent e) -> void
+NBenchmark.IMeasurementObserver.WantsSampleStream.get -> bool
+NBenchmark.InstanceLifetime
+NBenchmark.InstanceLifetime.PerClass = 1 -> NBenchmark.InstanceLifetime
+NBenchmark.InstanceLifetime.PerMethod = 0 -> NBenchmark.InstanceLifetime
+NBenchmark.InterferenceOptions
+NBenchmark.InterferenceOptions.<Clone>$() -> NBenchmark.InterferenceOptions!
+NBenchmark.InterferenceOptions.Enabled.get -> bool
+NBenchmark.InterferenceOptions.Enabled.init -> void
+NBenchmark.InterferenceOptions.Equals(NBenchmark.InterferenceOptions? other) -> bool
+NBenchmark.InterferenceOptions.HighRejectionWarningFraction.get -> double
+NBenchmark.InterferenceOptions.HighRejectionWarningFraction.init -> void
+NBenchmark.InterferenceOptions.InterferenceOptions() -> void
+NBenchmark.InterferenceOptions.KnownSampleFraction.get -> double
+NBenchmark.InterferenceOptions.KnownSampleFraction.init -> void
+NBenchmark.InterferenceOptions.ProbeCostBudgetFraction.get -> double
+NBenchmark.InterferenceOptions.ProbeCostBudgetFraction.init -> void
+NBenchmark.InterferenceOptions.RejectionThreshold.get -> double
+NBenchmark.InterferenceOptions.RejectionThreshold.init -> void
+NBenchmark.IsolationStatus
+NBenchmark.IsolationStatus.InProcessCapturedState = 2 -> NBenchmark.IsolationStatus
+NBenchmark.IsolationStatus.InProcessLiveFixture = 3 -> NBenchmark.IsolationStatus
+NBenchmark.IsolationStatus.InProcessNoWorker = 5 -> NBenchmark.IsolationStatus
+NBenchmark.IsolationStatus.InProcessRequested = 1 -> NBenchmark.IsolationStatus
+NBenchmark.IsolationStatus.InProcessUnaddressablePlan = 4 -> NBenchmark.IsolationStatus
+NBenchmark.IsolationStatus.Isolated = 0 -> NBenchmark.IsolationStatus
+NBenchmark.IsolationStatusExtensions
+NBenchmark.LatencyHistogram
+NBenchmark.LatencyHistogram.<Clone>$() -> NBenchmark.LatencyHistogram!
+NBenchmark.LatencyHistogram.Buckets.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.HistogramBucket>!
+NBenchmark.LatencyHistogram.Buckets.init -> void
+NBenchmark.LatencyHistogram.Deconstruct(out System.Collections.Generic.IReadOnlyList<NBenchmark.HistogramBucket>! Buckets, out double Min, out double Max, out int SampleCount) -> void
+NBenchmark.LatencyHistogram.Equals(NBenchmark.LatencyHistogram? other) -> bool
+NBenchmark.LatencyHistogram.LatencyHistogram(System.Collections.Generic.IReadOnlyList<NBenchmark.HistogramBucket>! Buckets, double Min, double Max, int SampleCount) -> void
+NBenchmark.LatencyHistogram.Max.get -> double
+NBenchmark.LatencyHistogram.Max.init -> void
+NBenchmark.LatencyHistogram.Min.get -> double
+NBenchmark.LatencyHistogram.Min.init -> void
+NBenchmark.LatencyHistogram.SampleCount.get -> int
+NBenchmark.LatencyHistogram.SampleCount.init -> void
+NBenchmark.LaunchCounts
+NBenchmark.LaunchDetail
+NBenchmark.LaunchDetail.<Clone>$() -> NBenchmark.LaunchDetail!
+NBenchmark.LaunchDetail.Duration.get -> System.TimeSpan
+NBenchmark.LaunchDetail.Duration.init -> void
+NBenchmark.LaunchDetail.Equals(NBenchmark.LaunchDetail? other) -> bool
+NBenchmark.LaunchDetail.ErrorMessage.get -> string?
+NBenchmark.LaunchDetail.ErrorMessage.init -> void
+NBenchmark.LaunchDetail.Errored.get -> bool
+NBenchmark.LaunchDetail.Errored.init -> void
+NBenchmark.LaunchDetail.Iterations.get -> int
+NBenchmark.LaunchDetail.Iterations.init -> void
+NBenchmark.LaunchDetail.LaunchDetail() -> void
+NBenchmark.LaunchDetail.LaunchIndex.get -> int
+NBenchmark.LaunchDetail.LaunchIndex.init -> void
+NBenchmark.LaunchDetail.Mean.get -> double
+NBenchmark.LaunchDetail.Mean.init -> void
+NBenchmark.LaunchDetail.Median.get -> double
+NBenchmark.LaunchDetail.Median.init -> void
+NBenchmark.LaunchDetail.StandardDeviation.get -> double
+NBenchmark.LaunchDetail.StandardDeviation.init -> void
+NBenchmark.LaunchStatistics
+NBenchmark.LaunchStatistics.<Clone>$() -> NBenchmark.LaunchStatistics!
+NBenchmark.LaunchStatistics.BetweenLaunchDispersion.get -> double?
+NBenchmark.LaunchStatistics.BetweenLaunchDispersion.init -> void
+NBenchmark.LaunchStatistics.Equals(NBenchmark.LaunchStatistics? other) -> bool
+NBenchmark.LaunchStatistics.LaunchConfidenceIntervalLower.get -> double?
+NBenchmark.LaunchStatistics.LaunchConfidenceIntervalLower.init -> void
+NBenchmark.LaunchStatistics.LaunchConfidenceIntervalUpper.get -> double?
+NBenchmark.LaunchStatistics.LaunchConfidenceIntervalUpper.init -> void
+NBenchmark.LaunchStatistics.LaunchCount.get -> int
+NBenchmark.LaunchStatistics.LaunchCount.init -> void
+NBenchmark.LaunchStatistics.LaunchMean.get -> double
+NBenchmark.LaunchStatistics.LaunchMean.init -> void
+NBenchmark.LaunchStatistics.LaunchMedian.get -> double
+NBenchmark.LaunchStatistics.LaunchMedian.init -> void
+NBenchmark.LaunchStatistics.LaunchStandardDeviation.get -> double
+NBenchmark.LaunchStatistics.LaunchStandardDeviation.init -> void
+NBenchmark.LaunchStatistics.LaunchStatistics() -> void
+NBenchmark.LaunchStatistics.Launches.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.LaunchDetail!>!
+NBenchmark.LaunchStatistics.Launches.init -> void
+NBenchmark.LaunchStatistics.ProcessVarianceRatio.get -> double?
+NBenchmark.LaunchStatistics.ProcessVarianceRatio.init -> void
+NBenchmark.LaunchStatistics.WithinLaunchStandardError.get -> double?
+NBenchmark.LaunchStatistics.WithinLaunchStandardError.init -> void
+NBenchmark.Lifecycle.IStateReset
+NBenchmark.Lifecycle.IStateReset.ResetAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NBenchmark.MeasurementEvent
+NBenchmark.MeasurementEvent.DetectorStateEvent.get -> NBenchmark.DetectorStateEvent
+NBenchmark.MeasurementEvent.Equals(NBenchmark.MeasurementEvent other) -> bool
+NBenchmark.MeasurementEvent.EventKind
+NBenchmark.MeasurementEvent.EventKind.DetectorState = 2 -> NBenchmark.MeasurementEvent.EventKind
+NBenchmark.MeasurementEvent.EventKind.Phase = 0 -> NBenchmark.MeasurementEvent.EventKind
+NBenchmark.MeasurementEvent.EventKind.Result = 3 -> NBenchmark.MeasurementEvent.EventKind
+NBenchmark.MeasurementEvent.EventKind.Sample = 1 -> NBenchmark.MeasurementEvent.EventKind
+NBenchmark.MeasurementEvent.Kind.get -> NBenchmark.MeasurementEvent.EventKind
+NBenchmark.MeasurementEvent.MeasurementEvent() -> void
+NBenchmark.MeasurementEvent.MeasurementEvent(NBenchmark.BenchmarkResult! result) -> void
+NBenchmark.MeasurementEvent.MeasurementEvent(NBenchmark.DetectorStateEvent e) -> void
+NBenchmark.MeasurementEvent.MeasurementEvent(NBenchmark.MeasurementPhaseEvent e) -> void
+NBenchmark.MeasurementEvent.MeasurementEvent(NBenchmark.SampleEvent e) -> void
+NBenchmark.MeasurementEvent.PhaseEvent.get -> NBenchmark.MeasurementPhaseEvent
+NBenchmark.MeasurementEvent.Result.get -> NBenchmark.BenchmarkResult?
+NBenchmark.MeasurementEvent.SampleEvent.get -> NBenchmark.SampleEvent
+NBenchmark.MeasurementOptions
+NBenchmark.MeasurementOptions.AutoTune.get -> NBenchmark.AutoTuneOptions!
+NBenchmark.MeasurementOptions.AutoTune.init -> void
+NBenchmark.MeasurementOptions.ConfidenceLevel.get -> double
+NBenchmark.MeasurementOptions.ConfidenceLevel.init -> void
+NBenchmark.MeasurementOptions.Diagnostics.get -> NBenchmark.DiagnosticsOptions!
+NBenchmark.MeasurementOptions.Diagnostics.init -> void
+NBenchmark.MeasurementOptions.DriftCanary.get -> NBenchmark.DriftCanaryOptions!
+NBenchmark.MeasurementOptions.DriftCanary.init -> void
+NBenchmark.MeasurementOptions.EnableHistogram.get -> bool
+NBenchmark.MeasurementOptions.EnableHistogram.init -> void
+NBenchmark.MeasurementOptions.EnableSignificance.get -> bool
+NBenchmark.MeasurementOptions.EnableSignificance.init -> void
+NBenchmark.MeasurementOptions.Environment.get -> NBenchmark.EnvironmentOptions?
+NBenchmark.MeasurementOptions.Environment.init -> void
+NBenchmark.MeasurementOptions.ForceGcBeforeEachIteration.get -> bool
+NBenchmark.MeasurementOptions.ForceGcBeforeEachIterationOverride.get -> bool?
+NBenchmark.MeasurementOptions.ForceGcBeforeEachIterationOverride.init -> void
+NBenchmark.MeasurementOptions.ForceGcBeforeMeasurement.get -> bool
+NBenchmark.MeasurementOptions.ForceGcBeforeMeasurementOverride.get -> bool?
+NBenchmark.MeasurementOptions.ForceGcBeforeMeasurementOverride.init -> void
+NBenchmark.MeasurementOptions.ForceGcBetweenBenchmarks.get -> bool
+NBenchmark.MeasurementOptions.ForceGcBetweenBenchmarksOverride.get -> bool?
+NBenchmark.MeasurementOptions.ForceGcBetweenBenchmarksOverride.init -> void
+NBenchmark.MeasurementOptions.HistogramBucketCount.get -> int
+NBenchmark.MeasurementOptions.HistogramBucketCount.init -> void
+NBenchmark.MeasurementOptions.Interference.get -> NBenchmark.InterferenceOptions!
+NBenchmark.MeasurementOptions.Interference.init -> void
+NBenchmark.MeasurementOptions.Iterations.get -> int?
+NBenchmark.MeasurementOptions.Iterations.init -> void
+NBenchmark.MeasurementOptions.MaxRawSamples.get -> int
+NBenchmark.MeasurementOptions.MaxRawSamples.init -> void
+NBenchmark.MeasurementOptions.MaxTransferredStateBytes.get -> int
+NBenchmark.MeasurementOptions.MaxTransferredStateBytes.init -> void
+NBenchmark.MeasurementOptions.MeasureAllocations.get -> bool
+NBenchmark.MeasurementOptions.MeasureAllocationsOverride.get -> bool?
+NBenchmark.MeasurementOptions.MeasureAllocationsOverride.init -> void
+NBenchmark.MeasurementOptions.MeasurementOptions() -> void
+NBenchmark.MeasurementOptions.MeasurementOptions(NBenchmark.MeasurementOptions! original) -> void
+NBenchmark.MeasurementOptions.MinimumPracticalEffect.get -> double?
+NBenchmark.MeasurementOptions.MinimumPracticalEffect.init -> void
+NBenchmark.MeasurementOptions.MinimumRelativeShift.get -> double?
+NBenchmark.MeasurementOptions.MinimumRelativeShift.init -> void
+NBenchmark.MeasurementOptions.OpsPerSample.get -> int?
+NBenchmark.MeasurementOptions.OpsPerSample.init -> void
+NBenchmark.MeasurementOptions.OutlierDetector.get -> NBenchmark.Stats.IOutlierDetector?
+NBenchmark.MeasurementOptions.OutlierDetector.init -> void
+NBenchmark.MeasurementOptions.OutlierDetectorFactory.get -> System.Func<NBenchmark.Stats.IOutlierDetector!>?
+NBenchmark.MeasurementOptions.OutlierDetectorFactory.init -> void
+NBenchmark.MeasurementOptions.OutlierMode.get -> NBenchmark.OutlierMode
+NBenchmark.MeasurementOptions.OutlierMode.init -> void
+NBenchmark.MeasurementOptions.Profile.get -> NBenchmark.MeasurementProfile
+NBenchmark.MeasurementOptions.Profile.init -> void
+NBenchmark.MeasurementOptions.ReportedPercentiles.get -> System.Collections.Generic.IReadOnlyList<double>!
+NBenchmark.MeasurementOptions.ReportedPercentiles.init -> void
+NBenchmark.MeasurementOptions.RequireIsolation.get -> bool
+NBenchmark.MeasurementOptions.RequireIsolation.init -> void
+NBenchmark.MeasurementOptions.ResolveOutlierDetector() -> NBenchmark.Stats.IOutlierDetector!
+NBenchmark.MeasurementOptions.ResolveSignificanceTest() -> NBenchmark.Stats.ISignificanceTest!
+NBenchmark.MeasurementOptions.RuntimeProfile.get -> NBenchmark.RuntimeProfile!
+NBenchmark.MeasurementOptions.RuntimeProfile.init -> void
+NBenchmark.MeasurementOptions.SignificanceLevel.get -> double
+NBenchmark.MeasurementOptions.SignificanceLevel.init -> void
+NBenchmark.MeasurementOptions.SignificanceTest.get -> NBenchmark.Stats.ISignificanceTest?
+NBenchmark.MeasurementOptions.SignificanceTest.init -> void
+NBenchmark.MeasurementOptions.SignificanceTestFactory.get -> System.Func<NBenchmark.Stats.ISignificanceTest!>?
+NBenchmark.MeasurementOptions.SignificanceTestFactory.init -> void
+NBenchmark.MeasurementOptions.StreamSamples.get -> bool
+NBenchmark.MeasurementOptions.StreamSamples.init -> void
+NBenchmark.MeasurementOptions.SuppressPerClassIndependenceWarning.get -> bool
+NBenchmark.MeasurementOptions.SuppressPerClassIndependenceWarning.init -> void
+NBenchmark.MeasurementOptions.SuppressRuntimeProfileWarning.get -> bool
+NBenchmark.MeasurementOptions.SuppressRuntimeProfileWarning.init -> void
+NBenchmark.MeasurementOptions.TailMetricsBasis.get -> NBenchmark.TailMetricsBasis
+NBenchmark.MeasurementOptions.TailMetricsBasis.init -> void
+NBenchmark.MeasurementOptions.WarmupIterations.get -> int?
+NBenchmark.MeasurementOptions.WarmupIterations.init -> void
+NBenchmark.MeasurementOutcome
+NBenchmark.MeasurementOutcome.<Clone>$() -> NBenchmark.MeasurementOutcome!
+NBenchmark.MeasurementOutcome.Equals(NBenchmark.MeasurementOutcome? other) -> bool
+NBenchmark.MeasurementOutcome.MeasurementOutcome() -> void
+NBenchmark.MeasurementOutcome.RawSamples.get -> double[]!
+NBenchmark.MeasurementOutcome.RawSamples.init -> void
+NBenchmark.MeasurementOutcome.Result.get -> NBenchmark.BenchmarkResult!
+NBenchmark.MeasurementOutcome.Result.init -> void
+NBenchmark.MeasurementPhase
+NBenchmark.MeasurementPhase.Calibration = 1 -> NBenchmark.MeasurementPhase
+NBenchmark.MeasurementPhase.Jitter = 0 -> NBenchmark.MeasurementPhase
+NBenchmark.MeasurementPhase.Measurement = 3 -> NBenchmark.MeasurementPhase
+NBenchmark.MeasurementPhase.SuiteCompleted = 4 -> NBenchmark.MeasurementPhase
+NBenchmark.MeasurementPhase.Warmup = 2 -> NBenchmark.MeasurementPhase
+NBenchmark.MeasurementPhaseEvent
+NBenchmark.MeasurementPhaseEvent.BenchmarkName.get -> string!
+NBenchmark.MeasurementPhaseEvent.BenchmarkName.init -> void
+NBenchmark.MeasurementPhaseEvent.Deconstruct(out string! BenchmarkName, out NBenchmark.MeasurementPhase Phase, out NBenchmark.PhaseTransition Transition, out double? JitterMetric, out bool DetectorSwitched, out int? ResolvedK, out int? ResolvedWarmup, out NBenchmark.WarmupStopReason? WarmupStop, out NBenchmark.SampleStopReason? SampleStop, out bool Succeeded) -> void
+NBenchmark.MeasurementPhaseEvent.DetectorSwitched.get -> bool
+NBenchmark.MeasurementPhaseEvent.DetectorSwitched.init -> void
+NBenchmark.MeasurementPhaseEvent.Equals(NBenchmark.MeasurementPhaseEvent other) -> bool
+NBenchmark.MeasurementPhaseEvent.JitterMetric.get -> double?
+NBenchmark.MeasurementPhaseEvent.JitterMetric.init -> void
+NBenchmark.MeasurementPhaseEvent.MeasurementPhaseEvent() -> void
+NBenchmark.MeasurementPhaseEvent.MeasurementPhaseEvent(string! BenchmarkName, NBenchmark.MeasurementPhase Phase, NBenchmark.PhaseTransition Transition, double? JitterMetric = null, bool DetectorSwitched = false, int? ResolvedK = null, int? ResolvedWarmup = null, NBenchmark.WarmupStopReason? WarmupStop = null, NBenchmark.SampleStopReason? SampleStop = null, bool Succeeded = true) -> void
+NBenchmark.MeasurementPhaseEvent.Phase.get -> NBenchmark.MeasurementPhase
+NBenchmark.MeasurementPhaseEvent.Phase.init -> void
+NBenchmark.MeasurementPhaseEvent.ResolvedK.get -> int?
+NBenchmark.MeasurementPhaseEvent.ResolvedK.init -> void
+NBenchmark.MeasurementPhaseEvent.ResolvedWarmup.get -> int?
+NBenchmark.MeasurementPhaseEvent.ResolvedWarmup.init -> void
+NBenchmark.MeasurementPhaseEvent.SampleStop.get -> NBenchmark.SampleStopReason?
+NBenchmark.MeasurementPhaseEvent.SampleStop.init -> void
+NBenchmark.MeasurementPhaseEvent.Succeeded.get -> bool
+NBenchmark.MeasurementPhaseEvent.Succeeded.init -> void
+NBenchmark.MeasurementPhaseEvent.Transition.get -> NBenchmark.PhaseTransition
+NBenchmark.MeasurementPhaseEvent.Transition.init -> void
+NBenchmark.MeasurementPhaseEvent.WarmupStop.get -> NBenchmark.WarmupStopReason?
+NBenchmark.MeasurementPhaseEvent.WarmupStop.init -> void
+NBenchmark.MeasurementProfile
+NBenchmark.MeasurementProfile.Independent = 1 -> NBenchmark.MeasurementProfile
+NBenchmark.MeasurementProfile.Realistic = 0 -> NBenchmark.MeasurementProfile
+NBenchmark.NullBenchmarkProgress
+NBenchmark.NullBenchmarkProgress.NullBenchmarkProgress() -> void
+NBenchmark.NullBenchmarkProgress.OnBenchmarkCompleted(NBenchmark.BenchmarkResult! result) -> System.Threading.Tasks.Task!
+NBenchmark.NullBenchmarkProgress.OnBenchmarkStarting(string! name, int index, int total) -> System.Threading.Tasks.Task!
+NBenchmark.NullBenchmarkProgress.OnIterationCompleted(string! name, int iteration, int totalIterations) -> System.Threading.Tasks.Task!
+NBenchmark.NullBenchmarkProgress.OnSuiteCompleted(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results) -> System.Threading.Tasks.Task!
+NBenchmark.NullBenchmarkProgress.OnSuiteStarting(System.Collections.Generic.IReadOnlyList<string!>! benchmarkNames, int total) -> System.Threading.Tasks.Task!
+NBenchmark.NullBenchmarkProgress.OnWarmupCompleted(string! name) -> System.Threading.Tasks.Task!
+NBenchmark.NullBenchmarkProgress.OnWarmupStarting(string! name, int totalWarmupIterations) -> System.Threading.Tasks.Task!
+NBenchmark.NullMeasurementObserver
+NBenchmark.NullMeasurementObserver.OnDetector(in NBenchmark.DetectorStateEvent e) -> void
+NBenchmark.NullMeasurementObserver.OnPhase(in NBenchmark.MeasurementPhaseEvent e) -> void
+NBenchmark.NullMeasurementObserver.OnResult(NBenchmark.BenchmarkResult! result) -> void
+NBenchmark.NullMeasurementObserver.OnSample(in NBenchmark.SampleEvent e) -> void
+NBenchmark.Observers.ObserverInfo
+NBenchmark.Observers.ObserverInfo.<Clone>$() -> NBenchmark.Observers.ObserverInfo!
+NBenchmark.Observers.ObserverInfo.Deconstruct(out string! Name, out string! Description) -> void
+NBenchmark.Observers.ObserverInfo.Description.get -> string!
+NBenchmark.Observers.ObserverInfo.Description.init -> void
+NBenchmark.Observers.ObserverInfo.Equals(NBenchmark.Observers.ObserverInfo? other) -> bool
+NBenchmark.Observers.ObserverInfo.Name.get -> string!
+NBenchmark.Observers.ObserverInfo.Name.init -> void
+NBenchmark.Observers.ObserverInfo.ObserverInfo(string! Name, string! Description) -> void
+NBenchmark.Observers.ObserverRegistry
+NBenchmark.OmnibusComparison
+NBenchmark.OmnibusComparison.<Clone>$() -> NBenchmark.OmnibusComparison!
+NBenchmark.OmnibusComparison.DegreesOfFreedom.get -> int
+NBenchmark.OmnibusComparison.DegreesOfFreedom.init -> void
+NBenchmark.OmnibusComparison.Equals(NBenchmark.OmnibusComparison? other) -> bool
+NBenchmark.OmnibusComparison.GroupCount.get -> int
+NBenchmark.OmnibusComparison.GroupCount.init -> void
+NBenchmark.OmnibusComparison.OmnibusComparison() -> void
+NBenchmark.OmnibusComparison.PValue.get -> double
+NBenchmark.OmnibusComparison.PValue.init -> void
+NBenchmark.OmnibusComparison.Statistic.get -> double
+NBenchmark.OmnibusComparison.Statistic.init -> void
+NBenchmark.OmnibusComparison.TestName.get -> string!
+NBenchmark.OmnibusComparison.TestName.init -> void
+NBenchmark.OmnibusComparison.Verdict.get -> NBenchmark.SignificanceVerdict
+NBenchmark.OmnibusComparison.Verdict.init -> void
+NBenchmark.OutlierMode
+NBenchmark.OutlierMode.IqrFence = 3 -> NBenchmark.OutlierMode
+NBenchmark.OutlierMode.MedianAbsoluteDeviation = 4 -> NBenchmark.OutlierMode
+NBenchmark.OutlierMode.None = 0 -> NBenchmark.OutlierMode
+NBenchmark.OutlierMode.RemoveTop5Percent = 1 -> NBenchmark.OutlierMode
+NBenchmark.OutlierMode.RemoveTopAndBottom5Percent = 2 -> NBenchmark.OutlierMode
+NBenchmark.PercentileEntry
+NBenchmark.PercentileEntry.Deconstruct(out double Percentile, out double Value) -> void
+NBenchmark.PercentileEntry.Equals(NBenchmark.PercentileEntry other) -> bool
+NBenchmark.PercentileEntry.Percentile.get -> double
+NBenchmark.PercentileEntry.Percentile.init -> void
+NBenchmark.PercentileEntry.PercentileEntry() -> void
+NBenchmark.PercentileEntry.PercentileEntry(double Percentile, double Value) -> void
+NBenchmark.PercentileEntry.Value.get -> double
+NBenchmark.PercentileEntry.Value.init -> void
+NBenchmark.PhaseTransition
+NBenchmark.PhaseTransition.Completed = 1 -> NBenchmark.PhaseTransition
+NBenchmark.PhaseTransition.Starting = 0 -> NBenchmark.PhaseTransition
+NBenchmark.RatioEstimate
+NBenchmark.RatioEstimate.<Clone>$() -> NBenchmark.RatioEstimate!
+NBenchmark.RatioEstimate.ConfidenceLevel.get -> double
+NBenchmark.RatioEstimate.ConfidenceLevel.init -> void
+NBenchmark.RatioEstimate.Equals(NBenchmark.RatioEstimate? other) -> bool
+NBenchmark.RatioEstimate.FormatInterval() -> string!
+NBenchmark.RatioEstimate.IncludesUnity.get -> bool
+NBenchmark.RatioEstimate.Lower.get -> double
+NBenchmark.RatioEstimate.Lower.init -> void
+NBenchmark.RatioEstimate.RatioEstimate() -> void
+NBenchmark.RatioEstimate.Replicates.get -> int
+NBenchmark.RatioEstimate.Replicates.init -> void
+NBenchmark.RatioEstimate.Upper.get -> double
+NBenchmark.RatioEstimate.Upper.init -> void
+NBenchmark.RatioEstimate.Value.get -> double
+NBenchmark.RatioEstimate.Value.init -> void
+NBenchmark.Reporters.CsvReporter
+NBenchmark.Reporters.CsvReporter.CsvReporter(string! outputDirectory = ".", string? name = null, NBenchmark.Reporters.ReportDetail detail = NBenchmark.Reporters.ReportDetail.Simple) -> void
+NBenchmark.Reporters.CsvReporter.Detail.get -> NBenchmark.Reporters.ReportDetail
+NBenchmark.Reporters.CsvReporter.Detail.set -> void
+NBenchmark.Reporters.CsvReporter.Name.get -> string!
+NBenchmark.Reporters.CsvReporter.ReportAsync(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.IReporter
+NBenchmark.Reporters.IReporter.Detail.get -> NBenchmark.Reporters.ReportDetail
+NBenchmark.Reporters.IReporter.Detail.set -> void
+NBenchmark.Reporters.IReporter.Name.get -> string!
+NBenchmark.Reporters.IReporter.ReportAsync(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.JsonReporter
+NBenchmark.Reporters.JsonReporter.Detail.get -> NBenchmark.Reporters.ReportDetail
+NBenchmark.Reporters.JsonReporter.Detail.set -> void
+NBenchmark.Reporters.JsonReporter.IncludeSamples.get -> bool
+NBenchmark.Reporters.JsonReporter.IncludeSamples.set -> void
+NBenchmark.Reporters.JsonReporter.JsonReporter(string! outputDirectory = ".", string? name = null, NBenchmark.Reporters.ReportDetail detail = NBenchmark.Reporters.ReportDetail.Simple) -> void
+NBenchmark.Reporters.JsonReporter.Name.get -> string!
+NBenchmark.Reporters.JsonReporter.ReportAsync(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.MarkdownReporter
+NBenchmark.Reporters.MarkdownReporter.Detail.get -> NBenchmark.Reporters.ReportDetail
+NBenchmark.Reporters.MarkdownReporter.Detail.set -> void
+NBenchmark.Reporters.MarkdownReporter.MarkdownReporter(string! outputDirectory = ".", string? name = null, NBenchmark.Reporters.ReportDetail detail = NBenchmark.Reporters.ReportDetail.Simple) -> void
+NBenchmark.Reporters.MarkdownReporter.Name.get -> string!
+NBenchmark.Reporters.MarkdownReporter.ReportAsync(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NBenchmark.Reporters.ReportDetail
+NBenchmark.Reporters.ReportDetail.Advanced = 2 -> NBenchmark.Reporters.ReportDetail
+NBenchmark.Reporters.ReportDetail.Simple = 0 -> NBenchmark.Reporters.ReportDetail
+NBenchmark.Reporters.ReportDetail.Standard = 1 -> NBenchmark.Reporters.ReportDetail
+NBenchmark.Reporters.ReportFormat
+NBenchmark.Reporters.ReporterInfo
+NBenchmark.Reporters.ReporterInfo.<Clone>$() -> NBenchmark.Reporters.ReporterInfo!
+NBenchmark.Reporters.ReporterInfo.Deconstruct(out string! Name, out string! Description) -> void
+NBenchmark.Reporters.ReporterInfo.Description.get -> string!
+NBenchmark.Reporters.ReporterInfo.Description.init -> void
+NBenchmark.Reporters.ReporterInfo.Equals(NBenchmark.Reporters.ReporterInfo? other) -> bool
+NBenchmark.Reporters.ReporterInfo.Name.get -> string!
+NBenchmark.Reporters.ReporterInfo.Name.init -> void
+NBenchmark.Reporters.ReporterInfo.ReporterInfo(string! Name, string! Description) -> void
+NBenchmark.Reporters.ReporterRegistry
+NBenchmark.RunOrder
+NBenchmark.RunOrder.Declaration = 1 -> NBenchmark.RunOrder
+NBenchmark.RunOrder.Random = 0 -> NBenchmark.RunOrder
+NBenchmark.RuntimeMoniker
+NBenchmark.RuntimeMoniker.Net10 = 2 -> NBenchmark.RuntimeMoniker
+NBenchmark.RuntimeMoniker.Net8 = 0 -> NBenchmark.RuntimeMoniker
+NBenchmark.RuntimeMoniker.Net9 = 1 -> NBenchmark.RuntimeMoniker
+NBenchmark.RuntimeProfile
+NBenchmark.RuntimeProfile.<Clone>$() -> NBenchmark.RuntimeProfile!
+NBenchmark.RuntimeProfile.ConcurrentGc.get -> bool?
+NBenchmark.RuntimeProfile.ConcurrentGc.init -> void
+NBenchmark.RuntimeProfile.Describe() -> string!
+NBenchmark.RuntimeProfile.Equals(NBenchmark.RuntimeProfile? other) -> bool
+NBenchmark.RuntimeProfile.ExtraEnvironment.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+NBenchmark.RuntimeProfile.ExtraEnvironment.init -> void
+NBenchmark.RuntimeProfile.Gc.get -> NBenchmark.GcMode?
+NBenchmark.RuntimeProfile.Gc.init -> void
+NBenchmark.RuntimeProfile.InheritsEverything.get -> bool
+NBenchmark.RuntimeProfile.Name.get -> string!
+NBenchmark.RuntimeProfile.Name.init -> void
+NBenchmark.RuntimeProfile.ReadyToRun.get -> bool?
+NBenchmark.RuntimeProfile.ReadyToRun.init -> void
+NBenchmark.RuntimeProfile.RuntimeProfile() -> void
+NBenchmark.RuntimeProfile.TieredCompilation.get -> bool?
+NBenchmark.RuntimeProfile.TieredCompilation.init -> void
+NBenchmark.RuntimeProfile.TieredPgo.get -> bool?
+NBenchmark.RuntimeProfile.TieredPgo.init -> void
+NBenchmark.RuntimeProfile.ToEnvironment() -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+NBenchmark.SampleEvent
+NBenchmark.SampleEvent.AllocDelta.get -> long
+NBenchmark.SampleEvent.AllocDelta.init -> void
+NBenchmark.SampleEvent.BenchmarkName.get -> string!
+NBenchmark.SampleEvent.BenchmarkName.init -> void
+NBenchmark.SampleEvent.Deconstruct(out string! BenchmarkName, out int Ordinal, out double PerOpNs, out int K, out long AllocDelta, out bool Warmup) -> void
+NBenchmark.SampleEvent.Equals(NBenchmark.SampleEvent other) -> bool
+NBenchmark.SampleEvent.K.get -> int
+NBenchmark.SampleEvent.K.init -> void
+NBenchmark.SampleEvent.Ordinal.get -> int
+NBenchmark.SampleEvent.Ordinal.init -> void
+NBenchmark.SampleEvent.PerOpNs.get -> double
+NBenchmark.SampleEvent.PerOpNs.init -> void
+NBenchmark.SampleEvent.SampleEvent() -> void
+NBenchmark.SampleEvent.SampleEvent(string! BenchmarkName, int Ordinal, double PerOpNs, int K, long AllocDelta, bool Warmup) -> void
+NBenchmark.SampleEvent.Warmup.get -> bool
+NBenchmark.SampleEvent.Warmup.init -> void
+NBenchmark.SampleStopReason
+NBenchmark.SampleStopReason.CiTargetMet = 0 -> NBenchmark.SampleStopReason
+NBenchmark.SampleStopReason.DriftUnresolved = 5 -> NBenchmark.SampleStopReason
+NBenchmark.SampleStopReason.ExplicitCount = 2 -> NBenchmark.SampleStopReason
+NBenchmark.SampleStopReason.GraceCapExhausted = 4 -> NBenchmark.SampleStopReason
+NBenchmark.SampleStopReason.MaxCeiling = 1 -> NBenchmark.SampleStopReason
+NBenchmark.SampleStopReason.WallClockCap = 3 -> NBenchmark.SampleStopReason
+NBenchmark.SignificanceVerdict
+NBenchmark.SignificanceVerdict.NotSignificant = 2 -> NBenchmark.SignificanceVerdict
+NBenchmark.SignificanceVerdict.NotTested = 0 -> NBenchmark.SignificanceVerdict
+NBenchmark.SignificanceVerdict.Significant = 1 -> NBenchmark.SignificanceVerdict
+NBenchmark.Stats.AllocationStats
+NBenchmark.Stats.AllocationStats.AllocationStats() -> void
+NBenchmark.Stats.AllocationStats.AllocationStats(long Mean, long P50, long P95, long Max) -> void
+NBenchmark.Stats.AllocationStats.Deconstruct(out long Mean, out long P50, out long P95, out long Max) -> void
+NBenchmark.Stats.AllocationStats.Equals(NBenchmark.Stats.AllocationStats other) -> bool
+NBenchmark.Stats.AllocationStats.Max.get -> long
+NBenchmark.Stats.AllocationStats.Max.init -> void
+NBenchmark.Stats.AllocationStats.Mean.get -> long
+NBenchmark.Stats.AllocationStats.Mean.init -> void
+NBenchmark.Stats.AllocationStats.P50.get -> long
+NBenchmark.Stats.AllocationStats.P50.init -> void
+NBenchmark.Stats.AllocationStats.P95.get -> long
+NBenchmark.Stats.AllocationStats.P95.init -> void
+NBenchmark.Stats.BimodalDetector
+NBenchmark.Stats.ChiSquared
+NBenchmark.Stats.DefaultSignificanceTest
+NBenchmark.Stats.DefaultSignificanceTest.Analyze(NBenchmark.Stats.SignificanceContext! context) -> NBenchmark.Stats.SignificanceReport!
+NBenchmark.Stats.DefaultSignificanceTest.DefaultSignificanceTest() -> void
+NBenchmark.Stats.DefaultSignificanceTest.Name.get -> string!
+NBenchmark.Stats.EffectDirection
+NBenchmark.Stats.EffectDirection.CandidateHigher = 1 -> NBenchmark.Stats.EffectDirection
+NBenchmark.Stats.EffectDirection.CandidateLower = 2 -> NBenchmark.Stats.EffectDirection
+NBenchmark.Stats.EffectDirection.None = 0 -> NBenchmark.Stats.EffectDirection
+NBenchmark.Stats.EffectMetrics
+NBenchmark.Stats.EffectSize
+NBenchmark.Stats.EffectSize.Deconstruct(out string! Metric, out double? Value, out string? Magnitude, out NBenchmark.Stats.EffectDirection Direction, out double? PracticalValue) -> void
+NBenchmark.Stats.EffectSize.Direction.get -> NBenchmark.Stats.EffectDirection
+NBenchmark.Stats.EffectSize.Direction.init -> void
+NBenchmark.Stats.EffectSize.EffectSize() -> void
+NBenchmark.Stats.EffectSize.EffectSize(string! Metric, double? Value, string? Magnitude = null, NBenchmark.Stats.EffectDirection Direction = NBenchmark.Stats.EffectDirection.None, double? PracticalValue = null) -> void
+NBenchmark.Stats.EffectSize.Equals(NBenchmark.Stats.EffectSize other) -> bool
+NBenchmark.Stats.EffectSize.Magnitude.get -> string?
+NBenchmark.Stats.EffectSize.Magnitude.init -> void
+NBenchmark.Stats.EffectSize.Metric.get -> string!
+NBenchmark.Stats.EffectSize.Metric.init -> void
+NBenchmark.Stats.EffectSize.PracticalValue.get -> double?
+NBenchmark.Stats.EffectSize.PracticalValue.init -> void
+NBenchmark.Stats.EffectSize.Value.get -> double?
+NBenchmark.Stats.EffectSize.Value.init -> void
+NBenchmark.Stats.EffectSizeFactory
+NBenchmark.Stats.HodgesLehmann
+NBenchmark.Stats.IOutlierDetector
+NBenchmark.Stats.IOutlierDetector.Classify(double[]! sortedSamples) -> NBenchmark.Stats.OutlierClassification!
+NBenchmark.Stats.IOutlierDetector.Name.get -> string!
+NBenchmark.Stats.ISignificanceTest
+NBenchmark.Stats.ISignificanceTest.Analyze(NBenchmark.Stats.SignificanceContext! context) -> NBenchmark.Stats.SignificanceReport!
+NBenchmark.Stats.ISignificanceTest.Name.get -> string!
+NBenchmark.Stats.IqrFenceOutlierDetector
+NBenchmark.Stats.IqrFenceOutlierDetector.Classify(double[]! sortedSamples) -> NBenchmark.Stats.OutlierClassification!
+NBenchmark.Stats.IqrFenceOutlierDetector.IqrFenceOutlierDetector(double k = 1.5) -> void
+NBenchmark.Stats.IqrFenceOutlierDetector.Name.get -> string!
+NBenchmark.Stats.KruskalWallis
+NBenchmark.Stats.KruskalWallisResult
+NBenchmark.Stats.KruskalWallisResult.Deconstruct(out double H, out int DegreesOfFreedom, out double PValue, out int GroupCount) -> void
+NBenchmark.Stats.KruskalWallisResult.DegreesOfFreedom.get -> int
+NBenchmark.Stats.KruskalWallisResult.DegreesOfFreedom.init -> void
+NBenchmark.Stats.KruskalWallisResult.Equals(NBenchmark.Stats.KruskalWallisResult other) -> bool
+NBenchmark.Stats.KruskalWallisResult.GroupCount.get -> int
+NBenchmark.Stats.KruskalWallisResult.GroupCount.init -> void
+NBenchmark.Stats.KruskalWallisResult.H.get -> double
+NBenchmark.Stats.KruskalWallisResult.H.init -> void
+NBenchmark.Stats.KruskalWallisResult.IsValid.get -> bool
+NBenchmark.Stats.KruskalWallisResult.KruskalWallisResult() -> void
+NBenchmark.Stats.KruskalWallisResult.KruskalWallisResult(double H, int DegreesOfFreedom, double PValue, int GroupCount) -> void
+NBenchmark.Stats.KruskalWallisResult.PValue.get -> double
+NBenchmark.Stats.KruskalWallisResult.PValue.init -> void
+NBenchmark.Stats.KruskalWallisSignificanceTest
+NBenchmark.Stats.KruskalWallisSignificanceTest.Analyze(NBenchmark.Stats.SignificanceContext! context) -> NBenchmark.Stats.SignificanceReport!
+NBenchmark.Stats.KruskalWallisSignificanceTest.KruskalWallisSignificanceTest() -> void
+NBenchmark.Stats.KruskalWallisSignificanceTest.Name.get -> string!
+NBenchmark.Stats.LogRatio
+NBenchmark.Stats.MadOutlierDetector
+NBenchmark.Stats.MadOutlierDetector.Classify(double[]! sortedSamples) -> NBenchmark.Stats.OutlierClassification!
+NBenchmark.Stats.MadOutlierDetector.MadOutlierDetector(double threshold = 3) -> void
+NBenchmark.Stats.MadOutlierDetector.Name.get -> string!
+NBenchmark.Stats.MagnitudeLabel
+NBenchmark.Stats.MagnitudeLabel.Large = 3 -> NBenchmark.Stats.MagnitudeLabel
+NBenchmark.Stats.MagnitudeLabel.Medium = 2 -> NBenchmark.Stats.MagnitudeLabel
+NBenchmark.Stats.MagnitudeLabel.Negligible = 0 -> NBenchmark.Stats.MagnitudeLabel
+NBenchmark.Stats.MagnitudeLabel.Small = 1 -> NBenchmark.Stats.MagnitudeLabel
+NBenchmark.Stats.MagnitudeLabelExtensions
+NBenchmark.Stats.MannWhitneyU
+NBenchmark.Stats.MannWhitneyUResult
+NBenchmark.Stats.MannWhitneyUResult.CliffsDelta.get -> double
+NBenchmark.Stats.MannWhitneyUResult.CliffsDelta.init -> void
+NBenchmark.Stats.MannWhitneyUResult.Deconstruct(out double PValue, out double CliffsDelta) -> void
+NBenchmark.Stats.MannWhitneyUResult.Equals(NBenchmark.Stats.MannWhitneyUResult other) -> bool
+NBenchmark.Stats.MannWhitneyUResult.MannWhitneyUResult() -> void
+NBenchmark.Stats.MannWhitneyUResult.MannWhitneyUResult(double PValue, double CliffsDelta) -> void
+NBenchmark.Stats.MannWhitneyUResult.PValue.get -> double
+NBenchmark.Stats.MannWhitneyUResult.PValue.init -> void
+NBenchmark.Stats.MannWhitneyUSignificanceTest
+NBenchmark.Stats.MannWhitneyUSignificanceTest.Analyze(NBenchmark.Stats.SignificanceContext! context) -> NBenchmark.Stats.SignificanceReport!
+NBenchmark.Stats.MannWhitneyUSignificanceTest.MannWhitneyUSignificanceTest() -> void
+NBenchmark.Stats.MannWhitneyUSignificanceTest.Name.get -> string!
+NBenchmark.Stats.MedianCi
+NBenchmark.Stats.MultipleComparisons
+NBenchmark.Stats.NoOutlierDetector
+NBenchmark.Stats.NoOutlierDetector.Classify(double[]! sortedSamples) -> NBenchmark.Stats.OutlierClassification!
+NBenchmark.Stats.NoOutlierDetector.Name.get -> string!
+NBenchmark.Stats.NoOutlierDetector.NoOutlierDetector() -> void
+NBenchmark.Stats.OutlierClassification
+NBenchmark.Stats.OutlierClassification.<Clone>$() -> NBenchmark.Stats.OutlierClassification!
+NBenchmark.Stats.OutlierClassification.Discarded.get -> double[]!
+NBenchmark.Stats.OutlierClassification.Discarded.init -> void
+NBenchmark.Stats.OutlierClassification.Equals(NBenchmark.Stats.OutlierClassification? other) -> bool
+NBenchmark.Stats.OutlierClassification.Kept.get -> double[]!
+NBenchmark.Stats.OutlierClassification.Kept.init -> void
+NBenchmark.Stats.OutlierClassification.LowerFence.get -> double?
+NBenchmark.Stats.OutlierClassification.LowerFence.init -> void
+NBenchmark.Stats.OutlierClassification.OutlierClassification() -> void
+NBenchmark.Stats.OutlierClassification.UpperFence.get -> double?
+NBenchmark.Stats.OutlierClassification.UpperFence.init -> void
+NBenchmark.Stats.OutlierDetectors
+NBenchmark.Stats.OutlierTrim
+NBenchmark.Stats.PairwiseComparison
+NBenchmark.Stats.PairwiseComparison.Deconstruct(out string! Name, out double? PValue, out NBenchmark.SignificanceVerdict Verdict, out NBenchmark.Stats.EffectSize? Effect, out NBenchmark.Stats.ShiftEstimate? Shift) -> void
+NBenchmark.Stats.PairwiseComparison.Effect.get -> NBenchmark.Stats.EffectSize?
+NBenchmark.Stats.PairwiseComparison.Effect.init -> void
+NBenchmark.Stats.PairwiseComparison.Equals(NBenchmark.Stats.PairwiseComparison other) -> bool
+NBenchmark.Stats.PairwiseComparison.Name.get -> string!
+NBenchmark.Stats.PairwiseComparison.Name.init -> void
+NBenchmark.Stats.PairwiseComparison.PValue.get -> double?
+NBenchmark.Stats.PairwiseComparison.PValue.init -> void
+NBenchmark.Stats.PairwiseComparison.PairwiseComparison() -> void
+NBenchmark.Stats.PairwiseComparison.PairwiseComparison(string! Name, double? PValue, NBenchmark.SignificanceVerdict Verdict, NBenchmark.Stats.EffectSize? Effect = null, NBenchmark.Stats.ShiftEstimate? Shift = null) -> void
+NBenchmark.Stats.PairwiseComparison.Shift.get -> NBenchmark.Stats.ShiftEstimate?
+NBenchmark.Stats.PairwiseComparison.Shift.init -> void
+NBenchmark.Stats.PairwiseComparison.Verdict.get -> NBenchmark.SignificanceVerdict
+NBenchmark.Stats.PairwiseComparison.Verdict.init -> void
+NBenchmark.Stats.Percentile
+NBenchmark.Stats.SampleGroup
+NBenchmark.Stats.SampleGroup.Deconstruct(out string! Name, out double[]! Samples, out bool IsBaseline) -> void
+NBenchmark.Stats.SampleGroup.Equals(NBenchmark.Stats.SampleGroup other) -> bool
+NBenchmark.Stats.SampleGroup.IsBaseline.get -> bool
+NBenchmark.Stats.SampleGroup.IsBaseline.init -> void
+NBenchmark.Stats.SampleGroup.Name.get -> string!
+NBenchmark.Stats.SampleGroup.Name.init -> void
+NBenchmark.Stats.SampleGroup.SampleGroup() -> void
+NBenchmark.Stats.SampleGroup.SampleGroup(string! Name, double[]! Samples, bool IsBaseline) -> void
+NBenchmark.Stats.SampleGroup.Samples.get -> double[]!
+NBenchmark.Stats.SampleGroup.Samples.init -> void
+NBenchmark.Stats.SampleQuality
+NBenchmark.Stats.ShiftEstimate
+NBenchmark.Stats.ShiftEstimate.ConfidenceLevel.get -> double
+NBenchmark.Stats.ShiftEstimate.ConfidenceLevel.init -> void
+NBenchmark.Stats.ShiftEstimate.Deconstruct(out double Value, out double Lower, out double Upper, out double ConfidenceLevel) -> void
+NBenchmark.Stats.ShiftEstimate.Equals(NBenchmark.Stats.ShiftEstimate other) -> bool
+NBenchmark.Stats.ShiftEstimate.Lower.get -> double
+NBenchmark.Stats.ShiftEstimate.Lower.init -> void
+NBenchmark.Stats.ShiftEstimate.ShiftEstimate() -> void
+NBenchmark.Stats.ShiftEstimate.ShiftEstimate(double Value, double Lower, double Upper, double ConfidenceLevel) -> void
+NBenchmark.Stats.ShiftEstimate.Upper.get -> double
+NBenchmark.Stats.ShiftEstimate.Upper.init -> void
+NBenchmark.Stats.ShiftEstimate.Value.get -> double
+NBenchmark.Stats.ShiftEstimate.Value.init -> void
+NBenchmark.Stats.Significance
+NBenchmark.Stats.SignificanceContext
+NBenchmark.Stats.SignificanceContext.<Clone>$() -> NBenchmark.Stats.SignificanceContext!
+NBenchmark.Stats.SignificanceContext.Baseline.get -> NBenchmark.Stats.SampleGroup
+NBenchmark.Stats.SignificanceContext.BaselineIndex.get -> int
+NBenchmark.Stats.SignificanceContext.BaselineIndex.init -> void
+NBenchmark.Stats.SignificanceContext.Candidates.get -> System.Collections.Generic.IEnumerable<NBenchmark.Stats.SampleGroup>!
+NBenchmark.Stats.SignificanceContext.Equals(NBenchmark.Stats.SignificanceContext? other) -> bool
+NBenchmark.Stats.SignificanceContext.Groups.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.Stats.SampleGroup>!
+NBenchmark.Stats.SignificanceContext.Groups.init -> void
+NBenchmark.Stats.SignificanceContext.SignificanceContext() -> void
+NBenchmark.Stats.SignificanceContext.SignificanceLevel.get -> double
+NBenchmark.Stats.SignificanceContext.SignificanceLevel.init -> void
+NBenchmark.Stats.SignificanceReport
+NBenchmark.Stats.SignificanceReport.<Clone>$() -> NBenchmark.Stats.SignificanceReport!
+NBenchmark.Stats.SignificanceReport.Equals(NBenchmark.Stats.SignificanceReport? other) -> bool
+NBenchmark.Stats.SignificanceReport.Omnibus.get -> NBenchmark.OmnibusComparison?
+NBenchmark.Stats.SignificanceReport.Omnibus.init -> void
+NBenchmark.Stats.SignificanceReport.Pairwise.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.Stats.PairwiseComparison>!
+NBenchmark.Stats.SignificanceReport.Pairwise.init -> void
+NBenchmark.Stats.SignificanceReport.SignificanceReport() -> void
+NBenchmark.Stats.StatsSummary
+NBenchmark.Stats.StatsSummary.CoefficientOfVariation.get -> double
+NBenchmark.Stats.StatsSummary.CoefficientOfVariation.init -> void
+NBenchmark.Stats.StatsSummary.ConfidenceLevel.get -> double
+NBenchmark.Stats.StatsSummary.ConfidenceLevel.init -> void
+NBenchmark.Stats.StatsSummary.Histogram.get -> NBenchmark.LatencyHistogram?
+NBenchmark.Stats.StatsSummary.Histogram.init -> void
+NBenchmark.Stats.StatsSummary.Kurtosis.get -> double
+NBenchmark.Stats.StatsSummary.Kurtosis.init -> void
+NBenchmark.Stats.StatsSummary.Mad.get -> double
+NBenchmark.Stats.StatsSummary.Mad.init -> void
+NBenchmark.Stats.StatsSummary.MarginOfError.get -> double
+NBenchmark.Stats.StatsSummary.MarginOfError.init -> void
+NBenchmark.Stats.StatsSummary.Max.get -> double
+NBenchmark.Stats.StatsSummary.Max.init -> void
+NBenchmark.Stats.StatsSummary.Mean.get -> double
+NBenchmark.Stats.StatsSummary.Mean.init -> void
+NBenchmark.Stats.StatsSummary.Median.get -> double
+NBenchmark.Stats.StatsSummary.Median.init -> void
+NBenchmark.Stats.StatsSummary.MedianCiLower.get -> double?
+NBenchmark.Stats.StatsSummary.MedianCiLower.init -> void
+NBenchmark.Stats.StatsSummary.MedianCiUpper.get -> double?
+NBenchmark.Stats.StatsSummary.MedianCiUpper.init -> void
+NBenchmark.Stats.StatsSummary.Min.get -> double
+NBenchmark.Stats.StatsSummary.Min.init -> void
+NBenchmark.Stats.StatsSummary.Percentiles.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.PercentileEntry>!
+NBenchmark.Stats.StatsSummary.Percentiles.init -> void
+NBenchmark.Stats.StatsSummary.Skewness.get -> double
+NBenchmark.Stats.StatsSummary.Skewness.init -> void
+NBenchmark.Stats.StatsSummary.StandardDeviation.get -> double
+NBenchmark.Stats.StatsSummary.StandardDeviation.init -> void
+NBenchmark.Stats.StatsSummary.StandardError.get -> double
+NBenchmark.Stats.StatsSummary.StandardError.init -> void
+NBenchmark.Stats.StatsSummary.StatsSummary() -> void
+NBenchmark.Stats.StudentT
+NBenchmark.Stats.TopPercentileOutlierDetector
+NBenchmark.Stats.TopPercentileOutlierDetector.Classify(double[]! sortedSamples) -> NBenchmark.Stats.OutlierClassification!
+NBenchmark.Stats.TopPercentileOutlierDetector.Name.get -> string!
+NBenchmark.Stats.TopPercentileOutlierDetector.TopPercentileOutlierDetector(double fraction = 0.05) -> void
+NBenchmark.Stats.TrimContext
+NBenchmark.Stats.TrimContext.Deconstruct(out double[]! SortedAll, out int TrimmedLow, out int TrimmedHigh) -> void
+NBenchmark.Stats.TrimContext.Equals(NBenchmark.Stats.TrimContext other) -> bool
+NBenchmark.Stats.TrimContext.IsTrimmed.get -> bool
+NBenchmark.Stats.TrimContext.SortedAll.get -> double[]!
+NBenchmark.Stats.TrimContext.SortedAll.init -> void
+NBenchmark.Stats.TrimContext.TrimContext() -> void
+NBenchmark.Stats.TrimContext.TrimContext(double[]! SortedAll, int TrimmedLow, int TrimmedHigh) -> void
+NBenchmark.Stats.TrimContext.TrimmedHigh.get -> int
+NBenchmark.Stats.TrimContext.TrimmedHigh.init -> void
+NBenchmark.Stats.TrimContext.TrimmedLow.get -> int
+NBenchmark.Stats.TrimContext.TrimmedLow.init -> void
+NBenchmark.Stats.TrimResult
+NBenchmark.Stats.TrimResult.Deconstruct(out double[]! Kept, out double[]! Discarded, out double Q1, out double Q3, out double InterquartileRange, out double? LowerFence, out double? UpperFence, out int[]! TrimmedOrdinals, out double[]! SortedAll) -> void
+NBenchmark.Stats.TrimResult.Discarded.get -> double[]!
+NBenchmark.Stats.TrimResult.Discarded.init -> void
+NBenchmark.Stats.TrimResult.Equals(NBenchmark.Stats.TrimResult other) -> bool
+NBenchmark.Stats.TrimResult.InterquartileRange.get -> double
+NBenchmark.Stats.TrimResult.InterquartileRange.init -> void
+NBenchmark.Stats.TrimResult.Kept.get -> double[]!
+NBenchmark.Stats.TrimResult.Kept.init -> void
+NBenchmark.Stats.TrimResult.LowerFence.get -> double?
+NBenchmark.Stats.TrimResult.LowerFence.init -> void
+NBenchmark.Stats.TrimResult.Q1.get -> double
+NBenchmark.Stats.TrimResult.Q1.init -> void
+NBenchmark.Stats.TrimResult.Q3.get -> double
+NBenchmark.Stats.TrimResult.Q3.init -> void
+NBenchmark.Stats.TrimResult.SortedAll.get -> double[]!
+NBenchmark.Stats.TrimResult.SortedAll.init -> void
+NBenchmark.Stats.TrimResult.TrimResult() -> void
+NBenchmark.Stats.TrimResult.TrimResult(double[]! Kept, double[]! Discarded, double Q1, double Q3, double InterquartileRange, double? LowerFence, double? UpperFence, int[]! TrimmedOrdinals, double[]! SortedAll) -> void
+NBenchmark.Stats.TrimResult.TrimmedOrdinals.get -> int[]!
+NBenchmark.Stats.TrimResult.TrimmedOrdinals.init -> void
+NBenchmark.Stats.TrimResult.UpperFence.get -> double?
+NBenchmark.Stats.TrimResult.UpperFence.init -> void
+NBenchmark.Stats.TwoSidedPercentileOutlierDetector
+NBenchmark.Stats.TwoSidedPercentileOutlierDetector.Classify(double[]! sortedSamples) -> NBenchmark.Stats.OutlierClassification!
+NBenchmark.Stats.TwoSidedPercentileOutlierDetector.Name.get -> string!
+NBenchmark.Stats.TwoSidedPercentileOutlierDetector.TwoSidedPercentileOutlierDetector(double fraction = 0.05) -> void
+NBenchmark.Stats.WinsorizedError
+NBenchmark.Stats.WinsorizedSpread
+NBenchmark.Stats.WinsorizedSpread.Deconstruct(out double StandardDeviation, out double StandardError, out double MarginOfError, out int DegreesOfFreedom) -> void
+NBenchmark.Stats.WinsorizedSpread.DegreesOfFreedom.get -> int
+NBenchmark.Stats.WinsorizedSpread.DegreesOfFreedom.init -> void
+NBenchmark.Stats.WinsorizedSpread.Equals(NBenchmark.Stats.WinsorizedSpread other) -> bool
+NBenchmark.Stats.WinsorizedSpread.MarginOfError.get -> double
+NBenchmark.Stats.WinsorizedSpread.MarginOfError.init -> void
+NBenchmark.Stats.WinsorizedSpread.StandardDeviation.get -> double
+NBenchmark.Stats.WinsorizedSpread.StandardDeviation.init -> void
+NBenchmark.Stats.WinsorizedSpread.StandardError.get -> double
+NBenchmark.Stats.WinsorizedSpread.StandardError.init -> void
+NBenchmark.Stats.WinsorizedSpread.WinsorizedSpread() -> void
+NBenchmark.Stats.WinsorizedSpread.WinsorizedSpread(double StandardDeviation, double StandardError, double MarginOfError, int DegreesOfFreedom) -> void
+NBenchmark.TailMetricsBasis
+NBenchmark.TailMetricsBasis.Raw = 0 -> NBenchmark.TailMetricsBasis
+NBenchmark.TailMetricsBasis.Trimmed = 1 -> NBenchmark.TailMetricsBasis
+NBenchmark.WarmupStopReason
+NBenchmark.WarmupStopReason.ExplicitCount = 2 -> NBenchmark.WarmupStopReason
+NBenchmark.WarmupStopReason.MaxCeiling = 1 -> NBenchmark.WarmupStopReason
+NBenchmark.WarmupStopReason.Settled = 0 -> NBenchmark.WarmupStopReason
+NBenchmark.WarmupStopReason.WallClockCap = 3 -> NBenchmark.WarmupStopReason
+NBenchmark.Workers.TestMethodRunner
+NBenchmark.Workers.TestMethodRunner.Measurement
+NBenchmark.Workers.TestMethodRunner.Measurement.Deconstruct(out string! Name, out NBenchmark.BenchmarkResult! Result, out double[]! RawSamples) -> void
+NBenchmark.Workers.TestMethodRunner.Measurement.Equals(NBenchmark.Workers.TestMethodRunner.Measurement other) -> bool
+NBenchmark.Workers.TestMethodRunner.Measurement.Measurement() -> void
+NBenchmark.Workers.TestMethodRunner.Measurement.Measurement(string! Name, NBenchmark.BenchmarkResult! Result, double[]! RawSamples) -> void
+NBenchmark.Workers.TestMethodRunner.Measurement.Name.get -> string!
+NBenchmark.Workers.TestMethodRunner.Measurement.Name.init -> void
+NBenchmark.Workers.TestMethodRunner.Measurement.RawSamples.get -> double[]!
+NBenchmark.Workers.TestMethodRunner.Measurement.RawSamples.init -> void
+NBenchmark.Workers.TestMethodRunner.Measurement.Result.get -> NBenchmark.BenchmarkResult!
+NBenchmark.Workers.TestMethodRunner.Measurement.Result.init -> void
+NBenchmark.Workers.TestMethodRunner.Outcome
+NBenchmark.Workers.TestMethodRunner.Outcome.Calibration.get -> NBenchmark.CalibrationResult?
+NBenchmark.Workers.TestMethodRunner.Outcome.Calibration.init -> void
+NBenchmark.Workers.TestMethodRunner.Outcome.Deconstruct(out System.Collections.Generic.IReadOnlyList<NBenchmark.Workers.TestMethodRunner.Measurement>! Measurements, out string? Refusal, out NBenchmark.CalibrationResult? Calibration) -> void
+NBenchmark.Workers.TestMethodRunner.Outcome.Equals(NBenchmark.Workers.TestMethodRunner.Outcome other) -> bool
+NBenchmark.Workers.TestMethodRunner.Outcome.Measured.get -> bool
+NBenchmark.Workers.TestMethodRunner.Outcome.Measurements.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.Workers.TestMethodRunner.Measurement>!
+NBenchmark.Workers.TestMethodRunner.Outcome.Measurements.init -> void
+NBenchmark.Workers.TestMethodRunner.Outcome.Outcome() -> void
+NBenchmark.Workers.TestMethodRunner.Outcome.Outcome(System.Collections.Generic.IReadOnlyList<NBenchmark.Workers.TestMethodRunner.Measurement>! Measurements, string? Refusal, NBenchmark.CalibrationResult? Calibration = null) -> void
+NBenchmark.Workers.TestMethodRunner.Outcome.RawSamples.get -> System.Collections.Generic.IReadOnlyList<double>!
+NBenchmark.Workers.TestMethodRunner.Outcome.Refusal.get -> string?
+NBenchmark.Workers.TestMethodRunner.Outcome.Refusal.init -> void
+NBenchmark.Workers.TestMethodRunner.Outcome.Result.get -> NBenchmark.BenchmarkResult?
+NBenchmark.Workers.TestMethodRunner.Subject
+NBenchmark.Workers.TestMethodRunner.Subject.Arguments.get -> object?[]!
+NBenchmark.Workers.TestMethodRunner.Subject.Arguments.init -> void
+NBenchmark.Workers.TestMethodRunner.Subject.Deconstruct(out System.Reflection.MethodInfo! Method, out object?[]! Arguments, out string! DisplayName) -> void
+NBenchmark.Workers.TestMethodRunner.Subject.DisplayName.get -> string!
+NBenchmark.Workers.TestMethodRunner.Subject.DisplayName.init -> void
+NBenchmark.Workers.TestMethodRunner.Subject.Equals(NBenchmark.Workers.TestMethodRunner.Subject other) -> bool
+NBenchmark.Workers.TestMethodRunner.Subject.Method.get -> System.Reflection.MethodInfo!
+NBenchmark.Workers.TestMethodRunner.Subject.Method.init -> void
+NBenchmark.Workers.TestMethodRunner.Subject.Subject() -> void
+NBenchmark.Workers.TestMethodRunner.Subject.Subject(System.Reflection.MethodInfo! Method, object?[]! Arguments, string! DisplayName) -> void
+const NBenchmark.DriftCanaryOptions.DefaultMinimumReportableDrift = 0.01 -> double
+const NBenchmark.DriftCanaryOptions.DefaultSamples = 32 -> int
+const NBenchmark.DriftCanaryOptions.DefaultWorkPerSample = 4096 -> int
+const NBenchmark.DriftCanaryOptions.MaxReportableDrift = 1 -> double
+const NBenchmark.DriftCanaryOptions.MaxSamples = 1024 -> int
+const NBenchmark.DriftCanaryOptions.MaxWorkPerSample = 1048576 -> int
+const NBenchmark.DriftCanaryOptions.MinReportableDrift = 0 -> double
+const NBenchmark.DriftCanaryOptions.MinSamples = 4 -> int
+const NBenchmark.DriftCanaryOptions.MinWorkPerSample = 64 -> int
+const NBenchmark.InterferenceOptions.DefaultHighRejectionWarningFraction = 0.2 -> double
+const NBenchmark.InterferenceOptions.DefaultKnownSampleFraction = 0.5 -> double
+const NBenchmark.InterferenceOptions.DefaultProbeCostBudgetFraction = 0.05 -> double
+const NBenchmark.InterferenceOptions.DefaultRejectionThreshold = 0.5 -> double
+const NBenchmark.InterferenceOptions.MaxHighRejectionWarningFraction = 1 -> double
+const NBenchmark.InterferenceOptions.MaxKnownSampleFraction = 1 -> double
+const NBenchmark.InterferenceOptions.MaxProbeCostBudgetFraction = 1 -> double
+const NBenchmark.InterferenceOptions.MaxRejectionThreshold = 1 -> double
+const NBenchmark.InterferenceOptions.MinHighRejectionWarningFraction = 0 -> double
+const NBenchmark.InterferenceOptions.MinKnownSampleFraction = 0 -> double
+const NBenchmark.InterferenceOptions.MinProbeCostBudgetFraction = 0.0001 -> double
+const NBenchmark.InterferenceOptions.MinRejectionThreshold = 0.01 -> double
+const NBenchmark.LaunchCounts.HarnessDefault = 5 -> int
+const NBenchmark.LaunchCounts.Max = 100 -> int
+const NBenchmark.LaunchCounts.Single = 1 -> int
+const NBenchmark.MeasurementOptions.DefaultMaxRawSamples = 4096 -> int
+const NBenchmark.MeasurementOptions.DefaultMaxTransferredStateBytes = 8388608 -> int
+const NBenchmark.MeasurementOptions.DefaultMinimumPracticalEffect = 0.147 -> double
+const NBenchmark.MeasurementOptions.DefaultMinimumRelativeShift = 0.01 -> double
+const NBenchmark.MeasurementOptions.MaxAutoWarmupIterations = 100000 -> int
+const NBenchmark.MeasurementOptions.MaxHistogramBucketCount = 100 -> int
+const NBenchmark.MeasurementOptions.MaxIterations = 100000 -> int
+const NBenchmark.MeasurementOptions.MaxOpsPerSampleLimit = 16777216 -> int
+const NBenchmark.MeasurementOptions.MaxTransferredStateCeiling = 33554432 -> int
+const NBenchmark.MeasurementOptions.MaxWarmupIterations = 10000 -> int
+const NBenchmark.MeasurementOptions.MinHistogramBucketCount = 5 -> int
+const NBenchmark.MeasurementOptions.MinIterations = 0 -> int
+const NBenchmark.MeasurementOptions.UnboundedRawSamples = 0 -> int
+const NBenchmark.Reporters.ReportFormat.MeasurementEpoch = 7 -> int
+const NBenchmark.Reporters.ReportFormat.SchemaVersion = 1 -> int
+const NBenchmark.Stats.EffectMetrics.CliffsDelta = "Cliff's δ" -> string!
+const NBenchmark.Stats.KruskalWallis.MinGroups = 2 -> int
+const NBenchmark.Stats.MannWhitneyU.ExactMaxCombinedSamples = 20 -> int
+const NBenchmark.Stats.SampleQuality.AutocorrelationThreshold = 0.5 -> double
+const NBenchmark.Stats.SampleQuality.DriftPValueThreshold = 0.001 -> double
+const NBenchmark.Stats.SampleQuality.DriftRelativeThreshold = 0.1 -> double
+const NBenchmark.Stats.SampleQuality.MinSamplesForChecks = 50 -> int
+override NBenchmark.AutoTuneDiagnostic.Equals(object? obj) -> bool
+override NBenchmark.AutoTuneDiagnostic.GetHashCode() -> int
+override NBenchmark.AutoTuneDiagnostic.ToString() -> string!
+override NBenchmark.AutoTuneOptions.Equals(object? obj) -> bool
+override NBenchmark.AutoTuneOptions.GetHashCode() -> int
+override NBenchmark.AutoTuneOptions.ToString() -> string!
+override NBenchmark.BenchmarkParameter.Equals(object? obj) -> bool
+override NBenchmark.BenchmarkParameter.GetHashCode() -> int
+override NBenchmark.BenchmarkParameter.ToString() -> string!
+override NBenchmark.BenchmarkResult.Equals(object? obj) -> bool
+override NBenchmark.BenchmarkResult.GetHashCode() -> int
+override NBenchmark.BenchmarkResult.ToString() -> string!
+override NBenchmark.BenchmarkRow.Equals(object? obj) -> bool
+override NBenchmark.BenchmarkRow.GetHashCode() -> int
+override NBenchmark.BenchmarkRow.ToString() -> string!
+override NBenchmark.BenchmarkTable.Equals(object? obj) -> bool
+override NBenchmark.BenchmarkTable.GetHashCode() -> int
+override NBenchmark.BenchmarkTable.ToString() -> string!
+override NBenchmark.CalibrationResult.Equals(object? obj) -> bool
+override NBenchmark.CalibrationResult.GetHashCode() -> int
+override NBenchmark.CalibrationResult.ToString() -> string!
+override NBenchmark.DetectorStateEvent.GetHashCode() -> int
+override NBenchmark.DiagnosticsOptions.Equals(object? obj) -> bool
+override NBenchmark.DiagnosticsOptions.GetHashCode() -> int
+override NBenchmark.DiagnosticsOptions.ToString() -> string!
+override NBenchmark.DiagnosticsResult.Equals(object? obj) -> bool
+override NBenchmark.DiagnosticsResult.GetHashCode() -> int
+override NBenchmark.DiagnosticsResult.ToString() -> string!
+override NBenchmark.Discovery.BenchmarkMethodDefinition.Equals(object? obj) -> bool
+override NBenchmark.Discovery.BenchmarkMethodDefinition.GetHashCode() -> int
+override NBenchmark.Discovery.BenchmarkMethodDefinition.ToString() -> string!
+override NBenchmark.Discovery.BenchmarkSuiteDefinition.Equals(object? obj) -> bool
+override NBenchmark.Discovery.BenchmarkSuiteDefinition.GetHashCode() -> int
+override NBenchmark.Discovery.BenchmarkSuiteDefinition.ToString() -> string!
+override NBenchmark.DriftCanaryOptions.Equals(object? obj) -> bool
+override NBenchmark.DriftCanaryOptions.GetHashCode() -> int
+override NBenchmark.DriftCanaryOptions.ToString() -> string!
+override NBenchmark.Engine.HostAssessment.GetHashCode() -> int
+override NBenchmark.Engine.ProcessedMeasurements.Equals(object? obj) -> bool
+override NBenchmark.Engine.ProcessedMeasurements.GetHashCode() -> int
+override NBenchmark.Engine.ProcessedMeasurements.ToString() -> string!
+override NBenchmark.Engine.RegressionCandidate.Equals(object? obj) -> bool
+override NBenchmark.Engine.RegressionCandidate.GetHashCode() -> int
+override NBenchmark.Engine.RegressionCandidate.ToString() -> string!
+override NBenchmark.Engine.RegressionVerdict.Equals(object? obj) -> bool
+override NBenchmark.Engine.RegressionVerdict.GetHashCode() -> int
+override NBenchmark.Engine.RegressionVerdict.ToString() -> string!
+override NBenchmark.Engine.RunSpec.GetHashCode() -> int
+override NBenchmark.Engine.ToleranceVerdict.Equals(object? obj) -> bool
+override NBenchmark.Engine.ToleranceVerdict.GetHashCode() -> int
+override NBenchmark.Engine.ToleranceVerdict.ToString() -> string!
+override NBenchmark.EnvironmentOptions.Equals(object? obj) -> bool
+override NBenchmark.EnvironmentOptions.GetHashCode() -> int
+override NBenchmark.EnvironmentOptions.ToString() -> string!
+override NBenchmark.HistogramBucket.GetHashCode() -> int
+override NBenchmark.HostTimeline.Equals(object? obj) -> bool
+override NBenchmark.HostTimeline.GetHashCode() -> int
+override NBenchmark.HostTimeline.ToString() -> string!
+override NBenchmark.InterferenceOptions.Equals(object? obj) -> bool
+override NBenchmark.InterferenceOptions.GetHashCode() -> int
+override NBenchmark.InterferenceOptions.ToString() -> string!
+override NBenchmark.LatencyHistogram.Equals(object? obj) -> bool
+override NBenchmark.LatencyHistogram.GetHashCode() -> int
+override NBenchmark.LatencyHistogram.ToString() -> string!
+override NBenchmark.LaunchDetail.Equals(object? obj) -> bool
+override NBenchmark.LaunchDetail.GetHashCode() -> int
+override NBenchmark.LaunchDetail.ToString() -> string!
+override NBenchmark.LaunchStatistics.Equals(object? obj) -> bool
+override NBenchmark.LaunchStatistics.GetHashCode() -> int
+override NBenchmark.LaunchStatistics.ToString() -> string!
+override NBenchmark.MeasurementEvent.GetHashCode() -> int
+override NBenchmark.MeasurementOptions.Equals(object? obj) -> bool
+override NBenchmark.MeasurementOptions.GetHashCode() -> int
+override NBenchmark.MeasurementOptions.ToString() -> string!
+override NBenchmark.MeasurementOutcome.Equals(object? obj) -> bool
+override NBenchmark.MeasurementOutcome.GetHashCode() -> int
+override NBenchmark.MeasurementOutcome.ToString() -> string!
+override NBenchmark.MeasurementPhaseEvent.GetHashCode() -> int
+override NBenchmark.Observers.ObserverInfo.Equals(object? obj) -> bool
+override NBenchmark.Observers.ObserverInfo.GetHashCode() -> int
+override NBenchmark.Observers.ObserverInfo.ToString() -> string!
+override NBenchmark.OmnibusComparison.Equals(object? obj) -> bool
+override NBenchmark.OmnibusComparison.GetHashCode() -> int
+override NBenchmark.OmnibusComparison.ToString() -> string!
+override NBenchmark.PercentileEntry.GetHashCode() -> int
+override NBenchmark.RatioEstimate.Equals(object? obj) -> bool
+override NBenchmark.RatioEstimate.GetHashCode() -> int
+override NBenchmark.RatioEstimate.ToString() -> string!
+override NBenchmark.Reporters.ReporterInfo.Equals(object? obj) -> bool
+override NBenchmark.Reporters.ReporterInfo.GetHashCode() -> int
+override NBenchmark.Reporters.ReporterInfo.ToString() -> string!
+override NBenchmark.RuntimeProfile.Equals(object? obj) -> bool
+override NBenchmark.RuntimeProfile.GetHashCode() -> int
+override NBenchmark.RuntimeProfile.ToString() -> string!
+override NBenchmark.SampleEvent.GetHashCode() -> int
+override NBenchmark.Stats.AllocationStats.GetHashCode() -> int
+override NBenchmark.Stats.EffectSize.GetHashCode() -> int
+override NBenchmark.Stats.KruskalWallisResult.GetHashCode() -> int
+override NBenchmark.Stats.MannWhitneyUResult.GetHashCode() -> int
+override NBenchmark.Stats.OutlierClassification.Equals(object? obj) -> bool
+override NBenchmark.Stats.OutlierClassification.GetHashCode() -> int
+override NBenchmark.Stats.OutlierClassification.ToString() -> string!
+override NBenchmark.Stats.PairwiseComparison.GetHashCode() -> int
+override NBenchmark.Stats.SampleGroup.GetHashCode() -> int
+override NBenchmark.Stats.ShiftEstimate.GetHashCode() -> int
+override NBenchmark.Stats.SignificanceContext.Equals(object? obj) -> bool
+override NBenchmark.Stats.SignificanceContext.GetHashCode() -> int
+override NBenchmark.Stats.SignificanceContext.ToString() -> string!
+override NBenchmark.Stats.SignificanceReport.Equals(object? obj) -> bool
+override NBenchmark.Stats.SignificanceReport.GetHashCode() -> int
+override NBenchmark.Stats.SignificanceReport.ToString() -> string!
+override NBenchmark.Stats.TrimContext.GetHashCode() -> int
+override NBenchmark.Stats.TrimResult.GetHashCode() -> int
+override NBenchmark.Stats.WinsorizedSpread.GetHashCode() -> int
+override NBenchmark.Workers.TestMethodRunner.Measurement.GetHashCode() -> int
+override NBenchmark.Workers.TestMethodRunner.Outcome.GetHashCode() -> int
+override NBenchmark.Workers.TestMethodRunner.Subject.GetHashCode() -> int
+static NBenchmark.AutoTuneDiagnostic.operator !=(NBenchmark.AutoTuneDiagnostic? left, NBenchmark.AutoTuneDiagnostic? right) -> bool
+static NBenchmark.AutoTuneDiagnostic.operator ==(NBenchmark.AutoTuneDiagnostic? left, NBenchmark.AutoTuneDiagnostic? right) -> bool
+static NBenchmark.AutoTuneOptions.FromPreset(NBenchmark.AutoTunePreset preset) -> NBenchmark.AutoTuneOptions!
+static NBenchmark.AutoTuneOptions.operator !=(NBenchmark.AutoTuneOptions? left, NBenchmark.AutoTuneOptions? right) -> bool
+static NBenchmark.AutoTuneOptions.operator ==(NBenchmark.AutoTuneOptions? left, NBenchmark.AutoTuneOptions? right) -> bool
+static NBenchmark.Benchmark.Run(System.Action! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.Run<T>(System.Func<T>! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.Run<TArg, TState, T>(System.Func<TArg, TState>! prepare, TArg prepareArgument, System.Func<TState, T>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.Run<TArg, TState>(System.Func<TArg, TState>! prepare, TArg prepareArgument, System.Action<TState>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.Run<TState, T>(System.Func<TState>! prepare, System.Func<TState, T>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.Run<TState1, TState2, T>(System.Func<TState1>! prepare1, System.Func<TState2>! prepare2, System.Func<TState1, TState2, T>! body, System.Action<TState1, TState2>? setup = null, System.Action<TState1, TState2>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.Run<TState1, TState2>(System.Func<TState1>! prepare1, System.Func<TState2>! prepare2, System.Action<TState1, TState2>! body, System.Action<TState1, TState2>? setup = null, System.Action<TState1, TState2>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.Run<TState>(System.Func<TState>! prepare, System.Action<TState>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.RunAsync(System.Func<System.Threading.Tasks.Task!>! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>!>! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunAsync<TArg, TState, T>(System.Func<TArg, TState>! prepare, TArg prepareArgument, System.Func<TState, System.Threading.Tasks.Task<T>!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunAsync<TArg, TState>(System.Func<TArg, TState>! prepare, TArg prepareArgument, System.Func<TState, System.Threading.Tasks.Task!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunAsync<TState, T>(System.Func<TState>! prepare, System.Func<TState, System.Threading.Tasks.Task<T>!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunAsync<TState1, TState2, T>(System.Func<TState1>! prepare1, System.Func<TState2>! prepare2, System.Func<TState1, TState2, System.Threading.Tasks.Task<T>!>! body, System.Action<TState1, TState2>? setup = null, System.Action<TState1, TState2>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunAsync<TState1, TState2>(System.Func<TState1>! prepare1, System.Func<TState2>! prepare2, System.Func<TState1, TState2, System.Threading.Tasks.Task!>! body, System.Action<TState1, TState2>? setup = null, System.Action<TState1, TState2>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunAsync<TState>(System.Func<TState>! prepare, System.Func<TState, System.Threading.Tasks.Task!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunInProcess(System.Action! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.RunInProcess<T>(System.Func<T>! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.RunInProcess<TState, T>(System.Func<TState>! prepare, System.Func<TState, T>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.RunInProcess<TState>(System.Func<TState>! prepare, System.Action<TState>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Benchmark.RunInProcessAsync(System.Func<System.Threading.Tasks.Task!>! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunInProcessAsync<T>(System.Func<System.Threading.Tasks.Task<T>!>! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunInProcessAsync<TState, T>(System.Func<TState>! prepare, System.Func<TState, System.Threading.Tasks.Task<T>!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunInProcessAsync<TState>(System.Func<TState>! prepare, System.Func<TState, System.Threading.Tasks.Task!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Benchmark.RunRaw(System.Action! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+static NBenchmark.Benchmark.RunRaw<T>(System.Func<T>! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+static NBenchmark.Benchmark.RunRaw<TArg, TState, T>(System.Func<TArg, TState>! prepare, TArg prepareArgument, System.Func<TState, T>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+static NBenchmark.Benchmark.RunRaw<TArg, TState>(System.Func<TArg, TState>! prepare, TArg prepareArgument, System.Action<TState>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+static NBenchmark.Benchmark.RunRaw<TState, T>(System.Func<TState>! prepare, System.Func<TState, T>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+static NBenchmark.Benchmark.RunRaw<TState1, TState2, T>(System.Func<TState1>! prepare1, System.Func<TState2>! prepare2, System.Func<TState1, TState2, T>! body, System.Action<TState1, TState2>? setup = null, System.Action<TState1, TState2>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+static NBenchmark.Benchmark.RunRaw<TState1, TState2>(System.Func<TState1>! prepare1, System.Func<TState2>! prepare2, System.Action<TState1, TState2>! body, System.Action<TState1, TState2>? setup = null, System.Action<TState1, TState2>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+static NBenchmark.Benchmark.RunRaw<TState>(System.Func<TState>! prepare, System.Action<TState>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.MeasurementOutcome!
+static NBenchmark.Benchmark.RunRawAsync(System.Func<System.Threading.Tasks.Task!>! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+static NBenchmark.Benchmark.RunRawAsync<T>(System.Func<System.Threading.Tasks.Task<T>!>! action, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+static NBenchmark.Benchmark.RunRawAsync<TArg, TState, T>(System.Func<TArg, TState>! prepare, TArg prepareArgument, System.Func<TState, System.Threading.Tasks.Task<T>!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+static NBenchmark.Benchmark.RunRawAsync<TArg, TState>(System.Func<TArg, TState>! prepare, TArg prepareArgument, System.Func<TState, System.Threading.Tasks.Task!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+static NBenchmark.Benchmark.RunRawAsync<TState, T>(System.Func<TState>! prepare, System.Func<TState, System.Threading.Tasks.Task<T>!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+static NBenchmark.Benchmark.RunRawAsync<TState1, TState2, T>(System.Func<TState1>! prepare1, System.Func<TState2>! prepare2, System.Func<TState1, TState2, System.Threading.Tasks.Task<T>!>! body, System.Action<TState1, TState2>? setup = null, System.Action<TState1, TState2>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+static NBenchmark.Benchmark.RunRawAsync<TState1, TState2>(System.Func<TState1>! prepare1, System.Func<TState2>! prepare2, System.Func<TState1, TState2, System.Threading.Tasks.Task!>! body, System.Action<TState1, TState2>? setup = null, System.Action<TState1, TState2>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+static NBenchmark.Benchmark.RunRawAsync<TState>(System.Func<TState>! prepare, System.Func<TState, System.Threading.Tasks.Task!>! body, System.Action<TState>? setup = null, System.Action<TState>? teardown = null, NBenchmark.MeasurementOptions? options = null, string! name = "Benchmark", NBenchmark.IBenchmarkProgress? progress = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.MeasurementOutcome!>!
+static NBenchmark.Benchmark.Warmup(NBenchmark.MeasurementOptions? options = null) -> void
+static NBenchmark.BenchmarkFormatter.FormatAlloc(long bytes) -> string!
+static NBenchmark.BenchmarkFormatter.FormatBytes(long bytes) -> string!
+static NBenchmark.BenchmarkFormatter.FormatDuration(System.TimeSpan duration) -> string!
+static NBenchmark.BenchmarkFormatter.FormatNs(double ns) -> string!
+static NBenchmark.BenchmarkFormatter.FormatNsPerOp(double ns) -> string!
+static NBenchmark.BenchmarkFormatter.FormatOpsPerSecond(double opsPerSecond) -> string!
+static NBenchmark.BenchmarkHarness.Create(string![]! args) -> NBenchmark.BenchmarkHarness!
+static NBenchmark.BenchmarkParameter.FormatDisplayName(string! baseName, System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkParameter!>! paramSet) -> string!
+static NBenchmark.BenchmarkParameter.FormatLabel(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkParameter!>! paramSet) -> string!
+static NBenchmark.BenchmarkParameter.FormatPart(NBenchmark.BenchmarkParameter! parameter) -> string!
+static NBenchmark.BenchmarkParameter.FormatValue(object? value) -> string!
+static NBenchmark.BenchmarkParameter.GetKey(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkParameter!>! paramSet) -> string!
+static NBenchmark.BenchmarkParameter.operator !=(NBenchmark.BenchmarkParameter? left, NBenchmark.BenchmarkParameter? right) -> bool
+static NBenchmark.BenchmarkParameter.operator ==(NBenchmark.BenchmarkParameter? left, NBenchmark.BenchmarkParameter? right) -> bool
+static NBenchmark.BenchmarkResult.FromCalibration(string! name, double mean, double median, double[]! samples) -> NBenchmark.BenchmarkResult!
+static NBenchmark.BenchmarkResult.operator !=(NBenchmark.BenchmarkResult? left, NBenchmark.BenchmarkResult? right) -> bool
+static NBenchmark.BenchmarkResult.operator ==(NBenchmark.BenchmarkResult? left, NBenchmark.BenchmarkResult? right) -> bool
+static NBenchmark.BenchmarkResultExtensions.Print(this NBenchmark.BenchmarkResult! result, NBenchmark.Reporters.ReportDetail detail = NBenchmark.Reporters.ReportDetail.Simple) -> NBenchmark.BenchmarkResult!
+static NBenchmark.BenchmarkResultExtensions.ToCsvAsync(this NBenchmark.BenchmarkResult! result, string! outputDir = ".", string? fileName = null) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.BenchmarkResultExtensions.ToJsonAsync(this NBenchmark.BenchmarkResult! result, string! outputDir = ".", string? fileName = null) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.BenchmarkResultExtensions.ToMarkdownAsync(this NBenchmark.BenchmarkResult! result, string! outputDir = ".", string? fileName = null) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.BenchmarkRow.operator !=(NBenchmark.BenchmarkRow? left, NBenchmark.BenchmarkRow? right) -> bool
+static NBenchmark.BenchmarkRow.operator ==(NBenchmark.BenchmarkRow? left, NBenchmark.BenchmarkRow? right) -> bool
+static NBenchmark.BenchmarkSuite.Over<TState>(string! name, System.Func<TState>! prepare) -> NBenchmark.BenchmarkSuite<TState>!
+static NBenchmark.BenchmarkSuite.RunPlanAsync(System.Func<NBenchmark.BenchmarkSuite!>! plan, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>!>!
+static NBenchmark.BenchmarkSuite.RunPlansAsync(System.Type! declaringType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>!>!
+static NBenchmark.BenchmarkSuite.RunPlansAsync<T>(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>!>!
+static NBenchmark.BenchmarkTable.Build(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results) -> NBenchmark.BenchmarkTable!
+static NBenchmark.BenchmarkTable.BuildPerClass(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results) -> System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkTable!>!
+static NBenchmark.BenchmarkTable.CrossClassMode.get -> bool
+static NBenchmark.BenchmarkTable.CrossClassMode.set -> void
+static NBenchmark.BenchmarkTable.FormatAutoTuneSummary(NBenchmark.AutoTuneDiagnostic! diagnostic) -> string!
+static NBenchmark.BenchmarkTable.FormatPercentileKey(double p) -> string!
+static NBenchmark.BenchmarkTable.FormatShift(NBenchmark.Stats.ShiftEstimate shift) -> string!
+static NBenchmark.BenchmarkTable.RenderStatsBlock(NBenchmark.BenchmarkRow! row, NBenchmark.Reporters.ReportDetail detail) -> string!
+static NBenchmark.BenchmarkTable.operator !=(NBenchmark.BenchmarkTable? left, NBenchmark.BenchmarkTable? right) -> bool
+static NBenchmark.BenchmarkTable.operator ==(NBenchmark.BenchmarkTable? left, NBenchmark.BenchmarkTable? right) -> bool
+static NBenchmark.CalibrationResult.operator !=(NBenchmark.CalibrationResult? left, NBenchmark.CalibrationResult? right) -> bool
+static NBenchmark.CalibrationResult.operator ==(NBenchmark.CalibrationResult? left, NBenchmark.CalibrationResult? right) -> bool
+static NBenchmark.CalibrationStandard.Measure() -> NBenchmark.CalibrationResult!
+static NBenchmark.CalibrationStandard.ToBenchmarkResult(NBenchmark.CalibrationResult! calibration, NBenchmark.IsolationStatus isolationStatus) -> NBenchmark.BenchmarkResult!
+static NBenchmark.DetectorStateEvent.operator !=(NBenchmark.DetectorStateEvent left, NBenchmark.DetectorStateEvent right) -> bool
+static NBenchmark.DetectorStateEvent.operator ==(NBenchmark.DetectorStateEvent left, NBenchmark.DetectorStateEvent right) -> bool
+static NBenchmark.Diagnostics.TelemetryResource.Attributes.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+static NBenchmark.DiagnosticsOptions.FromMode(NBenchmark.DiagnosticsMode mode) -> NBenchmark.DiagnosticsOptions!
+static NBenchmark.DiagnosticsOptions.operator !=(NBenchmark.DiagnosticsOptions? left, NBenchmark.DiagnosticsOptions? right) -> bool
+static NBenchmark.DiagnosticsOptions.operator ==(NBenchmark.DiagnosticsOptions? left, NBenchmark.DiagnosticsOptions? right) -> bool
+static NBenchmark.DiagnosticsResult.operator !=(NBenchmark.DiagnosticsResult? left, NBenchmark.DiagnosticsResult? right) -> bool
+static NBenchmark.DiagnosticsResult.operator ==(NBenchmark.DiagnosticsResult? left, NBenchmark.DiagnosticsResult? right) -> bool
+static NBenchmark.Discovery.BenchmarkMethodDefinition.operator !=(NBenchmark.Discovery.BenchmarkMethodDefinition? left, NBenchmark.Discovery.BenchmarkMethodDefinition? right) -> bool
+static NBenchmark.Discovery.BenchmarkMethodDefinition.operator ==(NBenchmark.Discovery.BenchmarkMethodDefinition? left, NBenchmark.Discovery.BenchmarkMethodDefinition? right) -> bool
+static NBenchmark.Discovery.BenchmarkSuiteDefinition.operator !=(NBenchmark.Discovery.BenchmarkSuiteDefinition? left, NBenchmark.Discovery.BenchmarkSuiteDefinition? right) -> bool
+static NBenchmark.Discovery.BenchmarkSuiteDefinition.operator ==(NBenchmark.Discovery.BenchmarkSuiteDefinition? left, NBenchmark.Discovery.BenchmarkSuiteDefinition? right) -> bool
+static NBenchmark.DriftCanaryOptions.operator !=(NBenchmark.DriftCanaryOptions? left, NBenchmark.DriftCanaryOptions? right) -> bool
+static NBenchmark.DriftCanaryOptions.operator ==(NBenchmark.DriftCanaryOptions? left, NBenchmark.DriftCanaryOptions? right) -> bool
+static NBenchmark.Engine.BenchmarkRunner.GetResultConsumer<T>() -> System.Action<T>!
+static NBenchmark.Engine.BenchmarkRunner.Instance.get -> NBenchmark.Engine.BenchmarkRunner!
+static NBenchmark.Engine.EnvironmentControl.Apply(NBenchmark.EnvironmentOptions? options) -> System.IDisposable!
+static NBenchmark.Engine.EnvironmentControl.AssessHost() -> NBenchmark.Engine.HostAssessment
+static NBenchmark.Engine.HostAssessment.operator !=(NBenchmark.Engine.HostAssessment left, NBenchmark.Engine.HostAssessment right) -> bool
+static NBenchmark.Engine.HostAssessment.operator ==(NBenchmark.Engine.HostAssessment left, NBenchmark.Engine.HostAssessment right) -> bool
+static NBenchmark.Engine.ProcessedMeasurements.operator !=(NBenchmark.Engine.ProcessedMeasurements? left, NBenchmark.Engine.ProcessedMeasurements? right) -> bool
+static NBenchmark.Engine.ProcessedMeasurements.operator ==(NBenchmark.Engine.ProcessedMeasurements? left, NBenchmark.Engine.ProcessedMeasurements? right) -> bool
+static NBenchmark.Engine.RegressionCandidate.operator !=(NBenchmark.Engine.RegressionCandidate? left, NBenchmark.Engine.RegressionCandidate? right) -> bool
+static NBenchmark.Engine.RegressionCandidate.operator ==(NBenchmark.Engine.RegressionCandidate? left, NBenchmark.Engine.RegressionCandidate? right) -> bool
+static NBenchmark.Engine.RegressionTolerance.Evaluate(double measuredValue, double configuredThreshold, double toleranceMultiplier) -> NBenchmark.Engine.ToleranceVerdict!
+static NBenchmark.Engine.RegressionTolerance.NeedsRelaxation(NBenchmark.BenchmarkResult! result, bool isSharedRunner, double jitterAutoSwitchThreshold) -> bool
+static NBenchmark.Engine.RegressionVerdict.operator !=(NBenchmark.Engine.RegressionVerdict? left, NBenchmark.Engine.RegressionVerdict? right) -> bool
+static NBenchmark.Engine.RegressionVerdict.operator ==(NBenchmark.Engine.RegressionVerdict? left, NBenchmark.Engine.RegressionVerdict? right) -> bool
+static NBenchmark.Engine.RunSpec.operator !=(NBenchmark.Engine.RunSpec left, NBenchmark.Engine.RunSpec right) -> bool
+static NBenchmark.Engine.RunSpec.operator ==(NBenchmark.Engine.RunSpec left, NBenchmark.Engine.RunSpec right) -> bool
+static NBenchmark.Engine.StatsPipeline.Run(double[]! rawTimings, long[]? rawAllocations, NBenchmark.MeasurementOptions! options, int[]? perSampleGcCounts = null, double[]? perSampleOccupancy = null) -> NBenchmark.Engine.ProcessedMeasurements!
+static NBenchmark.Engine.ThreadEnvironmentControl.Apply(NBenchmark.EnvironmentOptions? options) -> System.IDisposable!
+static NBenchmark.Engine.ThresholdCheck.Check(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results, int thresholdPct) -> NBenchmark.Engine.RegressionVerdict!
+static NBenchmark.Engine.ThresholdCheck.HasRegression(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results, int thresholdPct) -> (bool HasRegression, System.Collections.Generic.IReadOnlyList<string!>! RegressedNames)
+static NBenchmark.Engine.ThresholdCheck.HasRegressionAcrossGroups(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results, int thresholdPct) -> (bool HasRegression, System.Collections.Generic.IReadOnlyList<string!>! RegressedNames)
+static NBenchmark.Engine.ToleranceVerdict.operator !=(NBenchmark.Engine.ToleranceVerdict? left, NBenchmark.Engine.ToleranceVerdict? right) -> bool
+static NBenchmark.Engine.ToleranceVerdict.operator ==(NBenchmark.Engine.ToleranceVerdict? left, NBenchmark.Engine.ToleranceVerdict? right) -> bool
+static NBenchmark.EnvironmentOptions.ParseCpuAffinity(string? raw) -> System.Collections.Generic.IReadOnlyList<int>?
+static NBenchmark.EnvironmentOptions.operator !=(NBenchmark.EnvironmentOptions? left, NBenchmark.EnvironmentOptions? right) -> bool
+static NBenchmark.EnvironmentOptions.operator ==(NBenchmark.EnvironmentOptions? left, NBenchmark.EnvironmentOptions? right) -> bool
+static NBenchmark.HistogramBucket.operator !=(NBenchmark.HistogramBucket left, NBenchmark.HistogramBucket right) -> bool
+static NBenchmark.HistogramBucket.operator ==(NBenchmark.HistogramBucket left, NBenchmark.HistogramBucket right) -> bool
+static NBenchmark.HostTimeline.operator !=(NBenchmark.HostTimeline? left, NBenchmark.HostTimeline? right) -> bool
+static NBenchmark.HostTimeline.operator ==(NBenchmark.HostTimeline? left, NBenchmark.HostTimeline? right) -> bool
+static NBenchmark.InterferenceOptions.operator !=(NBenchmark.InterferenceOptions? left, NBenchmark.InterferenceOptions? right) -> bool
+static NBenchmark.InterferenceOptions.operator ==(NBenchmark.InterferenceOptions? left, NBenchmark.InterferenceOptions? right) -> bool
+static NBenchmark.IsolationStatusExtensions.IsIsolated(this NBenchmark.IsolationStatus status) -> bool
+static NBenchmark.IsolationStatusExtensions.IsRefusal(this NBenchmark.IsolationStatus status) -> bool
+static NBenchmark.IsolationStatusExtensions.ToLabel(this NBenchmark.IsolationStatus status) -> string!
+static NBenchmark.IsolationStatusExtensions.ToRemedy(this NBenchmark.IsolationStatus status) -> string?
+static NBenchmark.LatencyHistogram.operator !=(NBenchmark.LatencyHistogram? left, NBenchmark.LatencyHistogram? right) -> bool
+static NBenchmark.LatencyHistogram.operator ==(NBenchmark.LatencyHistogram? left, NBenchmark.LatencyHistogram? right) -> bool
+static NBenchmark.LaunchCounts.Clamp(int count) -> int
+static NBenchmark.LaunchCounts.IsValid(int count) -> bool
+static NBenchmark.LaunchDetail.operator !=(NBenchmark.LaunchDetail? left, NBenchmark.LaunchDetail? right) -> bool
+static NBenchmark.LaunchDetail.operator ==(NBenchmark.LaunchDetail? left, NBenchmark.LaunchDetail? right) -> bool
+static NBenchmark.LaunchStatistics.operator !=(NBenchmark.LaunchStatistics? left, NBenchmark.LaunchStatistics? right) -> bool
+static NBenchmark.LaunchStatistics.operator ==(NBenchmark.LaunchStatistics? left, NBenchmark.LaunchStatistics? right) -> bool
+static NBenchmark.MeasurementEvent.operator !=(NBenchmark.MeasurementEvent left, NBenchmark.MeasurementEvent right) -> bool
+static NBenchmark.MeasurementEvent.operator ==(NBenchmark.MeasurementEvent left, NBenchmark.MeasurementEvent right) -> bool
+static NBenchmark.MeasurementOptions.For(NBenchmark.MeasurementProfile profile) -> NBenchmark.MeasurementOptions!
+static NBenchmark.MeasurementOptions.operator !=(NBenchmark.MeasurementOptions? left, NBenchmark.MeasurementOptions? right) -> bool
+static NBenchmark.MeasurementOptions.operator ==(NBenchmark.MeasurementOptions? left, NBenchmark.MeasurementOptions? right) -> bool
+static NBenchmark.MeasurementOutcome.operator !=(NBenchmark.MeasurementOutcome? left, NBenchmark.MeasurementOutcome? right) -> bool
+static NBenchmark.MeasurementOutcome.operator ==(NBenchmark.MeasurementOutcome? left, NBenchmark.MeasurementOutcome? right) -> bool
+static NBenchmark.MeasurementPhaseEvent.operator !=(NBenchmark.MeasurementPhaseEvent left, NBenchmark.MeasurementPhaseEvent right) -> bool
+static NBenchmark.MeasurementPhaseEvent.operator ==(NBenchmark.MeasurementPhaseEvent left, NBenchmark.MeasurementPhaseEvent right) -> bool
+static NBenchmark.Observers.ObserverInfo.operator !=(NBenchmark.Observers.ObserverInfo? left, NBenchmark.Observers.ObserverInfo? right) -> bool
+static NBenchmark.Observers.ObserverInfo.operator ==(NBenchmark.Observers.ObserverInfo? left, NBenchmark.Observers.ObserverInfo? right) -> bool
+static NBenchmark.Observers.ObserverRegistry.AutoAttached.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.Observers.ObserverInfo!>!
+static NBenchmark.Observers.ObserverRegistry.Available.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.Observers.ObserverInfo!>!
+static NBenchmark.Observers.ObserverRegistry.IsRegistered(string! name) -> bool
+static NBenchmark.Observers.ObserverRegistry.Register(string! name, string! description, System.Func<NBenchmark.IMeasurementObserver!>! factory) -> void
+static NBenchmark.Observers.ObserverRegistry.RegisterAutoAttach(string! name, string! description, System.Func<NBenchmark.IMeasurementObserver!>! factory) -> void
+static NBenchmark.Observers.ObserverRegistry.TryCreate(string! name, out NBenchmark.IMeasurementObserver? observer) -> bool
+static NBenchmark.OmnibusComparison.operator !=(NBenchmark.OmnibusComparison? left, NBenchmark.OmnibusComparison? right) -> bool
+static NBenchmark.OmnibusComparison.operator ==(NBenchmark.OmnibusComparison? left, NBenchmark.OmnibusComparison? right) -> bool
+static NBenchmark.PercentileEntry.operator !=(NBenchmark.PercentileEntry left, NBenchmark.PercentileEntry right) -> bool
+static NBenchmark.PercentileEntry.operator ==(NBenchmark.PercentileEntry left, NBenchmark.PercentileEntry right) -> bool
+static NBenchmark.RatioEstimate.operator !=(NBenchmark.RatioEstimate? left, NBenchmark.RatioEstimate? right) -> bool
+static NBenchmark.RatioEstimate.operator ==(NBenchmark.RatioEstimate? left, NBenchmark.RatioEstimate? right) -> bool
+static NBenchmark.Reporters.ReporterInfo.operator !=(NBenchmark.Reporters.ReporterInfo? left, NBenchmark.Reporters.ReporterInfo? right) -> bool
+static NBenchmark.Reporters.ReporterInfo.operator ==(NBenchmark.Reporters.ReporterInfo? left, NBenchmark.Reporters.ReporterInfo? right) -> bool
+static NBenchmark.Reporters.ReporterRegistry.AutoAttached.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.Reporters.ReporterInfo!>!
+static NBenchmark.Reporters.ReporterRegistry.Available.get -> System.Collections.Generic.IReadOnlyList<NBenchmark.Reporters.ReporterInfo!>!
+static NBenchmark.Reporters.ReporterRegistry.Register(string! name, string! description, System.Func<string?, NBenchmark.Reporters.ReportDetail, NBenchmark.Reporters.IReporter!>! factory) -> void
+static NBenchmark.Reporters.ReporterRegistry.RegisterAutoAttach(string! name, string! description, System.Func<string?, NBenchmark.Reporters.ReportDetail, NBenchmark.Reporters.IReporter!>! factory) -> void
+static NBenchmark.Reporters.ReporterRegistry.TryCreate(string! name, string? outputDir, NBenchmark.Reporters.ReportDetail detail, out NBenchmark.Reporters.IReporter? reporter) -> bool
+static NBenchmark.RuntimeProfile.KnownNames.get -> System.Collections.Generic.IReadOnlyList<string!>!
+static NBenchmark.RuntimeProfile.TryParse(string? name, out NBenchmark.RuntimeProfile! profile) -> bool
+static NBenchmark.RuntimeProfile.operator !=(NBenchmark.RuntimeProfile? left, NBenchmark.RuntimeProfile? right) -> bool
+static NBenchmark.RuntimeProfile.operator ==(NBenchmark.RuntimeProfile? left, NBenchmark.RuntimeProfile? right) -> bool
+static NBenchmark.SampleEvent.operator !=(NBenchmark.SampleEvent left, NBenchmark.SampleEvent right) -> bool
+static NBenchmark.SampleEvent.operator ==(NBenchmark.SampleEvent left, NBenchmark.SampleEvent right) -> bool
+static NBenchmark.Stats.AllocationStats.operator !=(NBenchmark.Stats.AllocationStats left, NBenchmark.Stats.AllocationStats right) -> bool
+static NBenchmark.Stats.AllocationStats.operator ==(NBenchmark.Stats.AllocationStats left, NBenchmark.Stats.AllocationStats right) -> bool
+static NBenchmark.Stats.BimodalDetector.DetectSlowCluster(double[]! kept, double[]! discarded, int totalSamples) -> (int Count, double Center)?
+static NBenchmark.Stats.ChiSquared.SurvivalFunction(double x, int degreesOfFreedom) -> double
+static NBenchmark.Stats.EffectSize.operator !=(NBenchmark.Stats.EffectSize left, NBenchmark.Stats.EffectSize right) -> bool
+static NBenchmark.Stats.EffectSize.operator ==(NBenchmark.Stats.EffectSize left, NBenchmark.Stats.EffectSize right) -> bool
+static NBenchmark.Stats.EffectSizeFactory.ForCliffsDelta(double cliffsDelta) -> NBenchmark.Stats.EffectSize
+static NBenchmark.Stats.HodgesLehmann.Estimate(double[]! baseline, double[]! candidate, double confidenceLevel) -> NBenchmark.Stats.ShiftEstimate?
+static NBenchmark.Stats.KruskalWallis.Test(System.Collections.Generic.IReadOnlyList<double[]!>! groups) -> NBenchmark.Stats.KruskalWallisResult
+static NBenchmark.Stats.KruskalWallisResult.operator !=(NBenchmark.Stats.KruskalWallisResult left, NBenchmark.Stats.KruskalWallisResult right) -> bool
+static NBenchmark.Stats.KruskalWallisResult.operator ==(NBenchmark.Stats.KruskalWallisResult left, NBenchmark.Stats.KruskalWallisResult right) -> bool
+static NBenchmark.Stats.LogRatio.Estimate(NBenchmark.BenchmarkResult! candidate, NBenchmark.BenchmarkResult! baseline) -> NBenchmark.RatioEstimate?
+static NBenchmark.Stats.LogRatio.Estimate(NBenchmark.BenchmarkResult! candidate, NBenchmark.BenchmarkResult! baseline, double confidenceLevel) -> NBenchmark.RatioEstimate?
+static NBenchmark.Stats.LogRatio.Estimate(NBenchmark.BenchmarkResult! candidate, System.Collections.Generic.IReadOnlyList<double>! baselineLaunchMedians) -> NBenchmark.RatioEstimate?
+static NBenchmark.Stats.LogRatio.Estimate(System.Collections.Generic.IReadOnlyList<double>! candidate, System.Collections.Generic.IReadOnlyList<double>! baseline, double confidenceLevel = 0.95) -> NBenchmark.RatioEstimate?
+static NBenchmark.Stats.MagnitudeLabelExtensions.Classify(double absDelta) -> NBenchmark.Stats.MagnitudeLabel
+static NBenchmark.Stats.MagnitudeLabelExtensions.ToShortString(this NBenchmark.Stats.MagnitudeLabel label) -> string!
+static NBenchmark.Stats.MannWhitneyU.Test(double[]! sampleA, double[]! sampleB) -> NBenchmark.Stats.MannWhitneyUResult
+static NBenchmark.Stats.MannWhitneyUResult.operator !=(NBenchmark.Stats.MannWhitneyUResult left, NBenchmark.Stats.MannWhitneyUResult right) -> bool
+static NBenchmark.Stats.MannWhitneyUResult.operator ==(NBenchmark.Stats.MannWhitneyUResult left, NBenchmark.Stats.MannWhitneyUResult right) -> bool
+static NBenchmark.Stats.MedianCi.Compute(double[]! sorted, double confidenceLevel) -> (double Lower, double Upper)?
+static NBenchmark.Stats.MultipleComparisons.HolmBonferroni(System.Collections.Generic.IReadOnlyList<double>! rawPValues) -> double[]!
+static NBenchmark.Stats.OutlierClassification.KeepAll(double[]! sortedSamples) -> NBenchmark.Stats.OutlierClassification!
+static NBenchmark.Stats.OutlierClassification.operator !=(NBenchmark.Stats.OutlierClassification? left, NBenchmark.Stats.OutlierClassification? right) -> bool
+static NBenchmark.Stats.OutlierClassification.operator ==(NBenchmark.Stats.OutlierClassification? left, NBenchmark.Stats.OutlierClassification? right) -> bool
+static NBenchmark.Stats.OutlierDetectors.ForMode(NBenchmark.OutlierMode mode) -> NBenchmark.Stats.IOutlierDetector!
+static NBenchmark.Stats.OutlierDetectors.IqrFence.get -> NBenchmark.Stats.IOutlierDetector!
+static NBenchmark.Stats.OutlierDetectors.MedianAbsoluteDeviation.get -> NBenchmark.Stats.IOutlierDetector!
+static NBenchmark.Stats.OutlierDetectors.None.get -> NBenchmark.Stats.IOutlierDetector!
+static NBenchmark.Stats.OutlierDetectors.RemoveTop5Percent.get -> NBenchmark.Stats.IOutlierDetector!
+static NBenchmark.Stats.OutlierDetectors.RemoveTopAndBottom5Percent.get -> NBenchmark.Stats.IOutlierDetector!
+static NBenchmark.Stats.OutlierTrim.Trim(double[]! timings, NBenchmark.OutlierMode mode) -> double[]!
+static NBenchmark.Stats.OutlierTrim.TrimDetailed(double[]! timings, NBenchmark.OutlierMode mode) -> NBenchmark.Stats.TrimResult
+static NBenchmark.Stats.OutlierTrim.TrimDetailed(double[]! timings, NBenchmark.Stats.IOutlierDetector! detector) -> NBenchmark.Stats.TrimResult
+static NBenchmark.Stats.PairwiseComparison.operator !=(NBenchmark.Stats.PairwiseComparison left, NBenchmark.Stats.PairwiseComparison right) -> bool
+static NBenchmark.Stats.PairwiseComparison.operator ==(NBenchmark.Stats.PairwiseComparison left, NBenchmark.Stats.PairwiseComparison right) -> bool
+static NBenchmark.Stats.Percentile.Compute(double[]! sorted, double p) -> double
+static NBenchmark.Stats.SampleGroup.operator !=(NBenchmark.Stats.SampleGroup left, NBenchmark.Stats.SampleGroup right) -> bool
+static NBenchmark.Stats.SampleGroup.operator ==(NBenchmark.Stats.SampleGroup left, NBenchmark.Stats.SampleGroup right) -> bool
+static NBenchmark.Stats.SampleQuality.BuildWarnings(double[]! rawArrivalOrder) -> System.Collections.Generic.IReadOnlyList<string!>!
+static NBenchmark.Stats.ShiftEstimate.operator !=(NBenchmark.Stats.ShiftEstimate left, NBenchmark.Stats.ShiftEstimate right) -> bool
+static NBenchmark.Stats.ShiftEstimate.operator ==(NBenchmark.Stats.ShiftEstimate left, NBenchmark.Stats.ShiftEstimate right) -> bool
+static NBenchmark.Stats.Significance.ApplyIfEnabled(System.Collections.Generic.List<NBenchmark.BenchmarkResult!>! results, System.Collections.Generic.Dictionary<string!, double[]!>! rawSamples, NBenchmark.MeasurementOptions! options) -> void
+static NBenchmark.Stats.Significance.ComputeSignificance(System.Collections.Generic.List<NBenchmark.BenchmarkResult!>! results, System.Collections.Generic.Dictionary<string!, double[]!>! rawSamples, NBenchmark.Stats.ISignificanceTest! test, double significanceLevel = 0.05, double? minimumPracticalEffect = null, double? minimumRelativeShift = null, double? minimumReportableDrift = null) -> void
+static NBenchmark.Stats.Significance.ComputeSignificance(System.Collections.Generic.List<NBenchmark.BenchmarkResult!>! results, System.Collections.Generic.Dictionary<string!, double[]!>! rawSamples, double significanceLevel = 0.05, double? minimumPracticalEffect = null, double? minimumRelativeShift = null, double? minimumReportableDrift = null) -> void
+static NBenchmark.Stats.SignificanceContext.operator !=(NBenchmark.Stats.SignificanceContext? left, NBenchmark.Stats.SignificanceContext? right) -> bool
+static NBenchmark.Stats.SignificanceContext.operator ==(NBenchmark.Stats.SignificanceContext? left, NBenchmark.Stats.SignificanceContext? right) -> bool
+static NBenchmark.Stats.SignificanceReport.operator !=(NBenchmark.Stats.SignificanceReport? left, NBenchmark.Stats.SignificanceReport? right) -> bool
+static NBenchmark.Stats.SignificanceReport.operator ==(NBenchmark.Stats.SignificanceReport? left, NBenchmark.Stats.SignificanceReport? right) -> bool
+static NBenchmark.Stats.StatsSummary.Compute(double[]! samples, double confidenceLevel = 0.95, System.Collections.Generic.IReadOnlyList<double>? reportedPercentiles = null, bool enableHistogram = true, int histogramBucketCount = 20, double[]? tailSource = null, NBenchmark.Stats.TrimContext? trim = null) -> NBenchmark.Stats.StatsSummary!
+static NBenchmark.Stats.StatsSummary.ComputeAllocations(long[]? samples) -> NBenchmark.Stats.AllocationStats
+static NBenchmark.Stats.StudentT.CriticalValue(double confidenceLevel, int degreesOfFreedom) -> double
+static NBenchmark.Stats.StudentT.InverseCdf(double p, int df) -> double
+static NBenchmark.Stats.StudentT.NormalQuantile(double p) -> double
+static NBenchmark.Stats.TrimContext.From(in NBenchmark.Stats.TrimResult trim) -> NBenchmark.Stats.TrimContext
+static NBenchmark.Stats.TrimContext.operator !=(NBenchmark.Stats.TrimContext left, NBenchmark.Stats.TrimContext right) -> bool
+static NBenchmark.Stats.TrimContext.operator ==(NBenchmark.Stats.TrimContext left, NBenchmark.Stats.TrimContext right) -> bool
+static NBenchmark.Stats.TrimResult.operator !=(NBenchmark.Stats.TrimResult left, NBenchmark.Stats.TrimResult right) -> bool
+static NBenchmark.Stats.TrimResult.operator ==(NBenchmark.Stats.TrimResult left, NBenchmark.Stats.TrimResult right) -> bool
+static NBenchmark.Stats.WinsorizedError.Compute(in NBenchmark.Stats.TrimContext context, double confidenceLevel) -> NBenchmark.Stats.WinsorizedSpread?
+static NBenchmark.Stats.WinsorizedSpread.operator !=(NBenchmark.Stats.WinsorizedSpread left, NBenchmark.Stats.WinsorizedSpread right) -> bool
+static NBenchmark.Stats.WinsorizedSpread.operator ==(NBenchmark.Stats.WinsorizedSpread left, NBenchmark.Stats.WinsorizedSpread right) -> bool
+static NBenchmark.Workers.TestMethodRunner.CanAddress(System.Reflection.MethodInfo! method, out string? refusal, NBenchmark.MeasurementOptions? options = null) -> bool
+static NBenchmark.Workers.TestMethodRunner.Measurement.operator !=(NBenchmark.Workers.TestMethodRunner.Measurement left, NBenchmark.Workers.TestMethodRunner.Measurement right) -> bool
+static NBenchmark.Workers.TestMethodRunner.Measurement.operator ==(NBenchmark.Workers.TestMethodRunner.Measurement left, NBenchmark.Workers.TestMethodRunner.Measurement right) -> bool
+static NBenchmark.Workers.TestMethodRunner.Outcome.operator !=(NBenchmark.Workers.TestMethodRunner.Outcome left, NBenchmark.Workers.TestMethodRunner.Outcome right) -> bool
+static NBenchmark.Workers.TestMethodRunner.Outcome.operator ==(NBenchmark.Workers.TestMethodRunner.Outcome left, NBenchmark.Workers.TestMethodRunner.Outcome right) -> bool
+static NBenchmark.Workers.TestMethodRunner.RunAsync(System.Collections.Generic.IReadOnlyList<NBenchmark.Workers.TestMethodRunner.Subject>! subjects, NBenchmark.MeasurementOptions! options, int launchCount, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), bool measureCalibration = false) -> System.Threading.Tasks.Task<NBenchmark.Workers.TestMethodRunner.Outcome>!
+static NBenchmark.Workers.TestMethodRunner.RunAsync(System.Reflection.MethodInfo! method, object?[]! arguments, string! displayName, NBenchmark.MeasurementOptions! options, int launchCount, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), bool measureCalibration = false) -> System.Threading.Tasks.Task<NBenchmark.Workers.TestMethodRunner.Outcome>!
+static NBenchmark.Workers.TestMethodRunner.Subject.operator !=(NBenchmark.Workers.TestMethodRunner.Subject left, NBenchmark.Workers.TestMethodRunner.Subject right) -> bool
+static NBenchmark.Workers.TestMethodRunner.Subject.operator ==(NBenchmark.Workers.TestMethodRunner.Subject left, NBenchmark.Workers.TestMethodRunner.Subject right) -> bool
+static readonly NBenchmark.AutoTuneOptions.Default -> NBenchmark.AutoTuneOptions!
+static readonly NBenchmark.AutoTuneOptions.Quick -> NBenchmark.AutoTuneOptions!
+static readonly NBenchmark.AutoTuneOptions.Thorough -> NBenchmark.AutoTuneOptions!
+static readonly NBenchmark.DiagnosticsOptions.All -> NBenchmark.DiagnosticsOptions!
+static readonly NBenchmark.DiagnosticsOptions.Default -> NBenchmark.DiagnosticsOptions!
+static readonly NBenchmark.DiagnosticsOptions.None -> NBenchmark.DiagnosticsOptions!
+static readonly NBenchmark.DriftCanaryOptions.Default -> NBenchmark.DriftCanaryOptions!
+static readonly NBenchmark.DriftCanaryOptions.Disabled -> NBenchmark.DriftCanaryOptions!
+static readonly NBenchmark.EnvironmentOptions.Default -> NBenchmark.EnvironmentOptions!
+static readonly NBenchmark.InterferenceOptions.Default -> NBenchmark.InterferenceOptions!
+static readonly NBenchmark.InterferenceOptions.Disabled -> NBenchmark.InterferenceOptions!
+static readonly NBenchmark.MeasurementOptions.Default -> NBenchmark.MeasurementOptions!
+static readonly NBenchmark.NullBenchmarkProgress.Instance -> NBenchmark.NullBenchmarkProgress!
+static readonly NBenchmark.NullMeasurementObserver.Instance -> NBenchmark.NullMeasurementObserver!
+static readonly NBenchmark.RuntimeProfile.Host -> NBenchmark.RuntimeProfile!
+static readonly NBenchmark.RuntimeProfile.Production -> NBenchmark.RuntimeProfile!
+static readonly NBenchmark.RuntimeProfile.ServerGc -> NBenchmark.RuntimeProfile!
+static readonly NBenchmark.RuntimeProfile.SteadyState -> NBenchmark.RuntimeProfile!
+static readonly NBenchmark.Stats.DefaultSignificanceTest.Instance -> NBenchmark.Stats.DefaultSignificanceTest!
+static readonly NBenchmark.Stats.KruskalWallisSignificanceTest.Instance -> NBenchmark.Stats.KruskalWallisSignificanceTest!
+static readonly NBenchmark.Stats.MannWhitneyUSignificanceTest.Instance -> NBenchmark.Stats.MannWhitneyUSignificanceTest!
+static readonly NBenchmark.Stats.SignificanceReport.Empty -> NBenchmark.Stats.SignificanceReport!
+virtual NBenchmark.BenchmarkResult.<Clone>$() -> NBenchmark.BenchmarkResult!
+virtual NBenchmark.BenchmarkResult.EqualityContract.get -> System.Type!
+virtual NBenchmark.BenchmarkResult.Equals(NBenchmark.BenchmarkResult? other) -> bool
+virtual NBenchmark.BenchmarkResult.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual NBenchmark.BenchmarkRow.<Clone>$() -> NBenchmark.BenchmarkRow!
+virtual NBenchmark.BenchmarkRow.EqualityContract.get -> System.Type!
+virtual NBenchmark.BenchmarkRow.Equals(NBenchmark.BenchmarkRow? other) -> bool
+virtual NBenchmark.BenchmarkRow.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual NBenchmark.EnvironmentOptions.<Clone>$() -> NBenchmark.EnvironmentOptions!
+virtual NBenchmark.EnvironmentOptions.EqualityContract.get -> System.Type!
+virtual NBenchmark.EnvironmentOptions.Equals(NBenchmark.EnvironmentOptions? other) -> bool
+virtual NBenchmark.EnvironmentOptions.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual NBenchmark.MeasurementOptions.<Clone>$() -> NBenchmark.MeasurementOptions!
+virtual NBenchmark.MeasurementOptions.EqualityContract.get -> System.Type!
+virtual NBenchmark.MeasurementOptions.Equals(NBenchmark.MeasurementOptions? other) -> bool
+virtual NBenchmark.MeasurementOptions.PrintMembers(System.Text.StringBuilder! builder) -> bool
+~override NBenchmark.DetectorStateEvent.Equals(object obj) -> bool
+~override NBenchmark.DetectorStateEvent.ToString() -> string
+~override NBenchmark.Engine.HostAssessment.Equals(object obj) -> bool
+~override NBenchmark.Engine.HostAssessment.ToString() -> string
+~override NBenchmark.Engine.RunSpec.Equals(object obj) -> bool
+~override NBenchmark.Engine.RunSpec.ToString() -> string
+~override NBenchmark.HistogramBucket.Equals(object obj) -> bool
+~override NBenchmark.HistogramBucket.ToString() -> string
+~override NBenchmark.MeasurementEvent.Equals(object obj) -> bool
+~override NBenchmark.MeasurementEvent.ToString() -> string
+~override NBenchmark.MeasurementPhaseEvent.Equals(object obj) -> bool
+~override NBenchmark.MeasurementPhaseEvent.ToString() -> string
+~override NBenchmark.PercentileEntry.Equals(object obj) -> bool
+~override NBenchmark.PercentileEntry.ToString() -> string
+~override NBenchmark.SampleEvent.Equals(object obj) -> bool
+~override NBenchmark.SampleEvent.ToString() -> string
+~override NBenchmark.Stats.AllocationStats.Equals(object obj) -> bool
+~override NBenchmark.Stats.AllocationStats.ToString() -> string
+~override NBenchmark.Stats.EffectSize.Equals(object obj) -> bool
+~override NBenchmark.Stats.EffectSize.ToString() -> string
+~override NBenchmark.Stats.KruskalWallisResult.Equals(object obj) -> bool
+~override NBenchmark.Stats.KruskalWallisResult.ToString() -> string
+~override NBenchmark.Stats.MannWhitneyUResult.Equals(object obj) -> bool
+~override NBenchmark.Stats.MannWhitneyUResult.ToString() -> string
+~override NBenchmark.Stats.PairwiseComparison.Equals(object obj) -> bool
+~override NBenchmark.Stats.PairwiseComparison.ToString() -> string
+~override NBenchmark.Stats.SampleGroup.Equals(object obj) -> bool
+~override NBenchmark.Stats.SampleGroup.ToString() -> string
+~override NBenchmark.Stats.ShiftEstimate.Equals(object obj) -> bool
+~override NBenchmark.Stats.ShiftEstimate.ToString() -> string
+~override NBenchmark.Stats.TrimContext.Equals(object obj) -> bool
+~override NBenchmark.Stats.TrimContext.ToString() -> string
+~override NBenchmark.Stats.TrimResult.Equals(object obj) -> bool
+~override NBenchmark.Stats.TrimResult.ToString() -> string
+~override NBenchmark.Stats.WinsorizedSpread.Equals(object obj) -> bool
+~override NBenchmark.Stats.WinsorizedSpread.ToString() -> string
+~override NBenchmark.Workers.TestMethodRunner.Measurement.Equals(object obj) -> bool
+~override NBenchmark.Workers.TestMethodRunner.Measurement.ToString() -> string
+~override NBenchmark.Workers.TestMethodRunner.Outcome.Equals(object obj) -> bool
+~override NBenchmark.Workers.TestMethodRunner.Outcome.ToString() -> string
+~override NBenchmark.Workers.TestMethodRunner.Subject.Equals(object obj) -> bool
+~override NBenchmark.Workers.TestMethodRunner.Subject.ToString() -> string

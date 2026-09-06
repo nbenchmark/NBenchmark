@@ -48,4 +48,23 @@
           Condition="'@(NBenchmarkWorkerFile)' != ''"/>
   </Target>
 
+  <!--
+    Set here rather than in Directory.Build.props: that file is imported before the csproj sets
+    IsShippingLibrary, and MSBuild evaluates properties in import order, so a condition on it
+    there is always false. Item conditions are evaluated in a later pass, which is why the
+    AdditionalFiles in Directory.Build.props do work.
+  -->
+  <PropertyGroup Condition="'$(IsShippingLibrary)' == 'true'">
+    <!--
+      RS0026 and RS0027 police overload sets where more than one member has optional parameters,
+      because adding a parameter to one of them later is a source-breaking change. NBenchmark is
+      built out of exactly that shape - `Benchmark.Run`, `BenchmarkSuite.Add` and their async and
+      generic siblings are 148 such overloads, each ending in the same optional
+      options/name/progress/cancellation tail - and collapsing them would mean spelling out
+      `MeasurementOptions` at every call site. The manifest is what protects compatibility here,
+      and the manifest is reviewed.
+    -->
+    <NoWarn>$(NoWarn);RS0026;RS0027</NoWarn>
+  </PropertyGroup>
+
 </Project>

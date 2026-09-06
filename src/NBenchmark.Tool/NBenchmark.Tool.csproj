@@ -4,6 +4,10 @@
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <RootNamespace>NBenchmark.Tool</RootNamespace>
+
+    <!-- Packed as a global tool. No public API manifest: the tool's contract is its
+         command line, not its types. -->
+    <IsPackable>true</IsPackable>
     <AssemblyName>nbenchmark-tool</AssemblyName>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>benchmark</ToolCommandName>
@@ -16,5 +20,8 @@
     <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
     <ProjectReference Include="..\NBenchmark.Reporters.Console\NBenchmark.Reporters.Console.csproj"/>
   </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, XML docs. -->
+  <Import Project="../../Release.props"/>
 
 </Project>

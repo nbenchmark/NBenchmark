@@ -1,0 +1,59 @@
+<!--
+  Shared package metadata for anything this repository publishes to nuget.org. Imported
+  explicitly by each shipping csproj rather than applied to every project from
+  Directory.Build.props, so a sample or a test project never evaluates packaging properties it
+  has no use for.
+
+  The version is not set here. VersionPrefix in Directory.Build.props is the local placeholder;
+  the release workflow supplies the real one at pack time from the tag.
+-->
+<Project>
+
+  <PropertyGroup>
+    <Authors>NBenchmark</Authors>
+    <Company>NBenchmark</Company>
+    <Copyright>Copyright (c) 2026 NBenchmark</Copyright>
+
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://www.nbenchmark.net</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
+
+    <!--
+      Repository metadata and source link. PublishRepositoryUrl puts the clone URL in the nupkg
+      and EmbedUntrackedSources carries generated sources into the symbol package;
+      ContinuousIntegrationBuild is what actually makes the build reproducible, by normalising
+      the embedded source paths. Without it a source-linked build is only nominally reproducible.
+    -->
+    <RepositoryUrl>https://github.com/nbenchmark/nbenchmark.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!--
+      Without this no NBenchmark.xml is produced, so none is packed, and every XML doc comment in
+      the repository is invisible in a consumer's IntelliSense. CS1591 (missing doc comment on a
+      public member) and CS1573 (a documented member with an undocumented parameter) stay
+      warnings rather than errors: together they are the inventory of what still needs
+      documenting before 1.0, not a reason nobody can build. Every other doc diagnostic - an
+      unresolvable cref, a paramref naming nothing, an ambiguous overload reference - is a
+      broken link in shipped IntelliSense and stays an error.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1591;CS1573</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath=""/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- PrivateAssets keeps it out of the consumer's dependency graph; it only affects what the
+         pack emits, not what a consumer restores. -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
+  </ItemGroup>
+
+</Project>

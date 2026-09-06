@@ -1,0 +1,64 @@
+#nullable enable
+NBenchmark.Integration.MSTest.PerformanceAssert
+NBenchmark.Integration.MSTest.PerformanceAssertException
+NBenchmark.Integration.MSTest.PerformanceAssertException.PerformanceAssertException(string! message) -> void
+NBenchmark.Integration.MSTest.PerformanceAssertException.PerformanceAssertException(string! message, System.Exception! innerException) -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.ConfidenceLevel.get -> double
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.ConfidenceLevel.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.Iterations.get -> int
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.Iterations.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxAbsoluteThresholdTolerance.get -> double
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxAbsoluteThresholdTolerance.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxAllocatedBytes.get -> long
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxAllocatedBytes.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxMeanNs.get -> double
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxMeanNs.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxP95Ns.get -> double
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxP95Ns.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxSlowdownRatio.get -> double
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MaxSlowdownRatio.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MeasureAllocations.get -> bool
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.MeasureAllocations.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.OutlierMode.get -> NBenchmark.OutlierMode
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.OutlierMode.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.PerformanceAssertionOptions() -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.ReferenceMethod.get -> string?
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.ReferenceMethod.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.RequireIsolation.get -> bool
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.RequireIsolation.init -> void
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.WarmupIterations.get -> int
+NBenchmark.Integration.MSTest.PerformanceAssertionOptions.WarmupIterations.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.ConfidenceLevel.get -> double
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.ConfidenceLevel.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.Iterations.get -> int
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.Iterations.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.LaunchCount.get -> int
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.LaunchCount.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxAbsoluteThresholdTolerance.get -> double
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxAbsoluteThresholdTolerance.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxAllocatedBytes.get -> long
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxAllocatedBytes.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxMeanNs.get -> double
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxMeanNs.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxP95Ns.get -> double
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxP95Ns.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxSlowdownRatio.get -> double
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MaxSlowdownRatio.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MeasureAllocations.get -> bool
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.MeasureAllocations.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.OutlierMode.get -> NBenchmark.OutlierMode
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.OutlierMode.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.PerformanceTestMethodAttribute(string! callerFilePath = "", int callerLineNumber = -1) -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.ReferenceMethod.get -> string?
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.ReferenceMethod.init -> void
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.WarmupIterations.get -> int
+NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.WarmupIterations.init -> void
+override NBenchmark.Integration.MSTest.PerformanceTestMethodAttribute.ExecuteAsync(Microsoft.VisualStudio.TestTools.UnitTesting.ITestMethod! testMethod) -> System.Threading.Tasks.Task<Microsoft.VisualStudio.TestTools.UnitTesting.TestResult![]!>!
+static NBenchmark.Integration.MSTest.PerformanceAssert.Run(System.Action! action, NBenchmark.Integration.MSTest.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Integration.MSTest.PerformanceAssert.Run<T>(System.Func<T>! action, NBenchmark.Integration.MSTest.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Integration.MSTest.PerformanceAssert.RunAsync(System.Func<System.Threading.Tasks.Task!>! action, NBenchmark.Integration.MSTest.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Integration.MSTest.PerformanceAssert.RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>!>! action, NBenchmark.Integration.MSTest.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Integration.MSTest.PerformanceAssert.Validate(NBenchmark.BenchmarkResult! result, NBenchmark.Integration.MSTest.PerformanceAssertionOptions? options = null) -> void
+static NBenchmark.Integration.MSTest.PerformanceAssert.Validate(NBenchmark.BenchmarkResult! result, double[]! rawSamples, NBenchmark.Integration.MSTest.PerformanceAssertionOptions? options = null) -> void

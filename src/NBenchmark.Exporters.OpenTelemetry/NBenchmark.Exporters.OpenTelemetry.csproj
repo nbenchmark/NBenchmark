@@ -3,6 +3,10 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <RootNamespace>NBenchmark.Exporters.OpenTelemetry</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <IsShippingLibrary>true</IsShippingLibrary>
+
     <PackageId>NBenchmark.Exporters.OpenTelemetry</PackageId>
     <Description>Exports NBenchmark's measurement telemetry over OTLP to any OpenTelemetry collector, from the harness and from every isolated worker process.</Description>
     <PackageTags>benchmark;performance;opentelemetry;otlp;telemetry;tracing;metrics</PackageTags>
@@ -14,7 +18,6 @@
   <ItemGroup>
     <PackageReference Include="OpenTelemetry"/>
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol"/>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
   </ItemGroup>
 
   <ItemGroup>
@@ -24,5 +27,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="NBenchmark.Exporters.OpenTelemetry.Tests"/>
   </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, XML docs. -->
+  <Import Project="../../Release.props"/>
 
 </Project>

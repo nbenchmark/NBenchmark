@@ -1,0 +1,66 @@
+#nullable enable
+NBenchmark.Integration.NUnit.PerformanceAssert
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ConfidenceLevel.get -> double
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ConfidenceLevel.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Iterations.get -> int
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Iterations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAbsoluteThresholdTolerance.get -> double
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAbsoluteThresholdTolerance.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAllocatedBytes.get -> long
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAllocatedBytes.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxMeanNs.get -> double
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxMeanNs.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxP95Ns.get -> double
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxP95Ns.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxSlowdownRatio.get -> double
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxSlowdownRatio.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MeasureAllocations.get -> bool
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MeasureAllocations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.OutlierMode.get -> NBenchmark.OutlierMode
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.OutlierMode.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.PerformanceAssertionOptions() -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ReferenceMethod.get -> string?
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ReferenceMethod.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.RequireIsolation.get -> bool
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.RequireIsolation.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.WarmupIterations.get -> int
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.WarmupIterations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute
+NBenchmark.Integration.NUnit.PerformanceAttribute.ApplyToTest(NUnit.Framework.Internal.Test! test) -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.BuildFrom(NUnit.Framework.Interfaces.IMethodInfo! method, NUnit.Framework.Internal.Test? suite) -> NUnit.Framework.Internal.TestMethod!
+NBenchmark.Integration.NUnit.PerformanceAttribute.ConfidenceLevel.get -> double
+NBenchmark.Integration.NUnit.PerformanceAttribute.ConfidenceLevel.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.Iterations.get -> int
+NBenchmark.Integration.NUnit.PerformanceAttribute.Iterations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.LaunchCount.get -> int
+NBenchmark.Integration.NUnit.PerformanceAttribute.LaunchCount.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxAbsoluteThresholdTolerance.get -> double
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxAbsoluteThresholdTolerance.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxAllocatedBytes.get -> long
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxAllocatedBytes.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxMeanNs.get -> double
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxMeanNs.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxP95Ns.get -> double
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxP95Ns.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxSlowdownRatio.get -> double
+NBenchmark.Integration.NUnit.PerformanceAttribute.MaxSlowdownRatio.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.MeasureAllocations.get -> bool
+NBenchmark.Integration.NUnit.PerformanceAttribute.MeasureAllocations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.OutlierMode.get -> NBenchmark.OutlierMode
+NBenchmark.Integration.NUnit.PerformanceAttribute.OutlierMode.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.PerformanceAttribute() -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.ReferenceMethod.get -> string?
+NBenchmark.Integration.NUnit.PerformanceAttribute.ReferenceMethod.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.WarmupIterations.get -> int
+NBenchmark.Integration.NUnit.PerformanceAttribute.WarmupIterations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.Wrap(NUnit.Framework.Internal.Commands.TestCommand! command) -> NUnit.Framework.Internal.Commands.TestCommand!
+NBenchmark.Integration.NUnit.PerformanceCommand
+NBenchmark.Integration.NUnit.PerformanceCommand.PerformanceCommand(NUnit.Framework.Internal.Commands.TestCommand! innerCommand, NBenchmark.Integration.NUnit.PerformanceAttribute! attribute) -> void
+override NBenchmark.Integration.NUnit.PerformanceCommand.Execute(NUnit.Framework.Internal.TestExecutionContext! context) -> NUnit.Framework.Internal.TestResult!
+static NBenchmark.Integration.NUnit.PerformanceAssert.Run(System.Action! action, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Integration.NUnit.PerformanceAssert.Run<T>(System.Func<T>! action, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> NBenchmark.BenchmarkResult!
+static NBenchmark.Integration.NUnit.PerformanceAssert.RunAsync(System.Func<System.Threading.Tasks.Task!>! action, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Integration.NUnit.PerformanceAssert.RunAsync<T>(System.Func<System.Threading.Tasks.Task<T>!>! action, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null, string! name = "Benchmark", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Integration.NUnit.PerformanceAssert.Validate(NBenchmark.BenchmarkResult! result, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null) -> void
+static NBenchmark.Integration.NUnit.PerformanceAssert.Validate(NBenchmark.BenchmarkResult! result, double[]! rawSamples, NBenchmark.Integration.NUnit.PerformanceAssertionOptions? options = null) -> void

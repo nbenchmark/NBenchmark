@@ -52,7 +52,7 @@ docs/                                   Documentation site
 
 - One logical change per PR
 - Include tests for bug fixes and new features
-- Keep public API changes minimal and documented
+- Keep public API changes minimal and documented. A change to a shipping library's public surface fails the build until you add it to that project's `PublicAPI.Unshipped.txt`, and a new or re-severity-ed analyzer rule fails until you add a row to `src/NBenchmark.Analyzers/AnalyzerReleases.Unshipped.md` - both diffs are part of the review.
 - Follow the existing code style - the repo uses an `.editorconfig`
 
 ## Reporting Issues

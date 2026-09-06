@@ -1,0 +1,81 @@
+#nullable enable
+NBenchmark.Integration.xUnit.PerformanceAssertException
+NBenchmark.Integration.xUnit.PerformanceAssertException.PerformanceAssertException(string! message) -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.ConfidenceLevel.get -> double
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.ConfidenceLevel.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.Iterations.get -> int
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.Iterations.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.LaunchCount.get -> int
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.LaunchCount.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxAbsoluteThresholdTolerance.get -> double
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxAbsoluteThresholdTolerance.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxAllocatedBytes.get -> long
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxAllocatedBytes.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxMeanNs.get -> double
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxMeanNs.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxP95Ns.get -> double
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxP95Ns.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxSlowdownRatio.get -> double
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MaxSlowdownRatio.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MeasureAllocations.get -> bool
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.MeasureAllocations.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.OutlierMode.get -> NBenchmark.OutlierMode
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.OutlierMode.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.PerformanceFactAttribute() -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.ReferenceMethod.get -> string?
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.ReferenceMethod.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.WarmupIterations.get -> int
+NBenchmark.Integration.xUnit.PerformanceFactAttribute.WarmupIterations.init -> void
+NBenchmark.Integration.xUnit.PerformanceFactDiscoverer
+NBenchmark.Integration.xUnit.PerformanceFactDiscoverer.Discover(Xunit.Abstractions.ITestFrameworkDiscoveryOptions! discoveryOptions, Xunit.Abstractions.ITestMethod! testMethod, Xunit.Abstractions.IAttributeInfo! factAttribute) -> System.Collections.Generic.IEnumerable<Xunit.Sdk.IXunitTestCase!>!
+NBenchmark.Integration.xUnit.PerformanceFactDiscoverer.PerformanceFactDiscoverer(Xunit.Abstractions.IMessageSink! diagnosticMessageSink) -> void
+NBenchmark.Integration.xUnit.PerformanceTestCase
+NBenchmark.Integration.xUnit.PerformanceTestCase.PerformanceTestCase() -> void
+NBenchmark.Integration.xUnit.PerformanceTestData
+NBenchmark.Integration.xUnit.PerformanceTestData.ConfidenceLevel.get -> double
+NBenchmark.Integration.xUnit.PerformanceTestData.Deserialize(Xunit.Abstractions.IXunitSerializationInfo! info) -> void
+NBenchmark.Integration.xUnit.PerformanceTestData.Iterations.get -> int
+NBenchmark.Integration.xUnit.PerformanceTestData.LaunchCount.get -> int
+NBenchmark.Integration.xUnit.PerformanceTestData.MaxAbsoluteThresholdTolerance.get -> double
+NBenchmark.Integration.xUnit.PerformanceTestData.MaxAllocatedBytes.get -> long
+NBenchmark.Integration.xUnit.PerformanceTestData.MaxMeanNs.get -> double
+NBenchmark.Integration.xUnit.PerformanceTestData.MaxP95Ns.get -> double
+NBenchmark.Integration.xUnit.PerformanceTestData.MaxSlowdownRatio.get -> double
+NBenchmark.Integration.xUnit.PerformanceTestData.MeasureAllocations.get -> bool
+NBenchmark.Integration.xUnit.PerformanceTestData.OutlierMode.get -> NBenchmark.OutlierMode
+NBenchmark.Integration.xUnit.PerformanceTestData.PerformanceTestData() -> void
+NBenchmark.Integration.xUnit.PerformanceTestData.ReferenceMethod.get -> string?
+NBenchmark.Integration.xUnit.PerformanceTestData.RequireIsolation.get -> bool
+NBenchmark.Integration.xUnit.PerformanceTestData.Serialize(Xunit.Abstractions.IXunitSerializationInfo! info) -> void
+NBenchmark.Integration.xUnit.PerformanceTestData.WarmupIterations.get -> int
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.ConfidenceLevel.get -> double
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.ConfidenceLevel.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.Iterations.get -> int
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.Iterations.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.LaunchCount.get -> int
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.LaunchCount.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxAbsoluteThresholdTolerance.get -> double
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxAbsoluteThresholdTolerance.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxAllocatedBytes.get -> long
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxAllocatedBytes.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxMeanNs.get -> double
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxMeanNs.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxP95Ns.get -> double
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxP95Ns.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxSlowdownRatio.get -> double
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MaxSlowdownRatio.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MeasureAllocations.get -> bool
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.MeasureAllocations.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.OutlierMode.get -> NBenchmark.OutlierMode
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.OutlierMode.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.PerformanceTheoryAttribute() -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.ReferenceMethod.get -> string?
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.ReferenceMethod.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.WarmupIterations.get -> int
+NBenchmark.Integration.xUnit.PerformanceTheoryAttribute.WarmupIterations.init -> void
+NBenchmark.Integration.xUnit.PerformanceTheoryDiscoverer
+NBenchmark.Integration.xUnit.PerformanceTheoryDiscoverer.PerformanceTheoryDiscoverer(Xunit.Abstractions.IMessageSink! diagnosticMessageSink) -> void
+override NBenchmark.Integration.xUnit.PerformanceTestCase.Deserialize(Xunit.Abstractions.IXunitSerializationInfo! info) -> void
+override NBenchmark.Integration.xUnit.PerformanceTestCase.Serialize(Xunit.Abstractions.IXunitSerializationInfo! info) -> void

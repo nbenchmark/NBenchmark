@@ -3,6 +3,10 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <RootNamespace>NBenchmark</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <IsShippingLibrary>true</IsShippingLibrary>
+
     <PackageId>NBenchmark</PackageId>
     <Description>NBenchmark is the easiest way to measure the speed of your .NET code. With zero setup and a focus on simplicity, you can go from installation to your first accurate benchmark in seconds - perfect for quick checks and full performance suites alike.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -42,7 +46,6 @@
 
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath=""/>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
   </ItemGroup>
 
   <ItemGroup>
@@ -108,5 +111,8 @@
     <Error Condition="!Exists('$(_NBenchmarkWorkerOutput)NBenchmark.dll')"
            Text="The measurement worker's copy of NBenchmark.dll is missing from '$(_NBenchmarkWorkerOutput)'. nbworker cannot start without it, so packing would ship a worker that dies before its handshake."/>
   </Target>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, XML docs. -->
+  <Import Project="../../Release.props"/>
 
 </Project>

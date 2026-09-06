@@ -3,6 +3,10 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <RootNamespace>NBenchmark.Integration.xUnit</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <IsShippingLibrary>true</IsShippingLibrary>
+
     <PackageId>NBenchmark.Integration.xUnit</PackageId>
     <Description>Run NBenchmark benchmarks as xUnit tests with configurable performance thresholds.</Description>
     <PackageTags>benchmark;performance;xunit;integration;microbenchmark</PackageTags>
@@ -11,7 +15,6 @@
   <ItemGroup>
     <PackageReference Include="xunit.extensibility.core"/>
     <PackageReference Include="xunit.extensibility.execution"/>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
   </ItemGroup>
 
   <ItemGroup>
@@ -22,5 +25,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="NBenchmark.Integration.xUnit.Tests"/>
   </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, XML docs. -->
+  <Import Project="../../Release.props"/>
 
 </Project>

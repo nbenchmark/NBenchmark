@@ -10,7 +10,7 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <DevelopmentDependency>true</DevelopmentDependency>
     <LangVersion>12</LangVersion>
-    <NoWarn>$(NoWarn);RS2008;CS1591</NoWarn>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +20,16 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="NBenchmark.Analyzers.Tests"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The analyzer release manifest is to a set of diagnostics what PublicAPI.Shipped.txt is to a
+      set of members: adding, renaming or re-severity-ing a rule is a reviewed diff. RS2008 used to
+      be suppressed in three csproj files instead.
+    -->
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md"/>
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md"/>
   </ItemGroup>
 
 </Project>

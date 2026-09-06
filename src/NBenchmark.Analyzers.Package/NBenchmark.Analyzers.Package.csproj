@@ -4,7 +4,6 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsPackable>true</IsPackable>
     <RootNamespace>NBenchmark.Analyzers.Package</RootNamespace>
     <LangVersion>12</LangVersion>
@@ -14,20 +13,12 @@
     <Title>NBenchmark Analyzers</Title>
     <Description>NBenchmark analyzers and code fixes for detecting and resolving common benchmark configuration issues at compile time</Description>
     <PackageTags>analyzers;roslyn;nbenchmark;codefixes;diagnostics;benchmark</PackageTags>
-    <Authors>NBenchmark</Authors>
-    <Copyright>Copyright (c) NBenchmark</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
     <!-- Analyzer Configuration -->
     <DevelopmentDependency>true</DevelopmentDependency>
-    <IncludeSymbols>false</IncludeSymbols>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-    <NoWarn>$(NoWarn);RS2008;NU5128</NoWarn>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1591</WarningsNotAsErrors>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
 
   <!-- Project references for analyzer and code fixes -->
@@ -52,6 +43,15 @@
   <PropertyGroup>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeAnalyzersInPackage</TargetsForTfmSpecificContentInPackage>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, XML docs. -->
+  <Import Project="../../Release.props"/>
+
+  <PropertyGroup>
+    <!-- After the import, because Release.props turns symbols on for a normal library. There is
+         no build output here to symbolicate: the analyzer assemblies arrive as content. -->
+    <IncludeSymbols>false</IncludeSymbols>
   </PropertyGroup>
 
 </Project>

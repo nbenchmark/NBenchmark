@@ -3,6 +3,10 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <RootNamespace>NBenchmark.DependencyInjection</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <IsShippingLibrary>true</IsShippingLibrary>
+
     <PackageId>NBenchmark.DependencyInjection</PackageId>
     <Description>Resolves benchmark classes from an IServiceProvider so they can have constructor dependencies.</Description>
     <PackageTags>benchmark;performance;dependency-injection;di</PackageTags>
@@ -10,11 +14,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions"/>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all"/>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
   </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, XML docs. -->
+  <Import Project="../../Release.props"/>
 
 </Project>
