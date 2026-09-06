@@ -18,6 +18,7 @@
   <ItemGroup>
     <PackageReference Include="OpenTelemetry"/>
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol"/>
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" />
   </ItemGroup>
 
   <ItemGroup>
