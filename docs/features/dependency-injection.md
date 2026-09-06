@@ -24,7 +24,7 @@ The companion package adds `Microsoft.Extensions.DependencyInjection.Abstraction
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Reporters.Console;
 using NBenchmark.DependencyInjection;
 

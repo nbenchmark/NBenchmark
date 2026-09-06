@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Discovery;
 using NBenchmark.Tests.ErrorFixtures;
 using Xunit;
@@ -11,7 +11,7 @@ namespace NBenchmark.Tests.Discovery;
 /// <remarks>
 ///     <para>
 ///         Discovery reads attributes, which reads as a pure operation - but a
-///         <c>[BenchmarkCases]</c> source is user code, and discovery invokes it. So a whole-assembly
+///         <c>[ArgumentsSource]</c> source is user code, and discovery invokes it. So a whole-assembly
 ///         pass has every class's side effects, and a worker measuring one class per group ran all of
 ///         them, once per group, to use one.
 ///     </para>
@@ -132,7 +132,7 @@ internal static class CountingCaseSources
 
 public class FirstCountedBenchmarks
 {
-    [BenchmarkCases(nameof(Cases))]
+    [ArgumentsSource(nameof(Cases))]
     [Benchmark]
     public int Compute(int n) => n;
 
@@ -146,7 +146,7 @@ public class FirstCountedBenchmarks
 
 public class SecondCountedBenchmarks
 {
-    [BenchmarkCases(nameof(Cases))]
+    [ArgumentsSource(nameof(Cases))]
     [Benchmark]
     public int Compute(int n) => n;
 

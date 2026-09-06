@@ -13,12 +13,12 @@ public class LaunchAggregatorTests
         {
             new()
             {
-                Name = "test", Mean = 100, Median = 95, StandardDeviation = 10,
-                Percentiles = [], Min = 80, Max = 130, N = 100,
-                Q1 = 90, Q3 = 105, InterquartileRange = 15,
-                OutliersRemoved = 0, Skewness = 0.5, Kurtosis = 3, Mad = 8,
-                AllocMedian = null, AllocP95 = null, AllocMax = null,
-                MeasuredIterations = 100, TotalDuration = TimeSpan.FromSeconds(1),
+                Name = "test", MeanNs = 100, MedianNs = 95, StandardDeviationNs = 10,
+                Percentiles = [], MinNs = 80, MaxNs = 130, SampleCount = 100,
+                Q1Ns = 90, Q3Ns = 105, InterquartileRangeNs = 15,
+                OutliersRemoved = 0, Skewness = 0.5, Kurtosis = 3, MedianAbsoluteDeviationNs = 8,
+                AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
+ TotalDuration = TimeSpan.FromSeconds(1),
             },
         };
 
@@ -109,9 +109,9 @@ public class LaunchAggregatorTests
         // per-sample stddev of 20 ns. SE = 20 / sqrt(10000) = 0.2 ns.
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", 100, 100, 20, 10_000) with { StandardError = 0.2 },
-            CreateResult("test", 110, 110, 20, 10_000) with { StandardError = 0.2 },
-            CreateResult("test", 120, 120, 20, 10_000) with { StandardError = 0.2 },
+            CreateResult("test", 100, 100, 20, 10_000) with { StandardErrorNs = 0.2 },
+            CreateResult("test", 110, 110, 20, 10_000) with { StandardErrorNs = 0.2 },
+            CreateResult("test", 120, 120, 20, 10_000) with { StandardErrorNs = 0.2 },
         };
 
         var stats = LaunchAggregator.Aggregate(results);
@@ -142,9 +142,9 @@ public class LaunchAggregatorTests
 
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", 100.0, 100.0, 2, 30) with { StandardError = standardError },
-            CreateResult("test", 100.4, 100.4, 2, 30) with { StandardError = standardError },
-            CreateResult("test", 100.8, 100.8, 2, 30) with { StandardError = standardError },
+            CreateResult("test", 100.0, 100.0, 2, 30) with { StandardErrorNs = standardError },
+            CreateResult("test", 100.4, 100.4, 2, 30) with { StandardErrorNs = standardError },
+            CreateResult("test", 100.8, 100.8, 2, 30) with { StandardErrorNs = standardError },
         };
 
         var stats = LaunchAggregator.Aggregate(results);
@@ -176,7 +176,7 @@ public class LaunchAggregatorTests
     {
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", 100, 100, 20, 10_000) with { StandardError = 0.2 },
+            CreateResult("test", 100, 100, 20, 10_000) with { StandardErrorNs = 0.2 },
         };
 
         var stats = LaunchAggregator.Aggregate(results);
@@ -196,9 +196,9 @@ public class LaunchAggregatorTests
     {
         var results = new List<BenchmarkResult>
         {
-            CreateResult("test", 100, 100, 20, 10_000) with { StandardError = 0.2 },
-            CreateResult("test", 110, 110, 20, 10_000) with { StandardError = 0.2 },
-            CreateResult("test", 120, 120, 20, 10_000) with { StandardError = 0.2 },
+            CreateResult("test", 100, 100, 20, 10_000) with { StandardErrorNs = 0.2 },
+            CreateResult("test", 110, 110, 20, 10_000) with { StandardErrorNs = 0.2 },
+            CreateResult("test", 120, 120, 20, 10_000) with { StandardErrorNs = 0.2 },
         };
 
         var warning = LaunchAggregator.DescribeReproducibility(LaunchAggregator.Aggregate(results));
@@ -311,15 +311,15 @@ public class LaunchAggregatorTests
             Launch(CreateResult("test", 120, 122, 10, 100)),
         ]);
 
-        Assert.Equal(110, combined.Median, 6);
-        Assert.Equal(112, combined.Mean, 6);
+        Assert.Equal(110, combined.MedianNs, 6);
+        Assert.Equal(112, combined.MeanNs, 6);
 
         // Not the fastest launch, which is what this replaced.
-        Assert.NotEqual(100, combined.Median);
+        Assert.NotEqual(100, combined.MedianNs);
     }
 
     /// <summary>
-    ///     Counts and durations are totals - the run really did measure that many iterations over that
+    ///     Counts and durations are totals - the run really did measure that many samples over that
     ///     much wall clock - while the extremes span everything observed.
     /// </summary>
     [Fact]
@@ -333,12 +333,12 @@ public class LaunchAggregatorTests
 
         var combined = LaunchAggregator.Combine(launches);
 
-        Assert.Equal(300, combined.N);
-        Assert.Equal(300, combined.MeasuredIterations);
+        Assert.Equal(300, combined.SampleCount);
+        Assert.Equal(300, combined.SampleCount);
         Assert.Equal(TimeSpan.FromSeconds(2), combined.TotalDuration);
 
-        Assert.Equal(launches.Min(l => l.Result.Min), combined.Min);
-        Assert.Equal(launches.Max(l => l.Result.Max), combined.Max);
+        Assert.Equal(launches.Min(l => l.Result.MinNs), combined.MinNs);
+        Assert.Equal(launches.Max(l => l.Result.MaxNs), combined.MaxNs);
     }
 
     /// <summary>
@@ -360,12 +360,12 @@ public class LaunchAggregatorTests
         var combined = LaunchAggregator.Combine(launches);
         var statistics = LaunchAggregator.Aggregate(launches.Select(l => l.Result).ToList());
 
-        Assert.Equal(statistics.LaunchStandardDeviation / Math.Sqrt(3), combined.StandardError, 6);
+        Assert.Equal(statistics.LaunchStandardDeviation / Math.Sqrt(3), combined.StandardErrorNs, 6);
 
         // Far larger than any launch's own 0.1 ns spread would imply - which is the point.
         Assert.True(
-            combined.MarginOfError > 10,
-            $"expected the between-launch margin to dominate, got {combined.MarginOfError}");
+            combined.MarginOfErrorNs > 10,
+            $"expected the between-launch margin to dominate, got {combined.MarginOfErrorNs}");
     }
 
     /// <summary>
@@ -385,25 +385,25 @@ public class LaunchAggregatorTests
         // within-process band that hides the 200 ns run-to-run spread entirely.
         var launches = new[]
         {
-            Launch(CreateResult("test", 100, 100, 0.1, 100) with { MedianCiLower = 99, MedianCiUpper = 101 }),
-            Launch(CreateResult("test", 200, 200, 0.1, 100) with { MedianCiLower = 199, MedianCiUpper = 201 }),
-            Launch(CreateResult("test", 300, 300, 0.1, 100) with { MedianCiLower = 299, MedianCiUpper = 301 }),
+            Launch(CreateResult("test", 100, 100, 0.1, 100) with { MedianConfidenceIntervalLowerNs = 99, MedianConfidenceIntervalUpperNs = 101 }),
+            Launch(CreateResult("test", 200, 200, 0.1, 100) with { MedianConfidenceIntervalLowerNs = 199, MedianConfidenceIntervalUpperNs = 201 }),
+            Launch(CreateResult("test", 300, 300, 0.1, 100) with { MedianConfidenceIntervalLowerNs = 299, MedianConfidenceIntervalUpperNs = 301 }),
         };
 
         var combined = LaunchAggregator.Combine(launches);
 
         // The interval is the between-launch one: median +/- the between-launch margin, not the
         // averaged within-launch [199, 201].
-        Assert.NotNull(combined.MedianCiLower);
-        Assert.NotNull(combined.MedianCiUpper);
-        Assert.Equal(combined.Median - combined.MarginOfError, combined.MedianCiLower!.Value, 6);
-        Assert.Equal(combined.Median + combined.MarginOfError, combined.MedianCiUpper!.Value, 6);
+        Assert.NotNull(combined.MedianConfidenceIntervalLowerNs);
+        Assert.NotNull(combined.MedianConfidenceIntervalUpperNs);
+        Assert.Equal(combined.MedianNs - combined.MarginOfErrorNs, combined.MedianConfidenceIntervalLowerNs!.Value, 6);
+        Assert.Equal(combined.MedianNs + combined.MarginOfErrorNs, combined.MedianConfidenceIntervalUpperNs!.Value, 6);
 
         // And it is wide - it must span the run-to-run spread, not the 2 ns within-launch band
         // the averaging would have produced.
         Assert.True(
-            combined.MedianCiUpper!.Value - combined.MedianCiLower!.Value > 100,
-            $"expected a between-launch interval spanning the spread, got [{combined.MedianCiLower}, {combined.MedianCiUpper}]");
+            combined.MedianConfidenceIntervalUpperNs!.Value - combined.MedianConfidenceIntervalLowerNs!.Value > 100,
+            $"expected a between-launch interval spanning the spread, got [{combined.MedianConfidenceIntervalLowerNs}, {combined.MedianConfidenceIntervalUpperNs}]");
     }
 
     /// <summary>
@@ -428,10 +428,10 @@ public class LaunchAggregatorTests
         };
 
         var combined = LaunchAggregator.Combine(launches);
-        var expected = StudentT.CriticalValue(level, 2) * combined.StandardError;
+        var expected = StudentT.CriticalValue(level, 2) * combined.StandardErrorNs;
 
         Assert.Equal(level, combined.ConfidenceLevel);
-        Assert.Equal(expected, combined.MarginOfError, 6);
+        Assert.Equal(expected, combined.MarginOfErrorNs, 6);
     }
 
     /// <summary>Throughput follows the averaged times rather than being averaged itself.</summary>
@@ -449,7 +449,7 @@ public class LaunchAggregatorTests
             Launch(CreateResult("test", 300, 300, 1, 100)),
         ]);
 
-        Assert.Equal(200, combined.Mean, 6);
+        Assert.Equal(200, combined.MeanNs, 6);
         Assert.Equal(1_000_000_000.0 / 200, combined.OperationsPerSecond, 3);
         Assert.Equal(1_000_000_000.0 / 200, combined.MedianOperationsPerSecond, 3);
     }
@@ -466,7 +466,7 @@ public class LaunchAggregatorTests
         ]);
 
         Assert.False(combined.Errored);
-        Assert.Equal(150, combined.Median, 6);
+        Assert.Equal(150, combined.MedianNs, 6);
         Assert.Equal(2, combined.LaunchStatistics!.LaunchCount);
         Assert.Equal(3, combined.LaunchStatistics.Launches.Count);
     }
@@ -510,7 +510,7 @@ public class LaunchAggregatorTests
                 CreateResult("test", 100, 100, 1, 3) with { TrimmedOrdinals = [0] }, fastest),
         ]);
 
-        Assert.Equal(200, combined.Median, 6);
+        Assert.Equal(200, combined.MedianNs, 6);
         Assert.Equal(typical, combined.RawSamples);
         Assert.Equal([1], combined.TrimmedOrdinals);
     }
@@ -575,7 +575,7 @@ public class LaunchAggregatorTests
         var combined = LaunchAggregator.Combine(launches);
 
         Assert.Equal(1.05, combined.HostTimeline!.RelativeToRunStart, 9);
-        Assert.Equal(1.0, combined.HostTimeline!.Position, 9);
+        Assert.Equal(1.0, combined.HostTimeline!.CompletedBenchmarks, 9);
     }
 
     /// <summary>
@@ -616,7 +616,7 @@ public class LaunchAggregatorTests
                 BeforeNs = 100 * relative,
                 AfterNs = 100 * relative,
                 RelativeToRunStart = relative,
-                Position = position,
+                CompletedBenchmarks = position,
             },
         };
 
@@ -632,30 +632,29 @@ public class LaunchAggregatorTests
         double median,
         double mean,
         double stdDev,
-        int iterations,
+        int samples,
         bool errored = false)
     {
         return new BenchmarkResult
         {
             Name = name,
-            Mean = mean,
-            Median = median,
-            StandardDeviation = stdDev,
+            MeanNs = mean,
+            MedianNs = median,
+            StandardDeviationNs = stdDev,
             Percentiles = [],
-            Min = median * 0.8,
-            Max = median * 1.3,
-            N = iterations,
-            Q1 = median * 0.9,
-            Q3 = median * 1.1,
-            InterquartileRange = median * 0.2,
+            MinNs = median * 0.8,
+            MaxNs = median * 1.3,
+            SampleCount = samples,
+            Q1Ns = median * 0.9,
+            Q3Ns = median * 1.1,
+            InterquartileRangeNs = median * 0.2,
             OutliersRemoved = 0,
             Skewness = 0,
             Kurtosis = 3,
-            Mad = stdDev * 0.8,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
-            MeasuredIterations = iterations,
+            MedianAbsoluteDeviationNs = stdDev * 0.8,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
             TotalDuration = TimeSpan.FromSeconds(1),
             Errored = errored,
             ErrorMessage = errored ? "Test error" : null,

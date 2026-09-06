@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Workers;
 using Xunit;
 
@@ -36,8 +36,8 @@ public sealed class CapturedStateTransferTests : IDisposable
 
     private static MeasurementOptions FastOptions => MeasurementOptions.Default with
     {
-        Iterations = 4,
-        WarmupIterations = 0,
+        Samples = 4,
+        WarmupSamples = 0,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {
@@ -479,8 +479,8 @@ public sealed class CapturedStateTransferTests : IDisposable
                     throw new InvalidOperationException($"SHARED:{counter[0]}");
             })
             .WithRunOrder(RunOrder.Declaration)
-            .WithIterations(4)
-            .WithWarmup(0)
+            .WithSamples(4)
+            .WithWarmupSamples(0)
             .WithOpsPerSample(1)
             .RunAsync();
 
@@ -520,8 +520,8 @@ public sealed class CapturedStateTransferTests : IDisposable
                         throw new InvalidOperationException($"setup did not reach this body: saw {buffer[0]}");
                 },
                 setup: () => buffer[0] = 7)
-            .WithIterations(4)
-            .WithWarmup(0)
+            .WithSamples(4)
+            .WithWarmupSamples(0)
             .WithOpsPerSample(1)
             .RunAsync();
 
@@ -567,8 +567,8 @@ public sealed class CapturedStateTransferTests : IDisposable
         }
 
         return suite
-            .WithIterations(4)
-            .WithWarmup(0)
+            .WithSamples(4)
+            .WithWarmupSamples(0)
             .WithOpsPerSample(1)
             .RunAsync();
     }
@@ -635,8 +635,8 @@ public sealed class CapturedStateTransferTests : IDisposable
 
         var results = await suite
             .WithRunOrder(RunOrder.Declaration)
-            .WithIterations(4)
-            .WithWarmup(0)
+            .WithSamples(4)
+            .WithWarmupSamples(0)
             .WithOpsPerSample(1)
             .RunAsync();
 

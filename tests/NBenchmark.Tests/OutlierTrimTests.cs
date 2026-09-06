@@ -54,7 +54,7 @@ public class OutlierTrimTests
     [Fact]
     public void IqrFence_Keeps_Inliers()
     {
-        // No clear outliers; all values within 1.5 × IQR of Q1/Q3.
+        // No clear outliers; all values within 1.5 × IQR of Q1Ns/Q3Ns.
         var values = new double[] { 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
 
         var result = OutlierTrim.Trim(values, OutlierMode.IqrFence);
@@ -92,7 +92,7 @@ public class OutlierTrimTests
     [Fact]
     public void IqrFence_Quartiles_Use_NearestRank()
     {
-        // For 1..20 the nearest-rank percentile gives Q1 = 5, Q3 = 15
+        // For 1..20 the nearest-rank percentile gives Q1Ns = 5, Q3Ns = 15
         // (numpy 'inverted_cdf'). Pin against the existing cross-check
         // contract - deliberately diverges from R's default type-7.
         var sorted = Enumerable.Range(1, 20).Select(i => (double)i).ToArray();

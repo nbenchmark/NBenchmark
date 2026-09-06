@@ -14,7 +14,7 @@ public class BenchmarkRunnerTests
 
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 4, Iterations = 2, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 4, Samples = 2, OutlierMode = OutlierMode.None },
             Progress = seen,
         };
 
@@ -32,7 +32,7 @@ public class BenchmarkRunnerTests
 
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 2, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 2, OutlierMode = OutlierMode.None },
             Progress = seen,
         };
 
@@ -48,7 +48,7 @@ public class BenchmarkRunnerTests
 
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 1, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 1, OutlierMode = OutlierMode.None },
             Progress = seen,
         };
 
@@ -67,7 +67,7 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 2, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 2, OutlierMode = OutlierMode.None },
         };
 
         var outcome = await BenchmarkRunner.Instance.RunAsync("bad",
@@ -75,7 +75,7 @@ public class BenchmarkRunnerTests
 
         Assert.True(outcome.Result.Errored);
         Assert.Contains("nope", outcome.Result.ErrorMessage);
-        Assert.Equal(0, outcome.Result.MeasuredIterations);
+        Assert.Equal(0, outcome.Result.SampleCount);
         Assert.Empty(outcome.RawSamples);
     }
 
@@ -84,7 +84,7 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 2, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 2, OutlierMode = OutlierMode.None },
         };
 
         var outcome = await BenchmarkRunner.Instance.RunAsync("bad",
@@ -103,14 +103,14 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 7, Iterations = 2, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 7, Samples = 2, OutlierMode = OutlierMode.None },
         };
 
         var outcome = await BenchmarkRunner.Instance.RunAsync("bad",
             () => throw new InvalidOperationException("nope"), spec);
 
         Assert.True(outcome.Result.Errored);
-        Assert.Equal(7, outcome.Result.WarmupIterations);
+        Assert.Equal(7, outcome.Result.WarmupSamples);
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 1, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 1, OutlierMode = OutlierMode.None },
         };
 
         using var cts = new CancellationTokenSource();
@@ -135,7 +135,7 @@ public class BenchmarkRunnerTests
         // run when the runner's own token was never cancelled.
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 2, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 2, OutlierMode = OutlierMode.None },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("user-oce",
@@ -150,7 +150,7 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 2, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 2, OutlierMode = OutlierMode.None },
         };
 
         var outcome = await BenchmarkRunner.Instance.RunAsync("user-tce",
@@ -167,12 +167,12 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 5, OutlierMode = OutlierMode.None },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("int-bench", () => 42, spec);
 
-        Assert.True(outcome.Result.Mean > 0);
+        Assert.True(outcome.Result.MeanNs > 0);
         Assert.False(outcome.Result.Errored);
     }
 
@@ -181,12 +181,12 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 5, OutlierMode = OutlierMode.None },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("string-bench", () => "hello", spec);
 
-        Assert.True(outcome.Result.Mean > 0);
+        Assert.True(outcome.Result.MeanNs > 0);
         Assert.False(outcome.Result.Errored);
     }
 
@@ -195,13 +195,13 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 5, OutlierMode = OutlierMode.None },
         };
 
         var outcome = await BenchmarkRunner.Instance.RunAsync("async-int",
             () => Task.FromResult(7), spec);
 
-        Assert.True(outcome.Result.Mean > 0);
+        Assert.True(outcome.Result.MeanNs > 0);
         Assert.False(outcome.Result.Errored);
     }
 
@@ -210,13 +210,13 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 5, OutlierMode = OutlierMode.None },
         };
 
         var outcome = await BenchmarkRunner.Instance.RunAsync("async-string",
             () => Task.FromResult("world"), spec);
 
-        Assert.True(outcome.Result.Mean > 0);
+        Assert.True(outcome.Result.MeanNs > 0);
         Assert.False(outcome.Result.Errored);
     }
 
@@ -229,15 +229,15 @@ public class BenchmarkRunnerTests
 
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 0, Iterations = 0 },
+            Options = new MeasurementOptions { WarmupSamples = 0, Samples = 0 },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("dry", () => invoked++, spec);
 
         Assert.Equal(0, invoked);
-        Assert.Equal(0, outcome.Result.MeasuredIterations);
-        Assert.Equal(0, outcome.Result.Mean);
-        Assert.Equal(0, outcome.Result.Median);
+        Assert.Equal(0, outcome.Result.SampleCount);
+        Assert.Equal(0, outcome.Result.MeanNs);
+        Assert.Equal(0, outcome.Result.MedianNs);
         Assert.False(outcome.Result.Errored);
         Assert.Empty(outcome.RawSamples);
 
@@ -254,14 +254,14 @@ public class BenchmarkRunnerTests
 
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 3, Iterations = 0, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 3, Samples = 0, OutlierMode = OutlierMode.None },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("warmup-only", () => invoked++, spec);
 
         Assert.Equal(3, invoked);
-        Assert.Equal(0, outcome.Result.MeasuredIterations);
-        Assert.Equal(0, outcome.Result.Mean);
+        Assert.Equal(0, outcome.Result.SampleCount);
+        Assert.Equal(0, outcome.Result.MeanNs);
 
         Assert.True(outcome.Result.TotalDuration > TimeSpan.Zero,
             "Dry-run-with-warmup path should record wall-clock cost including warmup");
@@ -281,8 +281,8 @@ public class BenchmarkRunnerTests
         {
             Options = new MeasurementOptions
             {
-                WarmupIterations = 0,
-                Iterations = 0,
+                WarmupSamples = 0,
+                Samples = 0,
                 OutlierMode = OutlierMode.None,
             },
         });
@@ -308,7 +308,7 @@ public class BenchmarkRunnerTests
         var outcome = runner.Run("sync-void", () => { }, DeterministicSuccessSpec());
 
         Assert.Equal([1_000.0, 3_000.0], outcome.RawSamples);
-        Assert.Equal(2_000.0, outcome.Result.Mean);
+        Assert.Equal(2_000.0, outcome.Result.MeanNs);
         Assert.Equal(TimeSpan.FromTicks(80), outcome.Result.MeasuredDuration);
         Assert.Equal(TimeSpan.FromTicks(120), outcome.Result.TotalDuration);
         Assert.Equal(0, clock.PendingElapsedCount);
@@ -330,8 +330,8 @@ public class BenchmarkRunnerTests
         var outcome = runner.Run("raw-order", () => { }, DeterministicSuccessSpec());
 
         Assert.Equal([3_000.0, 1_000.0], outcome.RawSamples);
-        Assert.Equal(1_000.0, outcome.Result.Min);
-        Assert.Equal(3_000.0, outcome.Result.Max);
+        Assert.Equal(1_000.0, outcome.Result.MinNs);
+        Assert.Equal(3_000.0, outcome.Result.MaxNs);
         Assert.Equal(0, clock.PendingElapsedCount);
     }
 
@@ -351,7 +351,7 @@ public class BenchmarkRunnerTests
         var outcome = runner.Run("sync-returning", () => 123, DeterministicSuccessSpec());
 
         Assert.Equal([4_000.0, 2_000.0], outcome.RawSamples);
-        Assert.Equal(3_000.0, outcome.Result.Mean);
+        Assert.Equal(3_000.0, outcome.Result.MeanNs);
         Assert.Equal(TimeSpan.FromTicks(180), outcome.Result.MeasuredDuration);
         Assert.Equal(TimeSpan.FromTicks(220), outcome.Result.TotalDuration);
         Assert.Equal(0, clock.PendingElapsedCount);
@@ -373,7 +373,7 @@ public class BenchmarkRunnerTests
         var outcome = await runner.RunAsync("async-void", () => Task.CompletedTask, DeterministicSuccessSpec());
 
         Assert.Equal([1_500.0, 2_500.0], outcome.RawSamples);
-        Assert.Equal(2_000.0, outcome.Result.Mean);
+        Assert.Equal(2_000.0, outcome.Result.MeanNs);
         Assert.Equal(TimeSpan.FromTicks(280), outcome.Result.MeasuredDuration);
         Assert.Equal(TimeSpan.FromTicks(320), outcome.Result.TotalDuration);
         Assert.Equal(0, clock.PendingElapsedCount);
@@ -395,7 +395,7 @@ public class BenchmarkRunnerTests
         var outcome = await runner.RunAsync("async-returning", () => Task.FromResult("ok"), DeterministicSuccessSpec());
 
         Assert.Equal([5_500.0, 3_500.0], outcome.RawSamples);
-        Assert.Equal(4_500.0, outcome.Result.Mean);
+        Assert.Equal(4_500.0, outcome.Result.MeanNs);
         Assert.Equal(TimeSpan.FromTicks(380), outcome.Result.MeasuredDuration);
         Assert.Equal(TimeSpan.FromTicks(420), outcome.Result.TotalDuration);
         Assert.Equal(0, clock.PendingElapsedCount);
@@ -412,8 +412,8 @@ public class BenchmarkRunnerTests
             {
                 Options = new MeasurementOptions
                 {
-                    WarmupIterations = 1,
-                    Iterations = 2,
+                    WarmupSamples = 1,
+                    Samples = 2,
                     OutlierMode = OutlierMode.None,
                 },
             });
@@ -432,8 +432,8 @@ public class BenchmarkRunnerTests
             Options = new MeasurementOptions
             {
                 OpsPerSample = 1,
-                WarmupIterations = 0,
-                Iterations = null,
+                WarmupSamples = 0,
+                Samples = null,
                 OutlierMode = OutlierMode.None,
                 MeasureAllocations = false,
                 AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 },
@@ -457,8 +457,8 @@ public class BenchmarkRunnerTests
             Options = new MeasurementOptions
             {
                 OpsPerSample = 1,
-                WarmupIterations = 0,
-                Iterations = null,
+                WarmupSamples = 0,
+                Samples = null,
                 OutlierMode = OutlierMode.None,
                 MeasureAllocations = false,
                 AutoTune = AutoTuneOptions.Default with
@@ -475,8 +475,8 @@ public class BenchmarkRunnerTests
         Assert.NotNull(outcome.Result.ErrorMessage);
         Assert.Contains("Measurement stopped at the wall-clock tuning cap", outcome.Result.ErrorMessage);
         Assert.Contains("--autotune-cap-behavior warn", outcome.Result.ErrorMessage);
-        Assert.Equal(0, outcome.Result.Mean);
-        Assert.Equal(0, outcome.Result.MeasuredIterations);
+        Assert.Equal(0, outcome.Result.MeanNs);
+        Assert.Equal(0, outcome.Result.SampleCount);
     }
 
     [Fact]
@@ -487,8 +487,8 @@ public class BenchmarkRunnerTests
             Options = new MeasurementOptions
             {
                 OpsPerSample = 1,
-                WarmupIterations = null, // auto warmup
-                Iterations = 1,
+                WarmupSamples = null, // auto warmup
+                Samples = 1,
                 OutlierMode = OutlierMode.None,
                 MeasureAllocations = false,
                 AutoTune = AutoTuneOptions.Default with
@@ -517,7 +517,7 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 50, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 50, OutlierMode = OutlierMode.None },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("a", () => Thread.SpinWait(100), spec);
@@ -532,8 +532,8 @@ public class BenchmarkRunnerTests
         {
             Options = new MeasurementOptions
             {
-                WarmupIterations = 1,
-                Iterations = 20,
+                WarmupSamples = 1,
+                Samples = 20,
                 OutlierMode = OutlierMode.None,
                 ConfidenceLevel = 0.99,
             },
@@ -542,7 +542,7 @@ public class BenchmarkRunnerTests
         var outcome = BenchmarkRunner.Instance.Run("a", () => Thread.SpinWait(100), spec);
 
         Assert.Equal(0.99, outcome.Result.ConfidenceLevel);
-        Assert.True(outcome.Result.MarginOfError >= 0);
+        Assert.True(outcome.Result.MarginOfErrorNs >= 0);
     }
 
     // ---------- Allocation tracking ----------
@@ -554,8 +554,8 @@ public class BenchmarkRunnerTests
         {
             Options = new MeasurementOptions
             {
-                WarmupIterations = 1,
-                Iterations = 10,
+                WarmupSamples = 1,
+                Samples = 10,
                 MeasureAllocations = true,
                 OutlierMode = OutlierMode.None,
             },
@@ -568,8 +568,8 @@ public class BenchmarkRunnerTests
                 return Task.CompletedTask;
             }, spec);
 
-        Assert.NotNull(outcome.Result.MeanAllocatedBytes);
-        Assert.True(outcome.Result.MeanAllocatedBytes >= 1024);
+        Assert.NotNull(outcome.Result.AllocatedBytesMean);
+        Assert.True(outcome.Result.AllocatedBytesMean >= 1024);
     }
 
     [Fact]
@@ -591,20 +591,20 @@ public class BenchmarkRunnerTests
             {
                 Options = new MeasurementOptions
                 {
-                    WarmupIterations = 1,
-                    Iterations = 30,
+                    WarmupSamples = 1,
+                    Samples = 30,
                     MeasureAllocations = true,
-                    ForceGcBeforeEachIteration = false,
+                    ForceGcBeforeEachSample = false,
                     OutlierMode = OutlierMode.None,
                 },
             };
 
             var outcome = BenchmarkRunner.Instance.Run("alloc-sync-noise", () => Thread.SpinWait(20_000), spec);
 
-            Assert.NotNull(outcome.Result.MeanAllocatedBytes);
+            Assert.NotNull(outcome.Result.AllocatedBytesMean);
 
-            Assert.True(outcome.Result.MeanAllocatedBytes < 64 * 1024,
-                $"Expected sync allocation measurement to stay near zero despite background allocator; got {outcome.Result.MeanAllocatedBytes} bytes/op.");
+            Assert.True(outcome.Result.AllocatedBytesMean < 64 * 1024,
+                $"Expected sync allocation measurement to stay near zero despite background allocator; got {outcome.Result.AllocatedBytesMean} bytes/op.");
         }
         finally
         {
@@ -628,8 +628,8 @@ public class BenchmarkRunnerTests
         {
             Options = new MeasurementOptions
             {
-                WarmupIterations = 1,
-                Iterations = 10,
+                WarmupSamples = 1,
+                Samples = 10,
                 MeasureAllocations = true,
                 OutlierMode = OutlierMode.None,
             },
@@ -642,10 +642,10 @@ public class BenchmarkRunnerTests
                 _ = new byte[2048];
             }, spec);
 
-        Assert.NotNull(outcome.Result.MeanAllocatedBytes);
+        Assert.NotNull(outcome.Result.AllocatedBytesMean);
 
-        Assert.True(outcome.Result.MeanAllocatedBytes >= 512,
-            $"Expected async thread-hop benchmark to report at least 512 bytes/op; got {outcome.Result.MeanAllocatedBytes}");
+        Assert.True(outcome.Result.AllocatedBytesMean >= 512,
+            $"Expected async thread-hop benchmark to report at least 512 bytes/op; got {outcome.Result.AllocatedBytesMean}");
     }
 
     [Fact]
@@ -675,10 +675,10 @@ public class BenchmarkRunnerTests
             {
                 Options = new MeasurementOptions
                 {
-                    WarmupIterations = 1,
-                    Iterations = 30,
+                    WarmupSamples = 1,
+                    Samples = 30,
                     MeasureAllocations = true,
-                    ForceGcBeforeEachIteration = false,
+                    ForceGcBeforeEachSample = false,
                     OutlierMode = OutlierMode.RemoveTop5Percent,
                 },
             };
@@ -690,10 +690,10 @@ public class BenchmarkRunnerTests
                     _ = new byte[4096];
                 }, spec);
 
-            Assert.NotNull(outcome.Result.MeanAllocatedBytes);
+            Assert.NotNull(outcome.Result.AllocatedBytesMean);
 
-            Assert.True(outcome.Result.MeanAllocatedBytes > 0,
-                $"Expected async thread-hop benchmark with background noise to report body allocations; got {outcome.Result.MeanAllocatedBytes}");
+            Assert.True(outcome.Result.AllocatedBytesMean > 0,
+                $"Expected async thread-hop benchmark with background noise to report body allocations; got {outcome.Result.AllocatedBytesMean}");
         }
         finally
         {
@@ -716,8 +716,8 @@ public class BenchmarkRunnerTests
         {
             Options = new MeasurementOptions
             {
-                WarmupIterations = 0,
-                Iterations = 3,
+                WarmupSamples = 0,
+                Samples = 3,
                 OutlierMode = OutlierMode.None,
             },
         };
@@ -735,8 +735,8 @@ public class BenchmarkRunnerTests
         {
             Options = new MeasurementOptions
             {
-                WarmupIterations = 0,
-                Iterations = 3,
+                WarmupSamples = 0,
+                Samples = 3,
                 OutlierMode = OutlierMode.None,
                 Diagnostics = new DiagnosticsOptions
                 {
@@ -759,7 +759,7 @@ public class BenchmarkRunnerTests
     {
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 5, OutlierMode = OutlierMode.None },
             IsBaseline = true,
         };
 
@@ -777,7 +777,7 @@ public class BenchmarkRunnerTests
 
         var spec = new RunSpec
         {
-            Options = new MeasurementOptions { WarmupIterations = 1, Iterations = 100, OutlierMode = OutlierMode.None },
+            Options = new MeasurementOptions { WarmupSamples = 1, Samples = 100, OutlierMode = OutlierMode.None },
         };
 
         using var cts = new CancellationTokenSource();
@@ -806,8 +806,8 @@ public class BenchmarkRunnerTests
         {
             Options = new MeasurementOptions
             {
-                WarmupIterations = 3,
-                Iterations = 10,
+                WarmupSamples = 3,
+                Samples = 10,
                 OutlierMode = OutlierMode.None,
             },
         };
@@ -833,8 +833,8 @@ public class BenchmarkRunnerTests
         {
             Options = new MeasurementOptions
             {
-                WarmupIterations = 0,
-                Iterations = 2,
+                WarmupSamples = 0,
+                Samples = 2,
                 OpsPerSample = 1,
                 OutlierMode = OutlierMode.None,
                 MeasureAllocations = false,
@@ -860,11 +860,11 @@ public class BenchmarkRunnerTests
             return Task.CompletedTask;
         }
 
-        public Task OnWarmupStarting(string name, int totalWarmupIterations)
+        public Task OnWarmupStarting(string name, int totalWarmupSamples)
         {
             WarmupStartingCount++;
             WarmupStartingName = name;
-            WarmupStartingTotal = totalWarmupIterations;
+            WarmupStartingTotal = totalWarmupSamples;
             return Task.CompletedTask;
         }
 
@@ -880,7 +880,7 @@ public class BenchmarkRunnerTests
             return Task.CompletedTask;
         }
 
-        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
+        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
 
         public Task OnBenchmarkCompleted(BenchmarkResult result)
         {

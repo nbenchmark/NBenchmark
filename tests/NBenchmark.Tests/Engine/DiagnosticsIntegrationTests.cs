@@ -27,8 +27,8 @@ public sealed class DiagnosticsIntegrationTests
 
         await new BenchmarkSuite("diag-smoke").WithIsolation(Isolation.Preferred)
             .Add("work", () => { })
-            .WithWarmup(0)
-            .WithIterations(3)
+            .WithWarmupSamples(0)
+            .WithSamples(3)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 

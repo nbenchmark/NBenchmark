@@ -49,15 +49,15 @@ public class WinsorizedErrorCrossCheckTests
         var winsorized = Compute(Timings20, 2, 2);
 
         // Generator: winsorized standard deviation and standard error, n = 20, g_L = g_U = 2, h = 16.
-        Numerics.AssertRelativeClose(4.404722346228922, winsorized.StandardDeviation, RelTol);
-        Numerics.AssertRelativeClose(1.2311573235225293, winsorized.StandardError, RelTol);
+        Numerics.AssertRelativeClose(4.404722346228922, winsorized.StandardDeviationNs, RelTol);
+        Numerics.AssertRelativeClose(1.2311573235225293, winsorized.StandardErrorNs, RelTol);
         Assert.Equal(15, winsorized.DegreesOfFreedom);
 
         // The same value via WRS2's proportional expression, recomputed here from the Winsorized
         // standard deviation NBenchmark returned - so the identity is asserted, not assumed.
         const double tr = 0.1;
-        var trimse = winsorized.StandardDeviation / ((1.0 - 2.0 * tr) * Math.Sqrt(Timings20.Length));
-        Numerics.AssertRelativeClose(trimse, winsorized.StandardError, RelTol);
+        var trimse = winsorized.StandardDeviationNs / ((1.0 - 2.0 * tr) * Math.Sqrt(Timings20.Length));
+        Numerics.AssertRelativeClose(trimse, winsorized.StandardErrorNs, RelTol);
     }
 
     /// <summary>
@@ -71,8 +71,8 @@ public class WinsorizedErrorCrossCheckTests
         var winsorized = Compute(HeavyRightTail, 0, 1);
 
         // Generator: n = 20, g_L = 0, g_U = 1, h = 19. Winsorized mean 109.45, Σ(w - w̄)² = 646.95.
-        Numerics.AssertRelativeClose(5.835237784358064, winsorized.StandardDeviation, RelTol);
-        Numerics.AssertRelativeClose(1.3734724579684094, winsorized.StandardError, RelTol);
+        Numerics.AssertRelativeClose(5.835237784358064, winsorized.StandardDeviationNs, RelTol);
+        Numerics.AssertRelativeClose(1.3734724579684094, winsorized.StandardErrorNs, RelTol);
         Assert.Equal(18, winsorized.DegreesOfFreedom);
     }
 
@@ -92,9 +92,9 @@ public class WinsorizedErrorCrossCheckTests
         const double trimmedStandardError = 1.2909944487358054;
         const double rawStandardError = 39.5689587934785;
 
-        Assert.True(winsorized.StandardError > trimmedStandardError);
-        Assert.True(winsorized.StandardError < rawStandardError);
-        Numerics.AssertRelativeClose(1.0639, winsorized.StandardError / trimmedStandardError, 1e-4);
+        Assert.True(winsorized.StandardErrorNs > trimmedStandardError);
+        Assert.True(winsorized.StandardErrorNs < rawStandardError);
+        Numerics.AssertRelativeClose(1.0639, winsorized.StandardErrorNs / trimmedStandardError, 1e-4);
     }
 
     private static WinsorizedSpread Compute(double[] values, int trimmedLow, int trimmedHigh)

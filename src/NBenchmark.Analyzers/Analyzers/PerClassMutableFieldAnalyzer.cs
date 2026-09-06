@@ -156,7 +156,7 @@ public sealed class PerClassMutableFieldAnalyzer : DiagnosticAnalyzer
         var ns = original.ContainingNamespace;
 
         return ns is { IsGlobalNamespace: false }
-               && ns.ToDisplayString() == "NBenchmark.Attributes";
+               && ns.ToDisplayString() == "NBenchmark";
     }
 
     private static bool TryMatchEnumValueByName(INamedTypeSymbol enumType, object? value, string memberName)

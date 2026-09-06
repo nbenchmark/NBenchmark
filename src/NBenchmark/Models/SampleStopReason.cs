@@ -9,7 +9,7 @@ public enum SampleStopReason
     /// <summary>The sample ceiling (<see cref="AutoTuneOptions.MaxSamples" />) was reached before the CI target.</summary>
     MaxCeiling = 1,
 
-    /// <summary>Measurement ran a user-pinned exact count (<see cref="MeasurementOptions.Iterations" />).</summary>
+    /// <summary>Measurement ran a user-pinned exact count (<see cref="MeasurementOptions.Samples" />).</summary>
     ExplicitCount = 2,
 
     /// <summary>The per-benchmark wall-clock cap (<see cref="AutoTuneOptions.MaxTuningTime" />) ended measurement early.</summary>

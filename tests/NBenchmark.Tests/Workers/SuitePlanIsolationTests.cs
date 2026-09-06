@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Stats;
 using NBenchmark.Workers;
 using Xunit;
@@ -34,8 +34,8 @@ public sealed class SuitePlanIsolationTests : IDisposable
     ///     quick. What these tests are about is the process boundary, not measurement quality.
     /// </summary>
     private static BenchmarkSuite Fast(BenchmarkSuite suite) => suite
-        .WithIterations(16)
-        .WithWarmup(1)
+        .WithSamples(16)
+        .WithWarmupSamples(1)
         .WithOpsPerSample(1)
         .WithAutoTune(AutoTuneOptions.Default with
         {
@@ -107,8 +107,8 @@ public sealed class SuitePlanIsolationTests : IDisposable
         var slow = results.Single(r => r.Name == "slow");
 
         Assert.True(
-            slow.Median > fast.Median * 2,
-            $"expected slow to be clearly slower: fast={fast.Median:F1}ns slow={slow.Median:F1}ns");
+            slow.MedianNs > fast.MedianNs * 2,
+            $"expected slow to be clearly slower: fast={fast.MedianNs:F1}ns slow={slow.MedianNs:F1}ns");
     }
 
     /// <summary>
@@ -144,7 +144,7 @@ public sealed class SuitePlanIsolationTests : IDisposable
 
         // The detector names itself with the sentinel it was constructed with, so this proves the
         // worker used *that* object rather than falling back to a built-in one.
-        Assert.Equal(ProbeDetector.NameFor(4242), result.OutlierDetector);
+        Assert.Equal(ProbeDetector.NameFor(4242), result.OutlierDetectorName);
     }
 
     /// <summary>
@@ -453,8 +453,8 @@ internal static class DeclaredPlans
     public static BenchmarkSuite Beta() => Shorten(new BenchmarkSuite("beta-plan").Add("beta", () => Thread.SpinWait(200)));
 
     private static BenchmarkSuite Shorten(BenchmarkSuite suite) => suite
-        .WithIterations(16)
-        .WithWarmup(1)
+        .WithSamples(16)
+        .WithWarmupSamples(1)
         .WithOpsPerSample(1)
         .WithAutoTune(AutoTuneOptions.Default with
         {

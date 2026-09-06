@@ -121,7 +121,7 @@ To avoid inflating the false-positive rate when comparing multiple benchmarks (t
 
 ### Algorithm
 
-Given $k$ groups of **pre-trim raw samples** with total size $N = \Sigma n_i$:
+Given $k$ groups of **pre-trim raw samples** with total size $SampleCount = \Sigma n_i$:
 
 1. Rank all $N$ values together, assigning mid-ranks to ties.
 2. Sum the ranks within each group: $R_i$.

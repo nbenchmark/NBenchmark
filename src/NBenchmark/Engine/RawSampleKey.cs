@@ -3,7 +3,7 @@ namespace NBenchmark.Engine;
 /// <summary>
 ///     The single source of truth for the key that pairs a <see cref="BenchmarkResult" />
 ///     with its raw pre-trim samples. Significance testing keys samples by benchmark name,
-///     but a multi-runtime run produces one result per <see cref="BenchmarkResult.RuntimeMoniker" />
+///     but a multi-runtime run produces one result per <see cref="BenchmarkResult.TargetFramework" />
 ///     under the same name, so the key must carry both.
 ///     <para>
 ///         This type exists because the format was previously inlined at nine call sites
@@ -18,7 +18,7 @@ namespace NBenchmark.Engine;
 internal static class RawSampleKey
 {
     /// <summary>The composite sample key for a completed result.</summary>
-    public static string For(BenchmarkResult result) => For(result.Name, result.RuntimeMoniker);
+    public static string For(BenchmarkResult result) => For(result.Name, result.TargetFramework);
 
     /// <summary>
     ///     The composite sample key for a benchmark name and runtime moniker. <c>\0</c> is the

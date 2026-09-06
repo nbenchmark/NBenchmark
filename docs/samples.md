@@ -70,7 +70,7 @@ Key observations:
 
 **`samples/Suite/`**
 
-This sample uses a `BenchmarkSuite` to compare bubble sort and LINQ sorting on a 100-element array. The sample uses a short iteration count for a fast demonstration.
+This sample uses a `BenchmarkSuite` to compare bubble sort and LINQ sorting on a 100-element array. The sample uses a short sample count for a fast demonstration.
 
 ```bash
 cd samples/Suite
@@ -92,8 +92,8 @@ var results = await new BenchmarkSuite("sorting")
         _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray();
     })
     .WithBaseline("bubble")
-    .WithWarmup(3)
-    .WithIterations(50)
+    .WithWarmupSamples(3)
+    .WithSamples(50)
     .WithOutlierMode(OutlierMode.RemoveTop5Percent)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
@@ -126,7 +126,7 @@ dotnet run -- --confidence 0.99
 ```csharp
 using NBenchmark;
 using NBenchmark.Reporters.Console;
-using NBenchmark.Attributes;
+using NBenchmark;
 
 await BenchmarkHarness.Create(args)
     .AddFromAssembly<HostBenchmarks>()
@@ -207,7 +207,7 @@ Key observations:
 
 This sample uses a `BenchmarkSuite` to compare three hash algorithms (`SHA256`, `SHA1`, and `MD5`) in two different runs.
 
-The first run uses the built-in Median Absolute Deviation outlier mode. Because the suite contains three groups, NBenchmark automatically reports a Kruskal-Wallis omnibus verdict. The second run uses a custom `IOutlierDetector` and a custom `ISignificanceTest`.
+The first run uses the built-in Median absolute deviation outlier mode. Because the suite contains three groups, NBenchmark automatically reports a Kruskal-Wallis omnibus verdict. The second run uses a custom `IOutlierDetector` and a custom `ISignificanceTest`.
 
 ```bash
 cd samples/ExtensibleStats
@@ -295,8 +295,8 @@ await new BenchmarkSuite("sleep")
     .Add("sleep200", () => Task.Delay(2).Wait())
     .WithBaseline("sleep100")
     .WithLaunchCount(3)
-    .WithWarmup(5)
-    .WithIterations(30)
+    .WithWarmupSamples(5)
+    .WithSamples(30)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
@@ -332,8 +332,8 @@ var results = await new BenchmarkSuite("string-concat")
     .Add("join", () => string.Join("", "a", "b", "c", "d", "e"))
     .WithBaseline("concat")
     .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)
-    .WithWarmup(3)
-    .WithIterations(50)
+    .WithWarmupSamples(3)
+    .WithSamples(50)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
@@ -357,12 +357,12 @@ This sample uses a `BenchmarkHarness` with attribute-based benchmarks that you c
 ```bash
 cd samples/MultiRuntimeHarness
 dotnet run -- --runtimes net8,net9,net10
-dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output ./results
+dotnet run -- --runtimes net8,net9 --samples 500 --reporter markdown --output ./results
 ```
 
 ```csharp
 using NBenchmark;
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Reporters.Console;
 
 await BenchmarkHarness.Create(args)
@@ -392,7 +392,7 @@ Key observations:
 - The `--runtimes net8,net9,net10` flag triggers cross-runtime builds and execution.
 - Observe the "Runtime" column in the console output.
 - The host builds the project for each target framework, runs benchmarks in workers, and aggregates the results.
-- You can combine the `--runtimes` flag with other CLI flags, such as `--iterations`, `--reporter`, and `--output`.
+- You can combine the `--runtimes` flag with other CLI flags, such as `--samples`, `--reporter`, and `--output`.
 
 ---
 
@@ -417,7 +417,7 @@ await new BenchmarkSuite("sorting-simple")
     .Add("bubble", () => { var a = Enumerable.Range(0, 100).Reverse().ToArray(); Array.Sort(a); })
     .Add("linq",   () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
-    .WithWarmup(3).WithIterations(50)
+    .WithWarmupSamples(3).WithSamples(50)
     .WithDetail(ReportDetail.Simple)
     .WithReporter(new ConsoleReporter())
     .RunAsync();
@@ -427,7 +427,7 @@ await new BenchmarkSuite("sorting-standard")
     .Add("bubble", () => { var a = Enumerable.Range(0, 100).Reverse().ToArray(); Array.Sort(a); })
     .Add("linq",   () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
-    .WithWarmup(3).WithIterations(50)
+    .WithWarmupSamples(3).WithSamples(50)
     .WithDetail(ReportDetail.Standard)
     .WithReporter(new ConsoleReporter())
     .RunAsync();
@@ -437,7 +437,7 @@ await new BenchmarkSuite("sorting-advanced")
     .Add("bubble", () => { var a = Enumerable.Range(0, 100).Reverse().ToArray(); Array.Sort(a); })
     .Add("linq",   () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
-    .WithWarmup(3).WithIterations(50)
+    .WithWarmupSamples(3).WithSamples(50)
     .WithDetail(ReportDetail.Advanced)
     .WithReporter(new ConsoleReporter())
     .RunAsync();
@@ -446,7 +446,7 @@ await new BenchmarkSuite("sorting-advanced")
 Key observations:
 
 - **Simple** (default): Displays a single table with Benchmark, Median, Ops/s, Ratio, Sig, and Alloc/op, plus a counts-only footer. It contains no statistical jargon.
-- **Standard**: Adds the Precision & Tail Latency table, a full Interpretation block (including the omnibus verdict, significance test, outlier detector, and measurement profile), and auto-tune summary lines.
+- **Standard**: Adds the Precision & Tail Latency table, a full Interpretation block (including the omnibus verdict, significance test, outlier detector, and GC behavior), and auto-tune summary lines.
 - **Advanced**: Adds a per-benchmark Distribution Details block containing quartiles, fences, skewness, kurtosis, MAD, Cliff's delta, and an allocation breakdown.
 
 For more information, see [Report Detail Levels](./output/report-detail-levels.md) for the full column reference.

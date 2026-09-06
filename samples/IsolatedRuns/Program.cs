@@ -1,5 +1,4 @@
 using NBenchmark;
-using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
 // Every mode below measures in a dedicated worker process (nbworker), because JIT tiering,
@@ -9,8 +8,8 @@ using NBenchmark.Reporters.Console;
 
 var singleOptions = new MeasurementOptions
 {
-    WarmupIterations = 3,
-    Iterations = 40,
+    WarmupSamples = 3,
+    Samples = 40,
     OutlierMode = OutlierMode.IqrFence,
 };
 
@@ -49,8 +48,8 @@ await new BenchmarkSuite("isolated-suite")
     .Add("baseline", () => Thread.SpinWait(5_000))
     .Add("candidate", () => Thread.SpinWait(3_500))
     .WithBaseline("baseline")
-    .WithWarmup(3)
-    .WithIterations(30)
+    .WithWarmupSamples(3)
+    .WithSamples(30)
     .WithOutlierMode(OutlierMode.None)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
@@ -73,7 +72,7 @@ static BenchmarkSuite BuildStatefulSuite()
     return new BenchmarkSuite("plan-suite")
         .Add("hash", () => payload.GetHashCode())
         .WithSuiteSetup(() => Random.Shared.NextBytes(payload))
-        .WithWarmup(3)
-        .WithIterations(30)
+        .WithWarmupSamples(3)
+        .WithSamples(30)
         .WithReporter(new ConsoleReporter());
 }

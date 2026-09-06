@@ -1,5 +1,4 @@
 using NBenchmark;
-using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
 await BenchmarkHarness.Create(args)

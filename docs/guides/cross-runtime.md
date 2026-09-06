@@ -8,7 +8,7 @@ order: 5
 
 ## Scenario
 
-If you support multiple runtimes (such as .NET 8, .NET 9, and .NET 10), you may want to determine if a newer runtime provides a real speedup for your hot paths before recommending an upgrade. NBenchmark builds the same benchmarks for each target framework, measures each build in its own worker process, stamps every result with its `RuntimeMoniker`, and groups significance within each runtime to ensure that a .NET 8 result is never compared against a .NET 10 baseline.
+If you support multiple runtimes (such as .NET 8, .NET 9, and .NET 10), you may want to determine if a newer runtime provides a real speedup for your hot paths before recommending an upgrade. NBenchmark builds the same benchmarks for each target framework, measures each build in its own worker process, stamps every result with its `TargetFramework`, and groups significance within each runtime to ensure that a .NET 8 result is never compared against a .NET 10 baseline.
 
 ## Complete example
 
@@ -56,7 +56,7 @@ dotnet run -c Release -- --runtimes net8,net9,net10
 Alternatively, declare the runtimes on the benchmark class using an attribute. This eliminates the need for the `--runtimes` flag, as the attribute drives the build process:
 
 ```csharp
-[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)]
+[Runtimes("net8.0", "net9.0", "net10.0")]
 public class StringBenchmarks
 {
     [Benchmark(Baseline = true)]
@@ -79,7 +79,7 @@ If you provide the `--runtimes` flag on the CLI, it takes precedence and the `[R
 
 - **Implicit baselines**: The first runtime in the list serves as the implicit baseline for ratio calculations within that runtime. Use `WithBaseline` (Suite) or `[Benchmark(Baseline = true)]` (Harness) to designate the 1.00x reference benchmark. The runtime order determines the presentation order of the results.
 
-- **Environment control propagation**: Settings such as `--cpu-affinity`, `--priority`, and `--dedicated-host-guidance` apply to every spawned worker. This ensures that every runtime runs under the same hardware constraints. For more information, see [Environment control: Isolated-process propagation](../features/environment-control.md#isolated-process-propagation).
+- **Environment control propagation**: Settings such as `--cpu-affinity`, `--priority`, and `--host-quality-warnings` apply to every spawned worker. This ensures that every runtime runs under the same hardware constraints. For more information, see [Environment control: Isolated-process propagation](../features/environment-control.md#isolated-process-propagation).
 
 > [!IMPORTANT] Compare on the same host
 > Cross-runtime comparisons are only meaningful when the runtimes execute on the same machine under identical conditions. Do not compare .NET 8 results from a laptop against .NET 10 results from a CI runner, as the host differences will outweigh the runtime differences. Run all runtimes in a single invocation on the same runner with the same environment controls.

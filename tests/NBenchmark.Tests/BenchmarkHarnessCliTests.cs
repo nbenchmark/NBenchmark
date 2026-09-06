@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Discovery;
 using NBenchmark.Observers;
 using NBenchmark.Reporters;
@@ -98,8 +98,8 @@ public class BenchmarkHarnessCliTests
                 var harness = BenchmarkHarness.Create([
                     "--filter", "TestBenchmarks.*",
                     "--threshold-pct", "999999",
-                    "--iterations", "20",
-                    "--warmup", "3",
+                    "--samples", "20",
+                    "--warmup-samples", "3",
                     "--launch-count", "1",
                 ]);
 
@@ -132,8 +132,8 @@ public class BenchmarkHarnessCliTests
                     var harness = BenchmarkHarness.Create([
                         "--filter", "SlowVsBaselineBenchmarks.*",
                         "--threshold-pct", "1",
-                        "--iterations", "20",
-                        "--warmup", "3",
+                        "--samples", "20",
+                        "--warmup-samples", "3",
                         "--launch-count", "1",
                     ]);
 
@@ -171,7 +171,7 @@ public class BenchmarkHarnessCliTests
     public async Task RunAsync_Without_LaunchCount_Uses_Harness_Default_MultiLaunch()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--iterations", "1", "--warmup", "0"])
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--samples", "1", "--warmup-samples", "0"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
@@ -203,7 +203,7 @@ public class BenchmarkHarnessCliTests
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*"])
                 .AddFromAssembly<TestBenchmarks>()
-                .WithOptions(MeasurementOptions.Default with { Iterations = 1, WarmupIterations = 0 })
+                .WithOptions(MeasurementOptions.Default with { Samples = 1, WarmupSamples = 0 })
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
                 .RunAsync()
@@ -227,7 +227,7 @@ public class BenchmarkHarnessCliTests
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*"])
                 .AddFromAssembly<TestBenchmarks>()
-                .WithOptions(MeasurementOptions.Default with { Iterations = 1, WarmupIterations = 0 })
+                .WithOptions(MeasurementOptions.Default with { Samples = 1, WarmupSamples = 0 })
                 .WithLaunchCount(LaunchCounts.Single)
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
@@ -268,7 +268,7 @@ public class BenchmarkHarnessCliTests
             await CaptureConsoleOutputAsync(async () =>
             {
                 await BenchmarkHarness.Create([
-                        "--filter", "TestBenchmarks.*", "--in-process", "--warmup", "0", "--iterations", "1", "--launch-count", "1", "--observer", "capturing",
+                        "--filter", "TestBenchmarks.*", "--in-process", "--warmup-samples", "0", "--samples", "1", "--launch-count", "1", "--observer", "capturing",
                     ])
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
@@ -330,7 +330,7 @@ public class BenchmarkHarnessCliTests
             await CaptureConsoleOutputAsync(async () =>
             {
                 await BenchmarkHarness.Create([
-                        "--filter", "TestBenchmarks.*", "--in-process", "--warmup", "0", "--iterations", "1", "--launch-count", "1", "--observer", "obs-a",
+                        "--filter", "TestBenchmarks.*", "--in-process", "--warmup-samples", "0", "--samples", "1", "--launch-count", "1", "--observer", "obs-a",
                         "--observer", "obs-b",
                     ])
                     .AddFromAssembly<TestBenchmarks>()
@@ -353,7 +353,7 @@ public class BenchmarkHarnessCliTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--iterations", "5", "--warmup", "2", "--launch-count", "1",
+                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
@@ -372,7 +372,7 @@ public class BenchmarkHarnessCliTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "CategoryBenchmarks.*", "--exclude-category", "Slow", "--iterations", "5", "--warmup", "2", "--launch-count", "1",
+                    "--filter", "CategoryBenchmarks.*", "--exclude-category", "Slow", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
@@ -391,7 +391,7 @@ public class BenchmarkHarnessCliTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--exclude-category", "Slow", "--iterations", "5", "--warmup", "2",
+                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--exclude-category", "Slow", "--samples", "5", "--warmup-samples", "2",
                     "--launch-count", "1",
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
@@ -409,10 +409,10 @@ public class BenchmarkHarnessCliTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--iterations", "5", "--warmup", "2", "--launch-count", "1",
+                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
-                .WithCategoryFilter(["Fast"])
+                .FilterCategories(["Fast"])
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
                 .RunAsync()
@@ -426,7 +426,7 @@ public class BenchmarkHarnessCliTests
     public void WithCategoryFilter_WithBlankCategory_Throws()
     {
         var harness = BenchmarkHarness.Create([]);
-        Assert.Throws<ArgumentException>(() => harness.WithCategoryFilter([" "]));
+        Assert.Throws<ArgumentException>(() => harness.FilterCategories([" "]));
     }
 
     [Fact]
@@ -450,10 +450,10 @@ public class BenchmarkHarnessCliTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--iterations", "5", "--warmup", "2", "--launch-count", "1",
+                    "--filter", "CategoryBenchmarks.*", "--category", "String", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
-                .WithCategoryFilter(["Number"])
+                .FilterCategories(["Number"])
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
                 .RunAsync()
@@ -655,7 +655,7 @@ public class BenchmarkHarnessCliTests
 
             var csvFile = Assert.Single(Directory.GetFiles(tempDir, "*.csv"));
             var lines = await File.ReadAllLinesAsync(csvFile);
-            Assert.Contains("Q1", lines[0]);
+            Assert.Contains("Q1Ns", lines[0]);
             Assert.Contains("Skewness", lines[0]);
         }
         finally
@@ -702,7 +702,7 @@ public class BenchmarkHarnessCliTests
 
             var csvFile = Assert.Single(Directory.GetFiles(tempDir, "*.csv"));
             var lines = await File.ReadAllLinesAsync(csvFile);
-            Assert.DoesNotContain("Q1", lines[0]);
+            Assert.DoesNotContain("Q1Ns", lines[0]);
             Assert.DoesNotContain("Skewness", lines[0]);
         }
         finally
@@ -825,7 +825,7 @@ public class BenchmarkHarnessCliTests
     public async Task No_Attribute_No_Cli_Flag_Runs_Single_Runtime()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "NoRuntimeAttributeBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
+            await BenchmarkHarness.Create(["--filter", "NoRuntimeAttributeBenchmarks.*", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1"])
                 .AddFromAssembly<NoRuntimeAttributeBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
@@ -1031,10 +1031,10 @@ public class BenchmarkHarnessCliTests
             return Task.CompletedTask;
         }
 
-        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
+        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
         public Task OnWarmupCompleted(string name) => Task.CompletedTask;
         public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
-        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
+        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
         public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
 
         public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
@@ -1097,14 +1097,14 @@ public class HarnessOrderBenchmarks
     public int B() => 2;
 }
 
-[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9)]
+[Runtimes("net8.0", "net9.0")]
 public class RuntimeAttributedHarnessBenchmarks
 {
     [Benchmark]
     public int A() => 1;
 }
 
-[Runtimes(RuntimeMoniker.Net10)]
+[Runtimes("net10.0")]
 public class CliOverrideHarnessBenchmarks
 {
     [Benchmark]

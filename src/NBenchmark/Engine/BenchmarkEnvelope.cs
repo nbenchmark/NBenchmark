@@ -66,10 +66,10 @@ internal sealed record BenchmarkEnvelope(
     ///     one made the common shape - <c>setup: () =&gt; Cache.Clear()</c> - cost the whole suite its
     ///     isolation for nothing.
     /// </summary>
-    public Delegate? IterationSetup { get; init; }
+    public Delegate? SampleSetup { get; init; }
 
-    /// <inheritdoc cref="IterationSetup" />
-    public Delegate? IterationTeardown { get; init; }
+    /// <inheritdoc cref="SampleSetup" />
+    public Delegate? SampleTeardown { get; init; }
 
     /// <summary>
     ///     Set by <c>BenchmarkSuite.AddInProcess</c>: this benchmark is measured in the coordinator on
@@ -90,7 +90,7 @@ internal sealed record BenchmarkEnvelope(
     ///     registrations never set it, which was invisible only because they carried no addressable
     ///     body either.
     /// </summary>
-    public bool HasIterationHooks => IterationSetup is not null || IterationTeardown is not null;
+    public bool HasSampleHooks => SampleSetup is not null || SampleTeardown is not null;
 
     /// <summary>
     ///     The class identifier used for discovered-benchmark result rows.
@@ -127,12 +127,12 @@ internal sealed record BenchmarkEnvelope(
         var description = method.Attribute.Description;
         var isBaseline = method.IsBaseline;
         var categories = method.Categories;
-        var attributeIterations = method.Attribute.Iterations;
-        var attributeWarmupIterations = method.Attribute.WarmupIterations;
-        var hasIterationsOverride = method.Attribute.HasIterationsOverride;
-        var hasWarmupIterationsOverride = method.Attribute.HasWarmupIterationsOverride;
-        var iterationSetupDel = method.IterationSetupDelegate;
-        var iterationTeardownDel = method.IterationTeardownDelegate;
+        var attributeSamples = method.Attribute.Samples;
+        var attributeWarmupSamples = method.Attribute.WarmupSamples;
+        var hasSamplesOverride = method.Attribute.HasSamplesOverride;
+        var hasWarmupSamplesOverride = method.Attribute.HasWarmupSamplesOverride;
+        var sampleSetupDel = method.SampleSetupDelegate;
+        var sampleTeardownDel = method.SampleTeardownDelegate;
         var bodyFactory = method.BodyFactory
                           ?? throw new InvalidOperationException(
                               $"Benchmark '{method.DisplayName}' carries no body factory, so there is "
@@ -148,34 +148,34 @@ internal sealed record BenchmarkEnvelope(
             // them and never reaches here. It used to be applied to the options anyway, guarded on
             // their launch count already being 1 - which every request path had pinned it to, making
             // a transport detail decide whether a user's attribute took effect.
-            if (spec.Options.Iterations is not 0)
+            if (spec.Options.Samples is not 0)
             {
                 var overriddenOptions = spec.Options;
 
-                if (hasIterationsOverride)
-                    overriddenOptions = overriddenOptions with { Iterations = attributeIterations };
+                if (hasSamplesOverride)
+                    overriddenOptions = overriddenOptions with { Samples = attributeSamples };
 
-                if (hasWarmupIterationsOverride)
-                    overriddenOptions = overriddenOptions with { WarmupIterations = attributeWarmupIterations };
+                if (hasWarmupSamplesOverride)
+                    overriddenOptions = overriddenOptions with { WarmupSamples = attributeWarmupSamples };
 
                 specWithOverride = spec with { Options = overriddenOptions };
             }
 
-            var specWithIter = (iterationSetupDel, iterationTeardownDel) switch
+            var specWithIter = (sampleSetupDel, sampleTeardownDel) switch
             {
                 (null, null) => specWithOverride,
                 (not null, null) => specWithOverride with
                 {
-                    IterationSetup = () => iterationSetupDel(instance),
+                    SampleSetup = () => sampleSetupDel(instance),
                 },
                 (null, not null) => specWithOverride with
                 {
-                    IterationTeardown = () => iterationTeardownDel(instance),
+                    SampleTeardown = () => sampleTeardownDel(instance),
                 },
                 (not null, not null) => specWithOverride with
                 {
-                    IterationSetup = () => iterationSetupDel(instance),
-                    IterationTeardown = () => iterationTeardownDel(instance),
+                    SampleSetup = () => sampleSetupDel(instance),
+                    SampleTeardown = () => sampleTeardownDel(instance),
                 },
             };
 

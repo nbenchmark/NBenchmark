@@ -51,7 +51,7 @@ public record EnvironmentOptions
     ///     throttling. The run still proceeds - this is guidance, not a gate. Defaults to
     ///     <c>false</c>.
     /// </summary>
-    public bool DedicatedHostGuidance { get; init; }
+    public bool HostQualityWarnings { get; init; }
 
     /// <summary>
     ///     Whether the OS controls that belong to the measuring <i>thread</i> are applied:
@@ -68,18 +68,6 @@ public record EnvironmentOptions
     ///     </para>
     /// </summary>
     public bool ThreadControl { get; init; } = true;
-
-    /// <summary>
-    ///     When <c>true</c>, suppresses the always-on warning that fires when the entry
-    ///     assembly was built in <c>Debug</c> configuration or when a debugger is attached.
-    ///     Both conditions defeat JIT inlining and tier-1 optimization, so the numbers are
-    ///     not production-representative; the warning is on by default to catch the common
-    ///     <c>dotnet run</c> (without <c>-c Release</c>) footgun. Set this to <c>true</c> when
-    ///     measuring Debug behaviour is intentional. The <c>NBENCHMARK_SUPPRESS_DEBUG_WARNING=1</c>
-    ///     environment variable also suppresses it, for CLI-only callers that cannot easily
-    ///     change the options record. Defaults to <c>false</c>.
-    /// </summary>
-    public bool SuppressBuildConfigurationWarning { get; init; }
 
     /// <summary>
     ///     Parses a comma-separated list of non-negative integers (e.g. <c>"0"</c> or

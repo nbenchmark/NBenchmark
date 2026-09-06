@@ -1,5 +1,5 @@
 using System.Reflection;
-using NBenchmark.Attributes;
+using NBenchmark;
 
 namespace NBenchmark.Discovery;
 
@@ -53,8 +53,8 @@ internal sealed record BenchmarkMethodDefinition(
     /// </remarks>
     internal Func<object, Delegate>? BodyFactory { get; init; }
 
-    public Action<object>? IterationSetupDelegate { get; init; }
-    public Action<object>? IterationTeardownDelegate { get; init; }
+    public Action<object>? SampleSetupDelegate { get; init; }
+    public Action<object>? SampleTeardownDelegate { get; init; }
 
     /// <summary>
     ///     The isolation intent declared by attributes on this benchmark or its class,

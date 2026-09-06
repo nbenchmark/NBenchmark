@@ -13,8 +13,8 @@ public class MeasurementObserverTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 2,
-            WarmupIterations = 3,
-            Iterations = 5,
+            WarmupSamples = 3,
+            Samples = 5,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
         };
@@ -36,8 +36,8 @@ public class MeasurementObserverTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 2,
-            WarmupIterations = 3,
-            Iterations = 5,
+            WarmupSamples = 3,
+            Samples = 5,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
@@ -50,9 +50,9 @@ public class MeasurementObserverTests
         var result = RunSync(() => bodyCalls++, options, clock, observer);
 
         // Jitter disabled: no Jitter phase events. Calibration skipped (OpsPerSample pinned).
-        // WarmupIterations pinned -> Phase B is ExplicitCount, with a Starting event but no warmup
+        // WarmupSamples pinned -> Phase B is ExplicitCount, with a Starting event but no warmup
         // samples (RunUntimedSample does not emit OnSample because the timing path isn't taken).
-        // Iterations pinned -> Phase C runs exactly 5 samples, CI detector is null, stop is ExplicitCount.
+        // Samples pinned -> Phase C runs exactly 5 samples, CI detector is null, stop is ExplicitCount.
         Assert.DoesNotContain(observer.Phases, e => e.Phase == MeasurementPhase.Jitter);
         Assert.DoesNotContain(observer.Phases, e => e.Phase == MeasurementPhase.Calibration);
 
@@ -97,12 +97,12 @@ public class MeasurementObserverTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1, // pin K so no calibration runs
-            WarmupIterations = null, // auto warmup
-            Iterations = 10, // explicit measured count
+            WarmupSamples = null, // auto warmup
+            Samples = 10, // explicit measured count
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             // Isolate the plateau rule from the warmup time floor and JIT gate so the scripted 1000 ns body
-            // settles on the plateau (32) rather than running to MaxWarmup.
+            // settles on the plateau (32) rather than running to MaxWarmupSamples.
             AutoTune = AutoTuneOptions.Default with
             {
                 EnableJitterCalibration = false,
@@ -117,12 +117,12 @@ public class MeasurementObserverTests
         var observer = new RecordingObserver();
         var result = RunSync(() => bodyCalls++, options, clock, observer);
 
-        // Constant signal: plateau settles at MinWarmup + PlateauPatience * BatchSize = 8 + 3 * 8 = 32.
+        // Constant signal: plateau settles at MinWarmupSamples + PlateauPatience * BatchSize = 8 + 3 * 8 = 32.
         Assert.Equal(32, result.ResolvedWarmup);
         Assert.Equal(WarmupStopReason.Settled, result.Diagnostic.WarmupStop);
 
-        // With Iterations=10, ProgressCadence(10) = 1, so every measured sample emits. The warmup
-        // interval is ProgressCadence(MaxWarmup=10000) = 50, so warmup emits on samples 0, 50, 100...
+        // With Samples=10, ProgressCadence(10) = 1, so every measured sample emits. The warmup
+        // interval is ProgressCadence(MaxWarmupSamples=10000) = 50, so warmup emits on samples 0, 50, 100...
         // - i.e. only sample 0 in a 32-sample warmup. Assert the Warmup flag distinguishes the two
         // phases, not the count.
         var warmupSamples = observer.Samples.Where(s => s.Warmup).ToList();
@@ -146,8 +146,8 @@ public class MeasurementObserverTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0, // no warmup
-            Iterations = null, // auto sample count -> CI detector
+            WarmupSamples = 0, // no warmup
+            Samples = null, // auto sample count -> CI detector
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             // MinMeasurementTime = 0 isolates the CI stop rule from the measurement time floor, which
@@ -176,7 +176,7 @@ public class MeasurementObserverTests
 
         var last = measurementDetectors[^1];
         Assert.Equal(32, last.SampleCount);
-        Assert.Equal(1000.0, last.Mean);
+        Assert.Equal(1000.0, last.MeanNs);
         Assert.Equal(0.0, last.CiHalfWidth, 10);
         Assert.Equal(1, last.CurrentK);
 
@@ -195,8 +195,8 @@ public class MeasurementObserverTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = null, // auto-calibrate
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             // Pin the 1 µs target this test's scripted 250/2000 ns timings assume (the default is now 10 µs).
@@ -239,8 +239,8 @@ public class MeasurementObserverTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
 
@@ -274,8 +274,8 @@ public class MeasurementObserverTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 5,
+            WarmupSamples = 0,
+            Samples = 5,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
@@ -293,8 +293,8 @@ public class MeasurementObserverTests
 
         var captured = Assert.Single(observer.Results);
         Assert.Equal("bench", captured.Name);
-        Assert.Equal(outcome.Result.Mean, captured.Mean);
-        Assert.Equal(5, captured.N);
+        Assert.Equal(outcome.Result.MeanNs, captured.MeanNs);
+        Assert.Equal(5, captured.SampleCount);
     }
 
     private static AdaptiveResult RunSync(

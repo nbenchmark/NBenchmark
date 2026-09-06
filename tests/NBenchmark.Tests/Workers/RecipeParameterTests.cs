@@ -28,8 +28,8 @@ public sealed class RecipeParameterTests : IDisposable
     public void Dispose() => WorkerLauncher.Current = _prior;
 
     private static BenchmarkSuite Fast(BenchmarkSuite suite) => suite
-        .WithIterations(16)
-        .WithWarmup(1)
+        .WithSamples(16)
+        .WithWarmupSamples(1)
         .WithOpsPerSample(1)
         .WithAutoTune(AutoTuneOptions.Default with
         {

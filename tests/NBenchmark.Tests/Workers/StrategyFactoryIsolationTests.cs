@@ -37,8 +37,8 @@ public sealed class StrategyFactoryIsolationTests : IDisposable
     public void Dispose() => WorkerLauncher.Current = _prior;
 
     private static BenchmarkSuite Fast(BenchmarkSuite suite) => suite
-        .WithIterations(16)
-        .WithWarmup(1)
+        .WithSamples(16)
+        .WithWarmupSamples(1)
         .WithOpsPerSample(1)
         .WithAutoTune(AutoTuneOptions.Default with
         {
@@ -76,7 +76,7 @@ public sealed class StrategyFactoryIsolationTests : IDisposable
             Assert.False(result.Errored, result.ErrorMessage);
             Assert.Equal(IsolationStatus.Isolated, result.IsolationStatus);
 
-            Assert.Equal(TrimFractionDetector.NameFor(0.25), result.OutlierDetector);
+            Assert.Equal(TrimFractionDetector.NameFor(0.25), result.OutlierDetectorName);
         }
     }
 
@@ -99,7 +99,7 @@ public sealed class StrategyFactoryIsolationTests : IDisposable
 
         // The captured fraction reached the worker: the detector encodes it into the name it reports,
         // so a run that had rebuilt the detector from a default would say something else here.
-        Assert.Equal(TrimFractionDetector.NameFor(fraction), result.OutlierDetector);
+        Assert.Equal(TrimFractionDetector.NameFor(fraction), result.OutlierDetectorName);
     }
 
     /// <summary>

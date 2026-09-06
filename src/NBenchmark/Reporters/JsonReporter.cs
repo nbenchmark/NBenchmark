@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace NBenchmark.Reporters;
 
-public sealed class JsonReporter(string outputDirectory = ".", string? name = null, ReportDetail detail = ReportDetail.Simple) : IReporter
+public sealed class JsonReporter(string outputDirectory = ".", string? fileName = null, ReportDetail detail = ReportDetail.Simple) : IReporter
 {
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -42,10 +42,10 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
     {
         Directory.CreateDirectory(_outputDirectory);
 
-        var fileName = name
+        var resolvedName = fileName
                        ?? $"benchmarks-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.json";
 
-        var filePath = Path.Combine(_outputDirectory, fileName);
+        var filePath = Path.Combine(_outputDirectory, resolvedName);
         LastWrittenPath = filePath;
 
         var serializedResults = IncludeSamples
@@ -58,7 +58,7 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
             MeasurementEpoch = ReportFormat.MeasurementEpoch,
             GeneratedAt = DateTimeOffset.UtcNow,
             Detail = Detail,
-            Profile = results.FirstOrDefault()?.Profile ?? MeasurementProfile.Realistic,
+            GcBehavior = results.FirstOrDefault()?.GcBehavior ?? GcBehavior.Natural,
             Results = serializedResults,
         };
 
@@ -74,7 +74,7 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
         public int MeasurementEpoch { get; init; }
         public DateTimeOffset GeneratedAt { get; init; }
         public ReportDetail Detail { get; init; }
-        public MeasurementProfile Profile { get; init; }
+        public GcBehavior GcBehavior { get; init; }
         public IReadOnlyList<BenchmarkResult> Results { get; init; } = [];
     }
 }

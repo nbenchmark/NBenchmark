@@ -15,20 +15,20 @@ namespace NBenchmark;
 public record MeasurementOptions
 {
     internal const double PercentileEqualityTolerance = 1e-9;
-    internal const int MinIterations = 0;
-    internal const int MaxIterations = 100_000;
+    internal const int MinSamplesLimit = 0;
+    internal const int MaxSamplesLimit = 100_000;
 
-    /// <summary>The ceiling on a <em>pinned</em> <see cref="WarmupIterations" /> (and <c>--warmup</c>).</summary>
-    internal const int MaxWarmupIterations = 10_000;
+    /// <summary>The ceiling on a <em>pinned</em> <see cref="WarmupSamples" /> (and <c>--warmup-samples</c>).</summary>
+    internal const int MaxWarmupSamplesLimit = 10_000;
 
     /// <summary>
-    ///     The ceiling on <em>auto</em>-resolved warmup (<see cref="AutoTuneOptions.MaxWarmup" /> and
-    ///     <c>--max-warmup</c> / <c>--min-warmup</c>). Deliberately far above
-    ///     <see cref="MaxWarmupIterations" />: a fast body needs tens of thousands of samples to reach
+    ///     The ceiling on <em>auto</em>-resolved warmup (<see cref="AutoTuneOptions.MaxWarmupSamples" /> and
+    ///     <c>--max-warmup-samples</c> / <c>--min-warmup-samples</c>). Deliberately far above
+    ///     <see cref="MaxWarmupSamplesLimit" />: a fast body needs tens of thousands of samples to reach
     ///     <see cref="AutoTuneOptions.MinWarmupTime" />, and a count ceiling that binds first would
     ///     silently defeat that floor.
     /// </summary>
-    internal const int MaxAutoWarmupIterations = 100_000;
+    internal const int MaxAutoWarmupSamplesLimit = 100_000;
 
     internal const int MaxOpsPerSampleLimit = 1 << 24;
     internal const int MinHistogramBucketCount = 5;
@@ -83,17 +83,17 @@ public record MeasurementOptions
     /// <summary>
     ///     The number of warmup samples to discard before measurement. <c>null</c> (the default)
     ///     auto-detects warmup length with a plateau rule; <c>0</c> skips warmup; a positive value
-    ///     pins an exact count. Must be between 0 and <see cref="MaxWarmupIterations" /> when set.
+    ///     pins an exact count. Must be between 0 and <see cref="MaxWarmupSamplesLimit" /> when set.
     /// </summary>
-    public int? WarmupIterations
+    public int? WarmupSamples
     {
         get => _warmupIterations;
         init
         {
-            if (value is { } count && count is < 0 or > MaxWarmupIterations)
+            if (value is { } count && count is < 0 or > MaxWarmupSamplesLimit)
             {
                 throw new ArgumentOutOfRangeException(nameof(value), value,
-                    $"WarmupIterations must be null (auto) or between 0 and {MaxWarmupIterations}.");
+                    $"WarmupSamples must be null (auto) or between 0 and {MaxWarmupSamplesLimit}.");
             }
 
             _warmupIterations = value;
@@ -103,17 +103,17 @@ public record MeasurementOptions
     /// <summary>
     ///     The number of measured samples to collect. <c>null</c> (the default) auto-detects the
     ///     count from a confidence-interval-width target; <c>0</c> is a dry-run; a positive value
-    ///     pins an exact count. Must be between 0 and <see cref="MaxIterations" /> when set.
+    ///     pins an exact count. Must be between 0 and <see cref="MaxSamplesLimit" /> when set.
     /// </summary>
-    public int? Iterations
+    public int? Samples
     {
         get => _iterations;
         init
         {
-            if (value is { } count && count is < 0 or > MaxIterations)
+            if (value is { } count && count is < 0 or > MaxSamplesLimit)
             {
                 throw new ArgumentOutOfRangeException(nameof(value), value,
-                    $"Iterations must be null (auto) or between 0 and {MaxIterations} (0 = dry-run).");
+                    $"Samples must be null (auto) or between 0 and {MaxSamplesLimit} (0 = dry-run).");
             }
 
             _iterations = value;
@@ -172,32 +172,32 @@ public record MeasurementOptions
     public InterferenceOptions Interference { get; init; } = InterferenceOptions.Default;
 
     /// <summary>
-    ///     The authoritative measurement profile. The four nullable GC/allocation settings below
+    ///     The authoritative GC behavior. The four nullable GC/allocation settings below
     ///     derive from this when left <c>null</c>; see <see cref="Resolve" />.
     /// </summary>
-    public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
+    public GcBehavior GcBehavior { get; init; } = GcBehavior.Natural;
 
     /// <summary>
     ///     Whether a Gen0 GC is forced before each measured iteration. <c>null</c> - the default -
-    ///     follows <see cref="Profile" />, which forces one under
-    ///     <see cref="MeasurementProfile.Independent" /> and not under
-    ///     <see cref="MeasurementProfile.Realistic" />.
+    ///     follows <see cref="GcBehavior" />, which forces one under
+    ///     <see cref="GcBehavior.PerSampleCollect" /> and not under
+    ///     <see cref="GcBehavior.Natural" />.
     /// </summary>
     /// <remarks>
     ///     The settable property is the one you can name. These four were once pairs - a resolved
     ///     <c>bool</c> under the discoverable name and a nullable <c>*Override</c> beside it - so
-    ///     <c>new MeasurementOptions { ForceGcBeforeEachIteration = true }</c> was a compile error
+    ///     <c>new MeasurementOptions { ForceGcBeforeEachSample = true }</c> was a compile error
     ///     pointing at a property whose <c>Override</c> suffix described an internal resolution step
     ///     the caller had no reason to know about. The resolved value is what a run <i>did</i>, and it
     ///     is read off <see cref="Resolve" /> or the result, not off the request.
     /// </remarks>
-    public bool? ForceGcBeforeEachIteration { get; init; }
+    public bool? ForceGcBeforeEachSample { get; init; }
 
     /// <summary>
     ///     Whether a full GC runs once between warmup and measurement, clearing the warmup heap so
-    ///     it cannot trigger a collection mid-measurement. <c>null</c> follows <see cref="Profile" />:
-    ///     forced under <see cref="MeasurementProfile.Independent" />, while
-    ///     <see cref="MeasurementProfile.Realistic" /> deliberately inherits the warmup heap to match
+    ///     it cannot trigger a collection mid-measurement. <c>null</c> follows <see cref="GcBehavior" />:
+    ///     forced under <see cref="GcBehavior.PerSampleCollect" />, while
+    ///     <see cref="GcBehavior.Natural" /> deliberately inherits the warmup heap to match
     ///     production. Distinct from <see cref="ForceGcBetweenBenchmarks" />, which runs a full GC
     ///     <em>between</em> benchmarks to keep them independent of one another.
     /// </summary>
@@ -227,8 +227,8 @@ public record MeasurementOptions
     /// </remarks>
     public ResolvedMeasurementOptions Resolve() => new()
     {
-        ForceGcBeforeEachIteration = ForceGcBeforeEachIteration ?? Profile == MeasurementProfile.Independent,
-        ForceGcBeforeMeasurement = ForceGcBeforeMeasurement ?? Profile == MeasurementProfile.Independent,
+        ForceGcBeforeEachSample = ForceGcBeforeEachSample ?? GcBehavior == NBenchmark.GcBehavior.PerSampleCollect,
+        ForceGcBeforeMeasurement = ForceGcBeforeMeasurement ?? GcBehavior == NBenchmark.GcBehavior.PerSampleCollect,
         ForceGcBetweenBenchmarks = ForceGcBetweenBenchmarks ?? true,
         MeasureAllocations = MeasureAllocations ?? true,
     };
@@ -294,7 +294,7 @@ public record MeasurementOptions
 
     /// <summary>
     ///     The set of percentiles to compute and report (values in [0, 1]).
-    ///     Default: [0.50, 0.95, 0.99, 0.999, 1.0] (P50, P95, P99, P99.9, Max).
+    ///     Default: [0.50, 0.95, 0.99, 0.999, 1.0] (P50, P95, P99, P99.9, MaxNs).
     ///     Use 1.0 to report the sample maximum for display alongside integer percentiles.
     ///     Values are normalized to ascending order with duplicates removed.
     /// </summary>
@@ -526,13 +526,11 @@ public record MeasurementOptions
     }
 
     /// <summary>
-    ///     When <c>false</c> (the default), a runtime warning is emitted when a class with
-    ///     <c>InstanceLifetime.PerClass</c> has more than one <c>[Benchmark]</c> method,
-    ///     because shared state across methods violates the statistical-independence
-    ///     assumption of the significance test. Set to <c>true</c> to suppress this warning
-    ///     when sharing is intentional.
+    ///     The setup warnings this run stays silent about. Defaults to
+    ///     <see cref="BenchmarkWarnings.None" />, which emits all of them. Suppressing a warning
+    ///     never changes what is measured - only whether the engine says the setup is imperfect.
     /// </summary>
-    public bool SuppressPerClassIndependenceWarning { get; init; }
+    public BenchmarkWarnings SuppressedWarnings { get; init; } = BenchmarkWarnings.None;
 
     /// <summary>
     ///     Hardware/OS controls applied for the duration of a run: CPU affinity, process
@@ -542,7 +540,7 @@ public record MeasurementOptions
     ///     the measuring thread is still raised to user-interactive quality of service on macOS.
     ///     Set via <see cref="BenchmarkSuite.WithHardwareAffinity" /> /
     ///     <see cref="BenchmarkHarness.WithHardwareAffinity" />, the <c>--cpu-affinity</c> /
-    ///     <c>--priority</c> / <c>--dedicated-host-guidance</c> CLI flags, or directly on
+    ///     <c>--priority</c> / <c>--host-quality-warnings</c> CLI flags, or directly on
     ///     the options record.
     /// </summary>
     public EnvironmentOptions? Environment { get; init; }
@@ -561,15 +559,6 @@ public record MeasurementOptions
     ///     </para>
     /// </summary>
     public RuntimeProfile RuntimeProfile { get; init; } = RuntimeProfile.SteadyState;
-
-    /// <summary>
-    ///     Suppresses the once-per-process guidance that fires when
-    ///     <see cref="RuntimeProfile" /> was requested but could not be applied because the
-    ///     measurement is running in the host process. Set this when in-process measurement is a
-    ///     deliberate choice. The result's <see cref="BenchmarkResult.RuntimeProfileName" /> stamp
-    ///     is unaffected - suppressing the message never suppresses the provenance.
-    /// </summary>
-    public bool SuppressRuntimeProfileWarning { get; init; }
 
     /// <summary>
     ///     Whether to measure in a worker process, and what happens when isolation is refused.
@@ -622,7 +611,7 @@ public record MeasurementOptions
     internal bool IsolationOff => Isolation == Isolation.Off;
 
     /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
-    public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };
+    public static MeasurementOptions For(GcBehavior profile) => new() { GcBehavior = profile };
 
     /// <summary>
     ///     Resolves the effective outlier detector: the one <see cref="OutlierDetector" /> builds when

@@ -1,5 +1,5 @@
 using System.Reflection;
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Lifecycle;
 
 namespace NBenchmark.Engine;
@@ -97,7 +97,7 @@ internal static class InstanceIndependence
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (options.SuppressPerClassIndependenceWarning)
+        if (options.SuppressedWarnings.HasFlag(BenchmarkWarnings.PerClassIndependence))
             return null;
 
         if (lifetime != InstanceLifetime.PerClass)
@@ -119,7 +119,8 @@ internal static class InstanceIndependence
                + "assumption of the significance test. To preserve independence: implement IStateReset "
                + "on the class (the engine will call it between methods), or use "
                + "InstanceLifetime.PerMethod. If the carry-over is deliberate, say so with "
-               + "[SharedState] - or set SuppressPerClassIndependenceWarning on MeasurementOptions to "
+               + "[SharedState] - or add BenchmarkWarnings.PerClassIndependence to "
+               + "MeasurementOptions.SuppressedWarnings to "
                + "silence it for the whole run.";
     }
 
@@ -154,5 +155,5 @@ internal static class InstanceIndependence
 
     /// <summary>Whether the class carries <c>[SharedState]</c>.</summary>
     public static bool SharesIntentionally(Type type)
-        => type.GetCustomAttribute<SharedStateAttribute>() is { Intentional: true };
+        => type.GetCustomAttribute<SharedStateAttribute>() is { Acknowledged: true };
 }

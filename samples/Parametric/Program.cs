@@ -1,12 +1,11 @@
 using NBenchmark;
-using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
 // Parametric benchmarks let you declare a method once and run it across many
 // argument sets, producing one result row per set.
 //
-// Use [BenchmarkCase(...)] for a short inline list of literal arguments.
-// Use [BenchmarkCases(nameof(Source))] for programmatic, named, or generated cases.
+// Use [Arguments(...)] for a short inline list of literal arguments.
+// Use [ArgumentsSource(nameof(Source))] for programmatic, named, or generated cases.
 //
 // In Harness mode each class renders as a single comparison table: parameter values
 // become columns. When competing benchmarks share a parameter group the baseline,
@@ -25,11 +24,11 @@ await BenchmarkHarness.Create(args)
 
 public class LinearSearchBenchmarks
 {
-    // Inline literal cases. Each [BenchmarkCase] produces one row.
+    // Inline literal cases. Each [Arguments] produces one row.
     [Benchmark(Baseline = true)]
-    [BenchmarkCase(10)]
-    [BenchmarkCase(100)]
-    [BenchmarkCase(1000)]
+    [Arguments(10)]
+    [Arguments(100)]
+    [Arguments(1000)]
     public int LinearSearch(int count)
     {
         var data = EmptyData(count);
@@ -65,7 +64,7 @@ public class BinarySearchBenchmarks
     // Programmatic source. The tuple element names appear in the report:
     //   BinarySearch(Count=10000, Target="last")
     [Benchmark(Baseline = true)]
-    [BenchmarkCases(nameof(BinarySearchCases))]
+    [ArgumentsSource(nameof(BinarySearchCases))]
     public int BinarySearch(int count, string targetLabel)
     {
         var data = SortedData(count);

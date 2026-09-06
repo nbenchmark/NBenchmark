@@ -1,5 +1,4 @@
 using NBenchmark;
-using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
 // MultiRuntimeHarness demonstrates running attribute-based benchmarks across multiple
@@ -16,7 +15,7 @@ using NBenchmark.Reporters.Console;
 //
 //   2. --runtimes CLI flag (overrides [Runtimes]):
 //        dotnet run --project samples/MultiRuntimeHarness -- --runtimes net8,net9,net10
-//        dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output ./results
+//        dotnet run -- --runtimes net8,net9 --samples 500 --reporter markdown --output ./results
 //
 // The host builds the project for each specified runtime, runs the benchmarks in a
 // child process under that runtime, and aggregates the results. The console output
@@ -28,7 +27,7 @@ await BenchmarkHarness.Create(args)
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
 
-[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)]
+[Runtimes("net8.0", "net9.0", "net10.0")]
 public class StringBenchmarks
 {
     [Benchmark(Baseline = true)]

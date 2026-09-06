@@ -118,7 +118,7 @@ internal static class LogRatio
 
         var baselineByIndex = baselineLaunches.Launches
             .Where(l => !l.Errored)
-            .ToDictionary(l => l.LaunchIndex, l => l.Median);
+            .ToDictionary(l => l.LaunchIndex, l => l.MedianNs);
 
         var paired = candidateLaunches.Launches
             .Where(l => !l.Errored && baselineByIndex.ContainsKey(l.LaunchIndex))
@@ -126,7 +126,7 @@ internal static class LogRatio
             .ToList();
 
         return Estimate(
-            paired.Select(l => l.Median).ToList(),
+            paired.Select(l => l.MedianNs).ToList(),
             paired.Select(l => baselineByIndex[l.LaunchIndex]).ToList(),
             confidenceLevel);
     }
@@ -162,7 +162,7 @@ internal static class LogRatio
             if (launch.Errored || launch.LaunchIndex < 0 || launch.LaunchIndex >= candidateMedians.Length)
                 continue;
 
-            candidateMedians[launch.LaunchIndex] = launch.Median;
+            candidateMedians[launch.LaunchIndex] = launch.MedianNs;
         }
 
         return Estimate(candidateMedians, baselineLaunchMedians, candidate.ConfidenceLevel);

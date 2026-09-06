@@ -160,14 +160,14 @@ internal static class SuitePlanRunner
         var options = localSuite.ResolvedOptions;
         var names = localSuite.BenchmarkNames();
 
-        Console.WriteLine($"Building for runtimes: {string.Join(", ", runtimes.Select(r => r.ToTargetFramework()))}");
+        Console.WriteLine($"Building for runtimes: {string.Join(", ", runtimes.Select(r => r.TargetFramework))}");
 
         var builds = await MultiRuntimeOrchestrator
             .BuildForRuntimesAsync(runtimes, cancellationToken).ConfigureAwait(false);
 
         foreach (var failed in builds.Where(b => b.Error is not null))
         {
-            Console.Error.WriteLine($"  {failed.Moniker.ToTargetFramework()}: {failed.Error}");
+            Console.Error.WriteLine($"  {failed.Moniker.TargetFramework}: {failed.Error}");
         }
 
         var allResults = new List<BenchmarkResult>();
@@ -175,7 +175,7 @@ internal static class SuitePlanRunner
 
         foreach (var build in builds.Where(b => b.DllPath is not null))
         {
-            var tfm = build.Moniker.ToTargetFramework();
+            var tfm = build.Moniker.TargetFramework;
 
             try
             {
@@ -222,7 +222,7 @@ internal static class SuitePlanRunner
 
                     var stamped = result with
                     {
-                        RuntimeMoniker = tfm,
+                        TargetFramework = tfm,
                         IsolationStatus = IsolationStatus.Isolated,
                         RawSamples = samples,
                     };

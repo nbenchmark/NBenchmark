@@ -1,5 +1,5 @@
 using System.Reflection;
-using NBenchmark.Attributes;
+using NBenchmark;
 
 namespace NBenchmark.Workers;
 

@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using Xunit;
@@ -75,15 +75,15 @@ public class EnvelopeTests
         {
             Options = new MeasurementOptions
             {
-                Iterations = 5,
-                WarmupIterations = 1,
+                Samples = 5,
+                WarmupSamples = 1,
                 OpsPerSample = 1,
                 OutlierMode = OutlierMode.None,
             },
         }, CancellationToken.None);
 
-        Assert.Equal(2, outcome.Result.MeasuredIterations);
-        Assert.Equal(3, outcome.Result.WarmupIterations);
+        Assert.Equal(2, outcome.Result.SampleCount);
+        Assert.Equal(3, outcome.Result.WarmupSamples);
         Assert.Equal(5, instance.InvocationCount);
     }
 
@@ -98,14 +98,14 @@ public class EnvelopeTests
         {
             Options = new MeasurementOptions
             {
-                Iterations = 0,
-                WarmupIterations = 0,
+                Samples = 0,
+                WarmupSamples = 0,
                 OutlierMode = OutlierMode.None,
             },
         }, CancellationToken.None);
 
-        Assert.Equal(0, outcome.Result.MeasuredIterations);
-        Assert.Equal(0, outcome.Result.WarmupIterations);
+        Assert.Equal(0, outcome.Result.SampleCount);
+        Assert.Equal(0, outcome.Result.WarmupSamples);
         Assert.Equal(0, instance.InvocationCount);
     }
 
@@ -120,8 +120,8 @@ public class EnvelopeTests
         {
             Options = new MeasurementOptions
             {
-                Iterations = 3,
-                WarmupIterations = 1,
+                Samples = 3,
+                WarmupSamples = 1,
                 OpsPerSample = 1,
                 OutlierMode = OutlierMode.None,
             },
@@ -135,7 +135,7 @@ public class EnvelopeTests
 
     private static RunSpec MinimalSpec() => new()
     {
-        Options = new MeasurementOptions { Iterations = 0, WarmupIterations = 0 },
+        Options = new MeasurementOptions { Samples = 0, WarmupSamples = 0 },
     };
 
     private sealed class BaselineBenchmarks
@@ -148,7 +148,7 @@ public class EnvelopeTests
     {
         public int InvocationCount;
 
-        [Benchmark(Iterations = 2, WarmupIterations = 3)]
+        [Benchmark(Samples = 2, WarmupSamples = 3)]
         public void Work() => InvocationCount++;
     }
 
@@ -156,7 +156,7 @@ public class EnvelopeTests
     {
         public int InvocationCount;
 
-        [Benchmark(Iterations = 3, WarmupIterations = 1)]
+        [Benchmark(Samples = 3, WarmupSamples = 1)]
         public int Compute()
         {
             InvocationCount++;

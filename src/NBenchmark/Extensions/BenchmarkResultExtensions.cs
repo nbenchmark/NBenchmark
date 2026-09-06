@@ -16,8 +16,8 @@ public static class BenchmarkResultExtensions
             return result;
         }
 
-        var allocText = result.MeanAllocatedBytes.HasValue
-            ? $"  Alloc/op: {BenchmarkFormatter.FormatBytes(result.MeanAllocatedBytes.Value)}"
+        var allocText = result.AllocatedBytesMean.HasValue
+            ? $"  Alloc/op: {BenchmarkFormatter.FormatBytes(result.AllocatedBytesMean.Value)}"
             : "";
 
         // Header
@@ -27,14 +27,14 @@ public static class BenchmarkResultExtensions
         if (detail == ReportDetail.Simple)
         {
             Console.WriteLine(
-                $"  │  Median: {BenchmarkFormatter.FormatNs(result.Median),-14} Ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond)}");
+                $"  │  Median: {BenchmarkFormatter.FormatNs(result.MedianNs),-14} Ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond)}");
 
             if (!string.IsNullOrEmpty(allocText))
                 Console.WriteLine($"  │{allocText}");
         }
         else
         {
-            Console.WriteLine($"  │  Median: {BenchmarkFormatter.FormatNs(result.Median),-14} Mean: {BenchmarkFormatter.FormatNs(result.Mean)}");
+            Console.WriteLine($"  │  Median: {BenchmarkFormatter.FormatNs(result.MedianNs),-14} Mean: {BenchmarkFormatter.FormatNs(result.MeanNs)}");
 
             Console.WriteLine(
                 $"  │  Ops/s:  {BenchmarkFormatter.FormatOpsPerSecond(result.OperationsPerSecond),-14} Median ops/s: {BenchmarkFormatter.FormatOpsPerSecond(result.MedianOperationsPerSecond)}");
@@ -50,14 +50,14 @@ public static class BenchmarkResultExtensions
             if (percentileSummary.Length > 0)
                 Console.WriteLine($"  │  {percentileSummary}");
 
-            Console.WriteLine($"  │  StdDev: {BenchmarkFormatter.FormatNs(result.StandardDeviation),-14} CV:   {result.CoefficientOfVariationPercent:F2}%");
+            Console.WriteLine($"  │  StdDev: {BenchmarkFormatter.FormatNs(result.StandardDeviationNs),-14} CV:   {result.CoefficientOfVariationPercent:F2}%");
 
-            if (result.MarginOfError > 0)
+            if (result.MarginOfErrorNs > 0)
             {
-                Console.WriteLine($"  │  Error:  ±{BenchmarkFormatter.FormatNs(result.MarginOfError)} ({result.MarginPercent:F2}% of Mean)");
+                Console.WriteLine($"  │  Error:  ±{BenchmarkFormatter.FormatNs(result.MarginOfErrorNs)} ({result.MarginOfErrorPercent:F2}% of mean)");
 
                 Console.WriteLine(
-                    $"  │  CI:     [{BenchmarkFormatter.FormatNs(result.ConfidenceIntervalLower)} … {BenchmarkFormatter.FormatNs(result.ConfidenceIntervalUpper)}] ({result.ConfidenceLevel * 100:0.#}%)");
+                    $"  │  CI:     [{BenchmarkFormatter.FormatNs(result.ConfidenceIntervalLowerNs)} … {BenchmarkFormatter.FormatNs(result.ConfidenceIntervalUpperNs)}] ({result.ConfidenceLevel * 100:0.#}%)");
             }
 
             if (!string.IsNullOrEmpty(allocText))
@@ -67,29 +67,29 @@ public static class BenchmarkResultExtensions
         if (detail == ReportDetail.Advanced)
         {
             Console.WriteLine("  │");
-            Console.WriteLine($"  │  N:      {result.N} samples (warmup: {result.WarmupIterations}, outliers removed: {result.OutliersRemoved})");
+            Console.WriteLine($"  │  Samples: {result.SampleCount} measured (warmup: {result.WarmupSamples}, outliers removed: {result.OutliersRemoved})");
 
             Console.WriteLine(
-                $"  │  Range:  {BenchmarkFormatter.FormatNs(result.Range)} ({BenchmarkFormatter.FormatNs(result.Min)} → {BenchmarkFormatter.FormatNs(result.Max)})");
+                $"  │  Range:   {BenchmarkFormatter.FormatNs(result.RangeNs)} ({BenchmarkFormatter.FormatNs(result.MinNs)} → {BenchmarkFormatter.FormatNs(result.MaxNs)})");
 
-            Console.WriteLine($"  │  Q1:     {BenchmarkFormatter.FormatNs(result.Q1),-14} Q3:   {BenchmarkFormatter.FormatNs(result.Q3)}");
-            Console.WriteLine($"  │  IQR:    {BenchmarkFormatter.FormatNs(result.InterquartileRange)}");
+            Console.WriteLine($"  │  Q1:     {BenchmarkFormatter.FormatNs(result.Q1Ns),-14} Q3:     {BenchmarkFormatter.FormatNs(result.Q3Ns)}");
+            Console.WriteLine($"  │  IQR:    {BenchmarkFormatter.FormatNs(result.InterquartileRangeNs)}");
 
-            if (result.LowerFence is not null && result.UpperFence is not null)
+            if (result.LowerFenceNs is not null && result.UpperFenceNs is not null)
             {
                 Console.WriteLine(
-                    $"  │  Fences: [{BenchmarkFormatter.FormatNs(result.LowerFence.Value)} … {BenchmarkFormatter.FormatNs(result.UpperFence.Value)}]");
+                    $"  │  Fences: [{BenchmarkFormatter.FormatNs(result.LowerFenceNs.Value)} … {BenchmarkFormatter.FormatNs(result.UpperFenceNs.Value)}]");
             }
 
             Console.WriteLine($"  │  Skew:   {result.Skewness:F4,-14} Kurt: {result.Kurtosis:F4}");
-            Console.WriteLine($"  │  MAD:    {BenchmarkFormatter.FormatNs(result.Mad)}");
+            Console.WriteLine($"  │  MAD:    {BenchmarkFormatter.FormatNs(result.MedianAbsoluteDeviationNs)}");
 
-            if (result.AllocMedian is not null)
+            if (result.AllocatedBytesMedian is not null)
             {
                 Console.WriteLine("  │");
-                Console.WriteLine($"  │  Alloc Median: {BenchmarkFormatter.FormatBytes(result.AllocMedian.Value)}");
-                Console.WriteLine($"  │  Alloc P95:    {BenchmarkFormatter.FormatBytes(result.AllocP95 ?? 0)}");
-                Console.WriteLine($"  │  Alloc Max:    {BenchmarkFormatter.FormatBytes(result.AllocMax ?? 0)}");
+                Console.WriteLine($"  │  Alloc Median: {BenchmarkFormatter.FormatBytes(result.AllocatedBytesMedian.Value)}");
+                Console.WriteLine($"  │  Alloc P95:    {BenchmarkFormatter.FormatBytes(result.AllocatedBytesP95 ?? 0)}");
+                Console.WriteLine($"  │  Alloc Max:       {BenchmarkFormatter.FormatBytes(result.AllocatedBytesMax ?? 0)}");
             }
         }
 

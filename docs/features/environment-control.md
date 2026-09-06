@@ -91,7 +91,7 @@ new BenchmarkSuite("MySuite")
 
 The host probe doesn't label every Mac a shared runner. It reads the performance/efficiency core split where the platform reports one and notes that frequency scaling and thermal throttling remain unobservable from managed code.
 
-On Apple Silicon, cores are not interchangeable. An M1 Max reports 10 logical CPUs, of which 8 are performance cores and 2 are efficiency cores. NBenchmark reads this split (`hw.nperflevels` and `hw.perflevelN.logicalcpu`) and reports it in the host guidance:
+On Apple Silicon, cores are not interchangeable. An M1 max reports 10 logical CPUs, of which 8 are performance cores and 2 are efficiency cores. NBenchmark reads this split (`hw.nperflevels` and `hw.perflevelN.logicalcpu`) and reports it in the host guidance:
 
 ```
 Dedicated-host guidance:
@@ -117,7 +117,7 @@ A non-fatal pre-run probe warns when the host appears to be a shared or noisy be
 
 **CLI:**
 ```bash
-dotnet run -- --dedicated-host-guidance
+dotnet run -- --host-quality-warnings
 ```
 
 The probe checks for:
@@ -132,7 +132,7 @@ The run proceeds regardless of the probe's findings.
 **Fluent API:**
 ```csharp
 new BenchmarkSuite("MySuite")
-    .WithDedicatedHostGuidance()
+    .WithHostQualityWarnings()
     .Add(...)
     .RunAsync();
 ```
@@ -151,12 +151,12 @@ Suppress this warning if measuring Debug behavior is intentional:
 **Fluent API:**
 ```csharp
 new BenchmarkSuite("MySuite")
-    .WithSuppressBuildConfigurationWarning()
+    .WithSuppressedWarnings(BenchmarkWarnings.BuildConfiguration)
     .Add(...)
     .RunAsync();
 
 await BenchmarkHarness.Create(args)
-    .WithSuppressBuildConfigurationWarning()
+    .WithSuppressedWarnings(BenchmarkWarnings.BuildConfiguration)
     .RunAsync();
 ```
 
@@ -171,7 +171,7 @@ The controls are independent and compose. For a dedicated benchmark host running
 
 **CLI:**
 ```bash
-dotnet run -- --cpu-affinity 2,3 --priority high --dedicated-host-guidance
+dotnet run -- --cpu-affinity 2,3 --priority high --host-quality-warnings
 ```
 
 **Fluent API:**
@@ -182,7 +182,7 @@ var options = new MeasurementOptions
     {
         CpuAffinity = [2, 3],
         ProcessPriority = ProcessPriorityClass.High,
-        DedicatedHostGuidance = true,
+        HostQualityWarnings = true,
     },
 };
 
@@ -190,7 +190,7 @@ var options = new MeasurementOptions
 new BenchmarkSuite("MySuite")
     .WithProcessPriority(ProcessPriorityClass.High)
     .WithHardwareAffinity(2, 3)
-    .WithDedicatedHostGuidance()
+    .WithHostQualityWarnings()
     .Add(...)
     .RunAsync();
 ```
@@ -214,6 +214,6 @@ For a discussion on why benchmarking on a noisy host is fundamentally difficult,
 For more information, see the following pages:
 
 - [Configuration: Environment](../reference/configuration.md#environment) - Reference for the `EnvironmentOptions` record.
-- [CLI Reference](../reference/cli.md) - Details on `--cpu-affinity`, `--priority`, `--dedicated-host-guidance`, and `--no-thread-control`.
+- [CLI Reference](../reference/cli.md) - Details on `--cpu-affinity`, `--priority`, `--host-quality-warnings`, and `--no-thread-control`.
 - [Measurement](../statistics/measurement.md) - The adaptive loop that runs under these controls.
 - [Outlier Trimming](../statistics/outliers.md) - The reactive noise handling that complements environment control.

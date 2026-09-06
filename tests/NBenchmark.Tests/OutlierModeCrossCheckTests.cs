@@ -18,12 +18,12 @@ public class OutlierModeCrossCheckTests
     [InlineData(50, 47)]
     [InlineData(100, 95)]
     [InlineData(200, 190)]
-    public async Task RemoveTop5Percent_Keeps_Floor_95Percent(int iterations, int expectedKept)
+    public async Task RemoveTop5Percent_Keeps_Floor_95Percent(int samples, int expectedKept)
     {
-        var outcome = await Measure(iterations, OutlierMode.RemoveTop5Percent);
+        var outcome = await Measure(samples, OutlierMode.RemoveTop5Percent);
 
-        Assert.Equal(expectedKept, outcome.Result.MeasuredIterations);
-        Assert.Equal(iterations, outcome.RawSamples.Length);
+        Assert.Equal(expectedKept, outcome.Result.SampleCount);
+        Assert.Equal(samples, outcome.RawSamples.Length);
     }
 
     // RemoveTopAndBottom5Percent removes floor(n × 0.05) from each end.
@@ -32,18 +32,18 @@ public class OutlierModeCrossCheckTests
     [InlineData(50, 46)]
     [InlineData(100, 90)]
     [InlineData(200, 180)]
-    public async Task RemoveBoth5Percent_Trims_Floor_Each_End(int iterations, int expectedKept)
+    public async Task RemoveBoth5Percent_Trims_Floor_Each_End(int samples, int expectedKept)
     {
-        var outcome = await Measure(iterations, OutlierMode.RemoveTopAndBottom5Percent);
+        var outcome = await Measure(samples, OutlierMode.RemoveTopAndBottom5Percent);
 
-        Assert.Equal(expectedKept, outcome.Result.MeasuredIterations);
-        Assert.Equal(iterations, outcome.RawSamples.Length);
+        Assert.Equal(expectedKept, outcome.Result.SampleCount);
+        Assert.Equal(samples, outcome.RawSamples.Length);
     }
 
     // The IqrFence quartiles come from the nearest-rank percentile. For a
-    // 1..20 ramp this gives Q1 = 5, Q3 = 15 (numpy method='inverted_cdf'),
-    // NOT R's default type-7 linear interpolation (which gives Q1 = 5.75,
-    // Q3 = 15.25). This pins the deliberate divergence documented in
+    // 1..20 ramp this gives Q1Ns = 5, Q3Ns = 15 (numpy method='inverted_cdf'),
+    // NOT R's default type-7 linear interpolation (which gives Q1Ns = 5.75,
+    // Q3Ns = 15.25). This pins the deliberate divergence documented in
     // docs/advanced/statistics.md.
     [Fact]
     public void IqrFence_Quartiles_Use_NearestRank_Not_R_Type7()
@@ -62,7 +62,7 @@ public class OutlierModeCrossCheckTests
         Assert.NotEqual(15.25, q3, 12);
     }
 
-    private static Task<MeasurementOutcome> Measure(int iterations, OutlierMode mode) =>
+    private static Task<MeasurementOutcome> Measure(int samples, OutlierMode mode) =>
         BenchmarkRunner.Instance.RunAsync(
             "outlier",
             () => Task.CompletedTask,
@@ -70,8 +70,8 @@ public class OutlierModeCrossCheckTests
             {
                 Options = new MeasurementOptions
                 {
-                    WarmupIterations = 1,
-                    Iterations = iterations,
+                    WarmupSamples = 1,
+                    Samples = samples,
                     OutlierMode = mode,
                     // These tests pin the trim-count *formulas* against a real (non-scripted)
                     // clock, and a trivial body's samples are all a handful of nanoseconds -

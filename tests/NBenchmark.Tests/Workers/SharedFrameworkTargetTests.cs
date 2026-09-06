@@ -28,8 +28,8 @@ public sealed class SharedFrameworkTargetTests
 {
     private static MeasurementOptions FastOptions => MeasurementOptions.Default with
     {
-        Iterations = 8,
-        WarmupIterations = 1,
+        Samples = 8,
+        WarmupSamples = 1,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {

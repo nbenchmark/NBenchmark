@@ -6,7 +6,7 @@ namespace NBenchmark.Workers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         A worker measures up to <see cref="MeasurementOptions.MaxIterations" /> samples, so an
+///         A worker measures up to <see cref="MeasurementOptions.MaxSamplesLimit" /> samples, so an
 ///         untruncated array is 800 KiB of JSON-encoded doubles per benchmark - which is why the frame
 ///         ceiling had to be set at 64 MiB to accommodate it. The full array is not what the
 ///         coordinator needs: the worker already computed every statistic from it locally, and what
@@ -19,7 +19,7 @@ namespace NBenchmark.Workers;
 ///         k-th sample. A prefix is not a sample of the distribution at all - it is the first
 ///         fraction of the run, which is exactly where residual warmup effects live. Systematic
 ///         every-k-th selection is unbiased in the mean but aliases against anything periodic in the
-///         measurement, and periodic structure is common here: a GC every n iterations, a buffer that
+///         measurement, and periodic structure is common here: a GC every n samples, a buffer that
 ///         wraps, a timer that ticks. Random selection cannot alias.
 ///     </para>
 ///     <para>

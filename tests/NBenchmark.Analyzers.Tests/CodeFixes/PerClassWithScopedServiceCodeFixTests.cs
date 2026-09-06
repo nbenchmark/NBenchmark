@@ -9,7 +9,7 @@ public sealed class PerClassWithScopedServiceCodeFixTests
     public async Task CodeFix_Changes_PerClass_To_PerMethod()
     {
         var source = """
-                     using NBenchmark.Attributes;
+                     using NBenchmark;
                      using NBenchmark;
 
                      [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -27,7 +27,7 @@ public sealed class PerClassWithScopedServiceCodeFixTests
                      """;
 
         var fixedSource = """
-                          using NBenchmark.Attributes;
+                          using NBenchmark;
                           using NBenchmark;
 
                           [InstanceLifetime(InstanceLifetime.PerMethod)]
@@ -53,7 +53,7 @@ public sealed class PerClassWithScopedServiceCodeFixTests
     {
         // Confirms the fix works for the broadened heuristic (any reference-type ctor param).
         var source = """
-                     using NBenchmark.Attributes;
+                     using NBenchmark;
                      using NBenchmark;
 
                      [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -68,7 +68,7 @@ public sealed class PerClassWithScopedServiceCodeFixTests
                      """;
 
         var fixedSource = """
-                          using NBenchmark.Attributes;
+                          using NBenchmark;
                           using NBenchmark;
 
                           [InstanceLifetime(InstanceLifetime.PerMethod)]
@@ -100,7 +100,7 @@ public sealed class PerClassWithScopedServiceCodeFixTests
     public async Task CodeFix_Implements_IStateReset_When_Selected()
     {
         var source = """
-                     using NBenchmark.Attributes;
+                     using NBenchmark;
                      using NBenchmark;
 
                      [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -118,7 +118,7 @@ public sealed class PerClassWithScopedServiceCodeFixTests
                      """;
 
         var fixedSource = """
-                          using NBenchmark.Attributes;
+                          using NBenchmark;
                           using NBenchmark;
                           using NBenchmark.Lifecycle;
 

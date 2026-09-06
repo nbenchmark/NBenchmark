@@ -228,13 +228,13 @@ public sealed class DiagnosticsTests : IDisposable
         var result = new BenchmarkResult
         {
             Name = "test",
-            Mean = 100, Median = 100, Min = 50, Max = 200,
-            StandardDeviation = 20,
-            Q1 = 80, Q3 = 120, InterquartileRange = 40,
+            MeanNs = 100, MedianNs = 100, MinNs = 50, MaxNs = 200,
+            StandardDeviationNs = 20,
+            Q1Ns = 80, Q3Ns = 120, InterquartileRangeNs = 40,
             OutliersRemoved = 3,
-            N = 10,
-            Skewness = 0, Kurtosis = 0, Mad = 10,
-            AllocMedian = null, AllocP95 = null, AllocMax = null,
+            SampleCount = 10,
+            Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 10,
+            AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
         };
 
         NBenchmarkDiagnostics.RecordResult(result);
@@ -276,10 +276,10 @@ public sealed class DiagnosticsTests : IDisposable
         {
             new()
             {
-                Name = "a", Mean = 1, Median = 1, Min = 1, Max = 1, StandardDeviation = 0,
-                Q1 = 1, Q3 = 1, InterquartileRange = 0, OutliersRemoved = 0, N = 1,
-                Skewness = 0, Kurtosis = 0, Mad = 0,
-                AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "a", MeanNs = 1, MedianNs = 1, MinNs = 1, MaxNs = 1, StandardDeviationNs = 0,
+                Q1Ns = 1, Q3Ns = 1, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 1,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -306,10 +306,10 @@ public sealed class DiagnosticsTests : IDisposable
         // Clean up the static run activity so it does not leak into the next test.
         NBenchmarkDiagnostics.OnBenchmarkRunCompleted(new BenchmarkResult
         {
-            Name = "MyClass.Fast", Mean = 1, Median = 1, Min = 1, Max = 1, StandardDeviation = 0,
-            Q1 = 1, Q3 = 1, InterquartileRange = 0, OutliersRemoved = 0, N = 1,
-            Skewness = 0, Kurtosis = 0, Mad = 0,
-            AllocMedian = null, AllocP95 = null, AllocMax = null,
+            Name = "MyClass.Fast", MeanNs = 1, MedianNs = 1, MinNs = 1, MaxNs = 1, StandardDeviationNs = 0,
+            Q1Ns = 1, Q3Ns = 1, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 1,
+            Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
         });
     }
 
@@ -328,10 +328,10 @@ public sealed class DiagnosticsTests : IDisposable
 
         var result = new BenchmarkResult
         {
-            Name = "b", Mean = 200, Median = 180, Min = 100, Max = 300,
-            StandardDeviation = 40, Q1 = 150, Q3 = 250, InterquartileRange = 100,
-            OutliersRemoved = 2, N = 20, Skewness = 0, Kurtosis = 0, Mad = 5,
-            AllocMedian = null, AllocP95 = null, AllocMax = null,
+            Name = "b", MeanNs = 200, MedianNs = 180, MinNs = 100, MaxNs = 300,
+            StandardDeviationNs = 40, Q1Ns = 150, Q3Ns = 250, InterquartileRangeNs = 100,
+            OutliersRemoved = 2, SampleCount = 20, Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 5,
+            AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
         };
 
         NBenchmarkDiagnostics.OnBenchmarkRunStarting("b", "C", false);
@@ -563,12 +563,12 @@ public sealed class DiagnosticsTests : IDisposable
         var result = new BenchmarkResult
         {
             Name = "gc-test",
-            Mean = 100, Median = 100, Min = 50, Max = 200,
-            StandardDeviation = 20,
-            Q1 = 80, Q3 = 120, InterquartileRange = 40,
-            OutliersRemoved = 0, N = 10,
-            Skewness = 0, Kurtosis = 0, Mad = 10,
-            AllocMedian = null, AllocP95 = null, AllocMax = null,
+            MeanNs = 100, MedianNs = 100, MinNs = 50, MaxNs = 200,
+            StandardDeviationNs = 20,
+            Q1Ns = 80, Q3Ns = 120, InterquartileRangeNs = 40,
+            OutliersRemoved = 0, SampleCount = 10,
+            Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 10,
+            AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             Diagnostics = new DiagnosticsResult
             {
                 Gen0Collections = 3,
@@ -618,12 +618,12 @@ public sealed class DiagnosticsTests : IDisposable
         var result = new BenchmarkResult
         {
             Name = "gc-test",
-            Mean = 100, Median = 100, Min = 50, Max = 200,
-            StandardDeviation = 20,
-            Q1 = 80, Q3 = 120, InterquartileRange = 40,
-            OutliersRemoved = 0, N = 10,
-            Skewness = 0, Kurtosis = 0, Mad = 10,
-            AllocMedian = null, AllocP95 = null, AllocMax = null,
+            MeanNs = 100, MedianNs = 100, MinNs = 50, MaxNs = 200,
+            StandardDeviationNs = 20,
+            Q1Ns = 80, Q3Ns = 120, InterquartileRangeNs = 40,
+            OutliersRemoved = 0, SampleCount = 10,
+            Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 10,
+            AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             Diagnostics = new DiagnosticsResult
             {
                 Gen0Collections = 3,
@@ -657,10 +657,10 @@ public sealed class DiagnosticsTests : IDisposable
         var result = new BenchmarkResult
         {
             Name = "no-diag",
-            Mean = 1, Median = 1, Min = 1, Max = 1, StandardDeviation = 0,
-            Q1 = 1, Q3 = 1, InterquartileRange = 0, OutliersRemoved = 0, N = 1,
-            Skewness = 0, Kurtosis = 0, Mad = 0,
-            AllocMedian = null, AllocP95 = null, AllocMax = null,
+            MeanNs = 1, MedianNs = 1, MinNs = 1, MaxNs = 1, StandardDeviationNs = 0,
+            Q1Ns = 1, Q3Ns = 1, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 1,
+            Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             Diagnostics = null,
         };
 

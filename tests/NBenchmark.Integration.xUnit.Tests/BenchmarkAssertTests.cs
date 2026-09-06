@@ -38,7 +38,7 @@ public sealed class BenchmarkAssertTests
         var violations = BenchmarkAssert.Validate(result, thresholds);
 
         Assert.Single(violations);
-        Assert.Contains("Mean 1500", violations[0]);
+        Assert.Contains("MeanNs 1500", violations[0]);
         Assert.Contains("1000", violations[0]);
     }
 
@@ -188,26 +188,25 @@ public sealed class BenchmarkAssertTests
         return new BenchmarkResult
         {
             Name = "TestBenchmark",
-            Mean = mean,
-            Median = mean * 0.9,
+            MeanNs = mean,
+            MedianNs = mean * 0.9,
             Percentiles = [new PercentileEntry(0.95, p95)],
-            Min = mean * 0.5,
-            Max = p95 * 1.5,
-            StandardDeviation = mean * 0.1,
-            MeanAllocatedBytes = allocations,
-            MeasuredIterations = 100,
-            WarmupIterations = 25,
-            Q1 = mean * 0.7,
-            Q3 = mean * 1.2,
-            InterquartileRange = mean * 0.5,
+            MinNs = mean * 0.5,
+            MaxNs = p95 * 1.5,
+            StandardDeviationNs = mean * 0.1,
+            AllocatedBytesMean = allocations,
+            SampleCount = 100,
+            WarmupSamples = 25,
+            Q1Ns = mean * 0.7,
+            Q3Ns = mean * 1.2,
+            InterquartileRangeNs = mean * 0.5,
             OutliersRemoved = 0,
-            N = 100,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = allocations,
-            AllocP95 = allocations,
-            AllocMax = allocations,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = allocations,
+            AllocatedBytesP95 = allocations,
+            AllocatedBytesMax = allocations,
         };
     }
 }

@@ -8,10 +8,10 @@ public sealed class DuplicateLifecycleMethodAnalyzerTests
     public async Task Reports_second_setup()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
-                       [BenchmarkSetup] public void Setup1() { }
-                       [BenchmarkSetup] public void Setup2() { }
+                       [GlobalSetup] public void Setup1() { }
+                       [GlobalSetup] public void Setup2() { }
                        [Benchmark] public void M() { }
                    }
                    """;
@@ -24,10 +24,10 @@ public sealed class DuplicateLifecycleMethodAnalyzerTests
     public async Task Reports_second_teardown()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
-                       [BenchmarkTeardown] public void Tear1() { }
-                       [BenchmarkTeardown] public void Tear2() { }
+                       [GlobalTeardown] public void Tear1() { }
+                       [GlobalTeardown] public void Tear2() { }
                        [Benchmark] public void M() { }
                    }
                    """;
@@ -40,10 +40,10 @@ public sealed class DuplicateLifecycleMethodAnalyzerTests
     public async Task Reports_second_iteration_setup()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
-                       [BenchmarkIterationSetup] public void Iter1() { }
-                       [BenchmarkIterationSetup] public void Iter2() { }
+                       [SampleSetup] public void Iter1() { }
+                       [SampleSetup] public void Iter2() { }
                        [Benchmark] public void M() { }
                    }
                    """;
@@ -56,12 +56,12 @@ public sealed class DuplicateLifecycleMethodAnalyzerTests
     public async Task No_diagnostic_when_single_each()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
-                       [BenchmarkSetup] public void Setup() { }
-                       [BenchmarkTeardown] public void Tear() { }
-                       [BenchmarkIterationSetup] public void IterSetup() { }
-                       [BenchmarkIterationTeardown] public void IterTear() { }
+                       [GlobalSetup] public void Setup() { }
+                       [GlobalTeardown] public void Tear() { }
+                       [SampleSetup] public void IterSetup() { }
+                       [SampleTeardown] public void IterTear() { }
                        [Benchmark] public void M() { }
                    }
                    """;
@@ -74,10 +74,10 @@ public sealed class DuplicateLifecycleMethodAnalyzerTests
     public async Task No_diagnostic_for_class_without_benchmarks()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
-                       [BenchmarkSetup] public void Setup() { }
-                       [BenchmarkSetup] public void Setup2() { }
+                       [GlobalSetup] public void Setup() { }
+                       [GlobalSetup] public void Setup2() { }
                    }
                    """;
 

@@ -961,8 +961,8 @@ public static class Benchmark
     {
         var spec = SpecFor(options, progress) with
         {
-            IterationSetup = hooks.HostSetup,
-            IterationTeardown = hooks.HostTeardown,
+            SampleSetup = hooks.HostSetup,
+            SampleTeardown = hooks.HostTeardown,
         };
 
         return action switch
@@ -990,7 +990,11 @@ public static class Benchmark
     /// </summary>
     private static RunSpec SpecFor(MeasurementOptions? options, IBenchmarkProgress? progress) => new()
     {
-        Options = (options ?? MeasurementOptions.Default) with { SuppressRuntimeProfileWarning = true },
+        Options = (options ?? MeasurementOptions.Default) with
+            {
+                SuppressedWarnings = (options ?? MeasurementOptions.Default).SuppressedWarnings
+                                     | BenchmarkWarnings.RuntimeProfile,
+            },
         Progress = progress ?? NullBenchmarkProgress.Instance,
     };
 
@@ -1011,5 +1015,6 @@ public static class Benchmark
     ///     Suite or Harness process that already warned via <c>Apply</c>.
     /// </summary>
     private static void EmitBuildConfigurationGuidanceOnce(MeasurementOptions? options)
-        => EnvironmentControl.EmitBuildConfigurationGuidance(options?.Environment);
+        => EnvironmentControl.EmitBuildConfigurationGuidance(
+            options?.SuppressedWarnings ?? BenchmarkWarnings.None);
 }

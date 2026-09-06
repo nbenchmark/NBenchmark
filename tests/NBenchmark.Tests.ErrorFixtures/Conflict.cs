@@ -1,11 +1,11 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 
 namespace NBenchmark.Tests.ErrorFixtures;
 
 public class ConflictCasesBenchmarks
 {
-    [BenchmarkCase(10)]
-    [BenchmarkCases(nameof(Cases))]
+    [Arguments(10)]
+    [ArgumentsSource(nameof(Cases))]
     [Benchmark]
     public int Both(int a) => a;
 

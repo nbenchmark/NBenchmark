@@ -14,7 +14,7 @@ public class WarmupPlateauDetectorTests
     [Fact]
     public void AlreadyWarmBody_SettlesAtFloorPlusPatience()
     {
-        // Default options: MinWarmup 8, BatchSize 8, PlateauPatience 3.
+        // Default options: MinWarmupSamples 8, BatchSize 8, PlateauPatience 3.
         var detector = new WarmupPlateauDetector(PlateauOnly);
 
         var resolvedAt = FeedConstantUntilResolved(detector, 100.0, 10_000);
@@ -55,7 +55,7 @@ public class WarmupPlateauDetectorTests
     [Fact]
     public void NeverStabilises_StopsAtCeiling()
     {
-        var options = PlateauOnly with { MinWarmup = 8, MaxWarmup = 40, BatchSize = 8, PlateauPatience = 3 };
+        var options = PlateauOnly with { MinWarmupSamples = 8, MaxWarmupSamples = 40, BatchSize = 8, PlateauPatience = 3 };
         var detector = new WarmupPlateauDetector(options);
 
         var resolvedAt = 0;
@@ -85,7 +85,7 @@ public class WarmupPlateauDetectorTests
         // A 2 s/sample body with default BatchSize = 8: the adaptive batch sizing should
         // shrink the effective batch to 1 (250 ms target / 2 s = 0.125, ceil = 1, clamped to
         // [1, 8] = 1). With batch = 1 the plateau is evaluated every sample, so patience (3)
-        // is satisfied by sample 4 - but MinWarmup (8) still binds, so warmup settles at 8
+        // is satisfied by sample 4 - but MinWarmupSamples (8) still binds, so warmup settles at 8
         // samples, not 32. The 8 samples cost 16 s of warmup instead of 64 s.
         var detector = new WarmupPlateauDetector(PlateauOnly, perSampleEstimateNs: 2_000_000_000.0);
 
@@ -93,7 +93,7 @@ public class WarmupPlateauDetectorTests
 
         Assert.True(detector.Resolved);
         Assert.Equal(WarmupStopReason.Settled, detector.StopReason);
-        // MinWarmup (8) binds: the plateau would settle at 4 (Patience + 1 with batch = 1) but
+        // MinWarmupSamples (8) binds: the plateau would settle at 4 (Patience + 1 with batch = 1) but
         // the floor keeps the loop running until sample 8.
         Assert.Equal(8, resolvedAt);
     }
@@ -101,10 +101,10 @@ public class WarmupPlateauDetectorTests
     [Fact]
     public void SlowBody_With_Low_MinWarmup_Settles_At_Patience_Plus_One()
     {
-        // With MinWarmup lowered below (Patience + 1) * effectiveBatch, the plateau settles
+        // With MinWarmupSamples lowered below (Patience + 1) * effectiveBatch, the plateau settles
         // at (Patience + 1) samples. For a 2 s body (effective batch = 1), Patience = 3, and
-        // MinWarmup = 1: settles at 4 samples.
-        var options = PlateauOnly with { MinWarmup = 1 };
+        // MinWarmupSamples = 1: settles at 4 samples.
+        var options = PlateauOnly with { MinWarmupSamples = 1 };
         var detector = new WarmupPlateauDetector(options, perSampleEstimateNs: 2_000_000_000.0);
 
         var resolvedAt = FeedConstantUntilResolved(detector, 100.0, 10_000);
@@ -163,14 +163,14 @@ public class WarmupPlateauDetectorTests
     [Fact]
     public void TimeFloor_Blocks_Settling_Until_MinWarmupTime_Reached()
     {
-        // batch=1, patience=1, MinWarmup=1 -> the plateau rule is satisfied at sample 2. Each sample
+        // batch=1, patience=1, MinWarmupSamples=1 -> the plateau rule is satisfied at sample 2. Each sample
         // reports 100 ns elapsed; MinWarmupTime = 1000 ns means the floor is met only at sample 10.
         // The JIT gate is off, so the time floor alone delays settling from sample 2 to sample 10.
         var options = AutoTuneOptions.Default with
         {
             BatchSize = 1,
             PlateauPatience = 1,
-            MinWarmup = 1,
+            MinWarmupSamples = 1,
             MinWarmupTime = TimeSpan.FromTicks(10), // 10 ticks x 100 ns/tick = 1000 ns
             RequireJitQuiescence = false,
         };
@@ -195,7 +195,7 @@ public class WarmupPlateauDetectorTests
         {
             BatchSize = 1,
             PlateauPatience = 1,
-            MinWarmup = 1,
+            MinWarmupSamples = 1,
             MinWarmupTime = TimeSpan.FromTicks(1), // 100 ns floor, met at sample 1
             RequireJitQuiescence = true,
         };
@@ -228,7 +228,7 @@ public class WarmupPlateauDetectorTests
         {
             BatchSize = 1,
             PlateauPatience = 1,
-            MinWarmup = 1,
+            MinWarmupSamples = 1,
             MinWarmupTime = TimeSpan.FromTicks(5), // 500 ns floor -> quiet period clamped to 500 ns
             JitQuietPeriod = TimeSpan.FromMilliseconds(50),
             RequireJitQuiescence = true,
@@ -257,7 +257,7 @@ public class WarmupPlateauDetectorTests
         {
             BatchSize = 1,
             PlateauPatience = 1,
-            MinWarmup = 1,
+            MinWarmupSamples = 1,
             MinWarmupTime = TimeSpan.FromTicks(3), // 300 ns floor
             JitQuietPeriod = TimeSpan.FromSeconds(10), // absurdly long; clamped to 300 ns
             RequireJitQuiescence = true,
@@ -283,8 +283,8 @@ public class WarmupPlateauDetectorTests
         {
             BatchSize = 1,
             PlateauPatience = 1,
-            MinWarmup = 1,
-            MaxWarmup = 20,
+            MinWarmupSamples = 1,
+            MaxWarmupSamples = 20,
             MinWarmupTime = TimeSpan.FromMilliseconds(100), // unreachable: 20 samples x 1 ns = 20 ns
             RequireJitQuiescence = false,
         };
@@ -323,7 +323,7 @@ public class WarmupPlateauDetectorTests
         {
             BatchSize = 1,
             PlateauPatience = 1,
-            MinWarmup = 1,
+            MinWarmupSamples = 1,
             MinWarmupTime = TimeSpan.FromTicks(3), // 300 ns floor
             RequireJitQuiescence = true,
         };
@@ -346,7 +346,7 @@ public class WarmupPlateauDetectorTests
         {
             BatchSize = 1,
             PlateauPatience = 1,
-            MinWarmup = 1,
+            MinWarmupSamples = 1,
             MinWarmupTime = TimeSpan.FromTicks(1), // 100 ns floor -> deactivate at 400 ns
             RequireJitQuiescence = true,
         };
@@ -366,7 +366,7 @@ public class WarmupPlateauDetectorTests
     {
         // The recalibration path reads LastBatchMeanPerOp as the warm per-op estimate; verify it
         // tracks the most recently completed batch rather than staying at its initial zero.
-        var options = PlateauOnly with { BatchSize = 4, PlateauPatience = 2, MinWarmup = 1 };
+        var options = PlateauOnly with { BatchSize = 4, PlateauPatience = 2, MinWarmupSamples = 1 };
         var detector = new WarmupPlateauDetector(options);
 
         Assert.Equal(0.0, detector.LastBatchMeanPerOp);
@@ -381,7 +381,7 @@ public class WarmupPlateauDetectorTests
     [Fact]
     public void Curve_Records_One_Point_Per_Completed_Batch()
     {
-        var options = PlateauOnly with { BatchSize = 4, PlateauPatience = 2, MinWarmup = 1 };
+        var options = PlateauOnly with { BatchSize = 4, PlateauPatience = 2, MinWarmupSamples = 1 };
         var detector = new WarmupPlateauDetector(options);
 
         // No batch has completed yet, so there is nothing to plot.
@@ -399,7 +399,7 @@ public class WarmupPlateauDetectorTests
     {
         // The point of retaining the curve: a body that starts slow in tier-0 code and speeds up as
         // the JIT promotes it must show that drop, otherwise there is nothing to visualise.
-        var options = PlateauOnly with { BatchSize = 4, PlateauPatience = 3, MinWarmup = 1 };
+        var options = PlateauOnly with { BatchSize = 4, PlateauPatience = 3, MinWarmupSamples = 1 };
         var detector = new WarmupPlateauDetector(options);
 
         for (var i = 1; i <= 1_000; i++)
@@ -425,7 +425,7 @@ public class WarmupPlateauDetectorTests
     {
         // This is the closest thing to a tier-up landing marker: the point in warmup after which the
         // JIT compiled nothing more.
-        var options = PlateauOnly with { BatchSize = 1, PlateauPatience = 100, MinWarmup = 1 };
+        var options = PlateauOnly with { BatchSize = 1, PlateauPatience = 100, MinWarmupSamples = 1 };
         var detector = new WarmupPlateauDetector(options);
 
         // Count climbs for the first 5 batches, then holds. Batch 1 sets the baseline, so the last
@@ -451,7 +451,7 @@ public class WarmupPlateauDetectorTests
             RequireJitQuiescence = true,
             BatchSize = 1,
             PlateauPatience = 100,
-            MinWarmup = 1,
+            MinWarmupSamples = 1,
         };
         var detector = new WarmupPlateauDetector(options);
 

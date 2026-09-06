@@ -28,7 +28,7 @@ public class PercentileTests
     public void Compute_Median_MidAverage_Matches_Other_Median_Conventions()
     {
         // Regression guard for the unified median: p == 0.50 must average the two middles so the
-        // reported Median agrees with JitterCalibrator.Median / LaunchAggregator.MedianOf.
+        // reported MedianNs agrees with JitterCalibrator.Median / LaunchAggregator.MedianOf.
         var sorted = new double[] { 10, 20, 30, 40, 50, 60 };
         Assert.Equal(35, Percentile.Compute(sorted, 0.50));
     }

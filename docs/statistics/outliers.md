@@ -25,9 +25,9 @@ The trimmed array is then passed to `StatsSummary.Compute`. The pre-trim raw arr
 `IqrFence` is the default because it adapts to the actual spread of each benchmark rather than discarding a fixed quota. In a clean run, almost every sample is kept; in a noisy run, more are trimmed. When the discarded slow samples form a tight secondary cluster (low relative spread rather than scattered noise), NBenchmark records a non-fatal **bimodal-distribution warning**. For more information, see [Bimodal-distribution warning](#bimodal-distribution-warning).
 
 > [!NOTE] Quartile definition
-> `IqrFence` computes Q1 and Q3 using the same **[nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method)** percentile used throughout NBenchmark (equivalent to `numpy.percentile(method='inverted_cdf')`).
+> `IqrFence` computes Q1Ns and Q3Ns using the same **[nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method)** percentile used throughout NBenchmark (equivalent to `numpy.percentile(method='inverted_cdf')`).
 >
-> This differs from R's default `type = 7` linear interpolation. For a 1..20 ramp, NBenchmark gives Q1 = 5 and Q3 = 15, whereas R type 7 gives Q1 = 5.75 and Q3 = 15.25. This choice ensures consistency across all quantiles in the library.
+> This differs from R's default `type = 7` linear interpolation. For a 1..20 ramp, NBenchmark gives Q1Ns = 5 and Q3Ns = 15, whereas R type 7 gives Q1Ns = 5.75 and Q3Ns = 15.25. This choice ensures consistency across all quantiles in the library.
 
 ## Bimodal-distribution warning
 
@@ -58,7 +58,7 @@ A bimodal warning indicates that the slow samples were not random; they represen
 |---|---|
 | **Lock contention** | 90% of calls use the fast lock-free path; 10% collide and wait a fixed spin duration. |
 | **Cache misses** | Most calls hit warm L1/L2; a minority miss to RAM and pay a ~100 ns penalty. |
-| **GC pauses** | A Gen0 or Gen1 collection fires on a subset of iterations, adding a fixed stall. |
+| **GC pauses** | A Gen0 or Gen1 collection fires on a subset of samples, adding a fixed stall. |
 | **Branch misprediction** | A data-dependent branch mispredicts on certain inputs, flushing the pipeline. |
 
 The warning is **non-fatal**. The benchmark completes and reports statistics on the trimmed (fast-cluster) set. This tells you that the reported numbers describe the common case, while the worst case is reproducible and not random.
@@ -67,12 +67,12 @@ The warning is **non-fatal**. The benchmark completes and reports statistics on 
 
 > [!CAUTION] Quick fix
 > 1. **Check the body** for lock contention or cache misses. The cluster center in the warning identifies the extra cost of the slow path.
-> 2. **If you suspect GC**: Run with `--profile independent` to force per-iteration Gen0 collection and make GC pauses deterministic.
+> 2. **If you suspect GC**: Run with `--gc per-sample-collect` to force per-sample Gen0 collection and make GC pauses deterministic.
 
 1. **Do not silence the warning.** It reveals a real property of your code's performance distribution. The reported median describes the fast path, while the cluster center describes a latency real users will experience.
-2. **Read the tail metrics.** By default, the [histogram](./descriptive.md) and the reported percentiles (P99, P99.9, Max) are computed from the full pre-trim distribution (`TailMetricsBasis = Raw`). The trimmed cluster is still visible in these metrics, so you do not need to re-run with `OutlierMode.None`. If you have explicitly set `TailMetricsBasis = Trimmed`, re-run with `OutlierMode.None` to see the cluster.
+2. **Read the tail metrics.** By default, the [histogram](./descriptive.md) and the reported percentiles (P99, P99.9, max) are computed from the full pre-trim distribution (`TailMetricsBasis = Raw`). The trimmed cluster is still visible in these metrics, so you do not need to re-run with `OutlierMode.None`. If you have explicitly set `TailMetricsBasis = Trimmed`, re-run with `OutlierMode.None` to see the cluster.
 3. **Investigate the cause.** Use a profiler or add instrumentation around suspected bottlenecks.
-4. **Use `--profile independent`** if you suspect GC.
+4. **Use `--gc per-sample-collect`** if you suspect GC.
 5. **Reduce noise at the source** using [environment control](../features/environment-control.md) if OS scheduling contributed to the spread.
 
 ### Interaction with outlier mode
@@ -93,7 +93,7 @@ When GC collection counts are enabled (`DiagnosticsOptions.GcCollectionCounts`),
 ⚠ 5 of 7 removed outlier(s) coincided with a garbage collection.
 ```
 
-If a bimodal warning also fires, this information is folded into that warning. A high GC-correlation share suggests allocation pressure; consider using `--profile independent` or reducing allocations in the body.
+If a bimodal warning also fires, this information is folded into that warning. A high GC-correlation share suggests allocation pressure; consider using `--gc per-sample-collect` or reducing allocations in the body.
 
 ## Evidence-based interference rejection
 
@@ -135,9 +135,9 @@ The filter is **enabled by default** and disables itself (with a reason in `Auto
 
 You can disable the filter entirely with `--no-interference-filter`, `InterferenceOptions.Enabled = false`, or `.WithInterferenceFilter(false)`.
 
-## Median Absolute Deviation (MAD)
+## Median absolute deviation (MAD)
 
-`MedianAbsoluteDeviation` is a robust alternative to `IqrFence`. It measures spread using the **median of absolute deviations from the median**, providing the highest possible [breakdown point](https://en.wikipedia.org/wiki/Robust_statistics#Breakdown_point) (50%). Up to half the samples can be contaminated before the estimate is distorted.
+`MedianAbsoluteDeviation` is a robust alternative to `IqrFence`. It measures spread using the **Median of absolute deviations from the median**, providing the highest possible [breakdown point](https://en.wikipedia.org/wiki/Robust_statistics#Breakdown_point) (50%). Up to half the samples can be contaminated before the estimate is distorted.
 
 **The algorithm:**
 1. Compute the median `m` of the sorted samples.
@@ -176,7 +176,7 @@ public sealed class KeepFastestDetector(double fraction) : IOutlierDetector
         {
             Kept = sortedSamples[..keep],
             Discarded = sortedSamples[keep..],
-            UpperFence = sortedSamples[keep],
+            UpperFenceNs = sortedSamples[keep],
         };
     }
 }
@@ -198,6 +198,6 @@ A custom `OutlierDetector` takes priority over `OutlierMode`.
 - `sortedSamples` arrives **sorted ascending**; do not mutate it.
 - Return `Kept` sorted ascending.
 - **Never discard every sample.** Return `OutlierClassification.KeepAll(sortedSamples)` if your rule would empty the set.
-- Set `LowerFence` and `UpperFence` only for fence-based rules.
+- Set `LowerFenceNs` and `UpperFenceNs` only for fence-based rules.
 
 The detector's `Name` appears in the report header.

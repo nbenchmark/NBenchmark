@@ -2,7 +2,7 @@ using System.Collections;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Engine;
 
 namespace NBenchmark.Discovery;
@@ -42,7 +42,7 @@ internal sealed class BenchmarkDiscoverer
     /// </summary>
     /// <remarks>
     ///     The restriction is not an optimisation. Discovery <i>invokes</i> every
-    ///     <c>[BenchmarkCases]</c> source it meets, so a whole-assembly pass runs every class's case
+    ///     <c>[ArgumentsSource]</c> source it meets, so a whole-assembly pass runs every class's case
     ///     source - with whatever side effects it has - and a worker measuring one class per group ran
     ///     all N of them, N times over. Filtering before <see cref="DiscoverType" /> means a class's
     ///     case source runs when something needs its cases and not otherwise.
@@ -87,10 +87,10 @@ internal sealed class BenchmarkDiscoverer
             .Concat(type.GetMethods(BindingFlags.NonPublic | BindingFlags.Instance))
             .ToArray();
 
-        var setupMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<BenchmarkSetupAttribute>() is not null);
-        var teardownMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<BenchmarkTeardownAttribute>() is not null);
-        var iterSetupMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<BenchmarkIterationSetupAttribute>() is not null);
-        var iterTeardownMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<BenchmarkIterationTeardownAttribute>() is not null);
+        var setupMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<GlobalSetupAttribute>() is not null);
+        var teardownMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<GlobalTeardownAttribute>() is not null);
+        var iterSetupMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<SampleSetupAttribute>() is not null);
+        var iterTeardownMethod = methods.FirstOrDefault(m2 => m2.GetCustomAttribute<SampleTeardownAttribute>() is not null);
 
         var setupDel = BuildVoidDelegate(setupMethod);
         var teardownDel = BuildVoidDelegate(teardownMethod);
@@ -132,15 +132,15 @@ internal sealed class BenchmarkDiscoverer
         bool factoryResolvedInstances)
     {
         var attribute = method.GetCustomAttribute<BenchmarkAttribute>()!;
-        var caseAttributes = method.GetCustomAttributes<BenchmarkCaseAttribute>().ToArray();
-        var casesAttribute = method.GetCustomAttribute<BenchmarkCasesAttribute>();
+        var caseAttributes = method.GetCustomAttributes<ArgumentsAttribute>().ToArray();
+        var casesAttribute = method.GetCustomAttribute<ArgumentsSourceAttribute>();
         var parameters = method.GetParameters();
 
         if (caseAttributes.Length > 0 && casesAttribute is not null)
         {
             throw new InvalidOperationException(
                 $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has both "
-                + "[BenchmarkCase] and [BenchmarkCases]. Use one or the other.");
+                + "[Arguments] and [ArgumentsSource]. Use one or the other.");
         }
 
         if (parameters.Length == 0)
@@ -148,14 +148,14 @@ internal sealed class BenchmarkDiscoverer
             if (caseAttributes.Length > 0)
             {
                 throw new InvalidOperationException(
-                    $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has [BenchmarkCase] "
+                    $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has [Arguments] "
                     + "but takes no parameters.");
             }
 
             if (casesAttribute is not null)
             {
                 throw new InvalidOperationException(
-                    $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has [BenchmarkCases] "
+                    $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' has [ArgumentsSource] "
                     + "but takes no parameters.");
             }
 
@@ -184,8 +184,8 @@ internal sealed class BenchmarkDiscoverer
             {
                 throw new InvalidOperationException(
                     $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' declares "
-                    + $"{parameters.Length} parameter(s) but has no [BenchmarkCase] or [BenchmarkCases]. "
-                    + "Add one [BenchmarkCase(...)] per argument set, or remove the parameters.");
+                    + $"{parameters.Length} parameter(s) but has no [Arguments] or [ArgumentsSource]. "
+                    + "Add one [Arguments(...)] per argument set, or remove the parameters.");
             }
 
             yield return CreateDefinition(method, attribute, method.Name, null, null,
@@ -204,7 +204,7 @@ internal sealed class BenchmarkDiscoverer
             {
                 throw new InvalidOperationException(
                     $"Benchmark '{method.DeclaringType!.Name}.{method.Name}' expects "
-                    + $"{parameters.Length} argument(s) but a [BenchmarkCase] attribute supplied "
+                    + $"{parameters.Length} argument(s) but a [Arguments] attribute supplied "
                     + $"{rawArgs.Length}.");
             }
 
@@ -220,7 +220,7 @@ internal sealed class BenchmarkDiscoverer
 
     private static IEnumerable<BenchmarkMethodDefinition> ExpandFromBenchmarkCases(
         MethodInfo method,
-        BenchmarkCasesAttribute casesAttribute,
+        ArgumentsSourceAttribute casesAttribute,
         BenchmarkAttribute benchmarkAttr,
         Action<object>? iterSetupDel,
         Action<object>? iterTeardownDel,
@@ -242,7 +242,7 @@ internal sealed class BenchmarkDiscoverer
         }
     }
 
-    private static MethodInfo ResolveCaseSource(MethodInfo method, BenchmarkCasesAttribute attr)
+    private static MethodInfo ResolveCaseSource(MethodInfo method, ArgumentsSourceAttribute attr)
     {
         var declaringType = method.DeclaringType!;
 
@@ -252,7 +252,7 @@ internal sealed class BenchmarkDiscoverer
         if (source is null)
         {
             throw new InvalidOperationException(
-                $"Benchmark '{declaringType.Name}.{method.Name}' has [BenchmarkCases(\"{attr.SourceName}\")] "
+                $"Benchmark '{declaringType.Name}.{method.Name}' has [ArgumentsSource(\"{attr.SourceName}\")] "
                 + $"but no member named '{attr.SourceName}' was found on type '{declaringType.Name}'.");
         }
 
@@ -260,14 +260,14 @@ internal sealed class BenchmarkDiscoverer
         {
             throw new InvalidOperationException(
                 $"Benchmark '{declaringType.Name}.{method.Name}' references source method "
-                + $"'{source.Name}' via [BenchmarkCases], but the source method must not be generic.");
+                + $"'{source.Name}' via [ArgumentsSource], but the source method must not be generic.");
         }
 
         if (source.GetParameters().Length > 0)
         {
             throw new InvalidOperationException(
                 $"Benchmark '{declaringType.Name}.{method.Name}' references source method "
-                + $"'{source.Name}' via [BenchmarkCases], but the source method must have no parameters.");
+                + $"'{source.Name}' via [ArgumentsSource], but the source method must have no parameters.");
         }
 
         var returnType = source.ReturnType;
@@ -346,7 +346,7 @@ internal sealed class BenchmarkDiscoverer
     }
 
     /// <summary>
-    ///     Invokes the <c>[BenchmarkCases]</c> source and flattens what it yielded into argument sets.
+    ///     Invokes the <c>[ArgumentsSource]</c> source and flattens what it yielded into argument sets.
     /// </summary>
     /// <param name="factoryResolvedInstances">
     ///     Whether benchmark instances come from a factory or service provider rather than from the
@@ -376,12 +376,12 @@ internal sealed class BenchmarkDiscoverer
             {
                 throw new InvalidOperationException(
                     $"Cannot create an instance of '{declaringType.Name}' to invoke the "
-                    + $"[BenchmarkCases] source method '{source.Name}': {ex.Message}. "
+                    + $"[ArgumentsSource] source method '{source.Name}': {ex.Message}. "
                     + (factoryResolvedInstances
                         ? $"Instances of '{declaringType.Name}' come from a factory or service provider, "
                           + "but case values are needed before any instance exists, so discovery has "
                           + $"only the type's own constructor to work with. Make '{source.Name}' static, "
-                          + "or supply the cases with [BenchmarkCase] attributes."
+                          + "or supply the cases with [Arguments] attributes."
                         : $"Make '{source.Name}' static if it does not need one."), ex);
             }
         }
@@ -395,7 +395,7 @@ internal sealed class BenchmarkDiscoverer
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"Failed to invoke [BenchmarkCases] source method '{declaringType.Name}.{source.Name}': "
+                $"Failed to invoke [ArgumentsSource] source method '{declaringType.Name}.{source.Name}': "
                 + $"{ex.InnerException?.Message ?? ex.Message}", ex);
         }
 
@@ -408,7 +408,7 @@ internal sealed class BenchmarkDiscoverer
         if (enumerableInterface is null)
         {
             throw new InvalidOperationException(
-                $"[BenchmarkCases] source method '{declaringType.Name}.{source.Name}' "
+                $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' "
                 + $"returned '{enumerableType.Name}', which is not IEnumerable<T>. The source must "
                 + "yield IEnumerable<ValueTuple<...>>.");
         }
@@ -423,7 +423,7 @@ internal sealed class BenchmarkDiscoverer
             if (element is null)
             {
                 throw new InvalidOperationException(
-                    $"[BenchmarkCases] source method '{declaringType.Name}.{source.Name}' yielded "
+                    $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' yielded "
                     + "a null element. ValueTuple elements must not be null.");
             }
 
@@ -432,7 +432,7 @@ internal sealed class BenchmarkDiscoverer
             if (!IsValueTupleType(elementTupleType))
             {
                 throw new InvalidOperationException(
-                    $"[BenchmarkCases] source method '{declaringType.Name}.{source.Name}' yielded "
+                    $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' yielded "
                     + $"a non-ValueTuple element of type '{elementTupleType.Name}'. "
                     + "All elements must be ValueTuples.");
             }
@@ -442,7 +442,7 @@ internal sealed class BenchmarkDiscoverer
             if (arity != benchmarkParams.Length)
             {
                 throw new InvalidOperationException(
-                    $"[BenchmarkCases] source method '{declaringType.Name}.{source.Name}' yields "
+                    $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' yields "
                     + $"ValueTuple with {arity} element(s), but benchmark method "
                     + $"'{method.DeclaringType!.Name}.{method.Name}' expects {benchmarkParams.Length} parameter(s).");
             }
@@ -450,9 +450,9 @@ internal sealed class BenchmarkDiscoverer
             if (arity > 7)
             {
                 throw new InvalidOperationException(
-                    $"[BenchmarkCases] source method '{declaringType.Name}.{source.Name}' yields "
+                    $"[ArgumentsSource] source method '{declaringType.Name}.{source.Name}' yields "
                     + $"a ValueTuple with {arity} element(s). NBenchmark supports at most 7 "
-                    + "parameters for [BenchmarkCases] sources.");
+                    + "parameters for [ArgumentsSource] sources.");
             }
 
             var tuple = (ITuple)element;
@@ -595,8 +595,8 @@ internal sealed class BenchmarkDiscoverer
             // signature, so the engine reaches the body without boxing its result - see
             // BenchmarkBodyFactory.
             BodyFactory = BenchmarkBodyFactory.Create(method, arguments),
-            IterationSetupDelegate = iterSetupDel,
-            IterationTeardownDelegate = iterTeardownDel,
+            SampleSetupDelegate = iterSetupDel,
+            SampleTeardownDelegate = iterTeardownDel,
             Isolation = ResolveIsolationMode(method),
             Categories = MergeCategories(classCategories, ResolveCategories(method)),
             IsBaseline = isBaseline,

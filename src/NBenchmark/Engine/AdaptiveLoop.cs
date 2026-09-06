@@ -56,7 +56,7 @@ internal static class AdaptiveLoop
         var resolvedOptions = o.Resolve();
         var measureAllocations = resolvedOptions.MeasureAllocations;
         var diagnostics = o.Diagnostics;
-        var forceGc = resolvedOptions.ForceGcBeforeEachIteration;
+        var forceGc = resolvedOptions.ForceGcBeforeEachSample;
         var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
         var calibrationWarmupCapNs = maxTuningNs * autoTune.WarmupBudgetFraction;
         var graceCapNs = maxTuningNs * autoTune.CapGraceFactor;
@@ -256,7 +256,7 @@ internal static class AdaptiveLoop
             warmupStop = WarmupStopReason.WallClockCap;
             warmup = WarmupOutcome.None(timeFloorMet: false);
         }
-        else if (o.WarmupIterations is { } explicitWarmup)
+        else if (o.WarmupSamples is { } explicitWarmup)
         {
             NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Warmup);
 
@@ -284,7 +284,7 @@ internal static class AdaptiveLoop
             var detector = new WarmupPlateauDetector(autoTune, perSampleEstimate);
             warmupStop = WarmupStopReason.Settled;
             var warmupOrdinal = 0;
-            var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
+            var warmupInterval = ProgressCadence(autoTune.MaxWarmupSamples);
 
             var warmupSamplesFed = 0;
             JitCounters? jitBaseline = null;
@@ -397,14 +397,14 @@ internal static class AdaptiveLoop
 
         // Pre-measurement full GC is intentionally profile-gated: the Independent profile clears
         // warmup garbage so it cannot trigger a collection mid-measurement, while the default
-        // Realistic profile deliberately inherits the warmup heap to match production. This is a
+        // Natural GC behavior deliberately inherits the warmup heap to match production. This is a
         // distinct decision from the between-benchmark GC (ForceGcBetweenBenchmarks, run by
         // SuiteRunner), which is on for both profiles.
         if (o.Resolve().ForceGcBeforeMeasurement)
             GcControl.ForceFullGc();
 
         // ----- Phase C: measurement -----
-        var explicitSamples = o.Iterations;
+        var explicitSamples = o.Samples;
 
         // The time-derived sample floor (see MeasurementGates) resolves the count a cheap body is held
         // to, so size the list for that rather than for MinSamples - otherwise every auto run regrows
@@ -481,7 +481,7 @@ internal static class AdaptiveLoop
                 }
 
                 if (sampleCount % progressInterval == 0)
-                    progress.OnIterationCompleted(name, sampleCount, reportedTotal).GetAwaiter().GetResult();
+                    progress.OnSampleCompleted(name, sampleCount, reportedTotal).GetAwaiter().GetResult();
 
                 if (ci is null)
                 {
@@ -501,7 +501,7 @@ internal static class AdaptiveLoop
                     // straight across it, which is how a 10x-wrong number gets a +/-0.9% error bar.
                     if (ci.StopReason == SampleStopReason.CiTargetMet
                         && !MeasurementGates.IsSteady(
-                            tracker.FirstHalfMean, tracker.SecondHalfMean, sampleCount, ci.StandardDeviation,
+                            tracker.FirstHalfMean, tracker.SecondHalfMean, sampleCount, ci.StandardDeviationNs,
                             autoTune.MeasurementDriftTolerance, MeasurementGates.DefaultSigmaTolerance))
                     {
                         if (restarts < autoTune.MeasurementRestartLimit)
@@ -541,12 +541,12 @@ internal static class AdaptiveLoop
 
                     sampleStop = ci.StopReason;
 
-                    NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
+                    NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.MeanNs);
 
                     if (attached)
                     {
                         observer.OnDetector(new DetectorStateEvent(
-                            name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
+                            name, MeasurementPhase.Measurement, (int)ci.Count, ci.MeanNs, ci.StandardDeviationNs,
                             ci.AchievedRelativeHalfWidth, k));
 
                         detectorEmitted = true;
@@ -582,7 +582,7 @@ internal static class AdaptiveLoop
         }
 
         if (ci is not null && !detectorEmitted)
-            NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
+            NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.MeanNs);
 
         NBenchmarkDiagnostics.OnPhaseCompleted(
             name, MeasurementPhase.Measurement,
@@ -595,7 +595,7 @@ internal static class AdaptiveLoop
             if (ci is not null && !detectorEmitted)
             {
                 observer.OnDetector(new DetectorStateEvent(
-                    name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
+                    name, MeasurementPhase.Measurement, (int)ci.Count, ci.MeanNs, ci.StandardDeviationNs,
                     ci.AchievedRelativeHalfWidth, k));
             }
 
@@ -639,7 +639,7 @@ internal static class AdaptiveLoop
             // pinned-count, wall-clock-cap, and ceiling stops - none of which consult the gate.
             splitHalfDrift: MeasurementGates.SplitHalfDrift(tracker.FirstHalfMean, tracker.SecondHalfMean),
             coefficientOfVariation: ci?.CoefficientOfVariation ?? double.NaN,
-            hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null,
+            hasSampleHooks: spec.SampleSetup is not null || spec.SampleTeardown is not null,
             clockResolutionNs: clockResolutionNs,
             targetSampleDurationNs: targetSampleDurationNs,
             occupancies: occupancies,
@@ -660,7 +660,7 @@ internal static class AdaptiveLoop
         var resolvedOptions = o.Resolve();
         var measureAllocations = resolvedOptions.MeasureAllocations;
         var diagnostics = o.Diagnostics;
-        var forceGc = resolvedOptions.ForceGcBeforeEachIteration;
+        var forceGc = resolvedOptions.ForceGcBeforeEachSample;
         var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
         var calibrationWarmupCapNs = maxTuningNs * autoTune.WarmupBudgetFraction;
         var graceCapNs = maxTuningNs * autoTune.CapGraceFactor;
@@ -863,7 +863,7 @@ internal static class AdaptiveLoop
             warmupStop = WarmupStopReason.WallClockCap;
             warmup = WarmupOutcome.None(timeFloorMet: false);
         }
-        else if (o.WarmupIterations is { } explicitWarmup)
+        else if (o.WarmupSamples is { } explicitWarmup)
         {
             NBenchmarkDiagnostics.OnPhaseStarting(name, MeasurementPhase.Warmup);
 
@@ -891,7 +891,7 @@ internal static class AdaptiveLoop
             var detector = new WarmupPlateauDetector(autoTune, perSampleEstimate);
             warmupStop = WarmupStopReason.Settled;
             var warmupOrdinal = 0;
-            var warmupInterval = ProgressCadence(autoTune.MaxWarmup);
+            var warmupInterval = ProgressCadence(autoTune.MaxWarmupSamples);
 
             var warmupSamplesFed = 0;
             JitCounters? jitBaseline = null;
@@ -1005,14 +1005,14 @@ internal static class AdaptiveLoop
 
         // Pre-measurement full GC is intentionally profile-gated: the Independent profile clears
         // warmup garbage so it cannot trigger a collection mid-measurement, while the default
-        // Realistic profile deliberately inherits the warmup heap to match production. This is a
+        // Natural GC behavior deliberately inherits the warmup heap to match production. This is a
         // distinct decision from the between-benchmark GC (ForceGcBetweenBenchmarks, run by
         // SuiteRunner), which is on for both profiles.
         if (o.Resolve().ForceGcBeforeMeasurement)
             GcControl.ForceFullGc();
 
         // ----- Phase C: measurement -----
-        var explicitSamples = o.Iterations;
+        var explicitSamples = o.Samples;
 
         // The time-derived sample floor (see MeasurementGates) resolves the count a cheap body is held
         // to, so size the list for that rather than for MinSamples - otherwise every auto run regrows
@@ -1092,7 +1092,7 @@ internal static class AdaptiveLoop
                 }
 
                 if (sampleCount % progressInterval == 0)
-                    await progress.OnIterationCompleted(name, sampleCount, reportedTotal).ConfigureAwait(false);
+                    await progress.OnSampleCompleted(name, sampleCount, reportedTotal).ConfigureAwait(false);
 
                 if (ci is null)
                 {
@@ -1112,7 +1112,7 @@ internal static class AdaptiveLoop
                     // straight across it, which is how a 10x-wrong number gets a +/-0.9% error bar.
                     if (ci.StopReason == SampleStopReason.CiTargetMet
                         && !MeasurementGates.IsSteady(
-                            tracker.FirstHalfMean, tracker.SecondHalfMean, sampleCount, ci.StandardDeviation,
+                            tracker.FirstHalfMean, tracker.SecondHalfMean, sampleCount, ci.StandardDeviationNs,
                             autoTune.MeasurementDriftTolerance, MeasurementGates.DefaultSigmaTolerance))
                     {
                         if (restarts < autoTune.MeasurementRestartLimit)
@@ -1152,12 +1152,12 @@ internal static class AdaptiveLoop
 
                     sampleStop = ci.StopReason;
 
-                    NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
+                    NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.MeanNs);
 
                     if (attached)
                     {
                         observer.OnDetector(new DetectorStateEvent(
-                            name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
+                            name, MeasurementPhase.Measurement, (int)ci.Count, ci.MeanNs, ci.StandardDeviationNs,
                             ci.AchievedRelativeHalfWidth, k));
 
                         detectorEmitted = true;
@@ -1193,7 +1193,7 @@ internal static class AdaptiveLoop
         }
 
         if (ci is not null && !detectorEmitted)
-            NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.Mean);
+            NBenchmarkDiagnostics.RecordDetectorState(ci.AchievedRelativeHalfWidth, ci.MeanNs);
 
         NBenchmarkDiagnostics.OnPhaseCompleted(
             name, MeasurementPhase.Measurement,
@@ -1206,7 +1206,7 @@ internal static class AdaptiveLoop
             if (ci is not null && !detectorEmitted)
             {
                 observer.OnDetector(new DetectorStateEvent(
-                    name, MeasurementPhase.Measurement, (int)ci.Count, ci.Mean, ci.StandardDeviation,
+                    name, MeasurementPhase.Measurement, (int)ci.Count, ci.MeanNs, ci.StandardDeviationNs,
                     ci.AchievedRelativeHalfWidth, k));
             }
 
@@ -1250,7 +1250,7 @@ internal static class AdaptiveLoop
             // pinned-count, wall-clock-cap, and ceiling stops - none of which consult the gate.
             splitHalfDrift: MeasurementGates.SplitHalfDrift(tracker.FirstHalfMean, tracker.SecondHalfMean),
             coefficientOfVariation: ci?.CoefficientOfVariation ?? double.NaN,
-            hasIterationHooks: spec.IterationSetup is not null || spec.IterationTeardown is not null,
+            hasSampleHooks: spec.SampleSetup is not null || spec.SampleTeardown is not null,
             clockResolutionNs: clockResolutionNs,
             targetSampleDurationNs: targetSampleDurationNs,
             occupancies: occupancies,
@@ -1258,14 +1258,14 @@ internal static class AdaptiveLoop
     }
 
     // Per-iteration setup/teardown make a K-batch semantically wrong (each op must be paired with
-    // its own setup), so those still block calibration. ForceGcBeforeEachIteration does NOT: the
+    // its own setup), so those still block calibration. ForceGcBeforeEachSample does NOT: the
     // forced Gen0 collection runs once per sample (K-batch), before the timestamp and outside the
     // timed window, which is exactly the pinned-K semantics - so auto-K under the Independent
     // profile behaves identically to a user who pinned K there.
     private static bool IsEligibleForCalibration(MeasurementOptions o, RunSpec spec)
         => o.OpsPerSample is null
-           && spec.IterationSetup is null
-           && spec.IterationTeardown is null;
+           && spec.SampleSetup is null
+           && spec.SampleTeardown is null;
 
     private static AdaptiveResult BuildResult(
         List<double> timings,
@@ -1297,7 +1297,7 @@ internal static class AdaptiveLoop
         int measurementRestarts,
         double splitHalfDrift,
         double coefficientOfVariation,
-        bool hasIterationHooks,
+        bool hasSampleHooks,
         double clockResolutionNs,
         double targetSampleDurationNs,
         List<double>? occupancies,
@@ -1308,13 +1308,13 @@ internal static class AdaptiveLoop
         // Achieved raw CI half-width, computed the same way for explicit and auto modes so the
         // diagnostic is consistent. The reported interval is computed separately on trimmed samples.
         var rawStats = StatsSummary.Compute(timingsArray, confidenceLevel);
-        var achievedCi = rawStats.Mean > 0 ? rawStats.MarginOfError / rawStats.Mean : 0.0;
+        var achievedCi = rawStats.MeanNs > 0 ? rawStats.MarginOfErrorNs / rawStats.MeanNs : 0.0;
 
         // What one timed sample actually spanned, from the achieved per-op mean rather than the target:
         // K is a power of two and the body is whatever speed it is, so the realised duration overshoots
         // the target, and post-warmup recalibration may have moved K again. Quantization has to be
         // computed against the duration that was really measured.
-        var achievedSampleDurationNs = rawStats.Mean * opsPerSample;
+        var achievedSampleDurationNs = rawStats.MeanNs * opsPerSample;
         var quantizationFraction = ClockResolutionProbe.QuantizationFraction(
             clockResolutionNs, achievedSampleDurationNs);
 
@@ -1354,7 +1354,7 @@ internal static class AdaptiveLoop
             warmupStop, sampleStop, calibrationCapped, maxTuningTime,
             achievedCi, ciTarget, maxSamples, sampleCount, explicitSamples, capGraceFactor,
             warmupBudgetFraction, warmup.TimeFloorMet, measurementRestarts, splitHalfDrift,
-            coefficientOfVariation, hasIterationHooks, resolvedWarmup);
+            coefficientOfVariation, hasSampleHooks, resolvedWarmup);
 
         if (detectorSwitched)
         {
@@ -1485,7 +1485,7 @@ internal static class AdaptiveLoop
         [
             $"Pre-flight jitter probe measured a jitter metric (MAD/median) of {metricLabel} "
             + "on the busy-weight loop, exceeding the auto-switch threshold. The outlier detector "
-            + "has been switched from IQR fence to Median Absolute Deviation for this run - MAD's "
+            + "has been switched from IQR fence to Median absolute deviation for this run - MAD's "
             + "higher breakdown point is more resilient to the heavy-tailed samples a noisy host "
             + "produces. Investigate the host (shared-tenant CI runner, thermal throttling, "
             + "frequency scaling) before trusting these numbers. Set AutoTune.JitterAutoSwitchThreshold "
@@ -1510,7 +1510,7 @@ internal static class AdaptiveLoop
         int measurementRestarts,
         double splitHalfDrift,
         double coefficientOfVariation,
-        bool hasIterationHooks,
+        bool hasSampleHooks,
         int resolvedWarmup)
     {
         var capLabel = BenchmarkFormatter.FormatDuration(maxTuningTime);
@@ -1532,18 +1532,18 @@ internal static class AdaptiveLoop
 
         if (sampleStop == SampleStopReason.WallClockCap)
         {
-            // When the user pinned --iterations, the cap prevented the loop from collecting the
-            // requested count. The auto-mode text ("pinning --iterations") would be misleading
-            // because iterations were already pinned; say how many of the requested samples were
+            // When the user pinned --samples, the cap prevented the loop from collecting the
+            // requested count. The auto-mode text ("pinning --samples") would be misleading
+            // because samples were already pinned; say how many of the requested samples were
             // collected and point at --max-tuning-time or a lower pinned count instead.
             if (explicitSamples is { } pinned and > 0)
             {
                 return
                 [
                     $"Measurement stopped at the wall-clock tuning cap ({capLabel}) "
-                    + $"after collecting {sampleCount} of the pinned {pinned} iterations. "
+                    + $"after collecting {sampleCount} of the pinned {pinned} samples. "
                     + "The reported statistics are based on fewer samples than requested. "
-                    + "Consider increasing --max-tuning-time or reducing --iterations.",
+                    + "Consider increasing --max-tuning-time or reducing --samples.",
                 ];
             }
 
@@ -1551,7 +1551,7 @@ internal static class AdaptiveLoop
             [
                 $"Measurement stopped at the wall-clock tuning cap ({capLabel}) "
                 + "before reaching the confidence-interval target. The reported error margin may be wider than requested. "
-                + "Consider increasing --max-tuning-time or pinning --iterations.",
+                + "Consider increasing --max-tuning-time or pinning --samples.",
             ];
         }
 
@@ -1577,7 +1577,7 @@ internal static class AdaptiveLoop
                 $"Measurement stopped at the grace ceiling ({capLabel} * {capGraceFactor:F1}) "
                 + $"after collecting only {sampleCount} samples, below the minimum required for a "
                 + "reliable confidence interval. The reported error margin is unreliable. "
-                + "Consider increasing --max-tuning-time, reducing --min-samples, or pinning --iterations.",
+                + "Consider increasing --max-tuning-time, reducing --min-samples, or pinning --samples.",
             ];
         }
 
@@ -1599,7 +1599,7 @@ internal static class AdaptiveLoop
                 + "The reported error margin is wider than requested."
                 + cvClause
                 + " Consider loosening --ci-target if the body is genuinely noisy, raising --max-samples, "
-                + "or pinning --iterations for a deterministic count. For short bodies (<100 ns), the variance is often "
+                + "or pinning --samples for a deterministic count. For short bodies (<100 ns), the variance is often "
                 + "dominated by timer overhead and scheduler jitter rather than the code under test - use --launch-count "
                 + "to measure across-launch spread, which is usually the more honest signal.",
             ];
@@ -1618,7 +1618,7 @@ internal static class AdaptiveLoop
             [
                 $"Warmup exhausted its calibration+warmup budget ({sharePct} of the {capLabel} tuning cap) "
                 + $"before the body reached a steady state. {floorClause} "
-                + "Consider increasing --max-tuning-time, raising --warmup-budget-fraction, or pinning --warmup.",
+                + "Consider increasing --max-tuning-time, raising --warmup-budget-fraction, or pinning --warmup-samples.",
             ];
         }
 
@@ -1629,15 +1629,15 @@ internal static class AdaptiveLoop
         {
             // Iteration setup/teardown runs outside the timed window, so accumulated in-body time
             // materially under-counts real elapsed time and the floor check is not meaningful there.
-            if (!warmupTimeFloorMet && !hasIterationHooks)
+            if (!warmupTimeFloorMet && !hasSampleHooks)
             {
                 return
                 [
-                    $"Warmup stopped at the sample ceiling ({resolvedWarmup:N0} iterations) without reaching the "
+                    $"Warmup stopped at the sample ceiling ({resolvedWarmup:N0} samples) without reaching the "
                     + "warmup time floor, so the body may still be running pre-tier-1 (unoptimized) code. "
                     + "A measurement taken there can be several times slower than steady state while still "
                     + "reporting a tight error margin, and it will not reproduce across runs. "
-                    + "Consider raising --max-warmup, lowering --min-warmup-time, or pinning --warmup. "
+                    + "Consider raising --max-warmup-samples, lowering --min-warmup-time, or pinning --warmup-samples. "
                     + "A body too fast to accumulate the floor within the ceiling (typically with "
                     + "--ops-per-sample pinned to 1) needs a larger --ops-per-sample so each sample spans more work.",
                 ];
@@ -1645,9 +1645,9 @@ internal static class AdaptiveLoop
 
             return
             [
-                $"Warmup stopped at the sample ceiling ({resolvedWarmup:N0} iterations) without ever reaching a "
+                $"Warmup stopped at the sample ceiling ({resolvedWarmup:N0} samples) without ever reaching a "
                 + "plateau - the body was still getting faster. The measured samples may be affected by "
-                + "ongoing JIT or cache warm-up. Consider raising --max-warmup or pinning --warmup.",
+                + "ongoing JIT or cache warm-up. Consider raising --max-warmup-samples or pinning --warmup-samples.",
             ];
         }
 
@@ -1675,7 +1675,7 @@ internal static class AdaptiveLoop
         if (forceGc)
             GcControl.ForceGen0Collection();
 
-        spec.IterationSetup?.Invoke();
+        spec.SampleSetup?.Invoke();
 
         AllocationMeter.AllocationSnapshot snapshot = default;
 
@@ -1723,7 +1723,7 @@ internal static class AdaptiveLoop
         var allocDelta = measureAllocations ? AllocationMeter.Delta(snapshot) : 0L;
         var diagDelta = diagnostics.Any ? DiagnosticMeter.Delta(diagSnapshot, diagnostics) : default;
 
-        spec.IterationTeardown?.Invoke();
+        spec.SampleTeardown?.Invoke();
         return (elapsedNs, allocDelta, diagDelta, occupancy);
     }
 
@@ -1734,7 +1734,7 @@ internal static class AdaptiveLoop
         if (forceGc)
             GcControl.ForceGen0Collection();
 
-        spec.IterationSetup?.Invoke();
+        spec.SampleSetup?.Invoke();
 
         AllocationMeter.AllocationSnapshot snapshot = default;
 
@@ -1776,7 +1776,7 @@ internal static class AdaptiveLoop
         var allocDelta = measureAllocations ? AllocationMeter.Delta(snapshot) : 0L;
         var diagDelta = diagnostics.Any ? DiagnosticMeter.Delta(diagSnapshot, diagnostics) : default;
 
-        spec.IterationTeardown?.Invoke();
+        spec.SampleTeardown?.Invoke();
         return (elapsedNs, allocDelta, diagDelta, occupancy);
     }
 
@@ -1785,14 +1785,14 @@ internal static class AdaptiveLoop
         if (forceGc)
             GcControl.ForceGen0Collection();
 
-        spec.IterationSetup?.Invoke();
+        spec.SampleSetup?.Invoke();
 
         for (var j = 0; j < k; j++)
         {
             body();
         }
 
-        spec.IterationTeardown?.Invoke();
+        spec.SampleTeardown?.Invoke();
     }
 
     private static async Task RunUntimedSampleAsync(Func<Task> body, RunSpec spec, int k, bool forceGc)
@@ -1800,14 +1800,14 @@ internal static class AdaptiveLoop
         if (forceGc)
             GcControl.ForceGen0Collection();
 
-        spec.IterationSetup?.Invoke();
+        spec.SampleSetup?.Invoke();
 
         for (var j = 0; j < k; j++)
         {
             await body().ConfigureAwait(false);
         }
 
-        spec.IterationTeardown?.Invoke();
+        spec.SampleTeardown?.Invoke();
     }
 
     private static int ProgressCadence(int total)

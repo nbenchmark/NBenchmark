@@ -17,7 +17,7 @@ The engine provides three ways to keep `PerClass` sharing honest: an explicit re
 Implement `IStateReset` on the benchmark class to declare how its shared state is cleared between methods. The engine calls `ResetAsync` after one method completes (and after its inter-benchmark GC) and before the next method's warmup starts. For *N* methods, the engine makes *N-1* calls.
 
 ```csharp
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Lifecycle;
 
 [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -88,13 +88,13 @@ The engine maintains the `PerClass` lifetime if:
 
 Whenever a class runs as `PerClass` with more than one `[Benchmark]` method and has declared neither `IStateReset` nor `[SharedState]`, the engine attaches a warning to every result:
 
-> Class 'OrderBenchmarks' uses InstanceLifetime.PerClass with 2 [Benchmark] methods. Sharing a single instance across methods can cause the second method to observe cached state from the first, violating the statistical-independence assumption of the significance test. To preserve independence: implement IStateReset on the class (the engine will call it between methods), or use InstanceLifetime.PerMethod. If the carry-over is deliberate, say so with [SharedState] - or set SuppressPerClassIndependenceWarning on MeasurementOptions to silence it for the whole run.
+> Class 'OrderBenchmarks' uses InstanceLifetime.PerClass with 2 [Benchmark] methods. Sharing a single instance across methods can cause the second method to observe cached state from the first, violating the statistical-independence assumption of the significance test. To preserve independence: implement IStateReset on the class (the engine will call it between methods), or use InstanceLifetime.PerMethod. If the carry-over is deliberate, say so with [SharedState] - or add BenchmarkWarnings.PerClassIndependence to MeasurementOptions.SuppressedWarnings to silence it for the whole run.
 
-Using `[SharedState]` is preferred over `SuppressPerClassIndependenceWarning` because it documents the intent on the class itself.
+Using `[SharedState]` is preferred over `BenchmarkWarnings.PerClassIndependence` because it documents the intent on the class itself.
 
 ## Launches
 
-When `LaunchCount` is greater than 1, each launch builds a **new instance** and re-runs `[BenchmarkSetup]` on every path. This ensures that the reported standard error and margin of error reflect between-launch reproducibility rather than readings of a single warmed object. Consequently, `IStateReset` is not called at launch boundaries - since there is no carried state - but only in the gaps between methods within a single launch.
+When `LaunchCount` is greater than 1, each launch builds a **new instance** and re-runs `[GlobalSetup]` on every path. This ensures that the reported standard error and margin of error reflect between-launch reproducibility rather than readings of a single warmed object. Consequently, `IStateReset` is not called at launch boundaries - since there is no carried state - but only in the gaps between methods within a single launch.
 
 ## Compile-time diagnostics (NB0011)
 
@@ -108,5 +108,5 @@ For more information, see the following pages:
 
 - [Dependency injection](./dependency-injection.md) - `WithScopedServices`, `WithServices`, and the `PerClass` sharing warning.
 - [Analyzers reference](../reference/analyzers.md) - NB0011 (PerClass with scoped service) and NB0013 (PerClass with mutable field).
-- [Configuration reference](../reference/configuration.md) - `SuppressPerClassIndependenceWarning` and `MeasurementOptions`.
+- [Configuration reference](../reference/configuration.md) - `SuppressedWarnings` and `MeasurementOptions`.
 - [Deep dive: Instance lifetime resolution](../deep-dives/instance-lifetime-resolution.md) - How the engine determines how long an instance lives and how that decision is propagated.

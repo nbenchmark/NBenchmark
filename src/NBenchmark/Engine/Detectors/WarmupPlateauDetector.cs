@@ -42,7 +42,7 @@ internal sealed class WarmupPlateauDetector
     ///     a handful of full-length batches. A 2 s body with default BatchSize = 8 would otherwise
     ///     have to feed (Patience + 1) * BatchSize = 32 samples (64 s) before the plateau rule can
     ///     settle; shrinking the batch to 1 drops the plateau requirement to (Patience + 1) = 4
-    ///     samples, after which <see cref="AutoTuneOptions.MinWarmup" /> (default 8) becomes the
+    ///     samples, after which <see cref="AutoTuneOptions.MinWarmupSamples" /> (default 8) becomes the
     ///     binding floor. The estimate is 0 when calibration did not run (K pinned, setup/teardown,
     ///     forced GC), in which case the configured BatchSize is used unchanged.
     ///     <para>
@@ -54,8 +54,8 @@ internal sealed class WarmupPlateauDetector
     /// </summary>
     public WarmupPlateauDetector(AutoTuneOptions options, double perSampleEstimateNs)
     {
-        _minWarmup = Math.Max(0, options.MinWarmup);
-        _maxWarmup = Math.Max(_minWarmup, options.MaxWarmup);
+        _minWarmup = Math.Max(0, options.MinWarmupSamples);
+        _maxWarmup = Math.Max(_minWarmup, options.MaxWarmupSamples);
         _epsilon = options.WarmupEpsilon;
         _patience = Math.Max(1, options.PlateauPatience);
         _batchSize = ResolveBatchSize(options.BatchSize, perSampleEstimateNs);

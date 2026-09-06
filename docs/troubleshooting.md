@@ -15,7 +15,7 @@ This guide provides symptoms, causes, and fixes for common measurement problems.
 > [!CAUTION] Quick fix
 > Rebuild your project with `dotnet run -c Release` (or set the configuration to Release in your IDE) and detach the debugger.
 
-If the entry assembly is built in `Debug` configuration or a debugger is attached, JIT inlining and tier-1 optimization are disabled. If you intentionally want to measure Debug behavior, suppress the warning by setting `NBENCHMARK_SUPPRESS_DEBUG_WARNING=1` or using `new MeasurementOptions { Environment = new EnvironmentOptions { SuppressBuildConfigurationWarning = true } }`.
+If the entry assembly is built in `Debug` configuration or a debugger is attached, JIT inlining and tier-1 optimization are disabled. If you intentionally want to measure Debug behavior, suppress the warning by setting `NBENCHMARK_SUPPRESS_DEBUG_WARNING=1` or using `new MeasurementOptions { SuppressedWarnings = BenchmarkWarnings.BuildConfiguration }`.
 
 ### Large error (wide confidence interval)
 
@@ -23,7 +23,7 @@ If the entry assembly is built in `Debug` configuration or a debugger is attache
 > - **Demand a tighter target:** Use `.WithAutoTune(AutoTuneOptions.Thorough)` or `--ci-target 0.01`.
 > - **Raise the sample ceiling:** Use `--max-samples <n>` and `--max-tuning-time <s>` if the loop stops at a cap.
 > - **Reduce OS scheduling noise:** Use `.WithOutlierMode(OutlierMode.IqrFence)` (the default).
-> - **Stabilize a hot laptop:** Use `--warmup 50` to let the CPU stabilize and ensure the laptop is plugged in.
+> - **Stabilize a hot laptop:** Use `--warmup-samples 50` to let the CPU stabilize and ensure the laptop is plugged in.
 
 A wide confidence interval indicates genuinely variable timings. In auto-sampling mode, NBenchmark collects samples until the Error meets the precision target. Therefore, a wide interval usually points to real run-to-run variability rather than an insufficient sample size.
 
@@ -45,7 +45,7 @@ Three different issues can produce this symptom. Diagnose them in the following 
 **1. Warmup ended before the JIT finished tiering up.**
 The run measured unoptimized code, which can be several times slower. Each run is internally consistent, so the margin appears trustworthy.
 
-Check `autoTune.warmupTimeFloorMet` in the JSON (or `warmup cut short` on the console summary), as well as `autoTune.jitQuiescenceAchieved` and `autoTune.splitHalfDrift`. The `autoTune.warmupCurve` shows whether the body was still speeding up when warmup ended. `autoTune.jitLastChangeAtNs` compared to `warmupElapsedNs` shows how much quiet time followed the last compilation. To fix this, raise `--min-warmup-time <ms>` (default 500) and `--max-warmup <n>` if the ceiling cut warmup short.
+Check `autoTune.warmupTimeFloorMet` in the JSON (or `warmup cut short` on the console summary), as well as `autoTune.jitQuiescenceAchieved` and `autoTune.splitHalfDrift`. The `autoTune.warmupCurve` shows whether the body was still speeding up when warmup ended. `autoTune.jitLastChangeAtNs` compared to `warmupElapsedNs` shows how much quiet time followed the last compilation. To fix this, raise `--min-warmup-time <ms>` (default 500) and `--max-warmup-samples <n>` if the ceiling cut warmup short.
 
 **2. The measurement is finer than the clock can resolve.**
 Compare `autoTune.sampleQuantizationFraction` against the reported margin. If one timer step is a larger fraction of the sample than the margin is, the results describe the clock's step grid rather than your code. Within a run, every sample lands on the same step; between runs, a tiny shift moves them all to the next one. NBenchmark warns you when it detects this. The default `MinQuantaPerSample` floor prevents this, so it generally only appears if you use a small pinned `--ops-per-sample` on a fast body. Raise the value so each sample spans hundreds of steps. For more information, see [Timer resolution](./statistics/measurement.md#timer-resolution).
@@ -63,7 +63,7 @@ To reduce this spread, use [environment controls](./features/environment-control
 > - **Accept the variance as the finding:** Use `--launch-count 5` to get an honest signal of run-to-run spread across launches.
 > - **Chase precision:** Raise `--max-samples` and loosen `--ci-target` (for example, `--ci-target 0.05`).
 
-The reported Error describes the **trimmed** mean, while the loop's stop rule runs on the **raw** stream. The Error accounts for how many samples the fence removed (it is a Winsorized interval), but not for how far out they were. A benchmark can show `MarginOfError` at ±1.3% of its mean while `autoTune.achievedRelativeCiWidth` is `1.05` (±105%). Both numbers are correct; they describe different sample sets.
+The reported Error describes the **trimmed** mean, while the loop's stop rule runs on the **raw** stream. The Error accounts for how many samples the fence removed (it is a Winsorized interval), but not for how far out they were. A benchmark can show `MarginOfErrorNs` at ±1.3% of its mean while `autoTune.achievedRelativeCiWidth` is `1.05` (±105%). Both numbers are correct; they describe different sample sets.
 
 Read `autoTune.sampleStop` before the Error column. A tight margin is evidence the measurement converged only when it reads `ciTargetMet`. Compare `autoTune.achievedRelativeCiWidth` against `marginOfError / mean`, and check `outliersRemoved` against the pre-trim sample count.
 
@@ -97,31 +97,31 @@ For more information, see [The host drift canary](./statistics/measurement.md#th
 ### Sample count varies between runs
 
 > [!CAUTION] Quick fix
-> This is expected behavior. Auto-sampling works as designed. To get a fixed, reproducible sample count (for example, in CI), use `.WithIterations(n)` or `--iterations n`.
+> This is expected behavior. Auto-sampling works as designed. To get a fixed, reproducible sample count (for example, in CI), use `.WithSamples(n)` or `--samples n`.
 
 Each run collects enough samples to hit the CI target. Use a fixed count only when you need reproducibility across runs for CI dashboards or regression baselines.
 
-For more information, see [Configuration: Iterations](./reference/configuration.md#iterations).
+For more information, see [Configuration: Samples](./reference/configuration.md#samples).
 
 ### High standard deviation
 
 > [!CAUTION] Pick one
 > - **Diagnose allocation pressure:** Enable allocation tracking with `.WithAllocations()` and read the `Alloc/op` column.
-> - **Isolate iterations from GC noise:** Use the `Independent` profile (`--profile independent`) to force per-iteration GC.
+> - **Isolate samples from GC noise:** Use the `PerSampleCollect` GC behavior (`--gc per-sample-collect`) to force per-sample GC.
 
-A high standard deviation indicates inconsistent timings. Under the default `Realistic` profile, natural GC pauses are included in the timing, and allocation pressure from the body produces a noisy tail. The `Independent` profile forces a Gen0 GC before every iteration, making GC pauses deterministic and removing them from the variance (at the cost of ecological validity).
+A high standard deviation indicates inconsistent timings. Under the default `Natural` GC behavior, natural GC pauses are included in the timing, and allocation pressure from the body produces a noisy tail. The `PerSampleCollect` GC behavior forces a Gen0 GC before every sample, making GC pauses deterministic and removing them from the variance (at the cost of ecological validity).
 
-For more information, see [Measurement Profiles](./statistics/measurement.md#measurement-profiles) and [Configuration: MeasureAllocations](./reference/configuration.md#measureallocations).
+For more information, see [GC behavior](./statistics/measurement.md#gc-behavior) and [Configuration: MeasureAllocations](./reference/configuration.md#measureallocations).
 
 ### Bimodal distribution warning
 
 > [!CAUTION] Quick fix
 > 1. **Check the body** for lock contention or cache misses. The cluster center in the warning names the extra cost of the slow path.
-> 2. **If you suspect GC:** Use `dotnet run -- --profile independent` to force per-iteration Gen0 collection.
+> 2. **If you suspect GC:** Use `dotnet run -- --gc per-sample-collect` to force per-sample Gen0 collection.
 
 The outlier detector found a tight secondary cluster of slow timings rather than scattered noise, indicating a real, repeatable slow path in the code. The reported median describes the fast path, and the cluster center describes a latency a real user will encounter. The warning is non-fatal; the benchmark still completes and reports statistics on the trimmed (fast-cluster) set.
 
-Do not silence this warning. Read the tail metrics as-is; by default, the histogram and P99/P99.9/Max are computed from the full pre-trim distribution. Investigate the cause with a profiler and reduce noise at the source with [environment control](./features/environment-control.md) if OS scheduling contributed to the spread.
+Do not silence this warning. Read the tail metrics as-is; by default, the histogram and P99/P99.9/max are computed from the full pre-trim distribution. Investigate the cause with a profiler and reduce noise at the source with [environment control](./features/environment-control.md) if OS scheduling contributed to the spread.
 
 For more information, see [Outlier Trimming: Bimodal-distribution warning](./statistics/outliers.md#bimodal-distribution-warning).
 
@@ -166,14 +166,14 @@ For more information, see [FAQ: `0 ns`](./faq.md#my-benchmark-produces-0-ns-what
 ### All results are zero
 
 > [!CAUTION] Quick fix
-> Remove the `--dry-run` flag or set `Iterations` > 0.
+> Remove the `--dry-run` flag or set `Samples` > 0.
 
-Dry-run mode is active (`--dry-run`, or `Iterations=0` and `WarmupIterations=0`). The body is not invoked, and no measurements are taken. Use `--dry-run` to validate discovery and wiring. To run the body exactly once for a smoke test, use `--iterations 1 --warmup 0`.
+Dry-run mode is active (`--dry-run`, or `Samples=0` and `WarmupSamples=0`). The body is not invoked, and no measurements are taken. Use `--dry-run` to validate discovery and wiring. To run the body exactly once for a smoke test, use `--samples 1 --warmup-samples 0`.
 
 ### Margin of error is ±0 ns
 
 > [!CAUTION] Quick fix
-> Unpin `Iterations` to use auto mode (which collects at least `AutoTune.MinSamples`), or pin a larger count.
+> Unpin `Samples` to use auto mode (which collects at least `AutoTune.MinSamples`), or pin a larger count.
 
 This happens if only one sample was collected (`n < 2`) or all measurements were identical (timer resolution is coarser than the benchmark duration). For a fast body, auto ops-per-sample calibration amortizes a coarse timer. Note that calibration is skipped when setup/teardown is set and bypassed when `OpsPerSample` is pinned.
 
@@ -182,7 +182,7 @@ Identical measurements occur when every sample lands on the same clock step. Com
 ### Significance column is blank
 
 > [!CAUTION] Quick fix
-> Increase iterations or combine more runs: `--iterations <n>` or `--min-samples <n>`.
+> Increase samples or combine more runs: `--samples <n>` or `--min-samples <n>`.
 
 This happens if there are too few samples for the significance test (which requires at least two per group), or if the Kruskal-Wallis omnibus test was not significant. In the second case, the blank is correct; the omnibus gate refused to run pairwise comparisons because the groups appear the same.
 
@@ -218,7 +218,7 @@ For more information, see [Dependency Injection](./features/dependency-injection
 > - **Use `AddInProcess(name, body)`** to keep a specific benchmark in the host process while others run in a worker.
 > - **Use `WithIsolation(Isolation.Preferred)`** to accept a labeled host-process measurement.
 
-`RequireIsolation` defaults to `true`. A benchmark that requires a worker but cannot be sent to one fails the run.
+`Isolation` defaults to `Isolation.Required`. A benchmark that requires a worker but cannot be sent to one fails the run.
 
 Ordinary captured data (such as `int`, `string`, `int[]`, `List<T>`, `Dictionary<K,V>` with default comparers, or records of those) is sent and stays isolated. This error occurs for values whose behavior is not carried by their contents:
 
@@ -262,7 +262,7 @@ For more information, see [Configuration: ForceGcBetweenBenchmarks](./reference/
 | Mode | When to use |
 | --- | --- |
 | `IqrFence` (default) | General-purpose. The [IQR](https://en.wikipedia.org/wiki/Interquartile_range)-based fence adapts to data spread and trims spikes from OS scheduling interrupts. |
-| `RemoveTop5Percent` | When you want a fixed quota; always removes the slowest 5% of iterations. |
+| `RemoveTop5Percent` | When you want a fixed quota; always removes the slowest 5% of samples. |
 | `RemoveTopAndBottom5Percent` | When very fast outliers (such as cache hits after warmup) also skew results. |
 | `None` | When every sample matters (latency-tail analysis). |
 

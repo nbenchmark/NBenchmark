@@ -48,8 +48,8 @@ public sealed class MeasurementOptionsBuilderTests
         public long MaxAllocatedBytes => -1;
         public string? ReferenceMethod => null;
         public double MaxSlowdownRatio => 0;
-        public int Iterations => 0;
-        public int WarmupIterations => 0;
+        public int Samples => 0;
+        public int WarmupSamples => 0;
         public bool MeasureAllocations => false;
         public OutlierMode OutlierMode => OutlierMode.IqrFence;
         public double ConfidenceLevel => 0.95;

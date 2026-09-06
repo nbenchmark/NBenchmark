@@ -6,7 +6,7 @@ order: 2
 
 # Allocation Measurement
 
-The **Alloc/op** column reports the mean number of bytes your benchmark allocated on the managed heap per operation. This is collected on every run by default, regardless of the [measurement profile](./measurement.md#measurement-profiles).
+The **Alloc/op** column reports the mean number of bytes your benchmark allocated on the managed heap per operation. This is collected on every run by default, regardless of the [GC behavior](./measurement.md#gc-behavior).
 
 Because the allocation counters are read outside the timed window, tracking has no impact on timing accuracy. Allocation is often more actionable than timing; while a timing difference tells you that code is slower, an allocation difference often explains *why* and points to a specific line of code.
 
@@ -22,18 +22,18 @@ Each measured sample reads a GC allocation counter before and after the body run
 
 | Step | Action |
 |---|---|
-| 1 | Forced Gen0 collection (if the `Independent` profile is active) |
-| 2 | `IterationSetup` (if configured) |
+| 1 | Forced Gen0 collection (if the `PerSampleCollect` GC behavior is active) |
+| 2 | `SampleSetup` (if configured) |
 | 3 | **Allocation counter read (before)** |
 | 4 | Timestamp read |
 | 5 | The body runs K times |
 | 6 | Elapsed time read |
 | 7 | **Allocation counter read (after)** |
-| 8 | `IterationTeardown` (if configured) |
+| 8 | `SampleTeardown` (if configured) |
 
 Two important consequences follow from this sequence:
-- **Reads are outside the timed window.** The timestamp is taken after the first read and the elapsed time is computed before the second read. Counter access never inflates a timing, which is why allocation tracking is enabled by default even under the `Independent` profile.
-- **Setup and teardown are excluded.** `IterationSetup` and `IterationTeardown` run outside the bracketed reads, so their allocations are not attributed to your benchmark body.
+- **Reads are outside the timed window.** The timestamp is taken after the first read and the elapsed time is computed before the second read. Counter access never inflates a timing, which is why allocation tracking is enabled by default even under the `PerSampleCollect` GC behavior.
+- **Setup and teardown are excluded.** `SampleSetup` and `SampleTeardown` run outside the bracketed reads, so their allocations are not attributed to your benchmark body.
 
 Only the measurement phase is sampled; warmup allocations are not recorded.
 
@@ -64,23 +64,23 @@ Allocation statistics are computed from the **raw, untrimmed** sample set. Timin
 
 | Field | Meaning | Location |
 |---|---|---|
-| `MeanAllocatedBytes` | Arithmetic mean per operation (truncated to a whole number of bytes) | `Alloc/op` column, all detail levels |
-| `AllocMedian` | Median (P50) per operation | Advanced detail, CSV, JSON |
-| `AllocP95` | 95th percentile per operation ([nearest-rank](./descriptive.md#percentiles)) | Advanced detail, CSV, JSON |
-| `AllocMax` | Largest per-operation value recorded by any single sample | Advanced detail, CSV, JSON |
+| `AllocatedBytesMean` | Arithmetic mean per operation (truncated to a whole number of bytes) | `Alloc/op` column, all detail levels |
+| `AllocatedBytesMedian` | Median (P50) per operation | Advanced detail, CSV, JSON |
+| `AllocatedBytesP95` | 95th percentile per operation ([nearest-rank](./descriptive.md#percentiles)) | Advanced detail, CSV, JSON |
+| `AllocatedBytesMax` | Largest per-operation value recorded by any single sample | Advanced detail, CSV, JSON |
 
-`MeanAllocatedBytes` is `null` if tracking is disabled or the benchmark errors; the other three are absent unless the run produced statistics.
+`AllocatedBytesMean` is `null` if tracking is disabled or the benchmark errors; the other three are absent unless the run produced statistics.
 
-A **median of 0 with a non-zero mean and a large max** typically indicates that most operations allocate nothing, but a minority allocate significantly. This is a common signature of growing buffers, cache-miss paths, or lazily initialized fields.
+A **Median of 0 with a non-zero mean and a large max** typically indicates that most operations allocate nothing, but a minority allocate significantly. This is a common signature of growing buffers, cache-miss paths, or lazily initialized fields.
 
 At Advanced detail, the breakdown appears under the benchmark:
 
 ```text
 Allocations:
-  Mean: 1.2 KiB
+  MeanNs: 1.2 KiB
   P50:  0 B
   P95:  8.0 KiB
-  Max:  32.0 KiB
+  MaxNs:  32.0 KiB
 ```
 
 ### Across multiple launches
@@ -122,5 +122,5 @@ options with { MeasureAllocations = false }
 
 - [Measurement](./measurement.md) - The sample loop these reads are bracketed into.
 - [Diagnostics](./diagnostics.md) - GC collection counts, showing how the collector responds to these allocations.
-- [Descriptive statistics](./descriptive.md) - The percentile convention used for `AllocP95`.
+- [Descriptive statistics](./descriptive.md) - The percentile convention used for `AllocatedBytesP95`.
 - [Reading your results](../getting-started/reading-your-results.md) - The `Alloc/op` column in context.

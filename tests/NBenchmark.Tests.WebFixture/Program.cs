@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Http;
-using NBenchmark.Attributes;
+using NBenchmark;
 
 namespace NBenchmark.Tests.WebFixture;
 

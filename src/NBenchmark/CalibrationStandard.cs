@@ -3,14 +3,14 @@ using System.Diagnostics;
 namespace NBenchmark;
 
 /// <summary>What one run of the calibration standard measured.</summary>
-/// <param name="Mean">The mean, averaged across launches when there was more than one.</param>
-/// <param name="Median">The median, averaged across launches when there was more than one.</param>
+/// <param name="MeanNs">The mean, averaged across launches when there was more than one.</param>
+/// <param name="MedianNs">The median, averaged across launches when there was more than one.</param>
 /// <param name="Samples">
 ///     The samples of a single launch. Pooling across launches would multiply the count without
 ///     improving reproducibility, which is the failure mode <see cref="LaunchMedians" /> exists to
 ///     measure instead.
 /// </param>
-public sealed record CalibrationResult(double Mean, double Median, double[] Samples)
+public sealed record CalibrationResult(double MeanNs, double MedianNs, double[] Samples)
 {
     /// <summary>
     ///     The median measured in each launch, <b>indexed by launch index</b>, when the caller measured
@@ -96,18 +96,18 @@ public static class CalibrationStandard
         ArgumentNullException.ThrowIfNull(calibration);
 
         return BenchmarkResult.FromCalibration(
-                "calibration", calibration.Mean, calibration.Median, calibration.Samples)
+                "calibration", calibration.MeanNs, calibration.MedianNs, calibration.Samples)
             with
             {
                 IsolationStatus = isolationStatus,
             };
     }
 
-    private static long BusyWeight(int iterations)
+    private static long BusyWeight(int samples)
     {
         long acc = 1;
 
-        for (var i = 0; i < iterations; i++)
+        for (var i = 0; i < samples; i++)
         {
             acc = unchecked(acc * (long)0x9E3779B97F4A7C15UL + i);
         }

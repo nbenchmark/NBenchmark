@@ -10,7 +10,7 @@ namespace NBenchmark.Stats;
 internal static class ChiSquared
 {
     private const double Epsilon = 1e-14;
-    private const int MaxIterations = 300;
+    private const int MaxSamplesLimit = 300;
     private const double TinyFloor = 1e-300;
 
     // Lanczos approximation coefficients (g = 7, n = 9).
@@ -82,7 +82,7 @@ internal static class ChiSquared
         var sum = 1.0 / a;
         var del = sum;
 
-        for (var n = 0; n < MaxIterations; n++)
+        for (var n = 0; n < MaxSamplesLimit; n++)
         {
             ap += 1.0;
             del *= x / ap;
@@ -103,7 +103,7 @@ internal static class ChiSquared
         var d = 1.0 / b;
         var h = d;
 
-        for (var i = 1; i <= MaxIterations; i++)
+        for (var i = 1; i <= MaxSamplesLimit; i++)
         {
             var an = -i * (i - a);
             b += 2.0;

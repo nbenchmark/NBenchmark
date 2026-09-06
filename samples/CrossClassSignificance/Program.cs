@@ -1,5 +1,4 @@
 using NBenchmark;
-using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
 // By default, Harness mode computes significance per class: each class gets its own

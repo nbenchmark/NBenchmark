@@ -272,9 +272,9 @@ internal static class TestMethodRunner
 
             if (group.Calibration is { } calibration)
             {
-                calibrationMedians[replicate] = calibration.Median;
-                calibrationMeanSum += calibration.Mean;
-                calibrationSum += calibration.Median;
+                calibrationMedians[replicate] = calibration.MedianNs;
+                calibrationMeanSum += calibration.MeanNs;
+                calibrationSum += calibration.MedianNs;
                 calibrationCount++;
                 firstCalibration ??= calibration;
             }
@@ -296,8 +296,8 @@ internal static class TestMethodRunner
 
             return firstCalibration with
             {
-                Mean = calibrationMeanSum / calibrationCount,
-                Median = calibrationSum / calibrationCount,
+                MeanNs = calibrationMeanSum / calibrationCount,
+                MedianNs = calibrationSum / calibrationCount,
 
                 // Only when there are launches to pair. A single-launch run reports an empty list
                 // rather than a one-entry one, because one ratio is not an estimate of one.

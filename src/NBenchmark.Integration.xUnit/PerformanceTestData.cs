@@ -18,8 +18,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         long maxAllocatedBytes,
         string? referenceMethod,
         double maxSlowdownRatio,
-        int iterations,
-        int warmupIterations,
+        int samples,
+        int warmupSamples,
         bool measureAllocations,
         OutlierMode outlierMode,
         double confidenceLevel,
@@ -33,8 +33,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         MaxAllocatedBytes = maxAllocatedBytes;
         ReferenceMethod = referenceMethod;
         MaxSlowdownRatio = maxSlowdownRatio;
-        Iterations = iterations;
-        WarmupIterations = warmupIterations;
+        Samples = samples;
+        WarmupSamples = warmupSamples;
         MeasureAllocations = measureAllocations;
         OutlierMode = outlierMode;
         ConfidenceLevel = confidenceLevel;
@@ -50,8 +50,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     public long MaxAllocatedBytes { get; private set; } = -1;
     public string? ReferenceMethod { get; private set; }
     public double MaxSlowdownRatio { get; private set; }
-    public int Iterations { get; private set; }
-    public int WarmupIterations { get; private set; }
+    public int Samples { get; private set; }
+    public int WarmupSamples { get; private set; }
     public bool MeasureAllocations { get; private set; }
     public OutlierMode OutlierMode { get; private set; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; private set; } = 0.95;
@@ -66,8 +66,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         info.AddValue(nameof(MaxAllocatedBytes), MaxAllocatedBytes);
         info.AddValue(nameof(ReferenceMethod), ReferenceMethod ?? NullSentinel);
         info.AddValue(nameof(MaxSlowdownRatio), MaxSlowdownRatio);
-        info.AddValue(nameof(Iterations), Iterations);
-        info.AddValue(nameof(WarmupIterations), WarmupIterations);
+        info.AddValue(nameof(Samples), Samples);
+        info.AddValue(nameof(WarmupSamples), WarmupSamples);
         info.AddValue(nameof(MeasureAllocations), MeasureAllocations);
         info.AddValue(nameof(OutlierMode), (int)OutlierMode);
         info.AddValue(nameof(ConfidenceLevel), ConfidenceLevel);
@@ -85,8 +85,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         var referenceMethod = info.GetValue<string>(nameof(ReferenceMethod));
         ReferenceMethod = referenceMethod == NullSentinel ? null : referenceMethod;
         MaxSlowdownRatio = info.GetValue<double>(nameof(MaxSlowdownRatio));
-        Iterations = info.GetValue<int>(nameof(Iterations));
-        WarmupIterations = info.GetValue<int>(nameof(WarmupIterations));
+        Samples = info.GetValue<int>(nameof(Samples));
+        WarmupSamples = info.GetValue<int>(nameof(WarmupSamples));
         MeasureAllocations = info.GetValue<bool>(nameof(MeasureAllocations));
         OutlierMode = (OutlierMode)info.GetValue<int>(nameof(OutlierMode));
         ConfidenceLevel = info.GetValue<double>(nameof(ConfidenceLevel));
@@ -108,8 +108,8 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
             thresholds.MaxAllocatedBytes,
             thresholds.ReferenceMethod,
             thresholds.MaxSlowdownRatio,
-            thresholds.Iterations,
-            thresholds.WarmupIterations,
+            thresholds.Samples,
+            thresholds.WarmupSamples,
             thresholds.MeasureAllocations,
             thresholds.OutlierMode,
             thresholds.ConfidenceLevel,

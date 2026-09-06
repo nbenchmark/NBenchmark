@@ -7,8 +7,8 @@ public interface IPerformanceThresholds
     public long MaxAllocatedBytes { get; }
     public string? ReferenceMethod { get; }
     public double MaxSlowdownRatio { get; }
-    public int Iterations { get; }
-    public int WarmupIterations { get; }
+    public int Samples { get; }
+    public int WarmupSamples { get; }
     public bool MeasureAllocations { get; }
     public OutlierMode OutlierMode { get; }
     public double ConfidenceLevel { get; }

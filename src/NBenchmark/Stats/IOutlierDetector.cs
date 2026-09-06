@@ -51,10 +51,10 @@ public sealed record OutlierClassification
     public required double[] Discarded { get; init; }
 
     /// <summary>The lower rejection boundary, when the detector is fence-based; otherwise <c>null</c>.</summary>
-    public double? LowerFence { get; init; }
+    public double? LowerFenceNs { get; init; }
 
     /// <summary>The upper rejection boundary, when the detector is fence-based; otherwise <c>null</c>.</summary>
-    public double? UpperFence { get; init; }
+    public double? UpperFenceNs { get; init; }
 
     /// <summary>Convenience factory that keeps every sample (no trimming).</summary>
     public static OutlierClassification KeepAll(double[] sortedSamples) =>

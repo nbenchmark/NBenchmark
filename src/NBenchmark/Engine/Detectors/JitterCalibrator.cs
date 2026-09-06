@@ -62,7 +62,7 @@ internal static class JitterCalibrator
     ///     <see cref="double.NaN" /> in the same cases.
     /// </summary>
     /// <param name="sampleCount">How many timed samples to collect.</param>
-    /// <param name="workPerSample">How many busy-weight iterations each sample performs.</param>
+    /// <param name="workPerSample">How many busy-weight samples each sample performs.</param>
     /// <param name="clock">The monotonic clock used by the adaptive loop.</param>
     /// <remarks>
     ///     The metric is a robust counterpart to the coefficient of variation: the median and
@@ -107,11 +107,11 @@ internal static class JitterCalibrator
     ///     latency-bound, making it sensitive to scheduling preemption rather than to
     ///     microarchitectural quirks.
     /// </summary>
-    private static long BusyWeight(int iterations)
+    private static long BusyWeight(int samples)
     {
         long acc = 1;
 
-        for (var i = 0; i < iterations; i++)
+        for (var i = 0; i < samples; i++)
         {
             // 0x9E3779B97F4A7C15 is the golden-ratio constant; keeps the accumulator drifting
             // without overflowing to zero, and the multiply-add is a single instruction on
@@ -159,9 +159,9 @@ internal static class JitterCalibrator
 
         Array.Sort(absDeviations);
 
-        var mad = Median(absDeviations);
+        var medianAbsoluteDeviation = Median(absDeviations);
 
-        return new JitterProbeResult(median, mad / median);
+        return new JitterProbeResult(median, medianAbsoluteDeviation / median);
     }
 
     /// <summary>

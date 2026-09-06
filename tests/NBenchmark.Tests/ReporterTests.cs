@@ -24,7 +24,7 @@ public class ReporterTests
 
             var content = await File.ReadAllTextAsync(files[0]);
             Assert.Contains("alpha", content);
-            Assert.Contains("\"median\"", content);
+            Assert.Contains("\"medianNs\"", content);
         }
         finally
         {
@@ -443,7 +443,7 @@ public class ReporterTests
             var filePath = Path.Combine(tempDir, "out.csv");
             Assert.True(File.Exists(filePath));
             var content = await File.ReadAllTextAsync(filePath);
-            Assert.Contains("Name,Median,Mean,OpsPerSecond", content);
+            Assert.Contains("Name,MedianNs,MeanNs,OpsPerSecond", content);
             Assert.Contains("EffectMetric,EffectValue,Magnitude", content);
             Assert.Contains("\"alpha\"", content);
         }
@@ -980,25 +980,25 @@ public class ReporterTests
         return new BenchmarkResult
         {
             Name = name,
-            Mean = median,
-            Median = median,
+            MeanNs = median,
+            MedianNs = median,
             Percentiles = percentiles,
-            Min = median * 0.8,
-            Max = median * 1.3,
-            StandardDeviation = median * 0.05,
-            MeanAllocatedBytes = 64,
-            RuntimeMoniker = runtimeMoniker,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            MinNs = median * 0.8,
+            MaxNs = median * 1.3,
+            StandardDeviationNs = median * 0.05,
+            AllocatedBytesMean = 64,
+            TargetFramework = runtimeMoniker,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 0,
+            SampleCount = 0,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
     }
 }

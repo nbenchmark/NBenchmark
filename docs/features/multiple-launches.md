@@ -22,8 +22,8 @@ await new BenchmarkSuite("sorting")
     .Add("array", () => Array.Sort(data))
     .WithBaseline("bubble")
     .WithLaunchCount(5)             // Five independent launches per benchmark
-    .WithIterations(100)
-    .WithWarmup(10)
+    .WithSamples(100)
+    .WithWarmupSamples(10)
     .RunAsync();
 ```
 
@@ -113,7 +113,7 @@ Raising `--launch-count` sharpens the estimate of the spread but does not narrow
 
 ## Dry-run interaction
 
-The `--dry-run` flag (Iterations=0, WarmupIterations=0) ignores both the harness default and `--launch-count`, performing exactly one dry launch. Extra launches provide no additional information because dry runs skip the body. However, an explicit `WithLaunchCount(n)` in code is still honored.
+The `--dry-run` flag (Samples=0, WarmupSamples=0) ignores both the harness default and `--launch-count`, performing exactly one dry launch. Extra launches provide no additional information because dry runs skip the body. However, an explicit `WithLaunchCount(n)` in code is still honored.
 
 ## Isolation interaction
 
@@ -151,8 +151,8 @@ Taking the interval from the spread between launches provides an honest measurem
 The second row is the honest result. The first claims a number that does not reproduce is known to within one percent.
 
 Two additional details on how the aggregate is built:
-- Counts and durations (`N`, `MeasuredIterations`, `TotalDuration`) are totals across all launches.
-- `Min` and `Max` span everything observed across all launches.
+- Counts and durations (`N`, `SampleCount`, `TotalDuration`) are totals across all launches.
+- `MinNs` and `MaxNs` span everything observed across all launches.
 - `RawSamples` and trimmed-sample marks come from the single launch nearest the averaged median. This is necessary because marks are positions into a specific sample array.
 - Significance testing reads the pooled samples from every launch.
 

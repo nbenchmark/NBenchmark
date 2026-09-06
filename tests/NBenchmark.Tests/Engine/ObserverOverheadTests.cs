@@ -31,8 +31,8 @@ public class ObserverOverheadTests
 
         var options = new MeasurementOptions
         {
-            WarmupIterations = 5,
-            Iterations = 30,
+            WarmupSamples = 5,
+            Samples = 30,
             OutlierMode = OutlierMode.IqrFence,
             MeasureAllocations = false,
         };
@@ -60,7 +60,7 @@ public class ObserverOverheadTests
                 () => BusyWait(targetMicros),
                 new RunSpec { Options = options, Observer = observer });
 
-            ratios[round] = observedOutcome.Result.Median / nullOutcome.Result.Median;
+            ratios[round] = observedOutcome.Result.MedianNs / nullOutcome.Result.MedianNs;
         }
 
         // Sanity: the observer did capture events (the contract is not "zero events").
@@ -86,8 +86,8 @@ public class ObserverOverheadTests
         // invariant directly: a null observer must not receive any events.
         var options = new MeasurementOptions
         {
-            WarmupIterations = 3,
-            Iterations = 10,
+            WarmupSamples = 3,
+            Samples = 10,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
         };

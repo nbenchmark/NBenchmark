@@ -39,8 +39,8 @@ public class WinsorizedErrorTests
         var winsorized = WinsorizedError.Compute(new TrimContext(samples, 0, 0), 0.95);
 
         Assert.NotNull(winsorized);
-        Numerics.AssertRelativeClose(NaiveStandardError(samples), winsorized.Value.StandardError, 1e-12);
-        Numerics.AssertRelativeClose(NaiveStandardDeviation(samples), winsorized.Value.StandardDeviation, 1e-12);
+        Numerics.AssertRelativeClose(NaiveStandardError(samples), winsorized.Value.StandardErrorNs, 1e-12);
+        Numerics.AssertRelativeClose(NaiveStandardDeviation(samples), winsorized.Value.StandardDeviationNs, 1e-12);
         Assert.Equal(samples.Length - 1, winsorized.Value.DegreesOfFreedom);
     }
 
@@ -60,15 +60,15 @@ public class WinsorizedErrorTests
         Assert.NotNull(winsorized);
 
         // Winsorized sample is [1..9, 9]: mean 5.4, sum of squared deviations 74.40.
-        Numerics.AssertRelativeClose(2.8751811537130436, winsorized.Value.StandardDeviation, 1e-12);
-        Numerics.AssertRelativeClose(1.0102356812582116, winsorized.Value.StandardError, 1e-12);
+        Numerics.AssertRelativeClose(2.8751811537130436, winsorized.Value.StandardDeviationNs, 1e-12);
+        Numerics.AssertRelativeClose(1.0102356812582116, winsorized.Value.StandardErrorNs, 1e-12);
         Assert.Equal(8, winsorized.Value.DegreesOfFreedom);
 
         // Wider than the naive interval on the kept set, by a margin set by how many samples were
         // trimmed - not by how extreme they were.
         var naive = NaiveStandardError(kept);
-        Assert.True(winsorized.Value.StandardError > naive);
-        Numerics.AssertRelativeClose(1.107, winsorized.Value.StandardError / naive, 1e-3);
+        Assert.True(winsorized.Value.StandardErrorNs > naive);
+        Numerics.AssertRelativeClose(1.107, winsorized.Value.StandardErrorNs / naive, 1e-3);
     }
 
     /// <summary>
@@ -88,7 +88,7 @@ public class WinsorizedErrorTests
         var winsorized = WinsorizedError.Compute(new TrimContext(samples, 0, 1), 0.95);
 
         Assert.NotNull(winsorized);
-        Numerics.AssertRelativeClose(1.0102356812582116, winsorized.Value.StandardError, 1e-12);
+        Numerics.AssertRelativeClose(1.0102356812582116, winsorized.Value.StandardErrorNs, 1e-12);
     }
 
     [Fact]
@@ -101,9 +101,9 @@ public class WinsorizedErrorTests
         var winsorized = WinsorizedError.Compute(new TrimContext(samples, 1, 1), 0.95);
 
         Assert.NotNull(winsorized);
-        Numerics.AssertRelativeClose(Math.Sqrt(66.5 / 9.0), winsorized.Value.StandardDeviation, 1e-12);
+        Numerics.AssertRelativeClose(Math.Sqrt(66.5 / 9.0), winsorized.Value.StandardDeviationNs, 1e-12);
         Numerics.AssertRelativeClose(
-            Math.Sqrt(66.5 / 9.0) * Math.Sqrt(10.0) / 8.0, winsorized.Value.StandardError, 1e-12);
+            Math.Sqrt(66.5 / 9.0) * Math.Sqrt(10.0) / 8.0, winsorized.Value.StandardErrorNs, 1e-12);
         Assert.Equal(7, winsorized.Value.DegreesOfFreedom);
     }
 
@@ -117,8 +117,8 @@ public class WinsorizedErrorTests
         Assert.NotNull(winsorized);
 
         // Read on h - 1 = 8 degrees of freedom, not n - 1 = 9: the interval is on the trimmed mean.
-        var expected = StudentT.CriticalValue(0.99, 8) * winsorized.Value.StandardError;
-        Numerics.AssertRelativeClose(expected, winsorized.Value.MarginOfError, 1e-12);
+        var expected = StudentT.CriticalValue(0.99, 8) * winsorized.Value.StandardErrorNs;
+        Numerics.AssertRelativeClose(expected, winsorized.Value.MarginOfErrorNs, 1e-12);
     }
 
     [Theory]

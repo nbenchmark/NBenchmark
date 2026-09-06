@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Engine;
 using NBenchmark.Lifecycle;
 using NBenchmark.Tests.Workers;
@@ -32,7 +32,7 @@ public class AutoIsolationFallbackTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
-            .WithCategoryFilter(["auto-iso-fallback"])
+            .FilterCategories(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
             .WithIsolation(Isolation.Required)
@@ -81,7 +81,7 @@ public class AutoIsolationFallbackTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
-            .WithCategoryFilter(["auto-iso-fallback"])
+            .FilterCategories(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
             .WithIsolation(Isolation.Required)
@@ -120,7 +120,7 @@ public class AutoIsolationFallbackTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
-            .WithCategoryFilter(["auto-iso-nofactory"])
+            .FilterCategories(["auto-iso-nofactory"])
             .WithLaunchCount(1)
             .WithIsolation(Isolation.Required);
 
@@ -208,7 +208,7 @@ public class AutoIsolationFallbackTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
-            .WithCategoryFilter(["auto-iso-factory-perclass"])
+            .FilterCategories(["auto-iso-factory-perclass"])
             .WithInstanceFactory(AddressableFactoryPerClassBenchmarks.Create)
             .WithLaunchCount(1)
             .WithIsolation(Isolation.Off);
@@ -226,7 +226,7 @@ public class AutoIsolationFallbackTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
-            .WithCategoryFilter([category])
+            .FilterCategories([category])
             .WithInstanceFactory(AddressableFactoryPerClassBenchmarks.Create)
             .WithLaunchCount(1)
             .WithIsolation(Isolation.Required);
@@ -247,7 +247,7 @@ public class AutoIsolationFallbackTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
-            .WithCategoryFilter(["auto-iso-inprocess-nofactory"])
+            .FilterCategories(["auto-iso-inprocess-nofactory"])
             .WithLaunchCount(1)
             .WithIsolation(Isolation.Required);
 
@@ -273,7 +273,7 @@ public class AutoIsolationFallbackTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
-            .WithCategoryFilter(["auto-iso-nofactory"])
+            .FilterCategories(["auto-iso-nofactory"])
             .WithLaunchCount(3)
             .WithRunOrder(RunOrder.Random)
             .WithIsolation(Isolation.Required);
@@ -304,7 +304,7 @@ public class AutoIsolationFallbackTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
-            .WithCategoryFilter(["auto-iso-nofactory"])
+            .FilterCategories(["auto-iso-nofactory"])
             .WithLaunchCount(1)
             .WithIsolation(Isolation.Required)
             .WithIsolation(Isolation.Preferred);
@@ -353,30 +353,29 @@ public class AutoIsolationFallbackTests
             {
                 Name = fullName,
                 ClassName = request.DisplayPrefix,
-                Mean = median,
-                Median = median,
+                MeanNs = median,
+                MedianNs = median,
                 Percentiles = [],
-                Min = median * 0.95,
-                Max = median * 1.10,
-                StandardDeviation = median * 0.02,
-                StandardError = median * 0.005,
-                MarginOfError = median * 0.01,
+                MinNs = median * 0.95,
+                MaxNs = median * 1.10,
+                StandardDeviationNs = median * 0.02,
+                StandardErrorNs = median * 0.005,
+                MarginOfErrorNs = median * 0.01,
                 ConfidenceLevel = 0.95,
                 CoefficientOfVariation = 0.02,
-                Q1 = median * 0.98,
-                Q3 = median * 1.02,
-                InterquartileRange = median * 0.04,
+                Q1Ns = median * 0.98,
+                Q3Ns = median * 1.02,
+                InterquartileRangeNs = median * 0.04,
                 OutliersRemoved = 0,
-                N = rawSamples.Length,
+                SampleCount = rawSamples.Length,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = median * 0.01,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = median * 0.01,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
                 OperationsPerSecond = 1_000_000_000.0 / median,
-                MeasuredIterations = rawSamples.Length,
-                WarmupIterations = 0,
+                WarmupSamples = 0,
                 RuntimeProfileName = request.Options.RuntimeProfile.Name,
                 RuntimeKnobs = request.Options.RuntimeProfile.Describe(),
                 Errored = false,

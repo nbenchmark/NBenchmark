@@ -306,19 +306,19 @@ public sealed class FrameChannelTests
     {
         var options = MeasurementOptions.Default with
         {
-            Iterations = 123,
-            WarmupIterations = 7,
+            Samples = 123,
+            WarmupSamples = 7,
             OpsPerSample = 64,
             ConfidenceLevel = 0.99,
             SignificanceLevel = 0.01,
             OutlierMode = OutlierMode.MedianAbsoluteDeviation,
             TailMetricsBasis = TailMetricsBasis.Trimmed,
-            Profile = MeasurementProfile.Independent,
+            GcBehavior = GcBehavior.PerSampleCollect,
             MinimumPracticalEffect = 0.25,
             EnableHistogram = false,
             HistogramBucketCount = 33,
             ReportedPercentiles = [0.5, 0.9, 0.999],
-            ForceGcBeforeEachIteration = true,
+            ForceGcBeforeEachSample = true,
             MeasureAllocations = false,
             Diagnostics = new DiagnosticsOptions { GcHeapInfo = true, CpuTime = true },
             AutoTune = AutoTuneOptions.Default with
@@ -331,7 +331,7 @@ public sealed class FrameChannelTests
                 RequireJitQuiescence = false,
                 CapBehavior = AutoTuneCapBehavior.Error,
             },
-            Environment = new EnvironmentOptions { CpuAffinity = [1, 3], DedicatedHostGuidance = true },
+            Environment = new EnvironmentOptions { CpuAffinity = [1, 3], HostQualityWarnings = true },
             RuntimeProfile = RuntimeProfile.ServerGc,
             MaxRawSamples = 512,
         };
@@ -375,20 +375,20 @@ public sealed class FrameChannelTests
 
         var actual = received.Options;
 
-        Assert.Equal(123, actual.Iterations);
-        Assert.Equal(7, actual.WarmupIterations);
+        Assert.Equal(123, actual.Samples);
+        Assert.Equal(7, actual.WarmupSamples);
         Assert.Equal(64, actual.OpsPerSample);
         Assert.Equal(0.99, actual.ConfidenceLevel);
         Assert.Equal(0.01, actual.SignificanceLevel);
         Assert.Equal(OutlierMode.MedianAbsoluteDeviation, actual.OutlierMode);
         Assert.Equal(TailMetricsBasis.Trimmed, actual.TailMetricsBasis);
-        Assert.Equal(MeasurementProfile.Independent, actual.Profile);
+        Assert.Equal(GcBehavior.PerSampleCollect, actual.GcBehavior);
         Assert.Equal(0.25, actual.MinimumPracticalEffect);
         Assert.False(actual.EnableHistogram);
         Assert.Equal(33, actual.HistogramBucketCount);
         Assert.Equal(512, actual.MaxRawSamples);
         Assert.Equal([0.5, 0.9, 0.999], actual.ReportedPercentiles);
-        Assert.True(actual.ForceGcBeforeEachIteration);
+        Assert.True(actual.ForceGcBeforeEachSample);
         Assert.False(actual.MeasureAllocations);
         Assert.True(actual.Diagnostics.GcHeapInfo);
         Assert.True(actual.Diagnostics.CpuTime);
@@ -402,7 +402,7 @@ public sealed class FrameChannelTests
         Assert.Equal(AutoTuneCapBehavior.Error, actual.AutoTune.CapBehavior);
 
         Assert.Equal([1, 3], actual.Environment!.CpuAffinity);
-        Assert.True(actual.Environment.DedicatedHostGuidance);
+        Assert.True(actual.Environment.HostQualityWarnings);
 
         // The knobs are what the process boundary exists to deliver, so they must survive it
         // exactly - a dropped knob would silently measure under the wrong configuration.
@@ -463,23 +463,23 @@ public sealed class FrameChannelTests
                 Result = new BenchmarkResult
                 {
                     Name = "Bench.Body",
-                    Mean = 12.5,
-                    Median = 12.0,
+                    MeanNs = 12.5,
+                    MedianNs = 12.0,
                     Percentiles = [new PercentileEntry(0.5, 12.0)],
-                    Min = 10,
-                    Max = 30,
-                    StandardDeviation = 1.25,
-                    Q1 = 11,
-                    Q3 = 13,
-                    InterquartileRange = 2,
+                    MinNs = 10,
+                    MaxNs = 30,
+                    StandardDeviationNs = 1.25,
+                    Q1Ns = 11,
+                    Q3Ns = 13,
+                    InterquartileRangeNs = 2,
                     OutliersRemoved = 3,
-                    N = 4096,
+                    SampleCount = 4096,
                     Skewness = 0.1,
                     Kurtosis = 0.2,
-                    Mad = 0.5,
-                    AllocMedian = 24,
-                    AllocP95 = 24,
-                    AllocMax = 24,
+                    MedianAbsoluteDeviationNs = 0.5,
+                    AllocatedBytesMedian = 24,
+                    AllocatedBytesP95 = 24,
+                    AllocatedBytesMax = 24,
                     RuntimeProfileName = "steady-state",
                     RuntimeKnobs = "tiered=off pgo=off r2r=off concurrentGc=off",
                 },
@@ -584,7 +584,7 @@ public sealed class FrameChannelTests
                 BenchmarkName = "Bench.Body",
                 Phase = MeasurementPhase.Measurement,
                 SampleCount = 512,
-                Mean = 2.53,
+                MeanNs = 2.53,
                 StdDev = 0.0,
                 CiHalfWidth = double.NaN,
                 CurrentK = 4096,
@@ -596,7 +596,7 @@ public sealed class FrameChannelTests
         Assert.Equal("Bench.Body", received.BenchmarkName);
         Assert.Equal(MeasurementPhase.Measurement, received.Phase);
         Assert.Equal(512, received.SampleCount);
-        Assert.Equal(2.53, received.Mean);
+        Assert.Equal(2.53, received.MeanNs);
         Assert.Equal(0.0, received.StdDev);
         Assert.True(double.IsNaN(received.CiHalfWidth));
         Assert.Equal(4096, received.CurrentK);
@@ -663,7 +663,7 @@ public sealed class FrameChannelTests
             Kurtosis = double.NaN,
             CoefficientOfVariation = double.NaN,
             OperationsPerSecond = double.PositiveInfinity,
-            StandardDeviation = 0,
+            StandardDeviationNs = 0,
         };
 
         await left.WriteAsync(
@@ -690,8 +690,8 @@ public sealed class FrameChannelTests
             GroupId = "g1",
             Calibration = new CalibrationPayload
             {
-                Mean = 1234.5,
-                Median = 1200.0,
+                MeanNs = 1234.5,
+                MedianNs = 1200.0,
                 Samples = [1100.0, 1200.0, 1300.0],
             },
         };
@@ -706,8 +706,8 @@ public sealed class FrameChannelTests
         var calibration = received.Calibration!.ToResult();
 
         Assert.Equal("g1", received.GroupId);
-        Assert.Equal(1234.5, calibration.Mean);
-        Assert.Equal(1200.0, calibration.Median);
+        Assert.Equal(1234.5, calibration.MeanNs);
+        Assert.Equal(1200.0, calibration.MedianNs);
         Assert.Equal([1100.0, 1200.0, 1300.0], calibration.Samples);
     }
 
@@ -811,22 +811,22 @@ public sealed class FrameChannelTests
     private static BenchmarkResult ResultNamed(string name) => new()
     {
         Name = name,
-        Mean = 1,
-        Median = 1,
+        MeanNs = 1,
+        MedianNs = 1,
         Percentiles = [],
-        Min = 1,
-        Max = 1,
-        StandardDeviation = 0,
-        Q1 = 1,
-        Q3 = 1,
-        InterquartileRange = 0,
+        MinNs = 1,
+        MaxNs = 1,
+        StandardDeviationNs = 0,
+        Q1Ns = 1,
+        Q3Ns = 1,
+        InterquartileRangeNs = 0,
         OutliersRemoved = 0,
-        N = 1,
+        SampleCount = 1,
         Skewness = 0,
         Kurtosis = 0,
-        Mad = 0,
-        AllocMedian = null,
-        AllocP95 = null,
-        AllocMax = null,
+        MedianAbsoluteDeviationNs = 0,
+        AllocatedBytesMedian = null,
+        AllocatedBytesP95 = null,
+        AllocatedBytesMax = null,
     };
 }

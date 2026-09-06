@@ -21,7 +21,7 @@ public sealed class MyReporter : IReporter
     {
         foreach (var result in results.Where(r => !r.Errored))
         {
-            Console.WriteLine($"{result.Name}: median={result.Median:F0}ns");
+            Console.WriteLine($"{result.Name}: median={result.MedianNs:F0}ns");
         }
     }
 }
@@ -35,7 +35,7 @@ If you want your custom reporter to be usable via the `--reporter` CLI flag, reg
 using NBenchmark.Reporters;
 
 // In a static constructor or [ModuleInitializer]:
-ReporterRegistry.Register("my-reporter", "Custom output", _ => new MyReporter());
+ReporterRegistry.Register("my-reporter", "Custom output", (_, detail) => new MyReporter { Detail = detail });
 ```
 
 After registration, the `--reporter my-reporter` flag works from the CLI.
@@ -95,11 +95,11 @@ This contract is a convention and is not enforced by NBenchmark; the package own
 For reporters that produce comparison tables, use `BenchmarkTable.Build(results)` rather than working with `IReadOnlyList<BenchmarkResult>` directly. `BenchmarkTable` centralizes several common logic patterns:
 
 - **Baseline selection**: Picks the first result marked `[Baseline]`, or falls back to the fastest (lowest median) if none is marked.
-- **Ratio computation**: `row.Ratio` is `result.Median / baseline.Median`, or `NaN` for errored results or single-benchmark runs.
+- **Ratio computation**: `row.Ratio` is `result.MedianNs / baseline.MedianNs`, or `NaN` for errored results or single-benchmark runs.
 - **Composition**: a `BenchmarkRow` carries the measurement itself as `row.Result` and adds only what is relative to the baseline - `Ratio`, `RatioEstimate`, `RatioSuppressed`, `SignificanceLabel`, `IsBaseline`, and `BaseName`. Every other property is read through `row.Result`.
 - **Significance labels**: `row.SignificanceLabel` is `"✓"` (significant), `"✗"` (not significant), or `""` (not applicable).
 - **Ordering**: Rows are sorted by median ascending.
-- **Run metadata**: Provides `table.RunAtUtc` (a `DateTimeOffset?`, `null` for an empty table), `table.WarmupIterations`, `table.MeasuredIterations`, `table.ConfidenceLevel`, `table.OutlierDetector` (the display name, such as `"IQR fence (1.5×)"`), `table.SignificanceTestName`, and `table.TotalDuration`.
+- **Run metadata**: Provides `table.RunAtUtc` (a `DateTimeOffset?`, `null` for an empty table), `table.WarmupSamples`, `table.SampleCount`, `table.ConfidenceLevel`, `table.OutlierDetectorName` (the display name, such as `"IQR fence (1.5×)"`), `table.SignificanceTestName`, and `table.TotalDuration`.
 - **Omnibus verdict**: `table.Omnibus` is non-`null` when an omnibus test runs (Kruskal-Wallis across three or more groups). It exposes `TestName`, `Statistic`, `DegreesOfFreedom`, `GroupCount`, `PValue`, and `Verdict`.
 
 ```csharp
@@ -110,7 +110,7 @@ public async Task ReportAsync(
     var table = BenchmarkTable.Build(results);
 
     Console.WriteLine(
-        $"Run at {table.RunAtUtc:yyyy-MM-dd HH:mm:ss} UTC - {table.WarmupIterations} warmup / {table.MeasuredIterations} measured");
+        $"Run at {table.RunAtUtc:yyyy-MM-dd HH:mm:ss} UTC - {table.WarmupSamples} warmup / {table.SampleCount} measured");
 
     foreach (var row in table.Rows)
     {
@@ -121,7 +121,7 @@ public async Task ReportAsync(
         }
 
         var sig = row.SignificanceLabel is "" ? "" : $" {row.SignificanceLabel}";
-        Console.WriteLine($"{row.Result.Name}{sig}: {row.Result.Median:F0} ns  ratio={row.Ratio:F2}x");
+        Console.WriteLine($"{row.Result.Name}{sig}: {row.Result.MedianNs:F0} ns  ratio={row.Ratio:F2}x");
     }
 }
 ```

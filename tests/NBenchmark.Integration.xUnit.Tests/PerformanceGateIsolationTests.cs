@@ -222,9 +222,9 @@ public sealed class PerformanceGateIsolationTests
         bool allowInProcessGate = false)
         => PerformanceGate.Evaluate(
             candidate,
-            Samples(candidate.Mean),
+            Samples(candidate.MeanNs),
             reference,
-            Samples(reference.Mean),
+            Samples(reference.MeanNs),
             new Thresholds { MaxSlowdownRatio = 1.2, RequireIsolation = false },
             allowInProcessGate);
 
@@ -244,25 +244,24 @@ public sealed class PerformanceGateIsolationTests
     {
         Name = name,
         IsolationStatus = status,
-        Mean = mean,
-        Median = mean,
+        MeanNs = mean,
+        MedianNs = mean,
         Percentiles = [],
-        Min = mean,
-        Max = mean,
-        StandardDeviation = 0,
-        MeasuredIterations = 50,
-        WarmupIterations = 10,
-        Q1 = 0,
-        Q3 = 0,
-        InterquartileRange = 0,
+        MinNs = mean,
+        MaxNs = mean,
+        StandardDeviationNs = 0,
+        SampleCount = 50,
+        WarmupSamples = 10,
+        Q1Ns = 0,
+        Q3Ns = 0,
+        InterquartileRangeNs = 0,
         OutliersRemoved = 0,
-        N = 50,
         Skewness = 0,
         Kurtosis = 0,
-        Mad = 0,
-        AllocMedian = null,
-        AllocP95 = null,
-        AllocMax = null,
+        MedianAbsoluteDeviationNs = 0,
+        AllocatedBytesMedian = null,
+        AllocatedBytesP95 = null,
+        AllocatedBytesMax = null,
     };
 
     /// <summary>
@@ -343,8 +342,8 @@ public sealed class PerformanceGateIsolationTests
         public long MaxAllocatedBytes => -1;
         public string? ReferenceMethod { get; init; }
         public double MaxSlowdownRatio { get; init; }
-        public int Iterations => 0;
-        public int WarmupIterations => 0;
+        public int Samples => 0;
+        public int WarmupSamples => 0;
         public bool MeasureAllocations => false;
         public OutlierMode OutlierMode => OutlierMode.IqrFence;
         public double ConfidenceLevel => 0.95;

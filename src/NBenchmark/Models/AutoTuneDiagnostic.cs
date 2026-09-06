@@ -76,7 +76,7 @@ public sealed record AutoTuneDiagnostic
     ///     <c>IqrFence</c> to <c>MedianAbsoluteDeviation</c> because the
     ///     <see cref="JitterMetric" /> exceeded <see cref="AutoTuneOptions.JitterAutoSwitchThreshold" />.
     ///     <c>false</c> when the configured detector was used unchanged. The detector name in
-    ///     use is on <see cref="BenchmarkResult.OutlierDetector" />.
+    ///     use is on <see cref="BenchmarkResult.OutlierDetectorName" />.
     /// </summary>
     public bool OutlierDetectorSwitched { get; init; }
 
@@ -102,14 +102,14 @@ public sealed record AutoTuneDiagnostic
 
     /// <summary>
     ///     Whether auto-warmup reached <see cref="AutoTuneOptions.MinWarmupTime" /> before it stopped.
-    ///     <c>false</c> means warmup was cut short - by <see cref="AutoTuneOptions.MaxWarmup" />, by the
+    ///     <c>false</c> means warmup was cut short - by <see cref="AutoTuneOptions.MaxWarmupSamples" />, by the
     ///     calibration+warmup budget share, or because the body is calibration-ineligible and too fast
     ///     to reach the floor within the sample ceiling - so the body may still have been running
     ///     pre-tier-1 code when measurement began.
     ///     <para>
     ///         This is the single most useful field for diagnosing a benchmark whose median differs
     ///         wildly between runs while each run reports a tight error margin. Always <c>true</c> for a
-    ///         pinned <see cref="MeasurementOptions.WarmupIterations" /> (the floor does not apply).
+    ///         pinned <see cref="MeasurementOptions.WarmupSamples" /> (the floor does not apply).
     ///     </para>
     /// </summary>
     public bool WarmupTimeFloorMet { get; init; } = true;

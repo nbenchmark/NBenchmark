@@ -86,7 +86,7 @@ dotnet run -c Release -- --cross-class
 dotnet run -c Release -- --cross-class --auto-tune thorough
 
 # Pin the run for reproducibility across CI and local environments
-dotnet run -c Release -- --cross-class --iterations 500 --warmup 50 --order declaration
+dotnet run -c Release -- --cross-class --samples 500 --warmup-samples 50 --order declaration
 ```
 
 ## Read the results

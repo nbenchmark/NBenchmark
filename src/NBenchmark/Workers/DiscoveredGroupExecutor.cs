@@ -299,8 +299,8 @@ internal static class DiscoveredGroupExecutor
         public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total)
             => inner.OnSuiteStarting(benchmarkNames, total);
 
-        public Task OnWarmupStarting(string name, int totalWarmupIterations)
-            => inner.OnWarmupStarting(name, totalWarmupIterations);
+        public Task OnWarmupStarting(string name, int totalWarmupSamples)
+            => inner.OnWarmupStarting(name, totalWarmupSamples);
 
         public Task OnWarmupCompleted(string name)
             => inner.OnWarmupCompleted(name);
@@ -308,8 +308,8 @@ internal static class DiscoveredGroupExecutor
         public Task OnBenchmarkStarting(string name, int index, int total)
             => inner.OnBenchmarkStarting(name, index, total);
 
-        public Task OnIterationCompleted(string name, int iteration, int totalIterations)
-            => inner.OnIterationCompleted(name, iteration, totalIterations);
+        public Task OnSampleCompleted(string name, int sample, int totalSamples)
+            => inner.OnSampleCompleted(name, sample, totalSamples);
 
         public Task OnBenchmarkCompleted(BenchmarkResult result)
         {

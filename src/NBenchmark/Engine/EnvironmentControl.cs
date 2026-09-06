@@ -23,7 +23,7 @@ internal static class EnvironmentControl
     /// <summary>
     ///     The env var opt-out for the always-on Debug-build / debugger-attached warning.
     ///     Set to <c>"1"</c> to suppress; the
-    ///     <see cref="EnvironmentOptions.SuppressBuildConfigurationWarning" /> flag is the
+    ///     <see cref="MeasurementOptions.SuppressedWarnings" /> flag is the
     ///     programmatic equivalent. Mirrors the <c>CI=true</c> opt-out convention used by
     ///     auto-attached reporters, so CLI-only callers can silence the warning without
     ///     changing code.
@@ -69,22 +69,22 @@ internal static class EnvironmentControl
     ///         always-on Debug-build / debugger-attached guidance check (see
     ///         <see cref="EmitBuildConfigurationGuidance" />) once per process. The check
     ///         is suppressed when the current process is an isolated child (the parent
-    ///         already warned), when <see cref="EnvironmentOptions.SuppressBuildConfigurationWarning" />
+    ///         already warned), when <see cref="MeasurementOptions.SuppressedWarnings" />
     ///         is set, or when the <see cref="SuppressDebugWarningEnvVar" /> env var is
     ///         <c>"1"</c>.
     ///     </para>
     /// </remarks>
-    public static IDisposable Apply(EnvironmentOptions? options)
+    public static IDisposable Apply(EnvironmentOptions? options, BenchmarkWarnings suppressed = BenchmarkWarnings.None)
     {
         // The build-config warning is always-on and independent of the hardware/OS options
         // below; fire it before the no-op fast path so a caller with no EnvironmentOptions
         // set still gets warned once per process. Gated on not-in-child so an isolated
         // child re-entering Apply does not re-emit the parent's warning.
-        EmitBuildConfigurationGuidance(options);
+        EmitBuildConfigurationGuidance(suppressed);
 
         if (options is null || (options.CpuAffinity is null
                                 && options.ProcessPriority is null
-                                && !options.DedicatedHostGuidance))
+                                && !options.HostQualityWarnings))
             return NoOpScope.Instance;
 
         var process = Process.GetCurrentProcess();
@@ -139,7 +139,7 @@ internal static class EnvironmentControl
             }
         }
 
-        if (options.DedicatedHostGuidance)
+        if (options.HostQualityWarnings)
             EmitDedicatedHostGuidance(affinityApplied, priorityApplied, options.ThreadControl);
 
         return new RestoreScope(process, priorAffinity, priorPriority, affinityApplied, priorityApplied);
@@ -263,7 +263,7 @@ internal static class EnvironmentControl
     ///     <c>dotnet run</c> without <c>-c Release</c> footgun is silent otherwise) and
     ///     fires at most once per process. Suppressed when the current process is an
     ///     isolated child (the parent already warned), when
-    ///     <see cref="EnvironmentOptions.SuppressBuildConfigurationWarning" /> is set, or
+    ///     <see cref="MeasurementOptions.SuppressedWarnings" /> is set, or
     ///     when the <see cref="SuppressDebugWarningEnvVar" /> env var is <c>"1"</c>.
     /// </summary>
     /// <remarks>
@@ -273,7 +273,7 @@ internal static class EnvironmentControl
     ///     run should never fail because the host or build is imperfect, but the user
     ///     should know the numbers are not trustworthy.
     /// </remarks>
-    internal static void EmitBuildConfigurationGuidance(EnvironmentOptions? options)
+    internal static void EmitBuildConfigurationGuidance(BenchmarkWarnings suppressed)
     {
         // Suppression and child-scope checks come *before* the once-per-process guard so a
         // suppressed call does not consume it - a later non-suppressed call in the same
@@ -281,7 +281,7 @@ internal static class EnvironmentControl
         //
         // A measurement worker never reaches here: it is a fresh process whose guard starts at 0,
         // and it does not run this guidance path at all.
-        if (options is { SuppressBuildConfigurationWarning: true })
+        if (suppressed.HasFlag(BenchmarkWarnings.BuildConfiguration))
             return;
 
         if (IsSuppressEnvVarSet())
@@ -299,7 +299,7 @@ internal static class EnvironmentControl
                 + "numbers are not production-representative. Rebuild with `dotnet run -c Release` "
                 + "(or set the configuration to Release in your IDE) before trusting the results. "
                 + "If measuring Debug is intentional, suppress this warning with "
-                + $"{SuppressDebugWarningEnvVar}=1 or EnvironmentOptions.SuppressBuildConfigurationWarning.");
+                + $"{SuppressDebugWarningEnvVar}=1 or MeasurementOptions.SuppressedWarnings.");
         }
 
         if (Debugger.IsAttached)

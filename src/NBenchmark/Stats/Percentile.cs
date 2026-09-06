@@ -13,8 +13,8 @@ internal static class Percentile
         // The median (p == 0.50) uses the mid-average convention - the mean of the two middle
         // order statistics on even n - so it agrees with JitterCalibrator.Median and
         // LaunchAggregator.MedianOf, which already average the middles. Without this, the reported
-        // Median had a small systematic downward bias on even n (nearest-rank picks the lower
-        // middle). Every other percentile (Q1, Q3, P95, P99, ...) keeps the nearest-rank
+        // Nearest-rank median had a small systematic downward bias on even n (nearest-rank picks the lower
+        // middle). Every other percentile (Q1Ns, Q3Ns, P95, P99, ...) keeps the nearest-rank
         // convention below, which is deliberate and pinned by OutlierModeCrossCheckTests.
         if (Math.Abs(p - 0.50) < 1e-9)
         {

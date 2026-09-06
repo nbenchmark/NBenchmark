@@ -14,7 +14,7 @@ namespace NBenchmark.Workers;
 ///     <para>
 ///         An <c>object?</c>-declared member gives the reader no type to deserialize into, so the
 ///         default behaviour produces a bare <c>JsonElement</c> - and worse, a
-///         <c>[BenchmarkCase(typeof(X))]</c> value is a <c>System.RuntimeType</c>, which
+///         <c>[Arguments(typeof(X))]</c> value is a <c>System.RuntimeType</c>, which
 ///         <c>System.Text.Json</c> refuses to serialize at all. This converter sidesteps both: it
 ///         never asks the serializer to handle <see cref="BenchmarkParameter.Value" /> as itself,
 ///         only the string <see cref="BenchmarkParameter.FormatValue" /> already knows how to build

@@ -39,8 +39,8 @@ public sealed class InstanceSourceIsolationTests : IDisposable
 
     private static MeasurementOptions FastOptions => MeasurementOptions.Default with
     {
-        Iterations = 4,
-        WarmupIterations = 0,
+        Samples = 4,
+        WarmupSamples = 0,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {
@@ -150,7 +150,7 @@ public sealed class InstanceSourceIsolationTests : IDisposable
     ///         <c>FactoryBuiltBenchmarks.Measure</c> spins deliberately. The sample count is asserted
     ///         separately from the median because the median is the clock-dependent half: at
     ///         <c>OpsPerSample = 1</c> a body faster than one timer step reports zero legitimately, so a
-    ///         bare <c>Median &gt; 0</c> would be asserting the host's timer granularity rather than
+    ///         bare <c>MedianNs &gt; 0</c> would be asserting the host's timer granularity rather than
     ///         anything about the factory.
     ///     </para>
     /// </remarks>
@@ -170,12 +170,12 @@ public sealed class InstanceSourceIsolationTests : IDisposable
         Assert.False(result.Errored, result.ErrorMessage);
 
         // The measurement ran to completion - independent of what the timer could resolve. Read from
-        // the pre-trim collected count rather than MeasuredIterations, which is the post-trim inlier
+        // the pre-trim collected count rather than SampleCount, which is the post-trim inlier
         // count and would move if the outlier fence removed a sample.
-        Assert.Equal(FastOptions.Iterations, result.AutoTune?.ResolvedSamples);
+        Assert.Equal(FastOptions.Samples, result.AutoTune?.ResolvedSamples);
 
         // And it recorded real time, which the fixture's spin makes safe to assert on any host.
-        Assert.True(result.Median > 0, $"median was {result.Median} ns");
+        Assert.True(result.MedianNs > 0, $"median was {result.MedianNs} ns");
     }
 
     /// <summary>

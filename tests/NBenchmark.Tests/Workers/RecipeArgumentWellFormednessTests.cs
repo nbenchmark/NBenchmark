@@ -72,7 +72,7 @@ public sealed class RecipeArgumentWellFormednessTests : IDisposable
             TargetAssemblyPath = malformedBody.AssemblyPath,
             Bodies = [malformedBody],
             Receivers = receivers.Receivers,
-            Options = MeasurementOptions.Default with { Iterations = 2, WarmupIterations = 0, OpsPerSample = 1 },
+            Options = MeasurementOptions.Default with { Samples = 2, WarmupSamples = 0, OpsPerSample = 1 },
             TotalBenchmarks = 1,
         };
 

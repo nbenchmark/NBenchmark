@@ -11,8 +11,8 @@ public class SuiteRunnerTests
     {
         var envelopes = new[]
         {
-            StaticEnvelope("a", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
-            StaticEnvelope("b", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
+            StaticEnvelope("a", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
+            StaticEnvelope("b", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
         };
 
         var (results, rawSamples) = await SuiteRunner.RunAsync(
@@ -33,10 +33,10 @@ public class SuiteRunnerTests
     {
         var envelopes = new[]
         {
-            StaticEnvelope("a", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
-            StaticEnvelope("b", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
-            StaticEnvelope("c", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
-            StaticEnvelope("d", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
+            StaticEnvelope("a", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
+            StaticEnvelope("b", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
+            StaticEnvelope("c", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
+            StaticEnvelope("d", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
         };
 
         var (first, _) = await SuiteRunner.RunAsync(
@@ -61,9 +61,9 @@ public class SuiteRunnerTests
     {
         var envelopes = new[]
         {
-            StaticEnvelope("first", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
-            StaticEnvelope("second", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
-            StaticEnvelope("third", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
+            StaticEnvelope("first", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
+            StaticEnvelope("second", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
+            StaticEnvelope("third", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
         };
 
         var (results, _) = await SuiteRunner.RunAsync(
@@ -81,8 +81,8 @@ public class SuiteRunnerTests
 
         var envelopes = new[]
         {
-            StaticEnvelope("a", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
-            StaticEnvelope("b", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
+            StaticEnvelope("a", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
+            StaticEnvelope("b", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
         };
 
         await SuiteRunner.RunAsync(
@@ -102,8 +102,8 @@ public class SuiteRunnerTests
 
         var envelopes = new[]
         {
-            StaticEnvelope("b", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
-            StaticEnvelope("c", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
+            StaticEnvelope("b", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
+            StaticEnvelope("c", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
         };
 
         await SuiteRunner.RunAsync(
@@ -122,7 +122,7 @@ public class SuiteRunnerTests
 
         var envelopes = new[]
         {
-            StaticEnvelope("a", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
+            StaticEnvelope("a", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
         };
 
         await SuiteRunner.RunAsync(
@@ -139,12 +139,12 @@ public class SuiteRunnerTests
     {
         var envelopes = new[]
         {
-            StaticEnvelope("only", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
+            StaticEnvelope("only", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
         };
 
         var (results, _) = await SuiteRunner.RunAsync(
             envelopes, RunOrder.Declaration, null,
-            new MeasurementOptions { Iterations = 0, WarmupIterations = 0, ForceGcBetweenBenchmarks = true },
+            new MeasurementOptions { Samples = 0, WarmupSamples = 0, ForceGcBetweenBenchmarks = true },
             0, 1,
             NullBenchmarkProgress.Instance, CancellationToken.None);
 
@@ -164,7 +164,7 @@ public class SuiteRunnerTests
                 false,
                 [],
                 (_, _) => throw new InvalidOperationException("boom")),
-            StaticEnvelope("ok", new MeasurementOptions { Iterations = 0, WarmupIterations = 0 }),
+            StaticEnvelope("ok", new MeasurementOptions { Samples = 0, WarmupSamples = 0 }),
         };
 
         var (results, rawSamples) = await SuiteRunner.RunAsync(
@@ -241,7 +241,7 @@ public class SuiteRunnerTests
     [Fact]
     public async Task RunAsync_Skips_The_Canary_On_A_Dry_Run()
     {
-        var options = new MeasurementOptions { Iterations = 0, WarmupIterations = 0 };
+        var options = new MeasurementOptions { Samples = 0, WarmupSamples = 0 };
 
         var (results, _) = await SuiteRunner.RunAsync(
             [StaticEnvelope("a", options)],
@@ -286,8 +286,8 @@ public class SuiteRunnerTests
     /// </summary>
     private static MeasurementOptions CanaryOptions() => new()
     {
-        Iterations = 1,
-        WarmupIterations = 0,
+        Samples = 1,
+        WarmupSamples = 0,
         DriftCanary = new DriftCanaryOptions { Samples = 4, WorkPerSample = 64 },
     };
 
@@ -296,8 +296,8 @@ public class SuiteRunnerTests
     {
         var options = new MeasurementOptions
         {
-            Iterations = 0,
-            WarmupIterations = 0,
+            Samples = 0,
+            WarmupSamples = 0,
             ForceGcBetweenBenchmarks = true,
         };
 
@@ -345,7 +345,7 @@ public class SuiteRunnerTests
             return Task.CompletedTask;
         }
 
-        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
+        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
 
         public Task OnWarmupCompleted(string name) => Task.CompletedTask;
 
@@ -355,7 +355,7 @@ public class SuiteRunnerTests
             return Task.CompletedTask;
         }
 
-        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
+        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
 
         public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
 

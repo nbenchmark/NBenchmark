@@ -25,7 +25,7 @@ namespace NBenchmark.Lifecycle;
 ///     </para>
 ///     <para>
 ///         Between <i>launches</i> nothing is asked of it: the instance is rebuilt and
-///         <c>[BenchmarkSetup]</c> runs again, which is strictly more than a reset. The callback
+///         <c>[GlobalSetup]</c> runs again, which is strictly more than a reset. The callback
 ///         covers the gaps between methods within one launch, and only those.
 ///     </para>
 /// </remarks>

@@ -88,8 +88,8 @@ public class PairedRatioReportingTests
     {
         var results = new[]
         {
-            Result("Baseline", [100], isBaseline: true) with { LaunchStatistics = null, Median = 100 },
-            Result("Candidate", [150]) with { LaunchStatistics = null, Median = 150 },
+            Result("Baseline", [100], isBaseline: true) with { LaunchStatistics = null, MedianNs = 100 },
+            Result("Candidate", [150]) with { LaunchStatistics = null, MedianNs = 150 },
         };
 
         var candidate = BenchmarkTable.Build(results).Rows.Single(r => r.Result.Name == "Candidate");
@@ -198,22 +198,22 @@ public class PairedRatioReportingTests
         => new()
         {
             Name = name,
-            Median = launchMedians.Average(),
-            Mean = launchMedians.Average(),
-            Min = launchMedians.Min(),
-            Max = launchMedians.Max(),
-            StandardDeviation = 1,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            MedianNs = launchMedians.Average(),
+            MeanNs = launchMedians.Average(),
+            MinNs = launchMedians.Min(),
+            MaxNs = launchMedians.Max(),
+            StandardDeviationNs = 1,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 100,
+            SampleCount = 100,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
             IsBaseline = isBaseline,
             IsolationStatus = IsolationStatus.Isolated,
             RuntimeProfileName = RuntimeProfile.SteadyState.Name,
@@ -227,10 +227,10 @@ public class PairedRatioReportingTests
                     .Select((median, index) => new LaunchDetail
                     {
                         LaunchIndex = index,
-                        Median = median,
-                        Mean = median,
-                        StandardDeviation = 0,
-                        Iterations = 100,
+                        MedianNs = median,
+                        MeanNs = median,
+                        StandardDeviationNs = 0,
+                        Samples = 100,
                         Duration = TimeSpan.FromSeconds(1),
                     })
                     .ToList(),

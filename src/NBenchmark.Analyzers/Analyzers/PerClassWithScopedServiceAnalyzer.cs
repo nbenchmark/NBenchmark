@@ -59,7 +59,7 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
 
     private const string InstanceLifetimeTypeMetadataName = "NBenchmark.InstanceLifetime";
     private const string IStateResetTypeMetadataName = "NBenchmark.Lifecycle.IStateReset";
-    private const string SharedStateAttributeMetadataName = "NBenchmark.Attributes.SharedStateAttribute";
+    private const string SharedStateAttributeMetadataName = "NBenchmark.SharedStateAttribute";
     private const string PerClassMemberName = "PerClass";
     private const string PerMethodMemberName = "PerMethod";
     private const string WithInstanceLifetimeMethodName = "WithInstanceLifetime";
@@ -305,7 +305,7 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
             // Mirrors the runtime rule: the property defaults to true, so the bare attribute counts,
             // and an explicit false parks the attribute without suppressing anything.
             var intentional = attribute.NamedArguments
-                .FirstOrDefault(a => a.Key == "Intentional").Value.Value;
+                .FirstOrDefault(a => a.Key == "Acknowledged").Value.Value;
 
             if (intentional is not false)
                 return true;
@@ -441,7 +441,7 @@ public sealed class PerClassWithScopedServiceAnalyzer : DiagnosticAnalyzer
         var ns = original.ContainingNamespace;
 
         return ns is { IsGlobalNamespace: false }
-               && ns.ToDisplayString() == "NBenchmark.Attributes";
+               && ns.ToDisplayString() == "NBenchmark";
     }
 
     private static bool TryMatchEnumValueByName(INamedTypeSymbol enumType, object? value, string memberName)

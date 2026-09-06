@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Engine;
 using Xunit;
 
@@ -13,11 +13,11 @@ namespace NBenchmark.Tests
 
             harness
                 .AddFromAssembly(typeof(W40FullNameDisambiguationTests).Assembly)
-                .WithCategoryFilter(["w40-fullname"])
+                .FilterCategories(["w40-fullname"])
                 .WithOptions(new MeasurementOptions
                 {
-                    Iterations = 8,
-                    WarmupIterations = 0,
+                    Samples = 8,
+                    WarmupSamples = 0,
                     OutlierMode = OutlierMode.None,
                 })
                 .WithIsolation(Isolation.Off);

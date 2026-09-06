@@ -24,7 +24,7 @@ Both `DiscoveredGroupExecutor` and the coordinator's in-process path can raise d
 
 ## Independence across multiple launches
 
-When `LaunchCount` is greater than 1, every launch constructs a new instance and re-runs `[BenchmarkSetup]` on every path. `LaunchAggregator` calculates the `StandardError` or `MarginOfError` based on the spread between launches. Launches that share a single object, scope, or setup are not independent measurements of anything - the field documented a reproducibility figure and carried the opposite. This approach also resolves the state reset question at the launch boundary: because each launch starts fresh, there is no carried state for `IStateReset` to clean.
+When `LaunchCount` is greater than 1, every launch constructs a new instance and re-runs `[GlobalSetup]` on every path. `LaunchAggregator` calculates the `StandardErrorNs` or `MarginOfErrorNs` based on the spread between launches. Launches that share a single object, scope, or setup are not independent measurements of anything - the field documented a reproducibility figure and carried the opposite. This approach also resolves the state reset question at the launch boundary: because each launch starts fresh, there is no carried state for `IStateReset` to clean.
 
 ## Instance sources and providers
 

@@ -35,10 +35,15 @@ public static class ReportFormat
     ///     <para>
     ///         History: <b>1</b> - first declared version, adding <c>schemaVersion</c> and
     ///         <c>measurementEpoch</c> to the envelope. Files written before this carry neither
-    ///         field.
+    ///         field. <b>2</b> - the 1.0 vocabulary pass renamed fields without changing any
+    ///         number: <c>n</c> and <c>measuredIterations</c> merged into <c>sampleCount</c>,
+    ///         <c>warmupIterations</c> became <c>warmupSamples</c>, the raw nanosecond statistics
+    ///         gained an <c>Ns</c> suffix (<c>mean</c> to <c>meanNs</c>, and so on), the
+    ///         abbreviated allocation and deviation fields were spelled out, <c>profile</c>
+    ///         became <c>gcBehavior</c>, and <c>runtimeMoniker</c> became <c>targetFramework</c>.
     ///     </para>
     /// </remarks>
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     /// <summary>
     ///     The comparability of the numbers. Bump when a change to NBenchmark itself moves what a
@@ -174,8 +179,8 @@ public static class ReportFormat
     ///                 scale is corrected back onto the trimmed mean by <c>sqrt(n) / h</c> on
     ///                 <c>h - 1</c> degrees of freedom.
     ///                 <para>
-    ///                     <c>StandardError</c>, <c>MarginOfError</c> and everything derived from
-    ///                     them - the confidence bounds, <c>MarginPercent</c>,
+    ///                     <c>StandardErrorNs</c>, <c>MarginOfErrorNs</c> and everything derived from
+    ///                     them - the confidence bounds, <c>MarginOfErrorPercent</c>,
     ///                     <c>StandardErrorPercent</c>, and the margins a
     ///                     <c>MaxRegressionPercent</c> or <c>--threshold-pct</c> gate reads - widen on
     ///                     every benchmark that trimmed anything, which under the default

@@ -27,9 +27,9 @@ public class OutlierDetectorTests
         Assert.Equal([200d], classification.Discarded);
         Assert.Equal(9, classification.Kept.Length);
         Assert.Equal(26d, classification.Kept[^1]);
-        Assert.NotNull(classification.LowerFence);
-        Assert.NotNull(classification.UpperFence);
-        Numerics.AssertRelativeClose(41.239, classification.UpperFence!.Value, 1e-4);
+        Assert.NotNull(classification.LowerFenceNs);
+        Assert.NotNull(classification.UpperFenceNs);
+        Numerics.AssertRelativeClose(41.239, classification.UpperFenceNs!.Value, 1e-4);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class OutlierDetectorTests
         Assert.Equal(5, result.Kept.Length);
 
         // Quartiles are still computed by the engine regardless of the trimming strategy.
-        Assert.True(result.InterquartileRange > 0);
+        Assert.True(result.InterquartileRangeNs > 0);
     }
 
     [Fact]
@@ -109,8 +109,8 @@ public class OutlierDetectorTests
     {
         var result = OutlierTrim.TrimDetailed([1, 2, 3, 4, 5, 500], new ThresholdOutlierDetector(100));
 
-        Assert.Null(result.LowerFence);
-        Assert.Null(result.UpperFence);
+        Assert.Null(result.LowerFenceNs);
+        Assert.Null(result.UpperFenceNs);
     }
 
     [Theory]
@@ -118,7 +118,7 @@ public class OutlierDetectorTests
     [InlineData(-1.5)]
     public void IqrFence_Throws_WhenKIsNotPositive(double k)
     {
-        // k = 0 would collapse the fence to [Q1, Q3] - not a Tukey fence.
+        // k = 0 would collapse the fence to [Q1Ns, Q3Ns] - not a Tukey fence.
         Assert.Throws<ArgumentOutOfRangeException>(() => new IqrFenceOutlierDetector(k));
     }
 

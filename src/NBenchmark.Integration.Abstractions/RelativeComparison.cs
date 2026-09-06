@@ -102,7 +102,7 @@ internal static class RelativeComparison
         {
             violations.Add(
                 "Current run produced no raw samples; cannot run significance test. " +
-                "Ensure the benchmark completed successfully with measurement iterations > 0.");
+                "Ensure the benchmark completed successfully with measurement samples > 0.");
 
             return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false, pairedRatio);
         }
@@ -116,12 +116,12 @@ internal static class RelativeComparison
             return new RelativeComparisonVerdict(violations, double.NaN, double.NaN, double.NaN, false, pairedRatio);
         }
 
-        if (referenceResult.Mean <= 0)
+        if (referenceResult.MeanNs <= 0)
         {
-            if (candidateResult.Mean > 0)
+            if (candidateResult.MeanNs > 0)
             {
                 violations.Add(
-                    $"Regression detected: mean {candidateResult.Mean:F2} ns exceeds non-positive reference {referenceResult.Mean:F2} ns.");
+                    $"Regression detected: mean {candidateResult.MeanNs:F2} ns exceeds non-positive reference {referenceResult.MeanNs:F2} ns.");
             }
 
             return new RelativeComparisonVerdict(
@@ -133,7 +133,7 @@ internal static class RelativeComparison
         // The paired estimate when the measurement produced one, on both counts: the ratio the gate
         // applies its threshold to, and the test of whether the two differ at all. See the parameter
         // documentation for why the pooled p-value is reported but not gated on.
-        var ratio = pairedRatio?.Value ?? candidateResult.Mean / referenceResult.Mean;
+        var ratio = pairedRatio?.Value ?? candidateResult.MeanNs / referenceResult.MeanNs;
 
         var differenceIsReal = pairedRatio is { } estimate
             ? estimate.Lower > 1.0
@@ -149,10 +149,10 @@ internal static class RelativeComparison
             violations.Add(pairedRatio is { } paired
                 ? $"Regression detected: {paired.Value:F2}x reference '{referenceName}' "
                   + $"[{paired.Lower:F2}-{paired.Upper:F2}x] over {paired.Replicates} paired replicates "
-                  + $"({paired.ConfidenceLevel:P0} interval). Median {candidateResult.Median:F2} ns vs "
-                  + $"{referenceResult.Median:F2} ns. Exceeds the {maxSlowdownRatio:F2}x ratio gate by more "
+                  + $"({paired.ConfidenceLevel:P0} interval). MedianNs {candidateResult.MedianNs:F2} ns vs "
+                  + $"{referenceResult.MedianNs:F2} ns. Exceeds the {maxSlowdownRatio:F2}x ratio gate by more "
                   + "than run-to-run variation."
-                : $"Regression detected: mean {candidateResult.Mean:F2} ns vs reference '{referenceName}' {referenceResult.Mean:F2} ns " +
+                : $"Regression detected: mean {candidateResult.MeanNs:F2} ns vs reference '{referenceName}' {referenceResult.MeanNs:F2} ns " +
                   $"(ratio {ratio:F2}x, p={mwu.PValue:F4}, Cliff's delta={mwu.CliffsDelta:F3}). " +
                   $"Significant slowdown exceeding {maxSlowdownRatio:F2}x ratio gate.");
         }

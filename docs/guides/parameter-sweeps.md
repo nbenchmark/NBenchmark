@@ -31,17 +31,17 @@ var results = await new BenchmarkSuite("sorting")
 
 This configuration produces four benchmarks: `sort(size=10)`, `sort(size=100)`, `sort(size=1_000)`, and `sort(size=10_000)`.
 
-### Harness mode: `[BenchmarkCase]` and `[BenchmarkCases]`
+### Harness mode: `[Arguments]` and `[ArgumentsSource]`
 
-For a small list of literal values, use the `[BenchmarkCase]` attribute:
+For a small list of literal values, use the `[Arguments]` attribute:
 
 ```csharp
 public class SortingBenchmarks
 {
-    [BenchmarkCase(10)]
-    [BenchmarkCase(100)]
-    [BenchmarkCase(1_000)]
-    [BenchmarkCase(10_000)]
+    [Arguments(10)]
+    [Arguments(100)]
+    [Arguments(1_000)]
+    [Arguments(10_000)]
     [Benchmark]
     public void Sort(int n)
     {
@@ -51,12 +51,12 @@ public class SortingBenchmarks
 }
 ```
 
-For a generated sweep (such as powers of ten or file-backed inputs), use the `[BenchmarkCases]` attribute:
+For a generated sweep (such as powers of ten or file-backed inputs), use the `[ArgumentsSource]` attribute:
 
 ```csharp
 public class SortingBenchmarks
 {
-    [BenchmarkCases(nameof(SortCases))]
+    [ArgumentsSource(nameof(SortCases))]
     [Benchmark]
     public void Sort(int n)
     {
@@ -89,7 +89,7 @@ var results = await new BenchmarkSuite("search")
 
 ## What's happening
 
-- **Declaring a sweep**: You can declare a sweep using `WithParameter("size", ...)` in suite mode, or `[BenchmarkCase(...)]` / `[BenchmarkCases(nameof(Source))]` in harness mode. Each value (or Cartesian product of multiple parameters) becomes a separate benchmark entry with a unique display name. For more information, see [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) and [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
+- **Declaring a sweep**: You can declare a sweep using `WithParameter("size", ...)` in suite mode, or `[Arguments(...)]` / `[ArgumentsSource(nameof(Source))]` in harness mode. Each value (or Cartesian product of multiple parameters) becomes a separate benchmark entry with a unique display name. For more information, see [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) and [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
 
 - **Grouped significance**: Significance is grouped by parameter set. For example, benchmarks with `size=100` are compared against each other, not against those with `size=10_000`. A parameterized suite with *N* parameter combinations and *M* benchmark methods produces *N* separate significance comparisons, each over *M* benchmarks. This ensures that comparisons remain apples-to-apples.
 
@@ -112,7 +112,7 @@ dotnet run -c Release
 dotnet run -c Release -- --filter "*n=1000*" --filter "*n=10000*"
 
 # Pin the run for reproducible results across CI and local environments
-dotnet run -c Release -- --iterations 200 --warmup 20 --order declaration
+dotnet run -c Release -- --samples 200 --warmup-samples 20 --order declaration
 ```
 
 ## Read the results
@@ -155,7 +155,7 @@ For a full explanation of indicators and warnings, see [Reading Your Results](..
 For more information, see the following pages:
 
 - [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) - Details on `WithParameter`, supported parameter types, and significance grouping.
-- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - Details on `[BenchmarkCase]` vs. `[BenchmarkCases]` and filtering by display name.
+- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - Details on `[Arguments]` vs. `[ArgumentsSource]` and filtering by display name.
 - [Suite mode: Run order](../usage-modes/suite-mode.md#run-order) - Why declaration order is clearer for sweeps.
-- [Configuration: Iterations](../reference/configuration.md#iterations) - Pinning the run for reproducible sweeps.
+- [Configuration: Samples](../reference/configuration.md#samples) - Pinning the run for reproducible sweeps.
 - [Reading Your Results](../getting-started/reading-your-results.md) - The full column reference and the behavior of the `Ratio` column.

@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using Xunit;

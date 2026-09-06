@@ -1,5 +1,4 @@
 using NBenchmark;
-using NBenchmark.Attributes;
 
 namespace NBenchmark.Tests.SharedPlanFixture;
 
@@ -20,7 +19,7 @@ public static class SharedHelperPlan
     public static BenchmarkSuite BuildSuite() =>
         new BenchmarkSuite(SuiteName)
             .Add(BenchmarkName, () => Thread.SpinWait(200))
-            .WithIterations(8)
-            .WithWarmup(1)
+            .WithSamples(8)
+            .WithWarmupSamples(1)
             .WithOpsPerSample(1);
 }

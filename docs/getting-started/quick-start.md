@@ -26,7 +26,7 @@ Run the project with `dotnet run` to see output similar to the following:
 ```text
   ┌─ Benchmark ─────────────────────────────────────
   │
-  │  Median: 342.1 ns       Ops/s: 2.87 Mops/s
+  │  MedianNs: 342.1 ns       Ops/s: 2.87 Mops/s
   │  Alloc/op: 0 B
   │
   │  Measured in an isolated worker under 'steady-state'.
@@ -49,11 +49,11 @@ The output is similar to the following:
 ```text
   ┌─ Benchmark ─────────────────────────────────────
   │
-  │  Median: 342.1 ns       Mean: 348.7 ns
+  │  MedianNs: 342.1 ns       MeanNs: 348.7 ns
   │  Ops/s:  2.87 Mops/s    Median ops/s: 2.92 Mops/s
   │  P95: 361.2 ns  P99: 378.5 ns  P99.9: 380.0 ns
   │  StdDev: 8.3 ns         CV:   2.38%
-  │  Error:  ±3.1 ns (0.89% of Mean)
+  │  Error:  ±3.1 ns (0.89% of mean)
   │  CI:     [345.6 ns … 351.8 ns] (95%)
   │  Alloc/op: 0 B
   │

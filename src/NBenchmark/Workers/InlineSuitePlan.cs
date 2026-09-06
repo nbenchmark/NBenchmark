@@ -168,10 +168,10 @@ internal static class InlineSuitePlan
             }
 
             if (!TryAddressHook(
-                    benchmark.IterationSetup,
+                    benchmark.SampleSetup,
                     $"'{benchmark.Name}' per-iteration setup",
                     receivers,
-                    out var iterationSetup,
+                    out var sampleSetup,
                     out var hookRefusal))
             {
                 Refused(HookStatus(hookRefusal), hookRefusal.Message);
@@ -180,10 +180,10 @@ internal static class InlineSuitePlan
             }
 
             if (!TryAddressHook(
-                    benchmark.IterationTeardown,
+                    benchmark.SampleTeardown,
                     $"'{benchmark.Name}' per-iteration teardown",
                     receivers,
-                    out var iterationTeardown,
+                    out var sampleTeardown,
                     out hookRefusal))
             {
                 Refused(HookStatus(hookRefusal), hookRefusal.Message);
@@ -193,8 +193,8 @@ internal static class InlineSuitePlan
 
             bodies.Add(bodyRef with
             {
-                IterationSetup = iterationSetup,
-                IterationTeardown = iterationTeardown,
+                SampleSetup = sampleSetup,
+                SampleTeardown = sampleTeardown,
             });
         }
 
@@ -435,10 +435,10 @@ internal static class InlineSuitePlan
             }
 
             if (!TryAddressHook(
-                    benchmark.IterationSetup,
+                    benchmark.SampleSetup,
                     $"'{benchmark.Name}' per-iteration setup",
                     receivers,
-                    out var iterationSetup,
+                    out var sampleSetup,
                     out var hookRefusal))
             {
                 receivers.Restore(checkpoint);
@@ -451,10 +451,10 @@ internal static class InlineSuitePlan
             }
 
             if (!TryAddressHook(
-                    benchmark.IterationTeardown,
+                    benchmark.SampleTeardown,
                     $"'{benchmark.Name}' per-iteration teardown",
                     receivers,
-                    out var iterationTeardown,
+                    out var sampleTeardown,
                     out hookRefusal))
             {
                 receivers.Restore(checkpoint);
@@ -468,13 +468,13 @@ internal static class InlineSuitePlan
 
             bodies.Add(bodyRef with
             {
-                IterationSetup = iterationSetup,
-                IterationTeardown = iterationTeardown,
+                SampleSetup = sampleSetup,
+                SampleTeardown = sampleTeardown,
             });
 
             AttributeOwner(ownersOf, bodyRef, benchmark.Name);
-            AttributeOwner(ownersOf, iterationSetup, benchmark.Name);
-            AttributeOwner(ownersOf, iterationTeardown, benchmark.Name);
+            AttributeOwner(ownersOf, sampleSetup, benchmark.Name);
+            AttributeOwner(ownersOf, sampleTeardown, benchmark.Name);
         }
 
         // A benchmark cascaded into offending after this pass already recorded it as addressed - its

@@ -6,11 +6,11 @@ internal static class MeasurementOptionsBuilder
     {
         var options = MeasurementOptions.Default;
 
-        if (thresholds.Iterations > 0)
-            options = options with { Iterations = thresholds.Iterations };
+        if (thresholds.Samples > 0)
+            options = options with { Samples = thresholds.Samples };
 
-        if (thresholds.WarmupIterations > 0)
-            options = options with { WarmupIterations = thresholds.WarmupIterations };
+        if (thresholds.WarmupSamples > 0)
+            options = options with { WarmupSamples = thresholds.WarmupSamples };
 
         if (thresholds.MeasureAllocations || thresholds.MaxAllocatedBytes >= 0)
             options = options with { MeasureAllocations = true };

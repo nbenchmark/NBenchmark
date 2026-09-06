@@ -87,10 +87,10 @@ internal sealed class CiWidthDetector
     public long Count { get; private set; }
 
     /// <summary>The running mean of the fed samples.</summary>
-    public double Mean { get; private set; }
+    public double MeanNs { get; private set; }
 
     /// <summary>The running sample standard deviation (Bessel-corrected) of the fed samples.</summary>
-    public double StandardDeviation => Count >= 2 ? Math.Sqrt(_m2 / (Count - 1)) : 0.0;
+    public double StandardDeviationNs => Count >= 2 ? Math.Sqrt(_m2 / (Count - 1)) : 0.0;
 
     /// <summary>
     ///     The running coefficient of variation (standard deviation / mean), or <see cref="double.NaN" />
@@ -98,7 +98,7 @@ internal sealed class CiWidthDetector
     ///     ceiling stop: the CI-on-the-mean rule needs samples proportional to the <em>square</em> of
     ///     this, so a body with a CV in the hundreds of percent can never converge.
     /// </summary>
-    public double CoefficientOfVariation => Mean > 0 ? StandardDeviation / Mean : double.NaN;
+    public double CoefficientOfVariation => MeanNs > 0 ? StandardDeviationNs / MeanNs : double.NaN;
 
     /// <summary>
     ///     Reports the per-op nanoseconds of one measured sample. Returns <c>true</c> when the
@@ -119,9 +119,9 @@ internal sealed class CiWidthDetector
 
         // Welford online mean/variance update.
         Count++;
-        var delta = perOpNs - Mean;
-        Mean += delta / Count;
-        var delta2 = perOpNs - Mean;
+        var delta = perOpNs - MeanNs;
+        MeanNs += delta / Count;
+        var delta2 = perOpNs - MeanNs;
         _m2 += delta * delta2;
 
         // The CI target is evaluated before the ceiling so that a run whose final sample both reaches
@@ -155,13 +155,13 @@ internal sealed class CiWidthDetector
 
     private bool ComputeHalfWidth()
     {
-        if (Count < 2 || Mean <= 0)
+        if (Count < 2 || MeanNs <= 0)
         {
             AchievedRelativeHalfWidth = double.PositiveInfinity;
             return false;
         }
 
-        var standardError = StandardDeviation / Math.Sqrt(Count);
+        var standardError = StandardDeviationNs / Math.Sqrt(Count);
         var t = StudentT.CriticalValue(_confidenceLevel, (int)(Count - 1));
 
         if (double.IsNaN(t))
@@ -170,7 +170,7 @@ internal sealed class CiWidthDetector
             return false;
         }
 
-        AchievedRelativeHalfWidth = t * standardError / Mean;
+        AchievedRelativeHalfWidth = t * standardError / MeanNs;
         _halfWidthSeries.Add(AchievedRelativeHalfWidth);
         return true;
     }

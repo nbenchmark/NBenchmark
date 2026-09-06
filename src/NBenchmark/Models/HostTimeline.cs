@@ -49,5 +49,5 @@ public sealed record HostTimeline
     ///     than an <see cref="int" /> because a multi-launch row averages the position over its
     ///     launches, which run in independent random orders.
     /// </summary>
-    public double Position { get; init; }
+    public double CompletedBenchmarks { get; init; }
 }

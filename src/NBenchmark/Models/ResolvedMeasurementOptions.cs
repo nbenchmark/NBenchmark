@@ -10,8 +10,8 @@ namespace NBenchmark;
 /// </remarks>
 public sealed record ResolvedMeasurementOptions
 {
-    /// <inheritdoc cref="MeasurementOptions.ForceGcBeforeEachIteration" />
-    public required bool ForceGcBeforeEachIteration { get; init; }
+    /// <inheritdoc cref="MeasurementOptions.ForceGcBeforeEachSample" />
+    public required bool ForceGcBeforeEachSample { get; init; }
 
     /// <inheritdoc cref="MeasurementOptions.ForceGcBeforeMeasurement" />
     public required bool ForceGcBeforeMeasurement { get; init; }

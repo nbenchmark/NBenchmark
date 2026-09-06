@@ -31,7 +31,7 @@ public class SerializationTests
 }
 ```
 
-`PerformanceFact` discovers this test through the xUnit extensibility API. NBenchmark runs the method body as a benchmark (including warmup and measured iterations) and compares the measured mean to `MaxMeanNs`. If the mean exceeds 500 $\mu$s, the test fails.
+`PerformanceFact` discovers this test through the xUnit extensibility API. NBenchmark runs the method body as a benchmark (including warmup and measured samples) and compares the measured mean to `MaxMeanNs`. If the mean exceeds 500 $\mu$s, the test fails.
 
 ## [PerformanceFact]
 
@@ -42,8 +42,8 @@ public class SerializationTests
     MaxMeanNs = 100_000,
     MaxP95Ns  = 250_000,
     MaxAllocatedBytes = 1024,
-    Iterations = 500,
-    WarmupIterations = 50)]
+    Samples = 500,
+    WarmupSamples = 50)]
 public void ProcessMessage()
 {
     MessageProcessor.Process(SampleMessage);
@@ -95,8 +95,8 @@ For a complete list, see the [thresholds reference](./index.md#thresholds-refere
     MaxSlowdownRatio = 5.0,       // fail if >5x the calibration benchmark
     ReferenceMethod  = nameof(ReferenceImpl),  // compare against this method instead of calibration
     LaunchCount      = 3,          // measure the pair in 3 workers, for a paired ratio interval
-    Iterations       = 300,
-    WarmupIterations = 30,
+    Samples       = 300,
+    WarmupSamples = 30,
     OutlierMode      = OutlierMode.IqrFence,
     ConfidenceLevel  = 0.99)]
 public void CriticalPath() { /* ... */ }
@@ -110,7 +110,7 @@ When a threshold is violated, the test fails with a `PerformanceAssertException`
 
 ```text
 Performance thresholds exceeded for 'CriticalPath':
-  - Mean 612,847.23 ns exceeds maximum 500,000.00 ns (excess: 112,847.23 ns)
+  - MeanNs 612,847.23 ns exceeds maximum 500,000.00 ns (excess: 112,847.23 ns)
   - P95 1,204,312.00 ns exceeds maximum 1,000,000.00 ns (excess: 204,312.00 ns)
 ```
 

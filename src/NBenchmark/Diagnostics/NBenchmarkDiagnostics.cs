@@ -305,9 +305,9 @@ internal static class NBenchmarkDiagnostics
         if (activity is null)
             return;
 
-        activity.SetTag("nbenchmark.result.median_ns", result.Median);
-        activity.SetTag("nbenchmark.result.mean_ns", result.Mean);
-        activity.SetTag("nbenchmark.result.sample_count", result.N);
+        activity.SetTag("nbenchmark.result.median_ns", result.MedianNs);
+        activity.SetTag("nbenchmark.result.mean_ns", result.MeanNs);
+        activity.SetTag("nbenchmark.result.sample_count", result.SampleCount);
         activity.SetTag("nbenchmark.result.outliers_removed", result.OutliersRemoved);
 
         activity.Dispose();

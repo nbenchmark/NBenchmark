@@ -100,7 +100,7 @@ internal static class AttributeBuilder
 
 public sealed class VoidFixture
 {
-    [Performance(Iterations = 3, WarmupIterations = 1)]
+    [Performance(Samples = 3, WarmupSamples = 1)]
     public void VoidMethod()
     {
     }
@@ -108,25 +108,25 @@ public sealed class VoidFixture
 
 public sealed class AsyncTaskFixture
 {
-    [Performance(Iterations = 3, WarmupIterations = 1)]
+    [Performance(Samples = 3, WarmupSamples = 1)]
     public Task TaskMethod() => Task.CompletedTask;
 }
 
 public sealed class TypedTaskFixture
 {
-    [Performance(Iterations = 3, WarmupIterations = 1)]
+    [Performance(Samples = 3, WarmupSamples = 1)]
     public Task<int> TypedTaskMethod() => Task.FromResult(0);
 }
 
 public sealed class ValueTaskFixture
 {
-    [Performance(Iterations = 3, WarmupIterations = 1)]
+    [Performance(Samples = 3, WarmupSamples = 1)]
     public ValueTask ValueTaskMethod() => default;
 }
 
 public sealed class TypedValueTaskFixture
 {
-    [Performance(Iterations = 3, WarmupIterations = 1)]
+    [Performance(Samples = 3, WarmupSamples = 1)]
     public async ValueTask<int> TypedValueTaskMethod()
     {
         await Task.Yield();
@@ -138,6 +138,6 @@ public sealed class BodyInvokedFixture
 {
     public static int InvocationCount { get; set; }
 
-    [Performance(Iterations = 3, WarmupIterations = 1)]
+    [Performance(Samples = 3, WarmupSamples = 1)]
     public void BodyMethod() => InvocationCount++;
 }

@@ -10,8 +10,8 @@ public class BenchmarkSuiteExtendedTests
     {
         var results = await new BenchmarkSuite("async-suite").WithIsolation(Isolation.Preferred)
             .Add("async-fast", async () => { await Task.Yield(); })
-            .WithWarmup(1)
-            .WithIterations(5)
+            .WithWarmupSamples(1)
+            .WithSamples(5)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -24,8 +24,8 @@ public class BenchmarkSuiteExtendedTests
     {
         var results = await new BenchmarkSuite("generic-suite").WithIsolation(Isolation.Preferred)
             .Add("returns-value", () => 42)
-            .WithWarmup(1)
-            .WithIterations(5)
+            .WithWarmupSamples(1)
+            .WithSamples(5)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -42,8 +42,8 @@ public class BenchmarkSuiteExtendedTests
                 await Task.Yield();
                 return 42;
             })
-            .WithWarmup(1)
-            .WithIterations(5)
+            .WithWarmupSamples(1)
+            .WithSamples(5)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -56,15 +56,15 @@ public class BenchmarkSuiteExtendedTests
     {
         var results = await new BenchmarkSuite("memory-suite").WithIsolation(Isolation.Preferred)
             .Add("alloc", () => { _ = new byte[1024]; })
-            .WithWarmup(1)
-            .WithIterations(10)
+            .WithWarmupSamples(1)
+            .WithSamples(10)
             .WithAllocations()
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
         Assert.Single(results);
-        Assert.NotNull(results[0].MeanAllocatedBytes);
-        Assert.True(results[0].MeanAllocatedBytes >= 1024);
+        Assert.NotNull(results[0].AllocatedBytesMean);
+        Assert.True(results[0].AllocatedBytesMean >= 1024);
     }
 
     [Fact]
@@ -72,8 +72,8 @@ public class BenchmarkSuiteExtendedTests
     {
         var results = await new BenchmarkSuite("confidence-suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => Thread.SpinWait(100))
-            .WithWarmup(1)
-            .WithIterations(10)
+            .WithWarmupSamples(1)
+            .WithSamples(10)
             .WithConfidenceLevel(0.99)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
@@ -92,8 +92,8 @@ public class BenchmarkSuiteExtendedTests
             .Add("work", () => Thread.SpinWait(100))
             .WithSuiteSetup(() => Interlocked.Increment(ref setupCount))
             .WithSuiteTeardown(() => Interlocked.Increment(ref teardownCount))
-            .WithWarmup(1)
-            .WithIterations(5)
+            .WithWarmupSamples(1)
+            .WithSamples(5)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -112,8 +112,8 @@ public class BenchmarkSuiteExtendedTests
             .Add("work", () => Thread.SpinWait(100),
                 () => Interlocked.Increment(ref setupCount),
                 () => Interlocked.Increment(ref teardownCount))
-            .WithWarmup(2)
-            .WithIterations(5)
+            .WithWarmupSamples(2)
+            .WithSamples(5)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -129,8 +129,8 @@ public class BenchmarkSuiteExtendedTests
 
         var results = await new BenchmarkSuite("reporter-suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(1)
-            .WithIterations(2)
+            .WithWarmupSamples(1)
+            .WithSamples(2)
             .WithOutlierMode(OutlierMode.None)
             .WithReporter(new StubReporter(r => { reported = true; }))
             .RunAsync();
@@ -145,8 +145,8 @@ public class BenchmarkSuiteExtendedTests
 
         var results = await new BenchmarkSuite("detail-suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => Thread.SpinWait(100))
-            .WithWarmup(1)
-            .WithIterations(2)
+            .WithWarmupSamples(1)
+            .WithSamples(2)
             .WithOutlierMode(OutlierMode.None)
             .WithReporter(stub)
             .WithDetail(ReportDetail.Advanced)
@@ -163,8 +163,8 @@ public class BenchmarkSuiteExtendedTests
 
         var results = await new BenchmarkSuite("detail-order-suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => Thread.SpinWait(100))
-            .WithWarmup(1)
-            .WithIterations(2)
+            .WithWarmupSamples(1)
+            .WithSamples(2)
             .WithOutlierMode(OutlierMode.None)
             .WithDetail(ReportDetail.Advanced)
             .WithReporter(stub)
@@ -181,8 +181,8 @@ public class BenchmarkSuiteExtendedTests
             .Add("baseline", () => Thread.SpinWait(500))
             .Add("other", () => Thread.SpinWait(1000))
             .WithBaseline("baseline")
-            .WithWarmup(1)
-            .WithIterations(20)
+            .WithWarmupSamples(1)
+            .WithSamples(20)
             .WithSignificance(false)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
@@ -197,8 +197,8 @@ public class BenchmarkSuiteExtendedTests
         var results = await new BenchmarkSuite("ordered").WithIsolation(Isolation.Preferred)
             .Add("first", () => Thread.SpinWait(100))
             .Add("second", () => Thread.SpinWait(100))
-            .WithWarmup(1)
-            .WithIterations(5)
+            .WithWarmupSamples(1)
+            .WithSamples(5)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .RunAsync();

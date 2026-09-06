@@ -22,8 +22,8 @@ internal static class PerformanceAttributeParser
             MaxAllocatedBytes = NormalizeThreshold(ParseLong(attribute, nameof(PerformanceFactAttribute.MaxAllocatedBytes))),
             ReferenceMethod = NormalizeReferenceMethod(ParseString(attribute, nameof(PerformanceFactAttribute.ReferenceMethod))),
             MaxSlowdownRatio = NormalizeSlowdownRatio(ParseDouble(attribute, nameof(PerformanceFactAttribute.MaxSlowdownRatio))),
-            Iterations = NormalizeIterations(ParseInt(attribute, nameof(PerformanceFactAttribute.Iterations))),
-            WarmupIterations = NormalizeIterations(ParseInt(attribute, nameof(PerformanceFactAttribute.WarmupIterations))),
+            Samples = NormalizeSamples(ParseInt(attribute, nameof(PerformanceFactAttribute.Samples))),
+            WarmupSamples = NormalizeSamples(ParseInt(attribute, nameof(PerformanceFactAttribute.WarmupSamples))),
             MeasureAllocations = ParseBool(attribute, nameof(PerformanceFactAttribute.MeasureAllocations)),
             OutlierMode = NormalizeOutlierMode(ParseOutlierMode(attribute), true),
             ConfidenceLevel = NormalizeConfidenceLevel(ParseDouble(attribute, nameof(PerformanceFactAttribute.ConfidenceLevel))),
@@ -49,8 +49,8 @@ internal static class PerformanceAttributeParser
             MaxAllocatedBytes = NormalizeThreshold(runtime.MaxAllocatedBytes),
             ReferenceMethod = NormalizeReferenceMethod(runtime.ReferenceMethod),
             MaxSlowdownRatio = NormalizeSlowdownRatio(runtime.MaxSlowdownRatio),
-            Iterations = NormalizeIterations(runtime.Iterations),
-            WarmupIterations = NormalizeIterations(runtime.WarmupIterations),
+            Samples = NormalizeSamples(runtime.Samples),
+            WarmupSamples = NormalizeSamples(runtime.WarmupSamples),
             MeasureAllocations = runtime.MeasureAllocations,
             OutlierMode = NormalizeOutlierMode(runtime.OutlierMode, false),
             ConfidenceLevel = NormalizeConfidenceLevel(runtime.ConfidenceLevel),
@@ -96,7 +96,7 @@ internal static class PerformanceAttributeParser
 
     private static string? NormalizeReferenceMethod(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
-    private static int NormalizeIterations(int value) => value > 0 ? value : 0;
+    private static int NormalizeSamples(int value) => value > 0 ? value : 0;
 
     private static double NormalizeSlowdownRatio(double value) => value > 0 ? value : DefaultMaxSlowdownRatio;
 
@@ -132,8 +132,8 @@ internal static class PerformanceAttributeParser
         public long MaxAllocatedBytes { get; init; } = -1;
         public string? ReferenceMethod { get; init; }
         public double MaxSlowdownRatio { get; init; }
-        public int Iterations { get; init; }
-        public int WarmupIterations { get; init; }
+        public int Samples { get; init; }
+        public int WarmupSamples { get; init; }
         public bool MeasureAllocations { get; init; }
         public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
         public double ConfidenceLevel { get; init; } = 0.95;

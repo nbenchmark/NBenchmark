@@ -1,4 +1,4 @@
-namespace NBenchmark.Attributes;
+namespace NBenchmark;
 
 /// <summary>
 ///     Declares that a <c>[InstanceLifetime(InstanceLifetime.PerClass)]</c> class carries state
@@ -35,5 +35,5 @@ public sealed class SharedStateAttribute : Attribute
     ///     <c>[SharedState]</c> form is the declaration; set it to <c>false</c> to park the
     ///     attribute on a class without suppressing anything.
     /// </summary>
-    public bool Intentional { get; init; } = true;
+    public bool Acknowledged { get; init; } = true;
 }

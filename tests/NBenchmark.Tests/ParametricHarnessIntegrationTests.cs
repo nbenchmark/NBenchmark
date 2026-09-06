@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using Xunit;
 
 namespace NBenchmark.Tests;
@@ -12,7 +12,7 @@ public class ParametricHarnessIntegrationTests
     public async Task RunAsync_Produces_One_Result_Per_BenchmarkCase()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
@@ -29,7 +29,7 @@ public class ParametricHarnessIntegrationTests
     public async Task RunAsync_Produces_One_Result_Per_BenchmarkCases_Tuple()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
@@ -46,7 +46,7 @@ public class ParametricHarnessIntegrationTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness
-                .Create(["--filter", "ParametricHarnessBenchmarks.Compute(n=100)", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
+                .Create(["--filter", "ParametricHarnessBenchmarks.Compute(n=100)", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
@@ -62,7 +62,7 @@ public class ParametricHarnessIntegrationTests
     {
         var results = await CaptureConsoleOutputAsync(async () =>
             await BenchmarkHarness.Create([
-                    "--filter", "ParametricHarnessBenchmarks.Multiply(a=10, b=20)", "--iterations", "5", "--warmup", "2", "--launch-count", "1",
+                    "--filter", "ParametricHarnessBenchmarks.Multiply(a=10, b=20)", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1",
                 ])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
@@ -97,7 +97,7 @@ public class ParametricHarnessIntegrationTests
     public async Task RunAsync_Populates_ParameterSet_On_Results()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
+            await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
@@ -126,7 +126,7 @@ public class ParametricHarnessIntegrationTests
     public async Task RunAsync_All_Baseline_Cases_Have_IsBaseline_True()
     {
         var results = await CaptureConsoleOutputAsync(async () =>
-            await BenchmarkHarness.Create(["--filter", "BaselineParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
+            await BenchmarkHarness.Create(["--filter", "BaselineParametricHarnessBenchmarks.*", "--samples", "5", "--warmup-samples", "2", "--launch-count", "1"])
                 .AddFromAssembly<BaselineParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithIsolation(Isolation.Off)
@@ -174,12 +174,12 @@ public class ParametricHarnessIntegrationTests
 
 public class ParametricHarnessBenchmarks
 {
-    [BenchmarkCase(100)]
-    [BenchmarkCase(1000)]
+    [Arguments(100)]
+    [Arguments(1000)]
     [Benchmark]
     public int Compute(int n) => n;
 
-    [BenchmarkCases(nameof(MultiplyCases))]
+    [ArgumentsSource(nameof(MultiplyCases))]
     [Benchmark]
     public int Multiply(int a, int b) => a * b;
 
@@ -193,12 +193,12 @@ public class ParametricHarnessBenchmarks
 
 public class BaselineParametricHarnessBenchmarks
 {
-    [BenchmarkCase(10)]
-    [BenchmarkCase(100)]
+    [Arguments(10)]
+    [Arguments(100)]
     [Benchmark(Baseline = true)]
     public int Compute(int n) => n;
 
-    [BenchmarkCases(nameof(Sizes))]
+    [ArgumentsSource(nameof(Sizes))]
     [Benchmark(Baseline = true)]
     public int Multiply(int a, int b) => a * b;
 

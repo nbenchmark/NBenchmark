@@ -15,7 +15,7 @@ The first few runs of .NET code are often slow because the Just-In-Time (JIT) co
 To prevent this, NBenchmark runs your method several times and discards those initial timings. The engine determines the warmup duration by monitoring the timings and stopping once they stop improving. Methods that settle quickly receive a short warmup, while those that continue to speed up receive a longer one.
 
 > [!TIP]
-> If you want to measure cold-start cost specifically, skip the warmup by using `WithWarmup(0)`.
+> If you want to measure cold-start cost specifically, skip the warmup by using `WithWarmupSamples(0)`.
 
 For more information, see [Measurement: warmup](../statistics/measurement.md#phase-b---warmup-plateau-detection), which covers the plateau rule, the time floor, and the JIT-quiescence gate.
 
@@ -35,7 +35,7 @@ NBenchmark discards these outliers before computing statistics using a rule that
 
 For more information, see [Outlier trimming](../statistics/outliers.md), which covers the five trimming modes, the bimodal warning, and custom detectors.
 
-## Median vs. mean
+## Median vs. Mean
 
 - **Median**: The middle value when measurements are sorted. The median is robust because a few slow measurements do not significantly affect it. When comparing two benchmarks, the median is the most reliable single number.
 - **Mean**: The average of all samples. Even after outlier trimming, the mean is more sensitive to skewed distributions than the median. The engine uses the mean to build the confidence interval.

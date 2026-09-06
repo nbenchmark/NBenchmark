@@ -12,18 +12,18 @@ public class StatsSummaryTests
         Array.Sort(samples);
         var stats = StatsSummary.Compute(samples);
 
-        Assert.Equal(3.0, stats.Mean, 10);
-        Assert.Equal(3.0, stats.Median, 10);
+        Assert.Equal(3.0, stats.MeanNs, 10);
+        Assert.Equal(3.0, stats.MedianNs, 10);
         Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 10);
         Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 10);
-        Assert.Equal(1.0, stats.Min, 10);
-        Assert.Equal(5.0, stats.Max, 10);
+        Assert.Equal(1.0, stats.MinNs, 10);
+        Assert.Equal(5.0, stats.MaxNs, 10);
 
         // Sample standard deviation (Bessel's correction): sqrt(10 / 4) = sqrt(2.5).
-        Assert.Equal(Math.Sqrt(2.5), stats.StandardDeviation, 10);
+        Assert.Equal(Math.Sqrt(2.5), stats.StandardDeviationNs, 10);
 
         // Standard error = s / sqrt(n) = sqrt(2.5) / sqrt(5) = sqrt(0.5).
-        Assert.Equal(Math.Sqrt(0.5), stats.StandardError, 10);
+        Assert.Equal(Math.Sqrt(0.5), stats.StandardErrorNs, 10);
     }
 
     [Fact]
@@ -36,18 +36,18 @@ public class StatsSummaryTests
 
         var stats = StatsSummary.Compute(unsorted);
 
-        Assert.Equal(3.0, stats.Median, 10);
-        Assert.Equal(1.0, stats.Min, 10);
-        Assert.Equal(5.0, stats.Max, 10);
+        Assert.Equal(3.0, stats.MedianNs, 10);
+        Assert.Equal(1.0, stats.MinNs, 10);
+        Assert.Equal(5.0, stats.MaxNs, 10);
         Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 10);
         Assert.Equal(original, unsorted);
 
         var sorted = new double[] { 1, 2, 3, 4, 5 };
         var expected = StatsSummary.Compute(sorted);
 
-        Assert.Equal(expected.Mean, stats.Mean, 10);
-        Assert.Equal(expected.StandardDeviation, stats.StandardDeviation, 10);
-        Assert.Equal(expected.Mad, stats.Mad, 10);
+        Assert.Equal(expected.MeanNs, stats.MeanNs, 10);
+        Assert.Equal(expected.StandardDeviationNs, stats.StandardDeviationNs, 10);
+        Assert.Equal(expected.MedianAbsoluteDeviationNs, stats.MedianAbsoluteDeviationNs, 10);
         Assert.Equal(expected.Skewness, stats.Skewness, 10);
         Assert.Equal(expected.Kurtosis, stats.Kurtosis, 10);
     }
@@ -60,10 +60,10 @@ public class StatsSummaryTests
         var stats = StatsSummary.Compute(samples);
 
         Assert.Equal(0.95, stats.ConfidenceLevel, 10);
-        Assert.True(stats.MarginOfError > 0);
+        Assert.True(stats.MarginOfErrorNs > 0);
 
         // Margin of error must equal t* × standard error and be a sane fraction of the spread.
-        Assert.True(stats.MarginOfError < stats.StandardDeviation);
+        Assert.True(stats.MarginOfErrorNs < stats.StandardDeviationNs);
         Assert.True(stats.CoefficientOfVariation > 0);
     }
 
@@ -76,30 +76,30 @@ public class StatsSummaryTests
         var ninetyFive = StatsSummary.Compute(samples);
         var ninetyNine = StatsSummary.Compute(samples, 0.99);
 
-        Assert.True(ninetyNine.MarginOfError > ninetyFive.MarginOfError);
+        Assert.True(ninetyNine.MarginOfErrorNs > ninetyFive.MarginOfErrorNs);
     }
 
     [Fact]
     public void Compute_Empty_Array_Returns_Defaults()
     {
         var stats = StatsSummary.Compute([]);
-        Assert.Equal(0, stats.Mean);
-        Assert.Equal(0, stats.Median);
-        Assert.Equal(0, stats.StandardDeviation);
-        Assert.Equal(0, stats.StandardError);
-        Assert.Equal(0, stats.MarginOfError);
+        Assert.Equal(0, stats.MeanNs);
+        Assert.Equal(0, stats.MedianNs);
+        Assert.Equal(0, stats.StandardDeviationNs);
+        Assert.Equal(0, stats.StandardErrorNs);
+        Assert.Equal(0, stats.MarginOfErrorNs);
     }
 
     [Fact]
     public void Compute_Single_Element()
     {
         var stats = StatsSummary.Compute([7.0]);
-        Assert.Equal(7.0, stats.Mean, 10);
-        Assert.Equal(7.0, stats.Median, 10);
+        Assert.Equal(7.0, stats.MeanNs, 10);
+        Assert.Equal(7.0, stats.MedianNs, 10);
         Assert.Null(stats.Histogram);
-        Assert.Equal(0.0, stats.StandardDeviation, 10);
-        Assert.Equal(0.0, stats.StandardError, 10);
-        Assert.Equal(0.0, stats.MarginOfError, 10);
+        Assert.Equal(0.0, stats.StandardDeviationNs, 10);
+        Assert.Equal(0.0, stats.StandardErrorNs, 10);
+        Assert.Equal(0.0, stats.MarginOfErrorNs, 10);
     }
 
     [Fact]
@@ -109,9 +109,9 @@ public class StatsSummaryTests
         Array.Sort(samples);
         var stats = StatsSummary.Compute(samples);
 
-        Assert.Equal(5.0, stats.Mean, 10);
-        Assert.Equal(5.0, stats.Median, 10);
-        Assert.Equal(0.0, stats.StandardDeviation, 10);
+        Assert.Equal(5.0, stats.MeanNs, 10);
+        Assert.Equal(5.0, stats.MedianNs, 10);
+        Assert.Equal(0.0, stats.StandardDeviationNs, 10);
     }
 
     [Fact]

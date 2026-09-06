@@ -1,4 +1,4 @@
-namespace NBenchmark.Attributes;
+namespace NBenchmark;
 
 /// <summary>
 ///     Marks a <b>static, parameterless</b> method returning a <see cref="BenchmarkSuite" /> as a

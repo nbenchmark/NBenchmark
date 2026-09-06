@@ -16,21 +16,21 @@ Simple detail shows a compact table with the essential information you need to d
 | --- | --- |
 | **Benchmark** | The benchmark name. |
 | **Median** | The median timing. |
-| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). |
+| **Ops/s** | Mean operations per second (`1e9 / MeanNs` when timing is in nanoseconds). |
 | **Ratio** | A visual bar and ratio relative to the baseline. |
 | **Sig** | `✓` = significant, `✗` = not significant, `-` = not applicable. |
-| **Alloc/op** | Mean bytes allocated per iteration, or `-` if not measured. |
+| **Alloc/op** | Mean bytes allocated per operation, or `-` if not measured. |
 
 A one-line footer shows the benchmark count, total duration, and confidence level. This mode avoids statistical jargon and auxiliary tables.
 
 ## Standard mode
 
-Standard mode shows the comparison table with additional columns (Mean, Mag, Description) and several auxiliary sections:
+Standard mode shows the comparison table with additional columns (mean, Mag, Description) and several auxiliary sections:
 
 - **Precision & Tail Latency table**: Displays Error (±CI), StdDev, CV, and upper-tail percentiles (such as P95, P99, etc.).
 - **Diagnostics table**: Displays GC Gen0/Gen1/Gen2 collection counts, heap info, CPU/wall ratio, and exceptions per op when diagnostics are enabled. For more information, see [Diagnostics](../statistics/diagnostics.md).
 - **Launch Aggregation table**: Displays cross-launch mean, stddev, median, and CI when `LaunchCount > 1`.
-- **Interpretation block**: Includes the omnibus verdict, significance test name, outlier detector, effect metric summary, and measurement profile.
+- **Interpretation block**: Includes the omnibus verdict, significance test name, outlier detector, effect metric summary, and GC behavior.
 - **Auto-tune summary lines**: Displays resolved warmup, sample count, ops-per-sample, and achieved CI half-width.
 - **Warnings**: Displays warnings when present.
 
@@ -41,17 +41,17 @@ Use this level if you need to understand variability and the statistical rigour 
 Advanced mode shows everything in Standard mode plus a per-benchmark stats block. The `ConsoleReporter` prints each stats block below its row, while the `MarkdownReporter` emits a dedicated details section after the table. The stats block includes:
 
 - **Outliers**: The count of removed samples and the trimming method.
-- **Range**: The Min to Max spread.
-- **Quartiles**: Q1, Q3, and IQR.
+- **Range**: The min-to-max spread.
+- **Quartiles**: Q1Ns, Q3Ns, and IQR.
 - **Fences**: Lower and upper fences (only for `IqrFence` mode).
-- **Iterations**: Pre-trim and post-trim sample counts and the warmup count.
+- **Samples**: Pre-trim and post-trim sample counts and the warmup count.
 - **Confidence interval**: Full CI bounds and the margin percent of the mean.
 - **CV**: The coefficient of variation as a percentage.
 - **Skewness and Kurtosis**: The shape of the distribution.
 - **MAD**: The scaled median absolute deviation.
-- **Percentiles**: The full set of configured percentile values (such as P50, P95, P99, P99.9, and Max).
+- **Percentiles**: The full set of configured percentile values (such as P50, P95, P99, P99.9, and max).
 - **N**: The post-trim sample count.
-- **Allocation breakdown**: Median, P95, and max allocation per iteration when `MeasureAllocations = true`.
+- **Allocation breakdown**: Median, P95, and max allocation per operation when `MeasureAllocations = true`.
 - **Diagnostics breakdown**: GC collection counts, heap committed and fragmented bytes, CPU time, CPU/wall ratio, and exceptions per operation when diagnostics are enabled.
 
 ## Setting the detail level
@@ -99,8 +99,8 @@ Single mode (`Benchmark.Run` / `Benchmark.RunAsync`) does not have a builder to 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
 
-result.Print();                            // Simple (default) - Median and Ops/s
-result.Print(ReportDetail.Standard);       // Adds Mean, percentiles, StdDev, Error, and CI
+result.Print();                            // Simple (default) - MedianNs and Ops/s
+result.Print(ReportDetail.Standard);       // Adds MeanNs, percentiles, StdDev, Error, and CI
 result.Print(ReportDetail.Advanced);       // Adds quartiles, fences, shape, and allocation breakdown
 ```
 

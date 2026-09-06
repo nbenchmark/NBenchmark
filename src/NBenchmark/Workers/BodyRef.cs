@@ -11,7 +11,7 @@ internal enum WorkGroupKind
     /// <summary>
     ///     Harness mode. The worker runs the normal attribute discovery pass over the target
     ///     assembly and keeps the named benchmarks. Discovery - not the coordinator - owns
-    ///     <c>[BenchmarkSetup]</c>, <c>[BenchmarkCase]</c>/<c>[BenchmarkCases]</c>, <c>[InstanceLifetime]</c> and the rest, so
+    ///     <c>[GlobalSetup]</c>, <c>[Arguments]</c>/<c>[ArgumentsSource]</c>, <c>[InstanceLifetime]</c> and the rest, so
     ///     nothing about that machinery has to cross the process boundary.
     /// </summary>
     DiscoveredClass = 0,
@@ -174,10 +174,10 @@ internal sealed record BodyRef
     ///         cross.
     ///     </para>
     /// </summary>
-    public BodyRef? IterationSetup { get; init; }
+    public BodyRef? SampleSetup { get; init; }
 
-    /// <inheritdoc cref="IterationSetup" />
-    public BodyRef? IterationTeardown { get; init; }
+    /// <inheritdoc cref="SampleSetup" />
+    public BodyRef? SampleTeardown { get; init; }
 
     /// <summary>
     ///     Which of the group's receivers this body binds to, when its receiver holds state - see

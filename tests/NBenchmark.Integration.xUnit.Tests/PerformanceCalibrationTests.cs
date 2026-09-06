@@ -10,8 +10,8 @@ public sealed class PerformanceCalibrationTests
     {
         var result = PerformanceCalibration.Run();
 
-        Assert.True(result.Mean > 0);
-        Assert.True(result.Median > 0);
+        Assert.True(result.MeanNs > 0);
+        Assert.True(result.MedianNs > 0);
         Assert.NotEmpty(result.Samples);
     }
 
@@ -30,9 +30,9 @@ public sealed class PerformanceCalibrationTests
         var result = PerformanceCalibration.CreateBenchmarkResult();
 
         Assert.Equal("calibration", result.Name);
-        Assert.True(result.Mean > 0);
-        Assert.True(result.Median > 0);
-        Assert.True(result.N > 0);
+        Assert.True(result.MeanNs > 0);
+        Assert.True(result.MedianNs > 0);
+        Assert.True(result.SampleCount > 0);
     }
 
     /// <summary>
@@ -67,6 +67,6 @@ public sealed class PerformanceCalibrationTests
         var result = CalibrationStandard.ToBenchmarkResult(measured, IsolationStatus.Isolated);
 
         Assert.True(result.IsolationStatus.IsIsolated());
-        Assert.Equal(measured.Median, result.Median);
+        Assert.Equal(measured.MedianNs, result.MedianNs);
     }
 }

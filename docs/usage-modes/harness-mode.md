@@ -28,7 +28,7 @@ dotnet add reference ../MyApp/MyApp.csproj
 ### 2. Write benchmark classes
 
 ```csharp
-using NBenchmark.Attributes;
+using NBenchmark;
 
 public class StringBenchmarks
 {
@@ -46,7 +46,7 @@ public class StringBenchmarks
 // Program.cs
 using NBenchmark;
 using NBenchmark.Reporters.Console;
-using NBenchmark.Attributes;
+using NBenchmark;
 
 await BenchmarkHarness.Create(args)
     .AddFromAssembly<StringBenchmarks>()
@@ -86,8 +86,8 @@ public async Task<int> MyAsyncMethodWithResult() => await ComputeAsync();
 |---|---|---|
 | `Baseline` | `bool` | Marks this method as the baseline for ratio and significance calculations. |
 | `Description` | `string?` | An optional label shown in output when descriptions are present. |
-| `Iterations` | `int?` | Overrides the default iteration count for this method only. |
-| `WarmupIterations` | `int?` | Overrides the default warmup count for this method only. |
+| `Samples` | `int?` | Overrides the default sample count for this method only. |
+| `WarmupSamples` | `int?` | Overrides the default warmup count for this method only. |
 | `LaunchCount` | `int` | Overrides the default launch count for this method only. |
 
 ```csharp
@@ -126,14 +126,14 @@ NBenchmark unions class-level categories with method-level categories. In the ex
 
 For the full filtering model (including CLI flags and programmatic filtering), see [Categories](../features/categories.md).
 
-### [BenchmarkCase] and [BenchmarkCases]
+### [Arguments] and [ArgumentsSource]
 
 Run the benchmark once for each case (argument set). The method must accept parameters that match the argument types.
 
 ```csharp
-[BenchmarkCase(10)]
-[BenchmarkCase(1_000)]
-[BenchmarkCase(100_000)]
+[Arguments(10)]
+[Arguments(1_000)]
+[Arguments(100_000)]
 [Benchmark]
 public void Sort(int n)
 {
@@ -142,38 +142,38 @@ public void Sort(int n)
 }
 ```
 
-Each case becomes a separate benchmark entry in the output, named `MethodName(name=value, ...)` using the method's parameter names. For programmatic case sources, generated values, or large parameter sweeps, use `[BenchmarkCases]` with a source method that yields named value tuples.
+Each case becomes a separate benchmark entry in the output, named `MethodName(name=value, ...)` using the method's parameter names. For programmatic case sources, generated values, or large parameter sweeps, use `[ArgumentsSource]` with a source method that yields named value tuples.
 
 For the full API, display name rules, baselines, significance, filtering, and a comparison with suite mode, see [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
 
 ### Lifecycle attributes
 
-These attributes control setup and teardown at the class and iteration level. All decorated methods must have no parameters.
+These attributes control setup and teardown at the class and sample level. All decorated methods must have no parameters.
 
 By default, the lifetime is `PerMethod` - both the instance and the lifecycle methods fire once per `[Benchmark]` method. To run setup and teardown once for the entire class, add `[InstanceLifetime(InstanceLifetime.PerClass)]` to the class.
 
 | Attribute | When it runs | Timing |
 | --- | --- | --- |
-| `[BenchmarkSetup]` | Before each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
-| `[BenchmarkTeardown]` | After each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
-| `[BenchmarkIterationSetup]` | Before each individual iteration | Not measured |
-| `[BenchmarkIterationTeardown]` | After each individual iteration | Not measured |
+| `[GlobalSetup]` | Before each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
+| `[GlobalTeardown]` | After each `[Benchmark]` method by default; once per suite under `[InstanceLifetime(PerClass)]` | Not measured |
+| `[SampleSetup]` | Before each individual sample | Not measured |
+| `[SampleTeardown]` | After each individual sample | Not measured |
 
 ```csharp
 public class DatabaseBenchmarks
 {
     private DbConnection _conn = null!;
 
-    [BenchmarkSetup]
+    [GlobalSetup]
     public void OpenConnection() => _conn = new DbConnection(connectionString);
 
-    [BenchmarkTeardown]
+    [GlobalTeardown]
     public void CloseConnection() => _conn.Dispose();
 
-    [BenchmarkIterationSetup]
+    [SampleSetup]
     public void BeginTransaction() => _conn.BeginTransaction();
 
-    [BenchmarkIterationTeardown]
+    [SampleTeardown]
     public void RollbackTransaction() => _conn.RollbackTransaction();
 
     [Benchmark]
@@ -181,13 +181,13 @@ public class DatabaseBenchmarks
 }
 ```
 
-If your `[BenchmarkSetup]` is expensive and you want to share the resulting state across all `[Benchmark]` methods in the class, use `PerClass`:
+If your `[GlobalSetup]` is expensive and you want to share the resulting state across all `[Benchmark]` methods in the class, use `PerClass`:
 
 ```csharp
 [InstanceLifetime(InstanceLifetime.PerClass)]
 public class DatabaseBenchmarks
 {
-    [BenchmarkSetup] public void OpenConnection() { ... }
+    [GlobalSetup] public void OpenConnection() { ... }
     [Benchmark] public void A() { ... }
     [Benchmark] public void B() { ... }
 }
@@ -287,8 +287,8 @@ BenchmarkHarness.Create(args)
     .AddFromAssembly<MyBenchmarks>()
     .WithOptions(new MeasurementOptions
     {
-        Iterations = 500,
-        WarmupIterations = 50,
+        Samples = 500,
+        WarmupSamples = 50,
         MeasureAllocations = true,
         ConfidenceLevel = 0.99,
     })
@@ -296,7 +296,7 @@ BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-CLI flags, such as `--iterations`, always override `WithOptions` values.
+CLI flags, such as `--samples`, always override `WithOptions` values.
 
 By default, benchmarks run in **random** order to reduce systematic bias. Call `WithRunOrder(RunOrder.Declaration)` or pass `--order declaration` to run them in declaration order.
 
@@ -324,7 +324,7 @@ Use `--launch-count <n>` on the CLI or `WithLaunchCount(n)` in code to run each 
 
 ## Category filtering
 
-When you tag benchmarks with `[BenchmarkCategory]`, you can include or exclude them from the run using the `--category` and `--exclude-category` CLI flags, or `WithCategoryFilter` in code. For the full filtering model, see [Categories](../features/categories.md).
+When you tag benchmarks with `[BenchmarkCategory]`, you can include or exclude them from the run using the `--category` and `--exclude-category` CLI flags, or `FilterCategories` in code. For the full filtering model, see [Categories](../features/categories.md).
 
 ## Listing benchmarks without running
 
@@ -350,7 +350,7 @@ A dry run validates that all benchmarks compile, discover, and wire up correctly
 dotnet run -- --dry-run
 ```
 
-The `--dry-run` flag is implemented as `--iterations 0 --warmup 0`. The body is not invoked, and no measurements are taken. Use this to confirm discovery, setup, and instantiation work before a full run. To run the body exactly once for a smoke test, use `--iterations 1 --warmup 0`.
+The `--dry-run` flag is implemented as `--samples 0 --warmup-samples 0`. The body is not invoked, and no measurements are taken. Use this to confirm discovery, setup, and instantiation work before a full run. To run the body exactly once for a smoke test, use `--samples 1 --warmup-samples 0`.
 
 ## Return value
 
@@ -358,7 +358,7 @@ The `--dry-run` flag is implemented as `--iterations 0 --warmup 0`. The body is 
 
 ## Next steps
 
-- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - `[BenchmarkCase]` and `[BenchmarkCases]` in depth
+- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - `[Arguments]` and `[ArgumentsSource]` in depth
 - [Multi-runtime comparison](../features/multi-runtime.md) - Compare across .NET runtimes
 - [Multiple launches](../features/multiple-launches.md) - Measure run-to-run variance
 - [CLI Reference](../reference/cli.md) - All command-line flags

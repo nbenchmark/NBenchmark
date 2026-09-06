@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
-using NBenchmark.Attributes;
 
 namespace NBenchmark.Tests.IsolationFixture;
 
@@ -110,8 +109,8 @@ public static class NamedPlanFixture
     public static BenchmarkSuite BuildSuite() =>
         new BenchmarkSuite(SuiteName)
             .Add(BenchmarkName, () => Thread.SpinWait(200))
-            .WithIterations(8)
-            .WithWarmup(1)
+            .WithSamples(8)
+            .WithWarmupSamples(1)
             .WithOpsPerSample(1)
             .WithAutoTune(AutoTuneOptions.Default with
             {
@@ -140,7 +139,7 @@ public static class NamedPlanFixture
 ///         the second benchmark and says why.
 ///     </para>
 ///     <para>
-///         The claim is taken in <c>[BenchmarkSetup]</c>, which runs once per instance. Taking it in
+///         The claim is taken in <c>[GlobalSetup]</c>, which runs once per instance. Taking it in
 ///         the body would throw on the second iteration of the first benchmark, which measures
 ///         nothing about scoping.
 ///     </para>
@@ -175,7 +174,7 @@ public sealed class ScopedClaim
 
 public class ScopedDiBenchmarks(ScopedClaim claim)
 {
-    [BenchmarkSetup]
+    [GlobalSetup]
     public void Setup() => claim.Claim();
 
     [Benchmark]
@@ -218,7 +217,7 @@ public class FactoryBuiltBenchmarks(int marker)
         // comparison and a return - a couple of nanoseconds - and on a host whose timer steps in
         // coarse units (41.667 ns on Apple Silicon, 100 ns on Windows QPC) a single-invocation sample
         // reads either zero or one whole step depending on where the tick boundary happens to fall.
-        // The test asserts Median > 0, and with four such samples the median is zero whenever three
+        // The test asserts MedianNs > 0, and with four such samples the median is zero whenever three
         // of them miss a tick, which made it fail on roughly one run in six.
         //
         // The spin is the fix rather than a larger OpsPerSample because the options are shared with

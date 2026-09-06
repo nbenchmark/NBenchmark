@@ -54,7 +54,7 @@ A worker loads the assembly declaring your benchmarks into its own load context,
 - **Group:** Scales with the benchmark count.
 - **Silence:** Based on the `IdleFrame`, derived from the per-benchmark ceiling rather than fixed at 30 seconds.
 
-The silence ceiling is what actually catches a wedged worker, because the group ceiling grows with the benchmark count - fifty benchmarks tolerate over half an hour of nothing, and a flat 30 s would kill exactly the slow-but-honest benchmarks. It is derived rather than fixed because progress frames are emitted per completed sample, so a body whose single iteration consumes the entire tuning budget is legitimately silent for that duration.
+The silence ceiling is what actually catches a wedged worker, because the group ceiling grows with the benchmark count - fifty benchmarks tolerate over half an hour of nothing, and a flat 30 s would kill exactly the slow-but-honest benchmarks. It is derived rather than fixed because progress frames are emitted per completed sample, so a body whose single sample consumes the entire tuning budget is legitimately silent for that duration.
 
 The engine kills any worker that exceeds these ceilings, along with its entire process tree. Affected benchmarks are reported as errored with a timeout message rather than hanging the run.
 
@@ -126,7 +126,7 @@ The engine transmits the receiver's runtime type (`StateTransfer.TransferredRece
 
 Factories also carry captures. `AddressedFactory.TryCreate` uses the group's receiver table so that a prepare delegate and a body closing over the same local share one object in the worker.
 
-### Per-iteration hooks
+### Per-sample hooks
 
 Hooks are addressed via `BodyRef.TryCreateHook` and carry no argument values. Instead, the worker binds the hook to the values the body's slots resolved to. For example, `setup: d => Shuffle(d)` shuffles the same array the body then sorts.
 
@@ -214,7 +214,7 @@ When a run fails due to isolation, the engine reports the benchmark, the structu
 
 In harness mode, `BenchmarkHarness.ResolveIsolationPlan` answers "can a worker measure this?" for every discovered class before the first benchmark is measured, and reports every refusal in one message. The same call is made per class immediately before that class launches, which under a hard error is the difference between failing in a second and failing after classes 1..N-1 had already run. Every input to the decision except the assembly path is run-global, so one evaluation per assembly serves every class in it - in the ordinary single-assembly run, one evaluation for the set. This allows the engine to fail early.
 
-`--strict-isolation` maps to `RequireIsolation` and audits the results. It previously set a CLI field with no mapping onto the options, so the flag could only ever take the expensive path - measure everything, then report - even though the early-throw mechanism it wanted already existed and the two are the same request phrased at different times.
+`--strict-isolation` maps to `Isolation.Required` and audits the results. It previously set a CLI field with no mapping onto the options, so the flag could only ever take the expensive path - measure everything, then report - even though the early-throw mechanism it wanted already existed and the two are the same request phrased at different times.
 
 `BenchmarkSuite.AddInProcess` provides a per-benchmark opt-out for suites. `WithIsolation(Isolation.Off)` is all-or-nothing, so one body holding a live object took every other benchmark in the suite into the host process with it - the price of measuring one un-isolatable thing was every comparison it was part of. The suite splits: addressable bodies go to a worker, while named bodies are measured in-process and stamped `InProcessRequested`, and the merged rows are put back into declaration order because a table's order is the one thing the author fully controls.
 

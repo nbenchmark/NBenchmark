@@ -126,8 +126,8 @@ public class CompositeMeasurementObserverTests
 
         await new BenchmarkSuite("additive-observers").WithIsolation(Isolation.Preferred)
             .Add("bench", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithObserver(a)
             .WithObserver(b)
@@ -154,8 +154,8 @@ public class CompositeMeasurementObserverTests
 
         await new BenchmarkSuite("null-after-attach").WithIsolation(Isolation.Preferred)
             .Add("bench", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithObserver(a)
             .WithObserver(null!) // null must be ignored, not replace
@@ -173,8 +173,8 @@ public class CompositeMeasurementObserverTests
 
         await new BenchmarkSuite("no-observer").WithIsolation(Isolation.Preferred)
             .Add("bench", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -188,7 +188,7 @@ public class CompositeMeasurementObserverTests
         var a = new RecordingObserver();
         var b = new RecordingObserver();
 
-        await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--warmup", "0", "--iterations", "1", "--launch-count", "1"])
+        await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--warmup-samples", "0", "--samples", "1", "--launch-count", "1"])
             .AddFromAssembly<TestBenchmarks>()
             .WithRunOrder(RunOrder.Declaration)
             .WithObserver(a)
@@ -204,22 +204,22 @@ public class CompositeMeasurementObserverTests
         new()
         {
             Name = name,
-            Mean = 100.0,
-            Median = 95.0,
-            Min = 80.0,
-            Max = 120.0,
-            StandardDeviation = 5.0,
-            Q1 = 85.0,
-            Q3 = 110.0,
-            InterquartileRange = 25.0,
+            MeanNs = 100.0,
+            MedianNs = 95.0,
+            MinNs = 80.0,
+            MaxNs = 120.0,
+            StandardDeviationNs = 5.0,
+            Q1Ns = 85.0,
+            Q3Ns = 110.0,
+            InterquartileRangeNs = 25.0,
             OutliersRemoved = 0,
-            N = 30,
+            SampleCount = 30,
             Skewness = 0.1,
             Kurtosis = 2.8,
-            Mad = 3.0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 3.0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
 
     private sealed class RecordingObserver : IMeasurementObserver

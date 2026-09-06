@@ -239,7 +239,7 @@ public class SignificanceStrategyTests
         {
             Result("a") with
             {
-                Median = 10,
+                MedianNs = 10,
                 LaunchStatistics = new LaunchStatistics
                 {
                     LaunchCount = 3,
@@ -250,7 +250,7 @@ public class SignificanceStrategyTests
             },
             Result("b") with
             {
-                Median = 12,
+                MedianNs = 12,
                 LaunchStatistics = new LaunchStatistics
                 {
                     LaunchCount = 3,
@@ -495,8 +495,8 @@ public class SignificanceStrategyTests
 
         var results = new List<BenchmarkResult>
         {
-            Result("baseline", true) with { Mean = 100, Median = 100 },
-            Result("candidate") with { Mean = 100.3, Median = 100.3 },
+            Result("baseline", true) with { MeanNs = 100, MedianNs = 100 },
+            Result("candidate") with { MeanNs = 100.3, MedianNs = 100.3 },
         };
         var rawSamples = new Dictionary<string, double[]>
         {
@@ -530,8 +530,8 @@ public class SignificanceStrategyTests
 
         var results = new List<BenchmarkResult>
         {
-            Result("baseline", true) with { Mean = 100, Median = 100 },
-            Result("candidate") with { Mean = 100.3, Median = 100.3 },
+            Result("baseline", true) with { MeanNs = 100, MedianNs = 100 },
+            Result("candidate") with { MeanNs = 100.3, MedianNs = 100.3 },
         };
         var rawSamples = new Dictionary<string, double[]>
         {
@@ -570,12 +570,12 @@ public class SignificanceStrategyTests
         {
             Result("baseline", true) with
             {
-                Mean = 100, Median = 100,
+                MeanNs = 100, MedianNs = 100,
                 LaunchStatistics = Launches(100, 100, 100),
             },
             Result("candidate") with
             {
-                Mean = 130, Median = 130,
+                MeanNs = 130, MedianNs = 130,
                 LaunchStatistics = Launches(100, 130, 160),
             },
         };
@@ -619,12 +619,12 @@ public class SignificanceStrategyTests
         {
             Result("baseline", true) with
             {
-                Mean = 100, Median = 100,
+                MeanNs = 100, MedianNs = 100,
                 LaunchStatistics = Launches(100, 100, 100),
             },
             Result("candidate") with
             {
-                Mean = 130, Median = 130,
+                MeanNs = 130, MedianNs = 130,
                 LaunchStatistics = Launches(130, 131, 129),
             },
         };
@@ -658,8 +658,8 @@ public class SignificanceStrategyTests
 
         var results = new List<BenchmarkResult>
         {
-            Result("baseline", true) with { Mean = 100, Median = 100 },
-            Result("candidate") with { Mean = 50, Median = 50 },
+            Result("baseline", true) with { MeanNs = 100, MedianNs = 100 },
+            Result("candidate") with { MeanNs = 50, MedianNs = 50 },
         };
         var rawSamples = new Dictionary<string, double[]>
         {
@@ -721,10 +721,10 @@ public class SignificanceStrategyTests
                 .Select((m, i) => new LaunchDetail
                 {
                     LaunchIndex = i,
-                    Median = m,
-                    Mean = m,
-                    StandardDeviation = 0.1,
-                    Iterations = 100,
+                    MedianNs = m,
+                    MeanNs = m,
+                    StandardDeviationNs = 0.1,
+                    Samples = 100,
                     Duration = TimeSpan.FromSeconds(1),
                 })
                 .ToList(),
@@ -749,24 +749,24 @@ public class SignificanceStrategyTests
     private static BenchmarkResult Result(string name, bool isBaseline = false) => new()
     {
         Name = name,
-        Mean = 0,
-        Median = 0,
+        MeanNs = 0,
+        MedianNs = 0,
         Percentiles = [],
-        Min = 0,
-        Max = 0,
-        StandardDeviation = 0,
+        MinNs = 0,
+        MaxNs = 0,
+        StandardDeviationNs = 0,
         IsBaseline = isBaseline,
-        Q1 = 0,
-        Q3 = 0,
-        InterquartileRange = 0,
+        Q1Ns = 0,
+        Q3Ns = 0,
+        InterquartileRangeNs = 0,
         OutliersRemoved = 0,
-        N = 0,
+        SampleCount = 0,
         Skewness = 0,
         Kurtosis = 0,
-        Mad = 0,
-        AllocMedian = null,
-        AllocP95 = null,
-        AllocMax = null,
+        MedianAbsoluteDeviationNs = 0,
+        AllocatedBytesMedian = null,
+        AllocatedBytesP95 = null,
+        AllocatedBytesMax = null,
     };
 
     private sealed class FixedSignificanceTest(string candidate, double pValue) : ISignificanceTest

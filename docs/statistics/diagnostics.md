@@ -26,7 +26,7 @@ Gen0, Gen1, and Gen2 collection counts during the measurement phase, reported as
 
 Heap committed bytes and fragmented bytes, reported as a delta across the measurement phase via `GC.GetGCMemoryInfo()`. A snapshot is taken before measurement begins and after it ends; the difference is reported.
 
-**Why it matters:** Shows how the benchmark affected the managed heap. A growing committed footprint or rising fragmentation signals that the body is not releasing memory efficiently, even if per-iteration allocations look small.
+**Why it matters:** Shows how the benchmark affected the managed heap. A growing committed footprint or rising fragmentation signals that the body is not releasing memory efficiently, even if per-operation allocations look small.
 
 **Overhead:** low. Two `GetGCMemoryInfo` calls per benchmark (one before measurement, one after).
 
@@ -203,5 +203,5 @@ Hardware performance counters (instructions retired, cache misses, branch mispre
 
 - [Configuration: Diagnostics](../reference/configuration.md#diagnostics) - the `DiagnosticsOptions` surface
 - [CLI Reference: `--diagnostics`](../reference/cli.md#diagnostics) - the CLI flag
-- [Allocation Measurement](./allocations.md) - how per-iteration heap allocation is sampled
+- [Allocation Measurement](./allocations.md) - how per-operation heap allocation is sampled
 - [Report Detail Levels](../output/report-detail-levels.md) - how the Diagnostics table fits into each detail tier

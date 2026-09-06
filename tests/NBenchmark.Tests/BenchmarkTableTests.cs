@@ -12,8 +12,8 @@ public class BenchmarkTableTests
 
         Assert.Empty(table.Rows);
         Assert.Null(table.RunAtUtc);
-        Assert.Equal(0, table.WarmupIterations);
-        Assert.Equal(0, table.MeasuredIterations);
+        Assert.Equal(0, table.WarmupSamples);
+        Assert.Equal(0, table.SampleCount);
     }
 
     [Fact]
@@ -23,20 +23,19 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "A", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -55,20 +54,19 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "A", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 OutliersRemoved = 2,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
-                N = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -84,37 +82,35 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Fast", Mean = 50, Median = 50, Percentiles = [], Min = 50, Max = 50,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Fast", MeanNs = 50, MedianNs = 50, Percentiles = [], MinNs = 50, MaxNs = 50,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "Slow", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Slow", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
                 IsBaseline = true,
             },
         };
@@ -136,37 +132,35 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Fast", Mean = 50, Median = 50, Percentiles = [], Min = 50, Max = 50,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Fast", MeanNs = 50, MedianNs = 50, Percentiles = [], MinNs = 50, MaxNs = 50,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "Slow", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Slow", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -188,20 +182,19 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 0, Median = 0, Percentiles = [], Min = 0, Max = 0,
-                StandardDeviation = 0, Errored = true, ErrorMessage = "fail",
-                MeasuredIterations = 0, WarmupIterations = 0, RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Name = "A", MeanNs = 0, MedianNs = 0, Percentiles = [], MinNs = 0, MaxNs = 0,
+                StandardDeviationNs = 0, Errored = true, ErrorMessage = "fail",
+                SampleCount = 0, WarmupSamples = 0, RunAtUtc = DateTimeOffset.UtcNow,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -220,54 +213,51 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Base", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
+                Name = "Base", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5, IsBaseline = true,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "TwoX", Mean = 200, Median = 200, Percentiles = [], Min = 200, Max = 200,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "TwoX", MeanNs = 200, MedianNs = 200, Percentiles = [], MinNs = 200, MaxNs = 200,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "Half", Mean = 50, Median = 50, Percentiles = [], Min = 50, Max = 50,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Half", MeanNs = 50, MedianNs = 50, Percentiles = [], MinNs = 50, MaxNs = 50,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -285,37 +275,35 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Base", Mean = 0, Median = 0, Percentiles = [], Min = 0, Max = 0,
-                StandardDeviation = 0, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
+                Name = "Base", MeanNs = 0, MedianNs = 0, Percentiles = [], MinNs = 0, MaxNs = 0,
+                StandardDeviationNs = 0, SampleCount = 10, WarmupSamples = 5, IsBaseline = true,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "Other", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Other", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -331,38 +319,36 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Base", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
+                Name = "Base", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5, IsBaseline = true,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "Fail", Mean = 0, Median = 0, Percentiles = [], Min = 0, Max = 0,
-                StandardDeviation = 0, Errored = true, ErrorMessage = "crash",
-                MeasuredIterations = 0, WarmupIterations = 0,
+                Name = "Fail", MeanNs = 0, MedianNs = 0, Percentiles = [], MinNs = 0, MaxNs = 0,
+                StandardDeviationNs = 0, Errored = true, ErrorMessage = "crash",
+                SampleCount = 0, WarmupSamples = 0,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -378,75 +364,71 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Base", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
+                Name = "Base", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5, IsBaseline = true,
                 SignificanceVerdict = SignificanceVerdict.NotSignificant,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "Sig", Mean = 200, Median = 200, Percentiles = [], Min = 200, Max = 200,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Sig", MeanNs = 200, MedianNs = 200, Percentiles = [], MinNs = 200, MaxNs = 200,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 SignificanceVerdict = SignificanceVerdict.Significant,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "NotSig", Mean = 150, Median = 150, Percentiles = [], Min = 150, Max = 150,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "NotSig", MeanNs = 150, MedianNs = 150, Percentiles = [], MinNs = 150, MaxNs = 150,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 SignificanceVerdict = SignificanceVerdict.NotSignificant,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "NoSig", Mean = 120, Median = 120, Percentiles = [], Min = 120, Max = 120,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "NoSig", MeanNs = 120, MedianNs = 120, Percentiles = [], MinNs = 120, MaxNs = 120,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 SignificanceVerdict = SignificanceVerdict.NotTested,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -465,21 +447,20 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Only", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5, IsBaseline = true,
+                Name = "Only", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5, IsBaseline = true,
                 SignificanceVerdict = SignificanceVerdict.Significant,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -497,28 +478,27 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "A", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = now, ConfidenceLevel = 0.99,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
         var table = BenchmarkTable.Build(results);
 
         Assert.Equal(now, table.RunAtUtc);
-        Assert.Equal(5, table.WarmupIterations);
-        Assert.Equal(10, table.MeasuredIterations);
+        Assert.Equal(5, table.WarmupSamples);
+        Assert.Equal(10, table.SampleCount);
         Assert.Equal(0.99, table.ConfidenceLevel);
     }
 
@@ -529,39 +509,37 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "A", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 TotalDuration = TimeSpan.FromSeconds(1),
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "B", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "B", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 TotalDuration = TimeSpan.FromSeconds(2),
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -577,54 +555,51 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "Slowest", Mean = 300, Median = 300, Percentiles = [], Min = 300, Max = 300,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Slowest", MeanNs = 300, MedianNs = 300, Percentiles = [], MinNs = 300, MaxNs = 300,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "Fastest", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Fastest", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new BenchmarkResult
             {
-                Name = "Middle", Mean = 200, Median = 200, Percentiles = [], Min = 200, Max = 200,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "Middle", MeanNs = 200, MedianNs = 200, Percentiles = [], MinNs = 200, MaxNs = 200,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
         };
 
@@ -640,18 +615,18 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
-                OutlierDetector = "MAD (3×)",
+                Name = "A", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
+                OutlierDetectorName = "MAD (3×)",
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
         var table = BenchmarkTable.Build(results);
 
-        Assert.Equal("MAD (3×)", table.OutlierDetector);
+        Assert.Equal("MAD (3×)", table.OutlierDetectorName);
     }
 
     [Fact]
@@ -671,12 +646,12 @@ public class BenchmarkTableTests
         {
             new BenchmarkResult
             {
-                Name = "A", Mean = 100, Median = 100, Percentiles = [], Min = 100, Max = 100,
-                StandardDeviation = 1, MeasuredIterations = 10, WarmupIterations = 5,
+                Name = "A", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 100, MaxNs = 100,
+                StandardDeviationNs = 1, SampleCount = 10, WarmupSamples = 5,
                 Omnibus = omnibus,
                 RunAtUtc = DateTimeOffset.UtcNow,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -824,10 +799,10 @@ public class BenchmarkTableTests
 
         var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
 
-        var baseNet8 = table.Rows.Single(r => r.BaseName == "Base" && r.Result.RuntimeMoniker == "net8.0");
-        var altNet8 = table.Rows.Single(r => r.BaseName == "Alt" && r.Result.RuntimeMoniker == "net8.0");
-        var baseNet9 = table.Rows.Single(r => r.BaseName == "Base" && r.Result.RuntimeMoniker == "net9.0");
-        var altNet9 = table.Rows.Single(r => r.BaseName == "Alt" && r.Result.RuntimeMoniker == "net9.0");
+        var baseNet8 = table.Rows.Single(r => r.BaseName == "Base" && r.Result.TargetFramework == "net8.0");
+        var altNet8 = table.Rows.Single(r => r.BaseName == "Alt" && r.Result.TargetFramework == "net8.0");
+        var baseNet9 = table.Rows.Single(r => r.BaseName == "Base" && r.Result.TargetFramework == "net9.0");
+        var altNet9 = table.Rows.Single(r => r.BaseName == "Alt" && r.Result.TargetFramework == "net9.0");
 
         Assert.True(baseNet8.IsBaseline);
         Assert.Equal(1.0, baseNet8.Ratio, 6);
@@ -851,10 +826,10 @@ public class BenchmarkTableTests
 
         var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
 
-        var binaryNet8 = table.Rows.Single(r => r.BaseName == "Binary" && r.Result.RuntimeMoniker == "net8.0");
-        var linearNet8 = table.Rows.Single(r => r.BaseName == "Linear" && r.Result.RuntimeMoniker == "net8.0");
-        var binaryNet9 = table.Rows.Single(r => r.BaseName == "Binary" && r.Result.RuntimeMoniker == "net9.0");
-        var linearNet9 = table.Rows.Single(r => r.BaseName == "Linear" && r.Result.RuntimeMoniker == "net9.0");
+        var binaryNet8 = table.Rows.Single(r => r.BaseName == "Binary" && r.Result.TargetFramework == "net8.0");
+        var linearNet8 = table.Rows.Single(r => r.BaseName == "Linear" && r.Result.TargetFramework == "net8.0");
+        var binaryNet9 = table.Rows.Single(r => r.BaseName == "Binary" && r.Result.TargetFramework == "net9.0");
+        var linearNet9 = table.Rows.Single(r => r.BaseName == "Linear" && r.Result.TargetFramework == "net9.0");
 
         Assert.Equal(1.0, binaryNet8.Ratio, 6);
         Assert.Equal(2.0, linearNet8.Ratio, 6);
@@ -923,7 +898,7 @@ public class BenchmarkTableTests
     }
 
     /// <summary>
-    ///     The Advanced block's "Median CI" line must say which kind of interval it is. With more
+    ///     The Advanced block's "MedianNs CI" line must say which kind of interval it is. With more
     ///     than one launch the interval is the between-launch reproducibility interval; labelling
     ///     it "distribution-free" (the within-launch label) would describe precision inside one
     ///     process for a number that actually describes run-to-run spread.
@@ -933,8 +908,8 @@ public class BenchmarkTableTests
     {
         var result = R("C", "C.M", 200, baseline: true) with
         {
-            MedianCiLower = 190,
-            MedianCiUpper = 210,
+            MedianConfidenceIntervalLowerNs = 190,
+            MedianConfidenceIntervalUpperNs = 210,
             LaunchStatistics = new LaunchStatistics
             {
                 LaunchCount = 3,
@@ -961,8 +936,8 @@ public class BenchmarkTableTests
     {
         var result = R("C", "C.M", 200, baseline: true) with
         {
-            MedianCiLower = 190,
-            MedianCiUpper = 210,
+            MedianConfidenceIntervalLowerNs = 190,
+            MedianConfidenceIntervalUpperNs = 210,
         };
 
         var row = Assert.Single(Assert.Single(BenchmarkTable.BuildPerClass([result])).Rows);
@@ -1046,29 +1021,28 @@ public class BenchmarkTableTests
             Name = BenchmarkParameter.FormatDisplayName(baseName, parameters),
             ClassName = className,
             ParameterSet = parameters,
-            Mean = median,
-            Median = median,
+            MeanNs = median,
+            MedianNs = median,
             Percentiles = [],
-            Min = median,
-            Max = median,
-            StandardDeviation = 1,
-            MeasuredIterations = 10,
-            WarmupIterations = 5,
+            MinNs = median,
+            MaxNs = median,
+            StandardDeviationNs = 1,
+            SampleCount = 10,
+            WarmupSamples = 5,
             IsBaseline = baseline,
             SignificanceVerdict = significance,
-            RuntimeMoniker = runtimeMoniker,
+            TargetFramework = runtimeMoniker,
             RunAtUtc = DateTimeOffset.UtcNow,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 0,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
     }
 }

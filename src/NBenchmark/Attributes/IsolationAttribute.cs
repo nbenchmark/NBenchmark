@@ -1,4 +1,4 @@
-namespace NBenchmark.Attributes;
+namespace NBenchmark;
 
 /// <summary>
 ///     Declares how a benchmark (or an entire benchmark class) is isolated, overriding the run-wide

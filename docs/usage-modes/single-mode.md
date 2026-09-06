@@ -56,7 +56,7 @@ var result = Benchmark.Run(
 
 This pattern is also available as `RunAsync`, for a `Task`-returning body.
 
-Optional `setup:` and `teardown:` hooks receive the state and run outside the timed window - per iteration, before and after the body. This allows you to reset state for a body that mutates its data between iterations:
+Optional `setup:` and `teardown:` hooks receive the state and run outside the timed window - per sample, before and after the body. This allows you to reset state for a body that mutates its data between samples:
 
 ```csharp
 var result = Benchmark.Run(
@@ -94,8 +94,8 @@ Pass a `MeasurementOptions` instance to override the defaults:
 ```csharp
 var options = new MeasurementOptions
 {
-    Iterations = 500,
-    WarmupIterations = 50,
+    Samples = 500,
+    WarmupSamples = 50,
     MeasureAllocations = true,
     ConfidenceLevel = 0.99,
 };
@@ -128,7 +128,7 @@ The output is similar to the following:
 ```text
   ┌─ Benchmark ─────────────────────────────────────
   │
-  │  Median: 342.1 ns       Ops/s: 2.87 Mops/s
+  │  MedianNs: 342.1 ns       Ops/s: 2.87 Mops/s
   │  Alloc/op: 0 B
   │
   │  Measured in an isolated worker under 'steady-state'.
@@ -147,11 +147,11 @@ The output is similar to the following:
 ```text
   ┌─ Benchmark ─────────────────────────────────────
   │
-  │  Median: 342.1 ns       Mean: 348.7 ns
+  │  MedianNs: 342.1 ns       MeanNs: 348.7 ns
   │  Ops/s:  2.87 Mops/s    Median ops/s: 2.92 Mops/s
   │  P95: 361.2 ns  P99: 378.5 ns  P99.9: 380.0 ns
   │  StdDev: 8.3 ns         CV:   2.38%
-  │  Error:  ±3.1 ns (0.89% of Mean)
+  │  Error:  ±3.1 ns (0.89% of mean)
   │  CI:     [345.6 ns … 351.8 ns] (95%)
   │  Alloc/op: 0 B
   │
@@ -185,16 +185,16 @@ await result.SaveJsonAsync("results/");   // output directory
 `BenchmarkResult` is a plain record. You can access any field directly:
 
 ```csharp
-Console.WriteLine($"Median:  {result.Median} ns");
-Console.WriteLine($"Mean:    {result.Mean} ns");
+Console.WriteLine($"MedianNs:  {result.MedianNs} ns");
+Console.WriteLine($"MeanNs:    {result.MeanNs} ns");
 Console.WriteLine($"Ops/s:   {result.OperationsPerSecond}");
 Console.WriteLine($"P95:     {result.GetPercentile(0.95)} ns");
-Console.WriteLine($"StdDev:  {result.StandardDeviation} ns");
-Console.WriteLine($"Error:   ±{result.MarginOfError} ns ({result.ConfidenceLevel * 100:0}% CI)");
-Console.WriteLine($"CI:      {result.ConfidenceIntervalLower} … {result.ConfidenceIntervalUpper} ns");
+Console.WriteLine($"StdDev:  {result.StandardDeviationNs} ns");
+Console.WriteLine($"Error:   ±{result.MarginOfErrorNs} ns ({result.ConfidenceLevel * 100:0}% CI)");
+Console.WriteLine($"CI:      {result.ConfidenceIntervalLowerNs} … {result.ConfidenceIntervalUpperNs} ns");
 
-if (result.MeanAllocatedBytes.HasValue)
-    Console.WriteLine($"Alloc:   {result.MeanAllocatedBytes.Value} bytes/op");
+if (result.AllocatedBytesMean.HasValue)
+    Console.WriteLine($"Alloc:   {result.AllocatedBytesMean.Value} bytes/op");
 ```
 
 ## Where measurements occur

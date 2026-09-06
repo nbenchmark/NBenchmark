@@ -53,6 +53,6 @@ internal sealed class ThrowingAutoReporter(string name) : IReporter
     public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
     {
         CallCount++;
-        throw new InvalidOperationException("Intentional auto-attached reporter failure");
+        throw new InvalidOperationException("Acknowledged auto-attached reporter failure");
     }
 }

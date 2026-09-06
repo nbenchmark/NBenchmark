@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Discovery;
 using Xunit;
 
@@ -136,7 +136,7 @@ public sealed class ValueTaskDiscoveryTests
     public class ParameterizedValueTaskBenchmarks
     {
         [Benchmark]
-        [BenchmarkCase(DelayMs)]
+        [Arguments(DelayMs)]
         public async ValueTask DelayAsync(int ms) => await Task.Delay(ms);
     }
 

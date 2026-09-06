@@ -50,11 +50,11 @@ MyApp.Benchmarks [options]
 
 | Flag | Description |
 | --- | --- |
-| `--iterations <n>` | Pin the measured-sample count per benchmark and disable auto-sampling. Valid range: 0 to 100,000. Use `--dry-run` to skip measurement. |
-| `--warmup <n>` | Pin the warmup-sample count per benchmark and disable the plateau rule. Valid range: 0 to 10,000. |
-| `--profile <mode>` | Set the measurement profile (e.g., `realistic` or `independent`). Controls GC behavior during the run. |
+| `--samples <n>` | Pin the measured-sample count per benchmark and disable auto-sampling. Valid range: 0 to 100,000. Use `--dry-run` to skip measurement. |
+| `--warmup-samples <n>` | Pin the warmup-sample count per benchmark and disable the plateau rule. Valid range: 0 to 10,000. |
+| `--gc <mode>` | Set the GC behavior: `natural` (default) or `per-sample-collect`. |
 | `--runtime-profile <profile>` | Set the runtime-startup configuration (JIT tiering, PGO, R2R, and GC flavor). |
-| `--force-gc` | Force a Gen0 GC before every measured iteration. |
+| `--force-gc` | Force a Gen0 GC before every measured sample. |
 | `--no-gc-between-benchmarks` | Disable the full GC that runs between benchmarks. |
 | `--no-allocations` | Disable allocation tracking and suppress the **Alloc/op** column. |
 | `--launch-count <n>` | Repeat each benchmark N times in separate worker processes. Valid range: 1 to 100. |
@@ -71,8 +71,8 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 | `--ci-target <0-1>` | `0.025` | The target relative CI half-width for auto sampling. |
 | `--min-samples <n>` | `30` | The floor for auto-resolved measured samples. |
 | `--max-samples <n>` | `5000` | The ceiling for auto-resolved measured samples. |
-| `--min-warmup <n>` | `8` | The floor for auto-detected warmup samples. |
-| `--max-warmup <n>` | `100000` | The ceiling for auto-detected warmup samples. |
+| `--min-warmup-samples <n>` | `8` | The floor for auto-detected warmup samples. |
+| `--max-warmup-samples <n>` | `100000` | The ceiling for auto-detected warmup samples. |
 | `--max-tuning-time <s>` | `20` | Per-benchmark wall-clock safety cap (seconds) for the adaptive loop. |
 | `--autotune-cap-behavior <mode>` | `warn` | Action when wall-clock cap is hit: `warn` emits a warning; `error` marks the benchmark as errored. |
 | `--warmup-budget-fraction <0-1>` | `0.4` | Max share of `--max-tuning-time` for calibration and warmup. |
@@ -124,7 +124,7 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 | `--cpu-affinity <list>` | Pin the process and measuring thread to specific logical CPU cores. |
 | `--priority <level>` | Request a process priority (e.g., `high`, `normal`, `idle`). |
 | `--no-thread-control` | Disable thread-level OS controls (affinity, priority, QoS). |
-| `--dedicated-host-guidance` | Warn if the host environment looks noisy or shared. |
+| `--host-quality-warnings` | Warn if the host environment looks noisy or shared. |
 
 ### Diagnostics
 
@@ -157,8 +157,8 @@ When exit code `1` is set during argument parsing, the run still completes to al
 ## Examples
 
 ```bash
-# Run all benchmarks with 500 iterations and save to Markdown
-dotnet run -- --iterations 500 --reporter markdown --output ./results
+# Run all benchmarks with 500 samples and save to Markdown
+dotnet run -- --samples 500 --reporter markdown --output ./results
 
 # Run only sorting benchmarks with a 99% confidence interval
 dotnet run -- --filter Sort* --confidence 0.99
@@ -170,7 +170,7 @@ dotnet run -- --order declaration --seed 12345
 dotnet run -- --launch-count 3
 
 # Pin to cores 2-3, raise priority, and warn if the host is noisy
-dotnet run -- --cpu-affinity 2,3 --priority high --dedicated-host-guidance
+dotnet run -- --cpu-affinity 2,3 --priority high --host-quality-warnings
 
 # Collect all diagnostics and use standard detail level
 dotnet run -- --diagnostics all --detail standard

@@ -18,8 +18,8 @@ public class ObserverPlumbingTests
         await new BenchmarkSuite("observer-plumbing").WithIsolation(Isolation.Preferred)
             .Add("fast", () => { })
             .Add("slow", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .WithObserver(observer)
@@ -43,8 +43,8 @@ public class ObserverPlumbingTests
 
         await new BenchmarkSuite("null-observer").WithIsolation(Isolation.Preferred)
             .Add("bench", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithObserver(NullMeasurementObserver.Instance) // explicit null - same as default
             .RunAsync();
@@ -62,8 +62,8 @@ public class ObserverPlumbingTests
         await new BenchmarkSuite("name-check").WithIsolation(Isolation.Preferred)
             .Add("alpha", () => { })
             .Add("beta", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .WithObserver(observer)
@@ -95,8 +95,8 @@ public class ObserverPlumbingTests
         {
             Options = new MeasurementOptions
             {
-                WarmupIterations = 0,
-                Iterations = 2,
+                WarmupSamples = 0,
+                Samples = 2,
                 OutlierMode = OutlierMode.None,
                 MeasureAllocations = false,
             },

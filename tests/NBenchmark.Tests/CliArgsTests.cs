@@ -22,8 +22,8 @@ public class CliArgsTests
         Assert.Null(result.OutputDir);
         Assert.Null(result.Seed);
         Assert.Null(result.RunOrder);
-        Assert.Null(result.Iterations);
-        Assert.Null(result.WarmupIterations);
+        Assert.Null(result.Samples);
+        Assert.Null(result.WarmupSamples);
         Assert.Null(result.ConfidenceLevel);
         Assert.Empty(result.ReporterNames);
         Assert.Empty(result.ObserverNames);
@@ -132,37 +132,37 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_Iterations_Valid_SetsIterations()
     {
-        var (result, errors) = CliArgs.ParseCore(["--iterations", "100"]);
+        var (result, errors) = CliArgs.ParseCore(["--samples", "100"]);
         Assert.Empty(errors);
-        Assert.Equal(100, result.Iterations);
+        Assert.Equal(100, result.Samples);
     }
 
     [Fact]
     public void ParseCore_Iterations_Invalid_ReturnsError()
     {
-        var (result, errors) = CliArgs.ParseCore(["--iterations", "-1"]);
+        var (result, errors) = CliArgs.ParseCore(["--samples", "-1"]);
 
-        Assert.Null(result.Iterations);
+        Assert.Null(result.Samples);
         var error = Assert.Single(errors);
-        Assert.Contains("Invalid --iterations", error);
+        Assert.Contains("Invalid --samples", error);
     }
 
     [Fact]
     public void ParseCore_Warmup_Valid_SetsWarmup()
     {
-        var (result, errors) = CliArgs.ParseCore(["--warmup", "10"]);
+        var (result, errors) = CliArgs.ParseCore(["--warmup-samples", "10"]);
         Assert.Empty(errors);
-        Assert.Equal(10, result.WarmupIterations);
+        Assert.Equal(10, result.WarmupSamples);
     }
 
     [Fact]
     public void ParseCore_Warmup_Invalid_ReturnsError()
     {
-        var (result, errors) = CliArgs.ParseCore(["--warmup", "-1"]);
+        var (result, errors) = CliArgs.ParseCore(["--warmup-samples", "-1"]);
 
-        Assert.Null(result.WarmupIterations);
+        Assert.Null(result.WarmupSamples);
         var error = Assert.Single(errors);
-        Assert.Contains("Invalid --warmup", error);
+        Assert.Contains("Invalid --warmup-samples", error);
     }
 
     [Fact]
@@ -401,10 +401,10 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_MultipleFlags_AllApplied()
     {
-        var (result, errors) = CliArgs.ParseCore(["--filter", "Foo*", "--iterations", "50", "--reporter", "json"]);
+        var (result, errors) = CliArgs.ParseCore(["--filter", "Foo*", "--samples", "50", "--reporter", "json"]);
         Assert.Empty(errors);
         Assert.Equal("Foo*", result.Filter);
-        Assert.Equal(50, result.Iterations);
+        Assert.Equal(50, result.Samples);
         var name = Assert.Single(result.ReporterNames);
         Assert.Equal("json", name);
     }
@@ -480,20 +480,20 @@ public class CliArgsTests
     }
 
     [Theory]
-    [InlineData("realistic", MeasurementProfile.Realistic)]
-    [InlineData("independent", MeasurementProfile.Independent)]
-    public void ParseCore_Profile_Valid_SetsProfile(string value, MeasurementProfile expected)
+    [InlineData("natural", GcBehavior.Natural)]
+    [InlineData("per-sample-collect", GcBehavior.PerSampleCollect)]
+    public void ParseCore_GcBehavior_Valid_SetsGcBehavior(string value, GcBehavior expected)
     {
-        var (result, errors) = CliArgs.ParseCore(["--profile", value]);
+        var (result, errors) = CliArgs.ParseCore(["--gc", value]);
         Assert.Empty(errors);
-        Assert.Equal(expected, result.Profile);
+        Assert.Equal(expected, result.GcBehavior);
     }
 
     [Fact]
-    public void ParseCore_Profile_Default_IsNull()
+    public void ParseCore_GcBehavior_Default_IsNull()
     {
         var (result, _) = CliArgs.ParseCore([]);
-        Assert.Null(result.Profile);
+        Assert.Null(result.GcBehavior);
     }
 
     [Theory]
@@ -705,11 +705,11 @@ public class CliArgsTests
     }
 
     [Theory]
-    [InlineData("--min-warmup", "100000")]
-    [InlineData("--max-warmup", "100000")]
+    [InlineData("--min-warmup-samples", "100000")]
+    [InlineData("--max-warmup-samples", "100000")]
     public void ParseCore_Auto_Warmup_Bounds_Accept_The_Auto_Ceiling(string flag, string value)
     {
-        // The auto-warmup bounds are validated against MaxAutoWarmupIterations (100,000), not the
+        // The auto-warmup bounds are validated against MaxAutoWarmupSamplesLimit (100,000), not the
         // tighter pinned-warmup limit (10,000): a fast body needs tens of thousands of samples to
         // accumulate MinWarmupTime, so 10,000 would silently defeat the floor.
         var (_, errors) = CliArgs.ParseCore([flag, value]);
@@ -719,8 +719,8 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_Pinned_Warmup_Still_Uses_The_Tighter_Limit()
     {
-        // --warmup pins an exact count and is unaffected by the auto ceiling.
-        var (_, errors) = CliArgs.ParseCore(["--warmup", "100000"]);
+        // --warmup-samples pins an exact count and is unaffected by the auto ceiling.
+        var (_, errors) = CliArgs.ParseCore(["--warmup-samples", "100000"]);
         Assert.Single(errors);
     }
 
@@ -782,13 +782,13 @@ public class CliArgsTests
     }
 
     [Fact]
-    public void ParseCore_Profile_Invalid_ReturnsError()
+    public void ParseCore_GcBehavior_Invalid_ReturnsError()
     {
-        var (result, errors) = CliArgs.ParseCore(["--profile", "bogus"]);
+        var (result, errors) = CliArgs.ParseCore(["--gc", "bogus"]);
 
-        Assert.Null(result.Profile);
+        Assert.Null(result.GcBehavior);
         var error = Assert.Single(errors);
-        Assert.Contains("Invalid --profile", error);
+        Assert.Contains("Invalid --gc", error);
     }
 
     [Fact]
@@ -840,8 +840,8 @@ public class CliArgsTests
         var (args, _) = CliArgs.ParseCore(["--no-gc-between-benchmarks"]);
         var overrides = MeasurementOverrides.FromCliArgs(args);
 
-        var realistic = overrides.Apply(MeasurementOptions.For(MeasurementProfile.Realistic));
-        var independent = overrides.Apply(MeasurementOptions.For(MeasurementProfile.Independent));
+        var realistic = overrides.Apply(MeasurementOptions.For(GcBehavior.Natural));
+        var independent = overrides.Apply(MeasurementOptions.For(GcBehavior.PerSampleCollect));
 
         Assert.False(realistic.Resolve().ForceGcBetweenBenchmarks);
         Assert.False(independent.Resolve().ForceGcBetweenBenchmarks);
@@ -1398,17 +1398,17 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_DedicatedHostGuidance_Sets_Flag()
     {
-        var (result, errors) = CliArgs.ParseCore(["--dedicated-host-guidance"]);
+        var (result, errors) = CliArgs.ParseCore(["--host-quality-warnings"]);
 
         Assert.Empty(errors);
-        Assert.True(result.DedicatedHostGuidance);
+        Assert.True(result.HostQualityWarnings);
     }
 
     [Fact]
     public void ParseCore_DedicatedHostGuidance_Default_IsFalse()
     {
         var (result, _) = CliArgs.ParseCore([]);
-        Assert.False(result.DedicatedHostGuidance);
+        Assert.False(result.HostQualityWarnings);
     }
 
     [Fact]
@@ -1489,7 +1489,7 @@ public class CliArgsTests
         Assert.Contains("--no-samples", stdout);
         Assert.Contains("--cpu-affinity", stdout);
         Assert.Contains("--priority", stdout);
-        Assert.Contains("--dedicated-host-guidance", stdout);
+        Assert.Contains("--host-quality-warnings", stdout);
         Assert.Contains("--otlp-endpoint", stdout);
     }
 

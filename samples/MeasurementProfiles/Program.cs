@@ -19,14 +19,14 @@ Console.WriteLine("=== Single Mode: Realistic ===");
 
 Benchmark.Run(
     () => AllocateAndConcat(100),
-    MeasurementOptions.For(MeasurementProfile.Realistic),
+    MeasurementOptions.For(GcBehavior.Natural),
     "string-concat/realistic").Print();
 
 Console.WriteLine("\n=== Single Mode: Independent ===");
 
 Benchmark.Run(
     () => AllocateAndConcat(100),
-    MeasurementOptions.For(MeasurementProfile.Independent),
+    MeasurementOptions.For(GcBehavior.PerSampleCollect),
     "string-concat/independent").Print();
 
 // Suite mode: run two separate suites, one per profile.
@@ -34,9 +34,9 @@ Console.WriteLine("\n=== Suite Mode: Realistic ===");
 
 await new BenchmarkSuite("string-concat (Realistic)")
     .Add("concat", () => AllocateAndConcat(100))
-    .WithWarmup(10)
-    .WithIterations(100)
-    .WithMeasurementProfile(MeasurementProfile.Realistic)
+    .WithWarmupSamples(10)
+    .WithSamples(100)
+    .WithGcBehavior(GcBehavior.Natural)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
@@ -45,9 +45,9 @@ Console.WriteLine("\n=== Suite Mode: Independent ===");
 
 await new BenchmarkSuite("string-concat (Independent)")
     .Add("concat", () => AllocateAndConcat(100))
-    .WithWarmup(10)
-    .WithIterations(100)
-    .WithMeasurementProfile(MeasurementProfile.Independent)
+    .WithWarmupSamples(10)
+    .WithSamples(100)
+    .WithGcBehavior(GcBehavior.PerSampleCollect)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();

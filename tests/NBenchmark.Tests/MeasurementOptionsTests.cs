@@ -10,12 +10,12 @@ public class MeasurementOptionsTests
     {
         var opts = MeasurementOptions.Default;
 
-        Assert.Null(opts.WarmupIterations);
-        Assert.Null(opts.Iterations);
+        Assert.Null(opts.WarmupSamples);
+        Assert.Null(opts.Samples);
         Assert.Null(opts.OpsPerSample);
         Assert.Equal(AutoTuneOptions.Default, opts.AutoTune);
-        Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
-        Assert.False(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.Equal(GcBehavior.Natural, opts.GcBehavior);
+        Assert.False(opts.Resolve().ForceGcBeforeEachSample);
         Assert.False(opts.Resolve().ForceGcBeforeMeasurement);
         Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
         Assert.True(opts.Resolve().MeasureAllocations);
@@ -125,10 +125,10 @@ public class MeasurementOptionsTests
     [Fact]
     public void Independent_ForcesGc_And_KeepsAllocationTracking()
     {
-        var opts = MeasurementOptions.For(MeasurementProfile.Independent);
+        var opts = MeasurementOptions.For(GcBehavior.PerSampleCollect);
 
-        Assert.Equal(MeasurementProfile.Independent, opts.Profile);
-        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.Equal(GcBehavior.PerSampleCollect, opts.GcBehavior);
+        Assert.True(opts.Resolve().ForceGcBeforeEachSample);
         Assert.True(opts.Resolve().ForceGcBeforeMeasurement);
         Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
         // Allocation tracking is on for both profiles now - it is measured outside the timed
@@ -139,9 +139,9 @@ public class MeasurementOptionsTests
     [Fact]
     public void Realistic_InheritsWarmupHeap_But_StillGcsBetweenBenchmarks()
     {
-        var opts = MeasurementOptions.For(MeasurementProfile.Realistic);
+        var opts = MeasurementOptions.For(GcBehavior.Natural);
 
-        // The pre-measurement GC is off (Realistic inherits the warmup heap to match production),
+        // The pre-measurement GC is off (Natural inherits the warmup heap to match production),
         // but the between-benchmark GC is on so one benchmark cannot bias the next.
         Assert.False(opts.Resolve().ForceGcBeforeMeasurement);
         Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
@@ -150,10 +150,10 @@ public class MeasurementOptionsTests
     [Fact]
     public void WithProfile_ResolvesOptionBundle()
     {
-        var opts = new MeasurementOptions() with { Profile = MeasurementProfile.Independent };
+        var opts = new MeasurementOptions() with { GcBehavior = GcBehavior.PerSampleCollect };
 
-        Assert.Equal(MeasurementProfile.Independent, opts.Profile);
-        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.Equal(GcBehavior.PerSampleCollect, opts.GcBehavior);
+        Assert.True(opts.Resolve().ForceGcBeforeEachSample);
         Assert.True(opts.Resolve().ForceGcBeforeMeasurement);
         Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
         Assert.True(opts.Resolve().MeasureAllocations);
@@ -164,12 +164,12 @@ public class MeasurementOptionsTests
     {
         var opts = new MeasurementOptions() with
         {
-            Profile = MeasurementProfile.Realistic,
-            ForceGcBeforeEachIteration = true,
+            GcBehavior = GcBehavior.Natural,
+            ForceGcBeforeEachSample = true,
         };
 
-        Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
-        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.Equal(GcBehavior.Natural, opts.GcBehavior);
+        Assert.True(opts.Resolve().ForceGcBeforeEachSample);
         Assert.False(opts.Resolve().ForceGcBeforeMeasurement);
         Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
         Assert.True(opts.Resolve().MeasureAllocations);
@@ -178,14 +178,14 @@ public class MeasurementOptionsTests
     [Fact]
     public void OverrideSurvivesWithProfileChange()
     {
-        var opts = MeasurementOptions.For(MeasurementProfile.Independent) with
+        var opts = MeasurementOptions.For(GcBehavior.PerSampleCollect) with
         {
-            Profile = MeasurementProfile.Realistic,
-            ForceGcBeforeEachIteration = true,
+            GcBehavior = GcBehavior.Natural,
+            ForceGcBeforeEachSample = true,
         };
 
-        Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
-        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.Equal(GcBehavior.Natural, opts.GcBehavior);
+        Assert.True(opts.Resolve().ForceGcBeforeEachSample);
         Assert.False(opts.Resolve().ForceGcBeforeMeasurement);
         Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
         Assert.True(opts.Resolve().MeasureAllocations);
@@ -196,14 +196,14 @@ public class MeasurementOptionsTests
     {
         var independent = new MeasurementOptions
         {
-            Profile = MeasurementProfile.Independent,
+            GcBehavior = GcBehavior.PerSampleCollect,
             ForceGcBeforeMeasurement = false,
         };
         Assert.False(independent.Resolve().ForceGcBeforeMeasurement);
 
         var realistic = new MeasurementOptions
         {
-            Profile = MeasurementProfile.Realistic,
+            GcBehavior = GcBehavior.Natural,
             ForceGcBeforeMeasurement = true,
         };
         Assert.True(realistic.Resolve().ForceGcBeforeMeasurement);
@@ -214,14 +214,14 @@ public class MeasurementOptionsTests
     {
         var realistic = new MeasurementOptions
         {
-            Profile = MeasurementProfile.Realistic,
+            GcBehavior = GcBehavior.Natural,
             ForceGcBetweenBenchmarks = false,
         };
         Assert.False(realistic.Resolve().ForceGcBetweenBenchmarks);
 
         var independent = new MeasurementOptions
         {
-            Profile = MeasurementProfile.Independent,
+            GcBehavior = GcBehavior.PerSampleCollect,
             ForceGcBetweenBenchmarks = false,
         };
         Assert.False(independent.Resolve().ForceGcBetweenBenchmarks);
@@ -232,7 +232,7 @@ public class MeasurementOptionsTests
     {
         var opts = new MeasurementOptions() with
         {
-            Profile = MeasurementProfile.Realistic,
+            GcBehavior = GcBehavior.Natural,
             MeasureAllocations = false,
         };
 
@@ -244,11 +244,11 @@ public class MeasurementOptionsTests
     {
         var opts = new MeasurementOptions() with
         {
-            Profile = MeasurementProfile.Realistic,
-            ForceGcBeforeEachIteration = true,
+            GcBehavior = GcBehavior.Natural,
+            ForceGcBeforeEachSample = true,
         };
 
-        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.True(opts.Resolve().ForceGcBeforeEachSample);
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public class MeasurementOptionsTests
     {
         var opts = new MeasurementOptions() with
         {
-            Profile = MeasurementProfile.Realistic,
+            GcBehavior = GcBehavior.Natural,
             ForceGcBetweenBenchmarks = true,
         };
 
@@ -299,7 +299,7 @@ public class MeasurementOptionsTests
     public void Iterations_Rejects_Invalid_Values(int value)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new MeasurementOptions { Iterations = value });
+            new MeasurementOptions { Samples = value });
     }
 
     [Theory]
@@ -309,8 +309,8 @@ public class MeasurementOptionsTests
     [InlineData(100000)]
     public void Iterations_Accepts_Valid_Values(int value)
     {
-        var opts = new MeasurementOptions { Iterations = value };
-        Assert.Equal(value, opts.Iterations);
+        var opts = new MeasurementOptions { Samples = value };
+        Assert.Equal(value, opts.Samples);
     }
 
     [Theory]
@@ -319,7 +319,7 @@ public class MeasurementOptionsTests
     public void WarmupIterations_Rejects_Invalid_Values(int value)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new MeasurementOptions { WarmupIterations = value });
+            new MeasurementOptions { WarmupSamples = value });
     }
 
     [Theory]
@@ -329,8 +329,8 @@ public class MeasurementOptionsTests
     [InlineData(10000)]
     public void WarmupIterations_Accepts_Valid_Values(int value)
     {
-        var opts = new MeasurementOptions { WarmupIterations = value };
-        Assert.Equal(value, opts.WarmupIterations);
+        var opts = new MeasurementOptions { WarmupSamples = value };
+        Assert.Equal(value, opts.WarmupSamples);
     }
 
     [Theory]
@@ -437,9 +437,9 @@ public class MeasurementOptionsTests
     {
         // A count ceiling that binds before MinWarmupTime silently defeats the floor: a fast body needs
         // ~25,000 samples at the 10 us sample target to accumulate 250 ms.
-        Assert.Equal(MeasurementOptions.MaxAutoWarmupIterations, AutoTuneOptions.Default.MaxWarmup);
-        Assert.Equal(100_000, AutoTuneOptions.Default.MaxWarmup);
-        Assert.True(AutoTuneOptions.Default.MaxWarmup > MeasurementOptions.MaxWarmupIterations);
+        Assert.Equal(MeasurementOptions.MaxAutoWarmupSamplesLimit, AutoTuneOptions.Default.MaxWarmupSamples);
+        Assert.Equal(100_000, AutoTuneOptions.Default.MaxWarmupSamples);
+        Assert.True(AutoTuneOptions.Default.MaxWarmupSamples > MeasurementOptions.MaxWarmupSamplesLimit);
     }
 
     [Fact]
@@ -456,7 +456,7 @@ public class MeasurementOptionsTests
     [Fact]
     public void AutoTune_Default_MaxSamples_Is_5000()
     {
-        // 100,000 was inherited from MeasurementOptions.MaxIterations, not chosen on measurement
+        // 100,000 was inherited from MeasurementOptions.MaxSamplesLimit, not chosen on measurement
         // grounds; at that ceiling a body with a CV in the hundreds of percent burns tens of thousands
         // of samples chasing a target more samples cannot reach.
         Assert.Equal(5_000, AutoTuneOptions.Default.MaxSamples);

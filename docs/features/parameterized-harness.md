@@ -1,6 +1,6 @@
 ---
 title: "Parameterized benchmarks: Harness mode"
-description: Run a benchmark body across multiple input values using BenchmarkCase and BenchmarkCases attributes in BenchmarkHarness.
+description: Run a benchmark body across multiple input values using Arguments and ArgumentsSource attributes in BenchmarkHarness.
 order: 4
 ---
 
@@ -8,20 +8,20 @@ order: 4
 
 Parameterized benchmarks run the same method body across multiple input values, producing one benchmark entry per parameter combination. This is useful for comparing algorithms at different scales, testing multiple configurations, or sweeping a parameter space.
 
-In Harness mode, parameterized benchmarks use the `[BenchmarkCase]` and `[BenchmarkCases]` attributes. The method must accept parameters that match the argument types.
+In Harness mode, parameterized benchmarks use the `[Arguments]` and `[ArgumentsSource]` attributes. The method must accept parameters that match the argument types.
 
-## `[BenchmarkCase]` - inline literal cases
+## `[Arguments]` - inline literal cases
 
 Apply the attribute multiple times, once per argument set:
 
 ```csharp
-using NBenchmark.Attributes;
+using NBenchmark;
 
 public class SortingBenchmarks
 {
-    [BenchmarkCase(10)]
-    [BenchmarkCase(1_000)]
-    [BenchmarkCase(100_000)]
+    [Arguments(10)]
+    [Arguments(1_000)]
+    [Arguments(100_000)]
     [Benchmark]
     public void Sort(int n)
     {
@@ -34,10 +34,10 @@ public class SortingBenchmarks
 Each case becomes a separate benchmark entry named `Sort(n=10)`, `Sort(n=1000)`, and `Sort(n=100000)`. For methods with multiple parameters, the engine uses the method-parameter names in the display name:
 
 ```csharp
-[BenchmarkCase(100, "asc")]
-[BenchmarkCase(100, "desc")]
-[BenchmarkCase(10_000, "asc")]
-[BenchmarkCase(10_000, "desc")]
+[Arguments(100, "asc")]
+[Arguments(100, "desc")]
+[Arguments(10_000, "asc")]
+[Arguments(10_000, "desc")]
 [Benchmark]
 public void Sort(int count, string order)
 {
@@ -49,12 +49,12 @@ public void Sort(int count, string order)
 // Names: Sort(count=100, order=asc), Sort(count=100, order=desc), Sort(count=10000, order=asc), Sort(count=10000, order=desc)
 ```
 
-## `[BenchmarkCases]` - programmatic case sources
+## `[ArgumentsSource]` - programmatic case sources
 
 For generated values, file-backed inputs, or large parameter sweeps, reference a source method that yields named value tuples:
 
 ```csharp
-[BenchmarkCases(nameof(SortCases))]
+[ArgumentsSource(nameof(SortCases))]
 [Benchmark]
 public void Sort(int count, string order)
 {
@@ -81,9 +81,9 @@ The source method can be `static` or instance, and `public` or `non-public`. Usi
 
 | Use case | Attribute |
 | --- | --- |
-| Small literal list (2-5 values) | `[BenchmarkCase]` |
-| Generated values, file/database-backed inputs, parameter sweeps, or large lists | `[BenchmarkCases]` |
-| Named display names for readability in reports | `[BenchmarkCases]` with named tuples |
+| Small literal list (2-5 values) | `[Arguments]` |
+| Generated values, file/database-backed inputs, parameter sweeps, or large lists | `[ArgumentsSource]` |
+| Named display names for readability in reports | `[ArgumentsSource]` with named tuples |
 
 The two attributes are mutually exclusive on a method; use only one.
 
@@ -92,13 +92,13 @@ The two attributes are mutually exclusive on a method; use only one.
 When `[Benchmark(Baseline = true)]` is applied to a parameterized method, the engine marks **all** expanded cases from that method as baselines:
 
 ```csharp
-[BenchmarkCase(10)]
-[BenchmarkCase(100)]
+[Arguments(10)]
+[Arguments(100)]
 [Benchmark(Baseline = true)]
 public void LinearSearch(int size) => Search(size);
 
-[BenchmarkCase(10)]
-[BenchmarkCase(100)]
+[Arguments(10)]
+[Arguments(100)]
 [Benchmark]
 public void BinarySearch(int size) => Search(size);
 ```
@@ -134,7 +134,7 @@ var results = await BenchmarkHarness.Create(args)
 
 foreach (var r in results)
 {
-    Console.WriteLine($"{r.Name}: {r.Median:F0} ns");
+    Console.WriteLine($"{r.Name}: {r.MedianNs:F0} ns");
     // Names: "Sort(n=10)", "Sort(n=1000)", "Sort(n=100000)"
     // r.ParameterSet carries the parsed parameter names and values.
 }
@@ -142,7 +142,7 @@ foreach (var r in results)
 
 ## Suite vs. Harness mode comparison
 
-| Feature | Suite (`WithParameter`) | Harness (`[BenchmarkCase]` / `[BenchmarkCases]`) |
+| Feature | Suite (`WithParameter`) | Harness (`[Arguments]` / `[ArgumentsSource]`) |
 | --- | --- | --- |
 | Declaration | Fluent lambda + `WithParameter` call | Attribute on method |
 | Parameter types | Primitives, enums, strings, null | Any type matching method signature |

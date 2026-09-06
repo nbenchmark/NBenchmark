@@ -30,7 +30,7 @@ public class EnvironmentControlTests
         // Guidance-only options should not attempt affinity or priority changes, so the
         // restore scope has nothing to restore. The only observable effect is console
         // output, which we do not assert here (it is environment-dependent).
-        using var scope = EnvironmentControl.Apply(new EnvironmentOptions { DedicatedHostGuidance = true });
+        using var scope = EnvironmentControl.Apply(new EnvironmentOptions { HostQualityWarnings = true });
 
         Assert.NotNull(scope);
     }
@@ -234,7 +234,7 @@ public class EnvironmentControlTests
 
         var stderr = CaptureStderr(() =>
         {
-            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { DedicatedHostGuidance = true });
+            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { HostQualityWarnings = true });
         });
 
         Assert.Contains($"{assessment.PerformanceCoreCount} performance cores", stderr);
@@ -255,7 +255,7 @@ public class EnvironmentControlTests
         {
             using var _ = EnvironmentControl.Apply(new EnvironmentOptions
             {
-                DedicatedHostGuidance = true,
+                HostQualityWarnings = true,
                 ThreadControl = false,
             });
         });
@@ -272,7 +272,7 @@ public class EnvironmentControlTests
         // code path is exercised, but only assert the small-host message there.
         var stderr = CaptureStderr(() =>
         {
-            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { DedicatedHostGuidance = true });
+            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { HostQualityWarnings = true });
         });
 
         if (Environment.ProcessorCount < 4)
@@ -297,7 +297,7 @@ public class EnvironmentControlTests
 
         var stderr = CaptureStderr(() =>
         {
-            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { DedicatedHostGuidance = true });
+            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { HostQualityWarnings = true });
         });
 
         Assert.Contains("Dedicated-host guidance", stderr);
@@ -323,7 +323,7 @@ public class EnvironmentControlTests
             using var _ = EnvironmentControl.Apply(
                 new EnvironmentOptions
                 {
-                    DedicatedHostGuidance = true,
+                    HostQualityWarnings = true,
                     CpuAffinity = [2, 3],
                 });
         });
@@ -348,7 +348,7 @@ public class EnvironmentControlTests
 
         var stderr = CaptureStderr(() =>
         {
-            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { DedicatedHostGuidance = true });
+            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { HostQualityWarnings = true });
         });
 
         Assert.DoesNotContain("--cpu-affinity 2,3", stderr);
@@ -366,7 +366,7 @@ public class EnvironmentControlTests
 
         var stderr = CaptureStderr(() =>
         {
-            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { DedicatedHostGuidance = true });
+            using var _ = EnvironmentControl.Apply(new EnvironmentOptions { HostQualityWarnings = true });
         });
 
         Assert.Contains("Dedicated-host guidance", stderr);
@@ -389,7 +389,7 @@ public class EnvironmentControlTests
             using var _ = EnvironmentControl.Apply(
                 new EnvironmentOptions
                 {
-                    DedicatedHostGuidance = true,
+                    HostQualityWarnings = true,
                     ProcessPriority = ProcessPriorityClass.High,
                 });
         });

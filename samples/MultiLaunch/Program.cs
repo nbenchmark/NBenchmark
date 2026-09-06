@@ -1,5 +1,4 @@
 using NBenchmark;
-using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
 // MultiLaunch runs each benchmark multiple times as independent launches.
@@ -23,8 +22,8 @@ await new BenchmarkSuite("sleep")
     .Add("sleep200", () => Task.Delay(2).Wait())
     .WithBaseline("sleep100")
     .WithLaunchCount(3)
-    .WithWarmup(5)
-    .WithIterations(30)
+    .WithWarmupSamples(5)
+    .WithSamples(30)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();

@@ -41,8 +41,8 @@ public sealed class OrphanedWorkerTests
         MeasureCalibration = measureCalibration,
         Options = MeasurementOptions.Default with
         {
-            Iterations = 1_200,
-            WarmupIterations = 1,
+            Samples = 1_200,
+            WarmupSamples = 1,
             OpsPerSample = 1,
             AutoTune = AutoTuneOptions.Default with
             {
@@ -128,7 +128,7 @@ public sealed class OrphanedWorkerTests
 
         var request = LongGroup(measureCalibration: false) with
         {
-            Options = LongGroup(measureCalibration: false).Options with { Iterations = 4 },
+            Options = LongGroup(measureCalibration: false).Options with { Samples = 4 },
         };
 
         var group = await WorkerGroupRunner.RunAsync(

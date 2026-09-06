@@ -114,7 +114,7 @@ public readonly record struct SampleEvent(
 ///     ops-per-sample (<c>K</c>).
 /// </summary>
 /// <remarks>
-///     During calibration, <see cref="Mean" />/<see cref="StdDev" />/<see cref="CiHalfWidth" />
+///     During calibration, <see cref="MeanNs" />/<see cref="StdDev" />/<see cref="CiHalfWidth" />
 ///     reflect the calibrator's probe readings (the CI fields are not meaningful until
 ///     measurement). During measurement, <see cref="CiHalfWidth" /> is the live
 ///     convergence curve - the single most useful "why did it stop" signal.
@@ -123,7 +123,7 @@ public readonly record struct DetectorStateEvent(
     string BenchmarkName,
     MeasurementPhase Phase,
     int SampleCount,
-    double Mean,
+    double MeanNs,
     double StdDev,
     double CiHalfWidth,
     int CurrentK);

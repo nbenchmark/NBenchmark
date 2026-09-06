@@ -105,6 +105,6 @@ public sealed class ScopedThing;
 
 public class FactoryScopedBenchmark(ScopedThing thing)
 {
-    [Attributes.Benchmark]
+    [Benchmark]
     public int Measure() => thing.GetHashCode();
 }

@@ -14,14 +14,14 @@ public record BenchmarkResult
 
     public string? Description { get; init; }
 
-    public required double Mean { get; init; }
-    public required double Median { get; init; }
-    public required double Min { get; init; }
-    public required double Max { get; init; }
+    public required double MeanNs { get; init; }
+    public required double MedianNs { get; init; }
+    public required double MinNs { get; init; }
+    public required double MaxNs { get; init; }
 
     /// <summary>
     ///     Configurable percentile values computed from the trimmed samples.
-    ///     Default set: P50 (0.50), P95 (0.95), P99 (0.99), P99.9 (0.999), Max (1.0).
+    ///     Default set: P50 (0.50), P95 (0.95), P99 (0.99), P99.9 (0.999), max (1.0).
     ///     Controlled by <see cref="MeasurementOptions.ReportedPercentiles" />.
     ///     Sorted by percentile value ascending.
     /// </summary>
@@ -34,25 +34,30 @@ public record BenchmarkResult
     /// </summary>
     public LatencyHistogram? Histogram { get; init; }
 
-    public required double StandardDeviation { get; init; }
+    public required double StandardDeviationNs { get; init; }
 
-    public double StandardError { get; init; }
+    public double StandardErrorNs { get; init; }
 
-    public double MarginOfError { get; init; }
+    public double MarginOfErrorNs { get; init; }
 
     public double ConfidenceLevel { get; init; } = 0.95;
 
     public double CoefficientOfVariation { get; init; }
 
-    public required double Q1 { get; init; }
-    public required double Q3 { get; init; }
-    public required double InterquartileRange { get; init; }
+    public required double Q1Ns { get; init; }
+    public required double Q3Ns { get; init; }
+    public required double InterquartileRangeNs { get; init; }
 
-    public double? LowerFence { get; init; }
-    public double? UpperFence { get; init; }
+    public double? LowerFenceNs { get; init; }
+    public double? UpperFenceNs { get; init; }
 
     public required int OutliersRemoved { get; init; }
-    public required int N { get; init; }
+
+    /// <summary>
+    ///     The number of measured samples the statistics were computed from, after outlier
+    ///     trimming. Add <see cref="OutliersRemoved" /> for the pre-trim count.
+    /// </summary>
+    public required int SampleCount { get; init; }
 
     /// <summary>
     ///     Ordinals (zero-based positions in the original raw-sample stream) of every sample
@@ -77,7 +82,7 @@ public record BenchmarkResult
 
     public required double Skewness { get; init; }
     public required double Kurtosis { get; init; }
-    public required double Mad { get; init; }
+    public required double MedianAbsoluteDeviationNs { get; init; }
 
     /// <summary>
     ///     Lower bound of the distribution-free confidence interval on the median (order-statistic
@@ -85,10 +90,10 @@ public record BenchmarkResult
     ///     calibration-derived results, or when there are fewer than two samples. Assumption-free,
     ///     unlike the t-interval on the mean - the median is the headline comparison metric.
     /// </summary>
-    public double? MedianCiLower { get; init; }
+    public double? MedianConfidenceIntervalLowerNs { get; init; }
 
-    /// <summary>Upper bound of the median confidence interval. See <see cref="MedianCiLower" />.</summary>
-    public double? MedianCiUpper { get; init; }
+    /// <summary>Upper bound of the median confidence interval. See <see cref="MedianConfidenceIntervalLowerNs" />.</summary>
+    public double? MedianConfidenceIntervalUpperNs { get; init; }
 
     /// <summary>
     ///     The Hodges-Lehmann shift versus the baseline (median of pairwise candidate − baseline
@@ -98,34 +103,28 @@ public record BenchmarkResult
     /// </summary>
     public ShiftEstimate? MedianShift { get; init; }
 
-    public required long? AllocMedian { get; init; }
-    public required long? AllocP95 { get; init; }
-    public required long? AllocMax { get; init; }
+    public required long? AllocatedBytesMedian { get; init; }
+    public required long? AllocatedBytesP95 { get; init; }
+    public required long? AllocatedBytesMax { get; init; }
 
-    public long? MeanAllocatedBytes { get; init; }
+    public long? AllocatedBytesMean { get; init; }
 
     /// <summary>
-    ///     The mean number of operations per second, computed as 1e9 / Mean where the mean is
+    ///     The mean number of operations per second, computed as 1e9 / MeanNs, where the mean is
     ///     measured in nanoseconds per operation. NaN for errored or dry-run results.
     /// </summary>
     public double OperationsPerSecond { get; init; }
 
     /// <summary>
-    ///     The median number of operations per second, computed as 1e9 / Median. NaN for errored
+    ///     The median number of operations per second, computed as 1e9 / MedianNs. NaN for errored
     ///     or dry-run results.
     /// </summary>
     public double MedianOperationsPerSecond { get; init; }
 
     /// <summary>
-    ///     Convenience alias for Mean, expressed as nanoseconds per operation. Identical to
-    ///     <see cref="Mean" />.
-    /// </summary>
-    public double NanosecondsPerOperation => Mean;
-
-    /// <summary>
     ///     Total body invocations executed across warmup and measurement. When auto-tuning is
     ///     active this mirrors <see cref="AutoTuneDiagnostic.TotalBodyInvocations" />; otherwise
-    ///     it is the sum of measured and warmup iterations.
+    ///     it is the sum of measured and warmup samples.
     /// </summary>
     public long TotalOperations { get; init; }
 
@@ -174,8 +173,7 @@ public record BenchmarkResult
     public bool Errored { get; init; }
     public string? ErrorMessage { get; init; }
 
-    public int MeasuredIterations { get; init; }
-    public int WarmupIterations { get; init; }
+    public int WarmupSamples { get; init; }
     public DateTimeOffset RunAtUtc { get; init; } = DateTimeOffset.UtcNow;
 
     public TimeSpan TotalDuration { get; init; } = TimeSpan.Zero;
@@ -186,7 +184,7 @@ public record BenchmarkResult
 
     /// <summary>
     ///     Categories assigned to this benchmark through class-level and method-level
-    ///     <see cref="NBenchmark.Attributes.BenchmarkCategoryAttribute" />. Empty when no
+    ///     <see cref="NBenchmark.BenchmarkCategoryAttribute" />. Empty when no
     ///     categories were declared.
     /// </summary>
     public IReadOnlyList<string> Categories { get; init; } = [];
@@ -196,7 +194,7 @@ public record BenchmarkResult
     ///     benchmark was executed. Empty when the runtime is not explicitly specified
     ///     (single-runtime runs).
     /// </summary>
-    public string RuntimeMoniker { get; init; } = "";
+    public string TargetFramework { get; init; } = "";
 
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
@@ -205,17 +203,17 @@ public record BenchmarkResult
     ///     <c>"IQR fence (1.5×)"</c>). Reflects a custom
     ///     <see cref="MeasurementOptions.OutlierDetector" /> when one is configured.
     /// </summary>
-    public string OutlierDetector { get; init; } = OutlierDetectors.IqrFence.Name;
+    public string OutlierDetectorName { get; init; } = OutlierDetectors.IqrFence.Name;
 
     /// <summary>
     ///     Which sample set the order statistics on this result were computed from -
     ///     <see cref="NBenchmark.TailMetricsBasis.Raw" /> (the full pre-trim distribution, the default) or
     ///     <see cref="NBenchmark.TailMetricsBasis.Trimmed" />.
     ///     <para>
-    ///         This matters for anything that displays these numbers. <see cref="Min" />,
-    ///         <see cref="Max" />, <see cref="Percentiles" /> and <see cref="Histogram" /> follow this
-    ///         basis, while <see cref="Mean" />, <see cref="Median" />,
-    ///         <see cref="StandardDeviation" />, the confidence intervals and <see cref="N" /> are
+    ///         This matters for anything that displays these numbers. <see cref="MinNs" />,
+    ///         <see cref="MaxNs" />, <see cref="Percentiles" /> and <see cref="Histogram" /> follow this
+    ///         basis, while <see cref="MeanNs" />, <see cref="MedianNs" />,
+    ///         <see cref="StandardDeviationNs" />, the confidence intervals and <see cref="SampleCount" /> are
     ///         always computed on the trimmed set. Under the default basis the two describe different
     ///         populations and are not comparable - a consumer that shows both must say which is which.
     ///     </para>
@@ -223,7 +221,7 @@ public record BenchmarkResult
     public TailMetricsBasis TailMetricsBasis { get; init; } = TailMetricsBasis.Raw;
 
     /// <summary>The measurement profile under which this result was produced.</summary>
-    public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
+    public GcBehavior GcBehavior { get; init; } = GcBehavior.Natural;
 
     /// <summary>
     ///     The name of the runtime-startup configuration this result was <b>actually</b> measured
@@ -334,11 +332,11 @@ public record BenchmarkResult
     /// </summary>
     public HostTimeline? HostTimeline { get; init; }
 
-    public double ConfidenceIntervalLower => Mean - MarginOfError;
-    public double ConfidenceIntervalUpper => Mean + MarginOfError;
-    public double Range => Max - Min;
-    public double StandardErrorPercent => Mean > 0 ? StandardError / Mean * 100 : 0;
-    public double MarginPercent => Mean > 0 ? MarginOfError / Mean * 100 : 0;
+    public double ConfidenceIntervalLowerNs => MeanNs - MarginOfErrorNs;
+    public double ConfidenceIntervalUpperNs => MeanNs + MarginOfErrorNs;
+    public double RangeNs => MaxNs - MinNs;
+    public double StandardErrorPercent => MeanNs > 0 ? StandardErrorNs / MeanNs * 100 : 0;
+    public double MarginOfErrorPercent => MeanNs > 0 ? MarginOfErrorNs / MeanNs * 100 : 0;
     public double CoefficientOfVariationPercent => CoefficientOfVariation * 100;
 
     /// <summary>
@@ -380,23 +378,22 @@ public record BenchmarkResult
             return new BenchmarkResult
             {
                 Name = name,
-                Mean = mean,
-                Median = median,
-                Min = 0,
-                Max = 0,
-                StandardDeviation = 0,
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                MeanNs = mean,
+                MedianNs = median,
+                MinNs = 0,
+                MaxNs = 0,
+                StandardDeviationNs = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
-                MeasuredIterations = 0,
+                SampleCount = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             };
         }
 
@@ -407,8 +404,8 @@ public record BenchmarkResult
         var stats = StatsSummary.Compute(samples, enableHistogram: false, reportedPercentiles: []);
 
         // Quartiles use the same nearest-rank convention the stats pipeline uses for the raw
-        // sample set (OutlierTrim computes Q1/Q3 on the raw, pre-trim array). StatsSummary
-        // does not surface Q1/Q3, so compute them on the sorted samples StatsSummary already
+        // sample set (OutlierTrim computes Q1Ns/Q3Ns on the raw, pre-trim array). StatsSummary
+        // does not surface Q1Ns/Q3Ns, so compute them on the sorted samples StatsSummary already
         // normalised internally. Build a sorted copy so the public FromCalibration contract
         // (the input array is never mutated) holds.
         var sorted = (double[])samples.Clone();
@@ -420,26 +417,25 @@ public record BenchmarkResult
         return new BenchmarkResult
         {
             Name = name,
-            Mean = mean,
-            Median = median,
-            Min = stats.Min,
-            Max = stats.Max,
-            StandardDeviation = stats.StandardDeviation,
-            StandardError = stats.StandardError,
-            MarginOfError = stats.MarginOfError,
+            MeanNs = mean,
+            MedianNs = median,
+            MinNs = stats.MinNs,
+            MaxNs = stats.MaxNs,
+            StandardDeviationNs = stats.StandardDeviationNs,
+            StandardErrorNs = stats.StandardErrorNs,
+            MarginOfErrorNs = stats.MarginOfErrorNs,
             ConfidenceLevel = stats.ConfidenceLevel,
-            Q1 = q1,
-            Q3 = q3,
-            InterquartileRange = q3 - q1,
+            Q1Ns = q1,
+            Q3Ns = q3,
+            InterquartileRangeNs = q3 - q1,
             OutliersRemoved = 0,
-            N = samples.Length,
-            MeasuredIterations = samples.Length,
+            SampleCount = samples.Length,
             Skewness = stats.Skewness,
             Kurtosis = stats.Kurtosis,
-            Mad = stats.Mad,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = stats.MedianAbsoluteDeviationNs,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
     }
 }

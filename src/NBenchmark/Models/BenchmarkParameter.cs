@@ -130,7 +130,7 @@ public sealed record BenchmarkParameter(string Name, object? Value)
 ///         original type's name is everything either one needs.
 ///     </para>
 ///     <para>
-///         This also removes the crash a <c>[BenchmarkCase(typeof(X))]</c> value used to cause: a
+///         This also removes the crash a <c>[Arguments(typeof(X))]</c> value used to cause: a
 ///         <c>System.RuntimeType</c> instance is one <c>System.Text.Json</c> refuses outright
 ///         (<c>NotSupportedException</c>, at the frame write), while <c>FormatValue</c> already
 ///         renders it - the same way it always has for an in-process row - with no serializer

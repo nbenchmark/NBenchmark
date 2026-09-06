@@ -1,11 +1,11 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using Xunit;
 
 namespace NBenchmark.Tests;
 
 /// <summary>
 ///     What a launch boundary is made of on the in-process paths: a new instance, a re-run
-///     <c>[BenchmarkSetup]</c>, and - for a container-resolved class - a new scope.
+///     <c>[GlobalSetup]</c>, and - for a container-resolved class - a new scope.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -76,8 +76,8 @@ public class LaunchInstanceLifetimeTests
         var harness = BenchmarkHarness.Create([
             "--filter", filter,
             "--in-process",
-            "--iterations", "1",
-            "--warmup", "0",
+            "--samples", "1",
+            "--warmup-samples", "0",
             "--ops-per-sample", "1",
             "--launch-count", "3",
         ]);
@@ -113,7 +113,7 @@ public class PerClassLaunchBenchmarks
         Setups = 0;
     }
 
-    [BenchmarkSetup]
+    [GlobalSetup]
     public void Setup() => Interlocked.Increment(ref Setups);
 
     [Benchmark]

@@ -57,7 +57,7 @@ Each phase transition creates an `Activity` span named `nbenchmark.phase.<phase>
 | `nbenchmark.sample_stop_reason` | stop (measurement) | Why measurement ended |
 | `nbenchmark.warmup_stop_reason` | stop (warmup) | Why warmup ended |
 | `nbenchmark.resolved_k` | stop (calibration) | Calibrated ops-per-sample count |
-| `nbenchmark.resolved_warmup` | stop (warmup) | Resolved warmup iteration count |
+| `nbenchmark.resolved_warmup` | stop (warmup) | Resolved warmup sample count |
 | `nbenchmark.jitter_metric` | stop (jitter) | Host jitter metric value |
 | `nbenchmark.detector_switched` | stop (jitter) | Whether the outlier detector was auto-switched |
 

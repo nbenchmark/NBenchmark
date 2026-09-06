@@ -43,8 +43,8 @@ public sealed class StateGapIsolationTests : IDisposable
 
     private static MeasurementOptions FastOptions => MeasurementOptions.Default with
     {
-        Iterations = 16,
-        WarmupIterations = 1,
+        Samples = 16,
+        WarmupSamples = 1,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {

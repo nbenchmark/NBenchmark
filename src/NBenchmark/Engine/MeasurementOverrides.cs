@@ -32,14 +32,14 @@ internal enum IsolationDecision
 /// </remarks>
 internal sealed record MeasurementOverrides
 {
-    public int? Iterations { get; init; }
-    public int? WarmupIterations { get; init; }
+    public int? Samples { get; init; }
+    public int? WarmupSamples { get; init; }
     public int? OpsPerSample { get; init; }
     public double? ConfidenceLevel { get; init; }
     public double? SignificanceLevel { get; init; }
     public OutlierMode? OutlierMode { get; init; }
     public TailMetricsBasis? TailMetricsBasis { get; init; }
-    public MeasurementProfile? Profile { get; init; }
+    public GcBehavior? GcBehavior { get; init; }
 
     /// <summary>
     ///     The runtime-startup configuration requested on the command line. It reaches a worker as
@@ -75,8 +75,8 @@ internal sealed record MeasurementOverrides
     public double? CiTarget { get; init; }
     public int? MinSamples { get; init; }
     public int? MaxSamples { get; init; }
-    public int? MinWarmup { get; init; }
-    public int? MaxWarmup { get; init; }
+    public int? MinWarmupSamples { get; init; }
+    public int? MaxWarmupSamples { get; init; }
     public TimeSpan? MaxTuningTime { get; init; }
 
     public AutoTuneCapBehavior? CapBehavior { get; init; }
@@ -142,14 +142,14 @@ internal sealed record MeasurementOverrides
 
     public static MeasurementOverrides FromCliArgs(CliArgs cliArgs) => new()
     {
-        Iterations = cliArgs.Iterations,
-        WarmupIterations = cliArgs.WarmupIterations,
+        Samples = cliArgs.Samples,
+        WarmupSamples = cliArgs.WarmupSamples,
         OpsPerSample = cliArgs.OpsPerSample,
         ConfidenceLevel = cliArgs.ConfidenceLevel,
         SignificanceLevel = cliArgs.Alpha,
         OutlierMode = cliArgs.OutlierMode,
         TailMetricsBasis = cliArgs.TailMetricsBasis,
-        Profile = cliArgs.Profile,
+        GcBehavior = cliArgs.GcBehavior,
         RuntimeProfile = cliArgs.RuntimeProfile,
         ForceGc = cliArgs.ForceGc,
         NoAllocations = cliArgs.NoAllocations,
@@ -161,8 +161,8 @@ internal sealed record MeasurementOverrides
         CiTarget = cliArgs.CiTarget,
         MinSamples = cliArgs.MinSamples,
         MaxSamples = cliArgs.MaxSamples,
-        MinWarmup = cliArgs.MinWarmup,
-        MaxWarmup = cliArgs.MaxWarmup,
+        MinWarmupSamples = cliArgs.MinWarmupSamples,
+        MaxWarmupSamples = cliArgs.MaxWarmupSamples,
         MaxTuningTime = cliArgs.MaxTuningTime,
         CapBehavior = cliArgs.AutoTuneCapBehavior,
         WarmupBudgetFraction = cliArgs.WarmupBudgetFraction,
@@ -188,11 +188,11 @@ internal sealed record MeasurementOverrides
     {
         var result = options;
 
-        if (Iterations.HasValue)
-            result = result with { Iterations = Iterations.Value };
+        if (Samples.HasValue)
+            result = result with { Samples = Samples.Value };
 
-        if (WarmupIterations.HasValue)
-            result = result with { WarmupIterations = WarmupIterations.Value };
+        if (WarmupSamples.HasValue)
+            result = result with { WarmupSamples = WarmupSamples.Value };
 
         if (ConfidenceLevel.HasValue)
             result = result with { ConfidenceLevel = ConfidenceLevel.Value };
@@ -206,14 +206,14 @@ internal sealed record MeasurementOverrides
         if (TailMetricsBasis.HasValue)
             result = result with { TailMetricsBasis = TailMetricsBasis.Value };
 
-        if (Profile.HasValue)
-            result = result with { Profile = Profile.Value };
+        if (GcBehavior.HasValue)
+            result = result with { GcBehavior = GcBehavior.Value };
 
         if (RuntimeProfile is not null)
             result = result with { RuntimeProfile = RuntimeProfile };
 
         if (ForceGc.HasValue)
-            result = result with { ForceGcBeforeEachIteration = ForceGc.Value };
+            result = result with { ForceGcBeforeEachSample = ForceGc.Value };
 
         if (NoAllocations.HasValue)
             result = result with { MeasureAllocations = !NoAllocations.Value };
@@ -252,15 +252,15 @@ internal sealed record MeasurementOverrides
             autoTuneChanged = true;
         }
 
-        if (MinWarmup.HasValue)
+        if (MinWarmupSamples.HasValue)
         {
-            autoTune = autoTune with { MinWarmup = MinWarmup.Value };
+            autoTune = autoTune with { MinWarmupSamples = MinWarmupSamples.Value };
             autoTuneChanged = true;
         }
 
-        if (MaxWarmup.HasValue)
+        if (MaxWarmupSamples.HasValue)
         {
-            autoTune = autoTune with { MaxWarmup = MaxWarmup.Value };
+            autoTune = autoTune with { MaxWarmupSamples = MaxWarmupSamples.Value };
             autoTuneChanged = true;
         }
 
@@ -407,14 +407,14 @@ internal sealed record MeasurementOverrides
     {
         if (cliArgs.CpuAffinity is null
             && cliArgs.ProcessPriority is null
-            && !cliArgs.DedicatedHostGuidance)
+            && !cliArgs.HostQualityWarnings)
             return null;
 
         return new EnvironmentOptions
         {
             CpuAffinity = cliArgs.CpuAffinity,
             ProcessPriority = cliArgs.ProcessPriority,
-            DedicatedHostGuidance = cliArgs.DedicatedHostGuidance,
+            HostQualityWarnings = cliArgs.HostQualityWarnings,
         };
     }
 
@@ -422,7 +422,7 @@ internal sealed record MeasurementOverrides
     ///     Layers CLI environment settings on top of any programmatic ones. CLI
     ///     flags win on a per-field basis for nullable fields (the same pattern as the
     ///     other overrides); unset CLI fields preserve the programmatic value. The
-    ///     <see cref="EnvironmentOptions.DedicatedHostGuidance" /> flag is a bool and
+    ///     <see cref="EnvironmentOptions.HostQualityWarnings" /> flag is a bool and
     ///     uses OR semantics - enabling it on either side enables it.
     /// </summary>
     private static EnvironmentOptions? MergeEnvironment(EnvironmentOptions? programmatic, EnvironmentOptions cli)
@@ -434,7 +434,7 @@ internal sealed record MeasurementOverrides
         {
             CpuAffinity = cli.CpuAffinity ?? programmatic.CpuAffinity,
             ProcessPriority = cli.ProcessPriority ?? programmatic.ProcessPriority,
-            DedicatedHostGuidance = cli.DedicatedHostGuidance || programmatic.DedicatedHostGuidance,
+            HostQualityWarnings = cli.HostQualityWarnings || programmatic.HostQualityWarnings,
         };
     }
 }

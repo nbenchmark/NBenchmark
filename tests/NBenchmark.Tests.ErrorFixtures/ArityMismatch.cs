@@ -1,10 +1,10 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 
 namespace NBenchmark.Tests.ErrorFixtures;
 
 public class ArityMismatchCasesBenchmarks
 {
-    [BenchmarkCases(nameof(MismatchCases))]
+    [ArgumentsSource(nameof(MismatchCases))]
     [Benchmark]
     public int Sum(int a, int b) => a + b;
 

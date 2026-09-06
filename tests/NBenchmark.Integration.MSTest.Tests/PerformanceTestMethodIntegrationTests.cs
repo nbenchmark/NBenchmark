@@ -156,7 +156,7 @@ public sealed class PerformanceTestMethodIntegrationTests
 
 public static class StaticVoidBenchmark
 {
-    [PerformanceTestMethod(Iterations = 3, WarmupIterations = 1)]
+    [PerformanceTestMethod(Samples = 3, WarmupSamples = 1)]
     public static void StaticVoidRun()
     {
         PerformanceTestMethodIntegrationTests.InvocationCounts.AddOrUpdate("StaticVoidRun", 1, (_, v) => v + 1);
@@ -166,7 +166,7 @@ public static class StaticVoidBenchmark
 
 public static class StaticAsyncBenchmark
 {
-    [PerformanceTestMethod(Iterations = 3, WarmupIterations = 1)]
+    [PerformanceTestMethod(Samples = 3, WarmupSamples = 1)]
     public static Task StaticAsyncRun()
     {
         PerformanceTestMethodIntegrationTests.InvocationCounts.AddOrUpdate("StaticAsyncRun", 1, (_, v) => v + 1);
@@ -176,7 +176,7 @@ public static class StaticAsyncBenchmark
 
 public sealed class InstanceBenchmark
 {
-    [PerformanceTestMethod(Iterations = 3, WarmupIterations = 1)]
+    [PerformanceTestMethod(Samples = 3, WarmupSamples = 1)]
     public void InstanceRun()
     {
         PerformanceTestMethodIntegrationTests.InvocationCounts.AddOrUpdate("InstanceRun", 1, (_, v) => v + 1);
@@ -186,7 +186,7 @@ public sealed class InstanceBenchmark
 
 public sealed class InstanceAsyncBenchmark
 {
-    [PerformanceTestMethod(Iterations = 3, WarmupIterations = 1)]
+    [PerformanceTestMethod(Samples = 3, WarmupSamples = 1)]
     public Task InstanceAsyncRun()
     {
         PerformanceTestMethodIntegrationTests.InvocationCounts.AddOrUpdate("InstanceAsyncRun", 1, (_, v) => v + 1);
@@ -206,7 +206,7 @@ public sealed class ParameterizedBenchmark
     ///     Succeeds or throws depending on its argument, so a caller can tell from the outcome alone
     ///     whether the value crossed the process boundary intact - with no reliance on timing.
     /// </summary>
-    [PerformanceTestMethod(Iterations = 3, WarmupIterations = 1)]
+    [PerformanceTestMethod(Samples = 3, WarmupSamples = 1)]
     public void RunWithArgument(int mode)
     {
         if (mode == Rejected)

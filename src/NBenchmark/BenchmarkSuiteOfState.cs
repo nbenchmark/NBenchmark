@@ -59,7 +59,7 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
 
         AddWithState(name, recipe, action,
             (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(name, () => action(state()),
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)),
             setup, teardown, categories);
 
         return this;
@@ -78,14 +78,14 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
 
         AddWithState(name, recipe, action,
             (spec, ct) => Task.FromResult(BenchmarkRunner.Instance.Run(name, () => action(state()),
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)),
             setup, teardown, categories);
 
         return this;
     }
 
     /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?, Func{TState}?)" />
-    public BenchmarkSuite<TState> AddAsync(string name, Func<TState, Task> action,
+    public BenchmarkSuite<TState> Add(string name, Func<TState, Task> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null,
         Func<TState>? prepare = null)
@@ -97,14 +97,14 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
 
         AddWithState(name, recipe, action,
             async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(name, () => action(state()),
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct).ConfigureAwait(false),
             setup, teardown, categories);
 
         return this;
     }
 
     /// <inheritdoc cref="Add(string, Action{TState}, Action?, Action?, IReadOnlyList{string}?, Func{TState}?)" />
-    public BenchmarkSuite<TState> AddAsync<TResult>(string name, Func<TState, Task<TResult>> action,
+    public BenchmarkSuite<TState> Add<TResult>(string name, Func<TState, Task<TResult>> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null,
         Func<TState>? prepare = null)
@@ -116,7 +116,7 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
 
         AddWithState(name, recipe, action,
             async (spec, ct) => await BenchmarkRunner.Instance.RunAsync(name, () => action(state()),
-                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct).ConfigureAwait(false),
             setup, teardown, categories);
 
         return this;
@@ -157,11 +157,11 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     /// <inheritdoc cref="BenchmarkSuite.WithBaseline" />
     public new BenchmarkSuite<TState> WithBaseline(string name) => Chain(() => base.WithBaseline(name));
 
-    /// <inheritdoc cref="BenchmarkSuite.WithIterations" />
-    public new BenchmarkSuite<TState> WithIterations(int iterations) => Chain(() => base.WithIterations(iterations));
+    /// <inheritdoc cref="BenchmarkSuite.WithSamples" />
+    public new BenchmarkSuite<TState> WithSamples(int samples) => Chain(() => base.WithSamples(samples));
 
-    /// <inheritdoc cref="BenchmarkSuite.WithWarmup" />
-    public new BenchmarkSuite<TState> WithWarmup(int iterations) => Chain(() => base.WithWarmup(iterations));
+    /// <inheritdoc cref="BenchmarkSuite.WithWarmupSamples" />
+    public new BenchmarkSuite<TState> WithWarmupSamples(int samples) => Chain(() => base.WithWarmupSamples(samples));
 
     /// <inheritdoc cref="BenchmarkSuite.WithLaunchCount" />
     public new BenchmarkSuite<TState> WithLaunchCount(int count) => Chain(() => base.WithLaunchCount(count));
@@ -189,9 +189,9 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     public new BenchmarkSuite<TState> WithProgress(IBenchmarkProgress progress)
         => Chain(() => base.WithProgress(progress));
 
-    /// <inheritdoc cref="BenchmarkSuite.WithMeasurementProfile" />
-    public new BenchmarkSuite<TState> WithMeasurementProfile(MeasurementProfile profile)
-        => Chain(() => base.WithMeasurementProfile(profile));
+    /// <inheritdoc cref="BenchmarkSuite.WithGcBehavior" />
+    public new BenchmarkSuite<TState> WithGcBehavior(GcBehavior profile)
+        => Chain(() => base.WithGcBehavior(profile));
 
     /// <inheritdoc cref="BenchmarkSuite.WithRuntimeProfile" />
     public new BenchmarkSuite<TState> WithRuntimeProfile(RuntimeProfile profile)
@@ -228,16 +228,16 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         => Chain(() => base.WithCategories(categories));
 
     /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithCategoryFilter(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
-        => Chain(() => base.WithCategoryFilter(include, exclude));
+    public new BenchmarkSuite<TState> FilterCategories(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
+        => Chain(() => base.FilterCategories(include, exclude));
 
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithConfidenceLevel(double level)
         => Chain(() => base.WithConfidenceLevel(level));
 
     /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithDedicatedHostGuidance(bool enabled = true)
-        => Chain(() => base.WithDedicatedHostGuidance(enabled));
+    public new BenchmarkSuite<TState> WithHostQualityWarnings(bool enabled = true)
+        => Chain(() => base.WithHostQualityWarnings(enabled));
 
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithDiagnostics(DiagnosticsOptions diagnostics)
@@ -248,7 +248,7 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         => Chain(() => base.WithDriftCanary(driftCanary));
 
     /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithDriftCanary(bool enabled)
+    public new BenchmarkSuite<TState> WithDriftCanary(bool enabled = true)
         => Chain(() => base.WithDriftCanary(enabled));
 
     /// <inheritdoc />
@@ -288,7 +288,7 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         => Chain(() => base.WithRuntimes(runtimes));
 
     /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithSignificance(bool enabled)
+    public new BenchmarkSuite<TState> WithSignificance(bool enabled = true)
         => Chain(() => base.WithSignificance(enabled));
 
     /// <inheritdoc />
@@ -300,8 +300,8 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         => Chain(() => base.WithSignificanceTest(factory));
 
     /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithSuppressBuildConfigurationWarning(bool suppress = true)
-        => Chain(() => base.WithSuppressBuildConfigurationWarning(suppress));
+    public new BenchmarkSuite<TState> WithSuppressedWarnings(BenchmarkWarnings warnings)
+        => Chain(() => base.WithSuppressedWarnings(warnings));
 
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithThreadControl(bool enabled = true)

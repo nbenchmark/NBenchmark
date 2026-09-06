@@ -62,7 +62,7 @@ public sealed record DriftCanaryOptions
     /// </summary>
     internal const double DefaultMinimumReportableDrift = 0.01;
 
-    /// <summary>The defaults: on, 32 samples of 4,096 iterations, warning past 1% drift.</summary>
+    /// <summary>The defaults: on, 32 samples of 4,096 samples, warning past 1% drift.</summary>
     public static readonly DriftCanaryOptions Default = new();
 
     /// <summary>The canary switched off. No readings are taken and no stamp is attached.</summary>
@@ -95,7 +95,7 @@ public sealed record DriftCanaryOptions
     }
 
     /// <summary>
-    ///     How many busy-weight iterations each canary sample performs. Must be between
+    ///     How many busy-weight samples each canary sample performs. Must be between
     ///     <see cref="MinWorkPerSample" /> and <see cref="MaxWorkPerSample" />. Default
     ///     <see cref="DefaultWorkPerSample" />.
     /// </summary>

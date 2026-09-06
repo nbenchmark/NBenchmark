@@ -18,7 +18,7 @@ public static class OutlierDetectors
     /// <summary>Tukey's 1.5×IQR fence (<see cref="OutlierMode.IqrFence" />).</summary>
     public static IOutlierDetector IqrFence { get; } = new IqrFenceOutlierDetector();
 
-    /// <summary>Median Absolute Deviation, 3× scaled-MAD fence (<see cref="OutlierMode.MedianAbsoluteDeviation" />).</summary>
+    /// <summary>Median absolute deviation, 3× scaled-MAD fence (<see cref="OutlierMode.MedianAbsoluteDeviation" />).</summary>
     public static IOutlierDetector MedianAbsoluteDeviation { get; } = new MadOutlierDetector();
 
     /// <summary>Resolves the built-in detector that corresponds to <paramref name="mode" />.</summary>
@@ -49,7 +49,7 @@ public static class OutlierDetectors
 
         // Never discard everything - the engine always needs samples to summarize.
         if (keptCount == 0 || keptCount == sorted.Length)
-            return new OutlierClassification { Kept = sorted, Discarded = [], LowerFence = lowerFence, UpperFence = upperFence };
+            return new OutlierClassification { Kept = sorted, Discarded = [], LowerFenceNs = lowerFence, UpperFenceNs = upperFence };
 
         var kept = new double[keptCount];
         var discarded = new double[sorted.Length - keptCount];
@@ -64,7 +64,7 @@ public static class OutlierDetectors
                 discarded[d++] = v;
         }
 
-        return new OutlierClassification { Kept = kept, Discarded = discarded, LowerFence = lowerFence, UpperFence = upperFence };
+        return new OutlierClassification { Kept = kept, Discarded = discarded, LowerFenceNs = lowerFence, UpperFenceNs = upperFence };
     }
 }
 
@@ -138,8 +138,8 @@ public sealed class TwoSidedPercentileOutlierDetector(double fraction = 0.05) : 
 }
 
 /// <summary>
-///     Tukey's fence: discards any sample below <c>Q1 − k × IQR</c> or above
-///     <c>Q3 + k × IQR</c> (<c>k = 1.5</c> by default). The library default.
+///     Tukey's fence: discards any sample below <c>Q1Ns − k × IQR</c> or above
+///     <c>Q3Ns + k × IQR</c> (<c>k = 1.5</c> by default). The library default.
 /// </summary>
 public sealed class IqrFenceOutlierDetector(double k = 1.5) : IOutlierDetector
 {
@@ -165,7 +165,7 @@ public sealed class IqrFenceOutlierDetector(double k = 1.5) : IOutlierDetector
 }
 
 /// <summary>
-///     Median Absolute Deviation fence. Computes the median <c>m</c> and the scaled MAD
+///     Median absolute deviation fence. Computes the median <c>m</c> and the scaled MAD
 ///     <c>1.4826 × median(|xᵢ − m|)</c>, then discards any sample whose distance from the
 ///     median exceeds <c>threshold × scaledMAD</c> (<c>threshold = 3.0</c> by default,
 ///     i.e. an Iglewicz–Hoaglin modified z-score cut-off).

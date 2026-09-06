@@ -24,16 +24,16 @@ The analyzers run automatically without additional configuration. The package in
 | --- | --- | --- | --- |
 | NB0001 | Benchmark class must have a public parameterless constructor | Warning | A class or record with `[Benchmark]` methods lacks a public parameterless constructor. |
 | NB0002 | `[Benchmark]` method must not be static | Error | A method marked `[Benchmark]` is `static`. Only instance methods are discovered. |
-| NB0003 | `[BenchmarkCase]` / `[BenchmarkCases]` must match method parameters | Error | The number of `[BenchmarkCase]` values does not match the method's parameter count. |
+| NB0003 | `[Arguments]` / `[ArgumentsSource]` must match method parameters | Error | The number of `[Arguments]` values does not match the method's parameter count. |
 | NB0004 | `[Benchmark]` body has no observable side effects | Error | A void `[Benchmark]` method body has no observable side effects, allowing the JIT to eliminate it. |
 | NB0005 | `[Benchmark]` body does no observable work | Error | A void `[Benchmark]` method has an empty body. |
 | NB0006 | Multiple `[Benchmark(Baseline = true)]` methods in the same class | Error | Only one benchmark per class can be the baseline. |
-| NB0007 | Duplicate lifecycle method in benchmark class | Error | Two methods share the same lifecycle attribute (e.g., `[BenchmarkSetup]`). |
-| NB0008 | `[Benchmark]` property value out of range | Error | `Iterations` or `WarmupIterations` on `[Benchmark]` is outside the valid range. |
+| NB0007 | Duplicate lifecycle method in benchmark class | Error | Two methods share the same lifecycle attribute (e.g., `[GlobalSetup]`). |
+| NB0008 | `[Benchmark]` property value out of range | Error | `Samples` or `WarmupSamples` on `[Benchmark]` is outside the valid range. |
 | NB0009 | `MeasurementOptions` property value out of range | Error | A property in a `MeasurementOptions` initializer is outside the valid range. |
 | NB0010 | Benchmark body is throwaway | Warning | A lambda passed to a `Benchmark.Run*` `Action` overload has no observable side effects. |
 | NB0011 | `PerClass` lifetime with scoped service may contaminate state | Warning | A class uses `PerClass` lifetime and injects a constructor dependency that may hold per-instance state (any non-primitive, non-ambient reference type), which can leak warmed state across benchmark methods. |
-| NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method uses both attributes, which is ambiguous. |
+| NB0012 | `[ArgumentsSource]` cannot be combined with `[Arguments]` | Error | A method uses both attributes, which is ambiguous. |
 | NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A class uses `PerClass` lifetime and has a mutable instance field accessed by multiple benchmarks. |
 | NB0014 | Benchmark body captures state | Info | A lambda passed to `Benchmark.Run*` or `BenchmarkSuite.Add` captures local state. |
 
@@ -74,23 +74,23 @@ public void Measure() { }
 
 This diagnostic includes an automatic code fix that removes the `static` keyword.
 
-### NB0003 - BenchmarkCase arity mismatch
+### NB0003 - Arguments arity mismatch
 
-The `[BenchmarkCase]` attribute must match the method's parameter count. Each attribute corresponds to one invocation of the method. When using `[BenchmarkCases]`, the source method must yield tuples whose arity matches the benchmark method's parameter count.
+The `[Arguments]` attribute must match the method's parameter count. Each attribute corresponds to one invocation of the method. When using `[ArgumentsSource]`, the source method must yield tuples whose arity matches the benchmark method's parameter count.
 
 ```csharp
-// Bad - method takes no parameters but has [BenchmarkCase]
-[BenchmarkCase(42)]
+// Bad - method takes no parameters but has [Arguments]
+[Arguments(42)]
 [Benchmark]
 public void Measure() { }
 
 // Bad - method expects one parameter, argument supplies none
-[BenchmarkCase]
+[Arguments]
 [Benchmark]
 public void Measure(int x) { }
 
-// Bad - [BenchmarkCases] source yields tuple with wrong arity
-[BenchmarkCases(nameof(Cases))]
+// Bad - [ArgumentsSource] source yields tuple with wrong arity
+[ArgumentsSource(nameof(Cases))]
 [Benchmark]
 public void Measure(int x, int y) { }
 
@@ -161,28 +161,28 @@ Only one benchmark per class can be the baseline. When multiple methods have `Ba
 
 ### NB0007 - Duplicate lifecycle methods
 
-Each lifecycle attribute (`[BenchmarkSetup]`, `[BenchmarkTeardown]`, `[BenchmarkIterationSetup]`, `[BenchmarkIterationTeardown]`) should appear at most once per class. If two methods share the same attribute, NBenchmark silently ignores the second one.
+Each lifecycle attribute (`[GlobalSetup]`, `[GlobalTeardown]`, `[SampleSetup]`, `[SampleTeardown]`) should appear at most once per class. If two methods share the same attribute, NBenchmark silently ignores the second one.
 
 ```csharp
-// Bad - duplicate [BenchmarkSetup]
-[BenchmarkSetup] public void Init() { }
-[BenchmarkSetup] public void InitAgain() { }
+// Bad - duplicate [GlobalSetup]
+[GlobalSetup] public void Init() { }
+[GlobalSetup] public void InitAgain() { }
 ```
 
-### NB0008 / NB0009 - Range violations
+### NB0008 / NB0009 - range violations
 
 NBenchmark checks `[Benchmark]` attribute properties and `MeasurementOptions` values against their valid ranges at compile time to prevent `ArgumentOutOfRangeException` at runtime.
 
 ```csharp
-// Bad - Iterations exceeds MaxIterations (100,000)
-[Benchmark(Iterations = 200000)]
+// Bad - Samples exceeds MaxSamplesLimit (100,000)
+[Benchmark(Samples = 200000)]
 public void Measure() { }
 
 // Bad - ConfidenceLevel must be strictly between 0 and 1
 var opts = new MeasurementOptions { ConfidenceLevel = 1.5 };
 
 // Bad - 'with' expression is also checked
-var opts2 = new MeasurementOptions() with { Iterations = 200000 };
+var opts2 = new MeasurementOptions() with { Samples = 200000 };
 ```
 
 ### NB0010 - Throwaway lambda body
@@ -248,21 +248,21 @@ To fix this, you can:
 > [!NOTE]
 > This is a compile-time warning. If you suppress NB0011, verify that shared state does not create timing dependencies by running each method in isolation and comparing results.
 
-### NB0012 - `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]`
+### NB0012 - `[ArgumentsSource]` cannot be combined with `[Arguments]`
 
-A method cannot carry both attributes. `[BenchmarkCase]` declares literal cases inline, while `[BenchmarkCases]` names a programmatic source. Combining them is ambiguous and results in an error.
+A method cannot carry both attributes. `[Arguments]` declares literal cases inline, while `[ArgumentsSource]` names a programmatic source. Combining them is ambiguous and results in an error.
 
 ```csharp
 // Error NB0012: both attributes on one method
-[BenchmarkCase(10)]
-[BenchmarkCases(nameof(SortCases))]
+[Arguments(10)]
+[ArgumentsSource(nameof(SortCases))]
 [Benchmark]
 public void Sort(int size) { }
 
 static IEnumerable<(int Size, string Label)> SortCases() => ...
 ```
 
-Use one or the other. For small literal lists, use `[BenchmarkCase]`. For generated values or parameter sweeps, use `[BenchmarkCases]`. See [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) for a full comparison.
+Use one or the other. For small literal lists, use `[Arguments]`. For generated values or parameter sweeps, use `[ArgumentsSource]`. See [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) for a full comparison.
 
 ### NB0013 - `PerClass` lifetime with mutable instance field
 
@@ -331,14 +331,14 @@ To isolate the body, move the state creation inside the lambda:
 Benchmark.Run(() => Process(BuildInput()));
 ```
 
-Alternatively, use a `[Benchmark]` class. Discovery runs inside the worker, so `[BenchmarkSetup]` and fields are built locally:
+Alternatively, use a `[Benchmark]` class. Discovery runs inside the worker, so `[GlobalSetup]` and fields are built locally:
 
 ```csharp
 public class ProcessBenchmarks
 {
     private Input _data = null!;
 
-    [BenchmarkSetup] public void Setup() => _data = BuildInput();
+    [GlobalSetup] public void Setup() => _data = BuildInput();
 
     [Benchmark] public Output Run() => Process(_data);
 }
@@ -356,7 +356,7 @@ To opt out, declare `[SharedState]` on the class:
 public class CacheBenchmarks { }
 ```
 
-You can also suppress this warning for the entire run by setting `SuppressPerClassIndependenceWarning = true` on `MeasurementOptions`.
+You can also suppress this warning for the entire run by setting `SuppressedWarnings = BenchmarkWarnings.PerClassIndependence` on `MeasurementOptions`.
 
 ## Disabling a rule
 

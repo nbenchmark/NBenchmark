@@ -96,7 +96,7 @@ internal static class MeasurementBudget
     ///         sketched, because the premise that made a flat value safe - "progress streams per
     ///         sample" - does not hold at the edges. The engine reports a sample only when one
     ///         finishes, so a body whose single iteration legitimately runs for the whole tuning
-    ///         budget sends nothing for that entire time, as does a worker in <c>[BenchmarkSetup]</c>,
+    ///         budget sends nothing for that entire time, as does a worker in <c>[GlobalSetup]</c>,
     ///         discovery, or process start. A flat 30 s would kill exactly the slow-but-honest
     ///         benchmarks the engine explicitly permits. Allowing one full per-benchmark ceiling plus
     ///         the startup allowance means silence is only ever fatal once it exceeds what any single

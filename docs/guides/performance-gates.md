@@ -49,7 +49,7 @@ public void OptimizedParse() => OptimizedParser.Parse(Payload);
 private static void NaiveParse() => NaiveParser.Parse(Payload);
 ```
 
-The candidate must not exceed 1.2x the reference. The reference can be private and runs with the same measurement options (iterations, warmup, and outlier mode) as the candidate. When both are isolated, they run in the same worker process, which removes the worker's core draw and memory layout from the ratio.
+The candidate must not exceed 1.2x the reference. The reference can be private and runs with the same measurement options (samples, warmup, and outlier mode) as the candidate. When both are isolated, they run in the same worker process, which removes the worker's core draw and memory layout from the ratio.
 
 At the default `LaunchCount = 1`, this produces a single quotient. For higher reliability in CI, add replicates:
 
@@ -159,10 +159,10 @@ dotnet test
 dotnet test --filter "FullyQualifiedName~ParseJson"
 ```
 
-To ensure reproducibility in CI, set `Iterations` and `WarmupIterations` on the attribute:
+To ensure reproducibility in CI, set `Samples` and `WarmupSamples` on the attribute:
 
 ```csharp
-[PerformanceFact(MaxSlowdownRatio = 5.0, Iterations = 200, WarmupIterations = 20)]
+[PerformanceFact(MaxSlowdownRatio = 5.0, Samples = 200, WarmupSamples = 20)]
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 

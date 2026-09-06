@@ -36,25 +36,25 @@ public class ConsoleReporterTests
             var result = new BenchmarkResult
             {
                 Name = "broken",
-                Mean = 0,
-                Median = 0,
+                MeanNs = 0,
+                MedianNs = 0,
                 Percentiles = [],
-                Min = 0,
-                Max = 0,
-                StandardDeviation = 0,
+                MinNs = 0,
+                MaxNs = 0,
+                StandardDeviationNs = 0,
                 Errored = true,
                 ErrorMessage = "something went wrong",
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
+                SampleCount = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             };
 
             await reporter.ReportAsync([result]);
@@ -71,25 +71,25 @@ public class ConsoleReporterTests
             var errored = new BenchmarkResult
             {
                 Name = "broken",
-                Mean = 0,
-                Median = 0,
+                MeanNs = 0,
+                MedianNs = 0,
                 Percentiles = [],
-                Min = 0,
-                Max = 0,
-                StandardDeviation = 0,
+                MinNs = 0,
+                MaxNs = 0,
+                StandardDeviationNs = 0,
                 Errored = true,
                 ErrorMessage = "something went wrong",
-                Q1 = 0,
-                Q3 = 0,
-                InterquartileRange = 0,
+                Q1Ns = 0,
+                Q3Ns = 0,
+                InterquartileRangeNs = 0,
                 OutliersRemoved = 0,
-                N = 0,
+                SampleCount = 0,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = 0,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = 0,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             };
 
             var healthy = MakeResult("healthy", 100) with
@@ -108,13 +108,13 @@ public class ConsoleReporterTests
 
         var net8 = MakeResult("alpha", 100) with
         {
-            RuntimeMoniker = "net8.0",
+            TargetFramework = "net8.0",
             Percentiles = [new PercentileEntry(0.95, 110)],
         };
 
         var net9 = MakeResult("alpha", 80) with
         {
-            RuntimeMoniker = "net9.0",
+            TargetFramework = "net9.0",
             Percentiles = [new PercentileEntry(0.95, 95)],
         };
 
@@ -258,7 +258,7 @@ public class ConsoleReporterTests
             RawSamples = [90.0, 95.0, 100.0, 105.0, 110.0, 200.0],
             TrimmedOrdinals = [5],
             OutliersRemoved = 1,
-            N = 5,
+            SampleCount = 5,
         };
 
         AnsiConsole.Record();
@@ -282,13 +282,13 @@ public class ConsoleReporterTests
         var reporter = new ConsoleReporter(ReportDetail.Advanced);
 
         // No raw samples: the box-whisker strip falls back to drawing from the summary
-        // statistics (Q1/Q3/median/min/max) alone, with no per-sample dots.
+        // statistics (Q1Ns/Q3Ns/median/min/max) alone, with no per-sample dots.
         var result = MakeResult("no-samples", 100) with
         {
             RawSamples = [],
-            Q1 = 95,
-            Q3 = 105,
-            N = 5,
+            Q1Ns = 95,
+            Q3Ns = 105,
+            SampleCount = 5,
         };
 
         AnsiConsole.Record();
@@ -337,24 +337,24 @@ public class ConsoleReporterTests
         return new BenchmarkResult
         {
             Name = name,
-            Mean = median,
-            Median = median,
+            MeanNs = median,
+            MedianNs = median,
             Percentiles = [],
-            Min = median * 0.8,
-            Max = median * 1.3,
-            StandardDeviation = median * 0.05,
-            MeanAllocatedBytes = 64,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            MinNs = median * 0.8,
+            MaxNs = median * 1.3,
+            StandardDeviationNs = median * 0.05,
+            AllocatedBytesMean = 64,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 0,
+            SampleCount = 0,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
     }
 

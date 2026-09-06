@@ -84,7 +84,7 @@ public static class DependencyInjectionHarnessExtensions
         return type =>
         {
             // The scope's disposal is bundled into the handle, so Harness mode tears it down after
-            // [BenchmarkTeardown] runs for the instance - preserving ordering without harness-level
+            // [GlobalTeardown] runs for the instance - preserving ordering without harness-level
             // hooks.
             var scope = provider.Value.CreateScope();
 

@@ -92,16 +92,16 @@ public sealed record LaunchDetail
     public required int LaunchIndex { get; init; }
 
     /// <summary>Median latency for this launch (ns).</summary>
-    public required double Median { get; init; }
+    public required double MedianNs { get; init; }
 
     /// <summary>Mean latency for this launch (ns).</summary>
-    public required double Mean { get; init; }
+    public required double MeanNs { get; init; }
 
     /// <summary>Standard deviation for this launch (ns).</summary>
-    public required double StandardDeviation { get; init; }
+    public required double StandardDeviationNs { get; init; }
 
-    /// <summary>Measured iterations in this launch.</summary>
-    public required int Iterations { get; init; }
+    /// <summary>Measured samples in this launch.</summary>
+    public required int Samples { get; init; }
 
     /// <summary>Wall-clock duration of this launch.</summary>
     public required TimeSpan Duration { get; init; }

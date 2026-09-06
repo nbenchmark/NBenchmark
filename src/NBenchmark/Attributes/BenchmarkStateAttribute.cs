@@ -1,4 +1,4 @@
-namespace NBenchmark.Attributes;
+namespace NBenchmark;
 
 /// <summary>
 ///     Declares that this type's measured behaviour is fully determined by its serialized contents,

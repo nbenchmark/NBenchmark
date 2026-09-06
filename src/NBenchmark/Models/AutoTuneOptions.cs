@@ -27,7 +27,7 @@ public sealed record AutoTuneOptions
     /// </summary>
     public static readonly AutoTuneOptions Quick = new()
     {
-        MinWarmup = 4,
+        MinWarmupSamples = 4,
         MinSamples = 15,
         MaxSamples = 2_000,
         CiTarget = 0.05,
@@ -40,7 +40,7 @@ public sealed record AutoTuneOptions
     /// <summary>More samples and a tighter CI target for publication-grade numbers.</summary>
     public static readonly AutoTuneOptions Thorough = new()
     {
-        MinWarmup = 16,
+        MinWarmupSamples = 16,
         MinSamples = 100,
         MaxSamples = 20_000,
         CiTarget = 0.01,
@@ -72,16 +72,16 @@ public sealed record AutoTuneOptions
     ///         This is a floor on the sample <em>count</em>. Note the plateau rule cannot settle
     ///         before it has seen <c>(PlateauPatience + 1) × BatchSize</c> samples (one improving
     ///         batch plus <see cref="PlateauPatience" /> non-improving ones), so with the defaults
-    ///         (patience 3, batch 8) the effective minimum is 32 samples and <c>MinWarmup</c> only
+    ///         (patience 3, batch 8) the effective minimum is 32 samples and <c>MinWarmupSamples</c> only
     ///         binds when raised above that. <see cref="MinWarmupTime" /> is the independent floor
     ///         on warmup <em>duration</em>, which in practice is the binding one for almost every body.
     ///     </para>
     /// </summary>
-    public int MinWarmup { get; init; } = 8;
+    public int MinWarmupSamples { get; init; } = 8;
 
     /// <summary>
     ///     The warmup ceiling, as a sample count. Default 100,000
-    ///     (== <see cref="MeasurementOptions.MaxAutoWarmupIterations" />).
+    ///     (== <see cref="MeasurementOptions.MaxAutoWarmupSamplesLimit" />).
     ///     <para>
     ///         This is deliberately far above the count any body needs, so that the <em>time</em> bounds -
     ///         <see cref="MinWarmupTime" /> from below and the calibration+warmup share
@@ -92,7 +92,7 @@ public sealed record AutoTuneOptions
     ///         reached raises a warning.
     ///     </para>
     /// </summary>
-    public int MaxWarmup { get; init; } = MeasurementOptions.MaxAutoWarmupIterations;
+    public int MaxWarmupSamples { get; init; } = MeasurementOptions.MaxAutoWarmupSamplesLimit;
 
     /// <summary>
     ///     The minimum relative improvement a warmup batch must show over the best batch so far
@@ -118,7 +118,7 @@ public sealed record AutoTuneOptions
     ///     preset); the same on every preset, since this is a correctness floor rather than a
     ///     speed/accuracy trade-off.
     ///     <para>
-    ///         The plateau rule measures warmup in <em>iterations</em>, but a fast body plateaus in
+    ///         The plateau rule measures warmup in <em>samples</em>, but a fast body plateaus in
     ///         microseconds of wall-clock - long before the background JIT delivers tier-1 (and
     ///         dynamic-PGO) code. Warmup then settles on the stable but slow tier-0 plateau and the
     ///         tier-1 switch lands mid-measurement as a step change, the dominant source of
@@ -147,7 +147,7 @@ public sealed record AutoTuneOptions
     ///     <para>
     ///         It is bounded above by the calibration+warmup budget share
     ///         (<see cref="WarmupBudgetFraction" /> of <see cref="MaxTuningTime" />) and by
-    ///         <see cref="MaxWarmup" />, either of which stops warmup first for a genuinely slow body.
+    ///         <see cref="MaxWarmupSamples" />, either of which stops warmup first for a genuinely slow body.
     ///         Set to <see cref="TimeSpan.Zero" /> to disable the floor (which also disables the
     ///         <see cref="RequireJitQuiescence" /> gate).
     ///     </para>
@@ -439,13 +439,13 @@ public sealed record AutoTuneOptions
 
     /// <summary>
     ///     The number of timed samples the jitter probe collects. Each sample runs
-    ///     <see cref="JitterCalibrationWorkPerSample" /> busy-weight iterations. Default 32 -
+    ///     <see cref="JitterCalibrationWorkPerSample" /> busy-weight samples. Default 32 -
     ///     enough to characterise the tail without measurably extending the tuning budget.
     /// </summary>
     public int JitterCalibrationSamples { get; init; } = 32;
 
     /// <summary>
-    ///     The number of deterministic arithmetic iterations each jitter sample performs. The
+    ///     The number of deterministic arithmetic samples each jitter sample performs. The
     ///     loop body is a multiply-accumulate over a private accumulator, chosen to be
     ///     CPU-bound, allocation-free, and not optimised away. Default 4096 - spans a few
     ///     microseconds on modern hardware, long enough to observe a scheduling preemption

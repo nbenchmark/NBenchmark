@@ -20,8 +20,8 @@ public sealed class TestMethodIsolationTests : IDisposable
 
     private static MeasurementOptions Fast() => MeasurementOptions.Default with
     {
-        Iterations = 16,
-        WarmupIterations = 1,
+        Samples = 16,
+        WarmupSamples = 1,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {
@@ -90,9 +90,9 @@ public sealed class TestMethodIsolationTests : IDisposable
         Assert.True(costly.Measured, costly.Refusal);
 
         Assert.True(
-            costly.Result!.Median > cheap.Result!.Median * 5,
-            $"the argument did not reach the worker: 200 spins={cheap.Result.Median:F0}ns, "
-            + $"20000 spins={costly.Result.Median:F0}ns");
+            costly.Result!.MedianNs > cheap.Result!.MedianNs * 5,
+            $"the argument did not reach the worker: 200 spins={cheap.Result.MedianNs:F0}ns, "
+            + $"20000 spins={costly.Result.MedianNs:F0}ns");
     }
 
     /// <summary>
@@ -142,8 +142,8 @@ public sealed class TestMethodIsolationTests : IDisposable
             Method(nameof(SubjectTests.DelayAsync)), [], "SubjectTests.DelayAsync",
             Fast() with
             {
-                Iterations = 3,
-                WarmupIterations = 0,
+                Samples = 3,
+                WarmupSamples = 0,
             },
             LaunchCounts.Single);
 
@@ -153,8 +153,8 @@ public sealed class TestMethodIsolationTests : IDisposable
         // The body delays 20 ms. A reading far below that means the await was skipped and only the
         // synchronous prefix was timed.
         Assert.True(
-            outcome.Result.Median > 10_000_000,
-            $"a 20 ms body measured {outcome.Result.Median / 1_000_000:F1} ms, so it was not awaited");
+            outcome.Result.MedianNs > 10_000_000,
+            $"a 20 ms body measured {outcome.Result.MedianNs / 1_000_000:F1} ms, so it was not awaited");
     }
 
     /// <summary>
@@ -221,7 +221,7 @@ public sealed class TestMethodIsolationTests : IDisposable
 
         public static void FastStatic() => Thread.SpinWait(200);
 
-        public void Spin(int iterations) => Thread.SpinWait(iterations);
+        public void Spin(int samples) => Thread.SpinWait(samples);
 
         public void TakesLong(long value) => Thread.SpinWait((int)value + 200);
 

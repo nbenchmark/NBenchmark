@@ -8,7 +8,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task Reports_diagnostic_when_PerClass_with_DbContext_ctor_parameter()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -33,7 +33,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_when_PerClass_with_scoped_service_implements_IStateReset()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
                    using NBenchmark.Lifecycle;
 
@@ -71,7 +71,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task Reports_diagnostic_when_IStateReset_implementation_is_empty()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
                    using NBenchmark.Lifecycle;
 
@@ -102,7 +102,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task Reports_diagnostic_when_IStateReset_implementation_is_an_empty_block()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
                    using NBenchmark.Lifecycle;
 
@@ -135,7 +135,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_when_sharing_is_declared_with_SharedState()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -166,7 +166,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task Reports_diagnostic_when_the_harness_default_is_PerClass()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    public class OrderBenchmarks
@@ -200,7 +200,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_when_the_harness_default_is_PerMethod()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    public class OrderBenchmarks
@@ -236,7 +236,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_when_the_class_overrides_a_PerClass_harness_default()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerMethod)]
@@ -272,7 +272,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_for_PerClass_with_a_single_benchmark_method()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -300,7 +300,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task Reports_diagnostic_for_a_non_public_constructor()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -329,7 +329,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_for_a_record_whose_only_reference_parameter_is_its_copy_constructor()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -348,7 +348,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_for_a_non_generic_ILogger_parameter()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -368,7 +368,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_for_PerMethod_with_DbContext()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerMethod)]
@@ -392,7 +392,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_for_PerClass_with_primitive_ctor_parameter()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -413,7 +413,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     {
         // string is a reference type but immutable; sharing it cannot contaminate state.
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -434,7 +434,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     {
         // The broadened heuristic now flags any non-primitive, non-ambient reference type.
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -456,7 +456,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_for_PerClass_with_HttpContext_parameter()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -475,7 +475,7 @@ public sealed class PerClassWithScopedServiceAnalyzerTests
     public async Task No_diagnostic_for_underspecified_DbContext_on_single_method_permethod()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerMethod)]

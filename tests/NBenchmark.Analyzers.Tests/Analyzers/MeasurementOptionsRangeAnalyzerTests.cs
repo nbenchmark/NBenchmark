@@ -11,7 +11,7 @@ public sealed class MeasurementOptionsRangeAnalyzerTests
                    using NBenchmark;
                    public class C {
                        public void M() {
-                           var opts = new MeasurementOptions { Iterations = 200000 };
+                           var opts = new MeasurementOptions { Samples = 200000 };
                        }
                    }
                    """;
@@ -27,7 +27,7 @@ public sealed class MeasurementOptionsRangeAnalyzerTests
                    using NBenchmark;
                    public class C {
                        public void M() {
-                           var opts = new MeasurementOptions { WarmupIterations = 50000 };
+                           var opts = new MeasurementOptions { WarmupSamples = 50000 };
                        }
                    }
                    """;
@@ -92,8 +92,8 @@ public sealed class MeasurementOptionsRangeAnalyzerTests
                    public class C {
                        public void M() {
                            var opts = new MeasurementOptions {
-                               Iterations = 200,
-                               WarmupIterations = 25,
+                               Samples = 200,
+                               WarmupSamples = 25,
                                ConfidenceLevel = 0.95
                            };
                        }
@@ -111,7 +111,7 @@ public sealed class MeasurementOptionsRangeAnalyzerTests
                    using NBenchmark;
                    public class C {
                        public void M() {
-                           var opts = new MeasurementOptions() with { Iterations = 200000 };
+                           var opts = new MeasurementOptions() with { Samples = 200000 };
                        }
                    }
                    """;
@@ -127,7 +127,7 @@ public sealed class MeasurementOptionsRangeAnalyzerTests
                    using NBenchmark;
                    public class C {
                        public void M() {
-                           var opts = new MeasurementOptions() with { WarmupIterations = 50000 };
+                           var opts = new MeasurementOptions() with { WarmupSamples = 50000 };
                        }
                    }
                    """;
@@ -159,7 +159,7 @@ public sealed class MeasurementOptionsRangeAnalyzerTests
                    using NBenchmark;
                    public class C {
                        public void M() {
-                           var opts = new MeasurementOptions() with { Iterations = 200, ConfidenceLevel = 0.95 };
+                           var opts = new MeasurementOptions() with { Samples = 200, ConfidenceLevel = 0.95 };
                        }
                    }
                    """;
@@ -175,8 +175,8 @@ public sealed class MeasurementOptionsRangeAnalyzerTests
                    using NBenchmark;
                    public class C {
                        public void M() {
-                           const int iterations = 200000;
-                           var opts = new MeasurementOptions { Iterations = iterations };
+                           const int samples = 200000;
+                           var opts = new MeasurementOptions { Samples = samples };
                        }
                    }
                    """;
@@ -192,7 +192,7 @@ public sealed class MeasurementOptionsRangeAnalyzerTests
                    using NBenchmark;
                    public class C {
                        public void M() {
-                           MeasurementOptions opts = new() { WarmupIterations = 50000 };
+                           MeasurementOptions opts = new() { WarmupSamples = 50000 };
                        }
                    }
                    """;

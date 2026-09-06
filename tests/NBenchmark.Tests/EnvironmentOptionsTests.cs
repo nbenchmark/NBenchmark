@@ -12,8 +12,7 @@ public class EnvironmentOptionsTests
 
         Assert.Null(opts.CpuAffinity);
         Assert.Null(opts.ProcessPriority);
-        Assert.False(opts.DedicatedHostGuidance);
-        Assert.False(opts.SuppressBuildConfigurationWarning);
+        Assert.False(opts.HostQualityWarnings);
     }
 
     [Fact]
@@ -112,21 +111,23 @@ public class BenchmarkSuiteEnvironmentFluentTests
     {
         var suite = new BenchmarkSuite("test");
 
-        suite.WithDedicatedHostGuidance();
+        suite.WithHostQualityWarnings();
 
         Assert.NotNull(suite.Environment);
-        Assert.True(suite.Environment!.DedicatedHostGuidance);
+        Assert.True(suite.Environment!.HostQualityWarnings);
     }
 
     [Fact]
-    public void WithSuppressBuildConfigurationWarning_Sets_Flag()
+    public void WithSuppressedWarnings_Sets_Flags()
     {
         var suite = new BenchmarkSuite("test");
 
-        suite.WithSuppressBuildConfigurationWarning();
+        suite.WithSuppressedWarnings(
+            BenchmarkWarnings.BuildConfiguration | BenchmarkWarnings.RuntimeProfile);
 
-        Assert.NotNull(suite.Environment);
-        Assert.True(suite.Environment!.SuppressBuildConfigurationWarning);
+        Assert.Equal(
+            BenchmarkWarnings.BuildConfiguration | BenchmarkWarnings.RuntimeProfile,
+            suite.ResolvedOptions.SuppressedWarnings);
     }
 
     [Fact]

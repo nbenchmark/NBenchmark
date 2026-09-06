@@ -136,14 +136,14 @@ This means a parameterized suite with `N` parameter combinations and `M` benchma
 
 ## Categories with parameters
 
-Use `categories` on parameterized `Add` overloads, then filter with `WithCategoryFilter`:
+Use `categories` on parameterized `Add` overloads, then filter with `FilterCategories`:
 
 ```csharp
 var results = await new BenchmarkSuite("search")
     .WithParameter("size", 10, 100)
     .Add("linear", (int size) => LinearSearch(size), categories: ["Brute"])
     .Add("binary", (int size) => BinarySearch(size), categories: ["Smart"])
-    .WithCategoryFilter(include: ["Smart"])
+    .FilterCategories(include: ["Smart"])
     .RunAsync();
 
 // Only runs "binary(size=10)" and "binary(size=100)"
@@ -222,7 +222,7 @@ var results = await new BenchmarkSuite("search")
 
 foreach (var r in results)
 {
-    Console.WriteLine($"{r.Name}: {r.Median:F0} ns");
+    Console.WriteLine($"{r.Name}: {r.MedianNs:F0} ns");
     // r.ParameterSet[0].Name  -> "size"
     // r.ParameterSet[0].Value -> 10 or 100
 }
@@ -232,7 +232,7 @@ foreach (var r in results)
 
 For more information, see the following pages:
 
-- [Parameterized benchmarks: Harness mode](./parameterized-harness.md) - The `[BenchmarkCase]` / `[BenchmarkCases]` attribute API.
+- [Parameterized benchmarks: Harness mode](./parameterized-harness.md) - The `[Arguments]` / `[ArgumentsSource]` attribute API.
 - [Suite mode](../usage-modes/suite-mode.md) - The full fluent API.
 - [Categories](./categories.md) - How to tag and filter benchmarks.
 - [Configuration](../reference/configuration.md) - All measurement options.

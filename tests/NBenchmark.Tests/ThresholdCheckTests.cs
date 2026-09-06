@@ -12,17 +12,17 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "slow", Mean = 120, Median = 120, Percentiles = [],
-                Min = 100, Max = 140, StandardDeviation = 8, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "slow", MeanNs = 120, MedianNs = 120, Percentiles = [],
+                MinNs = 100, MaxNs = 140, StandardDeviationNs = 8, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -40,17 +40,17 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "slow", Mean = 110, Median = 110, Percentiles = [],
-                Min = 95, Max = 125, StandardDeviation = 5, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "slow", MeanNs = 110, MedianNs = 110, Percentiles = [],
+                MinNs = 95, MaxNs = 125, StandardDeviationNs = 5, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -67,10 +67,10 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "solo", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "solo", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -87,11 +87,11 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "broken", Mean = 0, Median = 0, Percentiles = [],
-                Min = 0, Max = 0, StandardDeviation = 0, Errored = true,
+                Name = "broken", MeanNs = 0, MedianNs = 0, Percentiles = [],
+                MinNs = 0, MaxNs = 0, StandardDeviationNs = 0, Errored = true,
                 ErrorMessage = "error",
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -108,17 +108,17 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "baseline", Mean = 0, Median = 0, Percentiles = [],
-                Min = 0, Max = 0, StandardDeviation = 0, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 0, MedianNs = 0, Percentiles = [],
+                MinNs = 0, MaxNs = 0, StandardDeviationNs = 0, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "candidate", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "candidate", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -136,17 +136,17 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "baseline", Mean = 0, Median = 0, Percentiles = [],
-                Min = 0, Max = 0, StandardDeviation = 0, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 0, MedianNs = 0, Percentiles = [],
+                MinNs = 0, MaxNs = 0, StandardDeviationNs = 0, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "candidate", Mean = 0, Median = 0, Percentiles = [],
-                Min = 0, Max = 0, StandardDeviation = 0, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "candidate", MeanNs = 0, MedianNs = 0, Percentiles = [],
+                MinNs = 0, MaxNs = 0, StandardDeviationNs = 0, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -163,17 +163,17 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "slow", Mean = 120, Median = 120, Percentiles = [],
-                Min = 100, Max = 140, StandardDeviation = 8, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "slow", MeanNs = 120, MedianNs = 120, Percentiles = [],
+                MinNs = 100, MaxNs = 140, StandardDeviationNs = 8, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -187,10 +187,10 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -204,17 +204,17 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "faster", Mean = 50, Median = 50, Percentiles = [],
-                Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "faster", MeanNs = 50, MedianNs = 50, Percentiles = [],
+                MinNs = 40, MaxNs = 60, StandardDeviationNs = 3, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -231,24 +231,24 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "slow_one", Mean = 150, Median = 150, Percentiles = [],
-                Min = 130, Max = 170, StandardDeviation = 7, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "slow_one", MeanNs = 150, MedianNs = 150, Percentiles = [],
+                MinNs = 130, MaxNs = 170, StandardDeviationNs = 7, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "slow_two", Mean = 200, Median = 200, Percentiles = [],
-                Min = 180, Max = 260, StandardDeviation = 10, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "slow_two", MeanNs = 200, MedianNs = 200, Percentiles = [],
+                MinNs = 180, MaxNs = 260, StandardDeviationNs = 10, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -267,17 +267,17 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "fast", Mean = 50, Median = 50, Percentiles = [],
-                Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "fast", MeanNs = 50, MedianNs = 50, Percentiles = [],
+                MinNs = 40, MaxNs = 60, StandardDeviationNs = 3, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "slow", Mean = 200, Median = 200, Percentiles = [],
-                Min = 180, Max = 260, StandardDeviation = 10, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "slow", MeanNs = 200, MedianNs = 200, Percentiles = [],
+                MinNs = 180, MaxNs = 260, StandardDeviationNs = 10, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -295,25 +295,25 @@ public class ThresholdCheckTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "broken", Mean = 0, Median = 0, Percentiles = [],
-                Min = 0, Max = 0, StandardDeviation = 0, Errored = true,
+                Name = "broken", MeanNs = 0, MedianNs = 0, Percentiles = [],
+                MinNs = 0, MaxNs = 0, StandardDeviationNs = 0, Errored = true,
                 ErrorMessage = "error",
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "slow", Mean = 150, Median = 150, Percentiles = [],
-                Min = 130, Max = 170, StandardDeviation = 7, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "slow", MeanNs = 150, MedianNs = 150, Percentiles = [],
+                MinNs = 130, MaxNs = 170, StandardDeviationNs = 7, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -572,27 +572,27 @@ public class ThresholdCheckTests
         return new BenchmarkResult
         {
             Name = name,
-            Mean = median,
-            Median = median,
+            MeanNs = median,
+            MedianNs = median,
             Percentiles = [],
-            Min = median * 0.85,
-            Max = median * 1.2,
-            StandardDeviation = median * 0.05,
+            MinNs = median * 0.85,
+            MaxNs = median * 1.2,
+            StandardDeviationNs = median * 0.05,
             IsBaseline = isBaseline,
             RuntimeProfileName = runtimeProfileName,
             ClassName = className,
             IsolationStatus = isolationStatus,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 0,
+            SampleCount = 0,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
     }
 }

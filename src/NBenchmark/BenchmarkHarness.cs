@@ -48,7 +48,7 @@ public sealed class BenchmarkHarness
     /// </summary>
     /// <remarks>
     ///     Memoised because discovery is not a pure read. It <i>invokes</i> every
-    ///     <c>[BenchmarkCases]</c> source it meets, and a default run made two passes - one to read
+    ///     <c>[ArgumentsSource]</c> source it meets, and a default run made two passes - one to read
     ///     <c>[Runtimes]</c> attributes, one to run - with a third for a multi-runtime dispatch. Each
     ///     ran every case source again, with its side effects, and nothing said the three passes had to
     ///     agree: a source yielding different values on a second call produced a run whose case names
@@ -465,7 +465,7 @@ public sealed class BenchmarkHarness
     ///     of the run, removing inter-core migration noise. Cores are zero-based and
     ///     logical (as reported by the OS). The prior affinity is restored when the run
     ///     completes. Also propagated to isolated child processes. Call
-    ///     <see cref="WithDedicatedHostGuidance" /> alongside this to surface a warning
+    ///     <see cref="WithHostQualityWarnings" /> alongside this to surface a warning
     ///     when the host looks unsuitable.
     /// </summary>
     public BenchmarkHarness WithHardwareAffinity(params int[] cores)
@@ -517,11 +517,11 @@ public sealed class BenchmarkHarness
     ///     an unraisable process priority, or (on macOS) unobservable frequency scaling
     ///     and thermal throttling. The run still proceeds - this is guidance, not a gate.
     /// </summary>
-    public BenchmarkHarness WithDedicatedHostGuidance(bool enabled = true)
+    public BenchmarkHarness WithHostQualityWarnings(bool enabled = true)
     {
         _options = _options with
         {
-            Environment = (_options.Environment ?? new EnvironmentOptions()) with { DedicatedHostGuidance = enabled },
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { HostQualityWarnings = enabled },
         };
 
         return this;
@@ -546,32 +546,26 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     Suppresses the always-on Debug-build / debugger-attached guidance warning for
-    ///     this harness run. Use when measuring Debug behavior is intentional. Also
-    ///     propagated to isolated child processes.
+    ///     Silences the named setup warnings for this run. Flags combine, and each call replaces
+    ///     the previous set. Suppressing a warning never changes what is measured - only whether
+    ///     the engine reports that the setup is imperfect.
     /// </summary>
-    public BenchmarkHarness WithSuppressBuildConfigurationWarning(bool suppress = true)
+    public BenchmarkHarness WithSuppressedWarnings(BenchmarkWarnings warnings)
     {
-        _options = _options with
-        {
-            Environment = (_options.Environment ?? new EnvironmentOptions()) with
-            {
-                SuppressBuildConfigurationWarning = suppress,
-            },
-        };
+        _options = _options with { SuppressedWarnings = warnings };
 
         return this;
     }
 
     /// <summary>
-    ///     Sets the measurement profile, which bundles per-iteration GC, between-benchmark GC, and
-    ///     allocation tracking. <see cref="MeasurementProfile.Realistic" /> (the default) keeps natural
-    ///     GC pressure in the timing; <see cref="MeasurementProfile.Independent" /> isolates iterations
+    ///     Sets the GC behavior, which bundles per-sample GC, between-benchmark GC, and
+    ///     allocation tracking. <see cref="GcBehavior.Natural" /> (the default) keeps natural
+    ///     GC pressure in the timing; <see cref="GcBehavior.PerSampleCollect" /> isolates samples
     ///     for pure-CPU measurement.
     /// </summary>
-    public BenchmarkHarness WithMeasurementProfile(MeasurementProfile profile)
+    public BenchmarkHarness WithGcBehavior(GcBehavior profile)
     {
-        _options = _options with { Profile = profile };
+        _options = _options with { GcBehavior = profile };
         return this;
     }
 
@@ -639,7 +633,7 @@ public sealed class BenchmarkHarness
     ///     Turns the host drift canary on or off. On by default; switching it off takes no control
     ///     readings between benchmarks and silences the host-drift warning.
     /// </summary>
-    public BenchmarkHarness WithDriftCanary(bool enabled)
+    public BenchmarkHarness WithDriftCanary(bool enabled = true)
     {
         _options = _options with { DriftCanary = _options.DriftCanary with { Enabled = enabled } };
         return this;
@@ -695,7 +689,7 @@ public sealed class BenchmarkHarness
     ///     is set. This programmatic filter composes with the <c>--category</c> and
     ///     <c>--exclude-category</c> CLI flags.
     /// </summary>
-    public BenchmarkHarness WithCategoryFilter(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
+    public BenchmarkHarness FilterCategories(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
     {
         if (include is not null)
             AddCategories(_categoryFilterInclude, include, nameof(include));
@@ -922,7 +916,7 @@ public sealed class BenchmarkHarness
         var rawSamples = new Dictionary<string, double[]>();
 
         var suiteOptions = _cliArgs.DryRun
-            ? _options with { Iterations = 0, WarmupIterations = 0 }
+            ? _options with { Samples = 0, WarmupSamples = 0 }
             : MergeCliOptions(_options, _cliArgs);
 
         // Under --dry-run, --in-process, or WithIsolation(Isolation.Off), nothing is spawned. A dry run never
@@ -941,7 +935,7 @@ public sealed class BenchmarkHarness
         // guidance) for the duration of the run. The scope restores the prior process state on
         // dispose. A worker applies the same settings to itself from the options it was sent; this
         // covers in-process benchmarks and the coordinator's own thread.
-        using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
+        using var _ = EnvironmentControl.Apply(suiteOptions.Environment, suiteOptions.SuppressedWarnings);
 
         // Thread-scoped sibling, covering the same in-process rows. A worker opens its own on the
         // thread its measurement loop runs on, since a thread scope cannot cross a process.
@@ -980,8 +974,8 @@ public sealed class BenchmarkHarness
                 ? _cliArgs.Filter ?? "harness"
                 : $"{_cliArgs.Filter ?? "harness"} [in-process comparison]",
             totalBenchmarks,
-            _options.Profile.ToString(),
-            _cliArgs.Runtimes is { Count: > 0 } runtimes ? string.Join(",", runtimes.Select(r => r.ToTargetFramework())) : null,
+            _options.GcBehavior.ToString(),
+            _cliArgs.Runtimes is { Count: > 0 } runtimes ? string.Join(",", runtimes.Select(r => r.TargetFramework)) : null,
             _cliArgs.Seed,
             (_cliArgs.RunOrder ?? _runOrder).ToString());
 
@@ -1201,7 +1195,7 @@ public sealed class BenchmarkHarness
             return [];
         }
 
-        Console.WriteLine($"Building for runtimes: {string.Join(", ", runtimes.Select(r => r.ToTargetFramework()))}");
+        Console.WriteLine($"Building for runtimes: {string.Join(", ", runtimes.Select(r => r.TargetFramework))}");
 
         var builds = await MultiRuntimeOrchestrator
             .BuildForRuntimesAsync(runtimes, cancellationToken).ConfigureAwait(false);
@@ -1210,7 +1204,7 @@ public sealed class BenchmarkHarness
 
         foreach (var failed in failedBuilds)
         {
-            Console.Error.WriteLine($"  {failed.Moniker.ToTargetFramework()}: {failed.Error}");
+            Console.Error.WriteLine($"  {failed.Moniker.TargetFramework}: {failed.Error}");
         }
 
         var successfulBuilds = builds.Where(b => b.DllPath is not null).ToList();
@@ -1231,13 +1225,13 @@ public sealed class BenchmarkHarness
         var rawSamples = new Dictionary<string, double[]>();
 
         var suiteOptions = _cliArgs.DryRun
-            ? _options with { Iterations = 0, WarmupIterations = 0 }
+            ? _options with { Samples = 0, WarmupSamples = 0 }
             : MergeCliOptions(_options, _cliArgs);
 
         // Apply opt-in hardware/OS controls to this process for the duration of the multi-runtime
         // run, mirroring the single-runtime path. Each worker applies the same settings to itself
         // from the options it was sent; this scope covers the coordinator's own aggregation work.
-        using var _ = EnvironmentControl.Apply(suiteOptions.Environment);
+        using var _ = EnvironmentControl.Apply(suiteOptions.Environment, suiteOptions.SuppressedWarnings);
 
         // Resolve the observer once for the whole multi-runtime run so auto-attached
         // observers see one stream per RunAsync, mirroring the single-runtime path. The
@@ -1253,7 +1247,7 @@ public sealed class BenchmarkHarness
         {
             foreach (var build in successfulBuilds)
             {
-                var tfm = build.Moniker.ToTargetFramework();
+                var tfm = build.Moniker.TargetFramework;
 
                 try
                 {
@@ -1318,7 +1312,7 @@ public sealed class BenchmarkHarness
             if (_cliArgs.VerifyIsolation)
             {
                 IsolationAudit.RefuseCrossRuntimeComparison(
-                    runtimes.Select(r => r.ToTargetFramework()), Console.Out);
+                    runtimes.Select(r => r.TargetFramework), Console.Out);
             }
 
             return allResults;
@@ -1365,7 +1359,7 @@ public sealed class BenchmarkHarness
     {
         var results = new List<BenchmarkResult>();
         var rawSamples = new Dictionary<string, double[]>(StringComparer.Ordinal);
-        var tfm = moniker.ToTargetFramework();
+        var tfm = moniker.TargetFramework;
 
         var workerPath = WorkerLocator.ForOutputDirectory(build.OutputDirectory);
 
@@ -1460,7 +1454,7 @@ public sealed class BenchmarkHarness
                 // different runtimes out of each other's comparison groups.
                 var stamped = result with
                 {
-                    RuntimeMoniker = tfm,
+                    TargetFramework = tfm,
                     IsolationStatus = IsolationStatus.Isolated,
                     RawSamples = group.RawSamples.GetValueOrDefault(result.Name, []),
 
@@ -1683,7 +1677,7 @@ public sealed class BenchmarkHarness
     ///     by every launch, which quietly emptied the number the launch count exists to produce:
     ///     <see cref="LaunchAggregator" /> derives the reported standard error and margin of error
     ///     from the spread <i>between</i> launches, and three launches sharing one instance, one DI
-    ///     scope and one <c>[BenchmarkSetup]</c> are not three independent measurements of anything.
+    ///     scope and one <c>[GlobalSetup]</c> are not three independent measurements of anything.
     ///     Rebuilding also settles the reset question at the launch boundary by construction: there
     ///     is no state to carry across, so there is nothing for <see cref="IStateReset" /> to be
     ///     asked to do there.
@@ -1834,7 +1828,7 @@ public sealed class BenchmarkHarness
 
             // Inside the launch loop, for the reason given on RunPerClassInProcessAsync: a launch
             // count buys a between-launch spread, and launches sharing one instance and one
-            // [BenchmarkSetup] do not produce one.
+            // [GlobalSetup] do not produce one.
             for (var launchIdx = 0; launchIdx < perMethodLaunchCount && !faulted; launchIdx++)
             {
                 // Suppressed for every launch after the first, so a progress bar does not run

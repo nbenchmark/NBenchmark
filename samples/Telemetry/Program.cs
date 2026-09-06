@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using NBenchmark;
-using NBenchmark.Attributes;
 using NBenchmark.Exporters.OpenTelemetry;
 using NBenchmark.Reporters.Console;
 

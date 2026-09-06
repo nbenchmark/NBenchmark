@@ -47,7 +47,7 @@ public sealed class NamedFactoryResolutionTests : IDisposable
             DeclaringTypeFullName = FixtureType,
             MethodName = methodName,
         },
-        Options = MeasurementOptions.Default with { Iterations = 8, WarmupIterations = 1, OpsPerSample = 1 },
+        Options = MeasurementOptions.Default with { Samples = 8, WarmupSamples = 1, OpsPerSample = 1 },
         TotalBenchmarks = 1,
     };
 
@@ -75,7 +75,7 @@ public sealed class NamedFactoryResolutionTests : IDisposable
 
         Assert.Equal(NamedPlanFixtureNames.BenchmarkName, result.Name);
         Assert.False(result.Errored);
-        Assert.True(result.Median > 0);
+        Assert.True(result.MedianNs > 0);
     }
 
     /// <summary>

@@ -38,8 +38,8 @@ public sealed class InstanceLifetimeIsolationTests : IDisposable
 
     private static MeasurementOptions FastOptions => MeasurementOptions.Default with
     {
-        Iterations = 4,
-        WarmupIterations = 0,
+        Samples = 4,
+        WarmupSamples = 0,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {

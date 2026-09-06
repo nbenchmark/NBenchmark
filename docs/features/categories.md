@@ -13,7 +13,7 @@ NBenchmark supports tagging benchmarks with categories to include or exclude the
 Use `[BenchmarkCategory]` on methods, classes, or both. The attribute is repeatable.
 
 ```csharp
-using NBenchmark.Attributes;
+using NBenchmark;
 
 [BenchmarkCategory("String")]
 public class StringBenchmarks
@@ -67,27 +67,27 @@ If any `--category` flag is present, the engine excludes untagged benchmarks.
 
 ## Programmatic filtering
 
-In Harness mode, use `WithCategoryFilter`:
+In Harness mode, use `FilterCategories`:
 
 ```csharp
 await BenchmarkHarness.Create(args)
     .AddFromAssembly<StringBenchmarks>()
-    .WithCategoryFilter(include: ["String"], exclude: ["Slow"])
+    .FilterCategories(include: ["String"], exclude: ["Slow"])
     .RunAsync();
 ```
 
-In Suite mode, use `WithCategories` and `WithCategoryFilter`:
+In Suite mode, use `WithCategories` and `FilterCategories`:
 
 ```csharp
 var results = await new BenchmarkSuite("string")
     .Add("concat", () => "a" + "b", categories: ["Fast"])
     .Add("interpolate", () => $"a { "b" }", categories: ["Fast"])
     .Add("manyConcat", () => string.Concat(Enumerable.Range(0, 100)))
-    .WithCategoryFilter(include: ["Fast"])
+    .FilterCategories(include: ["Fast"])
     .RunAsync();
 ```
 
-`WithCategoryFilter` composes with CLI flags: each include source must match independently, while exclude lists are unioned. This allows you to set a default include list in code and still narrow it from the command line.
+`FilterCategories` composes with CLI flags: each include source must match independently, while exclude lists are unioned. This allows you to set a default include list in code and still narrow it from the command line.
 
 ## Categories in reports
 

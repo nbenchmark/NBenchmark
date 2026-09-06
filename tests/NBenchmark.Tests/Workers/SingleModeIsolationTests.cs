@@ -42,8 +42,8 @@ public sealed class SingleModeIsolationTests : IDisposable
 
     private static MeasurementOptions FastOptions => MeasurementOptions.Default with
     {
-        Iterations = 16,
-        WarmupIterations = 1,
+        Samples = 16,
+        WarmupSamples = 1,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {
@@ -101,7 +101,7 @@ public sealed class SingleModeIsolationTests : IDisposable
         Assert.Equal("steady-state", result.RuntimeProfileName);
         Assert.Equal("tiered=off pgo=off r2r=off concurrentGc=off", result.RuntimeKnobs);
 
-        Assert.True(result.Mean > 0);
+        Assert.True(result.MeanNs > 0);
         Assert.NotEmpty(result.RawSamples);
     }
 
@@ -121,8 +121,8 @@ public sealed class SingleModeIsolationTests : IDisposable
 
         // Zero, not 24 bytes: the worker binds Func<int>, not Func<object>.
         Assert.True(
-            result.AllocMedian is null or 0,
-            $"a body that allocates nothing reported {result.AllocMedian} B/op");
+            result.AllocatedBytesMedian is null or 0,
+            $"a body that allocates nothing reported {result.AllocatedBytesMedian} B/op");
     }
 
     /// <summary>
@@ -409,9 +409,9 @@ public sealed class SingleModeIsolationTests : IDisposable
         AssertIsolated(result);
 
         Assert.True(
-            result.Median > 10_000,
+            result.MedianNs > 10_000,
             $"expected the worker to have built the state before measuring, but the body cost "
-            + $"{result.Median:F1} ns - which is what an unprepared state would produce");
+            + $"{result.MedianNs:F1} ns - which is what an unprepared state would produce");
 
         // This process never built it, which is the other half of the same claim.
         Assert.Equal(0, PreparedStateProbe.Builds);
@@ -486,7 +486,7 @@ public sealed class SingleModeIsolationTests : IDisposable
         Assert.Equal(IsolationStatus.InProcessNoWorker, result.IsolationStatus);
 
         Assert.Equal(1, builds);
-        Assert.True(result.Median > 10_000, $"body measured {result.Median:F1} ns");
+        Assert.True(result.MedianNs > 10_000, $"body measured {result.MedianNs:F1} ns");
     }
 
     /// <summary>

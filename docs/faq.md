@@ -32,16 +32,16 @@ NBenchmark targets .NET 8, .NET 9, and .NET 10. You need the .NET 8 SDK or later
 
 A large error (margin of error) indicates that the measurements are highly variable. Common causes include:
 
-- **Insufficient iterations.** Try `WithIterations(500)` or higher.
+- **Insufficient samples.** Try `WithSamples(500)` or higher.
 - **OS scheduling noise.** Use `.WithOutlierMode(OutlierMode.IqrFence)` to discard extreme measurements from context switches or scheduler interrupts.
-- **Thermal throttling.** On laptops, the CPU may reduce clock speed mid-run. Increase warmup with `.WithWarmup(50)` to let the CPU stabilize before measurement, or reduce iterations to shorten the run.
-- **Variable code paths.** If your benchmark hits different code paths each iteration (for example, a cache that fills up), that variability is real and expected.
+- **Thermal throttling.** On laptops, the CPU may reduce clock speed mid-run. Increase warmup with `.WithWarmupSamples(50)` to let the CPU stabilize before measurement, or reduce samples to shorten the run.
+- **Variable code paths.** If your benchmark hits different code paths on each run of the body (for example, a cache that fills up), that variability is real and expected.
 
 For a full symptom-to-fix index and configuration remedies, see the [Troubleshooting guide](./troubleshooting.md).
 
 ### Why use the median instead of the mean?
 
-If a few iterations are very slow (for example, due to a GC pause), the mean is pulled upward, but the median is not. For most comparisons, the **median** better represents the steady-state performance of your code. The **mean** is most useful when read alongside the confidence interval.
+If a few samples are very slow (for example, due to a GC pause), the mean is pulled upward, but the median is not. For most comparisons, the **Median** better represents the steady-state performance of your code. The **Mean** is most useful when read alongside the confidence interval.
 
 ### My benchmark produces 0 ns. What's happening?
 
@@ -54,7 +54,7 @@ Use `--dry-run` to verify the body is being invoked. For more information on dea
 
 ### How does allocation tracking work? Does it include framework overhead?
 
-NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` immediately before and after the action. If an async benchmark resumes on a different thread, it falls back to a `GC.GetTotalAllocatedBytes` delta for that iteration.
+NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` immediately before and after the action. If an async benchmark resumes on a different thread, it falls back to a `GC.GetTotalAllocatedBytes` delta for that sample.
 
 Any allocations by the benchmark framework itself (such as setup/teardown delegates) that occur between the two reads are included, but this is usually negligible for simple benchmarks.
 
@@ -88,7 +88,7 @@ The `Sig` column is also blank for the baseline itself and when `EnableSignifica
 
 ### The result is significant but the difference is tiny. Should I care?
 
-Statistical significance does not imply practical importance. With many iterations, even a 0.1 ns difference can be statistically significant. Always combine the `Sig` column with the **Ratio** column to judge whether the difference is meaningful for your use case.
+Statistical significance does not imply practical importance. With many samples, even a 0.1 ns difference can be statistically significant. Always combine the `Sig` column with the **Ratio** column to judge whether the difference is meaningful for your use case.
 
 ### Which confidence level should I use?
 
@@ -98,7 +98,7 @@ A higher confidence level produces a **wider** (larger) error value.
 
 ### The Error column shows ±0 ns. Is that correct?
 
-`MarginOfError` is zero when `n < 2` (only one sample was collected) or when the measured standard deviation is exactly zero (all iterations took the same time). The latter occurs when the timer resolution is coarser than the benchmark duration; if every sample rounds to the same tick count, there is no measured spread.
+`MarginOfErrorNs` is zero when `n < 2` (only one sample was collected) or when the measured standard deviation is exactly zero (all samples took the same time). The latter occurs when the timer resolution is coarser than the benchmark duration; if every sample rounds to the same tick count, there is no measured spread.
 
 ---
 
@@ -139,7 +139,7 @@ public sealed class MyReporter : IReporter
     public Task ReportAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken = default)
     {
         foreach (var r in results.Where(r => !r.Errored))
-            System.Console.WriteLine($"{r.Name}: {r.Median:F0} ns");
+            System.Console.WriteLine($"{r.Name}: {r.MedianNs:F0} ns");
         return Task.CompletedTask;
     }
 }
@@ -148,7 +148,7 @@ public sealed class MyReporter : IReporter
 To make the reporter available via the `--reporter` CLI flag, register it with the global `ReporterRegistry`:
 
 ```csharp
-ReporterRegistry.Register("my-reporter", "Custom console output", _ => new MyReporter());
+ReporterRegistry.Register("my-reporter", "Custom console output", (_, detail) => new MyReporter { Detail = detail });
 ```
 
 Register the reporter in a `[ModuleInitializer]` in your package or at app startup before `BenchmarkHarness.Create(args)` is called.
@@ -188,7 +188,7 @@ Common causes include:
 1. The method is `static` (NBenchmark only measures instance methods).
 2. The class is abstract.
 3. The assembly containing the class was not passed to `AddFromAssembly`.
-4. The `[Benchmark]` attribute is from a different namespace (ensure you are using `NBenchmark.Attributes`).
+4. The `[Benchmark]` attribute is from a different namespace (ensure you are using `NBenchmark`).
 
 Use `--list` to check which benchmarks NBenchmark finds before running.
 
@@ -197,7 +197,7 @@ Use `--list` to check which benchmarks NBenchmark finds before running.
 `BenchmarkHarness` creates benchmark class instances using `Activator.CreateInstance`, which requires a **public parameterless constructor**. You can satisfy this requirement in three ways:
 
 1. **Add a parameterless constructor** that initializes dependencies. This is the simplest fix if the class has no real dependencies.
-2. **Use `[BenchmarkSetup]`** to populate fields on a parameterless-constructed instance.
+2. **Use `[GlobalSetup]`** to populate fields on a parameterless-constructed instance.
 3. **Use the `NBenchmark.DependencyInjection` companion package** to resolve the class from a container built by a factory:
 
 ```csharp

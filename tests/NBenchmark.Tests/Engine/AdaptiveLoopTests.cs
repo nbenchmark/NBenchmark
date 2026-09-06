@@ -14,8 +14,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 2,
-            WarmupIterations = 3,
-            Iterations = 5,
+            WarmupSamples = 3,
+            Samples = 5,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
         };
@@ -44,13 +44,13 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1, // pin K so no calibration runs
-            WarmupIterations = null, // auto warmup
-            Iterations = 10, // explicit measured count
+            WarmupSamples = null, // auto warmup
+            Samples = 10, // explicit measured count
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             // Isolate the plateau rule from the warmup time floor and JIT gate (both covered by
             // dedicated tests): with a scripted 1000 ns/sample body the 100 ms floor would otherwise
-            // hold warmup open to MaxWarmup instead of settling on the plateau.
+            // hold warmup open to MaxWarmupSamples instead of settling on the plateau.
             AutoTune = AutoTuneOptions.Default with { MinWarmupTime = TimeSpan.Zero, RequireJitQuiescence = false },
         };
 
@@ -59,7 +59,7 @@ public class AdaptiveLoopTests
 
         var result = RunSync(() => bodyCalls++, options, clock);
 
-        // Constant signal: plateau settles at MinWarmup + PlateauPatience * BatchSize = 8 + 3 * 8 = 32.
+        // Constant signal: plateau settles at MinWarmupSamples + PlateauPatience * BatchSize = 8 + 3 * 8 = 32.
         Assert.Equal(32, result.ResolvedWarmup);
         Assert.Equal(WarmupStopReason.Settled, result.Diagnostic.WarmupStop);
         Assert.Empty(result.Warnings);
@@ -77,8 +77,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0, // no warmup
-            Iterations = null, // auto sample count -> CI detector
+            WarmupSamples = 0, // no warmup
+            Samples = null, // auto sample count -> CI detector
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
         };
@@ -108,8 +108,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0, // no warmup
-            Iterations = null, // auto sample count -> CI detector
+            WarmupSamples = 0, // no warmup
+            Samples = null, // auto sample count -> CI detector
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
         };
@@ -141,8 +141,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 2,
-            WarmupIterations = 1,
-            Iterations = 4, // pinned measured count -> no CI detector is constructed
+            WarmupSamples = 1,
+            Samples = 4, // pinned measured count -> no CI detector is constructed
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
         };
@@ -154,7 +154,7 @@ public class AdaptiveLoopTests
         Assert.Equal(SampleStopReason.ExplicitCount, result.Diagnostic.SampleStop);
         Assert.Equal(4, result.Diagnostic.ResolvedSamples);
 
-        // The CI detector is built only in auto mode (Iterations == null). A pinned run has no
+        // The CI detector is built only in auto mode (Samples == null). A pinned run has no
         // detector, so no series is recorded.
         Assert.Empty(result.Diagnostic.CiWidthSeries);
     }
@@ -167,8 +167,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = null, // auto-calibrate
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             // Isolate Phase A calibration, and pin the 1 µs target this test's scripted timings assume
@@ -222,8 +222,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = null, // auto-calibrate
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             // Isolate Phase A; pin the 1 µs target so the short-circuit ratio below is unambiguous.
@@ -260,8 +260,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = null, // auto-calibrate against cold speed
-            WarmupIterations = null, // auto warmup (recalibration only runs in this path)
-            Iterations = 3,
+            WarmupSamples = null, // auto warmup (recalibration only runs in this path)
+            Samples = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             // 10 µs target; isolate from the warmup time floor / JIT gate so warmup settles on the
@@ -301,8 +301,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = null,
-            WarmupIterations = null,
-            Iterations = 3,
+            WarmupSamples = null,
+            Samples = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
@@ -338,8 +338,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = null, // auto, but an iteration setup disqualifies calibration
-            WarmupIterations = 0,
-            Iterations = 5,
+            WarmupSamples = 0,
+            Samples = 5,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
         };
@@ -363,8 +363,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = opsPerSample,
-            WarmupIterations = 1, // JIT the body before measuring so allocation deltas are clean
-            Iterations = 3,
+            WarmupSamples = 1, // JIT the body before measuring so allocation deltas are clean
+            Samples = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = true,
         };
@@ -402,8 +402,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = null, // auto -> would otherwise collect at least MinSamples (30)
+            WarmupSamples = 0,
+            Samples = null, // auto -> would otherwise collect at least MinSamples (30)
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 }, // 5000 ns
@@ -432,8 +432,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = null, // auto -> CI detector; MinSamples (30) never reached under the cap
+            WarmupSamples = 0,
+            Samples = null, // auto -> CI detector; MinSamples (30) never reached under the cap
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             // Base cap 10000 ns (10 samples), grace ceiling 20000 ns (20 samples). Both below the
@@ -464,8 +464,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = null,
+            WarmupSamples = 0,
+            Samples = null,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             // Base cap 25000 ns (25 samples), grace ceiling 50000 ns. MinSamples (30) sits between
@@ -492,8 +492,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = null,
+            WarmupSamples = 0,
+            Samples = null,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(100), CapGraceFactor = 2.0 },
@@ -521,15 +521,15 @@ public class AdaptiveLoopTests
     [Fact]
     public void WallClock_Cap_With_Pinned_Iterations_Reports_Collected_Of_Pinned()
     {
-        // When the user pinned --iterations and the cap fires before that count is reached, the
-        // warning must not suggest "pinning --iterations" (they already did). Instead it should
+        // When the user pinned --samples and the cap fires before that count is reached, the
+        // warning must not suggest "pinning --samples" (they already did). Instead it should
         // report how many of the requested samples were collected and suggest a lower pinned
         // count or a larger cap.
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 1_000, // pinned count, far above what the cap allows
+            WarmupSamples = 0,
+            Samples = 1_000, // pinned count, far above what the cap allows
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 }, // 5000 ns
@@ -539,21 +539,21 @@ public class AdaptiveLoopTests
 
         var result = RunSync(() => { }, options, clock);
 
-        // The 5000 ns cap fires after 5 of the pinned 1000 iterations.
+        // The 5000 ns cap fires after 5 of the pinned 1000 samples.
         Assert.Equal(SampleStopReason.WallClockCap, result.Diagnostic.SampleStop);
         Assert.Equal(5, result.PerOpTimings.Length);
         Assert.Single(result.Warnings);
 
-        // The pinned-iterations message names both counts and points at --iterations, not
-        // "pinning --iterations". Use the raw value (5) directly so the assertion is robust to
+        // The pinned-samples message names both counts and points at --samples, not
+        // "pinning --samples". Use the raw value (5) directly so the assertion is robust to
         // culture-dependent thousands separators in :N0 formatting.
         var warning = result.Warnings[0];
         Assert.Contains("wall-clock tuning cap", warning);
         Assert.Contains("after collecting 5 of the pinned", warning);
-        Assert.Contains("iterations", warning);
+        Assert.Contains("samples", warning);
         Assert.Contains("--max-tuning-time", warning);
-        Assert.Contains("reducing --iterations", warning);
-        Assert.DoesNotContain("pinning --iterations", warning);
+        Assert.Contains("reducing --samples", warning);
+        Assert.DoesNotContain("pinning --samples", warning);
     }
 
     [Fact]
@@ -562,8 +562,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = null, // auto warmup
-            Iterations = 0, // measurement phase exits immediately on explicit count
+            WarmupSamples = null, // auto warmup
+            Samples = 0, // measurement phase exits immediately on explicit count
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 }, // 5000 ns
@@ -593,8 +593,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 2,
-            Iterations = 4,
+            WarmupSamples = 2,
+            Samples = 4,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
         };
@@ -633,8 +633,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = null, // auto-calibrate K
-            WarmupIterations = null, // auto warmup (skipped if calibration is capped)
-            Iterations = 5, // explicit measured count
+            WarmupSamples = null, // auto warmup (skipped if calibration is capped)
+            Samples = 5, // explicit measured count
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
@@ -666,20 +666,20 @@ public class AdaptiveLoopTests
     public void WallClock_Cap_Warning_Shows_The_Cap_Not_The_Elapsed_Time()
     {
         // Auto warmup with a constant signal would normally settle at 32 samples
-        // (MinWarmup 8 + PlateauPatience 3 * BatchSize 8). Push MinWarmup + Patience high
+        // (MinWarmupSamples 8 + PlateauPatience 3 * BatchSize 8). Push MinWarmupSamples + Patience high
         // so the plateau would only settle well past the cap, and pair with a small cap
         // so warmup exhausts the budget before plateau settles.
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = null, // auto warmup
-            Iterations = 0, // measurement exits immediately on explicit count
+            WarmupSamples = null, // auto warmup
+            Samples = 0, // measurement exits immediately on explicit count
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 MaxTuningTime = TimeSpan.FromTicks(50), // 5000 ns cap
-                MinWarmup = 1_000,
+                MinWarmupSamples = 1_000,
                 PlateauPatience = 1_000,
             },
         };
@@ -704,8 +704,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = null, // auto -> CI detector
+            WarmupSamples = 0,
+            Samples = null, // auto -> CI detector
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
@@ -742,8 +742,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = null,
+            WarmupSamples = 0,
+            Samples = null,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
@@ -774,8 +774,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
@@ -803,8 +803,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
@@ -827,8 +827,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
 
             // Leave OutlierMode at the default IqrFence so the auto-switch is eligible.
             MeasureAllocations = false,
@@ -862,7 +862,7 @@ public class AdaptiveLoopTests
         // The switch produces a warning explaining what happened.
         Assert.Single(result.Warnings);
         Assert.Contains("auto-switch", result.Warnings[0]);
-        Assert.Contains("IQR fence to Median Absolute Deviation", result.Warnings[0]);
+        Assert.Contains("IQR fence to Median absolute deviation", result.Warnings[0]);
     }
 
     [Fact]
@@ -873,8 +873,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
             OutlierMode = OutlierMode.RemoveTop5Percent, // not IqrFence -> switch is not eligible
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
@@ -908,8 +908,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
 
             // Custom detector pinned -> switch is not eligible, even with OutlierMode at default.
             OutlierDetector = static () => OutlierDetectors.None,
@@ -943,8 +943,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
@@ -977,8 +977,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = 3,
+            WarmupSamples = 0,
+            Samples = 3,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
@@ -1019,8 +1019,8 @@ public class AdaptiveLoopTests
         var spec = new RunSpec
         {
             Options = options,
-            IterationSetup = setup,
-            IterationTeardown = teardown,
+            SampleSetup = setup,
+            SampleTeardown = teardown,
         };
 
         return AdaptiveLoop.Run(
@@ -1044,8 +1044,8 @@ public class AdaptiveLoopTests
     private static MeasurementOptions DriftOptions(int restartLimit) => MeasurementOptions.Default with
     {
         OpsPerSample = 1, // pin K so calibration consumes no scripted samples
-        WarmupIterations = 0, // no warmup, so scripted sample 0 is the first measured sample
-        Iterations = null, // auto -> CI detector, so the drift gate is consulted
+        WarmupSamples = 0, // no warmup, so scripted sample 0 is the first measured sample
+        Samples = null, // auto -> CI detector, so the drift gate is consulted
         OutlierMode = OutlierMode.None,
         MeasureAllocations = false,
         AutoTune = AutoTuneOptions.Default with
@@ -1182,14 +1182,14 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = null, // auto warmup
-            Iterations = 4,
+            WarmupSamples = null, // auto warmup
+            Samples = 4,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 EnableJitterCalibration = false,
-                MaxWarmup = 20, // 20 samples x 1000 ns = 20 us, nowhere near the 250 ms floor
+                MaxWarmupSamples = 20, // 20 samples x 1000 ns = 20 us, nowhere near the 250 ms floor
                 RequireJitQuiescence = false,
             },
         };
@@ -1212,14 +1212,14 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = null,
-            Iterations = 4,
+            WarmupSamples = null,
+            Samples = 4,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 EnableJitterCalibration = false,
-                MaxWarmup = 20,
+                MaxWarmupSamples = 20,
                 RequireJitQuiescence = false,
             },
         };
@@ -1243,8 +1243,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = null,
+            WarmupSamples = 0,
+            Samples = null,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
@@ -1268,8 +1268,8 @@ public class AdaptiveLoopTests
         var options = MeasurementOptions.Default with
         {
             OpsPerSample = 1,
-            WarmupIterations = 0,
-            Iterations = null,
+            WarmupSamples = 0,
+            Samples = null,
             OutlierMode = OutlierMode.None,
             MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },

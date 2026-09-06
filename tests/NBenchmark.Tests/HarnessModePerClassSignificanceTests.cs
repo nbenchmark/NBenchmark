@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Engine;
 using NBenchmark.Tests.Workers;
 using NBenchmark.Workers;
@@ -16,12 +16,12 @@ public class HarnessModePerClassSignificanceTests
 
         harness
             .AddFromAssembly(typeof(HarnessModePerClassSignificanceTests).Assembly)
-            .WithCategoryFilter(["harness-perclass"])
+            .FilterCategories(["harness-perclass"])
             .WithLaunchCount(1)
             .WithOptions(new MeasurementOptions
             {
-                Iterations = 20,
-                WarmupIterations = 0,
+                Samples = 20,
+                WarmupSamples = 0,
                 OutlierMode = OutlierMode.None,
             })
             .WithIsolation(Isolation.Required);
@@ -71,12 +71,12 @@ public class HarnessModePerClassSignificanceTests
 
         harness
             .AddFromAssembly(typeof(HarnessModePerClassSignificanceTests).Assembly)
-            .WithCategoryFilter(["harness-perclass"])
+            .FilterCategories(["harness-perclass"])
             .WithLaunchCount(1)
             .WithOptions(new MeasurementOptions
             {
-                Iterations = 20,
-                WarmupIterations = 0,
+                Samples = 20,
+                WarmupSamples = 0,
                 OutlierMode = OutlierMode.None,
             })
             .WithIsolation(Isolation.Required)
@@ -136,30 +136,29 @@ public class HarnessModePerClassSignificanceTests
             {
                 Name = fullName,
                 ClassName = prefix,
-                Mean = median,
-                Median = median,
+                MeanNs = median,
+                MedianNs = median,
                 Percentiles = [],
-                Min = median * 0.95,
-                Max = median * 1.10,
-                StandardDeviation = median * 0.02,
-                StandardError = median * 0.005,
-                MarginOfError = median * 0.01,
+                MinNs = median * 0.95,
+                MaxNs = median * 1.10,
+                StandardDeviationNs = median * 0.02,
+                StandardErrorNs = median * 0.005,
+                MarginOfErrorNs = median * 0.01,
                 ConfidenceLevel = 0.95,
                 CoefficientOfVariation = 0.02,
-                Q1 = median * 0.98,
-                Q3 = median * 1.02,
-                InterquartileRange = median * 0.04,
+                Q1Ns = median * 0.98,
+                Q3Ns = median * 1.02,
+                InterquartileRangeNs = median * 0.04,
                 OutliersRemoved = 0,
-                N = rawSamples.Length,
+                SampleCount = rawSamples.Length,
                 Skewness = 0,
                 Kurtosis = 0,
-                Mad = median * 0.01,
-                AllocMedian = null,
-                AllocP95 = null,
-                AllocMax = null,
+                MedianAbsoluteDeviationNs = median * 0.01,
+                AllocatedBytesMedian = null,
+                AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
                 OperationsPerSecond = 1_000_000_000.0 / median,
-                MeasuredIterations = rawSamples.Length,
-                WarmupIterations = 0,
+                WarmupSamples = 0,
                 IsBaseline = isBaseline,
                 Errored = false,
             });
@@ -170,7 +169,7 @@ public class HarnessModePerClassSignificanceTests
         return new WorkerGroupRunner.GroupResult { Results = results, RawSamples = samples, Faults = [] };
     }
 
-    private static (double Median, double[] RawSamples, bool IsBaseline) GetDeterministicData(
+    private static (double MedianNs, double[] RawSamples, bool IsBaseline) GetDeterministicData(
         string prefix,
         string displayName)
     {

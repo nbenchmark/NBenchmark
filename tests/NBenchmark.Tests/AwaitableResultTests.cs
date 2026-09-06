@@ -26,7 +26,7 @@ public sealed class AwaitableResultTests
 {
     private static RunSpec Spec => new()
     {
-        Options = MeasurementOptions.Default with { Iterations = 1, WarmupIterations = 0, OpsPerSample = 1 },
+        Options = MeasurementOptions.Default with { Samples = 1, WarmupSamples = 0, OpsPerSample = 1 },
         Progress = NullBenchmarkProgress.Instance,
     };
 
@@ -72,15 +72,15 @@ public sealed class AwaitableResultTests
     /// <remarks>
     ///     This is the shape a user actually writes: <c>Add("x", s =&gt; s.WorkAsync())</c> binds the
     ///     synchronous <c>Add&lt;TResult&gt;</c> overload with <c>TResult = ValueTask</c>, because
-    ///     <c>AddAsync</c> is a different method name and overload resolution has no reason to prefer it.
+    ///     <c>Add</c> is a different method name and overload resolution has no reason to prefer it.
     /// </remarks>
     [Fact]
     public async Task Suite_AddOverAValueTaskBody_ErrorsRatherThanMeasuringNothing()
     {
         var results = await new BenchmarkSuite("vt")
             .WithIsolation(Isolation.Off)
-            .WithIterations(1)
-            .WithWarmup(0)
+            .WithSamples(1)
+            .WithWarmupSamples(0)
             .Add("work", static () => default(ValueTask))
             .RunAsync();
 

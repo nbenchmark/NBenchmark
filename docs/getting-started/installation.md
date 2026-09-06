@@ -66,7 +66,7 @@ The output is similar to the following:
 ```text
   ┌─ Benchmark ─────────────────────────────────────
   │
-  │  Median: 1.20 µs       Ops/s: 833.3 Kops/s
+  │  MedianNs: 1.20 µs       Ops/s: 833.3 Kops/s
   │  Alloc/op: 0 B
   │
   │  Measured in an isolated worker under 'steady-state'.

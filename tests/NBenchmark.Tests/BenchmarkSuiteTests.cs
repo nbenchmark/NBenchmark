@@ -19,8 +19,8 @@ public class BenchmarkSuiteTests
         var results = await new BenchmarkSuite("capture").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
             .Add("b", () => { })
-            .WithWarmup(1)
-            .WithIterations(2)
+            .WithWarmupSamples(1)
+            .WithSamples(2)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -34,8 +34,8 @@ public class BenchmarkSuiteTests
             .Add("baseline", () => Thread.SpinWait(1000))
             .Add("faster", () => Thread.SpinWait(500))
             .WithBaseline("baseline")
-            .WithWarmup(2)
-            .WithIterations(20)
+            .WithWarmupSamples(2)
+            .WithSamples(20)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -60,8 +60,8 @@ public class BenchmarkSuiteTests
         var results = await new BenchmarkSuite("boom").WithIsolation(Isolation.Preferred)
             .Add("explodes", () => throw new InvalidOperationException("nope"))
             .Add("calm", () => { })
-            .WithWarmup(1)
-            .WithIterations(5)
+            .WithWarmupSamples(1)
+            .WithSamples(5)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -81,8 +81,8 @@ public class BenchmarkSuiteTests
 
         var suite = new BenchmarkSuite("cancel-teardown").WithIsolation(Isolation.Preferred)
             .Add("self-cancelling", () => cts.Cancel())
-            .WithWarmup(0)
-            .WithIterations(5)
+            .WithWarmupSamples(0)
+            .WithSamples(5)
             .WithOutlierMode(OutlierMode.None)
             .WithSuiteTeardown(() => teardownRan = true);
 
@@ -99,8 +99,8 @@ public class BenchmarkSuiteTests
         await new BenchmarkSuite("progress").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
             .Add("b", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .WithProgress(progress)
@@ -128,8 +128,8 @@ public class BenchmarkSuiteTests
 
         var suite = new BenchmarkSuite("ordering").WithIsolation(Isolation.Preferred)
             .Add("work", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithSuiteSetup(() => events.Add("setup"))
             .WithSuiteTeardown(() => events.Add("teardown"))
@@ -148,8 +148,8 @@ public class BenchmarkSuiteTests
         var results = await new BenchmarkSuite("tagged").WithIsolation(Isolation.Preferred)
             .Add("fast", () => { }, categories: ["Fast"])
             .Add("slow", () => { }, categories: ["Slow"])
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -167,8 +167,8 @@ public class BenchmarkSuiteTests
             .WithCategories("Shared")
             .Add("a", () => { })
             .Add("b", () => { }, categories: ["Extra"])
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -185,8 +185,8 @@ public class BenchmarkSuiteTests
         var results = await new BenchmarkSuite("normalized").WithIsolation(Isolation.Preferred)
             .WithCategories(" Fast ", "fast")
             .Add("x", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -204,7 +204,7 @@ public class BenchmarkSuiteTests
     public void WithCategoryFilter_WithBlankCategory_Throws()
     {
         var suite = new BenchmarkSuite("bad-filter").WithIsolation(Isolation.Preferred);
-        Assert.Throws<ArgumentException>(() => suite.WithCategoryFilter([" "]));
+        Assert.Throws<ArgumentException>(() => suite.FilterCategories([" "]));
     }
 
     [Fact]
@@ -214,9 +214,9 @@ public class BenchmarkSuiteTests
             .Add("fast", () => { }, categories: ["Fast"])
             .Add("slow", () => { }, categories: ["Slow"])
             .Add("untagged", () => { })
-            .WithCategoryFilter(["Fast"])
-            .WithWarmup(0)
-            .WithIterations(1)
+            .FilterCategories(["Fast"])
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -231,9 +231,9 @@ public class BenchmarkSuiteTests
             .Add("fast", () => { }, categories: ["Fast"])
             .Add("slow", () => { }, categories: ["Slow"])
             .Add("untagged", () => { })
-            .WithCategoryFilter(exclude: ["Slow"])
-            .WithWarmup(0)
-            .WithIterations(1)
+            .FilterCategories(exclude: ["Slow"])
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -248,9 +248,9 @@ public class BenchmarkSuiteTests
             .Add("a", () => { }, categories: ["A"])
             .Add("b", () => { }, categories: ["B"])
             .Add("c", () => { }, categories: ["C"])
-            .WithCategoryFilter(["A", "B"])
-            .WithWarmup(0)
-            .WithIterations(1)
+            .FilterCategories(["A", "B"])
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -270,8 +270,8 @@ public class BenchmarkSuiteTests
             .Add("c", () => { })
             .Add("d", () => { })
             .Add("e", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Random)
             .WithProgress(progress)
@@ -304,10 +304,10 @@ public class BenchmarkSuiteTests
             return Task.CompletedTask;
         }
 
-        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
+        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
         public Task OnWarmupCompleted(string name) => Task.CompletedTask;
         public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
-        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
+        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
         public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
 
         public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results)
@@ -329,7 +329,7 @@ public class BenchmarkSuiteTests
             return Task.CompletedTask;
         }
 
-        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
+        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
 
         public Task OnWarmupCompleted(string name) => Task.CompletedTask;
 
@@ -339,7 +339,7 @@ public class BenchmarkSuiteTests
             return Task.CompletedTask;
         }
 
-        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
+        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
 
         public Task OnBenchmarkCompleted(BenchmarkResult result) => Task.CompletedTask;
 

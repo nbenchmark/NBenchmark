@@ -37,13 +37,7 @@ BenchmarkHarness.Create(args)
     .WithObserver(myObserver);
 ```
 
-Or attach via `RunSpec.Observer` when using `BenchmarkRunner` directly:
-
-```csharp
-var runner = BenchmarkRunner.Instance;
-var spec = new RunSpec { Observer = myObserver };
-runner.Run("myBenchmark", () => Work(), spec);
-```
+`WithObserver` is the only way to attach one: the engine's per-benchmark runner is internal, so a Single-mode `Benchmark.Run` call cannot take an observer. Wrap the body in a one-benchmark suite when you need sample-level telemetry for a single measurement.
 
 In Harness mode, you can activate observers from the CLI using the `--observer <name>` flag (see [CLI Reference](cli.md#diagnostics)). The CLI resolves the name through `ObserverRegistry`. External packages self-register their observers via `[ModuleInitializer]`, mirroring the pattern used by reporters.
 
@@ -90,7 +84,7 @@ public readonly record struct MeasurementPhaseEvent(
 - `JitterMetric`: Present only for `Phase 0` `Completed` events.
 - `DetectorSwitched`: Meaningful only for `Phase 0` `Completed` events (`true` = IQR $\rightarrow$ MAD auto-switch).
 - `ResolvedK`: Set on `Calibration` completed; the calibrated ops-per-sample count.
-- `ResolvedWarmup`: Set on `Warmup` completed; the number of warmup iterations that ran.
+- `ResolvedWarmup`: Set on `Warmup` completed; the number of warmup samples that ran.
 - `WarmupStop`: Set on `Warmup` completed; why warmup stopped (e.g., `ExplicitCount`, `Settled`, `MaxCeiling`, `WallClockCap`).
 - `SampleStop`: Set on `Measurement` completed; why measurement stopped (e.g., `ExplicitCount`, `CiTargetMet`, `MaxCeiling`, `WallClockCap`).
 
@@ -115,17 +109,17 @@ public readonly record struct DetectorStateEvent(
     string BenchmarkName,
     MeasurementPhase Phase,
     int SampleCount,
-    double Mean,
+    double MeanNs,
     double StdDev,
     double CiHalfWidth,
     int CurrentK);
 ```
 
-NBenchmark emits this event after detector updates. During calibration, `Mean`, `StdDev`, and `CiHalfWidth` reflect the calibrator's probe readings. During measurement, this event is emitted when the stop rule resolves (or at phase completion fallback), and `CiHalfWidth` provides the convergence signal.
+NBenchmark emits this event after detector updates. During calibration, `MeanNs`, `StdDev`, and `CiHalfWidth` reflect the calibrator's probe readings. During measurement, this event is emitted when the stop rule resolves (or at phase completion fallback), and `CiHalfWidth` provides the convergence signal.
 
 ### BenchmarkResult
 
-The final result fires once per benchmark from `BenchmarkRunner.OnResult`. It contains the runner-assembled per-benchmark statistics and diagnostics before any suite-level post-processing.
+The final result fires once per benchmark, carrying the per-benchmark statistics and diagnostics as the engine assembled them - before any suite-level post-processing such as baseline ratios or significance.
 
 ## Event lifecycle
 
@@ -146,7 +140,7 @@ A typical benchmark with auto-warmup and auto-measurement emits events in this o
 13. `OnPhase(MeasurementPhase.Measurement, Completed)` - with `SampleStop`.
 14. `OnResult(result)` - final assembled `BenchmarkResult`.
 
-If `OpsPerSample` is pinned or `WarmupIterations` is 0, the corresponding phases are omitted.
+If `OpsPerSample` is pinned or `WarmupSamples` is 0, the corresponding phases are omitted.
 
 ## Isolated runs
 
@@ -219,12 +213,12 @@ public class LoggingObserver : IMeasurementObserver
     public void OnDetector(in DetectorStateEvent e)
     {
         Console.WriteLine($"[{e.BenchmarkName}] Detector [{e.Phase}]: " +
-            $"n={e.SampleCount}, mean={e.Mean:F2}, ci%={e.CiHalfWidth * 100:F2}");
+            $"n={e.SampleCount}, mean={e.MeanNs:F2}, ci%={e.CiHalfWidth * 100:F2}");
     }
 
     public void OnResult(BenchmarkResult result)
     {
-        Console.WriteLine($"[{result.Name}] Mean: {result.Statistics.Mean}");
+        Console.WriteLine($"[{result.Name}] MeanNs: {result.Statistics.MeanNs}");
     }
 }
 ```

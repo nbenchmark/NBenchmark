@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using NBenchmark.Lifecycle;
@@ -28,8 +28,8 @@ public sealed class RequiredIsolationTests
     /// </summary>
     private static MeasurementOptions Fast => MeasurementOptions.Default with
     {
-        Iterations = 2,
-        WarmupIterations = 0,
+        Samples = 2,
+        WarmupSamples = 0,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {
@@ -176,7 +176,7 @@ public sealed class RequiredIsolationTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(RequiredIsolationTests).Assembly)
-            .WithCategoryFilter(["require-isolation-gate"])
+            .FilterCategories(["require-isolation-gate"])
 
             // A live factory: the coordinator holds it, so no worker can reproduce it.
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
@@ -221,7 +221,7 @@ public sealed class RequiredIsolationTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(RequiredIsolationTests).Assembly)
-            .WithCategoryFilter(["require-isolation-gate"])
+            .FilterCategories(["require-isolation-gate"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
             .WithOptions(Fast)
@@ -266,7 +266,7 @@ public sealed class RequiredIsolationTests
         var harness = (BenchmarkHarness)Activator.CreateInstance(typeof(BenchmarkHarness), true)!;
 
         harness.AddFromAssembly(typeof(RequiredIsolationTests).Assembly)
-            .WithCategoryFilter(["require-isolation-denied"])
+            .FilterCategories(["require-isolation-denied"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
             .WithOptions(Fast)

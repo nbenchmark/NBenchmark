@@ -8,7 +8,7 @@ public sealed class StaticBenchmarkMethodAnalyzerTests
     public async Task Reports_static_method()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public static void M() { }
@@ -23,7 +23,7 @@ public sealed class StaticBenchmarkMethodAnalyzerTests
     public async Task No_diagnostic_for_instance_method()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public void M() { }
@@ -38,7 +38,7 @@ public sealed class StaticBenchmarkMethodAnalyzerTests
     public async Task No_diagnostic_for_static_non_benchmark()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        public static void M() { }
                        [Benchmark]

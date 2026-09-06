@@ -83,7 +83,7 @@ Every flag supported by `BenchmarkHarness` works unchanged:
 ```bash
 dotnet benchmark --filter "*Sort*"
 dotnet benchmark --reporter json --output ./results
-dotnet benchmark --iterations 500 --warmup 50
+dotnet benchmark --samples 500 --warmup-samples 50
 dotnet benchmark --detail advanced
 dotnet benchmark --threshold-pct 20
 dotnet benchmark --list

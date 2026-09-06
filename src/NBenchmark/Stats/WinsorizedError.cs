@@ -161,12 +161,12 @@ public readonly record struct TrimContext(double[] SortedAll, int TrimmedLow, in
 ///     standard error of the trimmed mean derived from it, the corresponding margin of error, and
 ///     the degrees of freedom the interval was read on.
 /// </summary>
-/// <param name="StandardDeviation">The Winsorized standard deviation <c>s_w</c> (with the <c>n - 1</c> denominator).</param>
-/// <param name="StandardError"><c>s_w × sqrt(n) / h</c> - the standard error of the trimmed mean.</param>
-/// <param name="MarginOfError"><c>t* × StandardError</c> at the requested confidence level.</param>
+/// <param name="StandardDeviationNs">The Winsorized standard deviation <c>s_w</c> (with the <c>n - 1</c> denominator).</param>
+/// <param name="StandardErrorNs"><c>s_w × sqrt(n) / h</c> - the standard error of the trimmed mean.</param>
+/// <param name="MarginOfErrorNs"><c>t* × StandardErrorNs</c> at the requested confidence level.</param>
 /// <param name="DegreesOfFreedom"><c>h - 1</c>, where <c>h</c> is the number of retained samples.</param>
 internal readonly record struct WinsorizedSpread(
-    double StandardDeviation,
-    double StandardError,
-    double MarginOfError,
+    double StandardDeviationNs,
+    double StandardErrorNs,
+    double MarginOfErrorNs,
     int DegreesOfFreedom);

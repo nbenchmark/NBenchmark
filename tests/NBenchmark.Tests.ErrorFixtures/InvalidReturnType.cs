@@ -1,10 +1,10 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 
 namespace NBenchmark.Tests.ErrorFixtures;
 
 public class InvalidReturnTypeCasesBenchmarks
 {
-    [BenchmarkCases(nameof(BadCases))]
+    [ArgumentsSource(nameof(BadCases))]
     [Benchmark]
     public int Sum(int a) => a;
 

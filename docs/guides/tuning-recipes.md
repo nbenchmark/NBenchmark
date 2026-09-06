@@ -60,8 +60,8 @@ dotnet run -- --priority high --outlier mad --launch-count 3 --autotune-cap-beha
 | Setting | Purpose |
 | --- | --- |
 | `AutoTune = AutoTuneOptions.Quick` | Lowers the CI target to ±5%, reduces minimum samples to 15, and minimum warmup to 4. |
-| `WarmupIterations = 4` | Sets a short, fixed warmup instead of using auto-detection. |
-| `Iterations = 20` | Sets a small, fixed measured sample count. |
+| `WarmupSamples = 4` | Sets a short, fixed warmup instead of using auto-detection. |
+| `Samples = 20` | Sets a small, fixed measured sample count. |
 | `ConfidenceLevel = 0.90` | Uses a 90% confidence interval, which is narrower and requires fewer samples. |
 
 **Fluent API**:
@@ -70,8 +70,8 @@ dotnet run -- --priority high --outlier mad --launch-count 3 --autotune-cap-beha
 await new BenchmarkSuite("fast-feedback")
     .Add("myBenchmark", () => MyMethod())
     .WithAutoTune(AutoTuneOptions.Quick)
-    .WithWarmup(4)
-    .WithIterations(20)
+    .WithWarmupSamples(4)
+    .WithSamples(20)
     .WithConfidenceLevel(0.90)
     .RunAsync();
 ```
@@ -79,13 +79,13 @@ await new BenchmarkSuite("fast-feedback")
 **CLI**:
 
 ```bash
-dotnet run -- --auto-tune quick --warmup 4 --iterations 20 --confidence 0.90
+dotnet run -- --auto-tune quick --warmup-samples 4 --samples 20 --confidence 0.90
 ```
 
 **See also**:
 - [AutoTune](../reference/configuration.md#autotune)
-- [WarmupIterations](../reference/configuration.md#warmupiterations)
-- [Iterations](../reference/configuration.md#iterations)
+- [WarmupSamples](../reference/configuration.md#warmupsamples)
+- [Samples](../reference/configuration.md#samples)
 - [ConfidenceLevel](../reference/configuration.md#confidencelevel)
 
 ---
@@ -136,29 +136,29 @@ dotnet run -- --auto-tune thorough --confidence 0.99 --launch-count 5
 
 | Setting | Purpose |
 | --- | --- |
-| `Profile = Independent` | Forces a Gen0 GC before every iteration, a full GC between benchmarks, and disables allocation tracking. |
-| `OpsPerSample = 1` | Sets each sample to a single invocation. Calibration is skipped when per-iteration GC is enabled, so the value stays 1 by default. |
+| `GcBehavior = PerSampleCollect` | Forces a Gen0 GC before every sample, a full GC between benchmarks, and disables allocation tracking. |
+| `OpsPerSample = 1` | Sets each sample to a single invocation. Calibration is skipped when per-sample GC is enabled, so the value stays 1 by default. |
 
 **Fluent API**:
 
 ```csharp
 await new BenchmarkSuite("cpu-only")
     .Add("myBenchmark", () => MyMethod())
-    .WithMeasurementProfile(MeasurementProfile.Independent)
+    .WithGcBehavior(GcBehavior.PerSampleCollect)
     .RunAsync();
 ```
 
 **CLI**:
 
 ```bash
-dotnet run -- --profile independent
+dotnet run -- --gc per-sample-collect
 ```
 
 **See also**:
-- [Profile](../reference/configuration.md#profile)
-- [ForceGcBeforeEachIteration](../reference/configuration.md#forcegcbeforeeachiteration)
+- [GcBehavior](../reference/configuration.md#gcbehavior)
+- [ForceGcBeforeEachSample](../reference/configuration.md#forcegcbeforeeachsample)
 - [MeasureAllocations](../reference/configuration.md#measureallocations)
-- [Measurement Profiles](../statistics/measurement.md#measurement-profiles)
+- [GC behavior](../statistics/measurement.md#gc-behavior)
 
 ---
 
@@ -196,7 +196,7 @@ dotnet run -- --diagnostics all --outlier mad --detail advanced --launch-count 5
 
 - **High jitter metric (> 0.10)**: Shown in the auto-tune diagnostic. This indicates the host is noisy. Consider using [environment controls](../features/environment-control.md).
 - **Quality-of-service class warnings (macOS)**: On Apple Silicon Macs, a note may appear stating the QoS class could not be raised. This means the scheduler may place the benchmark on an efficiency core. See [macOS and Apple Silicon](../features/environment-control.md#macos-and-apple-silicon).
-- **GC correlation**: If GC collection counts correlate with slow samples, GC pressure is affecting timings. Try using `--profile independent`.
+- **GC correlation**: If GC collection counts correlate with slow samples, GC pressure is affecting timings. Try using `--gc per-sample-collect`.
 - **Bimodal-distribution warning**: Investigate the cause (such as lock contention, cache misses, or GC pauses) rather than silencing the warning.
 - **Confirmed preemption**: If samples are "confirmed preempted by the OS," the host is too noisy to trust. This is detected via [evidence-based interference rejection](../statistics/outliers.md#evidence-based-interference-rejection).
 - **Interference disabled**: If `autoTune.interferenceDisabledReason` is set, the filter could not run (e.g., unsupported platform or async body). Timings are unaffected, but OS-preemption evidence is unavailable.

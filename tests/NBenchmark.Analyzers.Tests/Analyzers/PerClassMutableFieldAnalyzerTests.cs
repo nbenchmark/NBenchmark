@@ -8,7 +8,7 @@ public sealed class PerClassMutableFieldAnalyzerTests
     public async Task Reports_diagnostic_when_PerClass_with_mutable_field_accessed_by_two_benchmarks()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -29,7 +29,7 @@ public sealed class PerClassMutableFieldAnalyzerTests
     public async Task No_diagnostic_for_PerClass_with_readonly_field()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -50,7 +50,7 @@ public sealed class PerClassMutableFieldAnalyzerTests
     public async Task No_diagnostic_for_PerClass_with_mutable_field_accessed_by_one_benchmark()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]
@@ -71,7 +71,7 @@ public sealed class PerClassMutableFieldAnalyzerTests
     public async Task No_diagnostic_for_PerMethod_with_mutable_field()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerMethod)]
@@ -92,7 +92,7 @@ public sealed class PerClassMutableFieldAnalyzerTests
     public async Task No_diagnostic_for_PerClass_with_single_benchmark()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using NBenchmark;
 
                    [InstanceLifetime(InstanceLifetime.PerClass)]

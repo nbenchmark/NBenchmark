@@ -214,17 +214,17 @@ public class RuntimeProfileTests
     }
 
     /// <summary>
-    ///     After <c>LaunchAggregator.Combine</c>, <see cref="BenchmarkResult.Median" /> is the mean of
+    ///     After <c>LaunchAggregator.Combine</c>, <see cref="BenchmarkResult.MedianNs" /> is the mean of
     ///     per-launch medians and <see cref="LaunchStatistics.LaunchMedian" /> is the median of them;
     ///     with a skewed launch they disagree. The table baseline (<see cref="ComparisonGroup.PickBaseline" />)
     ///     must rank by the same selector the significance baseline uses
-    ///     (<c>LaunchStatistics?.LaunchMedian ?? Median</c>), or a mixed table shows a verdict scored
+    ///     (<c>LaunchStatistics?.LaunchMedian ?? MedianNs</c>), or a mixed table shows a verdict scored
     ///     against a baseline the table never names.
     /// </summary>
     [Fact]
     public void PickBaseline_RanksByLaunchMedian_WhenLaunchesAreSkewed()
     {
-        // By Median alone, plain (95) beats skewed_low (100). By LaunchMedian, skewed_low (90)
+        // By median alone, plain (95) beats skewed_low (100). By LaunchMedian, skewed_low (90)
         // beats plain (95). The two selectors pick different baselines; the unified one is
         // skewed_low, matching what Significance picks.
         var skewedLow = ResultWithLaunches("skewed_low", median: 100, launchMedian: 90);
@@ -242,24 +242,24 @@ public class RuntimeProfileTests
         {
             Name = name,
             ClassName = "Fixture",
-            Mean = median,
-            Median = median,
-            Min = median * 0.9,
-            Max = median * 1.1,
+            MeanNs = median,
+            MedianNs = median,
+            MinNs = median * 0.9,
+            MaxNs = median * 1.1,
             Percentiles = [],
-            StandardDeviation = 1,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            StandardDeviationNs = 1,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 10,
+            SampleCount = 10,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = 0,
-            AllocP95 = 0,
-            AllocMax = 0,
-            RuntimeMoniker = "",
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = 0,
+            AllocatedBytesP95 = 0,
+            AllocatedBytesMax = 0,
+            TargetFramework = "",
             RuntimeProfileName = profileName,
             LaunchStatistics = new LaunchStatistics
             {
@@ -347,9 +347,9 @@ public class RuntimeProfileTests
     {
         var options = new MeasurementOptions
         {
-            Iterations = 5,
-            WarmupIterations = 0,
-            SuppressRuntimeProfileWarning = true,
+            Samples = 5,
+            WarmupSamples = 0,
+            SuppressedWarnings = BenchmarkWarnings.RuntimeProfile,
         };
 
         Assert.Equal(RuntimeProfile.SteadyState.Name, options.RuntimeProfile.Name);
@@ -369,8 +369,8 @@ public class RuntimeProfileTests
         {
             var options = MeasurementOptions.Default with
             {
-                Iterations = 20,
-                WarmupIterations = 1,
+                Samples = 20,
+                WarmupSamples = 1,
                 RuntimeProfile = profile,
                 AutoTune = AutoTuneOptions.Default with
                 {
@@ -452,7 +452,7 @@ public class RuntimeProfileTests
                 RuntimeProfileEnvironment.ResetGuidanceGuardForTesting();
 
                 RuntimeProfileEnvironment.EmitNotAppliedGuidanceOnce(
-                    MeasurementOptions.Default with { SuppressRuntimeProfileWarning = true });
+                    MeasurementOptions.Default with { SuppressedWarnings = BenchmarkWarnings.RuntimeProfile });
             });
 
             Assert.Equal("", suppressed);
@@ -481,24 +481,24 @@ public class RuntimeProfileTests
     {
         Name = name,
         ClassName = "Fixture",
-        Mean = 10,
-        Median = 10,
-        Min = 9,
-        Max = 11,
+        MeanNs = 10,
+        MedianNs = 10,
+        MinNs = 9,
+        MaxNs = 11,
         Percentiles = [],
-        StandardDeviation = 1,
-        Q1 = 9,
-        Q3 = 11,
-        InterquartileRange = 2,
+        StandardDeviationNs = 1,
+        Q1Ns = 9,
+        Q3Ns = 11,
+        InterquartileRangeNs = 2,
         OutliersRemoved = 0,
-        N = 10,
+        SampleCount = 10,
         Skewness = 0,
         Kurtosis = 0,
-        Mad = 0,
-        AllocMedian = 0,
-        AllocP95 = 0,
-        AllocMax = 0,
-        RuntimeMoniker = moniker,
+        MedianAbsoluteDeviationNs = 0,
+        AllocatedBytesMedian = 0,
+        AllocatedBytesP95 = 0,
+        AllocatedBytesMax = 0,
+        TargetFramework = moniker,
         RuntimeProfileName = profileName,
         IsolationStatus = isolationStatus,
     };

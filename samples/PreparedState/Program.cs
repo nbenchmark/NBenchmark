@@ -38,8 +38,8 @@ using NBenchmark.Reporters.Console;
 
 var options = new MeasurementOptions
 {
-    WarmupIterations = 3,
-    Iterations = 40,
+    WarmupSamples = 3,
+    Samples = 40,
 };
 
 Console.WriteLine("=== Single mode: the capturing shape, and the prepared-state shape ===");
@@ -81,8 +81,8 @@ var suite = await BenchmarkSuite.Over("sorting", BuildData)
     .Add("array-sort", values => Array.Sort(values))
     .Add("linq-orderby", values => values.OrderBy(static x => x).ToArray())
     .WithBaseline("array-sort")
-    .WithWarmup(3)
-    .WithIterations(30)
+    .WithWarmupSamples(3)
+    .WithSamples(30)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
@@ -105,7 +105,7 @@ Console.WriteLine(
     "why a capture is sent where it can be rather than quietly costing the run its isolation.");
 
 static void Report(BenchmarkResult result) => Console.WriteLine(
-    $"  {result.Name,-14} {result.Median,9:F1} ns   {result.IsolationStatus} "
+    $"  {result.Name,-14} {result.MedianNs,9:F1} ns   {result.IsolationStatus} "
     + $"under '{result.RuntimeProfileName}'");
 
 static int[] BuildData() => Enumerable.Range(0, 4096).Reverse().ToArray();

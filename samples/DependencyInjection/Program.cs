@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using NBenchmark;
-using NBenchmark.Attributes;
 using NBenchmark.DependencyInjection;
 using NBenchmark.Reporters.Console;
 

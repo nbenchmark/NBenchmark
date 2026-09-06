@@ -47,7 +47,7 @@ public class StatsRecomputationTests
         const double confidence = 0.95;
         var stats = StatsSummary.Compute(samples);
 
-        // Mean from first principles.
+        // MeanNs from first principles.
         var sum = 0.0;
 
         foreach (var v in samples)
@@ -56,7 +56,7 @@ public class StatsRecomputationTests
         }
 
         var expectedMean = sum / n;
-        Numerics.AssertRelativeClose(expectedMean, stats.Mean, RelTol);
+        Numerics.AssertRelativeClose(expectedMean, stats.MeanNs, RelTol);
 
         // Sample variance / standard deviation (Bessel's correction).
         var sumSq = 0.0;
@@ -68,26 +68,26 @@ public class StatsRecomputationTests
 
         var expectedVariance = sumSq / (n - 1);
         var expectedStdDev = Math.Sqrt(expectedVariance);
-        Numerics.AssertRelativeClose(expectedStdDev, stats.StandardDeviation, RelTol);
+        Numerics.AssertRelativeClose(expectedStdDev, stats.StandardDeviationNs, RelTol);
 
         // Standard error of the mean.
         var expectedSem = expectedStdDev / Math.Sqrt(n);
-        Numerics.AssertRelativeClose(expectedSem, stats.StandardError, RelTol);
+        Numerics.AssertRelativeClose(expectedSem, stats.StandardErrorNs, RelTol);
 
         // Margin of error is the documented composition t* × SEM.
         var expectedMoe = StudentT.CriticalValue(confidence, n - 1) * expectedSem;
-        Numerics.AssertRelativeClose(expectedMoe, stats.MarginOfError, RelTol);
+        Numerics.AssertRelativeClose(expectedMoe, stats.MarginOfErrorNs, RelTol);
 
         // Coefficient of variation.
         Numerics.AssertRelativeClose(expectedStdDev / expectedMean, stats.CoefficientOfVariation, RelTol);
 
-        // Min / Max are the sorted endpoints.
-        Assert.Equal(samples[0], stats.Min, 12);
-        Assert.Equal(samples[^1], stats.Max, 12);
+        // MinNs / MaxNs are the sorted endpoints.
+        Assert.Equal(samples[0], stats.MinNs, 12);
+        Assert.Equal(samples[^1], stats.MaxNs, 12);
 
         // The median uses the mid-average convention (mean of the two middles on even n); every
         // other percentile keeps nearest-rank. Recomputed independently.
-        Assert.Equal(MidAverageMedian(samples), stats.Median, 12);
+        Assert.Equal(MidAverageMedian(samples), stats.MedianNs, 12);
         Assert.Equal(NearestRank(samples, 0.95), stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 12);
         Assert.Equal(NearestRank(samples, 0.99), stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 12);
     }
@@ -143,24 +143,24 @@ public class StatsRecomputationTests
         var expectedSem = winsorizedStdDev * Math.Sqrt(n) / h;
         var expectedMoe = StudentT.CriticalValue(confidence, h - 1) * expectedSem;
 
-        Numerics.AssertRelativeClose(expectedSem, stats.StandardError, RelTol);
-        Numerics.AssertRelativeClose(expectedMoe, stats.MarginOfError, RelTol);
+        Numerics.AssertRelativeClose(expectedSem, stats.StandardErrorNs, RelTol);
+        Numerics.AssertRelativeClose(expectedMoe, stats.MarginOfErrorNs, RelTol);
 
         // The correction moves the interval and nothing else: every central and shape statistic is
         // still the one computed on the kept samples alone.
         var untrimmed = StatsSummary.Compute(kept, confidence);
 
-        Assert.Equal(untrimmed.Mean, stats.Mean);
-        Assert.Equal(untrimmed.Median, stats.Median);
-        Assert.Equal(untrimmed.StandardDeviation, stats.StandardDeviation);
+        Assert.Equal(untrimmed.MeanNs, stats.MeanNs);
+        Assert.Equal(untrimmed.MedianNs, stats.MedianNs);
+        Assert.Equal(untrimmed.StandardDeviationNs, stats.StandardDeviationNs);
         Assert.Equal(untrimmed.CoefficientOfVariation, stats.CoefficientOfVariation);
         Assert.Equal(untrimmed.Skewness, stats.Skewness);
         Assert.Equal(untrimmed.Kurtosis, stats.Kurtosis);
-        Assert.Equal(untrimmed.Mad, stats.Mad);
+        Assert.Equal(untrimmed.MedianAbsoluteDeviationNs, stats.MedianAbsoluteDeviationNs);
 
         // And it widens: the reported interval is larger than the one that pretended the trimmed
         // samples were never collected.
-        Assert.True(stats.MarginOfError > untrimmed.MarginOfError);
+        Assert.True(stats.MarginOfErrorNs > untrimmed.MarginOfErrorNs);
     }
 
     /// <summary>
@@ -186,8 +186,8 @@ public class StatsRecomputationTests
         var plain = StatsSummary.Compute(samples);
         var withContext = StatsSummary.Compute(samples, trim: new TrimContext(samples, 0, 0));
 
-        Assert.Equal(plain.StandardError, withContext.StandardError);
-        Assert.Equal(plain.MarginOfError, withContext.MarginOfError);
+        Assert.Equal(plain.StandardErrorNs, withContext.StandardErrorNs);
+        Assert.Equal(plain.MarginOfErrorNs, withContext.MarginOfErrorNs);
     }
 
     [Theory]

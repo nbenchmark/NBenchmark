@@ -98,7 +98,7 @@ When three or more benchmarks are compared, the **Sig** column shows the post-ho
 **Omnibus (Kruskal-Wallis)** across 3 groups: H(2) = 7.20, p = 0.027 → significant
 ```
 
-Percentile columns (such as P95, P99, etc.) are dynamic. They appear only when you configure the corresponding percentiles via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set (`[0.50, 0.95, 0.99, 0.999, 1.0]`), NBenchmark emits columns P95 and P99 in the tail-latency table. P50 is already shown as Median, and Max appears as a separate statistic.
+Percentile columns (such as P95, P99, etc.) are dynamic. They appear only when you configure the corresponding percentiles via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set (`[0.50, 0.95, 0.99, 0.999, 1.0]`), NBenchmark emits columns P95 and P99 in the tail-latency table. P50 is already shown as median, and max appears as a separate statistic.
 
 ## Columns
 
@@ -107,12 +107,12 @@ Percentile columns (such as P95, P99, etc.) are dynamic. They appear only when y
 | **Benchmark** | The benchmark name. |
 | **Median** | The median timing. |
 | **Mean** | The arithmetic mean. |
-| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). A `-` indicates errored or dry-run results. |
+| **Ops/s** | Mean operations per second (`1e9 / MeanNs` when timing is in nanoseconds). A `-` indicates errored or dry-run results. |
 | **Ratio** | The speed relative to the baseline. |
 | **Scale** | A visual bar scaled to the slowest successful benchmark. |
 | **Sig** | `✓` = significant, `✗` = not significant, `-` = not applicable. |
 | **Magnitude** | A qualitative effect label. For built-in Mann-Whitney tests, this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `small` (< 0.33), `med` (< 0.474), and `large` (≥ 0.474). See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
-| **Alloc/op** | Mean bytes allocated per iteration, or `-` if not measured. |
+| **Alloc/op** | Mean bytes allocated per operation, or `-` if not measured. |
 
 ## Notes
 

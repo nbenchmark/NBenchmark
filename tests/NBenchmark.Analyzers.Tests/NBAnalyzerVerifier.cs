@@ -51,36 +51,36 @@ internal static class SharedReferences
 internal static class TestSources
 {
     public const string Stubs = """
-                                    namespace NBenchmark.Attributes
+                                    namespace NBenchmark
                                     {
                                         [System.AttributeUsage(System.AttributeTargets.Method)]
                                         public sealed class BenchmarkAttribute : System.Attribute
                                         {
                                             public string? Description { get; set; }
                                             public bool Baseline { get; set; }
-                                            public int Iterations { get; set; } = -1;
-                                            public int WarmupIterations { get; set; } = -1;
+                                            public int Samples { get; set; } = -1;
+                                            public int WarmupSamples { get; set; } = -1;
                                         }
                                         [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = true)]
-                                        public sealed class BenchmarkCaseAttribute : System.Attribute
+                                        public sealed class ArgumentsAttribute : System.Attribute
                                         {
-                                            public BenchmarkCaseAttribute(params object[] arguments) { Arguments = arguments; }
+                                            public ArgumentsAttribute(params object[] arguments) { Arguments = arguments; }
                                             public object[] Arguments { get; }
                                         }
                                         [System.AttributeUsage(System.AttributeTargets.Method)]
-                                        public sealed class BenchmarkCasesAttribute : System.Attribute
+                                        public sealed class ArgumentsSourceAttribute : System.Attribute
                                         {
-                                            public BenchmarkCasesAttribute(string sourceName) { SourceName = sourceName; }
+                                            public ArgumentsSourceAttribute(string sourceName) { SourceName = sourceName; }
                                             public string SourceName { get; }
                                         }
                                         [System.AttributeUsage(System.AttributeTargets.Method)]
-                                        public sealed class BenchmarkSetupAttribute : System.Attribute {}
+                                        public sealed class GlobalSetupAttribute : System.Attribute {}
                                         [System.AttributeUsage(System.AttributeTargets.Method)]
-                                        public sealed class BenchmarkTeardownAttribute : System.Attribute {}
+                                        public sealed class GlobalTeardownAttribute : System.Attribute {}
                                         [System.AttributeUsage(System.AttributeTargets.Method)]
-                                        public sealed class BenchmarkIterationSetupAttribute : System.Attribute {}
+                                        public sealed class SampleSetupAttribute : System.Attribute {}
                                         [System.AttributeUsage(System.AttributeTargets.Method)]
-                                        public sealed class BenchmarkIterationTeardownAttribute : System.Attribute {}
+                                        public sealed class SampleTeardownAttribute : System.Attribute {}
                                         [System.AttributeUsage(System.AttributeTargets.Class)]
                                         public sealed class InstanceLifetimeAttribute : System.Attribute
                                         {
@@ -89,7 +89,7 @@ internal static class TestSources
                                         [System.AttributeUsage(System.AttributeTargets.Class)]
                                         public sealed class SharedStateAttribute : System.Attribute
                                         {
-                                            public bool Intentional { get; init; } = true;
+                                            public bool Acknowledged { get; init; } = true;
                                         }
                                     }
                                     namespace NBenchmark
@@ -104,8 +104,8 @@ internal static class TestSources
 
                                         public sealed class MeasurementOptions
                                         {
-                                            public int Iterations { get; init; }
-                                            public int WarmupIterations { get; init; }
+                                            public int Samples { get; init; }
+                                            public int WarmupSamples { get; init; }
                                             public double ConfidenceLevel { get; init; }
                                     }
                                     

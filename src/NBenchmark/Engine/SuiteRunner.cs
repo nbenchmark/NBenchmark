@@ -30,7 +30,7 @@ internal static class SuiteRunner
         // after the inter-benchmark GC, one after the last - so benchmark i is bracketed by
         // readings i and i+1. Skipped for a dry-run, which measures nothing and should therefore
         // cost nothing.
-        var canary = defaultOptions.Iterations == 0
+        var canary = defaultOptions.Samples == 0
             ? null
             : HostDriftCanary.Create(defaultOptions.DriftCanary, clock ?? StopwatchClock.WallClock);
 
@@ -129,7 +129,7 @@ internal static class SuiteRunner
             // The gap between launches is deliberately not this callback's problem, and the
             // asymmetry is the contract rather than an omission: every caller builds a new instance
             // per launch, so the launch boundary already carries a fresh object and a re-run
-            // [BenchmarkSetup]. Firing a reset there would ask a class to clean state that does not
+            // [GlobalSetup]. Firing a reset there would ask a class to clean state that does not
             // exist yet.
             if (index < ordered.Count - 1 && onBetweenBenchmarksAsync is not null)
                 await onBetweenBenchmarksAsync().ConfigureAwait(false);
@@ -166,6 +166,6 @@ internal static class SuiteRunner
             return false;
 
         // True dry-runs do no work (0 warmup, 0 measured); skip inter-benchmark GC overhead.
-        return result.WarmupIterations != 0 || result.MeasuredIterations != 0 || result.Errored;
+        return result.WarmupSamples != 0 || result.SampleCount != 0 || result.Errored;
     }
 }

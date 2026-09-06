@@ -59,16 +59,16 @@ When you provide an explicit `fileName`, subsequent calls to `ReportAsync` overw
 ## Output format
 
 ```csv
-ClassName,Name,Median,OpsPerSecond,Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation
+ClassName,Name,MedianNs,OpsPerSecond,Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,GcBehavior,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation
 
 Each row contains a `MeasurementEpoch` of `7`:
-"SortingBenchmarks","Compute",300.0,3636363.6,0.75,"true",96,12,3,0,1,7,simple,realistic,steady-state,"",true,true,"isolated"
-"SortingBenchmarks","Baseline",400.0,2660985.4,1.00,"",120,11,2,0,1,7,simple,realistic,steady-state,"",true,true,"isolated"
+"SortingBenchmarks","Compute",300.0,3636363.6,0.75,"true",96,12,3,0,2,7,simple,natural,steady-state,"",true,true,"isolated"
+"SortingBenchmarks","Baseline",400.0,2660985.4,1.00,"",120,11,2,0,2,7,simple,natural,steady-state,"",true,true,"isolated"
 ```
 
 NBenchmark records all timing values in **nanoseconds**.
 
-Percentile columns (such as P95, P99, etc.) are dynamic. They appear only in Standard and Advanced modes when you configure the corresponding percentiles via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set (`[0.50, 0.95, 0.99, 0.999, 1.0]`), NBenchmark emits columns P95 and P99. P50 and Max (1.0) are excluded from percentile columns because they appear separately as Median and Max. Empty cells indicate that the percentile was not configured or the row errored.
+Percentile columns (such as P95, P99, etc.) are dynamic. They appear only in Standard and Advanced modes when you configure the corresponding percentiles via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set (`[0.50, 0.95, 0.99, 0.999, 1.0]`), NBenchmark emits columns P95 and P99. P50 and max (1.0) are excluded from percentile columns because they appear separately as median and max. Empty cells indicate that the percentile was not configured or the row errored.
 
 The `EffectMetric`, `EffectValue`, and `Magnitude` columns reflect the active significance strategy's output. For built-in Mann-Whitney tests:
 
@@ -84,16 +84,16 @@ The `EffectMetric`, `EffectValue`, and `Magnitude` columns reflect the active si
 | --- | --- | --- |
 | `ClassName` | string | Benchmark class name (double-quote escaped). |
 | `Name` | string | Benchmark name (double-quote escaped). |
-| `Median` | float | Median timing in nanoseconds. |
-| `OpsPerSecond` | float | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). Empty for errored or dry-run results. |
+| `MedianNs` | float | Median timing in nanoseconds. |
+| `OpsPerSecond` | float | Mean operations per second (`1e9 / MeanNs` when timing is in nanoseconds). Empty for errored or dry-run results. |
 | `Ratio` | float or `null` | Speed relative to the baseline. `null` if no baseline exists or only one benchmark was run. |
 | `Significant` | `"true"` / `"false"` / empty | [Mann-Whitney U](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) significance result. Empty for the baseline or when significance testing is disabled. |
-| `AllocPerOp` | integer or `null` | Mean heap bytes per iteration. `null` if allocation tracking is disabled. |
+| `AllocPerOp` | integer or `null` | Mean heap bytes per operation. `null` if allocation tracking is disabled. |
 | `Gen0`, `Gen1`, `Gen2` | integer or empty | Collection counts per generation. Empty when GC diagnostics are off. |
 | `SchemaVersion` | integer | The report shape. For more information, see [Report format versioning](./index.md#report-format-versioning). |
 | `MeasurementEpoch` | integer | Determines if numbers can be compared with another file. A different epoch means NBenchmark changed what it measures. |
 | `Detail` | string | Active detail level (`simple`, `standard`, or `advanced`). |
-| `Profile` | string | Active measurement profile (`realistic` or `independent`). |
+| `GcBehavior` | string | Active GC behavior (`natural` or `perSampleCollect`). |
 | `RuntimeProfile` | string | The runtime profile the measuring process used (`steady-state`, `host`, etc.). |
 | `RuntimeKnobs` | string | The environment variables the profile applied, or empty if inherited. |
 | `ThreadControl` | `true` / `false` | Whether thread-level environment control was enabled (affinity, priority, macOS performance-core placement). |
@@ -106,14 +106,14 @@ Standard mode adds the following columns after the simple columns:
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `Mean` | float | Arithmetic mean in nanoseconds. |
+| `MeanNs` | float | Arithmetic mean in nanoseconds. |
 | `StdDev` | float | Sample standard deviation in nanoseconds. |
 | `StdErr` | float | Standard error of the mean (`StdDev / √n`) in nanoseconds. |
-| `MarginOfError` | float | Half-width of the confidence interval in nanoseconds. |
-| `CiLower` | float | Lower bound of the confidence interval on the mean (`Mean - MarginOfError`). |
-| `CiUpper` | float | Upper bound of the confidence interval on the mean (`Mean + MarginOfError`). |
+| `MarginOfErrorNs` | float | Half-width of the confidence interval in nanoseconds. |
+| `CiLower` | float | Lower bound of the confidence interval on the mean (`MeanNs - MarginOfErrorNs`). |
+| `CiUpper` | float | Upper bound of the confidence interval on the mean (`MeanNs + MarginOfErrorNs`). |
 | `ConfidenceLevel` | float | The confidence level used (such as `0.95`). |
-| `CoefficientOfVariation` | float | `StdDev / Mean`. A dimensionless measure of relative variability. |
+| `CoefficientOfVariation` | float | `StdDev / MeanNs`. A dimensionless measure of relative variability. |
 | `RatioCiLower` | float or empty | Lower bound of the paired per-launch ratio interval. Empty if the run had a single launch. |
 | `RatioCiUpper` | float or empty | Upper bound of the paired per-launch ratio interval. An interval spanning `1.0` means the run cannot distinguish this benchmark from the baseline. |
 | `RatioReplicates` | integer or empty | The number of launches paired to produce the interval. |
@@ -121,7 +121,7 @@ Standard mode adds the following columns after the simple columns:
 | `EffectMetric` | string or empty | Strategy-defined effect metric name (such as `Cliff's δ`). Empty for the baseline or when significance is not tested. |
 | `EffectValue` | float or empty | Strategy-defined numeric effect value. For Mann-Whitney tests, this is **Cliff's delta** (positive = candidate slower than baseline). See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
 | `Magnitude` | string or empty | Strategy-defined qualitative effect label. For Mann-Whitney tests, this is the [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size) classification of `abs(Cliff's δ)`. |
-| `MarginPercent` | float | `MarginOfError / Mean * 100`. |
+| `MarginOfErrorPercent` | float | `MarginOfErrorNs / MeanNs * 100`. |
 | `OutliersRemoved` | integer | Number of samples removed by outlier trimming. |
 
 ### Advanced mode (dynamic columns)
@@ -130,22 +130,22 @@ Advanced mode adds the following columns to the standard set:
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `Q1` | float | First quartile (P25) in nanoseconds. |
-| `Q3` | float | Third quartile (P75) in nanoseconds. |
-| `Iqr` | float | Q3 - Q1 in nanoseconds. |
-| `LowerFence` | float or empty | Lower IQR fence. Empty when `OutlierMode` is not `IqrFence`. |
-| `UpperFence` | float or empty | Upper IQR fence. Empty when `OutlierMode` is not `IqrFence`. |
-| `Range` | float | Max - Min in nanoseconds. |
+| `Q1Ns` | float | First quartile (P25) in nanoseconds. |
+| `Q3Ns` | float | Third quartile (P75) in nanoseconds. |
+| `Iqr` | float | Q3Ns - Q1Ns in nanoseconds. |
+| `LowerFenceNs` | float or empty | Lower IQR fence. Empty when `OutlierMode` is not `IqrFence`. |
+| `UpperFenceNs` | float or empty | Upper IQR fence. Empty when `OutlierMode` is not `IqrFence`. |
+| `RangeNs` | float | Max - min in nanoseconds. |
 | `N` | integer | Post-trim sample count. |
 | `Skewness` | float | Sample skewness. Zero for `n < 3`. |
 | `Kurtosis` | float | Excess kurtosis. Zero for `n < 4`. |
-| `Mad` | float | Median absolute deviation (scaled by 1.4826). |
-| `AllocMedian` | integer or empty | Median allocation per iteration. |
-| `AllocP95` | integer or empty | P95 allocation per iteration. |
-| `AllocMax` | integer or empty | Max allocation per iteration. |
-| `StandardErrorPercent` | float | `StdErr / Mean * 100`. |
+| `MedianAbsoluteDeviationNs` | float | Median absolute deviation (scaled by 1.4826). |
+| `AllocatedBytesMedian` | integer or empty | Median allocation per operation. |
+| `AllocatedBytesP95` | integer or empty | P95 allocation per operation. |
+| `AllocatedBytesMax` | integer or empty | Max allocation per operation. |
+| `StandardErrorPercent` | float | `StdErr / MeanNs * 100`. |
 | `CoefficientOfVariationPercent` | float | `CoefficientOfVariation * 100`. |
-| `WarmupIterations` | integer | Resolved warmup samples (excluded from stats). |
+| `WarmupSamples` | integer | Resolved warmup samples (excluded from stats). |
 | `AutoTuneWarmup` | integer or empty | Resolved warmup length from the adaptive loop. |
 | `AutoTuneSamples` | integer or empty | Resolved measured-sample count (pre-trim). |
 | `AutoTuneOpsPerSample` | integer or empty | Resolved operations-per-sample (K). |

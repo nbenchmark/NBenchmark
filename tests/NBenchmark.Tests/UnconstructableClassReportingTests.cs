@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Engine;
 using NBenchmark.Workers;
 using Xunit;
@@ -24,7 +24,7 @@ public class UnconstructableClassReportingTests
 
         return harness
             .AddFromAssembly(typeof(UnconstructableClassReportingTests).Assembly)
-            .WithCategoryFilter([category])
+            .FilterCategories([category])
             .WithLaunchCount(1)
             .WithIsolation(Isolation.Off);
     }

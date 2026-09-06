@@ -39,8 +39,8 @@ public sealed class HardCrashTests
     /// </summary>
     private static MeasurementOptions FastOptions => MeasurementOptions.Default with
     {
-        Iterations = 24,
-        WarmupIterations = 2,
+        Samples = 24,
+        WarmupSamples = 2,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {

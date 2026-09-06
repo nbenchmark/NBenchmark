@@ -28,11 +28,11 @@ The following example shows the output of `result.Print(ReportDetail.Standard)`:
 ```text
   ┌─ Benchmark ─────────────────────────────────────
   │
-  │  Median: 342.1 ns       Mean: 348.7 ns
+  │  MedianNs: 342.1 ns       MeanNs: 348.7 ns
   │  Ops/s:  2.87 Mops/s    Median ops/s: 2.92 Mops/s
   │  P95: 361.2 ns  P99: 378.5 ns  P99.9: 380.0 ns
   │  StdDev: 8.3 ns         CV:   2.38%
-  │  Error:  ±3.1 ns (0.89% of Mean)
+  │  Error:  ±3.1 ns (0.89% of mean)
   │  CI:     [345.6 ns … 351.8 ns] (95%)
   │  Alloc/op: 0 B
   │
@@ -41,7 +41,7 @@ The following example shows the output of `result.Print(ReportDetail.Standard)`:
   └─────────────────────────────────────────────────
 ```
 
-A bare `result.Print()` call shows only the Median and Ops/s. Use `ReportDetail.Advanced` to include quartiles, fences, and distribution shape. For more information, see [Report detail levels](../output/report-detail-levels.md).
+A bare `result.Print()` call shows only the median and Ops/s. Use `ReportDetail.Advanced` to include quartiles, fences, and distribution shape. For more information, see [Report detail levels](../output/report-detail-levels.md).
 
 In suite mode, the console reporter adds a comparison table with Ratio, Sig, and Magnitude columns. For the full table layout, see the [Console Reporter](../output/console-reporter.md) page.
 
@@ -68,7 +68,7 @@ In auto-sampling mode, NBenchmark collects samples until the error meets the pre
 If you encounter a large error, try the following:
 - Check for external interference, such as background processes or thermal throttling.
 - Use the `Thorough` preset to demand a tighter target.
-- Increase the iteration count if you pinned `Iterations`, or return to auto mode.
+- Increase the sample count if you pinned `Samples`, or return to auto mode.
 - See [Troubleshooting](../troubleshooting.md) for further remedies.
 
 For more information, see [Descriptive Statistics: Confidence Interval](../statistics/descriptive.md#confidence-interval-on-the-mean).
@@ -162,15 +162,15 @@ This indicates that the slow samples were not random noise, but instead represen
 
 **Recommended actions:**
 - Do not ignore this warning; it reveals important information about your code's performance distribution.
-- Review the tail metrics (P99, P99.9, and Max). These are computed from the full pre-trim distribution by default, so the second cluster is already visible.
+- Review the tail metrics (P99, P99.9, and max). These are computed from the full pre-trim distribution by default, so the second cluster is already visible.
 - Use a profiler to investigate the cause.
-- If you suspect GC issues, try using `--profile independent`.
+- If you suspect GC issues, try using `--gc per-sample-collect`.
 
 For more information, see [Outlier Trimming: Bimodal-distribution warning](../statistics/outliers.md#bimodal-distribution-warning).
 
 ## Operations per second (Ops/s)
 
-Operations per second is derived from the mean timing. `Median ops/s` is derived from the median. These metrics are useful for throughput-oriented comparisons.
+Operations per second is derived from the mean timing. `MedianNs ops/s` is derived from the median. These metrics are useful for throughput-oriented comparisons.
 
 ## When to trust the numbers
 

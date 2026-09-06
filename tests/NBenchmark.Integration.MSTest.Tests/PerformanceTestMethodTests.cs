@@ -18,27 +18,26 @@ public sealed class PerformanceTestMethodTests
         var errored = new BenchmarkResult
         {
             Name = "Broken",
-            Mean = 0,
-            Median = 0,
+            MeanNs = 0,
+            MedianNs = 0,
             Percentiles = [],
-            Min = 0,
-            Max = 0,
-            StandardDeviation = 0,
-            MeasuredIterations = 0,
-            WarmupIterations = 0,
+            MinNs = 0,
+            MaxNs = 0,
+            StandardDeviationNs = 0,
+            SampleCount = 0,
+            WarmupSamples = 0,
             Errored = true,
             ErrorMessage = "Something exploded",
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 0,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
 
         var violations = PerformanceTestMethodAttribute.ValidateResult(errored, [], null, null, thresholds);
@@ -54,25 +53,24 @@ public sealed class PerformanceTestMethodTests
         var ok = new BenchmarkResult
         {
             Name = "Fine",
-            Mean = 100,
-            Median = 100,
+            MeanNs = 100,
+            MedianNs = 100,
             Percentiles = [],
-            Min = 50,
-            Max = 250,
-            StandardDeviation = 10,
-            MeasuredIterations = 100,
-            WarmupIterations = 25,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            MinNs = 50,
+            MaxNs = 250,
+            StandardDeviationNs = 10,
+            SampleCount = 100,
+            WarmupSamples = 25,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 100,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
 
         var violations = PerformanceTestMethodAttribute.ValidateResult(ok, [], null, null, thresholds);
@@ -155,8 +153,8 @@ public sealed class PerformanceTestMethodTests
     {
         var result = PerformanceAssert.Run(SimpleWork, new PerformanceAssertionOptions
         {
-            Iterations = 10,
-            WarmupIterations = 5,
+            Samples = 10,
+            WarmupSamples = 5,
             MaxMeanNs = 1_000_000_000,
         });
 
@@ -171,13 +169,13 @@ public sealed class PerformanceTestMethodTests
         {
             PerformanceAssert.Run(SlowWork, new PerformanceAssertionOptions
             {
-                Iterations = 10,
-                WarmupIterations = 5,
+                Samples = 10,
+                WarmupSamples = 5,
                 MaxMeanNs = 1,
             });
         });
 
-        Assert.IsTrue(ex.Message.Contains("Mean"));
+        Assert.IsTrue(ex.Message.Contains("MeanNs"));
     }
 
     [TestMethod]
@@ -185,7 +183,7 @@ public sealed class PerformanceTestMethodTests
     {
         var result = BenchmarkRunner.Instance.Run("ThrowingTest", ThrowingWork, new RunSpec
         {
-            Options = MeasurementOptions.Default with { Iterations = 3, WarmupIterations = 1 },
+            Options = MeasurementOptions.Default with { Samples = 3, WarmupSamples = 1 },
         }).Result;
 
         Assert.IsTrue(result.Errored);
@@ -200,13 +198,13 @@ public sealed class PerformanceTestMethodTests
     {
         var result = PerformanceAssert.Run(AllocatingWork, new PerformanceAssertionOptions
         {
-            Iterations = 10,
-            WarmupIterations = 3,
+            Samples = 10,
+            WarmupSamples = 3,
             MeasureAllocations = true,
         });
 
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.MeanAllocatedBytes > 0);
+        Assert.IsTrue(result.AllocatedBytesMean > 0);
     }
 
     [TestMethod]
@@ -251,25 +249,24 @@ public sealed class PerformanceTestMethodTests
         return new BenchmarkResult
         {
             Name = name,
-            Mean = mean,
-            Median = mean,
+            MeanNs = mean,
+            MedianNs = mean,
             Percentiles = [],
-            Min = mean,
-            Max = mean,
-            StandardDeviation = 0,
-            MeasuredIterations = 100,
-            WarmupIterations = 25,
-            Q1 = mean,
-            Q3 = mean,
-            InterquartileRange = 0,
+            MinNs = mean,
+            MaxNs = mean,
+            StandardDeviationNs = 0,
+            SampleCount = 100,
+            WarmupSamples = 25,
+            Q1Ns = mean,
+            Q3Ns = mean,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 100,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
     }
 
@@ -281,8 +278,8 @@ public sealed class PerformanceTestMethodTests
             MaxAllocatedBytes = -1,
             ReferenceMethod = null,
             MaxSlowdownRatio = 0,
-            Iterations = 0,
-            WarmupIterations = 0,
+            Samples = 0,
+            WarmupSamples = 0,
             MeasureAllocations = false,
             OutlierMode = OutlierMode.RemoveTop5Percent,
             ConfidenceLevel = 0.95,
@@ -295,8 +292,8 @@ public sealed class PerformanceTestMethodTests
         public long MaxAllocatedBytes { get; init; }
         public string? ReferenceMethod { get; init; }
         public double MaxSlowdownRatio { get; init; } = 1.2;
-        public int Iterations { get; init; }
-        public int WarmupIterations { get; init; }
+        public int Samples { get; init; }
+        public int WarmupSamples { get; init; }
         public bool MeasureAllocations { get; init; }
         public OutlierMode OutlierMode { get; init; } = OutlierMode.RemoveTop5Percent;
         public double ConfidenceLevel { get; init; } = 0.95;

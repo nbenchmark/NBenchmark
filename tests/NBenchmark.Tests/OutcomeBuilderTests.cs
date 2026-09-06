@@ -14,14 +14,14 @@ public class OutcomeBuilderTests
     {
         var stats = new StatsSummary
         {
-            Mean = 100,
-            Median = 99,
+            MeanNs = 100,
+            MedianNs = 99,
             Percentiles = [new PercentileEntry(0.95, 110), new PercentileEntry(0.99, 120)],
-            Min = 80,
-            Max = 130,
-            StandardDeviation = 5,
-            StandardError = 1,
-            MarginOfError = 2,
+            MinNs = 80,
+            MaxNs = 130,
+            StandardDeviationNs = 5,
+            StandardErrorNs = 1,
+            MarginOfErrorNs = 2,
             ConfidenceLevel = 0.95,
             CoefficientOfVariation = 0.05,
         };
@@ -31,8 +31,8 @@ public class OutcomeBuilderTests
 
         var options = new MeasurementOptions
         {
-            Iterations = 3,
-            WarmupIterations = 5,
+            Samples = 3,
+            WarmupSamples = 5,
             OutlierMode = OutlierMode.RemoveTop5Percent,
             ConfidenceLevel = 0.95,
         };
@@ -69,24 +69,24 @@ public class OutcomeBuilderTests
         var r = outcome.Result;
         Assert.Equal("bench", r.Name);
         Assert.Equal("desc", r.Description);
-        Assert.Equal(100, r.Mean);
-        Assert.Equal(99, r.Median);
+        Assert.Equal(100, r.MeanNs);
+        Assert.Equal(99, r.MedianNs);
         Assert.Equal(110, r.GetPercentile(0.95) ?? 0);
         Assert.Equal(120, r.GetPercentile(0.99) ?? 0);
-        Assert.Equal(80, r.Min);
-        Assert.Equal(130, r.Max);
-        Assert.Equal(5, r.StandardDeviation);
-        Assert.Equal(1, r.StandardError);
-        Assert.Equal(2, r.MarginOfError);
+        Assert.Equal(80, r.MinNs);
+        Assert.Equal(130, r.MaxNs);
+        Assert.Equal(5, r.StandardDeviationNs);
+        Assert.Equal(1, r.StandardErrorNs);
+        Assert.Equal(2, r.MarginOfErrorNs);
         Assert.Equal(0.95, r.ConfidenceLevel);
         Assert.Equal(0.05, r.CoefficientOfVariation);
-        Assert.Equal((long)((1024 + 2048 + 4096) / 3.0), r.MeanAllocatedBytes);
+        Assert.Equal((long)((1024 + 2048 + 4096) / 3.0), r.AllocatedBytesMean);
         Assert.Null(r.PValue);
         Assert.Equal(SignificanceVerdict.NotTested, r.SignificanceVerdict);
         Assert.False(r.Errored);
         Assert.Null(r.ErrorMessage);
-        Assert.Equal(3, r.MeasuredIterations);
-        Assert.Equal(5, r.WarmupIterations);
+        Assert.Equal(3, r.SampleCount);
+        Assert.Equal(5, r.WarmupSamples);
         Assert.Equal(total, r.TotalDuration);
         Assert.Equal(measured, r.MeasuredDuration);
         Assert.True(r.IsBaseline);
@@ -94,13 +94,12 @@ public class OutcomeBuilderTests
         Assert.Equal(10_000_000.0, r.OperationsPerSecond, 1);
         Assert.Equal(10_101_010.101010101, r.MedianOperationsPerSecond, 1);
         Assert.Equal(8, r.TotalOperations);
-        Assert.Equal(100.0, r.NanosecondsPerOperation);
     }
 
     [Fact]
     public void Build_Success_With_Allocations_Averages_Into_MeanAllocatedBytes()
     {
-        var stats = new StatsSummary { Mean = 1 };
+        var stats = new StatsSummary { MeanNs = 1 };
         var allocations = new long[] { 100, 200, 300, 400 };
 
         var outcome = OutcomeBuilder.Build(
@@ -112,13 +111,13 @@ public class OutcomeBuilderTests
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
 
-        Assert.Equal(250, outcome.Result.MeanAllocatedBytes);
+        Assert.Equal(250, outcome.Result.AllocatedBytesMean);
     }
 
     [Fact]
     public void Build_Success_Without_Allocations_Sets_MeanAllocatedBytes_Null()
     {
-        var stats = new StatsSummary { Mean = 1 };
+        var stats = new StatsSummary { MeanNs = 1 };
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
@@ -129,13 +128,13 @@ public class OutcomeBuilderTests
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
 
-        Assert.Null(outcome.Result.MeanAllocatedBytes);
+        Assert.Null(outcome.Result.AllocatedBytesMean);
     }
 
     [Fact]
     public void Build_Success_ConfidenceLevel_Comes_From_Options()
     {
-        var stats = new StatsSummary { Mean = 1, ConfidenceLevel = 0.99 };
+        var stats = new StatsSummary { MeanNs = 1, ConfidenceLevel = 0.99 };
         var options = new MeasurementOptions { ConfidenceLevel = 0.99 };
 
         var outcome = OutcomeBuilder.Build(
@@ -153,7 +152,7 @@ public class OutcomeBuilderTests
     [Fact]
     public void Build_Success_RunAt_Is_Recent_UtcNow()
     {
-        var stats = new StatsSummary { Mean = 1 };
+        var stats = new StatsSummary { MeanNs = 1 };
         var before = DateTimeOffset.UtcNow.AddSeconds(-5);
 
         var outcome = OutcomeBuilder.Build(
@@ -172,7 +171,7 @@ public class OutcomeBuilderTests
     [Fact]
     public void Build_Success_Flows_ResolvedWarmup_And_AutoTune_Diagnostic()
     {
-        var stats = new StatsSummary { Mean = 1 };
+        var stats = new StatsSummary { MeanNs = 1 };
 
         var diagnostic = new AutoTuneDiagnostic
         {
@@ -197,7 +196,7 @@ public class OutcomeBuilderTests
             12,
             diagnostic);
 
-        Assert.Equal(12, outcome.Result.WarmupIterations);
+        Assert.Equal(12, outcome.Result.WarmupSamples);
         Assert.Equal(diagnostic, outcome.Result.AutoTune);
     }
 
@@ -221,8 +220,8 @@ public class OutcomeBuilderTests
     {
         var options = new MeasurementOptions
         {
-            Iterations = 0,
-            WarmupIterations = 0,
+            Samples = 0,
+            WarmupSamples = 0,
             OutlierMode = OutlierMode.None,
             ConfidenceLevel = 0.95,
         };
@@ -235,20 +234,20 @@ public class OutcomeBuilderTests
             TimeSpan.FromMilliseconds(10));
 
         var r = outcome.Result;
-        Assert.Equal(0, r.Mean);
-        Assert.Equal(0, r.Median);
+        Assert.Equal(0, r.MeanNs);
+        Assert.Equal(0, r.MedianNs);
         Assert.Equal(0, r.GetPercentile(0.95) ?? 0);
         Assert.Equal(0, r.GetPercentile(0.99) ?? 0);
-        Assert.Equal(0, r.Min);
-        Assert.Equal(0, r.Max);
-        Assert.Equal(0, r.StandardDeviation);
-        Assert.Equal(0, r.StandardError);
-        Assert.Equal(0, r.MarginOfError);
+        Assert.Equal(0, r.MinNs);
+        Assert.Equal(0, r.MaxNs);
+        Assert.Equal(0, r.StandardDeviationNs);
+        Assert.Equal(0, r.StandardErrorNs);
+        Assert.Equal(0, r.MarginOfErrorNs);
         Assert.Equal(0, r.CoefficientOfVariation);
         Assert.Equal(0.95, r.ConfidenceLevel);
         Assert.False(r.Errored);
         Assert.Null(r.ErrorMessage);
-        Assert.Equal(0, r.MeasuredIterations);
+        Assert.Equal(0, r.SampleCount);
         Assert.Empty(outcome.RawSamples);
     }
 
@@ -262,7 +261,7 @@ public class OutcomeBuilderTests
             TimeSpan.FromMilliseconds(10),
             TimeSpan.FromMilliseconds(10));
 
-        Assert.Equal(0, outcome.Result.MeasuredIterations);
+        Assert.Equal(0, outcome.Result.SampleCount);
         Assert.Empty(outcome.RawSamples);
     }
 
@@ -301,7 +300,7 @@ public class OutcomeBuilderTests
     {
         var options = new MeasurementOptions
         {
-            WarmupIterations = 4,
+            WarmupSamples = 4,
             OutlierMode = OutlierMode.IqrFence,
             ConfidenceLevel = 0.99,
         };
@@ -322,25 +321,25 @@ public class OutcomeBuilderTests
         var r = outcome.Result;
         Assert.Equal("bad", r.Name);
         Assert.Equal("with desc", r.Description);
-        Assert.Equal(0, r.Mean);
-        Assert.Equal(0, r.Median);
+        Assert.Equal(0, r.MeanNs);
+        Assert.Equal(0, r.MedianNs);
         Assert.Equal(0, r.GetPercentile(0.95) ?? 0);
         Assert.Equal(0, r.GetPercentile(0.99) ?? 0);
-        Assert.Equal(0, r.Min);
-        Assert.Equal(0, r.Max);
-        Assert.Equal(0, r.StandardDeviation);
-        Assert.Equal(0, r.StandardError);
-        Assert.Equal(0, r.MarginOfError);
+        Assert.Equal(0, r.MinNs);
+        Assert.Equal(0, r.MaxNs);
+        Assert.Equal(0, r.StandardDeviationNs);
+        Assert.Equal(0, r.StandardErrorNs);
+        Assert.Equal(0, r.MarginOfErrorNs);
         Assert.Equal(0.99, r.ConfidenceLevel);
         Assert.Equal(0, r.CoefficientOfVariation);
-        Assert.Null(r.MeanAllocatedBytes);
+        Assert.Null(r.AllocatedBytesMean);
         Assert.Null(r.PValue);
         Assert.Equal(SignificanceVerdict.NotTested, r.SignificanceVerdict);
         Assert.True(r.Errored);
         Assert.NotNull(r.ErrorMessage);
         Assert.Contains("nope", r.ErrorMessage);
-        Assert.Equal(0, r.MeasuredIterations);
-        Assert.Equal(4, r.WarmupIterations);
+        Assert.Equal(0, r.SampleCount);
+        Assert.Equal(4, r.WarmupSamples);
         Assert.Equal(total, r.TotalDuration);
         Assert.Equal(measured, r.MeasuredDuration);
         Assert.True(r.IsBaseline);
@@ -414,7 +413,7 @@ public class OutcomeBuilderTests
     [Fact]
     public void Build_Success_SetsThreadControlEnabled_FromOptions()
     {
-        var stats = new StatsSummary { Mean = 1 };
+        var stats = new StatsSummary { MeanNs = 1 };
         var options = new MeasurementOptions
         {
             Environment = new EnvironmentOptions { ThreadControl = false },
@@ -435,7 +434,7 @@ public class OutcomeBuilderTests
     [Fact]
     public void Build_Success_SetsThreadControlEnabled_DefaultTrue_WhenEnvironmentNull()
     {
-        var stats = new StatsSummary { Mean = 1 };
+        var stats = new StatsSummary { MeanNs = 1 };
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(
@@ -452,7 +451,7 @@ public class OutcomeBuilderTests
     [Fact]
     public void Build_Success_SetsInterferenceFilterEnabled_FromOptions()
     {
-        var stats = new StatsSummary { Mean = 1 };
+        var stats = new StatsSummary { MeanNs = 1 };
         var options = new MeasurementOptions
         {
             Interference = InterferenceOptions.Disabled,
@@ -473,7 +472,7 @@ public class OutcomeBuilderTests
     [Fact]
     public void Build_Success_SetsInterferenceFilterEnabled_DefaultTrue()
     {
-        var stats = new StatsSummary { Mean = 1 };
+        var stats = new StatsSummary { MeanNs = 1 };
 
         var outcome = OutcomeBuilder.Build(
             new RunOutcome.Success(

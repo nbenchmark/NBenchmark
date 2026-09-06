@@ -21,7 +21,7 @@ internal static class LaunchAggregator
             .Where(x => !x.Result.Errored)
             .ToList();
 
-        var successfulMedians = successful.Select(x => x.Result.Median).ToArray();
+        var successfulMedians = successful.Select(x => x.Result.MedianNs).ToArray();
         var successfulCount = successfulMedians.Length;
 
         var launchMean = successfulCount > 0 ? successfulMedians.Average() : 0;
@@ -50,10 +50,10 @@ internal static class LaunchAggregator
             .Select((r, i) => new LaunchDetail
             {
                 LaunchIndex = i,
-                Median = r.Median,
-                Mean = r.Mean,
-                StandardDeviation = r.StandardDeviation,
-                Iterations = r.MeasuredIterations,
+                MedianNs = r.MedianNs,
+                MeanNs = r.MeanNs,
+                StandardDeviationNs = r.StandardDeviationNs,
+                Samples = r.SampleCount,
                 Duration = r.TotalDuration,
                 Errored = r.Errored,
                 ErrorMessage = r.ErrorMessage,
@@ -86,7 +86,7 @@ internal static class LaunchAggregator
             //
             // Averaging rather than taking the smallest keeps one unusually quiet launch from making
             // the whole run look irreproducible.
-            var meanStandardError = successful.Average(x => x.Result.StandardError);
+            var meanStandardError = successful.Average(x => x.Result.StandardErrorNs);
 
             if (meanStandardError > 0)
             {
@@ -220,8 +220,8 @@ internal static class LaunchAggregator
     ///     </para>
     ///     <para>
     ///         <b>The reported interval is derived from the launches, not from one of them.</b>
-    ///         <see cref="BenchmarkResult.StandardError" /> becomes the standard error of the mean of
-    ///         launch medians and <see cref="BenchmarkResult.MarginOfError" /> its Student-t half-width,
+    ///         <see cref="BenchmarkResult.StandardErrorNs" /> becomes the standard error of the mean of
+    ///         launch medians and <see cref="BenchmarkResult.MarginOfErrorNs" /> its Student-t half-width,
     ///         so the interval describes how well the number <i>reproduces</i> rather than how
     ///         precisely one process measured it. On this library's own sample those differ by a factor
     ///         of twenty.
@@ -293,7 +293,7 @@ internal static class LaunchAggregator
         // against a different array would point at the wrong ones - so the honest choice is the most
         // representative launch rather than the fastest. Picked against the *combined* median so the
         // distribution shown is the one nearest the number printed above it.
-        var representative = Nearest(successful, combined.Median);
+        var representative = Nearest(successful, combined.MedianNs);
 
         return Apply(
             combined with
@@ -315,8 +315,8 @@ internal static class LaunchAggregator
         double confidenceLevel)
     {
         var count = successful.Count;
-        var mean = successful.Average(r => r.Mean);
-        var median = successful.Average(r => r.Median);
+        var mean = successful.Average(r => r.MeanNs);
+        var median = successful.Average(r => r.MedianNs);
 
         // The standard error of the *mean of launch medians*, which is what the combined median is.
         // LaunchStandardDeviation is the spread of those medians, so this is the textbook s/sqrt(k) -
@@ -325,52 +325,51 @@ internal static class LaunchAggregator
 
         var marginOfError = count > 1
             ? StudentT.CriticalValue(confidenceLevel, count - 1) * standardError
-            : successful[0].MarginOfError;
+            : successful[0].MarginOfErrorNs;
 
         return successful[0] with
         {
-            Mean = mean,
-            Median = median,
+            MeanNs = mean,
+            MedianNs = median,
 
             // Extremes over everything observed, so the minimum of minima and the maximum of maxima.
             // Averaging an extreme would report a value no launch actually saw at either end.
-            Min = successful.Min(r => r.Min),
-            Max = successful.Max(r => r.Max),
+            MinNs = successful.Min(r => r.MinNs),
+            MaxNs = successful.Max(r => r.MaxNs),
 
             Percentiles = AveragePercentiles(successful),
-            StandardDeviation = successful.Average(r => r.StandardDeviation),
-            StandardError = standardError,
-            MarginOfError = marginOfError,
+            StandardDeviationNs = successful.Average(r => r.StandardDeviationNs),
+            StandardErrorNs = standardError,
+            MarginOfErrorNs = marginOfError,
             ConfidenceLevel = confidenceLevel,
             CoefficientOfVariation = successful.Average(r => r.CoefficientOfVariation),
-            Q1 = successful.Average(r => r.Q1),
-            Q3 = successful.Average(r => r.Q3),
-            InterquartileRange = successful.Average(r => r.InterquartileRange),
-            Mad = successful.Average(r => r.Mad),
+            Q1Ns = successful.Average(r => r.Q1Ns),
+            Q3Ns = successful.Average(r => r.Q3Ns),
+            InterquartileRangeNs = successful.Average(r => r.InterquartileRangeNs),
+            MedianAbsoluteDeviationNs = successful.Average(r => r.MedianAbsoluteDeviationNs),
             Skewness = successful.Average(r => r.Skewness),
             Kurtosis = successful.Average(r => r.Kurtosis),
 
-            // A fence is a threshold derived from Q1/Q3, so it follows them. Present only when every
+            // A fence is a threshold derived from Q1Ns/Q3Ns, so it follows them. Present only when every
             // launch reported one, since averaging over a subset would describe a different rule.
-            LowerFence = AverageOrNull(successful, r => r.LowerFence),
-            UpperFence = AverageOrNull(successful, r => r.UpperFence),
+            LowerFenceNs = AverageOrNull(successful, r => r.LowerFenceNs),
+            UpperFenceNs = AverageOrNull(successful, r => r.UpperFenceNs),
 
             // The median confidence interval describes reproducibility *between* launches, not
             // precision within one: the Student-t interval over the k launch medians, centred on
-            // the combined median and using the same between-launch margin as MarginOfError above.
+            // the combined median and using the same between-launch margin as MarginOfErrorNs above.
             // Averaging each launch's own within-launch (distribution-free) interval instead
             // printed a narrow band around the mean that described spread inside a single process
             // while saying nothing about run-to-run variation - a second interval about the same
             // number with no label to distinguish it from the margin line. The within-launch
             // distribution-free interval is kept only on the single-launch path (see Combine),
             // where there is no between-launch spread to describe.
-            MedianCiLower = median - marginOfError,
-            MedianCiUpper = median + marginOfError,
+            MedianConfidenceIntervalLowerNs = median - marginOfError,
+            MedianConfidenceIntervalUpperNs = median + marginOfError,
 
             // Counts and durations are totals: the run really did take this long and really did
-            // measure this many iterations.
-            N = successful.Sum(r => r.N),
-            MeasuredIterations = successful.Sum(r => r.MeasuredIterations),
+            // measure this many samples.
+            SampleCount = successful.Sum(r => r.SampleCount),
             OutliersRemoved = successful.Sum(r => r.OutliersRemoved),
             TotalOperations = successful.Sum(r => r.TotalOperations),
             TotalDuration = Total(successful, r => r.TotalDuration),
@@ -385,16 +384,16 @@ internal static class LaunchAggregator
             // Allocation samples do not cross the process boundary, so these are combined from the
             // per-launch summaries. A median of medians rather than a mean, because allocation per op
             // is usually identical across launches and a single anomalous launch should not move it.
-            AllocMedian = MedianOrNull(successful, r => r.AllocMedian),
-            AllocP95 = MedianOrNull(successful, r => r.AllocP95),
-            AllocMax = successful.Select(r => r.AllocMax).Where(v => v.HasValue).Max(),
-            MeanAllocatedBytes = MeanOrNull(successful, r => r.MeanAllocatedBytes),
+            AllocatedBytesMedian = MedianOrNull(successful, r => r.AllocatedBytesMedian),
+            AllocatedBytesP95 = MedianOrNull(successful, r => r.AllocatedBytesP95),
+            AllocatedBytesMax = successful.Select(r => r.AllocatedBytesMax).Where(v => v.HasValue).Max(),
+            AllocatedBytesMean = MeanOrNull(successful, r => r.AllocatedBytesMean),
 
             // Averaged rather than taken from one launch. Each launch is its own worker with its
             // own canary origin, so the absolute readings are not comparable between them - but
             // RelativeToRunStart is dimensionless and normalised within each launch, so its mean
             // is the honest answer to "across the launches, how far into a drifting host was this
-            // row measured?". Position averages for the same reason: under a random run order each
+            // row measured?". The completed-benchmark count averages for the same reason: under a random run order each
             // launch places the benchmark differently, and no single launch's index describes the
             // aggregate.
             HostTimeline = AverageTimeline(successful),
@@ -444,13 +443,13 @@ internal static class LaunchAggregator
             BeforeNs = stamps.Average(s => s.BeforeNs),
             AfterNs = stamps.Average(s => s.AfterNs),
             RelativeToRunStart = stamps.Average(s => s.RelativeToRunStart),
-            Position = stamps.Average(s => s.Position),
+            CompletedBenchmarks = stamps.Average(s => s.CompletedBenchmarks),
         };
     }
 
     /// <summary>The launch whose median is nearest <paramref name="target" />.</summary>
     private static Launch Nearest(IReadOnlyList<Launch> successful, double target)
-        => successful.MinBy(l => Math.Abs(l.Result.Median - target));
+        => successful.MinBy(l => Math.Abs(l.Result.MedianNs - target));
 
     private static double Throughput(double nanoseconds)
         => nanoseconds > 0 ? 1_000_000_000.0 / nanoseconds : double.NaN;

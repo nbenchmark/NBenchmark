@@ -26,10 +26,16 @@ var results = await new BenchmarkSuite("string-concat")
     .Add("interpolate", () => $"a {"b"} {"c"}")
     .WithBaseline("concat")
     .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)
-    .WithWarmup(3)
-    .WithIterations(50)
+    .WithWarmupSamples(3)
+    .WithSamples(50)
     .WithReporter(new ConsoleReporter())
     .RunAsync();
+```
+
+`RuntimeMoniker` is an open set, not a fixed enum: `Net8`, `Net9` and `Net10` are conveniences, and any other target framework parses. This means a new .NET release does not need an NBenchmark release before you can measure on it:
+
+```csharp
+.WithRuntimes(RuntimeMoniker.Net10, RuntimeMoniker.Parse("net11.0"))
 ```
 
 ## Harness mode: `--runtimes` CLI flag
@@ -39,19 +45,19 @@ Pass the runtimes on the command line. The engine accepts both short (`net8`) an
 ```bash
 dotnet run -- --runtimes net8,net9,net10
 dotnet run -- --runtimes net8.0,net10.0
-dotnet run -- --runtimes net8,net9 --iterations 500 --reporter markdown --output ./results
+dotnet run -- --runtimes net8,net9 --samples 500 --reporter markdown --output ./results
 ```
 
 When you specify `--runtimes`, NBenchmark builds the project for each target framework via `dotnet build -f <tfm>`, measures the benchmarks in that build's own worker process, and aggregates the results. Because a worker is framework-dependent, only the net8.0 worker can load a net8.0 build. The build targets deploy the correct worker beside each build's assemblies, so worker selection is a simple lookup.
 
 ## Harness mode: `[Runtimes]` attribute
 
-Instead of using the `--runtimes` flag, you can declare the runtimes on the benchmark class:
+Instead of using the `--runtimes` flag, you can declare the runtimes on the benchmark class. The attribute takes target-framework strings, because an attribute argument must be a compile-time constant. The short form (`"net10"`) is accepted alongside the full moniker:
 
 ```csharp
-using NBenchmark.Attributes;
+using NBenchmark;
 
-[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)]
+[Runtimes("net8.0", "net9.0", "net10.0")]
 public class StringBenchmarks
 {
     [Benchmark]

@@ -37,8 +37,8 @@ public class TimingSanityTests
             {
                 Options = new MeasurementOptions
                 {
-                    WarmupIterations = 3,
-                    Iterations = 15,
+                    WarmupSamples = 3,
+                    Samples = 15,
                     OutlierMode = OutlierMode.None,
                     MeasureAllocations = false,
                 },
@@ -49,7 +49,7 @@ public class TimingSanityTests
         // errors (e.g. ns reported as ms) without flaking under CI throttling.
         // Lower bound (70%) accounts for timer overhead, loop slack, and Stopwatch
         // resolution on slow runners.
-        Assert.InRange(outcome.Result.Min, targetNanos * 0.7, targetNanos * 10.0);
+        Assert.InRange(outcome.Result.MinNs, targetNanos * 0.7, targetNanos * 10.0);
     }
 
     [Fact]
@@ -70,10 +70,10 @@ public class TimingSanityTests
             {
                 Options = new MeasurementOptions
                 {
-                    WarmupIterations = 5,
-                    Iterations = 100,
+                    WarmupSamples = 5,
+                    Samples = 100,
                     OutlierMode = OutlierMode.None,
-                    ForceGcBeforeEachIteration = false,
+                    ForceGcBeforeEachSample = false,
                 },
             });
 

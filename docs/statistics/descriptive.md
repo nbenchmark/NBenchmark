@@ -22,30 +22,30 @@ NBenchmark uses the **mid-average** convention for the median:
 - For odd `n`, the median is the middle value.
 - For even `n`, the median is the mean of the two middle order statistics.
 
-This matches `numpy.median` and the median NBenchmark uses for per-launch aggregation and jitter calibration. Consequently, the reported `Median` and the `P50` percentile agree.
+This matches `numpy.median` and the median NBenchmark uses for per-launch aggregation and jitter calibration. Consequently, the reported `MedianNs` and the `P50` percentile agree.
 
 ### Percentiles
 
 NBenchmark computes configurable percentile values using the [nearest-rank](https://en.wikipedia.org/wiki/Percentile#The_nearest-rank_method) method: `i = ceil(p × n)`.
 
-The median (`p = 0.50`) is the only exception, as it uses the mid-average method for even `n`. All other percentiles, including `Q1` and `Q3`, use nearest-rank.
+The median (`p = 0.50`) is the only exception, as it uses the mid-average method for even `n`. All other percentiles, including `Q1Ns` and `Q3Ns`, use nearest-rank.
 
-You can control which percentiles are reported via `MeasurementOptions.ReportedPercentiles` (default: P50, P95, P99, P99.9, Max). Each entry is a `PercentileEntry` containing a `Percentile` (0-1) and a `Value` (nanoseconds). You can access a specific percentile using `result.GetPercentile(0.95)`.
+You can control which percentiles are reported via `MeasurementOptions.ReportedPercentiles` (default: P50, P95, P99, P99.9, max). Each entry is a `PercentileEntry` containing a `Percentile` (0-1) and a `Value` (nanoseconds). You can access a specific percentile using `result.GetPercentile(0.95)`.
 
-**Tail metrics are computed from the full pre-trim distribution by default.** Because percentiles, `Min`, `Max`, and the histogram describe the shape of the distribution, NBenchmark computes them from the raw (pre-trim) sample set (`MeasurementOptions.TailMetricsBasis = Raw`). This ensures that the IQR/MAD fence does not remove the slow tail that P99/P99.9/Max are intended to describe.
+**Tail metrics are computed from the full pre-trim distribution by default.** Because percentiles, `MinNs`, `MaxNs`, and the histogram describe the shape of the distribution, NBenchmark computes them from the raw (pre-trim) sample set (`MeasurementOptions.TailMetricsBasis = Raw`). This ensures that the IQR/MAD fence does not remove the slow tail that P99/P99.9/max are intended to describe.
 
 Central-tendency and dispersion statistics - including the mean, standard deviation, CI, CV, skewness, kurtosis, MAD, and median - always use the **trimmed** set. This prevents fenced-out spikes from moving the mean or inflating the interval. To compute tail metrics from the inlier set instead, set `TailMetricsBasis = Trimmed` (or use `--tail-basis trimmed`).
 
-NBenchmark records the basis used on the result as `BenchmarkResult.TailMetricsBasis` (and as `tailMetricsBasis` in JSON output), alongside the `OutlierDetector` that defined the boundary.
+NBenchmark records the basis used on the result as `BenchmarkResult.TailMetricsBasis` (and as `tailMetricsBasis` in JSON output), alongside the `OutlierDetectorName` that defined the boundary.
 
 > [!IMPORTANT] Percentiles describe samples, and a sample may be a batch
-> When [ops-per-sample calibration](./measurement.md#phase-a---ops-per-sample-calibration-k) resolves `K > 1` (common for bodies under 10 µs), each **sample** is the mean of `K` back-to-back operations. Therefore, percentiles, `Min`, `Max`, and the histogram describe **batch means**, not individual operations. A single slow operation is averaged with its `K-1` neighbors, which understates true per-operation tail latency.
+> When [ops-per-sample calibration](./measurement.md#phase-a---ops-per-sample-calibration-k) resolves `K > 1` (common for bodies under 10 µs), each **sample** is the mean of `K` back-to-back operations. Therefore, percentiles, `MinNs`, `MaxNs`, and the histogram describe **batch means**, not individual operations. A single slow operation is averaged with its `K-1` neighbors, which understates true per-operation tail latency.
 >
 > This is a deliberate trade-off to amortize timer overhead. If you need genuine per-op tail latency, pin `OpsPerSample = 1`. Note that at this scale, reported values are dominated by timer resolution and read overhead; compare these results against a baseline measured the same way. Bodies that already span $\ge$ `AutoTune.TargetSampleDurationNs` (10 µs) keep `K = 1` and already provide per-operation percentiles.
 
-### Min and Max
+### Min and max
 
-The `Min` and `Max` are the first (`samples[0]`) and last (`samples[n-1]`) values of the sorted tail source (the full pre-trim set by default).
+The `MinNs` and `MaxNs` are the first (`samples[0]`) and last (`samples[n-1]`) values of the sorted tail source (the full pre-trim set by default).
 
 ### Sample standard deviation
 
@@ -103,7 +103,7 @@ For typical auto-resolved sample counts (tens to low hundreds), the t critical v
 
 ### Honest caveats
 
-The CI is on the **mean** and relies on the [Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem), which assumes the sample mean is approximately normally distributed. This is generally safe for `n ≥ 30`. For very small sample counts, the approximation is weaker, but the t-distribution's heavier tails provide some protection.
+The CI is on the **Mean** and relies on the [Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem), which assumes the sample mean is approximately normally distributed. This is generally safe for `n ≥ 30`. For very small sample counts, the approximation is weaker, but the t-distribution's heavier tails provide some protection.
 
 ### T-critical values in practice
 
@@ -121,13 +121,13 @@ These approximations are cross-checked against SciPy on every build. The t criti
 
 ## Confidence interval on the median
 
-While the t-interval describes the mean, the median is the headline comparison metric for NBenchmark. `MedianCiLower` and `MedianCiUpper` report a **distribution-free** confidence interval on the median based on order statistics.
+While the t-interval describes the mean, the median is the headline comparison metric for NBenchmark. `MedianConfidenceIntervalLowerNs` and `MedianConfidenceIntervalUpperNs` report a **distribution-free** confidence interval on the median based on order statistics.
 
 For `n < 50`, the rank bounds are exact, derived from the binomial(`n`, ½) distribution. The interval `[X(l), X(u)]` covers the median with probability $1 − 2·\text{CDF}(l−1)$, where `l` is the largest rank whose lower-tail mass does not exceed $\alpha/2$.
 
 For `n \ge 50`, NBenchmark uses the normal approximation to the binomial: `l = ⌊(n − z√n)/2⌋` and `u = ⌈1 + (n + z√n)/2⌉`, where `z = Φ⁻¹((1+CL)/2)`.
 
-The interval is computed on the same trimmed set as the `Median`. It is always present in JSON output and appears in the advanced-detail stats block.
+The interval is computed on the same trimmed set as the `MedianNs`. It is always present in JSON output and appears in the advanced-detail stats block.
 
 ## Coefficient of variation
 
@@ -175,39 +175,39 @@ MAD is reported as `0` when `n < 1`.
 
 | Field | Formula / method | Description |
 |---|---|---|
-| `Median` | Mid-average P50 | [Robust central tendency](https://en.wikipedia.org/wiki/Median). |
-| `Mean` | $\bar{x} = \frac{1}{n}\sum x_i$ | [Arithmetic average](https://en.wikipedia.org/wiki/Arithmetic_mean). |
-| `Percentiles` | `IReadOnlyList<PercentileEntry>` | Configurable percentile values. Default set includes P50, P95, P99, P99.9, and Max. Controlled by `MeasurementOptions.ReportedPercentiles`. |
+| `MedianNs` | Mid-average P50 | [Robust central tendency](https://en.wikipedia.org/wiki/median). |
+| `MeanNs` | $\bar{x} = \frac{1}{n}\sum x_i$ | [Arithmetic average](https://en.wikipedia.org/wiki/Arithmetic_mean). |
+| `Percentiles` | `IReadOnlyList<PercentileEntry>` | Configurable percentile values. Default set includes P50, P95, P99, P99.9, and max. Controlled by `MeasurementOptions.ReportedPercentiles`. |
 | `Histogram` | `LatencyHistogram?` | Latency histogram with bucket boundaries and sample counts. `null` if `EnableHistogram` is `false` or fewer than 2 samples exist. |
-| `Min` | $x_1$ (sorted) | [Fastest measured sample](https://en.wikipedia.org/wiki/Sample_maximum_and_minimum). |
-| `Max` | $x_n$ (sorted) | [Slowest measured sample](https://en.wikipedia.org/wiki/Sample_maximum_and_minimum). |
-| `Q1` | Nearest-rank P25 | [First quartile](https://en.wikipedia.org/wiki/Quartile). |
-| `Q3` | Nearest-rank P75 | [Third quartile](https://en.wikipedia.org/wiki/Quartile). |
-| `InterquartileRange` | Q3 - Q1 | [Spread of the middle 50% of samples](https://en.wikipedia.org/wiki/Interquartile_range). |
-| `LowerFence` | Detector-dependent | [Lower outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences). Set only by fence-based detectors. `IqrFence`: $Q1 - k \times \text{IQR}$ (default $k = 1.5$). `MedianAbsoluteDeviation`: $m - t \times \text{scaledMAD}$ (default $t = 3$). `null` otherwise. |
-| `UpperFence` | Detector-dependent | [Upper outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences). Set only by fence-based detectors. `IqrFence`: $Q3 + k \times \text{IQR}$ (default $k = 1.5$). `MedianAbsoluteDeviation`: $m + t \times \text{scaledMAD}$ (default $t = 3$). `null` otherwise. |
+| `MinNs` | $x_1$ (sorted) | [Fastest measured sample](https://en.wikipedia.org/wiki/Sample_maximum_and_minimum). |
+| `MaxNs` | $x_n$ (sorted) | [Slowest measured sample](https://en.wikipedia.org/wiki/Sample_maximum_and_minimum). |
+| `Q1Ns` | Nearest-rank P25 | [First quartile](https://en.wikipedia.org/wiki/Quartile). |
+| `Q3Ns` | Nearest-rank P75 | [Third quartile](https://en.wikipedia.org/wiki/Quartile). |
+| `InterquartileRangeNs` | Q3Ns - Q1Ns | [Spread of the middle 50% of samples](https://en.wikipedia.org/wiki/Interquartile_range). |
+| `LowerFenceNs` | Detector-dependent | [Lower outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences). Set only by fence-based detectors. `IqrFence`: $Q_1 - k \times \text{IQR}$ (default $k = 1.5$). `MedianAbsoluteDeviation`: $m - t \times \text{scaledMAD}$ (default $t = 3$). `null` otherwise. |
+| `UpperFenceNs` | Detector-dependent | [Upper outlier boundary](https://en.wikipedia.org/wiki/Outlier#Tukey%27s_fences). Set only by fence-based detectors. `IqrFence`: $Q_3 + k \times \text{IQR}$ (default $k = 1.5$). `MedianAbsoluteDeviation`: $m + t \times \text{scaledMAD}$ (default $t = 3$). `null` otherwise. |
 | `OutliersRemoved` | Count of discarded samples | [Number of samples removed by outlier trimming](https://en.wikipedia.org/wiki/Outlier). |
-| `N` | Post-trim length | Sample count after outlier removal. |
-| `StandardDeviation` | $s = \sqrt{\frac{1}{n-1}\sum(x_i-\bar{x})^2}$ | Spread of measurements (Bessel). |
-| `StandardError` | $s/\sqrt{n}$ (untrimmed); $s_w\sqrt{n}/h$ [Winsorized](#winsorized-standard-error-for-trimmed-data) | Precision of the mean estimate. |
-| `MarginOfError` | $t^{*} \times \text{SEM}$, on $n-1$ df untrimmed and $h-1$ after trimming | Half-width of CI on the mean. |
-| `ConfidenceIntervalLower` | $\bar{x} - \text{MoE}$ | Lower CI bound. |
-| `ConfidenceIntervalUpper` | $\bar{x} + \text{MoE}$ | Upper CI bound. |
-| `MedianCiLower` / `MedianCiUpper` | Order-statistic interval | Distribution-free confidence interval on the median. `null` when undefined ($n < 2$, dry-run, or errored). |
+| `SampleCount` | Post-trim length | Number of measured samples the statistics were computed from. Add `OutliersRemoved` for the pre-trim count. |
+| `StandardDeviationNs` | $s = \sqrt{\frac{1}{n-1}\sum(x_i-\bar{x})^2}$ | Spread of measurements (Bessel). |
+| `StandardErrorNs` | $s/\sqrt{n}$ (untrimmed); $s_w\sqrt{n}/h$ [Winsorized](#winsorized-standard-error-for-trimmed-data) | Precision of the mean estimate. |
+| `MarginOfErrorNs` | $t^{*} \times \text{SEM}$, on $n-1$ df untrimmed and $h-1$ after trimming | Half-width of CI on the mean. |
+| `ConfidenceIntervalLowerNs` | $\bar{x} - \text{MoE}$ | Lower CI bound. |
+| `ConfidenceIntervalUpperNs` | $\bar{x} + \text{MoE}$ | Upper CI bound. |
+| `MedianConfidenceIntervalLowerNs` / `MedianConfidenceIntervalUpperNs` | Order-statistic interval | Distribution-free confidence interval on the median. `null` when undefined ($n < 2$, dry-run, or errored). |
 | `MedianShift` | Hodges-Lehmann + Lehmann CI | Location shift vs. baseline in ns/op. Positive means the candidate is slower. `null` for the baseline or when significance was not tested. |
 | `CoefficientOfVariation` | $s / \bar{x}$ | Relative variability. |
 | `Skewness` | $g_1 = \frac{n \sum (x_i - \bar{x})^3}{(n-1)(n-2) s^3}$ | [Sample skewness](https://en.wikipedia.org/wiki/Skewness). Zero for $n < 3$. |
 | `Kurtosis` | $g_2$ (excess) | [Excess kurtosis](https://en.wikipedia.org/wiki/Kurtosis). Zero for $n < 4$. |
-| `Mad` | Scaled MAD | [Median absolute deviation](https://en.wikipedia.org/wiki/Median_absolute_deviation). Zero for $n < 1$. |
+| `MedianAbsoluteDeviationNs` | Scaled MAD | [Median absolute deviation](https://en.wikipedia.org/wiki/Median_absolute_deviation). Zero for $n < 1$. |
 | `PValue` | Mann-Whitney U | Two-tailed pairwise p-value vs. baseline. `null` for omnibus cases. |
 | `SignificanceVerdict` | $p < \alpha$ | Whether the pairwise difference is real (`Significant`, `NotSignificant`, or `NotTested`). |
 | `Omnibus` | Kruskal-Wallis | Across-all-groups verdict for three or more benchmarks. |
 | `SignificanceTestName` | - | Display name of the pairwise significance test used. |
-| `OutlierDetector` | - | Display name of the outlier detector applied. |
-| `MeanAllocatedBytes` | Mean of iteration deltas | Mean heap allocation per iteration. |
-| `AllocMedian` | Mid-average P50 | Median allocation per iteration. |
-| `AllocP95` | Nearest-rank P95 | P95 allocation per iteration. |
-| `AllocMax` | Max of iteration deltas | Max allocation per iteration. |
+| `OutlierDetectorName` | - | Display name of the outlier detector applied. |
+| `AllocatedBytesMean` | Mean of per-op deltas | Mean heap allocation per operation. |
+| `AllocatedBytesMedian` | Mid-average P50 | Median allocation per operation. |
+| `AllocatedBytesP95` | Nearest-rank P95 | P95 allocation per operation. |
+| `AllocatedBytesMax` | Max of per-op deltas | Max allocation per operation. |
 
 ### Provenance fields
 
@@ -224,16 +224,15 @@ Provenance fields record the run configuration used for a result, allowing users
 
 | Field | Formula | Description |
 |---|---|---|
-| `OperationsPerSecond` | `1e9 / Mean` | Mean operations per second. `NaN` for errored or dry-run results. |
-| `MedianOperationsPerSecond` | `1e9 / Median` | Median operations per second. `NaN` for errored or dry-run results. |
-| `NanosecondsPerOperation` | Alias for `Mean` | Convenience alias for the mean timing in nanoseconds per operation. |
-| `TotalOperations` | `MeasuredIterations + WarmupIterations`, or `AutoTuneDiagnostic.TotalBodyInvocations` when auto-tuning | Total body invocations across warmup and measurement. |
+| `OperationsPerSecond` | `1e9 / MeanNs` | Mean operations per second. `NaN` for errored or dry-run results. |
+| `MedianOperationsPerSecond` | `1e9 / MedianNs` | Median operations per second. `NaN` for errored or dry-run results. |
+| `TotalOperations` | `SampleCount + WarmupSamples`, or `AutoTuneDiagnostic.TotalBodyInvocations` when auto-tuning | Total body invocations across warmup and measurement. |
 
 ### Computed properties
 
 | Property | Formula | Description |
 |---|---|---|
-| `Range` | Max - Min | [Full spread of trimmed samples](https://en.wikipedia.org/wiki/Range_(statistics)). |
+| `RangeNs` | Max - min | [Full spread of trimmed samples](https://en.wikipedia.org/wiki/Range_(statistics)). |
 | `StandardErrorPercent` | $\text{SEM} / \bar{x} \times 100$ | Standard error as a percentage of the mean. |
-| `MarginPercent` | $\text{MoE} / \bar{x} \times 100$ | Margin of error as a percentage of the mean. |
+| `MarginOfErrorPercent` | $\text{MoE} / \bar{x} \times 100$ | Margin of error as a percentage of the mean. |
 | `CoefficientOfVariationPercent` | $\text{CV} \times 100$ | Coefficient of variation as a percentage. |

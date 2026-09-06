@@ -92,7 +92,7 @@ internal sealed class HostDriftCanary
             BeforeNs = before,
             AfterNs = after,
             RelativeToRunStart = (before + after) / 2.0 / origin,
-            Position = index,
+            CompletedBenchmarks = index,
         };
     }
 

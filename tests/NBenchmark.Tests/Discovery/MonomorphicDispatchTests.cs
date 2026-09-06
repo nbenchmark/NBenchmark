@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Discovery;
 using NBenchmark.Engine;
 using NBenchmark.Workers;
@@ -16,7 +16,7 @@ namespace NBenchmark.Tests.Discovery;
 ///         Discovery used to hand the engine a <c>Func&lt;object, object?&gt;</c>. Every
 ///         value-returning <c>[Benchmark]</c> method therefore boxed its result once per operation,
 ///         and the report attributed those 24 bytes to the user: <c>samples/Harness</c> declares four
-///         bodies that allocate nothing and every one of them reported <c>allocMedian = 24</c>.
+///         bodies that allocate nothing and every one of them reported <c>allocatedBytesMedian = 24</c>.
 ///     </para>
 ///     <para>
 ///         The assertions here are deliberately allocation-first rather than time-first. Allocation
@@ -45,7 +45,7 @@ public sealed class MonomorphicDispatchTests
         var outcome = await MeasureAsync<StructReturningBenchmarks>();
 
         Assert.False(outcome.Result.Errored);
-        Assert.Equal(0, outcome.Result.AllocMedian);
+        Assert.Equal(0, outcome.Result.AllocatedBytesMedian);
     }
 
     /// <summary>
@@ -58,7 +58,7 @@ public sealed class MonomorphicDispatchTests
         var outcome = await MeasureAsync<ParameterizedStructBenchmarks>();
 
         Assert.False(outcome.Result.Errored);
-        Assert.Equal(0, outcome.Result.AllocMedian);
+        Assert.Equal(0, outcome.Result.AllocatedBytesMedian);
     }
 
     /// <summary>
@@ -74,7 +74,7 @@ public sealed class MonomorphicDispatchTests
         var outcome = BenchmarkRunner.Instance.Run<object>(
             "boxing-control", () => seed + 1, Spec());
 
-        Assert.Equal(24, outcome.Result.AllocMedian);
+        Assert.Equal(24, outcome.Result.AllocatedBytesMedian);
     }
 
     /// <summary>
@@ -133,7 +133,7 @@ public sealed class MonomorphicDispatchTests
         Assert.False(outcome.Result.Errored);
 
         Assert.InRange(
-            outcome.Result.Median,
+            outcome.Result.MedianNs,
             KnownCostBenchmarks.TargetNanoseconds * 0.7,
             KnownCostBenchmarks.TargetNanoseconds * 4.0);
     }
@@ -172,7 +172,7 @@ public sealed class MonomorphicDispatchTests
             "argument-bound", bound, Spec(), CancellationToken.None);
 
         Assert.False(outcome.Result.Errored, outcome.Result.ErrorMessage);
-        Assert.Equal(0, outcome.Result.AllocMedian);
+        Assert.Equal(0, outcome.Result.AllocatedBytesMedian);
 
         // The bound argument really reached the body, and the body's result really reached the sink.
         Assert.Equal(expected, BenchmarkRunner.LastConsumed<Token>());
@@ -194,8 +194,8 @@ public sealed class MonomorphicDispatchTests
     {
         Options = new MeasurementOptions
         {
-            Iterations = 20,
-            WarmupIterations = 2,
+            Samples = 20,
+            WarmupSamples = 2,
             OpsPerSample = 1,
             OutlierMode = OutlierMode.None,
         },
@@ -210,7 +210,7 @@ public sealed class MonomorphicDispatchTests
     public sealed class ParameterizedStructBenchmarks
     {
         [Benchmark]
-        [BenchmarkCase(Expected)]
+        [Arguments(Expected)]
         public Token Compute(long value) => new(value);
     }
 

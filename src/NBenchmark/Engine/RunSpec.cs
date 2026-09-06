@@ -16,8 +16,8 @@ internal readonly record struct RunSpec
     public string? Description { get; init; }
     public bool IsBaseline { get; init; }
     public IReadOnlyList<string> Categories { get; init; } = [];
-    public Action? IterationSetup { get; init; }
-    public Action? IterationTeardown { get; init; }
+    public Action? SampleSetup { get; init; }
+    public Action? SampleTeardown { get; init; }
     public IBenchmarkProgress Progress { get; init; } = NullBenchmarkProgress.Instance;
     public IMeasurementObserver Observer { get; init; } = NullMeasurementObserver.Instance;
 

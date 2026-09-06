@@ -20,8 +20,7 @@ public class EnvironmentControlBuildConfigTests
 
         var stderr = CaptureStderr(() =>
         {
-            EnvironmentControl.EmitBuildConfigurationGuidance(
-                new EnvironmentOptions { SuppressBuildConfigurationWarning = true });
+            EnvironmentControl.EmitBuildConfigurationGuidance(BenchmarkWarnings.BuildConfiguration);
         });
 
         Assert.DoesNotContain("Build configuration guidance", stderr);
@@ -44,7 +43,7 @@ public class EnvironmentControlBuildConfigTests
 
             var stderr = CaptureStderr(() =>
             {
-                EnvironmentControl.EmitBuildConfigurationGuidance(null);
+                EnvironmentControl.EmitBuildConfigurationGuidance(BenchmarkWarnings.None);
             });
 
             Assert.DoesNotContain("Build configuration guidance", stderr);
@@ -64,12 +63,12 @@ public class EnvironmentControlBuildConfigTests
         // and debugger state, but it must consume the guard so the second call is silent.
         CaptureStderr(() =>
         {
-            EnvironmentControl.EmitBuildConfigurationGuidance(null);
+            EnvironmentControl.EmitBuildConfigurationGuidance(BenchmarkWarnings.None);
         });
 
         var secondStderr = CaptureStderr(() =>
         {
-            EnvironmentControl.EmitBuildConfigurationGuidance(null);
+            EnvironmentControl.EmitBuildConfigurationGuidance(BenchmarkWarnings.None);
         });
 
         // The second call must never emit, regardless of whether the first did.
@@ -139,18 +138,18 @@ public class EnvironmentControlBuildConfigTests
         var stderr = CaptureStderr(() =>
         {
             using var _ = EnvironmentControl.Apply(
-                new EnvironmentOptions { SuppressBuildConfigurationWarning = true });
+                new EnvironmentOptions(), BenchmarkWarnings.BuildConfiguration);
         });
 
         Assert.DoesNotContain("Build configuration guidance", stderr);
     }
 
     [Fact]
-    public void EnvironmentOptions_SuppressBuildConfigurationWarning_Defaults_False()
+    public void MeasurementOptions_SuppressedWarnings_Defaults_To_None()
     {
-        var opts = new EnvironmentOptions();
+        var opts = MeasurementOptions.Default;
 
-        Assert.False(opts.SuppressBuildConfigurationWarning);
+        Assert.Equal(BenchmarkWarnings.None, opts.SuppressedWarnings);
     }
 
     /// <summary>
@@ -174,7 +173,7 @@ public class EnvironmentControlBuildConfigTests
 
         var stderr = CaptureStderr(() =>
         {
-            EnvironmentControl.EmitBuildConfigurationGuidance(null);
+            EnvironmentControl.EmitBuildConfigurationGuidance(BenchmarkWarnings.None);
         });
 
         if (!string.IsNullOrEmpty(configuration)

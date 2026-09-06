@@ -74,7 +74,7 @@ internal sealed class BenchmarkRunner
         {
             progress.OnWarmupStarting(name, PlannedWarmup(options)).GetAwaiter().GetResult();
 
-            if (options.Iterations is 0)
+            if (options.Samples is 0)
             {
                 RunFixedWarmupSync(body, spec, ct);
                 var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
@@ -121,7 +121,7 @@ internal sealed class BenchmarkRunner
         {
             await progress.OnWarmupStarting(name, PlannedWarmup(options)).ConfigureAwait(false);
 
-            if (options.Iterations is 0)
+            if (options.Samples is 0)
             {
                 await RunFixedWarmupAsync(body, spec, ct).ConfigureAwait(false);
                 var dryRun = BuildDryRunOutcome(name, spec, totalStartTimestamp);
@@ -160,27 +160,27 @@ internal sealed class BenchmarkRunner
     // measure against). Calibration is skipped, so K is 1.
     private static void RunFixedWarmupSync(Action body, RunSpec spec, CancellationToken ct)
     {
-        var warmup = spec.Options.WarmupIterations ?? 0;
+        var warmup = spec.Options.WarmupSamples ?? 0;
 
         for (var i = 0; i < warmup; i++)
         {
             ct.ThrowIfCancellationRequested();
-            spec.IterationSetup?.Invoke();
+            spec.SampleSetup?.Invoke();
             body();
-            spec.IterationTeardown?.Invoke();
+            spec.SampleTeardown?.Invoke();
         }
     }
 
     private static async Task RunFixedWarmupAsync(Func<Task> body, RunSpec spec, CancellationToken ct)
     {
-        var warmup = spec.Options.WarmupIterations ?? 0;
+        var warmup = spec.Options.WarmupSamples ?? 0;
 
         for (var i = 0; i < warmup; i++)
         {
             ct.ThrowIfCancellationRequested();
-            spec.IterationSetup?.Invoke();
+            spec.SampleSetup?.Invoke();
             await body().ConfigureAwait(false);
-            spec.IterationTeardown?.Invoke();
+            spec.SampleTeardown?.Invoke();
         }
     }
 
@@ -188,7 +188,7 @@ internal sealed class BenchmarkRunner
     // warmup length is decided at runtime by the plateau rule. Progress UIs treat a non-positive
     // total as an indeterminate phase.
     private static int PlannedWarmup(MeasurementOptions options)
-        => options.WarmupIterations ?? 0;
+        => options.WarmupSamples ?? 0;
 
     private MeasurementOutcome BuildDryRunOutcome(string name, RunSpec spec, long totalStartTimestamp)
     {
@@ -201,7 +201,7 @@ internal sealed class BenchmarkRunner
             spec.Options,
             _clock.GetElapsedTime(totalStartTimestamp),
             TimeSpan.Zero,
-            spec.Options.WarmupIterations ?? 0,
+            spec.Options.WarmupSamples ?? 0,
             null,
             spec.Categories);
     }
@@ -243,7 +243,7 @@ internal sealed class BenchmarkRunner
         var mergedWarnings = MergeWarnings(pipeline.Warnings, adaptive.Warnings);
         mergedWarnings = MergeWarnings(
             mergedWarnings,
-            BuildMidBatchGcWarnings(effectiveOptions, adaptive.Diagnostic.OpsPerSample, pipeline.MeanAllocatedBytes));
+            BuildMidBatchGcWarnings(effectiveOptions, adaptive.Diagnostic.OpsPerSample, pipeline.AllocatedBytesMean));
         var diagnosticsResult = BuildDiagnosticsResult(adaptive, spec.Options.Diagnostics);
         var mergedPipeline = pipeline with { Warnings = mergedWarnings, DiagnosticsResult = diagnosticsResult };
 
@@ -351,7 +351,7 @@ internal sealed class BenchmarkRunner
         return $"{phase} stopped at the wall-clock tuning cap ({BenchmarkFormatter.FormatDuration(maxTuningTime)}) "
                + "before reaching the requested precision. "
                + "Use --autotune-cap-behavior warn to accept under-sampled results, "
-               + "or increase --max-tuning-time / pin --iterations / pin --warmup.";
+               + "or increase --max-tuning-time / pin --samples / pin --warmup-samples.";
     }
 
     // Under a per-iteration forced GC (the Independent profile), the collection runs once per
@@ -360,14 +360,14 @@ internal sealed class BenchmarkRunner
     // reintroducing exactly the pause the forced GC was meant to exclude. Auto-K is now allowed
     // under Independent, so surface this so the user can pin K = 1 when it matters.
     private static IReadOnlyList<string> BuildMidBatchGcWarnings(
-        MeasurementOptions options, int opsPerSample, long? meanAllocatedBytes)
+        MeasurementOptions options, int opsPerSample, long? allocatedBytesMean)
     {
-        if (options.Resolve().ForceGcBeforeEachIteration && opsPerSample > 1 && meanAllocatedBytes is > 0)
+        if (options.Resolve().ForceGcBeforeEachSample && opsPerSample > 1 && allocatedBytesMean is > 0)
         {
             return
             [
                 $"ops-per-sample K = {opsPerSample} and the body allocates "
-                + $"~{BenchmarkFormatter.FormatAlloc(meanAllocatedBytes.Value)}/op under a per-iteration forced GC; "
+                + $"~{BenchmarkFormatter.FormatAlloc(allocatedBytesMean.Value)}/op under a per-iteration forced GC; "
                 + "a collection can occur inside a timed K-batch. Pin --ops-per-sample 1 to keep each timed sample GC-free.",
             ];
         }
@@ -400,7 +400,7 @@ internal sealed class BenchmarkRunner
             spec.Options,
             _clock.GetElapsedTime(totalStartTimestamp),
             TimeSpan.Zero,
-            spec.Options.WarmupIterations ?? 0,
+            spec.Options.WarmupSamples ?? 0,
             null,
             spec.Categories);
     }

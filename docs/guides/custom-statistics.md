@@ -39,7 +39,7 @@ public sealed class KeepFastestDetector(double fraction) : IOutlierDetector
         {
             Kept = sortedSamples[..keep],
             Discarded = sortedSamples[keep..],
-            UpperFence = sortedSamples[keep],
+            UpperFenceNs = sortedSamples[keep],
         };
     }
 }
@@ -124,13 +124,13 @@ new MeasurementOptions
 
 ## What's happening
 
-- **`IOutlierDetector`**: This interface receives a sorted-ascending sample array and returns an `OutlierClassification` containing `Kept`, `Discarded`, and optional `LowerFence` or `UpperFence` values. The contract requires that the detector never discards every sample (return `KeepAll` if the rule would empty the set), does not mutate the input, and returns the `Kept` array sorted ascending. A custom `OutlierDetector` takes priority over the `OutlierMode` setting. The detector's `Name` appears in the report header. For more information, see [Outlier Trimming: Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors).
+- **`IOutlierDetector`**: This interface receives a sorted-ascending sample array and returns an `OutlierClassification` containing `Kept`, `Discarded`, and optional `LowerFenceNs` or `UpperFenceNs` values. The contract requires that the detector never discards every sample (return `KeepAll` if the rule would empty the set), does not mutate the input, and returns the `Kept` array sorted ascending. A custom `OutlierDetector` takes priority over the `OutlierMode` setting. The detector's `Name` appears in the report header. For more information, see [Outlier Trimming: Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors).
 
 - **`ISignificanceTest`**: This interface receives a `SignificanceContext` (including the comparable `Groups`, the `BaselineIndex`, the `Baseline` group, the non-baseline `Candidates`, and the `SignificanceLevel`) and returns a `SignificanceReport`. The report contains `Pairwise` comparisons, optional `Effect` metadata, an optional `Shift` estimate, and an optional `Omnibus` verdict. Use `PValue: null` for rules that do not produce a p-value. For more information, see [Significance Testing: Custom significance tests](../statistics/significance.md#custom-significance-tests).
 
 - **The `MinimumPracticalEffect` gate**: The engine enforces this gate in `Significance.ApplyReport` after the test runs. If a custom test returns an `EffectSize` with a `PracticalValue`, it is gated automatically. Tests that do not return a practical value are unaffected. For more information, see [Significance Testing: Practical-significance gate](../statistics/significance.md#practical-significance-gate).
 
-- **Custom statistics in isolated workers**: Strategies are passed to the worker either as a factory or a type name. If a strategy is passed as an instance with constructor arguments, the engine refuses to isolate the run because the instance cannot cross the process boundary. To resolve this, use a factory. In harness mode, scalar CLI overrides (such as iterations, warmup, and confidence) are forwarded to each worker. For more information, see [Isolated runs](../features/isolated-runs.md#additional-details).
+- **Custom statistics in isolated workers**: Strategies are passed to the worker either as a factory or a type name. If a strategy is passed as an instance with constructor arguments, the engine refuses to isolate the run because the instance cannot cross the process boundary. To resolve this, use a factory. In harness mode, scalar CLI overrides (such as samples, warmup, and confidence) are forwarded to each worker. For more information, see [Isolated runs](../features/isolated-runs.md#additional-details).
 
 - **Worker-side failures**: If a custom strategy fails inside the worker (e.g., because a required file is missing), the engine falls back to the built-in strategy rather than failing the entire run. The engine attaches a warning to each affected result naming the substitution and the reason for the failure.
 

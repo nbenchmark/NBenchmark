@@ -255,26 +255,26 @@ public class LogRatioTests
 
     private static BenchmarkResult ResultWithLaunches(
         string name,
-        (int Index, double Median, bool Errored)[] launches)
+        (int Index, double MedianNs, bool Errored)[] launches)
         => new()
         {
             Name = name,
-            Mean = launches.Average(l => l.Median),
-            Median = launches.Average(l => l.Median),
-            Min = 0,
-            Max = 0,
-            StandardDeviation = 0,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            MeanNs = launches.Average(l => l.MedianNs),
+            MedianNs = launches.Average(l => l.MedianNs),
+            MinNs = 0,
+            MaxNs = 0,
+            StandardDeviationNs = 0,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 10,
+            SampleCount = 10,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
             LaunchStatistics = new LaunchStatistics
             {
                 LaunchCount = launches.Count(l => !l.Errored),
@@ -285,10 +285,10 @@ public class LogRatioTests
                     .Select(l => new LaunchDetail
                     {
                         LaunchIndex = l.Index,
-                        Median = l.Median,
-                        Mean = l.Median,
-                        StandardDeviation = 0,
-                        Iterations = 10,
+                        MedianNs = l.MedianNs,
+                        MeanNs = l.MedianNs,
+                        StandardDeviationNs = 0,
+                        Samples = 10,
                         Duration = TimeSpan.FromSeconds(1),
                         Errored = l.Errored,
                     })

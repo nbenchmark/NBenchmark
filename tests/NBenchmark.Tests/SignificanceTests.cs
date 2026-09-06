@@ -16,17 +16,17 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "faster", Mean = 50, Median = 50, Percentiles = [],
-                Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "faster", MeanNs = 50, MedianNs = 50, Percentiles = [],
+                MinNs = 40, MaxNs = 60, StandardDeviationNs = 3, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -64,17 +64,17 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "Dupe", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "Dupe", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "Dupe", Mean = 80, Median = 80, Percentiles = [],
-                Min = 70, Max = 100, StandardDeviation = 5, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "Dupe", MeanNs = 80, MedianNs = 80, Percentiles = [],
+                MinNs = 70, MaxNs = 100, StandardDeviationNs = 5, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -106,17 +106,17 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "faster", Mean = 50, Median = 50, Percentiles = [],
-                Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "faster", MeanNs = 50, MedianNs = 50, Percentiles = [],
+                MinNs = 40, MaxNs = 60, StandardDeviationNs = 3, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -143,17 +143,17 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "other", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "other", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -177,10 +177,10 @@ public class SignificanceTests
             ErroredResult("broken", "error"),
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -201,10 +201,10 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "solo", Mean = 100, Median = 100, Percentiles = [],
-                Min = 85, Max = 120, StandardDeviation = 5,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "solo", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                MinNs = 85, MaxNs = 120, StandardDeviationNs = 5,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -225,17 +225,17 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "fast", Mean = 50, Median = 50, Percentiles = [],
-                Min = 40, Max = 60, StandardDeviation = 3, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "fast", MeanNs = 50, MedianNs = 50, Percentiles = [],
+                MinNs = 40, MaxNs = 60, StandardDeviationNs = 3, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "slow", Mean = 200, Median = 200, Percentiles = [],
-                Min = 180, Max = 260, StandardDeviation = 10, IsBaseline = false,
-                Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "slow", MeanNs = 200, MedianNs = 200, Percentiles = [],
+                MinNs = 180, MaxNs = 260, StandardDeviationNs = 10, IsBaseline = false,
+                Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -262,13 +262,13 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "a", Mean = 100, Median = 100, Percentiles = [], Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0, Q3 = 0,
-                InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "a", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true, Q1Ns = 0, Q3Ns = 0,
+                InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0, Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "b", Mean = 50, Median = 50, Percentiles = [], Min = 40, Max = 60, StandardDeviation = 3, Q1 = 0, Q3 = 0, InterquartileRange = 0,
-                OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "b", MeanNs = 50, MedianNs = 50, Percentiles = [], MinNs = 40, MaxNs = 60, StandardDeviationNs = 3, Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0,
+                OutliersRemoved = 0, SampleCount = 0, Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -286,8 +286,8 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "a", Mean = 100, Median = 100, Percentiles = [], Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0, Q3 = 0,
-                InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "a", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true, Q1Ns = 0, Q3Ns = 0,
+                InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0, Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -309,14 +309,14 @@ public class SignificanceTests
         {
             new()
             {
-                Name = "baseline", Mean = 100, Median = 100, Percentiles = [], Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true, Q1 = 0,
-                Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null,
-                AllocMax = null,
+                Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [], MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true, Q1Ns = 0,
+                Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0, Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null,
+                AllocatedBytesMax = null,
             },
             new()
             {
-                Name = "faster", Mean = 50, Median = 50, Percentiles = [], Min = 40, Max = 60, StandardDeviation = 3, Q1 = 0, Q3 = 0, InterquartileRange = 0,
-                OutliersRemoved = 0, N = 0, Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                Name = "faster", MeanNs = 50, MedianNs = 50, Percentiles = [], MinNs = 40, MaxNs = 60, StandardDeviationNs = 3, Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0,
+                OutliersRemoved = 0, SampleCount = 0, Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
             },
         };
 
@@ -363,17 +363,17 @@ public class SignificanceTests
             [
                 new BenchmarkResult
                 {
-                    Name = "baseline", Mean = 100, Median = 100, Percentiles = [],
-                    Min = 85, Max = 120, StandardDeviation = 5, IsBaseline = true,
-                    Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                    Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                    Name = "baseline", MeanNs = 100, MedianNs = 100, Percentiles = [],
+                    MinNs = 85, MaxNs = 120, StandardDeviationNs = 5, IsBaseline = true,
+                    Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                    Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
                 },
                 new BenchmarkResult
                 {
-                    Name = "candidate", Mean = 92, Median = 92, Percentiles = [],
-                    Min = 80, Max = 110, StandardDeviation = 5, IsBaseline = false,
-                    Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-                    Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+                    Name = "candidate", MeanNs = 92, MedianNs = 92, Percentiles = [],
+                    MinNs = 80, MaxNs = 110, StandardDeviationNs = 5, IsBaseline = false,
+                    Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+                    Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
                 },
             ];
         }
@@ -383,24 +383,24 @@ public class SignificanceTests
         new()
         {
             Name = name,
-            Mean = 0,
-            Median = 0,
+            MeanNs = 0,
+            MedianNs = 0,
             Percentiles = [],
-            Min = 0,
-            Max = 0,
-            StandardDeviation = 0,
+            MinNs = 0,
+            MaxNs = 0,
+            StandardDeviationNs = 0,
             Errored = true,
             ErrorMessage = error,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 0,
+            SampleCount = 0,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
 }

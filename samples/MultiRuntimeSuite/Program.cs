@@ -1,5 +1,4 @@
 using NBenchmark;
-using NBenchmark.Attributes;
 using NBenchmark.Reporters.Console;
 
 // MultiRuntimeSuite runs the same benchmarks across net8.0, net9.0 and net10.0 and compares the
@@ -29,7 +28,7 @@ static BenchmarkSuite BuildSuite() =>
         .Add("join", () => string.Join("", "a", "b", "c", "d", "e"))
         .WithBaseline("concat")
         .WithRuntimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9, RuntimeMoniker.Net10)
-        .WithWarmup(3)
-        .WithIterations(50)
+        .WithWarmupSamples(3)
+        .WithSamples(50)
         .WithReporter(new ConsoleReporter())
         .WithProgress(new ConsoleBenchmarkProgress());

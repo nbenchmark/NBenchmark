@@ -50,7 +50,7 @@ internal static class ComparisonGroup
     ///     </para>
     /// </summary>
     public static (string RuntimeMoniker, string RuntimeProfileName, bool Isolated) KeyFor(BenchmarkResult result)
-        => (result.RuntimeMoniker, result.RuntimeProfileName, result.IsolationStatus.IsIsolated());
+        => (result.TargetFramework, result.RuntimeProfileName, result.IsolationStatus.IsIsolated());
 
     /// <summary>Whether two results may be compared against each other.</summary>
     public static bool SameGroup(BenchmarkResult left, BenchmarkResult right)
@@ -63,14 +63,14 @@ internal static class ComparisonGroup
     ///     significance baseline so the two name the same row.
     /// </summary>
     /// <remarks>
-    ///     After <see cref="LaunchAggregator.Combine" />, <see cref="BenchmarkResult.Median" /> is
+    ///     After <see cref="LaunchAggregator.Combine" />, <see cref="BenchmarkResult.MedianNs" /> is
     ///     the <i>mean</i> of per-launch medians and <see cref="LaunchStatistics.LaunchMedian" /> is
     ///     the <i>median</i> of them. With a skewed launch those disagree, so ranking the table by
-    ///     <c>Median</c> and significance by <c>LaunchMedian ?? Median</c> picks two different
+    ///     <c>MedianNs</c> and significance by <c>LaunchMedian ?? MedianNs</c> picks two different
     ///     baselines for the same numbers.
     /// </remarks>
     internal static double ComparisonMedian(BenchmarkResult result)
-        => result.LaunchStatistics?.LaunchMedian ?? result.Median;
+        => result.LaunchStatistics?.LaunchMedian ?? result.MedianNs;
 
     /// <summary>
     ///     Picks the baseline for a set of results: an explicitly declared one, else the fastest

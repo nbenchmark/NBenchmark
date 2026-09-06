@@ -7,13 +7,13 @@ public sealed class MarkdownReporter : IReporter
 {
     private const int BarWidth = 15;
     private static int _fileCounter;
-    private readonly string? _name;
+    private readonly string? _fileName;
     private readonly string _outputDirectory;
 
-    public MarkdownReporter(string outputDirectory = ".", string? name = null, ReportDetail detail = ReportDetail.Simple)
+    public MarkdownReporter(string outputDirectory = ".", string? fileName = null, ReportDetail detail = ReportDetail.Simple)
     {
         _outputDirectory = PathValidation.ValidateOutputPath(outputDirectory);
-        _name = name;
+        _fileName = fileName;
         Detail = detail;
     }
 
@@ -37,7 +37,7 @@ public sealed class MarkdownReporter : IReporter
     {
         Directory.CreateDirectory(_outputDirectory);
 
-        var fileName = _name
+        var fileName = _fileName
                        ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.md";
 
         var filePath = Path.Combine(_outputDirectory, fileName);
@@ -59,7 +59,7 @@ public sealed class MarkdownReporter : IReporter
         }
 
         sb.AppendLine(
-            $"> **{tables[0].RunAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? ""} UTC** · {tables[0].WarmupIterations} warmup · {tables[0].MeasuredIterations} measured · {tables[0].Profile.ToString().ToLowerInvariant()} profile");
+            $"> **{tables[0].RunAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? ""} UTC** · {tables[0].WarmupSamples} warmup · {tables[0].SampleCount} measured · {tables[0].GcBehavior.ToString().ToLowerInvariant()} profile");
 
         // The runtime configuration is provenance a reader needs to interpret the numbers at all,
         // so it goes in the header rather than a footnote.
@@ -143,9 +143,9 @@ public sealed class MarkdownReporter : IReporter
     private static void RenderComparisonTable(StringBuilder sb, BenchmarkTable table, ReportDetail detail)
     {
         var successfulRows = table.Rows.Where(r => !r.Result.Errored).ToList();
-        var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Result.Median) : 1;
+        var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Result.MedianNs) : 1;
         var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Result.Categories.Count > 0);
-        var showRuntime = table.Rows.Any(r => r.Result.RuntimeMoniker.Length > 0);
+        var showRuntime = table.Rows.Any(r => r.Result.TargetFramework.Length > 0);
 
         // Only when the rows disagree; on a uniform table it would be a constant column.
         var showIsolation = table.MixedIsolationStatuses;
@@ -257,7 +257,7 @@ public sealed class MarkdownReporter : IReporter
                     errored.Append($" {row.Result.ClassName} |");
 
                 if (showRuntime)
-                    errored.Append($" {row.Result.RuntimeMoniker} |");
+                    errored.Append($" {row.Result.TargetFramework} |");
 
                 if (showIsolation)
                     errored.Append($" {row.Result.IsolationStatus.ToLabel()} |");
@@ -292,10 +292,10 @@ public sealed class MarkdownReporter : IReporter
                 ? $"**{baseName}** _(baseline)_"
                 : baseName;
 
-            var bar = RenderMarkdownBar(row.Result.Median, maxMedian);
+            var bar = RenderMarkdownBar(row.Result.MedianNs, maxMedian);
 
-            var allocText = row.Result.MeanAllocatedBytes.HasValue
-                ? BenchmarkFormatter.FormatBytes(row.Result.MeanAllocatedBytes.Value)
+            var allocText = row.Result.AllocatedBytesMean.HasValue
+                ? BenchmarkFormatter.FormatBytes(row.Result.AllocatedBytesMean.Value)
                 : "-";
 
             var opsText = BenchmarkFormatter.FormatOpsPerSecond(row.Result.OperationsPerSecond);
@@ -306,7 +306,7 @@ public sealed class MarkdownReporter : IReporter
                 line.Append($" {row.Result.ClassName} |");
 
             if (showRuntime)
-                line.Append($" {row.Result.RuntimeMoniker} |");
+                line.Append($" {row.Result.TargetFramework} |");
 
             if (showIsolation)
                 line.Append($" {row.Result.IsolationStatus.ToLabel()} |");
@@ -317,10 +317,10 @@ public sealed class MarkdownReporter : IReporter
             }
 
             line.Append(
-                $" {BenchmarkFormatter.FormatNs(row.Result.Median)} |");
+                $" {BenchmarkFormatter.FormatNs(row.Result.MedianNs)} |");
 
             if (!isSimple)
-                line.Append($" {BenchmarkFormatter.FormatNs(row.Result.Mean)} |");
+                line.Append($" {BenchmarkFormatter.FormatNs(row.Result.MeanNs)} |");
 
             line.Append(
                 $" {opsText} |");
@@ -373,7 +373,7 @@ public sealed class MarkdownReporter : IReporter
     private static void RenderTimingDetail(StringBuilder sb, BenchmarkTable table)
     {
         var successful = table.Rows.Where(r => !r.Result.Errored).ToList();
-        var showRuntime = successful.Any(r => r.Result.RuntimeMoniker.Length > 0);
+        var showRuntime = successful.Any(r => r.Result.TargetFramework.Length > 0);
 
         if (successful.Count == 0)
             return;
@@ -422,11 +422,11 @@ public sealed class MarkdownReporter : IReporter
             var line = new StringBuilder($"| {row.Result.Name} |");
 
             if (showRuntime)
-                line.Append($" {row.Result.RuntimeMoniker} |");
+                line.Append($" {row.Result.TargetFramework} |");
 
             line.Append(
-                $" ±{BenchmarkFormatter.FormatNs(row.Result.MarginOfError)} ({row.Result.MarginPercent:F2}%) "
-                + $"| {BenchmarkFormatter.FormatNs(row.Result.StandardDeviation)} "
+                $" ±{BenchmarkFormatter.FormatNs(row.Result.MarginOfErrorNs)} ({row.Result.MarginOfErrorPercent:F2}%) "
+                + $"| {BenchmarkFormatter.FormatNs(row.Result.StandardDeviationNs)} "
                 + $"| {row.Result.CoefficientOfVariationPercent:F2}% ");
 
             if (percentileKeys.Count > 0)
@@ -453,7 +453,7 @@ public sealed class MarkdownReporter : IReporter
         var header = new StringBuilder("| Benchmark |");
         var separator = new StringBuilder("|---|");
 
-        var showRuntime = table.Rows.Any(r => r.Result.RuntimeMoniker.Length > 0);
+        var showRuntime = table.Rows.Any(r => r.Result.TargetFramework.Length > 0);
 
         if (showRuntime)
         {
@@ -498,7 +498,7 @@ public sealed class MarkdownReporter : IReporter
             var line = new StringBuilder($"| {MarkdownEscape(row.Result.Name)} |");
 
             if (showRuntime)
-                line.Append($" {row.Result.RuntimeMoniker} |");
+                line.Append($" {row.Result.TargetFramework} |");
 
             var diag = row.Result.Diagnostics!;
 
@@ -576,7 +576,7 @@ public sealed class MarkdownReporter : IReporter
 
         var hasMultipleRuntimes = table.Rows
             .Where(r => !r.Result.Errored)
-            .Select(r => r.Result.RuntimeMoniker)
+            .Select(r => r.Result.TargetFramework)
             .Distinct(StringComparer.Ordinal)
             .Take(2)
             .Count() > 1;
@@ -611,7 +611,7 @@ public sealed class MarkdownReporter : IReporter
         var testName = hasMultipleRuntimes ? table.SignificanceTestName : table.Omnibus?.TestName ?? table.SignificanceTestName;
 
         sb.AppendLine($"- Significance: {testName} (p < {table.SignificanceLevel:0.###})");
-        sb.AppendLine($"- Outliers: {table.OutlierDetector}");
+        sb.AppendLine($"- Outliers: {table.OutlierDetectorName}");
         sb.AppendLine($"- Effect metric: {GetEffectMetricSummary(table.Rows)}");
         sb.AppendLine();
     }

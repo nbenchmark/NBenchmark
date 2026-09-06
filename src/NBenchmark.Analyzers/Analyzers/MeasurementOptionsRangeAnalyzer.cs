@@ -11,8 +11,8 @@ namespace NBenchmark.Analyzers.Analyzers;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
 {
-    private const int MaxIterations = 100_000;
-    private const int MaxWarmupIterations = 10_000;
+    private const int MaxSamplesLimit = 100_000;
+    private const int MaxWarmupSamplesLimit = 10_000;
     private const int MaxOpsPerSampleLimit = 1 << 24;
 
     private static readonly DiagnosticDescriptor Rule = new(
@@ -112,22 +112,22 @@ public sealed class MeasurementOptionsRangeAnalyzer : DiagnosticAnalyzer
 
         switch (property.Name)
         {
-            case "Iterations":
-                if (TryConvertToInt(constant.Value, out var iters) && (iters < 0 || iters > MaxIterations))
+            case "Samples":
+                if (TryConvertToInt(constant.Value, out var iters) && (iters < 0 || iters > MaxSamplesLimit))
                 {
                     context.ReportDiagnostic(Diagnostic.Create(Rule,
                         assignment.GetLocation(),
-                        $"Iterations = {iters} is out of range. Must be 0-{MaxIterations}."));
+                        $"Samples = {iters} is out of range. Must be 0-{MaxSamplesLimit}."));
                 }
 
                 break;
 
-            case "WarmupIterations":
-                if (TryConvertToInt(constant.Value, out var warmup) && (warmup < 0 || warmup > MaxWarmupIterations))
+            case "WarmupSamples":
+                if (TryConvertToInt(constant.Value, out var warmup) && (warmup < 0 || warmup > MaxWarmupSamplesLimit))
                 {
                     context.ReportDiagnostic(Diagnostic.Create(Rule,
                         assignment.GetLocation(),
-                        $"WarmupIterations = {warmup} is out of range. Must be 0-{MaxWarmupIterations}."));
+                        $"WarmupSamples = {warmup} is out of range. Must be 0-{MaxWarmupSamplesLimit}."));
                 }
 
                 break;

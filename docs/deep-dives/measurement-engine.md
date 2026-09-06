@@ -48,11 +48,11 @@ With the default `MinQuantaPerSample` floor, this warning is rare. It primarily 
 
 Phase 0 times a deterministic, allocation-free busy-weight loop to derive a robust jitter metric: the ratio of the median absolute deviation to the median (MAD / median) of its per-sample timings. This probes the host, not the code under test. A quiet dedicated host typically reports well below 0.05, while a shared-tenant CI runner typically reports 0.10-0.30. This metric is robust because both the median and MAD have a ~50% breakdown point, meaning a single JIT spike or preemption cannot distort it as they would for standard deviation or mean.
 
-This metric is critical because the default outlier detector (IQR fence) uses the interquartile range as its scale estimate, which has a low breakdown point. A heavy tail of scheduling-preempted samples can distort the fence and cause the engine to trim the wrong values. Median Absolute Deviation (MAD) is far more resilient to such tails. When the jitter metric exceeds `AutoTune.JitterAutoSwitchThreshold` (default 0.10) and the user has not pinned an outlier detector, the engine automatically switches the detector from IQR fence to MAD for that run. The engine records this switch in the `AutoTune` diagnostic (`OutlierDetectorSwitched`) and emits a warning.
+This metric is critical because the default outlier detector (IQR fence) uses the interquartile range as its scale estimate, which has a low breakdown point. A heavy tail of scheduling-preempted samples can distort the fence and cause the engine to trim the wrong values. Median absolute deviation (MAD) is far more resilient to such tails. When the jitter metric exceeds `AutoTune.JitterAutoSwitchThreshold` (default 0.10) and the user has not pinned an outlier detector, the engine automatically switches the detector from IQR fence to MAD for that run. The engine records this switch in the `AutoTune` diagnostic (`OutlierDetectorSwitched`) and emits a warning.
 
 The probe is enabled by default (`AutoTune.EnableJitterCalibration`). Pinning `OutlierMode` to a non-default value or supplying a custom `OutlierDetector` disables the auto-switch but not the probe, as the metric is still reported for visibility. You can set `AutoTune.JitterAutoSwitchThreshold` to 0 to disable the auto-switch while keeping the probe, or set `AutoTune.EnableJitterCalibration` to false to skip the probe entirely.
 
-When the engine auto-switches the detector, the runner creates an effective options record with the switched detector pinned. It passes this to `StatsPipeline` and `OutcomeBuilder` so that the trimmed stats and the result's `OutlierDetector` name reflect the switch.
+When the engine auto-switches the detector, the runner creates an effective options record with the switched detector pinned. It passes this to `StatsPipeline` and `OutcomeBuilder` so that the trimmed stats and the result's `OutlierDetectorName` reflect the switch.
 
 ## The optional-stopping correction
 
@@ -72,13 +72,13 @@ The correct approach is a group-sequential boundary (such as Pocock or O'Brien-F
 
 ## Warmup gates
 
-The plateau rule alone measures warmup in iterations. However, a fast body can plateau in microseconds of wall-clock time, long before the background JIT delivers tier-1 (and dynamic-PGO) code. In such cases, warmup would settle on a stable but slow tier-0 plateau, and the tier-1 switch would occur mid-measurement as a step change, becoming the dominant source of run-to-run variance. Two gates prevent this.
+The plateau rule alone measures warmup in samples. However, a fast body can plateau in microseconds of wall-clock time, long before the background JIT delivers tier-1 (and dynamic-PGO) code. In such cases, warmup would settle on a stable but slow tier-0 plateau, and the tier-1 switch would occur mid-measurement as a step change, becoming the dominant source of run-to-run variance. Two gates prevent this.
 
 ### The 500 ms time floor
 
 `AutoTune.MinWarmupTime` defaults to 5× the runtime's `TieredCompilation.CallCountingDelayMs` (100 ms). This delay restarts whenever tier-0 methods are called for the first time. Tier-1 is only queued once this delay expires and is then compiled on a background thread, with a second instrumented→optimized transition under dynamic PGO. A floor at or below 100 ms therefore reliably lands those transitions inside the measurement window rather than before it.
 
-Because of this floor, `AutoTune.MaxWarmup` defaults to **100,000** rather than the 10,000 that bounds a pinned `WarmupIterations`. A fast body needs roughly 50,000 samples to accumulate 500 ms at a 10 µs sample, or ~24,000 at 21 µs. If the count ceiling is reached before the time floor, the engine raises a warning and records `AutoTune.WarmupTimeFloorMet`. If a body cannot reach the floor within the ceiling - typically when `OpsPerSample` is pinned to 1 on a nanosecond body - the engine suggests increasing `--ops-per-sample` so each sample spans more work.
+Because of this floor, `AutoTune.MaxWarmupSamples` defaults to **100,000** rather than the 10,000 that bounds a pinned `WarmupSamples`. A fast body needs roughly 50,000 samples to accumulate 500 ms at a 10 µs sample, or ~24,000 at 21 µs. If the count ceiling is reached before the time floor, the engine raises a warning and records `AutoTune.WarmupTimeFloorMet`. If a body cannot reach the floor within the ceiling - typically when `OpsPerSample` is pinned to 1 on a nanosecond body - the engine suggests increasing `--ops-per-sample` so each sample spans more work.
 
 ### Quiescence as a sustained interval
 

@@ -4,8 +4,8 @@ internal static class MetricsFormatter
 {
     public static string Format(BenchmarkResult result)
     {
-        var allocations = result.MeanAllocatedBytes.HasValue
-            ? $"{result.MeanAllocatedBytes.Value} B"
+        var allocations = result.AllocatedBytesMean.HasValue
+            ? $"{result.AllocatedBytesMean.Value} B"
             : "n/a";
 
         var p95 = result.GetPercentile(0.95);
@@ -13,10 +13,10 @@ internal static class MetricsFormatter
 
         return
             $"NBenchmark metrics{Environment.NewLine}" +
-            $"Mean: {result.Mean:F2} ns{Environment.NewLine}" +
+            $"MeanNs: {result.MeanNs:F2} ns{Environment.NewLine}" +
             $"P95: {p95Text}{Environment.NewLine}" +
             $"Allocations: {allocations}{Environment.NewLine}" +
-            $"Iterations: {result.MeasuredIterations} (warmup: {result.WarmupIterations})" +
+            $"Samples: {result.SampleCount} (warmup: {result.WarmupSamples})" +
             Launches(result);
     }
 

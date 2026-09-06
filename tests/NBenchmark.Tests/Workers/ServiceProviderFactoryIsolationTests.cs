@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Workers;
 using Xunit;
 
@@ -44,12 +44,12 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
 
         return harness
             .AddFromAssembly(typeof(ServiceProviderFactoryIsolationTests).Assembly)
-            .WithCategoryFilter(["sp-factory"])
+            .FilterCategories(["sp-factory"])
             .WithLaunchCount(1)
             .WithOptions(MeasurementOptions.Default with
             {
-                Iterations = 16,
-                WarmupIterations = 1,
+                Samples = 16,
+                WarmupSamples = 1,
                 AutoTune = AutoTuneOptions.Default with
                 {
                     MaxTuningTime = TimeSpan.FromSeconds(5),
@@ -86,8 +86,8 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
 
         // Cost scales with the injected payload, so the worker resolved the configured dependency.
         Assert.True(
-            result.Median > 5_000,
-            $"expected the injected spin count to dominate, but measured {result.Median:F1} ns");
+            result.MedianNs > 5_000,
+            $"expected the injected spin count to dominate, but measured {result.MedianNs:F1} ns");
     }
 
     /// <summary>

@@ -22,7 +22,7 @@ public sealed class PerformanceFactIntegrationTests
     {
         var spec = new RunSpec
         {
-            Options = MeasurementOptions.Default with { Iterations = 10, WarmupIterations = 5 },
+            Options = MeasurementOptions.Default with { Samples = 10, WarmupSamples = 5 },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("FastTest", SimpleWork, spec);
@@ -40,7 +40,7 @@ public sealed class PerformanceFactIntegrationTests
     {
         var spec = new RunSpec
         {
-            Options = MeasurementOptions.Default with { Iterations = 10, WarmupIterations = 5 },
+            Options = MeasurementOptions.Default with { Samples = 10, WarmupSamples = 5 },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("SlowTest", SlowWork, spec);
@@ -58,7 +58,7 @@ public sealed class PerformanceFactIntegrationTests
     {
         var spec = new RunSpec
         {
-            Options = MeasurementOptions.Default with { Iterations = 10, WarmupIterations = 5 },
+            Options = MeasurementOptions.Default with { Samples = 10, WarmupSamples = 5 },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("JitteryTest", JitteryWork, spec);
@@ -78,8 +78,8 @@ public sealed class PerformanceFactIntegrationTests
         {
             Options = MeasurementOptions.Default with
             {
-                Iterations = 10,
-                WarmupIterations = 3,
+                Samples = 10,
+                WarmupSamples = 3,
                 MeasureAllocations = true,
             },
         };
@@ -87,8 +87,8 @@ public sealed class PerformanceFactIntegrationTests
         var outcome = BenchmarkRunner.Instance.Run("AllocTest", AllocatingWork, spec);
 
         var result = outcome.Result;
-        Assert.NotNull(result.MeanAllocatedBytes);
-        Assert.True(result.MeanAllocatedBytes > 0);
+        Assert.NotNull(result.AllocatedBytesMean);
+        Assert.True(result.AllocatedBytesMean > 0);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class PerformanceFactIntegrationTests
     {
         var spec = new RunSpec
         {
-            Options = MeasurementOptions.Default with { Iterations = 3, WarmupIterations = 1 },
+            Options = MeasurementOptions.Default with { Samples = 3, WarmupSamples = 1 },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("ThrowingTest", ThrowingWork, spec);
@@ -119,8 +119,8 @@ public sealed class PerformanceFactIntegrationTests
         var result = outcome.Result;
         Assert.False(result.Errored);
         Assert.NotNull(result.AutoTune);
-        Assert.True(result.MeasuredIterations >= AutoTuneOptions.Default.MinSamples);
-        Assert.True(result.WarmupIterations >= AutoTuneOptions.Default.MinWarmup);
+        Assert.True(result.SampleCount >= AutoTuneOptions.Default.MinSamples);
+        Assert.True(result.WarmupSamples >= AutoTuneOptions.Default.MinWarmupSamples);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed class PerformanceFactIntegrationTests
     {
         var spec = new RunSpec
         {
-            Options = MeasurementOptions.Default with { Iterations = 10, WarmupIterations = 5 },
+            Options = MeasurementOptions.Default with { Samples = 10, WarmupSamples = 5 },
         };
 
         var outcome = BenchmarkRunner.Instance.Run("CalibrationTest", SimpleWork, spec);
@@ -154,8 +154,8 @@ public sealed class PerformanceFactIntegrationTests
         {
             Options = MeasurementOptions.Default with
             {
-                Iterations = 50,
-                WarmupIterations = 5,
+                Samples = 50,
+                WarmupSamples = 5,
                 OutlierMode = OutlierMode.None,
             },
         };
@@ -243,27 +243,26 @@ public sealed class PerformanceFactIntegrationTests
         var errored = new BenchmarkResult
         {
             Name = "Broken",
-            Mean = 0,
-            Median = 0,
+            MeanNs = 0,
+            MedianNs = 0,
             Percentiles = [],
-            Min = 0,
-            Max = 0,
-            StandardDeviation = 0,
-            MeasuredIterations = 0,
-            WarmupIterations = 0,
+            MinNs = 0,
+            MaxNs = 0,
+            StandardDeviationNs = 0,
+            SampleCount = 0,
+            WarmupSamples = 0,
             Errored = true,
             ErrorMessage = "Something exploded",
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 0,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
 
         var violations = PerformanceTestCase.ValidateResult(errored, [], null, null, data);
@@ -279,25 +278,24 @@ public sealed class PerformanceFactIntegrationTests
         var ok = new BenchmarkResult
         {
             Name = "Fine",
-            Mean = 100,
-            Median = 100,
+            MeanNs = 100,
+            MedianNs = 100,
             Percentiles = [],
-            Min = 50,
-            Max = 250,
-            StandardDeviation = 10,
-            MeasuredIterations = 100,
-            WarmupIterations = 25,
-            Q1 = 0,
-            Q3 = 0,
-            InterquartileRange = 0,
+            MinNs = 50,
+            MaxNs = 250,
+            StandardDeviationNs = 10,
+            SampleCount = 100,
+            WarmupSamples = 25,
+            Q1Ns = 0,
+            Q3Ns = 0,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 100,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
 
         var violations = PerformanceTestCase.ValidateResult(ok, [], null, null, data);
@@ -356,25 +354,24 @@ public sealed class PerformanceFactIntegrationTests
         return new BenchmarkResult
         {
             Name = name,
-            Mean = mean,
-            Median = mean,
+            MeanNs = mean,
+            MedianNs = mean,
             Percentiles = [],
-            Min = mean,
-            Max = mean,
-            StandardDeviation = 0,
-            MeasuredIterations = 100,
-            WarmupIterations = 25,
-            Q1 = mean,
-            Q3 = mean,
-            InterquartileRange = 0,
+            MinNs = mean,
+            MaxNs = mean,
+            StandardDeviationNs = 0,
+            SampleCount = 100,
+            WarmupSamples = 25,
+            Q1Ns = mean,
+            Q3Ns = mean,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 100,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
         };
     }
 

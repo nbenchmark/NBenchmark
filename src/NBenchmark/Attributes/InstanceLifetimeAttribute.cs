@@ -1,4 +1,4 @@
-namespace NBenchmark.Attributes;
+namespace NBenchmark;
 
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class InstanceLifetimeAttribute : Attribute

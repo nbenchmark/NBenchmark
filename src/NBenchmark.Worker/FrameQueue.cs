@@ -90,7 +90,7 @@ internal sealed class FrameQueue(
         catch (Exception ex) when (ex is InvalidOperationException or JsonException or NotSupportedException)
         {
             // This frame cannot be written, but the pipe is fine: it exceeded the protocol's size
-            // ceiling, or it carries a value the serializer refuses - a `[BenchmarkCase(typeof(X))]`
+            // ceiling, or it carries a value the serializer refuses - a `[Arguments(typeof(X))]`
             // argument is the reachable one. Deliberately *not* reported as transport failure, because
             // the coordinator is still there and every other frame will reach it. Dropping this one
             // loses a result; treating it as coordinator loss would lose the group.

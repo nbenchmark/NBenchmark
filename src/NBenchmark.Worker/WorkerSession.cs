@@ -345,7 +345,7 @@ internal sealed class WorkerSession(FrameChannel channel)
             // The worker was launched with the runtime profile already applied to its environment
             // block - that is the only moment it could have been. Affinity and priority, by
             // contrast, are settable at any time and belong here.
-            environment = EnvironmentControl.Apply(options.Environment);
+            environment = EnvironmentControl.Apply(options.Environment, options.SuppressedWarnings);
 
             // Applied to *this* thread, which is the one the measurement loop runs on: the group's
             // work is awaited from here, and the loop itself is straight-line synchronous code. A
@@ -900,13 +900,13 @@ internal sealed class WorkerSession(FrameChannel channel)
         // measure a differently-configured object under the right name. Absent a factory this stays
         // null and the group was never routed here in the first place.
         //
-        // Ahead of discovery, not after it: discovery invokes [BenchmarkCases] sources, and whether
+        // Ahead of discovery, not after it: discovery invokes [ArgumentsSource] sources, and whether
         // instances come from a factory decides whether an *instance* source may be invoked at all.
         if (!TryBuildInstanceFactory(request, context, receivers, out var instanceFactory))
             return;
 
         // Restricted to the class this group is about. A whole-assembly pass invokes every class's
-        // [BenchmarkCases] source, so an N-class assembly measured one class per group ran all N
+        // [ArgumentsSource] source, so an N-class assembly measured one class per group ran all N
         // sources - and their side effects - N times over, to use one of them.
         var discoverer = new BenchmarkDiscoverer(
             request.DefaultInstanceLifetime,
@@ -1083,8 +1083,8 @@ internal sealed class WorkerSession(FrameChannel channel)
                     continue;
                 }
 
-                if (!TryResolveIterationHooks(context, body, receivers, boundArguments, out var iterationSetup,
-                        out var iterationTeardown, out var hookError))
+                if (!TryResolveSampleHooks(context, body, receivers, boundArguments, out var sampleSetup,
+                        out var sampleTeardown, out var hookError))
                 {
                     // Reported as this benchmark's own failure rather than measured without its hooks.
                     // A body measured with its setup silently dropped produces a plausible number for
@@ -1102,8 +1102,8 @@ internal sealed class WorkerSession(FrameChannel channel)
                     Options = options,
                     Progress = progress,
                     Observer = progress.AsObserver(),
-                    IterationSetup = iterationSetup,
-                    IterationTeardown = iterationTeardown,
+                    SampleSetup = sampleSetup,
+                    SampleTeardown = sampleTeardown,
                 };
 
                 var outcome = await DelegateDispatch
@@ -1176,7 +1176,7 @@ internal sealed class WorkerSession(FrameChannel channel)
     ///     The values the body's parameters were filled with, so a hook that takes them acts on the
     ///     same prepared state the body reads rather than on a second copy of it.
     /// </param>
-    private static bool TryResolveIterationHooks(
+    private static bool TryResolveSampleHooks(
         BenchmarkLoadContext context,
         BodyRef body,
         ResolvedReceivers receivers,
@@ -1190,13 +1190,13 @@ internal sealed class WorkerSession(FrameChannel channel)
         error = null;
 
         if (!TryResolveHook(
-                context, body.IterationSetup, receivers, boundArguments, "per-iteration setup", out setup, out error))
+                context, body.SampleSetup, receivers, boundArguments, "per-iteration setup", out setup, out error))
         {
             return false;
         }
 
         return TryResolveHook(
-            context, body.IterationTeardown, receivers, boundArguments, "per-iteration teardown", out teardown,
+            context, body.SampleTeardown, receivers, boundArguments, "per-iteration teardown", out teardown,
             out error);
     }
 
@@ -1382,8 +1382,8 @@ internal sealed class WorkerSession(FrameChannel channel)
 
             return new CalibrationPayload
             {
-                Mean = calibration.Mean,
-                Median = calibration.Median,
+                MeanNs = calibration.MeanNs,
+                MedianNs = calibration.MedianNs,
                 Samples = calibration.Samples,
             };
         }

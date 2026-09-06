@@ -204,10 +204,10 @@ public sealed class PairedRatioGateTests
             .Select((median, index) => new LaunchDetail
             {
                 LaunchIndex = index,
-                Median = median,
-                Mean = median,
-                StandardDeviation = 0,
-                Iterations = 50,
+                MedianNs = median,
+                MeanNs = median,
+                StandardDeviationNs = 0,
+                Samples = 50,
                 Duration = TimeSpan.Zero,
             })
             .ToList();
@@ -246,25 +246,24 @@ public sealed class PairedRatioGateTests
     {
         Name = name,
         IsolationStatus = IsolationStatus.Isolated,
-        Mean = value,
-        Median = value,
+        MeanNs = value,
+        MedianNs = value,
         Percentiles = [],
-        Min = value,
-        Max = value,
-        StandardDeviation = 0,
-        MeasuredIterations = 50,
-        WarmupIterations = 10,
-        Q1 = 0,
-        Q3 = 0,
-        InterquartileRange = 0,
+        MinNs = value,
+        MaxNs = value,
+        StandardDeviationNs = 0,
+        SampleCount = 50,
+        WarmupSamples = 10,
+        Q1Ns = 0,
+        Q3Ns = 0,
+        InterquartileRangeNs = 0,
         OutliersRemoved = 0,
-        N = 50,
         Skewness = 0,
         Kurtosis = 0,
-        Mad = 0,
-        AllocMedian = null,
-        AllocP95 = null,
-        AllocMax = null,
+        MedianAbsoluteDeviationNs = 0,
+        AllocatedBytesMedian = null,
+        AllocatedBytesP95 = null,
+        AllocatedBytesMax = null,
     };
 
     private sealed class Thresholds : IPerformanceThresholds
@@ -274,8 +273,8 @@ public sealed class PairedRatioGateTests
         public long MaxAllocatedBytes => -1;
         public string? ReferenceMethod { get; init; }
         public double MaxSlowdownRatio { get; init; }
-        public int Iterations => 0;
-        public int WarmupIterations => 0;
+        public int Samples => 0;
+        public int WarmupSamples => 0;
         public bool MeasureAllocations => false;
         public OutlierMode OutlierMode => OutlierMode.IqrFence;
         public double ConfidenceLevel => 0.95;

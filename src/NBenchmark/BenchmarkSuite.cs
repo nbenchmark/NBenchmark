@@ -66,7 +66,7 @@ public class BenchmarkSuite(string name)
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
                 Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
-                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+                    spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)),
             action, setup, teardown);
 
     public BenchmarkSuite Add(string name, Func<Task> action,
@@ -74,7 +74,7 @@ public class BenchmarkSuite(string name)
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
                 await BenchmarkRunner.Instance.RunAsync(name, action,
-                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+                    spec with { SampleSetup = setup, SampleTeardown = teardown }, ct).ConfigureAwait(false),
             action, setup, teardown);
 
     public BenchmarkSuite Add<T>(string name, Func<T> action,
@@ -82,7 +82,7 @@ public class BenchmarkSuite(string name)
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
                 Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
-                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+                    spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)),
             action, setup, teardown);
 
     public BenchmarkSuite Add<T>(string name, Func<Task<T>> action,
@@ -90,7 +90,7 @@ public class BenchmarkSuite(string name)
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
                 await BenchmarkRunner.Instance.RunAsync(name, action,
-                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+                    spec with { SampleSetup = setup, SampleTeardown = teardown }, ct).ConfigureAwait(false),
             action, setup, teardown);
 
     // --- Deliberately in-process Add overloads ---
@@ -122,7 +122,7 @@ public class BenchmarkSuite(string name)
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
                 Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
-                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+                    spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)),
             body: null, setup, teardown, runsInProcess: true);
 
     /// <inheritdoc cref="AddInProcess(string, Action, Action?, Action?, IReadOnlyList{string}?)" />
@@ -131,7 +131,7 @@ public class BenchmarkSuite(string name)
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
                 await BenchmarkRunner.Instance.RunAsync(name, action,
-                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+                    spec with { SampleSetup = setup, SampleTeardown = teardown }, ct).ConfigureAwait(false),
             body: null, setup, teardown, runsInProcess: true);
 
     /// <inheritdoc cref="AddInProcess(string, Action, Action?, Action?, IReadOnlyList{string}?)" />
@@ -140,7 +140,7 @@ public class BenchmarkSuite(string name)
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), (spec, ct) =>
                 Task.FromResult(BenchmarkRunner.Instance.Run(name, action,
-                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)),
+                    spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)),
             body: null, setup, teardown, runsInProcess: true);
 
     /// <inheritdoc cref="AddInProcess(string, Action, Action?, Action?, IReadOnlyList{string}?)" />
@@ -149,7 +149,7 @@ public class BenchmarkSuite(string name)
         IReadOnlyList<string>? categories = null)
         => AddEnvelope(name, ResolveAddCategories(categories, _pendingCategories), async (spec, ct) =>
                 await BenchmarkRunner.Instance.RunAsync(name, action,
-                    spec with { IterationSetup = setup, IterationTeardown = teardown }, ct).ConfigureAwait(false),
+                    spec with { SampleSetup = setup, SampleTeardown = teardown }, ct).ConfigureAwait(false),
             body: null, setup, teardown, runsInProcess: true);
 
     // --- Parameterized Add overloads: arity 1 ---
@@ -173,7 +173,7 @@ public class BenchmarkSuite(string name)
                         var val = slot();
 
                         return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
-                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                            spec with { SampleSetup = setup, SampleTeardown = teardown }, ct));
                     });
             },
             [typeof(T)],
@@ -204,7 +204,7 @@ public class BenchmarkSuite(string name)
 
                         return await BenchmarkRunner.Instance.RunAsync(displayName,
                                 async () => await action(val).ConfigureAwait(false),
-                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)
                             .ConfigureAwait(false);
                     });
             },
@@ -235,7 +235,7 @@ public class BenchmarkSuite(string name)
                         var val = slot();
 
                         return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(val),
-                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                            spec with { SampleSetup = setup, SampleTeardown = teardown }, ct));
                     });
             },
             [typeof(T)],
@@ -266,7 +266,7 @@ public class BenchmarkSuite(string name)
 
                         return await BenchmarkRunner.Instance.RunAsync(displayName,
                                 () => action(val),
-                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)
                             .ConfigureAwait(false);
                     });
             },
@@ -301,7 +301,7 @@ public class BenchmarkSuite(string name)
                         var v2 = slot2();
 
                         return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
-                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                            spec with { SampleSetup = setup, SampleTeardown = teardown }, ct));
                     });
             },
             [typeof(T1), typeof(T2)],
@@ -334,7 +334,7 @@ public class BenchmarkSuite(string name)
 
                         return await BenchmarkRunner.Instance.RunAsync(displayName,
                                 async () => await action(v1, v2).ConfigureAwait(false),
-                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)
                             .ConfigureAwait(false);
                     });
             },
@@ -367,7 +367,7 @@ public class BenchmarkSuite(string name)
                         var v2 = slot2();
 
                         return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2),
-                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                            spec with { SampleSetup = setup, SampleTeardown = teardown }, ct));
                     });
             },
             [typeof(T1), typeof(T2)],
@@ -400,7 +400,7 @@ public class BenchmarkSuite(string name)
 
                         return await BenchmarkRunner.Instance.RunAsync(displayName,
                                 () => action(v1, v2),
-                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)
                             .ConfigureAwait(false);
                     });
             },
@@ -437,7 +437,7 @@ public class BenchmarkSuite(string name)
                         var v3 = slot3();
 
                         return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
-                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                            spec with { SampleSetup = setup, SampleTeardown = teardown }, ct));
                     });
             },
             [typeof(T1), typeof(T2), typeof(T3)],
@@ -472,7 +472,7 @@ public class BenchmarkSuite(string name)
 
                         return await BenchmarkRunner.Instance.RunAsync(displayName,
                                 async () => await action(v1, v2, v3).ConfigureAwait(false),
-                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)
                             .ConfigureAwait(false);
                     });
             },
@@ -507,7 +507,7 @@ public class BenchmarkSuite(string name)
                         var v3 = slot3();
 
                         return Task.FromResult(BenchmarkRunner.Instance.Run(displayName, () => action(v1, v2, v3),
-                            spec with { IterationSetup = setup, IterationTeardown = teardown }, ct));
+                            spec with { SampleSetup = setup, SampleTeardown = teardown }, ct));
                     });
             },
             [typeof(T1), typeof(T2), typeof(T3)],
@@ -542,7 +542,7 @@ public class BenchmarkSuite(string name)
 
                         return await BenchmarkRunner.Instance.RunAsync(displayName,
                                 () => action(v1, v2, v3),
-                                spec with { IterationSetup = setup, IterationTeardown = teardown }, ct)
+                                spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)
                             .ConfigureAwait(false);
                     });
             },
@@ -556,21 +556,15 @@ public class BenchmarkSuite(string name)
 
     // --- Fluent parameter registration ---
 
+    /// <summary>
+    ///     Declares a sweep over <paramref name="values" />, expanding every benchmark registered with
+    ///     a typed lambda once per value. Chain a call per parameter - two calls sweep the two
+    ///     parameters combinatorially, in the order they were declared.
+    /// </summary>
     public BenchmarkSuite WithParameter<T>(string name, params T[] values)
     {
         ValidateParameterType(name, values);
         _parameterDefs.Add(new ParameterDef(name, typeof(T), values.Cast<object?>().ToArray()));
-        return this;
-    }
-
-    public BenchmarkSuite WithParameter<T1, T2>(
-        string name1, T1[] values1,
-        string name2, T2[] values2)
-    {
-        ValidateParameterType(name1, values1);
-        ValidateParameterType(name2, values2);
-        _parameterDefs.Add(new ParameterDef(name1, typeof(T1), values1.Cast<object?>().ToArray()));
-        _parameterDefs.Add(new ParameterDef(name2, typeof(T2), values2.Cast<object?>().ToArray()));
         return this;
     }
 
@@ -630,20 +624,6 @@ public class BenchmarkSuite(string name)
 
         _parameterDefs.Add(new ParameterDef(name, typeof(T), recipes));
 
-        return this;
-    }
-
-    public BenchmarkSuite WithParameter<T1, T2, T3>(
-        string name1, T1[] values1,
-        string name2, T2[] values2,
-        string name3, T3[] values3)
-    {
-        ValidateParameterType(name1, values1);
-        ValidateParameterType(name2, values2);
-        ValidateParameterType(name3, values3);
-        _parameterDefs.Add(new ParameterDef(name1, typeof(T1), values1.Cast<object?>().ToArray()));
-        _parameterDefs.Add(new ParameterDef(name2, typeof(T2), values2.Cast<object?>().ToArray()));
-        _parameterDefs.Add(new ParameterDef(name3, typeof(T3), values3.Cast<object?>().ToArray()));
         return this;
     }
 
@@ -711,8 +691,8 @@ public class BenchmarkSuite(string name)
         {
             Body = body,
             StateRecipes = [StateRecipe.For(prepare)],
-            IterationSetup = setup,
-            IterationTeardown = teardown,
+            SampleSetup = setup,
+            SampleTeardown = teardown,
         });
 
         return this;
@@ -732,8 +712,8 @@ public class BenchmarkSuite(string name)
         IReadOnlyList<string> categories,
         Func<RunSpec, CancellationToken, Task<MeasurementOutcome>> runAsync,
         Delegate? body = null,
-        Action? iterationSetup = null,
-        Action? iterationTeardown = null,
+        Action? sampleSetup = null,
+        Action? sampleTeardown = null,
         bool runsInProcess = false)
     {
         EnsureUniqueName(name);
@@ -744,8 +724,8 @@ public class BenchmarkSuite(string name)
 
             // The delegates themselves rather than a flag saying they exist, so addressing can try to
             // carry them to the worker instead of giving up on the whole suite for having them.
-            IterationSetup = iterationSetup,
-            IterationTeardown = iterationTeardown,
+            SampleSetup = sampleSetup,
+            SampleTeardown = sampleTeardown,
             RunsInProcess = runsInProcess,
         });
 
@@ -792,9 +772,9 @@ public class BenchmarkSuite(string name)
     ///     Pins an exact measured-sample count, overriding the default confidence-interval-driven
     ///     auto-detection. Pass <c>0</c> for a dry-run.
     /// </summary>
-    public BenchmarkSuite WithIterations(int iterations)
+    public BenchmarkSuite WithSamples(int samples)
     {
-        _options = _options with { Iterations = iterations };
+        _options = _options with { Samples = samples };
         return this;
     }
 
@@ -802,9 +782,9 @@ public class BenchmarkSuite(string name)
     ///     Pins an exact warmup-sample count, overriding the default plateau-driven auto-detection.
     ///     Pass <c>0</c> to skip warmup.
     /// </summary>
-    public BenchmarkSuite WithWarmup(int iterations)
+    public BenchmarkSuite WithWarmupSamples(int samples)
     {
-        _options = _options with { WarmupIterations = iterations };
+        _options = _options with { WarmupSamples = samples };
         return this;
     }
 
@@ -883,21 +863,21 @@ public class BenchmarkSuite(string name)
     ///     Turns the host drift canary on or off. On by default; switching it off takes no control
     ///     readings between benchmarks and silences the host-drift warning.
     /// </summary>
-    public BenchmarkSuite WithDriftCanary(bool enabled)
+    public BenchmarkSuite WithDriftCanary(bool enabled = true)
     {
         _options = _options with { DriftCanary = _options.DriftCanary with { Enabled = enabled } };
         return this;
     }
 
     /// <summary>
-    ///     Sets the measurement profile, which bundles per-iteration GC, between-benchmark GC, and
-    ///     allocation tracking. <see cref="MeasurementProfile.Realistic" /> (the default) keeps natural
-    ///     GC pressure in the timing; <see cref="MeasurementProfile.Independent" /> isolates iterations
+    ///     Sets the GC behavior, which bundles per-sample GC, between-benchmark GC, and
+    ///     allocation tracking. <see cref="GcBehavior.Natural" /> (the default) keeps natural
+    ///     GC pressure in the timing; <see cref="GcBehavior.PerSampleCollect" /> isolates samples
     ///     for pure-CPU measurement.
     /// </summary>
-    public BenchmarkSuite WithMeasurementProfile(MeasurementProfile profile)
+    public BenchmarkSuite WithGcBehavior(GcBehavior profile)
     {
-        _options = _options with { Profile = profile };
+        _options = _options with { GcBehavior = profile };
         return this;
     }
 
@@ -963,7 +943,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
-    public BenchmarkSuite WithSignificance(bool enabled)
+    public BenchmarkSuite WithSignificance(bool enabled = true)
     {
         _options = _options with { EnableSignificance = enabled };
         return this;
@@ -1016,7 +996,7 @@ public class BenchmarkSuite(string name)
     ///     Pins the benchmark process to the specified logical CPU cores for the duration
     ///     of the run, removing inter-core migration noise. Cores are zero-based and
     ///     logical (as reported by the OS). The prior affinity is restored when the run
-    ///     completes. Call <see cref="WithDedicatedHostGuidance" /> alongside this to
+    ///     completes. Call <see cref="WithHostQualityWarnings" /> alongside this to
     ///     surface a warning when the host looks unsuitable.
     /// </summary>
     public BenchmarkSuite WithHardwareAffinity(params int[] cores)
@@ -1067,11 +1047,11 @@ public class BenchmarkSuite(string name)
     ///     an unraisable process priority, or (on macOS) unobservable frequency scaling
     ///     and thermal throttling. The run still proceeds - this is guidance, not a gate.
     /// </summary>
-    public BenchmarkSuite WithDedicatedHostGuidance(bool enabled = true)
+    public BenchmarkSuite WithHostQualityWarnings(bool enabled = true)
     {
         _options = _options with
         {
-            Environment = (_options.Environment ?? new EnvironmentOptions()) with { DedicatedHostGuidance = enabled },
+            Environment = (_options.Environment ?? new EnvironmentOptions()) with { HostQualityWarnings = enabled },
         };
 
         return this;
@@ -1095,18 +1075,13 @@ public class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Suppresses the always-on Debug-build / debugger-attached guidance warning for
-    ///     this suite. Use when measuring Debug behavior is intentional.
+    ///     Silences the named setup warnings for this run. Flags combine, and each call replaces
+    ///     the previous set. Suppressing a warning never changes what is measured - only whether
+    ///     the engine reports that the setup is imperfect.
     /// </summary>
-    public BenchmarkSuite WithSuppressBuildConfigurationWarning(bool suppress = true)
+    public BenchmarkSuite WithSuppressedWarnings(BenchmarkWarnings warnings)
     {
-        _options = _options with
-        {
-            Environment = (_options.Environment ?? new EnvironmentOptions()) with
-            {
-                SuppressBuildConfigurationWarning = suppress,
-            },
-        };
+        _options = _options with { SuppressedWarnings = warnings };
 
         return this;
     }
@@ -1270,7 +1245,7 @@ public class BenchmarkSuite(string name)
     ///     removed if it has any excluded category. Untagged benchmarks are excluded when
     ///     any include filter is set.
     /// </summary>
-    public BenchmarkSuite WithCategoryFilter(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
+    public BenchmarkSuite FilterCategories(IEnumerable<string>? include = null, IEnumerable<string>? exclude = null)
     {
         if (include is not null)
             AddCategories(_categoryFilterInclude, include, nameof(include));
@@ -1710,8 +1685,8 @@ public class BenchmarkSuite(string name)
         var filteredBenchmarks = ApplyCategoryFilter(ordered);
         var envelopeNames = filteredBenchmarks.Select(b => b.Name).ToList();
 
-        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, _options.Profile.ToString(),
-            _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.ToTargetFramework())) : null, runOrder: _runOrder.ToString());
+        NBenchmarkDiagnostics.OnSuiteStarting(Name, filteredBenchmarks.Count, _options.GcBehavior.ToString(),
+            _runtimes.Count > 0 ? string.Join(",", _runtimes.Select(r => r.TargetFramework)) : null, runOrder: _runOrder.ToString());
 
         List<BenchmarkResult> results = [];
         var sentinelEmitted = false;
@@ -1829,7 +1804,7 @@ public class BenchmarkSuite(string name)
         // Apply opt-in hardware/OS controls for the duration of the in-process run. The scope restores
         // the prior process state on dispose. A worker measuring this suite applies the same settings to
         // itself - see MeasureInWorkerAsync.
-        using var _ = EnvironmentControl.Apply(_options.Environment);
+        using var _ = EnvironmentControl.Apply(_options.Environment, _options.SuppressedWarnings);
 
         // The thread-scoped sibling: it is this thread that runs the bodies in-process, and it is
         // the only scope that can place the thread on an Apple Silicon performance core.
@@ -1914,7 +1889,7 @@ public class BenchmarkSuite(string name)
         // The runtime profile was applied to this process's environment block before it started -
         // the only moment it could have been. Affinity and priority are settable at any time and
         // belong here.
-        using var _ = EnvironmentControl.Apply(_options.Environment);
+        using var _ = EnvironmentControl.Apply(_options.Environment, _options.SuppressedWarnings);
         using var _thread = ThreadEnvironmentControl.Apply(_options.Environment);
 
         _suiteSetup?.Invoke();
@@ -2006,7 +1981,7 @@ public class BenchmarkSuite(string name)
             aggregated.Add(combined);
 
             if (pooledSamples.TryGetValue(name, out var samples))
-                rawSamples[RawSampleKey.For(name, combined.RuntimeMoniker)] = samples;
+                rawSamples[RawSampleKey.For(name, combined.TargetFramework)] = samples;
         }
 
         return (aggregated, rawSamples);
@@ -2136,8 +2111,8 @@ public class BenchmarkSuite(string name)
                     Body = factory.Action,
                     Arguments = arguments,
                     StateRecipes = recipes,
-                    IterationSetup = factory.IterationSetup,
-                    IterationTeardown = factory.IterationTeardown,
+                    SampleSetup = factory.SampleSetup,
+                    SampleTeardown = factory.SampleTeardown,
                 });
             }
         }
@@ -2440,7 +2415,7 @@ public class BenchmarkSuite(string name)
     ///     metadata token identifies NBenchmark's wrapper; only this points at the method the developer
     ///     wrote, and it is what lets a parameter sweep be addressed for a worker.
     /// </param>
-    /// <param name="IterationSetup">
+    /// <param name="SampleSetup">
     ///     The per-iteration <c>setup</c> this registration supplied, if any. Carried here because only
     ///     the registration knows, and the expansion is what builds the envelope addressing consults.
     ///     Before parameter sweeps were addressable this went unrecorded and was harmless - a
@@ -2454,6 +2429,6 @@ public class BenchmarkSuite(string name)
         Func<object?[], string, BenchmarkEnvelope> Factory,
         Type[] ParamTypes,
         Delegate Action,
-        Action? IterationSetup,
-        Action? IterationTeardown);
+        Action? SampleSetup,
+        Action? SampleTeardown);
 }

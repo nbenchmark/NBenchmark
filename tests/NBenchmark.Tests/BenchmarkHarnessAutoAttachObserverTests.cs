@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Observers;
 using Xunit;
 
@@ -24,7 +24,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1"])
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();
@@ -49,7 +49,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1"])
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();
@@ -70,7 +70,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1"])
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();
@@ -101,7 +101,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
         await CaptureConsoleOutputAsync(async () =>
         {
             await BenchmarkHarness.Create([
-                    "--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1", "--observer", "auto",
+                    "--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1", "--observer", "auto",
                 ])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
@@ -133,7 +133,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
         await CaptureConsoleOutputAsync(async () =>
         {
             await BenchmarkHarness.Create([
-                    "--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1", "--observer", "explicit",
+                    "--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1", "--observer", "explicit",
                 ])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
@@ -172,7 +172,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
         await CaptureConsoleOutputAsync(async () =>
         {
             await BenchmarkHarness.Create([
-                    "--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1", "--observer", "dup",
+                    "--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1", "--observer", "dup",
                 ])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
@@ -201,7 +201,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1"])
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithObserver(programmatic)
@@ -222,7 +222,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1"])
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithObserver(programmatic)
@@ -244,7 +244,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1"])
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithObserver(explicitObserver)
@@ -265,7 +265,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1"])
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();
@@ -282,7 +282,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1"])
+            await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();
@@ -309,7 +309,7 @@ public class BenchmarkHarnessAutoAttachObserverTests : IDisposable
 
         await CaptureConsoleOutputAsync(async () =>
         {
-            await BenchmarkHarness.Create(["--filter", "ThrowingCtorBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup", "0", "--iterations", "1"])
+            await BenchmarkHarness.Create(["--filter", "ThrowingCtorBenchmarks.*", "--in-process", "--launch-count", "1", "--warmup-samples", "0", "--samples", "1"])
                 .AddFromAssembly<ThrowingCtorBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .RunAsync();

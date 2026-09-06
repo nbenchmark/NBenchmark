@@ -7,7 +7,7 @@ using NBenchmark.Stats;
 // NBenchmark - Extensible statistics
 //
 // This sample shows three things the engine lets you customize:
-//   1. The built-in Median Absolute Deviation (MAD) outlier detector.
+//   1. The built-in Median absolute deviation (MAD) outlier detector.
 //   2. The omnibus Kruskal-Wallis test, used automatically for 3+ benchmarks.
 //   3. Plugging in your OWN outlier detector and significance test.
 // ---------------------------------------------------------------------------
@@ -28,8 +28,8 @@ await new BenchmarkSuite("hashing")
     .Add("sha1", () => SHA1.HashData(Payload))
     .Add("md5", () => MD5.HashData(Payload))
     .WithBaseline("md5")
-    .WithWarmup(5)
-    .WithIterations(60)
+    .WithWarmupSamples(5)
+    .WithSamples(60)
     .WithOutlierMode(OutlierMode.MedianAbsoluteDeviation)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
@@ -56,8 +56,8 @@ var custom = await new BenchmarkSuite("hashing-custom")
     .Add("sha1", () => SHA1.HashData(Payload))
     .Add("md5", () => MD5.HashData(Payload))
     .WithBaseline("md5")
-    .WithWarmup(5)
-    .WithIterations(60)
+    .WithWarmupSamples(5)
+    .WithSamples(60)
     .WithOutlierDetector(static () => new KeepFastestDetector(0.90))
     .WithSignificanceTest(static () => new MedianRatioSignificanceTest(25))
     .WithReporter(new ConsoleReporter())
@@ -72,7 +72,7 @@ foreach (var result in custom)
 {
     Console.WriteLine(
         $"  {result.Name}: {result.IsolationStatus} under '{result.RuntimeProfileName}', "
-        + $"trimmed by '{result.OutlierDetector}'");
+        + $"trimmed by '{result.OutlierDetectorName}'");
 }
 
 internal static partial class Program
@@ -109,7 +109,7 @@ internal sealed class KeepFastestDetector(double fraction) : IOutlierDetector
         {
             Kept = sortedSamples[..keep],
             Discarded = sortedSamples[keep..],
-            UpperFence = sortedSamples[keep],
+            UpperFenceNs = sortedSamples[keep],
         };
     }
 }

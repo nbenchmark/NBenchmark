@@ -14,8 +14,8 @@ public sealed class PerformanceFactAttribute : FactAttribute, IPerformanceThresh
     public long MaxAllocatedBytes { get; init; } = -1;
     public string? ReferenceMethod { get; init; }
     public double MaxSlowdownRatio { get; init; } = 0;
-    public int Iterations { get; init; }
-    public int WarmupIterations { get; init; }
+    public int Samples { get; init; }
+    public int WarmupSamples { get; init; }
     public bool MeasureAllocations { get; init; }
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
     public double ConfidenceLevel { get; init; } = 0.95;

@@ -19,8 +19,8 @@ public sealed class TestMeasurementTests
     {
         Options = MeasurementOptions.Default with
         {
-            Iterations = 16,
-            WarmupIterations = 1,
+            Samples = 16,
+            WarmupSamples = 1,
             OpsPerSample = 1,
             AutoTune = AutoTuneOptions.Default with
             {
@@ -123,14 +123,14 @@ public sealed class TestMeasurementTests
             new PlainSubject(),
             [],
             "Plain.DelayAsync",
-            new RunSpec { Options = spec.Options with { Iterations = 3, WarmupIterations = 0 } },
+            new RunSpec { Options = spec.Options with { Samples = 3, WarmupSamples = 0 } },
             LaunchCounts.Single);
 
         Assert.Equal(IsolationStatus.Isolated, measured.Result.IsolationStatus);
 
         Assert.True(
-            measured.Result.Median > 10_000_000,
-            $"a 20 ms body measured {measured.Result.Median / 1_000_000:F1} ms, so it was not awaited");
+            measured.Result.MedianNs > 10_000_000,
+            $"a 20 ms body measured {measured.Result.MedianNs / 1_000_000:F1} ms, so it was not awaited");
     }
 
     /// <summary>
@@ -221,7 +221,7 @@ public sealed class TestMeasurementTests
     {
         public void Work() => Thread.SpinWait(300);
 
-        public void Spin(int iterations) => Thread.SpinWait(iterations);
+        public void Spin(int samples) => Thread.SpinWait(samples);
 
         public void WorkWith(System.Text.StringBuilder payload) => _ = payload.Length;
 

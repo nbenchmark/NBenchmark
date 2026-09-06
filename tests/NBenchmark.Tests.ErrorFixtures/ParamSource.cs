@@ -1,10 +1,10 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 
 namespace NBenchmark.Tests.ErrorFixtures;
 
 public class ParamSourceCasesBenchmarks
 {
-    [BenchmarkCases(nameof(BadSource))]
+    [ArgumentsSource(nameof(BadSource))]
     [Benchmark]
     public int Square(int a) => a * a;
 

@@ -40,7 +40,7 @@ You don't need to call `.WithReporter(new ConsoleReporter())` when using the CLI
 ```text
 ── BENCHMARK RESULTS  2026-06-06 03:40:00 UTC ──────────────────────────────────
 
-  Benchmark              Median   Mean     Ops/s       Ratio                  Sig    Mag     Alloc/op
+  Benchmark              MedianNs   MeanNs     Ops/s       Ratio                  Sig    Mag     Alloc/op
   Compute                300 ns   275 ns   3.64 Mops/s ████████ 0.75x         ✓      lrg     -
   Baseline (baseline)    400 ns   376 ns   2.66 Mops/s ████████████ baseline  -      -       -
 
@@ -52,7 +52,7 @@ Omnibus: not run (fewer than 3 comparable groups)
 Significance: Mann-Whitney U (p < 0.05)
 Outliers: IQR fence (1.5×)
 Effect metric: Cliff's δ (Romano neg/small/med/large labels)
-Profile: realistic (no per-iteration GC, no between-benchmark GC, alloc tracking on)
+GC behavior: natural (no per-sample GC, no between-benchmark GC, alloc tracking on)
 2 benchmark(s) · 0.0s total · CI 95%
 
 Compute: auto-tuned: 190 samples × 1 ops, warmup 40, CI ±1.8%
@@ -72,13 +72,13 @@ Omnibus Kruskal-Wallis across 3 groups: H(2) = 7.20, p = 0.027 → significant
 Significance: Kruskal-Wallis (p < 0.05)
 Outliers: MAD (3×)
 Effect metric: Cliff's δ (Romano neg/small/med/large labels)
-Profile: realistic (no per-iteration GC, no between-benchmark GC, alloc tracking on)
+GC behavior: natural (no per-sample GC, no between-benchmark GC, alloc tracking on)
 3 benchmark(s) · 0.0s total · CI 95%
 ```
 
 Following the **Interpretation** section, `ConsoleReporter` prints a grey `auto-tuned: …` line per benchmark. This line summarizes what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) resolved: the measured-sample count, operations-per-sample (K), warmup length, and the achieved CI half-width. Pinned runs still show this line with the counts you set.
 
-The **Interpretation** section provides omnibus/significance context, the outlier mode, effect-metric semantics, and the measurement profile. If warnings exist, NBenchmark displays them in a separate **Warnings** section below the auto-tune lines. The final summary line shows the benchmark count, total run time, and confidence interval.
+The **Interpretation** section provides omnibus/significance context, the outlier mode, effect-metric semantics, and the GC behavior. If warnings exist, NBenchmark displays them in a separate **Warnings** section below the auto-tune lines. The final summary line shows the benchmark count, total run time, and confidence interval.
 
 ## Columns
 
@@ -87,11 +87,11 @@ The **Interpretation** section provides omnibus/significance context, the outlie
 | **Benchmark** | The benchmark name. Color-coding indicates performance relative to baseline: green (≤ 5% slower), yellow (≤ 50% slower), and red (> 50% slower). The baseline is bold. |
 | **Median** | The median timing. |
 | **Mean** | The arithmetic mean. |
-| **Ops/s** | Mean operations per second (`1e9 / Mean` when timing is in nanoseconds). A `-` indicates errored or dry-run results. |
+| **Ops/s** | Mean operations per second (`1e9 / MeanNs` when timing is in nanoseconds). A `-` indicates errored or dry-run results. |
 | **Ratio** | A visual bar and ratio relative to the baseline. Colors indicate performance: green for faster, yellow for moderately slower, and red for significantly slower. The baseline cell shows `baseline`. |
 | **Sig** | **✓** = difference from baseline is statistically significant; **✗** = not significant; **-** = not applicable (baseline or significance not tested). |
 | **Mag** | A qualitative effect label. For built-in Mann-Whitney tests, this is Cliff's delta classified by [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size): `neg` (abs(δ) < 0.147), `sml` (< 0.33), `med` (< 0.474), and `lrg` (≥ 0.474). For `lrg`, the cell is bold-red when the candidate is slower and bold-green when faster. See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
-| **Alloc/op** | Mean heap bytes per iteration (visible only when allocation tracking is enabled). |
+| **Alloc/op** | Mean heap bytes per operation (visible only when allocation tracking is enabled). |
 
 If any benchmark has a `Description` set, NBenchmark adds an optional **Description** column.
 
@@ -112,8 +112,8 @@ In Advanced mode (`--detail advanced` or `WithDetail(ReportDetail.Advanced)`), N
 using NBenchmark.Reporters.Console;
 
 await new BenchmarkSuite("name")
-    .WithWarmup(25)        // Pin to provide an exact total for the progress bar
-    .WithIterations(200)   // Pin to provide an exact total for the progress bar
+    .WithWarmupSamples(25)        // Pin to provide an exact total for the progress bar
+    .WithSamples(200)   // Pin to provide an exact total for the progress bar
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();

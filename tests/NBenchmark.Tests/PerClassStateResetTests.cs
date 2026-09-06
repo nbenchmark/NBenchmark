@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Engine;
 using NBenchmark.Lifecycle;
 using Xunit;
@@ -109,7 +109,7 @@ public class PerClassStateResetTests
     {
         // Integration test: a PerClass benchmark class implementing IStateReset must have
         // ResetAsync called between benchmark methods. We use --dry-run with a pinned
-        // WarmupIterations=1 so the body runs once, and assert the reset call count is
+        // WarmupSamples=1 so the body runs once, and assert the reset call count is
         // N-1 for N methods. We run in-process to observe the shared instance directly.
         ResetTrackingBenchmarks.ResetCallCount = 0;
         ResetTrackingBenchmarks.SharedState = 0;
@@ -117,8 +117,8 @@ public class PerClassStateResetTests
         var harness = BenchmarkHarness.Create([
             "--filter", "ResetTrackingBenchmarks.*",
             "--in-process",
-            "--iterations", "1",
-            "--warmup", "1",
+            "--samples", "1",
+            "--warmup-samples", "1",
             "--launch-count", "1",
         ]);
 
@@ -140,8 +140,8 @@ public class PerClassStateResetTests
         var harness = BenchmarkHarness.Create([
             "--filter", "NoResetBenchmarks.*",
             "--in-process",
-            "--iterations", "1",
-            "--warmup", "1",
+            "--samples", "1",
+            "--warmup-samples", "1",
             "--launch-count", "1",
         ]);
 
@@ -170,7 +170,7 @@ public class PerClassStateResetTests
         public Action<string>? OnBenchmarkCompletedHandler { get; set; }
 
         public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) => Task.CompletedTask;
-        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
+        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
         public Task OnWarmupCompleted(string name) => Task.CompletedTask;
 
         public Task OnBenchmarkStarting(string name, int index, int total)
@@ -179,7 +179,7 @@ public class PerClassStateResetTests
             return Task.CompletedTask;
         }
 
-        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
+        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
 
         public Task OnBenchmarkCompleted(BenchmarkResult result)
         {

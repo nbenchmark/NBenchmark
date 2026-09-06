@@ -22,7 +22,7 @@ Get reliable numbers on a noisy shared runner and fail the build upon regression
 Determine if a change to a hot path actually improved performance. This guide uses suite mode with a baseline, the Sig and Magnitude columns, and the practical-significance gate. It also covers cross-class significance when old and new implementations reside in separate classes.
 
 ### [Parameter sweeps across input sizes](./parameter-sweeps.md)
-Analyze how an algorithm scales across different input sizes. This guide uses parameterized suite mode (`WithParameter`) and parameterized harness mode (`[BenchmarkCase]` / `[BenchmarkCases]`), and explains how to read scaling trends in the output table.
+Analyze how an algorithm scales across different input sizes. This guide uses parameterized suite mode (`WithParameter`) and parameterized harness mode (`[Arguments]` / `[ArgumentsSource]`), and explains how to read scaling trends in the output table.
 
 ### [Cross-runtime comparison](./cross-runtime.md)
 Verify if your code benefits from .NET 10 compared to .NET 8. This guide covers multi-runtime support in suite mode (`WithRuntimes`) and harness mode (`--runtimes` / `[Runtimes]`), `<TargetFrameworks>` project setup, always-worker isolation, and significance grouped within each runtime.

@@ -14,7 +14,7 @@ internal static class MultiRuntimeOrchestrator
 
         foreach (var moniker in runtimes)
         {
-            var tfm = moniker.ToTargetFramework();
+            var tfm = moniker.TargetFramework;
 
             var outputDir = Path.Combine(
                 Path.GetTempPath(),

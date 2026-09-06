@@ -11,8 +11,8 @@ namespace NBenchmark.Analyzers.Analyzers;
 public sealed class BenchmarkAttributeRangeAnalyzer : DiagnosticAnalyzer
 {
     private const int UnsetSentinel = -1;
-    private const int MaxIterations = 100_000;
-    private const int MaxWarmupIterations = 10_000;
+    private const int MaxSamplesLimit = 100_000;
+    private const int MaxWarmupSamplesLimit = 10_000;
 
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticIds.BenchmarkAttributeRange,
@@ -50,22 +50,22 @@ public sealed class BenchmarkAttributeRangeAnalyzer : DiagnosticAnalyzer
             {
                 switch (namedArg.Key)
                 {
-                    case "Iterations" when namedArg.Value.Value is int iters:
-                        if (iters != UnsetSentinel && (iters < 0 || iters > MaxIterations))
+                    case "Samples" when namedArg.Value.Value is int iters:
+                        if (iters != UnsetSentinel && (iters < 0 || iters > MaxSamplesLimit))
                         {
                             context.ReportDiagnostic(Diagnostic.Create(Rule,
                                 methodDecl.Identifier.GetLocation(),
-                                $"[Benchmark(Iterations = {iters})] is out of range. Must be 0-{MaxIterations} (or -1 to use the suite default)."));
+                                $"[Benchmark(Samples = {iters})] is out of range. Must be 0-{MaxSamplesLimit} (or -1 to use the suite default)."));
                         }
 
                         break;
 
-                    case "WarmupIterations" when namedArg.Value.Value is int warmup:
-                        if (warmup != UnsetSentinel && (warmup < 0 || warmup > MaxWarmupIterations))
+                    case "WarmupSamples" when namedArg.Value.Value is int warmup:
+                        if (warmup != UnsetSentinel && (warmup < 0 || warmup > MaxWarmupSamplesLimit))
                         {
                             context.ReportDiagnostic(Diagnostic.Create(Rule,
                                 methodDecl.Identifier.GetLocation(),
-                                $"[Benchmark(WarmupIterations = {warmup})] is out of range. Must be 0-{MaxWarmupIterations} (or -1 to use the suite default)."));
+                                $"[Benchmark(WarmupSamples = {warmup})] is out of range. Must be 0-{MaxWarmupSamplesLimit} (or -1 to use the suite default)."));
                         }
 
                         break;

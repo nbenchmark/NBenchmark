@@ -12,8 +12,8 @@ public sealed class BenchmarkCaseConflictAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticIds.BenchmarkCaseConflict,
-        "[BenchmarkCases] cannot be combined with [BenchmarkCase]",
-        "Method '{0}' has both [BenchmarkCases] and [BenchmarkCase]. Use one or the other.",
+        "[ArgumentsSource] cannot be combined with [Arguments]",
+        "Method '{0}' has both [ArgumentsSource] and [Arguments]. Use one or the other.",
         "NBenchmark.Usage",
         DiagnosticSeverity.Error,
         true);

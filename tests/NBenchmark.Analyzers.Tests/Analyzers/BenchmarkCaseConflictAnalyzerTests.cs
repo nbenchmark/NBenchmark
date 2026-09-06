@@ -8,11 +8,11 @@ public sealed class BenchmarkCaseConflictAnalyzerTests
     public async Task Reports_when_both_BenchmarkCase_and_BenchmarkCases_are_present()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using System.Collections.Generic;
                    public class C {
-                       [BenchmarkCase(10)]
-                       [BenchmarkCases(nameof(Cases))]
+                       [Arguments(10)]
+                       [ArgumentsSource(nameof(Cases))]
                        [Benchmark]
                        public void M(int a) { }
                        public static IEnumerable<(int x)> Cases() { yield return (1,); }
@@ -27,9 +27,9 @@ public sealed class BenchmarkCaseConflictAnalyzerTests
     public async Task No_diagnostic_when_only_BenchmarkCase()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
-                       [BenchmarkCase(42)]
+                       [Arguments(42)]
                        [Benchmark]
                        public void M(int x) { }
                    }
@@ -43,10 +43,10 @@ public sealed class BenchmarkCaseConflictAnalyzerTests
     public async Task No_diagnostic_when_only_BenchmarkCases()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    using System.Collections.Generic;
                    public class C {
-                       [BenchmarkCases(nameof(Cases))]
+                       [ArgumentsSource(nameof(Cases))]
                        [Benchmark]
                        public void M(int x) { }
                        public static IEnumerable<(int a)> Cases() { yield return (1,); }

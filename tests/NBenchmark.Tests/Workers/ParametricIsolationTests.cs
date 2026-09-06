@@ -1,11 +1,11 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Workers;
 using Xunit;
 
 namespace NBenchmark.Tests.Workers;
 
 /// <summary>
-///     D7: a <c>[BenchmarkCase]</c> value survives an isolated run with the same fidelity it has
+///     D7: a <c>[Arguments]</c> value survives an isolated run with the same fidelity it has
 ///     in-process - a <c>Type</c> argument no longer crashes the frame write, and every other value
 ///     renders and groups exactly as its in-process counterpart would.
 /// </summary>
@@ -13,7 +13,7 @@ namespace NBenchmark.Tests.Workers;
 ///     <para>
 ///         <c>BenchmarkParameter.Value</c> is declared <c>object?</c>, which - before this - crossed
 ///         the worker/coordinator wire as a raw <c>System.Text.Json</c> value: a
-///         <c>[BenchmarkCase(typeof(X))]</c> argument is a <c>System.RuntimeType</c>, which the
+///         <c>[Arguments(typeof(X))]</c> argument is a <c>System.RuntimeType</c>, which the
 ///         serializer refuses outright, and every other value came back as a type-blind
 ///         <c>JsonElement</c> - an enum rendered as its underlying number, and the grouping key's
 ///         type component read <c>System.Text.Json.JsonElement</c> for every isolated parameter
@@ -48,8 +48,8 @@ public sealed class ParametricIsolationTests : IDisposable
             .WithLaunchCount(1)
             .WithOptions(MeasurementOptions.Default with
             {
-                Iterations = 8,
-                WarmupIterations = 1,
+                Samples = 8,
+                WarmupSamples = 1,
                 AutoTune = AutoTuneOptions.Default with
                 {
                     MaxTuningTime = TimeSpan.FromSeconds(5),
@@ -69,7 +69,7 @@ public sealed class ParametricIsolationTests : IDisposable
     public async Task A_Type_Valued_Case_Isolates_Instead_Of_Losing_The_Row()
     {
         var results = await Harness()
-            .WithCategoryFilter(["typed-case"])
+            .FilterCategories(["typed-case"])
             .RunAsync();
 
         var intCase = Assert.Single(results, r => r.Name.Contains("(kind=System.Int32)"));
@@ -92,7 +92,7 @@ public sealed class ParametricIsolationTests : IDisposable
     public async Task An_Enum_Valued_Case_Isolates_And_Renders_By_Name()
     {
         var results = await Harness()
-            .WithCategoryFilter(["enum-case"])
+            .FilterCategories(["enum-case"])
             .RunAsync();
 
         var slow = Assert.Single(results, r => r.Name.Contains("Slow"));
@@ -115,7 +115,7 @@ public sealed class ParametricIsolationTests : IDisposable
     public async Task An_Isolated_Parameter_Key_Matches_Its_InProcess_Shape()
     {
         var results = await Harness()
-            .WithCategoryFilter(["enum-case"])
+            .FilterCategories(["enum-case"])
             .RunAsync();
 
         var slow = Assert.Single(results, r => r.Name.Contains("Slow"));
@@ -137,13 +137,13 @@ public sealed class TypedCaseIsolationBenchmarks
 {
     [Benchmark]
     [BenchmarkCategory("typed-case")]
-    [BenchmarkCase(typeof(int))]
-    [BenchmarkCase(typeof(string))]
+    [Arguments(typeof(int))]
+    [Arguments(typeof(string))]
     public int Run(Type kind) => kind == typeof(int) ? 1 : 2;
 
     [Benchmark]
     [BenchmarkCategory("enum-case")]
-    [BenchmarkCase(ProcessingMode.Fast)]
-    [BenchmarkCase(ProcessingMode.Slow)]
+    [Arguments(ProcessingMode.Fast)]
+    [Arguments(ProcessingMode.Slow)]
     public int RunMode(ProcessingMode mode) => (int)mode;
 }

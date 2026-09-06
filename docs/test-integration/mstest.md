@@ -83,8 +83,8 @@ For a complete list, see the [thresholds reference](./index.md#thresholds-refere
     MaxSlowdownRatio  = 5.0,      // fail if >5x the calibration benchmark
     ReferenceMethod   = nameof(ReferenceImpl),  // compare against this method instead of calibration
     LaunchCount       = 3,         // measure the pair in 3 workers, for a paired ratio interval
-    Iterations        = 300,
-    WarmupIterations  = 30,
+    Samples        = 300,
+    WarmupSamples  = 30,
     OutlierMode       = OutlierMode.IqrFence,
     ConfidenceLevel   = 0.99)]
 public void CriticalPath() { /* ... */ }
@@ -110,7 +110,7 @@ public void Repository_Query_Is_Fast_Enough()
         name: "GetRecentOrders");
 
     // result is a BenchmarkResult; you can inspect it further if needed
-    Assert.IsTrue(result.Mean < 3_000_000);
+    Assert.IsTrue(result.MeanNs < 3_000_000);
 }
 ```
 
@@ -155,8 +155,8 @@ new PerformanceAssertionOptions
     MaxP95Ns           = 300_000,
     MaxAllocatedBytes  = 4096,
     MaxSlowdownRatio   = 5.0,      // calibration mode (assert pattern does not support ReferenceMethod)
-    Iterations         = 300,
-    WarmupIterations   = 30,
+    Samples         = 300,
+    WarmupSamples   = 30,
     MeasureAllocations = true,
     OutlierMode        = OutlierMode.IqrFence,
     ConfidenceLevel    = 0.99,
@@ -169,5 +169,5 @@ When a threshold is violated, the test fails with a `PerformanceAssertException`
 
 ```text
 Performance thresholds exceeded for 'GetRecentOrders':
-  - Mean 2,341,289.50 ns exceeds maximum 2,000,000.00 ns (excess: 341,289.50 ns)
+  - MeanNs 2,341,289.50 ns exceeds maximum 2,000,000.00 ns (excess: 341,289.50 ns)
 ```

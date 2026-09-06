@@ -1,4 +1,4 @@
-namespace NBenchmark.Attributes;
+namespace NBenchmark;
 
 /// <summary>
 ///     Tags a benchmark (or an entire benchmark class) with a category. Categories are

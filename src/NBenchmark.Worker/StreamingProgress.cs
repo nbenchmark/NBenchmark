@@ -45,7 +45,7 @@ internal sealed class StreamingProgress(
 
     /// <summary>
     ///     Minimum gap between forwarded per-sample progress ticks. The engine calls
-    ///     <see cref="OnIterationCompleted" /> once per sample and can take thousands of samples per
+    ///     <see cref="OnSampleCompleted" /> once per sample and can take thousands of samples per
     ///     benchmark; forwarding each one would put tens of milliseconds of frame encoding into a
     ///     run whose whole point is measuring milliseconds. A progress bar cannot show more than
     ///     this anyway.
@@ -85,7 +85,7 @@ internal sealed class StreamingProgress(
     /// </remarks>
     private static readonly long SampleFlushTicks = Stopwatch.Frequency / 10;
 
-    private long _lastIterationTick;
+    private long _lastSampleTick;
 
     /// <summary>
     ///     The sample batch in flight. Only allocated when streaming was asked for, so an ordinary
@@ -138,9 +138,9 @@ internal sealed class StreamingProgress(
 
     public Task OnSuiteCompleted(IReadOnlyList<BenchmarkResult> results) => Task.CompletedTask;
 
-    public Task OnWarmupStarting(string name, int totalWarmupIterations)
+    public Task OnWarmupStarting(string name, int totalWarmupSamples)
     {
-        Send(ProgressCallback.WarmupStarting, name, 0, totalWarmupIterations);
+        Send(ProgressCallback.WarmupStarting, name, 0, totalWarmupSamples);
         return Task.CompletedTask;
     }
 
@@ -156,16 +156,16 @@ internal sealed class StreamingProgress(
         return Task.CompletedTask;
     }
 
-    public Task OnIterationCompleted(string name, int iteration, int totalIterations)
+    public Task OnSampleCompleted(string name, int sample, int totalSamples)
     {
         var now = Stopwatch.GetTimestamp();
-        var last = Volatile.Read(ref _lastIterationTick);
+        var last = Volatile.Read(ref _lastSampleTick);
 
         if (now - last < CoalesceTicks)
             return Task.CompletedTask;
 
-        Volatile.Write(ref _lastIterationTick, now);
-        Send(ProgressCallback.IterationCompleted, name, iteration, totalIterations);
+        Volatile.Write(ref _lastSampleTick, now);
+        Send(ProgressCallback.SampleCompleted, name, sample, totalSamples);
 
         return Task.CompletedTask;
     }
@@ -315,7 +315,7 @@ internal sealed class StreamingProgress(
             BenchmarkName = e.BenchmarkName,
             Phase = e.Phase,
             SampleCount = e.SampleCount,
-            Mean = e.Mean,
+            MeanNs = e.MeanNs,
             StdDev = e.StdDev,
             CiHalfWidth = e.CiHalfWidth,
             CurrentK = e.CurrentK,

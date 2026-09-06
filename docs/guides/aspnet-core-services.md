@@ -29,9 +29,9 @@ public sealed class OrderBenchmarks(BenchDbContext db)
 {
     [Benchmark]
     [BenchmarkCategory("Read")]
-    [BenchmarkCase(10)]
-    [BenchmarkCase(100)]
-    [BenchmarkCase(1_000)]
+    [Arguments(10)]
+    [Arguments(100)]
+    [Arguments(1_000)]
     public int ListRecentOrders(int limit)
         => db.Orders.OrderByDescending(o => o.Id).Take(limit).Count();
 
@@ -53,7 +53,7 @@ public sealed class OrderBenchmarks(BenchDbContext db)
 
 - **`AddDbContext` and `WithScopedServices`**: This combination provides each benchmark method with a fresh `DbContext`. With the default `PerMethod` lifetime, one method cannot warm the entity cache for another. For a full overview, see the [lifetime and disposal table](../features/dependency-injection.md#lifetime-and-disposal-semantics).
 
-- **`[BenchmarkCase(...)]`**: This attribute expands a single method into multiple benchmarks, one for each case. The display name includes the parameter, such as `ListRecentOrders(limit=10)`. The engine groups significance testing by parameter set, meaning benchmarks with `limit=100` are compared against each other rather than against benchmarks with `limit=1_000`. For more information, see [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
+- **`[Arguments(...)]`**: This attribute expands a single method into multiple benchmarks, one for each case. The display name includes the parameter, such as `ListRecentOrders(limit=10)`. The engine groups significance testing by parameter set, meaning benchmarks with `limit=100` are compared against each other rather than against benchmarks with `limit=1_000`. For more information, see [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
 
 - **`[BenchmarkCategory(...)]`**: This attribute tags benchmarks for easier filtering. For example, you can run only the read path using `dotnet run -- --category Read`, or exclude writes using `dotnet run -- --exclude-category Write`. For more information, see [Categories](../features/categories.md).
 
@@ -73,7 +73,7 @@ dotnet run -c Release -- --category Read --filter "*limit=100*" --filter "*limit
 
 # Perform a smoke test (runs the body once without warmup or measurement)
 dotnet run -c Release -- --dry-run
-dotnet run -c Release -- --iterations 1 --warmup 0
+dotnet run -c Release -- --samples 1 --warmup-samples 0
 
 # Export results to JSON for a CI dashboard
 dotnet run -c Release -- --reporter json --output ./results
@@ -97,9 +97,9 @@ For a full explanation of every column, indicator, and warning, see [Reading You
 
 For more information, see the following pages:
 
-- [Harness mode: BenchmarkHarness](../usage-modes/harness-mode.md) - Full attribute reference, including `[BenchmarkSetup]`, `[BenchmarkIterationSetup]`, `[Isolation(Isolation.Required)]`, and `[Runtimes]`.
+- [Harness mode: BenchmarkHarness](../usage-modes/harness-mode.md) - Full attribute reference, including `[GlobalSetup]`, `[SampleSetup]`, `[Isolation(Isolation.Required)]`, and `[Runtimes]`.
 - [Dependency Injection](../features/dependency-injection.md) - Details on scoped vs. root providers, multiple assemblies, non-Microsoft containers, and the `WithInstanceFactory` method.
-- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - Using `[BenchmarkCases]` for generated or file-backed inputs.
+- [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - Using `[ArgumentsSource]` for generated or file-backed inputs.
 - [State isolation](../features/state-isolation.md) - Using `IStateReset` for classes that intentionally share state.
 - [Analyzers](../reference/analyzers.md) - The NB0001-NB0014 Roslyn diagnostics, including NB0011.
 - [Performance gates in your test suite](./performance-gates.md) - How to fail a pull request on regression instead of printing a table.

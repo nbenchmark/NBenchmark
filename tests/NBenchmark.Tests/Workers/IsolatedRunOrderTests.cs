@@ -32,8 +32,8 @@ public sealed class IsolatedRunOrderTests
     };
 
     private static BenchmarkSuite Fast(BenchmarkSuite suite) => suite
-        .WithIterations(2)
-        .WithWarmup(0)
+        .WithSamples(2)
+        .WithWarmupSamples(0)
         .WithOpsPerSample(1)
 
         // The fake launcher deliberately returns nothing, which is a worker fault and therefore a

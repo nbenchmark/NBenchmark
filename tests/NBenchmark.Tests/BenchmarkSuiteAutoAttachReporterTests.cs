@@ -21,8 +21,8 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
         var results = await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
             .Add("b", () => { })
-            .WithWarmup(1)
-            .WithIterations(2)
+            .WithWarmupSamples(1)
+            .WithSamples(2)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -43,8 +43,8 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(1)
-            .WithIterations(1)
+            .WithWarmupSamples(1)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithReporter(explicitReporter)
             .RunAsync();
@@ -62,8 +62,8 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
 
         var results = await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(1)
-            .WithIterations(1)
+            .WithWarmupSamples(1)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -85,8 +85,8 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(1)
-            .WithIterations(1)
+            .WithWarmupSamples(1)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -102,8 +102,8 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(1)
-            .WithIterations(1)
+            .WithWarmupSamples(1)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithReporter(explicitInstance)
             .RunAsync();
@@ -122,8 +122,8 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
             .Add("a", () => { })
             .Add("b", () => { })
             .Add("c", () => { })
-            .WithWarmup(1)
-            .WithIterations(1)
+            .WithWarmupSamples(1)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -139,8 +139,8 @@ public class BenchmarkSuiteAutoAttachReporterTests : IDisposable
 
         var results = await new BenchmarkSuite("isolated").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(1)
-            .WithIterations(1)
+            .WithWarmupSamples(1)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 

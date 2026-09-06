@@ -12,7 +12,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticIds.BenchmarkCaseArity,
-        "[BenchmarkCase] / [BenchmarkCases] must match method parameters",
+        "[Arguments] / [ArgumentsSource] must match method parameters",
         "{0}",
         "NBenchmark.Usage",
         DiagnosticSeverity.Error,
@@ -54,7 +54,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' has [BenchmarkCase] but takes no parameters."));
+                $"Method '{method.Name}' has [Arguments] but takes no parameters."));
 
             return;
         }
@@ -63,7 +63,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' has {parameterCount} parameter(s) but no [BenchmarkCase] or [BenchmarkCases]. Add one [BenchmarkCase(...)] per argument set."));
+                $"Method '{method.Name}' has {parameterCount} parameter(s) but no [Arguments] or [ArgumentsSource]. Add one [Arguments(...)] per argument set."));
 
             return;
         }
@@ -76,13 +76,13 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
             {
                 context.ReportDiagnostic(Diagnostic.Create(Rule,
                     methodDecl.Identifier.GetLocation(),
-                    $"Method '{method.Name}' expects {parameterCount} argument(s) but a [BenchmarkCase] attribute supplies none."));
+                    $"Method '{method.Name}' expects {parameterCount} argument(s) but a [Arguments] attribute supplies none."));
             }
             else if (effectiveCount > 0 && effectiveCount != parameterCount)
             {
                 context.ReportDiagnostic(Diagnostic.Create(Rule,
                     methodDecl.Identifier.GetLocation(),
-                    $"Method '{method.Name}' expects {parameterCount} argument(s) but a [BenchmarkCase] attribute supplies {effectiveCount}."));
+                    $"Method '{method.Name}' expects {parameterCount} argument(s) but a [Arguments] attribute supplies {effectiveCount}."));
             }
         }
     }
@@ -98,7 +98,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' has [BenchmarkCases] but takes no parameters."));
+                $"Method '{method.Name}' has [ArgumentsSource] but takes no parameters."));
 
             return;
         }
@@ -109,7 +109,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' has [BenchmarkCases] with no source member name. "
+                $"Method '{method.Name}' has [ArgumentsSource] with no source member name. "
                 + "Specify the name of a parameterless method that returns IEnumerable<ValueTuple<...>>."));
 
             return;
@@ -126,7 +126,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' has [BenchmarkCases(\"{sourceName}\")] but no member named '{sourceName}' was found on type '{declaringType.Name}'."));
+                $"Method '{method.Name}' has [ArgumentsSource(\"{sourceName}\")] but no member named '{sourceName}' was found on type '{declaringType.Name}'."));
 
             return;
         }
@@ -137,7 +137,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' references [BenchmarkCases(\"{sourceName}\")] but '{sourceName}' is not a method."));
+                $"Method '{method.Name}' references [ArgumentsSource(\"{sourceName}\")] but '{sourceName}' is not a method."));
 
             return;
         }
@@ -146,7 +146,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' references source method '{sourceName}' via [BenchmarkCases], but the source method must not be generic."));
+                $"Method '{method.Name}' references source method '{sourceName}' via [ArgumentsSource], but the source method must not be generic."));
 
             return;
         }
@@ -155,7 +155,7 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' references source method '{sourceName}' via [BenchmarkCases], but the source method must have no parameters."));
+                $"Method '{method.Name}' references source method '{sourceName}' via [ArgumentsSource], but the source method must have no parameters."));
 
             return;
         }
@@ -199,15 +199,15 @@ public sealed class BenchmarkCaseArityAnalyzer : DiagnosticAnalyzer
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' has [BenchmarkCases(\"{sourceName}\")] where the source yields "
+                $"Method '{method.Name}' has [ArgumentsSource(\"{sourceName}\")] where the source yields "
                 + $"ValueTuple with {tupleArity} element(s), but the method has {parameterCount} parameter(s)."));
         }
         else if (tupleArity > 7)
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule,
                 methodDecl.Identifier.GetLocation(),
-                $"Method '{method.Name}' has [BenchmarkCases(\"{sourceName}\")] where the source yields "
-                + $"a ValueTuple with {tupleArity} element(s). NBenchmark supports at most 7 parameters for [BenchmarkCases] sources."));
+                $"Method '{method.Name}' has [ArgumentsSource(\"{sourceName}\")] where the source yields "
+                + $"a ValueTuple with {tupleArity} element(s). NBenchmark supports at most 7 parameters for [ArgumentsSource] sources."));
         }
     }
 

@@ -15,8 +15,8 @@ internal sealed record CliArgs
     public string? OutputDir { get; init; }
     public int? Seed { get; init; }
     public RunOrder? RunOrder { get; init; }
-    public int? Iterations { get; init; }
-    public int? WarmupIterations { get; init; }
+    public int? Samples { get; init; }
+    public int? WarmupSamples { get; init; }
     public double? ConfidenceLevel { get; init; }
     public double? Alpha { get; init; }
     public OutlierMode? OutlierMode { get; init; }
@@ -63,7 +63,7 @@ internal sealed record CliArgs
     /// </summary>
     public bool CrossClass { get; init; }
 
-    public MeasurementProfile? Profile { get; init; }
+    public GcBehavior? GcBehavior { get; init; }
 
     /// <summary>
     ///     The runtime-startup configuration requested via <c>--runtime-profile</c>. Applied to
@@ -108,9 +108,9 @@ internal sealed record CliArgs
 
     public int? MaxSamples { get; init; }
 
-    public int? MinWarmup { get; init; }
+    public int? MinWarmupSamples { get; init; }
 
-    public int? MaxWarmup { get; init; }
+    public int? MaxWarmupSamples { get; init; }
 
     public TimeSpan? MaxTuningTime { get; init; }
 
@@ -216,7 +216,7 @@ internal sealed record CliArgs
     /// </summary>
     /// <remarks>
     ///     Off by default because a worker can measure up to
-    ///     <see cref="MeasurementOptions.MaxIterations" /> samples, and the coordinator only uses what
+    ///     <see cref="MeasurementOptions.MaxSamplesLimit" /> samples, and the coordinator only uses what
     ///     crosses for significance testing and the Console sparkline - both distribution properties,
     ///     which a few thousand samples describe as well as a hundred thousand. Turn it on to export
     ///     the full series for external analysis; it does not change any statistic NBenchmark itself
@@ -259,9 +259,9 @@ internal sealed record CliArgs
     ///     When true, emits a non-fatal pre-run warning when the host looks like a shared
     ///     or noisy benchmark environment (low core count, unraisable priority, or on
     ///     macOS unobservable frequency scaling/thermal throttling). Mapped into
-    ///     <see cref="EnvironmentOptions.DedicatedHostGuidance" />.
+    ///     <see cref="EnvironmentOptions.HostQualityWarnings" />.
     /// </summary>
-    public bool DedicatedHostGuidance { get; init; }
+    public bool HostQualityWarnings { get; init; }
 
     /// <summary>
     ///     Target framework monikers to benchmark under. When non-empty, the harness builds
@@ -294,8 +294,8 @@ internal sealed record CliArgs
         string? outputDir = null;
         int? seed = null;
         RunOrder? runOrder = null;
-        int? iterations = null;
-        int? warmupIterations = null;
+        int? samples = null;
+        int? warmupSamples = null;
         double? confidenceLevel = null;
         var reporterNames = new List<string>();
         var observerNames = new List<string>();
@@ -309,7 +309,7 @@ internal sealed record CliArgs
         var verifyIsolation = false;
         OutlierMode? outlierMode = null;
         TailMetricsBasis? tailMetricsBasis = null;
-        MeasurementProfile? profile = null;
+        GcBehavior? profile = null;
         RuntimeProfile? runtimeProfile = null;
         bool? forceGc = null;
         bool? noAllocations = null;
@@ -347,7 +347,7 @@ internal sealed record CliArgs
         IReadOnlyList<int>? cpuAffinity = null;
         ProcessPriorityClass? processPriority = null;
         var crossClass = false;
-        var dedicatedHostGuidance = false;
+        var hostQualityWarnings = false;
         string? otlpEndpoint = null;
 
         var errors = new List<string>();
@@ -362,22 +362,22 @@ internal sealed record CliArgs
                 case "--filter" when i + 1 < args.Length:
                     filter = args[++i];
                     break;
-                case "--iterations" when i + 1 < args.Length:
+                case "--samples" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var iters)
-                        && iters >= MeasurementOptions.MinIterations
-                        && iters <= MeasurementOptions.MaxIterations)
-                        iterations = iters;
+                        && iters >= MeasurementOptions.MinSamplesLimit
+                        && iters <= MeasurementOptions.MaxSamplesLimit)
+                        samples = iters;
                     else
-                        errors.Add($"Invalid --iterations value '{args[i]}'. Must be {MeasurementOptions.MinIterations}–{MeasurementOptions.MaxIterations}.");
+                        errors.Add($"Invalid --samples value '{args[i]}'. Must be {MeasurementOptions.MinSamplesLimit}–{MeasurementOptions.MaxSamplesLimit}.");
 
                     break;
-                case "--warmup" when i + 1 < args.Length:
+                case "--warmup-samples" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out var warmup)
                         && warmup >= 0
-                        && warmup <= MeasurementOptions.MaxWarmupIterations)
-                        warmupIterations = warmup;
+                        && warmup <= MeasurementOptions.MaxWarmupSamplesLimit)
+                        warmupSamples = warmup;
                     else
-                        errors.Add($"Invalid --warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupIterations}.");
+                        errors.Add($"Invalid --warmup-samples value '{args[i]}'. Must be 0–{MeasurementOptions.MaxWarmupSamplesLimit}.");
 
                     break;
                 case "--output" when i + 1 < args.Length:
@@ -488,15 +488,15 @@ internal sealed record CliArgs
                 case "--cross-class":
                     crossClass = true;
                     break;
-                case "--profile" when i + 1 < args.Length:
-                    var profileStr = args[++i];
+                case "--gc" when i + 1 < args.Length:
+                    var gcStr = args[++i];
 
-                    if (string.Equals(profileStr, "realistic", StringComparison.OrdinalIgnoreCase))
-                        profile = MeasurementProfile.Realistic;
-                    else if (string.Equals(profileStr, "independent", StringComparison.OrdinalIgnoreCase))
-                        profile = MeasurementProfile.Independent;
+                    if (string.Equals(gcStr, "natural", StringComparison.OrdinalIgnoreCase))
+                        profile = NBenchmark.GcBehavior.Natural;
+                    else if (string.Equals(gcStr, "per-sample-collect", StringComparison.OrdinalIgnoreCase))
+                        profile = NBenchmark.GcBehavior.PerSampleCollect;
                     else
-                        errors.Add($"Invalid --profile value '{profileStr}'. Must be 'realistic' or 'independent'.");
+                        errors.Add($"Invalid --gc value '{gcStr}'. Must be 'natural' or 'per-sample-collect'.");
 
                     break;
                 case "--runtime-profile" when i + 1 < args.Length:
@@ -580,33 +580,33 @@ internal sealed record CliArgs
 
                     break;
                 case "--min-samples" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var mins) && mins >= 1 && mins <= MeasurementOptions.MaxIterations)
+                    if (int.TryParse(args[++i], out var mins) && mins >= 1 && mins <= MeasurementOptions.MaxSamplesLimit)
                         minSamples = mins;
                     else
-                        errors.Add($"Invalid --min-samples value '{args[i]}'. Must be 1–{MeasurementOptions.MaxIterations}.");
+                        errors.Add($"Invalid --min-samples value '{args[i]}'. Must be 1–{MeasurementOptions.MaxSamplesLimit}.");
 
                     break;
                 case "--max-samples" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var maxs) && maxs >= 1 && maxs <= MeasurementOptions.MaxIterations)
+                    if (int.TryParse(args[++i], out var maxs) && maxs >= 1 && maxs <= MeasurementOptions.MaxSamplesLimit)
                         maxSamples = maxs;
                     else
-                        errors.Add($"Invalid --max-samples value '{args[i]}'. Must be 1–{MeasurementOptions.MaxIterations}.");
+                        errors.Add($"Invalid --max-samples value '{args[i]}'. Must be 1–{MeasurementOptions.MaxSamplesLimit}.");
 
                     break;
-                // The auto-warmup bounds use MaxAutoWarmupIterations, not the tighter pinned-warmup
+                // The auto-warmup bounds use MaxAutoWarmupSamplesLimit, not the tighter pinned-warmup
                 // limit: a fast body needs tens of thousands of samples to reach MinWarmupTime.
-                case "--min-warmup" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var minw) && minw >= 0 && minw <= MeasurementOptions.MaxAutoWarmupIterations)
+                case "--min-warmup-samples" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var minw) && minw >= 0 && minw <= MeasurementOptions.MaxAutoWarmupSamplesLimit)
                         minWarmup = minw;
                     else
-                        errors.Add($"Invalid --min-warmup value '{args[i]}'. Must be 0–{MeasurementOptions.MaxAutoWarmupIterations}.");
+                        errors.Add($"Invalid --min-warmup-samples value '{args[i]}'. Must be 0–{MeasurementOptions.MaxAutoWarmupSamplesLimit}.");
 
                     break;
-                case "--max-warmup" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var maxw) && maxw >= 1 && maxw <= MeasurementOptions.MaxAutoWarmupIterations)
+                case "--max-warmup-samples" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var maxw) && maxw >= 1 && maxw <= MeasurementOptions.MaxAutoWarmupSamplesLimit)
                         maxWarmup = maxw;
                     else
-                        errors.Add($"Invalid --max-warmup value '{args[i]}'. Must be 1–{MeasurementOptions.MaxAutoWarmupIterations}.");
+                        errors.Add($"Invalid --max-warmup-samples value '{args[i]}'. Must be 1–{MeasurementOptions.MaxAutoWarmupSamplesLimit}.");
 
                     break;
                 case "--max-tuning-time" when i + 1 < args.Length:
@@ -759,8 +759,8 @@ internal sealed record CliArgs
                     }
 
                     break;
-                case "--dedicated-host-guidance":
-                    dedicatedHostGuidance = true;
+                case "--host-quality-warnings":
+                    hostQualityWarnings = true;
                     break;
                 case "--otlp-endpoint" when i + 1 < args.Length:
                     var endpointStr = args[++i];
@@ -778,7 +778,7 @@ internal sealed record CliArgs
 
                     foreach (var part in runtimeParts)
                     {
-                        if (TryParseRuntimeMoniker(part, out var parsedMoniker))
+                        if (RuntimeMoniker.TryParse(part, out var parsedMoniker))
                         {
                             if (!runtimes.Contains(parsedMoniker))
                                 runtimes.Add(parsedMoniker);
@@ -788,12 +788,12 @@ internal sealed record CliArgs
                     }
 
                     break;
-                case "--filter" or "--iterations" or "--warmup" or "--output"
+                case "--filter" or "--samples" or "--warmup-samples" or "--output"
                     or "--reporter" or "--observer" or "--category" or "--exclude-category" or "--confidence" or "--order"
-                    or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--tail-basis" or "--detail" or "--profile"
+                    or "--threshold-pct" or "--seed" or "--alpha" or "--outlier" or "--tail-basis" or "--detail" or "--gc"
                     or "--runtime-profile"
                     or "--auto-tune" or "--ops-per-sample" or "--ci-target" or "--min-samples" or "--max-samples"
-                    or "--min-warmup" or "--max-warmup" or "--max-tuning-time" or "--autotune-cap-behavior"
+                    or "--min-warmup-samples" or "--max-warmup-samples" or "--max-tuning-time" or "--autotune-cap-behavior"
                     or "--warmup-budget-fraction" or "--cap-grace-factor" or "--min-warmup-time"
                     or "--jit-quiet-period" or "--min-measurement-time" or "--drift-tolerance"
                     or "--max-drift-restarts"
@@ -822,8 +822,8 @@ internal sealed record CliArgs
             OutputDir = outputDir,
             Seed = seed,
             RunOrder = runOrder,
-            Iterations = iterations,
-            WarmupIterations = warmupIterations,
+            Samples = samples,
+            WarmupSamples = warmupSamples,
             ConfidenceLevel = confidenceLevel,
             Alpha = alpha,
             OutlierMode = outlierMode,
@@ -837,7 +837,7 @@ internal sealed record CliArgs
             StrictIsolation = strictIsolation,
             VerifyIsolation = verifyIsolation,
             CrossClass = crossClass,
-            Profile = profile,
+            GcBehavior = profile,
             RuntimeProfile = runtimeProfile,
             ForceGc = forceGc,
             NoAllocations = noAllocations,
@@ -850,8 +850,8 @@ internal sealed record CliArgs
             CiTarget = ciTarget,
             MinSamples = minSamples,
             MaxSamples = maxSamples,
-            MinWarmup = minWarmup,
-            MaxWarmup = maxWarmup,
+            MinWarmupSamples = minWarmup,
+            MaxWarmupSamples = maxWarmup,
             MaxTuningTime = maxTuningTime,
             AutoTuneCapBehavior = autoTuneCapBehavior,
             WarmupBudgetFraction = warmupBudgetFraction,
@@ -874,7 +874,7 @@ internal sealed record CliArgs
             Runtimes = runtimes,
             CpuAffinity = cpuAffinity,
             ProcessPriority = processPriority,
-            DedicatedHostGuidance = dedicatedHostGuidance,
+            HostQualityWarnings = hostQualityWarnings,
             OtlpEndpoint = otlpEndpoint,
         }, errors);
     }
@@ -942,24 +942,6 @@ internal sealed record CliArgs
         }
     }
 
-    private static bool TryParseRuntimeMoniker(string value, out RuntimeMoniker moniker)
-    {
-        switch (value.ToLowerInvariant())
-        {
-            case "net8" or "net8.0":
-                moniker = RuntimeMoniker.Net8;
-                return true;
-            case "net9" or "net9.0":
-                moniker = RuntimeMoniker.Net9;
-                return true;
-            case "net10" or "net10.0":
-                moniker = RuntimeMoniker.Net10;
-                return true;
-            default:
-                moniker = default;
-                return false;
-        }
-    }
 
     private static bool TryParseProcessPriority(string value, out ProcessPriorityClass priority)
     {
@@ -1026,18 +1008,19 @@ internal sealed record CliArgs
     internal static readonly string[] KnownFlags =
     [
         "--alpha", "--auto-tune", "--autotune-cap-behavior", "--cap-grace-factor", "--category",
-        "--ci-target", "--confidence", "--cpu-affinity", "--cross-class",
-        "--dedicated-host-guidance", "--detail", "--diagnostics", "--drift-tolerance", "--dry-run",
-        "--emit-raw", "--exclude-category", "--filter", "--force-gc", "--help", "--in-process",
-        "--iterations", "--jit-quiet-period", "--launch-count", "--list", "--max-drift-restarts",
-        "--max-samples", "--max-tuning-time", "--max-warmup", "--min-measurement-time",
-        "--min-practical-effect", "--min-relative-shift", "--min-samples", "--min-warmup", "--min-warmup-time",
-        "--no-allocations", "--no-drift-canary", "--no-gc-between-benchmarks", "--no-histogram",
-        "--no-interference-filter", "--no-jit-quiescence",
-        "--no-samples", "--no-thread-control", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint", "--outlier",
-        "--output", "--percentiles", "--priority", "--profile", "--reporter", "--runtime-profile",
-        "--runtimes", "--seed", "--stream-samples", "--strict-isolation", "--tail-basis",
-        "--threshold-pct", "--verify-isolation", "--warmup", "--warmup-budget-fraction",
+        "--ci-target", "--confidence", "--cpu-affinity", "--cross-class", "--detail",
+        "--diagnostics", "--drift-tolerance", "--dry-run", "--emit-raw", "--exclude-category",
+        "--filter", "--force-gc", "--gc", "--help", "--host-quality-warnings", "--in-process",
+        "--jit-quiet-period", "--launch-count", "--list", "--max-drift-restarts", "--max-samples",
+        "--max-tuning-time", "--max-warmup-samples", "--min-measurement-time",
+        "--min-practical-effect", "--min-relative-shift", "--min-samples", "--min-warmup-samples",
+        "--min-warmup-time", "--no-allocations", "--no-drift-canary", "--no-gc-between-benchmarks",
+        "--no-histogram", "--no-interference-filter", "--no-jit-quiescence", "--no-samples",
+        "--no-thread-control", "--observer", "--ops-per-sample", "--order", "--otlp-endpoint",
+        "--outlier", "--output", "--percentiles", "--priority", "--reporter", "--runtime-profile",
+        "--runtimes", "--samples", "--seed", "--stream-samples", "--strict-isolation",
+        "--tail-basis", "--threshold-pct", "--verify-isolation", "--warmup-budget-fraction",
+        "--warmup-samples",
     ];
 
     internal static void PrintHelp()
@@ -1045,72 +1028,72 @@ internal sealed record CliArgs
         Console.WriteLine($"Usage: {ProgramName()} [options]");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  --filter <pattern>     Run suites/methods matching glob (e.g., String*, *.Contains*)");
-        Console.WriteLine("  --category <name>      Include benchmarks tagged with this category (repeatable, OR)");
-        Console.WriteLine("  --exclude-category <name> Exclude benchmarks tagged with this category (repeatable, OR)");
-        Console.WriteLine("  --iterations <n>       Pin measured sample count (default: auto, CI-driven)");
-        Console.WriteLine("  --warmup <n>           Pin warmup sample count (default: auto, plateau-driven)");
-        Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}{FormatAutoAttached()}");
+        Console.WriteLine("  --filter <pattern>              Run suites/methods matching glob (e.g., String*, *.Contains*)");
+        Console.WriteLine("  --category <name>               Include benchmarks tagged with this category (repeatable, OR)");
+        Console.WriteLine("  --exclude-category <name>       Exclude benchmarks tagged with this category (repeatable, OR)");
+        Console.WriteLine("  --samples <n>                   Pin measured sample count (default: auto, CI-driven)");
+        Console.WriteLine("  --warmup-samples <n>            Pin warmup sample count (default: auto, plateau-driven)");
+        Console.WriteLine($"  --reporter <type>               Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}{FormatAutoAttached()}");
 
-        Console.WriteLine($"  --observer <type>      Attach measurement observer: {FormatObservers()}");
-        Console.WriteLine("                         (repeatable; multiple observers are composed into a fan-out)");
-        Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
-        Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
-        Console.WriteLine("  --alpha <0-1>          Significance level for the significance test (default: 0.05)");
-        Console.WriteLine("  --outlier <mode>       Outlier trimming: none, top5, both5, iqr (default), mad");
-        Console.WriteLine("  --tail-basis <basis>   Percentile/Min/Max/histogram source: raw (default), trimmed");
-        Console.WriteLine("  --auto-tune <preset>   Adaptive tuning preset: default, quick, or thorough");
-        Console.WriteLine("  --ops-per-sample <n>   Pin ops-per-sample K (default: auto-calibrated)");
-        Console.WriteLine("  --ci-target <0-1>      Target relative CI half-width for auto sampling (default: 0.025)");
-        Console.WriteLine("  --min-samples <n>      Minimum measured samples in auto mode (default: 30)");
-        Console.WriteLine("  --max-samples <n>      Maximum measured samples in auto mode (default: 5000)");
-        Console.WriteLine("  --min-warmup <n>       Minimum warmup samples in auto mode (default: 8)");
-        Console.WriteLine("  --max-warmup <n>       Maximum warmup samples in auto mode (default: 100000)");
-        Console.WriteLine("  --max-tuning-time <s>  Wall-clock cap per benchmark, in seconds (default: 20)");
+        Console.WriteLine($"  --observer <type>               Attach measurement observer: {FormatObservers()}");
+        Console.WriteLine("                                  (repeatable; multiple observers are composed into a fan-out)");
+        Console.WriteLine("  --output <dir>                  Set output directory for file-based reporters");
+        Console.WriteLine("  --confidence <0-1>              Confidence level for the interval on the mean (default: 0.95)");
+        Console.WriteLine("  --alpha <0-1>                   Significance level for the significance test (default: 0.05)");
+        Console.WriteLine("  --outlier <mode>                Outlier trimming: none, top5, both5, iqr (default), mad");
+        Console.WriteLine("  --tail-basis <basis>            Percentile/min/max/histogram source: raw (default), trimmed");
+        Console.WriteLine("  --auto-tune <preset>            Adaptive tuning preset: default, quick, or thorough");
+        Console.WriteLine("  --ops-per-sample <n>            Pin ops-per-sample K (default: auto-calibrated)");
+        Console.WriteLine("  --ci-target <0-1>               Target relative CI half-width for auto sampling (default: 0.025)");
+        Console.WriteLine("  --min-samples <n>               Minimum measured samples in auto mode (default: 30)");
+        Console.WriteLine("  --max-samples <n>               Maximum measured samples in auto mode (default: 5000)");
+        Console.WriteLine("  --min-warmup-samples <n>        Minimum warmup samples in auto mode (default: 8)");
+        Console.WriteLine("  --max-warmup-samples <n>        Maximum warmup samples in auto mode (default: 100000)");
+        Console.WriteLine("  --max-tuning-time <s>           Wall-clock cap per benchmark, in seconds (default: 20)");
         Console.WriteLine("  --autotune-cap-behavior <mode>  Cap handling: warn (default) or error");
         Console.WriteLine("  --warmup-budget-fraction <0-1>  Max share of --max-tuning-time for calibration + warmup (default: 0.4)");
-        Console.WriteLine("  --cap-grace-factor <n>  Multiplier on --max-tuning-time the measurement phase may reach while chasing --min-samples (default: 1.5)");
-        Console.WriteLine("  --min-warmup-time <ms>  Minimum warmup time before auto-warmup may settle, in ms (default: 500; 0 disables)");
-        Console.WriteLine("  --no-jit-quiescence     Disable the JIT-quiescence warmup gate (keep only the time floor)");
-        Console.WriteLine("  --jit-quiet-period <ms>  How long the JIT must stay quiet before auto-warmup may settle, in ms (default: 50; 0 disables the gate)");
-        Console.WriteLine("  --min-measurement-time <ms>  Minimum measurement time before the CI target may stop sampling, in ms (default: 100; 0 disables)");
-        Console.WriteLine("  --drift-tolerance <0-1>  Max first-half/second-half disagreement before the CI stop is refused (default: 0.1; 0 disables)");
-        Console.WriteLine("  --max-drift-restarts <n>  How many times drift may discard samples and restart measurement (default: 2)");
-        Console.WriteLine("  --launch-count <n>      Repeat each benchmark N times as separate launches (harness default: 5)");
-        Console.WriteLine("  --percentiles <list>    Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
-        Console.WriteLine("  --no-histogram          Disable latency histogram computation");
-        Console.WriteLine("  --no-drift-canary       Disable the host drift canary (the control workload measured between benchmarks)");
-        Console.WriteLine("  --no-thread-control     Disable thread-level affinity, priority and (on macOS) performance-core placement");
-        Console.WriteLine("  --no-interference-filter  Disable evidence-based interference rejection (trim only on the statistical outlier detector)");
-        Console.WriteLine("  --no-samples            Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
-        Console.WriteLine($"  --emit-raw              Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset");
-        Console.WriteLine("  --stream-samples        Forward the live per-sample observer stream out of an isolated worker (needs --observer; costs fidelity)");
-        Console.WriteLine("  --list                 List discovered benchmarks without running");
-        Console.WriteLine("  --dry-run              Run with 0 iterations; no measurement, no body invocation");
-        Console.WriteLine("  --in-process           Run every benchmark in the host process (disables isolation)");
-        Console.WriteLine("  --strict-isolation     Fail with exit code 1 if any benchmark could not be isolated");
-        Console.WriteLine("  --verify-isolation     Re-measure in this process and print how much isolation changed");
-        Console.WriteLine("  --cross-class          Compute significance across all classes instead of per class");
-        Console.WriteLine("  --runtimes <list>      Runtimes to compare (comma-separated, e.g. net8,net9,net10)");
-        Console.WriteLine("  --order <mode>         Run order: random (default) or declaration");
-        Console.WriteLine("  --seed <n>             Seed for deterministic random ordering");
-        Console.WriteLine("  --detail <level>       Report detail: simple, standard, or advanced (default: simple)");
-        Console.WriteLine("  --threshold-pct <n>    Fail with exit code 1 if any benchmark regresses");
-        Console.WriteLine("                        >N% vs baseline (median-based comparison; n >= 1).");
-        Console.WriteLine("  --profile <mode>       Measurement profile: realistic (default) or independent");
-        Console.WriteLine("  --runtime-profile <p>   Runtime config for isolated children: steady-state");
-        Console.WriteLine("                          (default), production, server-gc, or host");
-        Console.WriteLine("  --force-gc             Force Gen0 GC before every iteration (overrides profile)");
-        Console.WriteLine("  --no-allocations       Disable allocation tracking (overrides profile)");
-        Console.WriteLine("  --no-gc-between-benchmarks  Disable the full GC between benchmarks (on by default for both profiles)");
-        Console.WriteLine("  --min-practical-effect <0-1>  Min practical effect for a significant verdict (default: 0.147; 0 = p-value only)");
-        Console.WriteLine("  --min-relative-shift <0-1>   Min relative median shift for a significant verdict (default: 0.01; 0 = off)");
-        Console.WriteLine("  --diagnostics <mode>   Runtime diagnostics: none, gc, gcandcpu, all (default: gc)");
-        Console.WriteLine("  --cpu-affinity <list>  Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)");
-        Console.WriteLine("  --priority <level>     Process priority: normal, idle, belownormal, abovenormal, high, realtime");
-        Console.WriteLine("  --dedicated-host-guidance  Warn when the host looks noisy (low core count, unraisable priority, macOS throttling)");
-        Console.WriteLine("  --otlp-endpoint <url>  OTLP endpoint for the OpenTelemetry SDK (http:// or https://); forwarded to isolated children");
-        Console.WriteLine("  --help, -h             Show this help text");
+        Console.WriteLine("  --cap-grace-factor <n>          Multiplier on --max-tuning-time the measurement phase may reach while chasing --min-samples (default: 1.5)");
+        Console.WriteLine("  --min-warmup-time <ms>          Minimum warmup time before auto-warmup may settle, in ms (default: 500; 0 disables)");
+        Console.WriteLine("  --no-jit-quiescence             Disable the JIT-quiescence warmup gate (keep only the time floor)");
+        Console.WriteLine("  --jit-quiet-period <ms>         How long the JIT must stay quiet before auto-warmup may settle, in ms (default: 50; 0 disables the gate)");
+        Console.WriteLine("  --min-measurement-time <ms>     Minimum measurement time before the CI target may stop sampling, in ms (default: 100; 0 disables)");
+        Console.WriteLine("  --drift-tolerance <0-1>         Max first-half/second-half disagreement before the CI stop is refused (default: 0.1; 0 disables)");
+        Console.WriteLine("  --max-drift-restarts <n>        How many times drift may discard samples and restart measurement (default: 2)");
+        Console.WriteLine("  --launch-count <n>              Repeat each benchmark N times as separate launches (harness default: 5)");
+        Console.WriteLine("  --percentiles <list>            Custom percentile values (comma-separated, e.g. 0.50,0.95,0.99,0.999)");
+        Console.WriteLine("  --no-histogram                  Disable latency histogram computation");
+        Console.WriteLine("  --no-drift-canary               Disable the host drift canary (the control workload measured between benchmarks)");
+        Console.WriteLine("  --no-thread-control             Disable thread-level affinity, priority and (on macOS) performance-core placement");
+        Console.WriteLine("  --no-interference-filter        Disable evidence-based interference rejection (trim only on the statistical outlier detector)");
+        Console.WriteLine("  --no-samples                    Omit raw per-sample arrays from JSON output (samples still feed significance and Console histogram)");
+        Console.WriteLine($"  --emit-raw                      Return every raw sample from an isolated worker instead of a {MeasurementOptions.DefaultMaxRawSamples}-sample representative subset");
+        Console.WriteLine("  --stream-samples                Forward the live per-sample observer stream out of an isolated worker (needs --observer; costs fidelity)");
+        Console.WriteLine("  --list                          List discovered benchmarks without running");
+        Console.WriteLine("  --dry-run                       Run with 0 samples; no measurement, no body invocation");
+        Console.WriteLine("  --in-process                    Run every benchmark in the host process (disables isolation)");
+        Console.WriteLine("  --strict-isolation              Fail with exit code 1 if any benchmark could not be isolated");
+        Console.WriteLine("  --verify-isolation              Re-measure in this process and print how much isolation changed");
+        Console.WriteLine("  --cross-class                   Compute significance across all classes instead of per class");
+        Console.WriteLine("  --runtimes <list>               Runtimes to compare (comma-separated, e.g. net8,net9,net10)");
+        Console.WriteLine("  --order <mode>                  Run order: random (default) or declaration");
+        Console.WriteLine("  --seed <n>                      Seed for deterministic random ordering");
+        Console.WriteLine("  --detail <level>                Report detail: simple, standard, or advanced (default: simple)");
+        Console.WriteLine("  --threshold-pct <n>             Fail with exit code 1 if any benchmark regresses");
+        Console.WriteLine("                                  >N% vs baseline (median-based comparison; n >= 1).");
+        Console.WriteLine("  --gc <mode>                     GC behavior: natural (default) or per-sample-collect");
+        Console.WriteLine("  --runtime-profile <p>           Runtime config for isolated children: steady-state");
+        Console.WriteLine("                                  (default), production, server-gc, or host");
+        Console.WriteLine("  --force-gc                      Force Gen0 GC before every sample (overrides profile)");
+        Console.WriteLine("  --no-allocations                Disable allocation tracking (overrides profile)");
+        Console.WriteLine("  --no-gc-between-benchmarks      Disable the full GC between benchmarks (on by default for both profiles)");
+        Console.WriteLine("  --min-practical-effect <0-1>    Minimum practical effect for a significant verdict (default: 0.147; 0 = p-value only)");
+        Console.WriteLine("  --min-relative-shift <0-1>      Minimum relative median shift for a significant verdict (default: 0.01; 0 = off)");
+        Console.WriteLine("  --diagnostics <mode>            Runtime diagnostics: none, gc, gcandcpu, all (default: gc)");
+        Console.WriteLine("  --cpu-affinity <list>           Pin benchmark process to logical CPU cores (e.g. 0 or 2,3)");
+        Console.WriteLine("  --priority <level>              Process priority: normal, idle, belownormal, abovenormal, high, realtime");
+        Console.WriteLine("  --host-quality-warnings         Warn when the host looks noisy (low core count, unraisable priority, macOS throttling)");
+        Console.WriteLine("  --otlp-endpoint <url>           OTLP endpoint for the OpenTelemetry SDK (http:// or https://); forwarded to isolated children");
+        Console.WriteLine("  --help, -h                      Show this help text");
     }
 
     /// <summary>

@@ -62,7 +62,7 @@ The envelope begins with `schemaVersion` and `measurementEpoch`. For more inform
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "measurementEpoch": 7,
   "generatedAt": "2026-06-06T03:40:00.000Z",
   "detail": "simple",
@@ -102,13 +102,13 @@ The envelope begins with `schemaVersion` and `measurementEpoch`. For more inform
       "medianOperationsPerSecond": 3333333.3,
       "nanosecondsPerOperation": 275.3,
       "totalOperations": 230,
-      "meanAllocatedBytes": null,
+      "allocatedBytesMean": null,
       "pValue": 0.0012,
       "isSignificant": true,
       "errored": false,
       "errorMessage": null,
-      "measuredIterations": 190,
-      "warmupIterations": 40,
+      "sampleCount": 190,
+      "warmupSamples": 40,
       "runAt": "2026-06-06T03:40:00.000Z",
       "totalDuration": "00:00:00.050",
       "measuredDuration": "00:00:00.040",
@@ -160,10 +160,10 @@ The result contains **two populations**, and the `tailMetricsBasis` field indica
 
 When `tailMetricsBasis` is `raw`:
 - The order statistics (`min`, `max`, `percentiles`, and `histogram`) describe the **full pre-trim** sample set.
-- The core statistics (`mean`, `median`, `standardDeviation`, `coefficientOfVariation`, and `measuredIterations`) describe the **trimmed (inlier)** set.
+- The core statistics (`mean`, `median`, `standardDeviation`, `coefficientOfVariation`, and `sampleCount`) describe the **trimmed (inlier)** set.
 - The precision metrics (`standardError` and `marginOfError`) are hybrid. They describe the precision of the trimmed mean but are computed [Winsorized](../statistics/descriptive.md#winsorized-standard-error-for-trimmed-data) over the pre-trim set. This ensures that the samples removed by the outlier fence still count as observations.
 
-This distinction is deliberate because the outlier fence removes exactly the slow tail that `P99` and `Max` are designed to describe. See [Descriptive statistics](../statistics/descriptive.md) for more information. When displaying both sets of metrics, you should label them clearly; the `outlierDetector` field names the detector that separated the two.
+This distinction is deliberate because the outlier fence removes exactly the slow tail that `P99` and `MaxNs` are designed to describe. See [Descriptive statistics](../statistics/descriptive.md) for more information. When displaying both sets of metrics, you should label them clearly; the `outlierDetector` field names the detector that separated the two.
 
 ### The `autoTune` object
 
@@ -181,7 +181,7 @@ The `autoTune` object records the decisions made by the [adaptive measurement lo
 > [!IMPORTANT]
 > `achievedRelativeCiWidth` and `marginOfError` measure different things. The former is the CI half-width the loop achieved on the **raw** stream at the time of the stop decision. The latter is the interval on the **trimmed** mean. `marginOfError` accounts for how many samples the fence removed, but not how far out they were. When outliers carry most of the variance, these two values can diverge sharply. Treat the trimmed margin as optimistic whenever `sampleStop` is not `ciTargetMet`.
 
-The `warmupCurve` records the mean per-op time of each warmup batch (oldest first), illustrating the shape of tiered compilation. Since a body promoted from tier-0 to tier-1 (and re-optimized under dynamic PGO) gets faster in steps, the curve shows these transitions. `warmupSampleInterval` provides the iterations between consecutive points for plotting. NBenchmark bounds this array at 512 points; longer warmups are decimated by a doubling stride to maintain shape. This array is empty for pinned `warmupIterations` or when `IncludeSamples` is off.
+The `warmupCurve` records the mean per-op time of each warmup batch (oldest first), illustrating the shape of tiered compilation. Since a body promoted from tier-0 to tier-1 (and re-optimized under dynamic PGO) gets faster in steps, the curve shows these transitions. `warmupSampleInterval` provides the samples between consecutive points for plotting. NBenchmark bounds this array at 512 points; longer warmups are decimated by a doubling stride to maintain shape. This array is empty for pinned `warmupSamples` or when `IncludeSamples` is off.
 
 Note two limitations:
 1. NBenchmark collects **aggregate decay**, not per-method tier attribution. To identify individual methods and their tiers, use the runtime's `MethodLoadVerbose` events via EventPipe or an in-process `EventListener`.
@@ -193,14 +193,14 @@ The `sampleQuantizationFraction` is one clock step as a fraction of one sample. 
 
 The `jitLastChangeAtNs` field records how far into warmup the JIT last compiled a method. Under continuous load, this is typically the promotion of the benchmark's own hot path. Compare this against `warmupElapsedNs` to determine how much quiet time followed the last JIT event. The `warmupJit*` counters are process-wide `System.Runtime.JitInfo` deltas. In in-process runs, the first benchmark typically absorbs most startup compilation.
 
-`totalDuration` is the end-to-end wall-clock time (warmup + pre-measure GC + measured loop), while `measuredDuration` is the measured loop only. The gap is primarily composed of warmup iterations and the pre-measure `GC.Collect`.
+`totalDuration` is the end-to-end wall-clock time (warmup + pre-measure GC + measured loop), while `measuredDuration` is the measured loop only. The gap is primarily composed of warmup samples and the pre-measure `GC.Collect`.
 
-The `detail` and `profile` fields in the envelope report the active detail level (`simple`, `standard`, or `advanced`) and measurement profile. The result records always contain all available fields regardless of the detail level.
+The `detail` and `profile` fields in the envelope report the active detail level (`simple`, `standard`, or `advanced`) and GC behavior. The result records always contain all available fields regardless of the detail level.
 
 ## Notes
 
 - NBenchmark creates the output directory automatically if it does not exist.
-- `BenchmarkResult` is serialized with all properties, including `ConfidenceIntervalLower` and `ConfidenceIntervalUpper` (computed from `Mean ± MarginOfError`).
+- `BenchmarkResult` is serialized with all properties, including `ConfidenceIntervalLowerNs` and `ConfidenceIntervalUpperNs` (computed from `MeanNs ± MarginOfErrorNs`).
 - The `autoTune` object is `null` for dry-run and errored results. For pinned runs, the stop reasons are `explicitCount`.
 
 ## Using with Benchmark (Single mode)

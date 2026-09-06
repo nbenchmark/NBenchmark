@@ -73,8 +73,8 @@ public class HostDriftCanaryTests
         canary.Take();
         canary.Take();
 
-        Assert.Equal(0, canary.StampFor(0)!.Position);
-        Assert.Equal(1, canary.StampFor(1)!.Position);
+        Assert.Equal(0, canary.StampFor(0)!.CompletedBenchmarks);
+        Assert.Equal(1, canary.StampFor(1)!.CompletedBenchmarks);
     }
 
     /// <summary>
@@ -319,15 +319,15 @@ public class HostDriftTests
     private static BenchmarkResult Comparable(string name, double median, bool isBaseline, double? relative) => new()
     {
         Name = name,
-        Mean = median,
-        Median = median,
+        MeanNs = median,
+        MedianNs = median,
         Percentiles = [],
-        Min = median,
-        Max = median,
-        StandardDeviation = 0,
+        MinNs = median,
+        MaxNs = median,
+        StandardDeviationNs = 0,
         IsBaseline = isBaseline,
-        Q1 = 0, Q3 = 0, InterquartileRange = 0, OutliersRemoved = 0, N = 0,
-        Skewness = 0, Kurtosis = 0, Mad = 0, AllocMedian = null, AllocP95 = null, AllocMax = null,
+        Q1Ns = 0, Q3Ns = 0, InterquartileRangeNs = 0, OutliersRemoved = 0, SampleCount = 0,
+        Skewness = 0, Kurtosis = 0, MedianAbsoluteDeviationNs = 0, AllocatedBytesMedian = null, AllocatedBytesP95 = null, AllocatedBytesMax = null,
         HostTimeline = relative is { } r
             ? new HostTimeline
             {

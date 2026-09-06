@@ -4,13 +4,13 @@ namespace NBenchmark.Analyzers.Shared;
 
 internal static class BenchmarkSymbols
 {
-    private const string BenchmarkAttributeFullName = "NBenchmark.Attributes.BenchmarkAttribute";
-    private const string BenchmarkCaseAttributeFullName = "NBenchmark.Attributes.BenchmarkCaseAttribute";
-    private const string BenchmarkCasesAttributeFullName = "NBenchmark.Attributes.BenchmarkCasesAttribute";
-    private const string BenchmarkSetupAttributeFullName = "NBenchmark.Attributes.BenchmarkSetupAttribute";
-    private const string BenchmarkTeardownAttributeFullName = "NBenchmark.Attributes.BenchmarkTeardownAttribute";
-    private const string BenchmarkIterationSetupAttributeFullName = "NBenchmark.Attributes.BenchmarkIterationSetupAttribute";
-    private const string BenchmarkIterationTeardownAttributeFullName = "NBenchmark.Attributes.BenchmarkIterationTeardownAttribute";
+    private const string BenchmarkAttributeFullName = "NBenchmark.BenchmarkAttribute";
+    private const string BenchmarkCaseAttributeFullName = "NBenchmark.ArgumentsAttribute";
+    private const string BenchmarkCasesAttributeFullName = "NBenchmark.ArgumentsSourceAttribute";
+    private const string BenchmarkSetupAttributeFullName = "NBenchmark.GlobalSetupAttribute";
+    private const string BenchmarkTeardownAttributeFullName = "NBenchmark.GlobalTeardownAttribute";
+    private const string SampleSetupAttributeFullName = "NBenchmark.SampleSetupAttribute";
+    private const string SampleTeardownAttributeFullName = "NBenchmark.SampleTeardownAttribute";
     private const string MeasurementOptionsFullName = "NBenchmark.MeasurementOptions";
 
     private static string? GetAttributeFullName(INamedTypeSymbol? attributeClass) =>
@@ -40,8 +40,8 @@ internal static class BenchmarkSymbols
 
         return name is BenchmarkSetupAttributeFullName
             or BenchmarkTeardownAttributeFullName
-            or BenchmarkIterationSetupAttributeFullName
-            or BenchmarkIterationTeardownAttributeFullName;
+            or SampleSetupAttributeFullName
+            or SampleTeardownAttributeFullName;
     }
 
     public static bool HasBenchmarkAttribute(IMethodSymbol method)

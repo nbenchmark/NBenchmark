@@ -21,8 +21,8 @@ public sealed class RealWorkerTests
     /// </summary>
     private static MeasurementOptions FastOptions => MeasurementOptions.Default with
     {
-        Iterations = 24,
-        WarmupIterations = 2,
+        Samples = 24,
+        WarmupSamples = 2,
         OpsPerSample = 1,
         AutoTune = AutoTuneOptions.Default with
         {
@@ -41,7 +41,7 @@ public sealed class RealWorkerTests
     /// </summary>
     private static MeasurementOptions AutoStopOptions => FastOptions with
     {
-        Iterations = null,
+        Samples = null,
         AutoTune = FastOptions.AutoTune with { MinSamples = 8, MaxSamples = 32 },
     };
 
@@ -131,7 +131,7 @@ public sealed class RealWorkerTests
                 group.RawSamples[result.Name].Length > 0,
                 $"'{result.Name}' came back with no raw samples.");
 
-            Assert.True(result.Mean > 0);
+            Assert.True(result.MeanNs > 0);
 
             // Stamped by the worker from its own environment, so it describes the process that
             // actually did the measuring.
@@ -146,8 +146,8 @@ public sealed class RealWorkerTests
         var slow = group.Results.Single(r => r.Name.EndsWith(".Slow", StringComparison.Ordinal));
 
         Assert.True(
-            slow.Median > fast.Median * 2,
-            $"expected Slow to be clearly slower: Fast={fast.Median:F1}ns Slow={slow.Median:F1}ns");
+            slow.MedianNs > fast.MedianNs * 2,
+            $"expected Slow to be clearly slower: Fast={fast.MedianNs:F1}ns Slow={slow.MedianNs:F1}ns");
     }
 
     /// <summary>
@@ -242,7 +242,7 @@ public sealed class RealWorkerTests
             Options = FastOptions with
             {
                 RuntimeProfile = RuntimeProfile.SteadyState,
-                WarmupIterations = null,
+                WarmupSamples = null,
                 StreamSamples = true,
             },
         };
@@ -313,7 +313,7 @@ public sealed class RealWorkerTests
 
         Assert.Equal(MeasurementPhase.Measurement, detector.Phase);
         Assert.True(detector.SampleCount > 0);
-        Assert.True(detector.Mean > 0);
+        Assert.True(detector.MeanNs > 0);
 
         // The samples are not lost, only not live: the complete series still arrives with the result.
         Assert.NotEmpty(Assert.Single(group.RawSamples).Value);
@@ -393,7 +393,7 @@ public sealed class RealWorkerTests
 
         public Task OnSuiteStarting(IReadOnlyList<string> benchmarkNames, int total) => Record(nameof(OnSuiteStarting));
 
-        public Task OnWarmupStarting(string name, int totalWarmupIterations)
+        public Task OnWarmupStarting(string name, int totalWarmupSamples)
             => Record(ProgressCallback.WarmupStarting.ToString());
 
         public Task OnWarmupCompleted(string name) => Record(ProgressCallback.WarmupCompleted.ToString());
@@ -401,8 +401,8 @@ public sealed class RealWorkerTests
         public Task OnBenchmarkStarting(string name, int index, int total)
             => Record(ProgressCallback.BenchmarkStarting.ToString());
 
-        public Task OnIterationCompleted(string name, int iteration, int totalIterations)
-            => Record(ProgressCallback.IterationCompleted.ToString());
+        public Task OnSampleCompleted(string name, int sample, int totalSamples)
+            => Record(ProgressCallback.SampleCompleted.ToString());
 
         public Task OnBenchmarkCompleted(BenchmarkResult result) => Record(nameof(OnBenchmarkCompleted));
 
@@ -421,7 +421,7 @@ public sealed class RealWorkerTests
 
     /// <summary>
     ///     The sample cap applied across a real process boundary. A worker measures up to
-    ///     <see cref="MeasurementOptions.MaxIterations" /> samples and the whole array used to cross
+    ///     <see cref="MeasurementOptions.MaxSamplesLimit" /> samples and the whole array used to cross
     ///     on every result; it now sends a bounded representative subset.
     /// </summary>
     [Fact]
@@ -436,7 +436,7 @@ public sealed class RealWorkerTests
             Options = FastOptions with
             {
                 RuntimeProfile = RuntimeProfile.SteadyState,
-                Iterations = 400,
+                Samples = 400,
                 MaxRawSamples = 64,
             },
         };
@@ -467,7 +467,7 @@ public sealed class RealWorkerTests
             Options = FastOptions with
             {
                 RuntimeProfile = RuntimeProfile.SteadyState,
-                Iterations = 400,
+                Samples = 400,
                 MaxRawSamples = MeasurementOptions.UnboundedRawSamples,
             },
         };
@@ -499,7 +499,7 @@ public sealed class RealWorkerTests
             Options = FastOptions with
             {
                 RuntimeProfile = RuntimeProfile.SteadyState,
-                Iterations = 400,
+                Samples = 400,
                 MaxRawSamples = 64,
                 OutlierMode = OutlierMode.IqrFence,
             },
@@ -542,8 +542,8 @@ public sealed class RealWorkerTests
 
         var calibration = Assert.IsType<CalibrationResult>(group.Calibration);
 
-        Assert.True(calibration.Mean > 0);
-        Assert.True(calibration.Median > 0);
+        Assert.True(calibration.MeanNs > 0);
+        Assert.True(calibration.MedianNs > 0);
         Assert.NotEmpty(calibration.Samples);
     }
 

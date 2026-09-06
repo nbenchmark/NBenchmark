@@ -8,7 +8,7 @@ public sealed class MissingParameterlessConstructorAnalyzerTests
     public async Task Reports_class_without_parameterless_ctor()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class Bench
                    {
                        private readonly int _x;
@@ -25,7 +25,7 @@ public sealed class MissingParameterlessConstructorAnalyzerTests
     public async Task No_diagnostic_for_class_with_implicit_ctor()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class Bench
                    {
                        [Benchmark] public void M() { }
@@ -40,7 +40,7 @@ public sealed class MissingParameterlessConstructorAnalyzerTests
     public async Task No_diagnostic_for_class_with_explicit_parameterless_ctor()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class Bench
                    {
                        public Bench() { }
@@ -71,7 +71,7 @@ public sealed class MissingParameterlessConstructorAnalyzerTests
     public async Task No_diagnostic_for_abstract_class()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public abstract class Bench
                    {
                        protected Bench(int x) { }
@@ -87,7 +87,7 @@ public sealed class MissingParameterlessConstructorAnalyzerTests
     public async Task Reports_record_without_parameterless_ctor()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public record Bench(int X)
                    {
                        [Benchmark] public void M() { }
@@ -116,7 +116,7 @@ public sealed class MissingParameterlessConstructorAnalyzerTests
     public async Task No_diagnostic_for_derived_class_with_no_own_benchmarks()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public abstract class Base
                    {
                        [Benchmark] public void M() { }
@@ -135,7 +135,7 @@ public sealed class MissingParameterlessConstructorAnalyzerTests
     public async Task No_diagnostic_for_record_struct_with_primary_ctor()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public record struct Bench(int X)
                    {
                        [Benchmark] public void M() { }

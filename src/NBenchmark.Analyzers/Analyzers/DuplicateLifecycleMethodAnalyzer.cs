@@ -20,10 +20,10 @@ public sealed class DuplicateLifecycleMethodAnalyzer : DiagnosticAnalyzer
 
     private static readonly string[] LifecycleAttributeNames =
     [
-        "BenchmarkSetup",
-        "BenchmarkTeardown",
-        "BenchmarkIterationSetup",
-        "BenchmarkIterationTeardown",
+        "GlobalSetup",
+        "GlobalTeardown",
+        "SampleSetup",
+        "SampleTeardown",
     ];
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Rule];
@@ -58,7 +58,7 @@ public sealed class DuplicateLifecycleMethodAnalyzer : DiagnosticAnalyzer
 
         foreach (var attrName in LifecycleAttributeNames)
         {
-            var fullName = $"NBenchmark.Attributes.{attrName}Attribute";
+            var fullName = $"NBenchmark.{attrName}Attribute";
             var methodsWithAttr = new List<IMethodSymbol>();
 
             foreach (var member in cls.GetMembers().OfType<IMethodSymbol>())

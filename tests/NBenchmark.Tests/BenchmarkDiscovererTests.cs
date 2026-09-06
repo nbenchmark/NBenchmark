@@ -1,4 +1,4 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Discovery;
 using NBenchmark.Tests.ErrorFixtures;
 using Xunit;
@@ -129,13 +129,13 @@ public class BenchmarkDiscovererTests
         Assert.NotNull(suite.TeardownDelegate);
 
         var benchmark = suite.Benchmarks.First();
-        Assert.NotNull(benchmark.IterationSetupDelegate);
-        Assert.NotNull(benchmark.IterationTeardownDelegate);
+        Assert.NotNull(benchmark.SampleSetupDelegate);
+        Assert.NotNull(benchmark.SampleTeardownDelegate);
 
         var instance = new LifecycleBenchmarks();
         suite.SetupDelegate!(instance);
-        benchmark.IterationSetupDelegate!(instance);
-        benchmark.IterationTeardownDelegate!(instance);
+        benchmark.SampleSetupDelegate!(instance);
+        benchmark.SampleTeardownDelegate!(instance);
         suite.TeardownDelegate!(instance);
 
         Assert.Equal(1, instance.SetupCount);
@@ -436,7 +436,7 @@ public class BenchmarkDiscovererTests
     }
 }
 
-[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9)]
+[Runtimes("net8.0", "net9.0")]
 public class RuntimeAttributedBenchmarks
 {
     [Benchmark]
@@ -446,7 +446,7 @@ public class RuntimeAttributedBenchmarks
     public int B() => 2;
 }
 
-[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9)]
+[Runtimes("net8.0", "net9.0")]
 public class BaseRuntimeAttributedBenchmarks
 {
     [Benchmark]
@@ -459,14 +459,14 @@ public class DerivedRuntimeAttributedBenchmarks : BaseRuntimeAttributedBenchmark
     public int Declared() => 2;
 }
 
-[Runtimes(RuntimeMoniker.Net8, RuntimeMoniker.Net9)]
+[Runtimes("net8.0", "net9.0")]
 public class BaseOverridingRuntimeAttributedBenchmarks
 {
     [Benchmark]
     public int Inherited() => 1;
 }
 
-[Runtimes(RuntimeMoniker.Net10)]
+[Runtimes("net10.0")]
 public class OverridingRuntimeAttributedBenchmarks : BaseOverridingRuntimeAttributedBenchmarks
 {
     [Benchmark]
@@ -600,17 +600,17 @@ public class LifecycleBenchmarks
     public int SetupCount;
     public int TeardownCount;
 
-    [BenchmarkSetup]
+    [GlobalSetup]
     public void Setup() => SetupCount++;
 
-    [BenchmarkTeardown]
+    [GlobalTeardown]
     public void Teardown() => TeardownCount++;
 
-    [BenchmarkIterationSetup]
-    public void IterationSetup() => IterationSetupCount++;
+    [SampleSetup]
+    public void SampleSetup() => IterationSetupCount++;
 
-    [BenchmarkIterationTeardown]
-    public void IterationTeardown() => IterationTeardownCount++;
+    [SampleTeardown]
+    public void SampleTeardown() => IterationTeardownCount++;
 
     [Benchmark]
     public int Work() => 1;
@@ -643,16 +643,16 @@ internal static class InternalBenchmarksMarker
 
 public class ParametricBenchmarks
 {
-    [BenchmarkCase(100)]
-    [BenchmarkCase(1000)]
+    [Arguments(100)]
+    [Arguments(1000)]
     [Benchmark]
     public int Compute(int n) => n;
 
-    [BenchmarkCase("a", 3)]
+    [Arguments("a", 3)]
     [Benchmark]
     public string Concat(string value, int times) => string.Concat(Enumerable.Repeat(value, times));
 
-    [BenchmarkCases(nameof(MultiplyCases))]
+    [ArgumentsSource(nameof(MultiplyCases))]
     [Benchmark]
     public int Multiply(int a, int b) => a * b;
 
@@ -663,7 +663,7 @@ public class ParametricBenchmarks
         yield return (10, 20);
     }
 
-    [BenchmarkCases(nameof(DivideCases))]
+    [ArgumentsSource(nameof(DivideCases))]
     [Benchmark]
     public int Divide(int x, int y) => x / y;
 
@@ -676,7 +676,7 @@ public class ParametricBenchmarks
 
 public class UnnamedTupleCaseBenchmarks
 {
-    [BenchmarkCases(nameof(AddCases))]
+    [ArgumentsSource(nameof(AddCases))]
     [Benchmark]
     public int Add(int a, int b) => a + b;
 
@@ -689,12 +689,12 @@ public class UnnamedTupleCaseBenchmarks
 
 public class BaselineParametricBenchmarks
 {
-    [BenchmarkCase(10)]
-    [BenchmarkCase(100)]
+    [Arguments(10)]
+    [Arguments(100)]
     [Benchmark(Baseline = true)]
     public int Compute(int n) => n;
 
-    [BenchmarkCases(nameof(Sizes))]
+    [ArgumentsSource(nameof(Sizes))]
     [Benchmark(Baseline = true)]
     public int Multiply(int a, int b) => a * b;
 

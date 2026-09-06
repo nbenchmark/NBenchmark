@@ -261,10 +261,10 @@ internal static class IsolationAudit
         // The host side is keyed by name alone, so a cross-runtime run - where rows share a name and
         // differ only by moniker - would compare every runtime against one unlabelled host row. Guarded
         // here as well as at the call site, so no future caller can produce that table by accident.
-        if (isolated.Any(r => !string.IsNullOrEmpty(r.RuntimeMoniker)))
+        if (isolated.Any(r => !string.IsNullOrEmpty(r.TargetFramework)))
         {
             RefuseCrossRuntimeComparison(
-                isolated.Select(r => r.RuntimeMoniker).Where(m => !string.IsNullOrEmpty(m)).Distinct()!,
+                isolated.Select(r => r.TargetFramework).Where(m => !string.IsNullOrEmpty(m)).Distinct()!,
                 output);
 
             return;
@@ -280,22 +280,22 @@ internal static class IsolationAudit
 
             if (!reference.IsolationStatus.IsIsolated())
             {
-                rows.Add((reference.Name, "-", Format(host.Median), "not isolated", null));
+                rows.Add((reference.Name, "-", Format(host.MedianNs), "not isolated", null));
                 continue;
             }
 
-            if (reference.Errored || host.Errored || reference.Median <= 0)
+            if (reference.Errored || host.Errored || reference.MedianNs <= 0)
             {
-                rows.Add((reference.Name, Format(reference.Median), Format(host.Median), "-", null));
+                rows.Add((reference.Name, Format(reference.MedianNs), Format(host.MedianNs), "-", null));
                 continue;
             }
 
-            var ratio = host.Median / reference.Median;
+            var ratio = host.MedianNs / reference.MedianNs;
 
             rows.Add((
                 reference.Name,
-                Format(reference.Median),
-                Format(host.Median),
+                Format(reference.MedianNs),
+                Format(host.MedianNs),
                 ratio.ToString("0.00", CultureInfo.InvariantCulture) + "x",
 
                 // Distance from 1.0 in either direction: a host reading half the isolated one is

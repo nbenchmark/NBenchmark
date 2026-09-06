@@ -12,22 +12,22 @@ public sealed class IsolationAuditTests
         new()
         {
             Name = name,
-            Mean = median,
-            Median = median,
-            Min = median,
-            Max = median,
-            StandardDeviation = 0,
-            Q1 = median,
-            Q3 = median,
-            InterquartileRange = 0,
+            MeanNs = median,
+            MedianNs = median,
+            MinNs = median,
+            MaxNs = median,
+            StandardDeviationNs = 0,
+            Q1Ns = median,
+            Q3Ns = median,
+            InterquartileRangeNs = 0,
             OutliersRemoved = 0,
-            N = 30,
+            SampleCount = 30,
             Skewness = 0,
             Kurtosis = 0,
-            Mad = 0,
-            AllocMedian = null,
-            AllocP95 = null,
-            AllocMax = null,
+            MedianAbsoluteDeviationNs = 0,
+            AllocatedBytesMedian = null,
+            AllocatedBytesP95 = null,
+            AllocatedBytesMax = null,
             IsolationStatus = status,
         };
 
@@ -65,8 +65,8 @@ public sealed class IsolationAuditTests
 
         var isolated = new[]
         {
-            Result("Bench.Body", IsolationStatus.Isolated, 100) with { RuntimeMoniker = "net8.0" },
-            Result("Bench.Body", IsolationStatus.Isolated, 80) with { RuntimeMoniker = "net10.0" },
+            Result("Bench.Body", IsolationStatus.Isolated, 100) with { TargetFramework = "net8.0" },
+            Result("Bench.Body", IsolationStatus.Isolated, 80) with { TargetFramework = "net10.0" },
         };
 
         IsolationAudit.Render(

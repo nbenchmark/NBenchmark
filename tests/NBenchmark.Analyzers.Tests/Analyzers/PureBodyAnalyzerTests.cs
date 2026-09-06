@@ -9,7 +9,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task Reports_empty_body()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public void M() { }
@@ -24,7 +24,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task Reports_body_with_only_local_var()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public void M() { var x = 42; }
@@ -39,7 +39,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task Reports_body_with_empty_for_loop()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public void M() { for (var i = 0; i < 1000; i++) { } }
@@ -54,7 +54,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task Reports_diagnostic_when_incrementing_local()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public void M() { int x = 0; x++; }
@@ -70,7 +70,7 @@ public sealed class PureBodyAnalyzerTests
     {
         var code = """
                    using System;
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public void M() { Console.WriteLine("hi"); }
@@ -85,7 +85,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task No_diagnostic_when_assigning_field()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        private int _x;
                        [Benchmark]
@@ -101,7 +101,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task No_diagnostic_for_returning_method()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public int M() => 42;
@@ -116,7 +116,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task No_diagnostic_for_new_object()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public void M() { new object(); }
@@ -131,7 +131,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task No_diagnostic_for_expression_body_with_method_call()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        [Benchmark]
                        public void M() => System.Math.Sqrt(2);
@@ -149,7 +149,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task No_diagnostic_when_incrementing_field()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        private int _x;
                        [Benchmark]
@@ -165,7 +165,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task No_diagnostic_when_decrementing_field()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        private int _x;
                        [Benchmark]
@@ -181,7 +181,7 @@ public sealed class PureBodyAnalyzerTests
     public async Task No_diagnostic_when_incrementing_property()
     {
         var code = """
-                   using NBenchmark.Attributes;
+                   using NBenchmark;
                    public class C {
                        public int Counter { get; set; }
                        [Benchmark]

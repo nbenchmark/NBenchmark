@@ -14,9 +14,9 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
     private readonly Stopwatch _suiteStopwatch = new();
     private int _completedBenchmarks;
     private int _currentIndex;
-    private int _currentIteration;
+    private int _currentSample;
     private string _currentName = "";
-    private int _currentTotalIterations;
+    private int _currentTotalSamples;
     private bool _inWarmup;
     private int _pulse;
     private int _suiteTotal;
@@ -31,11 +31,11 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
         return Task.CompletedTask;
     }
 
-    public Task OnWarmupStarting(string name, int totalWarmupIterations)
+    public Task OnWarmupStarting(string name, int totalWarmupSamples)
     {
         _inWarmup = true;
-        _currentIteration = 0;
-        _currentTotalIterations = totalWarmupIterations;
+        _currentSample = 0;
+        _currentTotalSamples = totalWarmupSamples;
         RenderStatus();
         return Task.CompletedTask;
     }
@@ -51,16 +51,16 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
         _currentName = name;
         _currentIndex = index;
         _suiteTotal = total;
-        _currentIteration = 0;
+        _currentSample = 0;
         _pulse = 0;
         _benchmarkStopwatch.Restart();
         return Task.CompletedTask;
     }
 
-    public Task OnIterationCompleted(string name, int iteration, int totalIterations)
+    public Task OnSampleCompleted(string name, int sample, int totalSamples)
     {
-        _currentIteration = iteration;
-        _currentTotalIterations = totalIterations;
+        _currentSample = sample;
+        _currentTotalSamples = totalSamples;
         RenderStatus();
         return Task.CompletedTask;
     }
@@ -76,7 +76,7 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
 
         var timing = result.Errored
             ? result.ErrorMessage
-            : BenchmarkFormatter.FormatNs(result.Median);
+            : BenchmarkFormatter.FormatNs(result.MedianNs);
 
         var diagSuffix = "";
 
@@ -104,12 +104,12 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
     {
         var phase = _inWarmup ? "warmup" : "measuring";
 
-        if (_currentTotalIterations <= 0)
+        if (_currentTotalSamples <= 0)
         {
             // An auto-resolved count has no honest denominator, so show a moving indicator and the
             // live sample count instead of a fake percentage and ETA.
             var indeterminate = IndeterminateBar(20);
-            var count = _currentIteration > 0 ? $" ({_currentIteration} samples)" : "";
+            var count = _currentSample > 0 ? $" ({_currentSample} samples)" : "";
 
             Console.Write(
                 $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] {_currentName}  {indeterminate} {phase}{count}");
@@ -117,12 +117,12 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
             return;
         }
 
-        var pct = _currentTotalIterations > 0
-            ? (int)Math.Round(100.0 * _currentIteration / _currentTotalIterations)
+        var pct = _currentTotalSamples > 0
+            ? (int)Math.Round(100.0 * _currentSample / _currentTotalSamples)
             : 0;
 
         const int barWidth = 20;
-        var filled = (int)Math.Round(barWidth * _currentIteration / (double)Math.Max(1, _currentTotalIterations));
+        var filled = (int)Math.Round(barWidth * _currentSample / (double)Math.Max(1, _currentTotalSamples));
         filled = Math.Clamp(filled, 0, barWidth);
         var empty = barWidth - filled;
         var bar = $"{new string('\u2588', filled)}{new string('\u2591', empty)}";
@@ -131,7 +131,7 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
         var etaText = eta.HasValue ? $" ETA {FormatTimeSpan(eta.Value)}" : "";
 
         Console.Write(
-            $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] {_currentName}  {bar} {pct}% {phase} ({_currentIteration}/{_currentTotalIterations}){etaText}");
+            $"\r\x1b[2K  [{_currentIndex}/{_suiteTotal}] {_currentName}  {bar} {pct}% {phase} ({_currentSample}/{_currentTotalSamples}){etaText}");
     }
 
     private string IndeterminateBar(int width)
@@ -157,11 +157,11 @@ public sealed class DefaultConsoleProgress : IBenchmarkProgress
 
     private TimeSpan? ComputeEta()
     {
-        if (_currentIteration <= 0 || _currentTotalIterations <= 0)
+        if (_currentSample <= 0 || _currentTotalSamples <= 0)
             return null;
 
         var elapsed = _benchmarkStopwatch.Elapsed;
-        var remaining = elapsed / _currentIteration * (_currentTotalIterations - _currentIteration);
+        var remaining = elapsed / _currentSample * (_currentTotalSamples - _currentSample);
 
         return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }

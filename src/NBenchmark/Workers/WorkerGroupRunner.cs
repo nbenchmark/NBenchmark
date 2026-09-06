@@ -89,7 +89,7 @@ internal static class WorkerGroupRunner
                     {
                         Message = $"The measurement worker sent nothing for {idleTimeout.TotalSeconds:0.#}s and "
                                   + $"was stopped. The last thing it reported was that {lastActivity}. A worker "
-                                  + "goes quiet this long only when a benchmark body, a [BenchmarkSetup] or a "
+                                  + "goes quiet this long only when a benchmark body, a [GlobalSetup] or a "
                                   + "static initializer is blocked - on a lock, on I/O, or on an await that "
                                   + "never completes."
                                   + (host.StderrTail.Length == 0 ? "" : $" Worker stderr: {host.StderrTail}"),
@@ -284,7 +284,7 @@ internal static class WorkerGroupRunner
             ProgressCallback.WarmupStarting => $"'{payload.Name}' began warming up",
             ProgressCallback.WarmupCompleted => $"'{payload.Name}' finished warming up",
             ProgressCallback.BenchmarkStarting => $"'{payload.Name}' started",
-            ProgressCallback.IterationCompleted =>
+            ProgressCallback.SampleCompleted =>
                 $"'{payload.Name}' completed iteration {payload.Index}",
             _ => $"'{payload.Name}' reported {payload.Callback}",
         };
@@ -296,8 +296,8 @@ internal static class WorkerGroupRunner
             ProgressCallback.WarmupCompleted => progress.OnWarmupCompleted(payload.Name),
             ProgressCallback.BenchmarkStarting =>
                 progress.OnBenchmarkStarting(payload.Name, payload.Index, payload.Total),
-            ProgressCallback.IterationCompleted =>
-                progress.OnIterationCompleted(payload.Name, payload.Index, payload.Total),
+            ProgressCallback.SampleCompleted =>
+                progress.OnSampleCompleted(payload.Name, payload.Index, payload.Total),
             _ => Task.CompletedTask,
         };
 
@@ -390,7 +390,7 @@ internal static class WorkerGroupRunner
             payload.BenchmarkName,
             payload.Phase,
             payload.SampleCount,
-            payload.Mean,
+            payload.MeanNs,
             payload.StdDev,
             payload.CiHalfWidth,
             payload.CurrentK));
@@ -484,23 +484,23 @@ internal static class WorkerGroupRunner
     {
         Name = name,
         ClassName = className,
-        Mean = 0,
-        Median = 0,
+        MeanNs = 0,
+        MedianNs = 0,
         Percentiles = [],
-        Min = 0,
-        Max = 0,
-        StandardDeviation = 0,
-        Q1 = 0,
-        Q3 = 0,
-        InterquartileRange = 0,
+        MinNs = 0,
+        MaxNs = 0,
+        StandardDeviationNs = 0,
+        Q1Ns = 0,
+        Q3Ns = 0,
+        InterquartileRangeNs = 0,
         OutliersRemoved = 0,
-        N = 0,
+        SampleCount = 0,
         Skewness = 0,
         Kurtosis = 0,
-        Mad = 0,
-        AllocMedian = null,
-        AllocP95 = null,
-        AllocMax = null,
+        MedianAbsoluteDeviationNs = 0,
+        AllocatedBytesMedian = null,
+        AllocatedBytesP95 = null,
+        AllocatedBytesMax = null,
         Errored = true,
         ErrorMessage = message,
     };

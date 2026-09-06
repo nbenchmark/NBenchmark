@@ -38,9 +38,9 @@ public class StatsPipelineInterferenceTests
 
         Assert.Equal(0, withOccupancy.InterferenceRejectedCount);
         Assert.Equal(withoutOccupancy.OutliersRemoved, withOccupancy.OutliersRemoved);
-        Assert.Equal(withoutOccupancy.Stats.Mean, withOccupancy.Stats.Mean);
-        Assert.Equal(withoutOccupancy.Stats.MarginOfError, withOccupancy.Stats.MarginOfError);
-        Assert.Equal(withoutOccupancy.MeasuredIterations, withOccupancy.MeasuredIterations);
+        Assert.Equal(withoutOccupancy.Stats.MeanNs, withOccupancy.Stats.MeanNs);
+        Assert.Equal(withoutOccupancy.Stats.MarginOfErrorNs, withOccupancy.Stats.MarginOfErrorNs);
+        Assert.Equal(withoutOccupancy.SampleCount, withOccupancy.SampleCount);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class StatsPipelineInterferenceTests
             perSampleOccupancy: occupancy);
 
         Assert.Equal(1, result.InterferenceRejectedCount);
-        Assert.Equal(n - 1, result.MeasuredIterations);
+        Assert.Equal(n - 1, result.SampleCount);
         Assert.Equal(1, result.OutliersRemoved);
     }
 

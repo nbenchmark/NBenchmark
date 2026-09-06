@@ -3,8 +3,8 @@ NBenchmark.Integration.NUnit.PerformanceAssert
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ConfidenceLevel.get -> double
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ConfidenceLevel.init -> void
-NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Iterations.get -> int
-NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Iterations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Samples.get -> int
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.Samples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAbsoluteThresholdTolerance.get -> double
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAbsoluteThresholdTolerance.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.MaxAllocatedBytes.get -> long
@@ -24,15 +24,15 @@ NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ReferenceMethod.get -> 
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.ReferenceMethod.init -> void
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.RequireIsolation.get -> bool
 NBenchmark.Integration.NUnit.PerformanceAssertionOptions.RequireIsolation.init -> void
-NBenchmark.Integration.NUnit.PerformanceAssertionOptions.WarmupIterations.get -> int
-NBenchmark.Integration.NUnit.PerformanceAssertionOptions.WarmupIterations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.WarmupSamples.get -> int
+NBenchmark.Integration.NUnit.PerformanceAssertionOptions.WarmupSamples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute
 NBenchmark.Integration.NUnit.PerformanceAttribute.ApplyToTest(NUnit.Framework.Internal.Test! test) -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.BuildFrom(NUnit.Framework.Interfaces.IMethodInfo! method, NUnit.Framework.Internal.Test? suite) -> NUnit.Framework.Internal.TestMethod!
 NBenchmark.Integration.NUnit.PerformanceAttribute.ConfidenceLevel.get -> double
 NBenchmark.Integration.NUnit.PerformanceAttribute.ConfidenceLevel.init -> void
-NBenchmark.Integration.NUnit.PerformanceAttribute.Iterations.get -> int
-NBenchmark.Integration.NUnit.PerformanceAttribute.Iterations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.Samples.get -> int
+NBenchmark.Integration.NUnit.PerformanceAttribute.Samples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.LaunchCount.get -> int
 NBenchmark.Integration.NUnit.PerformanceAttribute.LaunchCount.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.MaxAbsoluteThresholdTolerance.get -> double
@@ -52,8 +52,8 @@ NBenchmark.Integration.NUnit.PerformanceAttribute.OutlierMode.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.PerformanceAttribute() -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.ReferenceMethod.get -> string?
 NBenchmark.Integration.NUnit.PerformanceAttribute.ReferenceMethod.init -> void
-NBenchmark.Integration.NUnit.PerformanceAttribute.WarmupIterations.get -> int
-NBenchmark.Integration.NUnit.PerformanceAttribute.WarmupIterations.init -> void
+NBenchmark.Integration.NUnit.PerformanceAttribute.WarmupSamples.get -> int
+NBenchmark.Integration.NUnit.PerformanceAttribute.WarmupSamples.init -> void
 NBenchmark.Integration.NUnit.PerformanceAttribute.Wrap(NUnit.Framework.Internal.Commands.TestCommand! command) -> NUnit.Framework.Internal.Commands.TestCommand!
 NBenchmark.Integration.NUnit.PerformanceCommand
 NBenchmark.Integration.NUnit.PerformanceCommand.PerformanceCommand(NUnit.Framework.Internal.Commands.TestCommand! innerCommand, NBenchmark.Integration.NUnit.PerformanceAttribute! attribute) -> void

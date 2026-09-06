@@ -22,8 +22,8 @@ public class BenchmarkStaticTests
         var result = Benchmark.Run(() => Thread.SpinWait(100),
             new MeasurementOptions
             {
-                WarmupIterations = 1,
-                Iterations = 10,
+                WarmupSamples = 1,
+                Samples = 10,
                 OutlierMode = OutlierMode.None,
                 Isolation = Isolation.Preferred,
                 // This test is about the sample count contract, not interference rejection - a
@@ -33,8 +33,8 @@ public class BenchmarkStaticTests
             });
 
         Assert.Equal("Benchmark", result.Name);
-        Assert.True(result.Median > 0);
-        Assert.Equal(10, result.MeasuredIterations);
+        Assert.True(result.MedianNs > 0);
+        Assert.Equal(10, result.SampleCount);
         Assert.False(result.Errored);
     }
 
@@ -46,9 +46,9 @@ public class BenchmarkStaticTests
                 Thread.SpinWait(10);
                 return 42;
             },
-            new MeasurementOptions { WarmupIterations = 1, Iterations = 10, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred });
+            new MeasurementOptions { WarmupSamples = 1, Samples = 10, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred });
 
-        Assert.True(result.Median > 0);
+        Assert.True(result.MedianNs > 0);
         Assert.False(result.Errored);
     }
 
@@ -56,10 +56,10 @@ public class BenchmarkStaticTests
     public async Task RunAsync_Executes_Async_Benchmark()
     {
         var result = await Benchmark.RunAsync(async () => { await Task.Delay(1); },
-            new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred });
+            new MeasurementOptions { WarmupSamples = 1, Samples = 5, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred });
 
         Assert.Equal("Benchmark", result.Name);
-        Assert.True(result.Median > 0);
+        Assert.True(result.MedianNs > 0);
         Assert.False(result.Errored);
     }
 
@@ -70,9 +70,9 @@ public class BenchmarkStaticTests
         {
             await Task.Yield();
             return 42;
-        }, new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred });
+        }, new MeasurementOptions { WarmupSamples = 1, Samples = 5, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred });
 
-        Assert.True(result.Median > 0);
+        Assert.True(result.MedianNs > 0);
         Assert.False(result.Errored);
     }
 
@@ -80,17 +80,17 @@ public class BenchmarkStaticTests
     public void RunRaw_Returns_RawSamples()
     {
         var outcome = Benchmark.RunRaw(() => Thread.SpinWait(100),
-            new MeasurementOptions { WarmupIterations = 1, Iterations = 20, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred });
+            new MeasurementOptions { WarmupSamples = 1, Samples = 20, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred });
 
         Assert.Equal(20, outcome.RawSamples.Length);
-        Assert.True(outcome.Result.Median > 0);
+        Assert.True(outcome.Result.MedianNs > 0);
     }
 
     [Fact]
     public void Run_With_Custom_Name()
     {
         var result = Benchmark.Run(() => Thread.SpinWait(100),
-            new MeasurementOptions { WarmupIterations = 1, Iterations = 5, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred },
+            new MeasurementOptions { WarmupSamples = 1, Samples = 5, OutlierMode = OutlierMode.None, Isolation = Isolation.Preferred },
             "CustomName");
 
         Assert.Equal("CustomName", result.Name);

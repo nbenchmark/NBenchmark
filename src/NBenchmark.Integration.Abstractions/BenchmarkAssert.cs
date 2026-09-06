@@ -63,11 +63,11 @@ public static class BenchmarkAssert
 
         if (thresholds.MaxMeanNs.HasValue)
         {
-            var verdict = RegressionTolerance.Evaluate(result.Mean, thresholds.MaxMeanNs.Value, toleranceMultiplier);
+            var verdict = RegressionTolerance.Evaluate(result.MeanNs, thresholds.MaxMeanNs.Value, toleranceMultiplier);
 
             if (verdict.ExceedsThreshold)
             {
-                var message = $"Mean {result.Mean:F2} ns exceeds maximum {thresholds.MaxMeanNs.Value:F2} ns";
+                var message = $"MeanNs {result.MeanNs:F2} ns exceeds maximum {thresholds.MaxMeanNs.Value:F2} ns";
 
                 if (verdict.Relaxed)
                     message += $" (relaxed to {verdict.EffectiveThreshold:F2} ns for shared-runner jitter tolerance)";
@@ -104,10 +104,10 @@ public static class BenchmarkAssert
         }
 
         if (thresholds.MaxAllocatedBytes.HasValue
-            && result.MeanAllocatedBytes.HasValue)
+            && result.AllocatedBytesMean.HasValue)
         {
             var verdict = RegressionTolerance.Evaluate(
-                result.MeanAllocatedBytes.Value,
+                result.AllocatedBytesMean.Value,
                 thresholds.MaxAllocatedBytes.Value,
                 toleranceMultiplier);
 
@@ -117,13 +117,13 @@ public static class BenchmarkAssert
                     ? long.MaxValue
                     : (long)verdict.EffectiveThreshold;
 
-                var message = $"Mean allocated bytes {result.MeanAllocatedBytes.Value} exceeds maximum " +
+                var message = $"Mean allocated bytes {result.AllocatedBytesMean.Value} exceeds maximum " +
                               $"{thresholds.MaxAllocatedBytes.Value}";
 
                 if (verdict.Relaxed)
                     message += $" (relaxed to {effectiveMax} for shared-runner jitter tolerance)";
 
-                message += $" (excess: {result.MeanAllocatedBytes.Value - effectiveMax})";
+                message += $" (excess: {result.AllocatedBytesMean.Value - effectiveMax})";
 
                 violations.Add(message);
             }

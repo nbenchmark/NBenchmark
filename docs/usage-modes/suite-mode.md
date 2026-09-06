@@ -54,7 +54,7 @@ suite.Add("name", async () => await ComputeAsync(input));
 
 ### Per-benchmark setup and teardown
 
-The optional `setup` and `teardown` callbacks run before and after **each iteration**:
+The optional `setup` and `teardown` callbacks run before and after **each sample**:
 
 ```csharp
 suite.Add(
@@ -76,7 +76,7 @@ Tag a benchmark with categories and filter the suite before running. For the ful
 var results = await new BenchmarkSuite("sorting")
     .Add("bubble", () => { }, categories: ["Classic"])
     .Add("linq", () => { }, categories: ["Modern"])
-    .WithCategoryFilter(include: ["Classic"])
+    .FilterCategories(include: ["Classic"])
     .WithReporter(new ConsoleReporter())
     .RunAsync();
 ```
@@ -110,8 +110,8 @@ await new BenchmarkSuite("name")
     .Add(...)
     .WithBaseline("name")           // Specifies the 1.00x reference benchmark
     .WithParameter("size", 10, 100) // Expands parameterized benchmarks across values
-    .WithIterations(200)            // Sets measured samples (default: auto)
-    .WithWarmup(25)                 // Sets warmup samples (default: auto)
+    .WithSamples(200)            // Sets measured samples (default: auto)
+    .WithWarmupSamples(25)                 // Sets warmup samples (default: auto)
     .WithLaunchCount(3)             // Repeats each benchmark 3 times as separate launches (default: 1)
     .WithAllocations()              // Enables allocation tracking
     .WithOutlierMode(OutlierMode.IqrFence)   // Default outlier mode
@@ -255,7 +255,7 @@ suite
 .WithProgress(new ConsoleBenchmarkProgress())
 ```
 
-Pass the same values you provide to `WithIterations` and `WithWarmup` to ensure the progress display is accurate.
+Pass the same values you provide to `WithSamples` and `WithWarmupSamples` to ensure the progress display is accurate.
 
 ## Return value
 
@@ -265,7 +265,7 @@ Pass the same values you provide to `WithIterations` and `WithWarmup` to ensure 
 var results = await suite.RunAsync();
 
 foreach (var result in results.Where(r => !r.Errored))
-    Console.WriteLine($"{result.Name}: {result.Median:F0} ns median");
+    Console.WriteLine($"{result.Name}: {result.MedianNs:F0} ns median");
 ```
 
 Errored benchmarks have `result.Errored == true` and a message in `result.ErrorMessage`. NBenchmark includes them in the list so reporters can display them.

@@ -26,7 +26,7 @@ await BenchmarkHarness.Create(args)
     .AddFromAssembly<MyBenchmarks>()
     .WithHardwareAffinity(2, 3)
     .WithProcessPriority(ProcessPriorityClass.High)
-    .WithDedicatedHostGuidance()
+    .WithHostQualityWarnings()
     .WithReporter(new ConsoleReporter())
     .RunAsync();
 ```
@@ -37,7 +37,7 @@ Use the following CLI invocation for a full CI run:
 dotnet run -c Release -- \
   --cpu-affinity 2,3 \
   --priority high \
-  --dedicated-host-guidance \
+  --host-quality-warnings \
   --launch-count 5 \
   --threshold-pct 10 \
   --reporter json --output ./benchmark-results
@@ -51,7 +51,7 @@ dotnet run -c Release -- \
 
 - **Process priority** (`--priority high`): This reduces preemption by unrelated OS tasks. If the runner denies the priority elevation (which is common on locked-down runners), the engine issues a warning, but the run proceeds at the priority allowed by the host. The priority is restored once the run completes.
 
-- **Dedicated-host guidance** (`--dedicated-host-guidance`): This is a non-fatal pre-run probe that warns you if the host appears noisy (e.g., low core count, unraisable priority, or macOS thermal/frequency scaling). It provides guidance rather than acting as a gate. For more information, see [Environment control](../features/environment-control.md).
+- **Dedicated-host guidance** (`--host-quality-warnings`): This is a non-fatal pre-run probe that warns you if the host appears noisy (e.g., low core count, unraisable priority, or macOS thermal/frequency scaling). It provides guidance rather than acting as a gate. For more information, see [Environment control](../features/environment-control.md).
 
 - **Launch count** (`--launch-count 5`): The engine runs each benchmark five times as independent launches and reports the cross-launch aggregation. On a contested host, per-launch medians will likely disagree. This disagreement is the "honest signal" that indicates noise is present. The reported number is the average across launches, the interval represents the spread between them, and significance is computed using samples pooled from all launches. For more information, see [Multiple launches](../features/multiple-launches.md).
 
@@ -75,7 +75,7 @@ On a CI runner, use the full noise-reduction stack:
 
 ```bash
 dotnet run -c Release -- \
-  --cpu-affinity 2,3 --priority high --dedicated-host-guidance \
+  --cpu-affinity 2,3 --priority high --host-quality-warnings \
   --launch-count 5 \
   --threshold-pct 10 \
   --reporter json --output ./benchmark-results
@@ -110,7 +110,7 @@ jobs:
           dotnet-version: '8.0.x'
       - run: dotnet build -c Release ./benchmarks/MyApp.Benchmarks.csproj
       - run: dotnet run --project ./benchmarks/MyApp.Benchmarks -c Release --no-build -- \
-          --cpu-affinity 2,3 --priority high --dedicated-host-guidance \
+          --cpu-affinity 2,3 --priority high --host-quality-warnings \
           --launch-count 5 --threshold-pct 10 \
           --reporter json --output ./benchmark-results
       - uses: actions/upload-artifact@v4
@@ -121,7 +121,7 @@ jobs:
 ```
 
 > [!TIP]
-> GitHub-hosted runners are shared-tenant VMs. You should expect `--dedicated-host-guidance` to warn about low effective isolation. For a publication-grade gate, use a self-hosted runner with `--cpu-affinity` on dedicated cores. If you prefer to embed thresholds in your unit tests instead of using `--threshold-pct`, use the `MaxAbsoluteThresholdTolerance` setting in the [test-integration packages](../test-integration/index.md).
+> GitHub-hosted runners are shared-tenant VMs. You should expect `--host-quality-warnings` to warn about low effective isolation. For a publication-grade gate, use a self-hosted runner with `--cpu-affinity` on dedicated cores. If you prefer to embed thresholds in your unit tests instead of using `--threshold-pct`, use the `MaxAbsoluteThresholdTolerance` setting in the [test-integration packages](../test-integration/index.md).
 
 ## Next steps
 

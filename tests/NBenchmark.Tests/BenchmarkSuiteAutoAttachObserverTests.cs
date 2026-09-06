@@ -21,8 +21,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
             .Add("b", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -42,8 +42,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
 
         var results = await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -61,8 +61,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -90,8 +90,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithObserver(programmatic)
             .RunAsync();
@@ -119,8 +119,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithObserver(programmatic)
             .RunAsync();
@@ -138,8 +138,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithObserver(programmatic)
             .RunAsync();
@@ -158,8 +158,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithObserver(explicitObserver)
             .RunAsync();
@@ -177,8 +177,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
 
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -194,8 +194,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
         await new BenchmarkSuite("suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
             .Add("b", () => { })
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -220,8 +220,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
             await new BenchmarkSuite("crashing-suite").WithIsolation(Isolation.Preferred)
                 .WithSuiteSetup(() => throw new InvalidOperationException("setup boom"))
                 .Add("a", () => { })
-                .WithWarmup(0)
-                .WithIterations(1)
+                .WithWarmupSamples(0)
+                .WithSamples(1)
                 .WithOutlierMode(OutlierMode.None)
                 .RunAsync();
         });
@@ -247,8 +247,8 @@ public class BenchmarkSuiteAutoAttachObserverTests : IDisposable
             await new BenchmarkSuite("crashing-suite").WithIsolation(Isolation.Preferred)
                 .WithSuiteSetup(() => throw new InvalidOperationException("setup boom"))
                 .Add("a", () => { })
-                .WithWarmup(0)
-                .WithIterations(1)
+                .WithWarmupSamples(0)
+                .WithSamples(1)
                 .WithOutlierMode(OutlierMode.None)
                 .RunAsync();
         });

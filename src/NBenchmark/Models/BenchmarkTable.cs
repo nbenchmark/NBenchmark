@@ -38,10 +38,10 @@ public sealed record BenchmarkTable
     ///     back out. Reporters format it; the model carries the value.
     /// </remarks>
     public required DateTimeOffset? RunAtUtc { get; init; }
-    public required int WarmupIterations { get; init; }
-    public required int MeasuredIterations { get; init; }
+    public required int WarmupSamples { get; init; }
+    public required int SampleCount { get; init; }
     public required double ConfidenceLevel { get; init; }
-    public required string OutlierDetector { get; init; }
+    public required string OutlierDetectorName { get; init; }
     public required TimeSpan TotalDuration { get; init; }
     public double SignificanceLevel { get; init; } = 0.05;
 
@@ -49,7 +49,7 @@ public sealed record BenchmarkTable
     public string SignificanceTestName { get; init; } = DefaultSignificanceTest.Instance.Name;
 
     /// <summary>The measurement profile under which the run was produced.</summary>
-    public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
+    public GcBehavior GcBehavior { get; init; } = GcBehavior.Natural;
 
     /// <summary>
     ///     The runtime-startup configuration these results were actually measured under, by name.
@@ -200,12 +200,12 @@ public sealed record BenchmarkTable
         // does - a single method swept across parameter values - rank the whole table against
         // its reference point so the Ratio column conveys the scaling factor across the sweep.
         var anyGroupComparison = groups.Any(g =>
-            g.GroupBy(r => r.RuntimeMoniker, StringComparer.Ordinal)
+            g.GroupBy(r => r.TargetFramework, StringComparer.Ordinal)
                 .Any(runtimeGroup => runtimeGroup.Count(r => !r.Errored) > 1));
 
         if (!anyGroupComparison)
         {
-            foreach (var runtimeGroup in results.GroupBy(r => r.RuntimeMoniker, StringComparer.Ordinal))
+            foreach (var runtimeGroup in results.GroupBy(r => r.TargetFramework, StringComparer.Ordinal))
             {
                 var runtimeResults = runtimeGroup.ToList();
                 var successful = runtimeResults.Where(r => !r.Errored).ToList();
@@ -222,7 +222,7 @@ public sealed record BenchmarkTable
                         : ComparisonGroup.PickBaseline(successful);
                 }
 
-                foreach (var result in runtimeResults.OrderBy(r => r.Median))
+                foreach (var result in runtimeResults.OrderBy(r => r.MedianNs))
                 {
                     rows.Add(BuildRow(
                         result,
@@ -238,14 +238,14 @@ public sealed record BenchmarkTable
 
         foreach (var group in groups)
         {
-            foreach (var runtimeGroup in group.GroupBy(r => r.RuntimeMoniker, StringComparer.Ordinal))
+            foreach (var runtimeGroup in group.GroupBy(r => r.TargetFramework, StringComparer.Ordinal))
             {
                 var runtimeResults = runtimeGroup.ToList();
                 var successful = runtimeResults.Where(r => !r.Errored).ToList();
                 var baseline = ComparisonGroup.PickBaseline(successful);
                 var multiBenchmark = successful.Count > 1;
 
-                foreach (var result in runtimeResults.OrderBy(r => r.Median))
+                foreach (var result in runtimeResults.OrderBy(r => r.MedianNs))
                 {
                     rows.Add(BuildRow(result, baseline, multiBenchmark, multiBenchmark));
                 }
@@ -272,7 +272,7 @@ public sealed record BenchmarkTable
 
     private static bool HasMultipleRuntimes(IReadOnlyList<BenchmarkResult> results)
         => results
-            .Select(r => r.RuntimeMoniker)
+            .Select(r => r.TargetFramework)
             .Distinct(StringComparer.Ordinal)
             .Take(2)
             .Count() > 1;
@@ -286,14 +286,14 @@ public sealed record BenchmarkTable
         {
             var rowsByRuntime = new List<BenchmarkRow>(results.Count);
 
-            foreach (var runtimeGroup in results.GroupBy(r => r.RuntimeMoniker, StringComparer.Ordinal))
+            foreach (var runtimeGroup in results.GroupBy(r => r.TargetFramework, StringComparer.Ordinal))
             {
                 var runtimeResults = runtimeGroup.ToList();
                 var successful = runtimeResults.Where(r => !r.Errored).ToList();
                 var runtimeBaseline = ComparisonGroup.PickBaseline(successful);
                 var runtimeMultiBenchmark = runtimeResults.Count > 1;
 
-                foreach (var result in runtimeResults.OrderBy(r => r.Median))
+                foreach (var result in runtimeResults.OrderBy(r => r.MedianNs))
                 {
                     rowsByRuntime.Add(BuildRow(result, runtimeBaseline, runtimeMultiBenchmark));
                 }
@@ -303,7 +303,7 @@ public sealed record BenchmarkTable
         }
 
         var rows = results
-            .OrderBy(r => r.Median)
+            .OrderBy(r => r.MedianNs)
             .Select(r => BuildRow(r, baseline, multiBenchmark))
             .ToList();
 
@@ -323,14 +323,14 @@ public sealed record BenchmarkTable
             CrossClass = CrossClassMode,
             ParameterNames = parameterNames,
             RunAtUtc = headerSource?.RunAtUtc,
-            WarmupIterations = headerSource?.WarmupIterations ?? 0,
-            MeasuredIterations = headerSource?.MeasuredIterations ?? 0,
+            WarmupSamples = headerSource?.WarmupSamples ?? 0,
+            SampleCount = headerSource?.SampleCount ?? 0,
             ConfidenceLevel = headerSource?.ConfidenceLevel ?? 0.95,
-            OutlierDetector = results.FirstOrDefault()?.OutlierDetector ?? OutlierDetectors.IqrFence.Name,
+            OutlierDetectorName = results.FirstOrDefault()?.OutlierDetectorName ?? OutlierDetectors.IqrFence.Name,
             TotalDuration = results.Aggregate(TimeSpan.Zero, (a, r) => a + r.TotalDuration),
             SignificanceLevel = headerSource?.SignificanceLevel ?? 0.05,
             SignificanceTestName = headerSource?.SignificanceTestName ?? DefaultSignificanceTest.Instance.Name,
-            Profile = results.FirstOrDefault()?.Profile ?? MeasurementProfile.Realistic,
+            GcBehavior = results.FirstOrDefault()?.GcBehavior ?? GcBehavior.Natural,
             RuntimeProfileName = results.FirstOrDefault()?.RuntimeProfileName ?? RuntimeProfile.Host.Name,
             RuntimeKnobs = results.FirstOrDefault()?.RuntimeKnobs ?? "",
             MixedRuntimeProfiles = results
@@ -421,10 +421,10 @@ public sealed record BenchmarkTable
 
     private static double ComputeRatio(BenchmarkResult result, BenchmarkResult? baseline)
     {
-        if (result.Errored || baseline is null || baseline.Median == 0)
+        if (result.Errored || baseline is null || baseline.MedianNs == 0)
             return double.NaN;
 
-        return result.Median / baseline.Median;
+        return result.MedianNs / baseline.MedianNs;
     }
 
     private static string ComputeSignificanceLabel(BenchmarkResult result, bool multiBenchmark)
@@ -442,7 +442,7 @@ public sealed record BenchmarkTable
 
         var lines = new List<string>();
 
-        lines.Add($"Iterations: {row.Result.N} measured (warmup: {row.Result.WarmupIterations}, pre-trim: {row.Result.N + row.Result.OutliersRemoved})");
+        lines.Add($"Samples: {row.Result.SampleCount} measured (warmup: {row.Result.WarmupSamples}, pre-trim: {row.Result.SampleCount + row.Result.OutliersRemoved})");
 
         if (row.Result.OutliersRemoved > 0)
         {
@@ -450,18 +450,18 @@ public sealed record BenchmarkTable
             lines.Add($"Outliers: {row.Result.OutliersRemoved} {label} removed");
         }
 
-        lines.Add($"Range: {BenchmarkFormatter.FormatNs(row.Result.Range)} ({BenchmarkFormatter.FormatNs(row.Result.Min)} -> {BenchmarkFormatter.FormatNs(row.Result.Max)})");
+        lines.Add($"Range: {BenchmarkFormatter.FormatNs(row.Result.RangeNs)} ({BenchmarkFormatter.FormatNs(row.Result.MinNs)} -> {BenchmarkFormatter.FormatNs(row.Result.MaxNs)})");
 
         lines.Add(
-            $"Quartiles: Q1 = {BenchmarkFormatter.FormatNs(row.Result.Q1)}, Q3 = {BenchmarkFormatter.FormatNs(row.Result.Q3)}, IQR = {BenchmarkFormatter.FormatNs(row.Result.InterquartileRange)}");
+            $"Quartiles: Q1 = {BenchmarkFormatter.FormatNs(row.Result.Q1Ns)}, Q3 = {BenchmarkFormatter.FormatNs(row.Result.Q3Ns)}, IQR = {BenchmarkFormatter.FormatNs(row.Result.InterquartileRangeNs)}");
 
-        if (row.Result.LowerFence is not null && row.Result.UpperFence is not null)
-            lines.Add($"Fences: [{BenchmarkFormatter.FormatNs(row.Result.LowerFence.Value)}; {BenchmarkFormatter.FormatNs(row.Result.UpperFence.Value)}]");
+        if (row.Result.LowerFenceNs is not null && row.Result.UpperFenceNs is not null)
+            lines.Add($"Fences: [{BenchmarkFormatter.FormatNs(row.Result.LowerFenceNs.Value)}; {BenchmarkFormatter.FormatNs(row.Result.UpperFenceNs.Value)}]");
 
         lines.Add(
-            $"CI: [{BenchmarkFormatter.FormatNs(row.Result.ConfidenceIntervalLower)}; {BenchmarkFormatter.FormatNs(row.Result.ConfidenceIntervalUpper)}] (CI {row.Result.ConfidenceLevel * 100:F1}%)");
+            $"CI: [{BenchmarkFormatter.FormatNs(row.Result.ConfidenceIntervalLowerNs)}; {BenchmarkFormatter.FormatNs(row.Result.ConfidenceIntervalUpperNs)}] (CI {row.Result.ConfidenceLevel * 100:F1}%)");
 
-        if (row.Result.MedianCiLower is { } medianLower && row.Result.MedianCiUpper is { } medianUpper)
+        if (row.Result.MedianConfidenceIntervalLowerNs is { } medianLower && row.Result.MedianConfidenceIntervalUpperNs is { } medianUpper)
         {
             // With more than one launch this interval is the between-launch reproducibility
             // interval (the Student-t band over the k launch medians); with one launch it is the
@@ -477,7 +477,7 @@ public sealed record BenchmarkTable
                 + $"({source}, CI {row.Result.ConfidenceLevel * 100:F1}%)");
         }
 
-        lines.Add($"Margin: ±{BenchmarkFormatter.FormatNs(row.Result.MarginOfError)} ({row.Result.MarginPercent:F2}% of Mean)");
+        lines.Add($"Margin: ±{BenchmarkFormatter.FormatNs(row.Result.MarginOfErrorNs)} ({row.Result.MarginOfErrorPercent:F2}% of mean)");
 
         if (row.RatioEstimate is { } ratio)
         {
@@ -507,13 +507,13 @@ public sealed record BenchmarkTable
 
         lines.Add($"CV: {row.Result.CoefficientOfVariation:F4} ({row.Result.CoefficientOfVariationPercent:F2}%)");
 
-        var skewSuffix = row.Result.N < 3 ? " (n too small)" : "";
+        var skewSuffix = row.Result.SampleCount < 3 ? " (n too small)" : "";
         lines.Add($"Skewness: {row.Result.Skewness:F4}{skewSuffix}");
 
-        var kurtSuffix = row.Result.N < 4 ? " (n too small)" : "";
+        var kurtSuffix = row.Result.SampleCount < 4 ? " (n too small)" : "";
         lines.Add($"Kurtosis: {row.Result.Kurtosis:F4}{kurtSuffix}");
 
-        lines.Add($"MAD: {BenchmarkFormatter.FormatNs(row.Result.Mad)}");
+        lines.Add($"MAD: {BenchmarkFormatter.FormatNs(row.Result.MedianAbsoluteDeviationNs)}");
 
         if (row.Result.Percentiles.Count > 0)
         {
@@ -556,14 +556,14 @@ public sealed record BenchmarkTable
         if (row.Result.MedianShift is { } shift)
             lines.Add($"Median shift (Hodges-Lehmann): {FormatShift(shift)}");
 
-        if (row.Result.AllocMedian is not null)
+        if (row.Result.AllocatedBytesMedian is not null)
         {
             lines.Add("");
             lines.Add("Allocations:");
-            lines.Add($"  Mean: {BenchmarkFormatter.FormatAlloc(row.Result.MeanAllocatedBytes ?? 0)}");
-            lines.Add($"  P50:  {BenchmarkFormatter.FormatAlloc(row.Result.AllocMedian.Value)}");
-            lines.Add($"  P95:  {BenchmarkFormatter.FormatAlloc(row.Result.AllocP95 ?? 0)}");
-            lines.Add($"  Max:  {BenchmarkFormatter.FormatAlloc(row.Result.AllocMax ?? 0)}");
+            lines.Add($"  Mean: {BenchmarkFormatter.FormatAlloc(row.Result.AllocatedBytesMean ?? 0)}");
+            lines.Add($"  P50:  {BenchmarkFormatter.FormatAlloc(row.Result.AllocatedBytesMedian.Value)}");
+            lines.Add($"  P95:  {BenchmarkFormatter.FormatAlloc(row.Result.AllocatedBytesP95 ?? 0)}");
+            lines.Add($"  Max:  {BenchmarkFormatter.FormatAlloc(row.Result.AllocatedBytesMax ?? 0)}");
         }
 
         if (row.Result.Diagnostics is { } diag)

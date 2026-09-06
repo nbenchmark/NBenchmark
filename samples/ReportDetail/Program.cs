@@ -6,7 +6,7 @@ using NBenchmark.Reporters.Console;
 // average developer who just wants "is A faster than B?"
 //
 // Measurement is pinned (OpsPerSample=1 disables ops-per-sample auto-calibration,
-// so each run times the same K body invocations per sample; warmup 25 / iterations
+// so each run times the same K body invocations per sample; warmup 25 / samples
 // 500 give the JIT time to settle and tighten the confidence interval). Only the
 // reporter rendering differs across the three runs.
 await new BenchmarkSuite("sorting-simple")
@@ -17,7 +17,7 @@ await new BenchmarkSuite("sorting-simple")
     })
     .Add("linq", () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
-    .WithWarmup(25).WithIterations(500).WithOpsPerSample(1)
+    .WithWarmupSamples(25).WithSamples(500).WithOpsPerSample(1)
     .WithDetail(ReportDetail.Simple)
     .WithReporter(new ConsoleReporter())
     .RunAsync();
@@ -38,7 +38,7 @@ await new BenchmarkSuite("sorting-standard")
     })
     .Add("linq", () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
-    .WithWarmup(25).WithIterations(500).WithOpsPerSample(1)
+    .WithWarmupSamples(25).WithSamples(500).WithOpsPerSample(1)
     .WithDetail(ReportDetail.Standard)
     .WithReporter(new ConsoleReporter())
     .RunAsync();
@@ -56,7 +56,7 @@ await new BenchmarkSuite("sorting-advanced")
     })
     .Add("linq", () => { _ = Enumerable.Range(0, 100).Reverse().OrderBy(x => x).ToArray(); })
     .WithBaseline("bubble")
-    .WithWarmup(25).WithIterations(500).WithOpsPerSample(1)
+    .WithWarmupSamples(25).WithSamples(500).WithOpsPerSample(1)
     .WithDetail(ReportDetail.Advanced)
     .WithReporter(new ConsoleReporter())
     .RunAsync();

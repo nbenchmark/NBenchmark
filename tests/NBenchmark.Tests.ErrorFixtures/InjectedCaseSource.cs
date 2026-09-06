@@ -1,10 +1,10 @@
-using NBenchmark.Attributes;
+using NBenchmark;
 
 namespace NBenchmark.Tests.ErrorFixtures;
 
 /// <summary>
 ///     A class whose instances could only come from a container, with an <b>instance</b>
-///     <c>[BenchmarkCases]</c> source.
+///     <c>[ArgumentsSource]</c> source.
 /// </summary>
 /// <remarks>
 ///     Case values decide how many benchmarks there are, so discovery needs them before any instance
@@ -18,7 +18,7 @@ namespace NBenchmark.Tests.ErrorFixtures;
 /// </remarks>
 public class InjectedCaseSourceBenchmarks(int scale)
 {
-    [BenchmarkCases(nameof(Cases))]
+    [ArgumentsSource(nameof(Cases))]
     [Benchmark]
     public int Compute(int n) => n * scale;
 

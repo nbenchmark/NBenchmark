@@ -2,7 +2,7 @@ namespace NBenchmark.Stats;
 
 /// <summary>
 ///     Bridges the engine to an <see cref="IOutlierDetector" />: it computes the quartile
-///     descriptive statistics (Q1/Q3/IQR) that every report shows - independent of the
+///     descriptive statistics (Q1Ns/Q3Ns/IQR) that every report shows - independent of the
 ///     trimming strategy - and delegates the keep/discard decision to the detector.
 /// </summary>
 /// <remarks>
@@ -32,7 +32,7 @@ internal static class OutlierTrim
         TrimDetailed(timings, OutlierDetectors.ForMode(mode));
 
     /// <summary>
-    ///     Computes Q1/Q3/IQR over <paramref name="timings" />, delegates the keep/discard
+    ///     Computes Q1Ns/Q3Ns/IQR over <paramref name="timings" />, delegates the keep/discard
     ///     decision to <paramref name="detector" />, and returns the kept and discarded
     ///     samples plus the fence boundaries and the original ordinals of every discarded
     ///     sample.
@@ -85,8 +85,8 @@ internal static class OutlierTrim
             q1,
             q3,
             iqr,
-            classification.LowerFence,
-            classification.UpperFence,
+            classification.LowerFenceNs,
+            classification.UpperFenceNs,
             trimmedOrdinals,
             sorted);
     }
@@ -140,11 +140,11 @@ internal static class OutlierTrim
 /// </summary>
 /// <param name="Kept">Inlier samples to feed into the statistics summary, sorted ascending.</param>
 /// <param name="Discarded">Outlier samples rejected by the detector, sorted ascending.</param>
-/// <param name="Q1">First quartile of the full (pre-trim) sample set.</param>
-/// <param name="Q3">Third quartile of the full (pre-trim) sample set.</param>
-/// <param name="InterquartileRange"><paramref name="Q3" /> - <paramref name="Q1" />.</param>
-/// <param name="LowerFence">Lower rejection boundary when the detector is fence-based; otherwise <c>null</c>.</param>
-/// <param name="UpperFence">Upper rejection boundary when the detector is fence-based; otherwise <c>null</c>.</param>
+/// <param name="Q1Ns">First quartile of the full (pre-trim) sample set.</param>
+/// <param name="Q3Ns">Third quartile of the full (pre-trim) sample set.</param>
+/// <param name="InterquartileRangeNs"><paramref name="Q3Ns" /> - <paramref name="Q1Ns" />.</param>
+/// <param name="LowerFenceNs">Lower rejection boundary when the detector is fence-based; otherwise <c>null</c>.</param>
+/// <param name="UpperFenceNs">Upper rejection boundary when the detector is fence-based; otherwise <c>null</c>.</param>
 /// <param name="TrimmedOrdinals">
 ///     Positions in the original input array of every sample in <paramref name="Discarded" />,
 ///     in the same order as <paramref name="Discarded" /> (sorted ascending by value). Empty
@@ -159,10 +159,10 @@ internal static class OutlierTrim
 public readonly record struct TrimResult(
     double[] Kept,
     double[] Discarded,
-    double Q1,
-    double Q3,
-    double InterquartileRange,
-    double? LowerFence,
-    double? UpperFence,
+    double Q1Ns,
+    double Q3Ns,
+    double InterquartileRangeNs,
+    double? LowerFenceNs,
+    double? UpperFenceNs,
     int[] TrimmedOrdinals,
     double[] SortedAll);

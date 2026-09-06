@@ -42,14 +42,14 @@ internal static class SingleBodyRunner
         Func<Task<MeasurementOutcome>> measureInProcess,
         CancellationToken cancellationToken,
         IReadOnlyList<StateRecipe?>? recipes = null,
-        Delegate? iterationSetup = null,
-        Delegate? iterationTeardown = null)
+        Delegate? sampleSetup = null,
+        Delegate? sampleTeardown = null)
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(measureInProcess);
 
         if (!TryPlan(
-                body, name, options, recipes, iterationSetup, iterationTeardown,
+                body, name, options, recipes, sampleSetup, sampleTeardown,
                 out var bodyRef, out var receivers, out var status, out var refusal))
         {
             IsolationAudit.ThrowIfRequired(options, name, status, refusal);
@@ -136,8 +136,8 @@ internal static class SingleBodyRunner
         string name,
         MeasurementOptions options,
         IReadOnlyList<StateRecipe?>? recipes,
-        Delegate? iterationSetup,
-        Delegate? iterationTeardown,
+        Delegate? sampleSetup,
+        Delegate? sampleTeardown,
         out BodyRef bodyRef,
         out ReceiverTable? receiverTable,
         out IsolationStatus status,
@@ -202,14 +202,14 @@ internal static class SingleBodyRunner
         // belongs to bind to one object rather than to a copy each. A hook that cannot cross costs the
         // benchmark its isolation rather than being dropped: a body measured without its setup reports
         // a plausible number for work that never happened.
-        if (!TryAddressHook(iterationSetup, name, "setup", receivers, out var setupRef, out status, out refusal)
+        if (!TryAddressHook(sampleSetup, name, "setup", receivers, out var setupRef, out status, out refusal)
             || !TryAddressHook(
-                iterationTeardown, name, "teardown", receivers, out var teardownRef, out status, out refusal))
+                sampleTeardown, name, "teardown", receivers, out var teardownRef, out status, out refusal))
         {
             return false;
         }
 
-        bodyRef = bodyRef with { IterationSetup = setupRef, IterationTeardown = teardownRef };
+        bodyRef = bodyRef with { SampleSetup = setupRef, SampleTeardown = teardownRef };
 
         receiverTable = receivers;
         status = IsolationStatus.Isolated;

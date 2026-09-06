@@ -2,13 +2,13 @@ namespace NBenchmark.Stats;
 
 internal sealed class StatsSummary
 {
-    public double Mean { get; init; }
-    public double Median { get; init; }
+    public double MeanNs { get; init; }
+    public double MedianNs { get; init; }
     public IReadOnlyList<PercentileEntry> Percentiles { get; init; } = [];
     public LatencyHistogram? Histogram { get; init; }
-    public double Min { get; init; }
-    public double Max { get; init; }
-    public double StandardDeviation { get; init; }
+    public double MinNs { get; init; }
+    public double MaxNs { get; init; }
+    public double StandardDeviationNs { get; init; }
 
     /// <summary>
     ///     Standard error of the mean. <c>s / sqrt(n)</c> on an untrimmed set; the Winsorized (Yuen)
@@ -16,14 +16,14 @@ internal sealed class StatsSummary
     ///     variance the fence discarded is accounted for rather than dropped. See
     ///     <see cref="WinsorizedError" />.
     /// </summary>
-    public double StandardError { get; init; }
+    public double StandardErrorNs { get; init; }
 
     /// <summary>
-    ///     Half-width of the confidence interval on the mean: <c>t* × StandardError</c>, read on
+    ///     Half-width of the confidence interval on the mean: <c>t* × StandardErrorNs</c>, read on
     ///     <c>n - 1</c> degrees of freedom on an untrimmed set and on <c>h - 1</c> when trimming
-    ///     removed samples. See <see cref="StandardError" />.
+    ///     removed samples. See <see cref="StandardErrorNs" />.
     /// </summary>
-    public double MarginOfError { get; init; }
+    public double MarginOfErrorNs { get; init; }
 
     public double ConfidenceLevel { get; init; }
 
@@ -31,18 +31,18 @@ internal sealed class StatsSummary
 
     public double Skewness { get; init; }
     public double Kurtosis { get; init; }
-    public double Mad { get; init; }
+    public double MedianAbsoluteDeviationNs { get; init; }
 
     /// <summary>
     ///     Lower bound of the distribution-free confidence interval on the median (order-statistic
     ///     interval at <see cref="ConfidenceLevel" />). <c>null</c> when it is undefined (fewer than
-    ///     two samples). Computed on the same set as <see cref="Median" /> (the central,
+    ///     two samples). Computed on the same set as <see cref="MedianNs" /> (the central,
     ///     trimmed set).
     /// </summary>
-    public double? MedianCiLower { get; init; }
+    public double? MedianConfidenceIntervalLowerNs { get; init; }
 
-    /// <summary>Upper bound of the median confidence interval. <c>null</c> when undefined. See <see cref="MedianCiLower" />.</summary>
-    public double? MedianCiUpper { get; init; }
+    /// <summary>Upper bound of the median confidence interval. <c>null</c> when undefined. See <see cref="MedianConfidenceIntervalLowerNs" />.</summary>
+    public double? MedianConfidenceIntervalUpperNs { get; init; }
 
     /// <summary>
     ///     Computes the full descriptive-statistics summary for <paramref name="samples" />.
@@ -60,7 +60,7 @@ internal sealed class StatsSummary
     ///     </para>
     ///     <para>
     ///         When <paramref name="trim" /> is supplied and describes a set that actually lost
-    ///         samples, <see cref="StandardError" /> and <see cref="MarginOfError" /> are the
+    ///         samples, <see cref="StandardErrorNs" /> and <see cref="MarginOfErrorNs" /> are the
     ///         Winsorized (Yuen) ones - see <see cref="WinsorizedError" /> - so the interval accounts
     ///         for the variance trimming removed instead of reporting the precision of a run that
     ///         happened to produce only the inliers. Every other statistic is unaffected. Omitting
@@ -154,8 +154,8 @@ internal sealed class StatsSummary
         if (trim is { IsTrimmed: true } context
             && WinsorizedError.Compute(context, confidenceLevel) is { } winsorized)
         {
-            standardError = winsorized.StandardError;
-            marginOfError = winsorized.MarginOfError;
+            standardError = winsorized.StandardErrorNs;
+            marginOfError = winsorized.MarginOfErrorNs;
         }
 
         var cv = mean != 0 ? sampleStdDev / mean : 0.0;
@@ -169,7 +169,7 @@ internal sealed class StatsSummary
               - 3.0 * (n - 1.0) * (n - 1.0) / ((n - 2.0) * (n - 3.0))
             : 0.0;
 
-        var mad = ComputeMad(samples);
+        var medianAbsoluteDeviation = ComputeMad(samples);
 
         // Order statistics describe the distribution's shape, so they read from the tail source
         // (the full pre-trim set by default). The central statistics above stay on the trimmed
@@ -180,22 +180,22 @@ internal sealed class StatsSummary
 
         return new StatsSummary
         {
-            Mean = mean,
-            Median = Percentile.Compute(samples, 0.50),
+            MeanNs = mean,
+            MedianNs = Percentile.Compute(samples, 0.50),
             Percentiles = percentiles,
             Histogram = histogram,
-            Min = tail[0],
-            Max = tail[^1],
-            StandardDeviation = sampleStdDev,
-            StandardError = standardError,
-            MarginOfError = marginOfError,
+            MinNs = tail[0],
+            MaxNs = tail[^1],
+            StandardDeviationNs = sampleStdDev,
+            StandardErrorNs = standardError,
+            MarginOfErrorNs = marginOfError,
             ConfidenceLevel = confidenceLevel,
             CoefficientOfVariation = cv,
             Skewness = skewness,
             Kurtosis = kurtosis,
-            Mad = mad,
-            MedianCiLower = medianCi?.Lower,
-            MedianCiUpper = medianCi?.Upper,
+            MedianAbsoluteDeviationNs = medianAbsoluteDeviation,
+            MedianConfidenceIntervalLowerNs = medianCi?.Lower,
+            MedianConfidenceIntervalUpperNs = medianCi?.Upper,
         };
     }
 
@@ -276,9 +276,9 @@ internal sealed class StatsSummary
         }
 
         Array.Sort(absDiffs);
-        var mad = Percentile.Compute(absDiffs, 0.50);
+        var medianAbsoluteDeviation = Percentile.Compute(absDiffs, 0.50);
 
-        return mad * 1.4826;
+        return medianAbsoluteDeviation * 1.4826;
     }
 
     public static AllocationStats ComputeAllocations(long[]? samples)

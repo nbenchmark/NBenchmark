@@ -112,7 +112,7 @@ public void OptimizedParse() => OptimizedParser.Parse(Payload);
 private static void NaiveParse() => NaiveParser.Parse(Payload);
 ```
 
-The reference method can be private. It uses the same measurement options as the candidate (iterations, warmup, outlier mode, and confidence level) to ensure an apples-to-apples comparison. For example, if the candidate uses `Iterations = 300`, the reference also runs 300 iterations. The total wall-clock cost for the test is the combined duration of the candidate and the reference.
+The reference method can be private. It uses the same measurement options as the candidate (samples, warmup, outlier mode, and confidence level) to ensure an apples-to-apples comparison. For example, if the candidate uses `Samples = 300`, the reference also runs 300 samples. The total wall-clock cost for the test is the combined duration of the candidate and the reference.
 
 The candidate and its reference are measured co-resident in one worker process per replicate. This ensures their ratio excludes the worker's core draw, thermal state, and address-space layout. This pairing is why the pair is handled as a single measurement request.
 
@@ -141,7 +141,7 @@ The following table shows how the gate changes when an interval exists:
 | Ratio gated on | Candidate mean / reference mean | Geometric mean of per-launch ratios |
 | "Is the difference real?" | Mann-Whitney U on pooled samples | Does the interval exclude `1.00x`? |
 | Worker launches | One | One per replicate (pair shares each) |
-| Test output | Mean, P95, allocations, iterations | Above, plus a `Launches:` line with the run-to-run spread |
+| Test output | mean, P95, allocations, samples | Above, plus a `Launches:` line with the run-to-run spread |
 
 Although NBenchmark still computes and reports the p-value for `LaunchCount >= 2`, the gate no longer relies on it. Pooling samples across launches increases statistical power without improving reproducibility; a difference far below the run-to-run noise can appear overwhelmingly significant. A gate must survive the interval over per-replicate ratios. For more information, see [ratios: when sig and the ratio interval disagree](../statistics/ratios.md#when-sig-and-the-ratio-interval-disagree).
 
@@ -164,8 +164,8 @@ All three integration packages share the same threshold properties. A value of `
 | `MaxAllocatedBytes` | `long` | -1 (disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
 | `MaxSlowdownRatio` | `double` | 0 (disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g., `5.0` = 5$\times$ the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
 | `ReferenceMethod` | `string?` | null | Name of a method on the same class to use as the reference. When null, calibration mode runs. |
-| `Iterations` | `int` | 0 (default) | Number of measured samples. `0` uses the framework default. |
-| `WarmupIterations` | `int` | 0 (default) | Number of warmup samples. `0` uses the framework default. |
+| `Samples` | `int` | 0 (default) | Number of measured samples. `0` uses the framework default. |
+| `WarmupSamples` | `int` | 0 (default) | Number of warmup samples. `0` uses the framework default. |
 | `MeasureAllocations` | `bool` | false | Enable allocation tracking. Automatically enabled when `MaxAllocatedBytes` is set. |
 | `RequireIsolation` | `bool` | **true** | Fails the test if the measurement occurs in the test host rather than a worker process. Opt out with `[AllowInProcessGate]` on the method, class, or assembly. This is settable only via `PerformanceAssert` options. |
 | `LaunchCount` | `int` | 1 | Number of worker processes to measure this test in. Two or more enable the paired per-replicate estimate with a confidence interval. |

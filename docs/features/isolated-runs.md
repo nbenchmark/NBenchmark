@@ -72,7 +72,7 @@ await BenchmarkSuite.Over("sorting", () => BuildData())
     .RunAsync();
 ```
 
-`prepare` runs **once per benchmark**, before that benchmark's warmup, not once per suite. If two sorts shared one array, the second would measure what the first already sorted. Where the body mutates its state, reset it each iteration using the `setup:` argument on `Add`, which runs outside the timed window.
+`prepare` runs **once per benchmark**, before that benchmark's warmup, not once per suite. If two sorts shared one array, the second would measure what the first already sorted. Where the body mutates its state, reset it each sample using the `setup:` argument on `Add`, which runs outside the timed window.
 
 ### Harness mode
 
@@ -139,7 +139,7 @@ These rows are labeled in the `Iso` column and are never given a ratio against a
 
 ## When isolation is refused
 
-**A refusal is an error.** `RequireIsolation` defaults to `true`, so a benchmark that asks for a worker but cannot have one **fails the run** rather than being quietly measured in the host process.
+**A refusal is an error.** `Isolation` defaults to `Isolation.Required`, so a benchmark that asks for a worker but cannot have one **fails the run** rather than being quietly measured in the host process.
 
 Reconstructing state doesn't always fail loudly; it can return plausible but wrong numbers. For example, a body over a captured `5` might measure as if it were `1` with no error and a tight confidence interval. NBenchmark declines to measure rather than guessing.
 
@@ -187,6 +187,6 @@ For more information, see the [CLI reference](../reference/cli.md#isolation).
 For more information, see the following pages:
 
 - [Isolation internals](../deep-dives/isolation-internals.md) - How the engine finds and launches workers, what crosses the wire, and how refusals are classified.
-- [Harness mode](../usage-modes/harness-mode.md#isolatedprocess) - The `[Isolation(Isolation.Required)]` and `[Isolation(Isolation.Off)]` attributes.
+- [Harness mode](../usage-modes/harness-mode.md#isolationisolationrequired) - The `[Isolation(Isolation.Required)]` and `[Isolation(Isolation.Off)]` attributes.
 - [Suite mode](../usage-modes/suite-mode.md) - The full `BenchmarkSuite` API.
 - [Samples](../samples.md) - A runnable isolated-runs sample project.

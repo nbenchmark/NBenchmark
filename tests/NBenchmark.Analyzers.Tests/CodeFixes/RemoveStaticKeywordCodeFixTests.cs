@@ -9,7 +9,7 @@ public sealed class RemoveStaticKeywordCodeFixTests
     public async Task Analyzer_detects_static_method()
     {
         var source = """
-                     using NBenchmark.Attributes;
+                     using NBenchmark;
                      public class C {
                          [Benchmark]
                          public static void M() { }
@@ -24,7 +24,7 @@ public sealed class RemoveStaticKeywordCodeFixTests
     public async Task No_diagnostic_for_instance_method()
     {
         var source = """
-                     using NBenchmark.Attributes;
+                     using NBenchmark;
                      public class C {
                          [Benchmark]
                          public void M() { }
@@ -39,7 +39,7 @@ public sealed class RemoveStaticKeywordCodeFixTests
     public async Task CodeFix_removes_static_modifier()
     {
         var source = """
-                     using NBenchmark.Attributes;
+                     using NBenchmark;
                      public class C {
                          [Benchmark]
                          public static void M() { }
@@ -47,7 +47,7 @@ public sealed class RemoveStaticKeywordCodeFixTests
                      """;
 
         var fixedSource = """
-                          using NBenchmark.Attributes;
+                          using NBenchmark;
                           public class C {
                               [Benchmark]
                               public void M() { }

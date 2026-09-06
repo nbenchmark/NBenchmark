@@ -63,8 +63,8 @@ public class CiWidthDetectorTests
 
         var expected = StatsSummary.Compute(samples);
 
-        Assert.Equal(expected.Mean, detector.Mean, 9);
-        Assert.Equal(expected.StandardDeviation, detector.StandardDeviation, 9);
+        Assert.Equal(expected.MeanNs, detector.MeanNs, 9);
+        Assert.Equal(expected.StandardDeviationNs, detector.StandardDeviationNs, 9);
     }
 
     [Theory]
@@ -143,8 +143,8 @@ public class CiWidthDetectorTests
     [Fact]
     public void HalfWidthSeries_EmptyWhenComputeHalfWidthNeverSucceeds()
     {
-        // ComputeHalfWidth returns false (and does not append) when Count < 2 or Mean <= 0.
-        // Feeding only zeros keeps Mean = 0, so no evaluation ever appends. The detector still
+        // ComputeHalfWidth returns false (and does not append) when Count < 2 or MeanNs <= 0.
+        // Feeding only zeros keeps MeanNs = 0, so no evaluation ever appends. The detector still
         // resolves at the MaxCeiling because the MaxCeiling branch calls ComputeHalfWidth but
         // ignores its return value.
         var options = AutoTuneOptions.Default with
@@ -268,7 +268,7 @@ public class CiWidthDetectorTests
             detector.Feed(i % 2 == 0 ? 90.0 : 110.0, stopAllowed: true);
         }
 
-        Assert.Equal(detector.StandardDeviation / detector.Mean, detector.CoefficientOfVariation, 12);
+        Assert.Equal(detector.StandardDeviationNs / detector.MeanNs, detector.CoefficientOfVariation, 12);
         Assert.InRange(detector.CoefficientOfVariation, 0.09, 0.11);
     }
 

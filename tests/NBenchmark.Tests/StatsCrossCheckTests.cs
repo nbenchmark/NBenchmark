@@ -50,12 +50,12 @@ public class StatsCrossCheckTests
     {
         var stats = Compute(OneToFive, 0.95);
 
-        Numerics.AssertRelativeClose(3.0, stats.Mean, 1e-12);
-        Numerics.AssertRelativeClose(1.5811388300841898, stats.StandardDeviation, 1e-9);
-        Numerics.AssertRelativeClose(0.7071067811865476, stats.StandardError, 1e-9);
-        Numerics.AssertRelativeClose(1.9632431614775572, stats.MarginOfError, 1e-2);
+        Numerics.AssertRelativeClose(3.0, stats.MeanNs, 1e-12);
+        Numerics.AssertRelativeClose(1.5811388300841898, stats.StandardDeviationNs, 1e-9);
+        Numerics.AssertRelativeClose(0.7071067811865476, stats.StandardErrorNs, 1e-9);
+        Numerics.AssertRelativeClose(1.9632431614775572, stats.MarginOfErrorNs, 1e-2);
 
-        Assert.Equal(3.0, stats.Median, 12);
+        Assert.Equal(3.0, stats.MedianNs, 12);
         Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 12);
         Assert.Equal(5.0, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 12);
     }
@@ -64,7 +64,7 @@ public class StatsCrossCheckTests
     public void OneToFive_MarginOfError_99_Matches_Reference()
     {
         var stats = Compute(OneToFive, 0.99);
-        Numerics.AssertRelativeClose(3.2555867047577847, stats.MarginOfError, 1e-2);
+        Numerics.AssertRelativeClose(3.2555867047577847, stats.MarginOfErrorNs, 1e-2);
     }
 
     [Fact]
@@ -72,14 +72,14 @@ public class StatsCrossCheckTests
     {
         var stats = Compute(Timings, 0.95);
 
-        Numerics.AssertRelativeClose(101.45, stats.Mean, 1e-12);
-        Numerics.AssertRelativeClose(4.229854213405782, stats.StandardDeviation, 1e-9);
-        Numerics.AssertRelativeClose(1.3375973484822197, stats.StandardError, 1e-9);
-        Numerics.AssertRelativeClose(3.02585542280894, stats.MarginOfError, 1e-2);
+        Numerics.AssertRelativeClose(101.45, stats.MeanNs, 1e-12);
+        Numerics.AssertRelativeClose(4.229854213405782, stats.StandardDeviationNs, 1e-9);
+        Numerics.AssertRelativeClose(1.3375973484822197, stats.StandardErrorNs, 1e-9);
+        Numerics.AssertRelativeClose(3.02585542280894, stats.MarginOfErrorNs, 1e-2);
 
         // n = 10 (even): numpy.median mid-averages the two middles (100.0, 101.2) → 100.6,
         // rather than the nearest-rank P50 of 100.0.
-        Assert.Equal(100.6, stats.Median, 12);
+        Assert.Equal(100.6, stats.MedianNs, 12);
         Assert.Equal(110.1, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 12);
         Assert.Equal(110.1, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 12);
     }
@@ -89,14 +89,14 @@ public class StatsCrossCheckTests
     {
         var stats = Compute(Normal64, 0.95);
 
-        Numerics.AssertRelativeClose(501.5077683775768, stats.Mean, 1e-9);
-        Numerics.AssertRelativeClose(39.289116231983144, stats.StandardDeviation, 1e-9);
-        Numerics.AssertRelativeClose(4.911139528997893, stats.StandardError, 1e-9);
-        Numerics.AssertRelativeClose(9.814129230772705, stats.MarginOfError, 1e-3);
+        Numerics.AssertRelativeClose(501.5077683775768, stats.MeanNs, 1e-9);
+        Numerics.AssertRelativeClose(39.289116231983144, stats.StandardDeviationNs, 1e-9);
+        Numerics.AssertRelativeClose(4.911139528997893, stats.StandardErrorNs, 1e-9);
+        Numerics.AssertRelativeClose(9.814129230772705, stats.MarginOfErrorNs, 1e-3);
 
         // n = 64 (even): numpy.median = mean of the two middles → 503.3726220059931, versus the
         // nearest-rank P50 of 502.83658401138837.
-        Assert.Equal(503.3726220059931, stats.Median, 9);
+        Assert.Equal(503.3726220059931, stats.MedianNs, 9);
         Assert.Equal(555.9591597889488, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value, 9);
         Assert.Equal(604.7263770547136, stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value, 9);
     }

@@ -17,8 +17,8 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(-1, parsed.MaxAllocatedBytes);
         Assert.Null(parsed.ReferenceMethod);
         Assert.Equal(0, parsed.MaxSlowdownRatio);
-        Assert.Equal(0, parsed.Iterations);
-        Assert.Equal(0, parsed.WarmupIterations);
+        Assert.Equal(0, parsed.Samples);
+        Assert.Equal(0, parsed.WarmupSamples);
         Assert.False(parsed.MeasureAllocations);
         Assert.Equal(OutlierMode.IqrFence, parsed.OutlierMode);
         Assert.Equal(0.95, parsed.ConfidenceLevel);
@@ -34,8 +34,8 @@ public sealed class PerformanceAttributeParserTests
             MaxAllocatedBytes = 1024,
             ReferenceMethod = "ReferenceMethod",
             MaxSlowdownRatio = 1.5,
-            Iterations = 42,
-            WarmupIterations = 7,
+            Samples = 42,
+            WarmupSamples = 7,
             MeasureAllocations = true,
             OutlierMode = OutlierMode.None,
             ConfidenceLevel = 0.9,
@@ -60,8 +60,8 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(1024, parsed.MaxAllocatedBytes);
         Assert.Equal("ReferenceMethod", parsed.ReferenceMethod);
         Assert.Equal(1.5, parsed.MaxSlowdownRatio);
-        Assert.Equal(42, parsed.Iterations);
-        Assert.Equal(7, parsed.WarmupIterations);
+        Assert.Equal(42, parsed.Samples);
+        Assert.Equal(7, parsed.WarmupSamples);
         Assert.True(parsed.MeasureAllocations);
         Assert.Equal(OutlierMode.None, parsed.OutlierMode);
         Assert.Equal(0.9, parsed.ConfidenceLevel);
@@ -79,8 +79,8 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(-1, parsed.MaxAllocatedBytes);
         Assert.Null(parsed.ReferenceMethod);
         Assert.Equal(0, parsed.MaxSlowdownRatio);
-        Assert.Equal(0, parsed.Iterations);
-        Assert.Equal(0, parsed.WarmupIterations);
+        Assert.Equal(0, parsed.Samples);
+        Assert.Equal(0, parsed.WarmupSamples);
         Assert.False(parsed.MeasureAllocations);
         Assert.Equal(OutlierMode.IqrFence, parsed.OutlierMode);
         Assert.Equal(0.95, parsed.ConfidenceLevel);
@@ -96,8 +96,8 @@ public sealed class PerformanceAttributeParserTests
             [nameof(PerformanceFactAttribute.MaxAllocatedBytes)] = 4096L,
             [nameof(PerformanceFactAttribute.ReferenceMethod)] = "MyReference",
             [nameof(PerformanceFactAttribute.MaxSlowdownRatio)] = 1.8d,
-            [nameof(PerformanceFactAttribute.Iterations)] = 64,
-            [nameof(PerformanceFactAttribute.WarmupIterations)] = 8,
+            [nameof(PerformanceFactAttribute.Samples)] = 64,
+            [nameof(PerformanceFactAttribute.WarmupSamples)] = 8,
             [nameof(PerformanceFactAttribute.MeasureAllocations)] = true,
             [nameof(PerformanceFactAttribute.OutlierMode)] = OutlierMode.IqrFence,
             [nameof(PerformanceFactAttribute.ConfidenceLevel)] = 0.99,
@@ -110,8 +110,8 @@ public sealed class PerformanceAttributeParserTests
         Assert.Equal(4096, parsed.MaxAllocatedBytes);
         Assert.Equal("MyReference", parsed.ReferenceMethod);
         Assert.Equal(1.8, parsed.MaxSlowdownRatio);
-        Assert.Equal(64, parsed.Iterations);
-        Assert.Equal(8, parsed.WarmupIterations);
+        Assert.Equal(64, parsed.Samples);
+        Assert.Equal(8, parsed.WarmupSamples);
         Assert.True(parsed.MeasureAllocations);
         Assert.Equal(OutlierMode.IqrFence, parsed.OutlierMode);
         Assert.Equal(0.99, parsed.ConfidenceLevel);

@@ -79,7 +79,7 @@ internal static class WorkerProtocol
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
     ///     buffer instead of attempting a multi-gigabyte one. Generous enough for an untruncated
-    ///     raw-sample payload at <see cref="MeasurementOptions.MaxIterations" />.
+    ///     raw-sample payload at <see cref="MeasurementOptions.MaxSamplesLimit" />.
     /// </summary>
     public const int MaxFrameBytes = 64 * 1024 * 1024;
 
@@ -489,7 +489,7 @@ internal enum ProgressCallback
     WarmupStarting = 0,
     WarmupCompleted = 1,
     BenchmarkStarting = 2,
-    IterationCompleted = 3,
+    SampleCompleted = 3,
 }
 
 /// <summary>A <see cref="MeasurementPhaseEvent" />, flattened for the wire.</summary>
@@ -549,7 +549,7 @@ internal sealed record ObserverDetectorPayload
     public required string BenchmarkName { get; init; }
     public required MeasurementPhase Phase { get; init; }
     public required int SampleCount { get; init; }
-    public required double Mean { get; init; }
+    public required double MeanNs { get; init; }
     public required double StdDev { get; init; }
     public required double CiHalfWidth { get; init; }
     public required int CurrentK { get; init; }
@@ -588,11 +588,11 @@ internal sealed record GroupCompletedPayload
 /// <summary>A worker-measured <see cref="CalibrationResult" />, flattened for the wire.</summary>
 internal sealed record CalibrationPayload
 {
-    public required double Mean { get; init; }
-    public required double Median { get; init; }
+    public required double MeanNs { get; init; }
+    public required double MedianNs { get; init; }
     public required double[] Samples { get; init; }
 
-    public CalibrationResult ToResult() => new(Mean, Median, Samples);
+    public CalibrationResult ToResult() => new(MeanNs, MedianNs, Samples);
 }
 
 internal sealed record FaultPayload

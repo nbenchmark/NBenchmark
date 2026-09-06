@@ -27,8 +27,8 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     public void Dispose() => WorkerLauncher.Current = _prior;
 
     private static BenchmarkSuite Fast(BenchmarkSuite suite) => suite
-        .WithIterations(16)
-        .WithWarmup(1)
+        .WithSamples(16)
+        .WithWarmupSamples(1)
         .WithOpsPerSample(1)
         .WithAutoTune(AutoTuneOptions.Default with
         {
@@ -45,8 +45,8 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     ///     scope afterwards.
     /// </summary>
     private static BenchmarkSuite<TState> Fast<TState>(BenchmarkSuite<TState> suite) => suite
-        .WithIterations(16)
-        .WithWarmup(1)
+        .WithSamples(16)
+        .WithWarmupSamples(1)
         .WithOpsPerSample(1)
         .WithAutoTune(AutoTuneOptions.Default with
         {
@@ -232,8 +232,8 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         Assert.False(slow.IsBaseline);
 
         Assert.True(
-            slow.Median > fast.Median * 2,
-            $"expected slow to be clearly slower: fast={fast.Median:F1}ns slow={slow.Median:F1}ns");
+            slow.MedianNs > fast.MedianNs * 2,
+            $"expected slow to be clearly slower: fast={fast.MedianNs:F1}ns slow={slow.MedianNs:F1}ns");
     }
 
     /// <summary>
@@ -371,9 +371,9 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         // Zero spins costs single-digit nanoseconds; 200,000 costs tens of microseconds. Any median
         // above this floor is only reachable if the worker ran the setup before measuring.
         Assert.True(
-            result.Median > 10_000,
+            result.MedianNs > 10_000,
             $"expected the worker's own setup to have raised the body's cost, but it measured "
-            + $"{result.Median:F1} ns - which is what an unrun setup would produce");
+            + $"{result.MedianNs:F1} ns - which is what an unrun setup would produce");
 
         // Nothing wrote this process's copy, which is the other half of the same claim.
         Assert.Equal(0, WorkerVisibleState.Spins);
@@ -578,9 +578,9 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         var large = results.Single(r => r.Name.Contains("200000)", StringComparison.Ordinal));
 
         Assert.True(
-            small.Median < medium.Median && medium.Median < large.Median,
-            $"expected cost to rise with the bound argument: {small.Median:F1} < {medium.Median:F1} "
-            + $"< {large.Median:F1} ns");
+            small.MedianNs < medium.MedianNs && medium.MedianNs < large.MedianNs,
+            $"expected cost to rise with the bound argument: {small.MedianNs:F1} < {medium.MedianNs:F1} "
+            + $"< {large.MedianNs:F1} ns");
     }
 
     /// <summary>
@@ -615,8 +615,8 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         var forty = results.Single(r => r.Name.Contains("outer=40,", StringComparison.Ordinal));
 
         Assert.True(
-            forty.Median > one.Median * 4,
-            $"expected outer=40 to cost clearly more than outer=1: {one.Median:F1} vs {forty.Median:F1} ns");
+            forty.MedianNs > one.MedianNs * 4,
+            $"expected outer=40 to cost clearly more than outer=1: {one.MedianNs:F1} vs {forty.MedianNs:F1} ns");
     }
 
     /// <summary>
@@ -735,8 +735,8 @@ public sealed class InlineSuiteIsolationTests : IDisposable
             Assert.NotEmpty(result.RawSamples);
 
             Assert.True(
-                result.Median > 5_000,
-                $"'{result.Name}' measured {result.Median:F1} ns, which is what unprepared state "
+                result.MedianNs > 5_000,
+                $"'{result.Name}' measured {result.MedianNs:F1} ns, which is what unprepared state "
                 + "would produce");
         }
 
@@ -747,8 +747,8 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         var half = results.Single(r => r.Name == "half");
 
         Assert.True(
-            spin.Median > half.Median * 1.5,
-            $"expected the full spin to cost clearly more than half: {spin.Median:F1} vs {half.Median:F1} ns");
+            spin.MedianNs > half.MedianNs * 1.5,
+            $"expected the full spin to cost clearly more than half: {spin.MedianNs:F1} vs {half.MedianNs:F1} ns");
     }
 
     /// <summary>
@@ -792,8 +792,8 @@ public sealed class InlineSuiteIsolationTests : IDisposable
 
         var results = await BenchmarkSuite.Over("captured-state", () => new int[size])
             .Add("a", buffer => buffer.Length == size ? 1 : throw new InvalidOperationException("wrong size"))
-            .WithIterations(4)
-            .WithWarmup(0)
+            .WithSamples(4)
+            .WithWarmupSamples(0)
             .WithOpsPerSample(1)
             .RunAsync();
 

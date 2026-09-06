@@ -2,7 +2,7 @@ using System.Text;
 
 namespace NBenchmark.Reporters;
 
-public sealed class CsvReporter(string outputDirectory = ".", string? name = null, ReportDetail detail = ReportDetail.Simple) : IReporter
+public sealed class CsvReporter(string outputDirectory = ".", string? fileName = null, ReportDetail detail = ReportDetail.Simple) : IReporter
 {
     private static int _fileCounter;
 
@@ -28,17 +28,17 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
     {
         Directory.CreateDirectory(_outputDirectory);
 
-        var fileName = name
+        var resolvedName = fileName
                        ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.csv";
 
-        var filePath = Path.Combine(_outputDirectory, fileName);
+        var filePath = Path.Combine(_outputDirectory, resolvedName);
         LastWrittenPath = filePath;
 
         var sb = new StringBuilder();
         var detail = Detail.ToString().ToLowerInvariant();
 
         var tables = BenchmarkTable.BuildPerClass(results);
-        var profile = tables[0].Profile.ToString().ToLowerInvariant();
+        var profile = tables[0].GcBehavior.ToString().ToLowerInvariant();
 
         var percentileCols = tables
             .SelectMany(t => t.Rows)
@@ -52,28 +52,28 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
         var percentileHeaders = string.Join(",", percentileCols.Select(p => $"P{BenchmarkTable.FormatPercentileKey(p)}"));
         var percentileHeaderPart = percentileHeaders.Length > 0 ? $",{percentileHeaders}" : "";
 
-        var baseHeaders = "ClassName,Name,Median";
+        var baseHeaders = "ClassName,Name,MedianNs";
 
         if (Detail == ReportDetail.Simple)
         {
             baseHeaders += ",OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation");
+                $"{baseHeaders},Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,GcBehavior,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation");
         }
         else if (Detail == ReportDetail.Standard)
         {
-            baseHeaders += ",Mean,OpsPerSecond";
+            baseHeaders += ",MeanNs,OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfErrorNs,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginOfErrorPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,GcBehavior,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation");
         }
         else
         {
-            baseHeaders += ",Mean,OpsPerSecond";
+            baseHeaders += ",MeanNs,OpsPerSecond";
 
             sb.AppendLine(
-                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfError,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,Profile,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Q1,Q3,Iqr,LowerFence,UpperFence,Range,N,Skewness,Kurtosis,Mad,AllocMedian,AllocP95,AllocMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupIterations,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,AutoTuneSplitHalfDrift,AutoTuneRestarts,AutoTuneWarmupTimeFloorMet,AutoTuneWarmupJitMethods,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories,Isolation");
+                $"{baseHeaders}{percentileHeaderPart},StdDev,StdErr,MarginOfErrorNs,CiLower,CiUpper,ConfidenceLevel,CoefficientOfVariation,Ratio,RatioCiLower,RatioCiUpper,RatioReplicates,Significant,EffectMetric,EffectValue,Magnitude,AllocPerOp,Gen0,Gen1,Gen2,MarginOfErrorPercent,OutliersRemoved,SchemaVersion,MeasurementEpoch,Detail,GcBehavior,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Q1Ns,Q3Ns,Iqr,LowerFenceNs,UpperFenceNs,RangeNs,SampleCount,Skewness,Kurtosis,MedianAbsoluteDeviationNs,AllocatedBytesMedian,AllocatedBytesP95,AllocatedBytesMax,StandardErrorPercent,CoefficientOfVariationPercent,WarmupSamples,AutoTuneWarmup,AutoTuneSamples,AutoTuneOpsPerSample,AutoTuneSampleStop,AutoTuneCiWidth,AutoTuneTuningMs,AutoTuneJitterMetric,AutoTuneDetectorSwitched,AutoTuneSplitHalfDrift,AutoTuneRestarts,AutoTuneWarmupTimeFloorMet,AutoTuneWarmupJitMethods,HeapCommitted,HeapFragmented,ExceptionPerOp,CpuTimeNsPerOp,CpuWallRatio,DiagnosticsMode,Categories,Isolation");
         }
 
         foreach (var table in tables)
@@ -105,7 +105,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
 
             var commonData = $"\"{safeClassName}\"," +
                              $"\"{safeName}\"," +
-                             $"{row.Result.Median:F1}";
+                             $"{row.Result.MedianNs:F1}";
 
             if (Detail == ReportDetail.Simple)
             {
@@ -115,7 +115,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{commonData},{row.Result.OperationsPerSecond:F1}," +
                     $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
                     $"\"{safeSig}\"," +
-                    $"{row.Result.MeanAllocatedBytes?.ToString() ?? "null"}," +
+                    $"{row.Result.AllocatedBytesMean?.ToString() ?? "null"}," +
                     $"{simpleDiag?.Gen0Collections?.ToString() ?? ""}," +
                     $"{simpleDiag?.Gen1Collections?.ToString() ?? ""}," +
                     $"{simpleDiag?.Gen2Collections?.ToString() ?? ""}," +
@@ -132,12 +132,12 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                 var diag = row.Result.Diagnostics;
                 var diagCols = $"{diag?.Gen0Collections?.ToString() ?? ""},{diag?.Gen1Collections?.ToString() ?? ""},{diag?.Gen2Collections?.ToString() ?? ""}";
 
-                var fullData = $"{commonData},{row.Result.Mean:F1},{row.Result.OperationsPerSecond:F1}{percentileData}," +
-                               $"{row.Result.StandardDeviation:F1}," +
-                               $"{row.Result.StandardError:F1}," +
-                               $"{row.Result.MarginOfError:F1}," +
-                               $"{row.Result.ConfidenceIntervalLower:F1}," +
-                               $"{row.Result.ConfidenceIntervalUpper:F1}," +
+                var fullData = $"{commonData},{row.Result.MeanNs:F1},{row.Result.OperationsPerSecond:F1}{percentileData}," +
+                               $"{row.Result.StandardDeviationNs:F1}," +
+                               $"{row.Result.StandardErrorNs:F1}," +
+                               $"{row.Result.MarginOfErrorNs:F1}," +
+                               $"{row.Result.ConfidenceIntervalLowerNs:F1}," +
+                               $"{row.Result.ConfidenceIntervalUpperNs:F1}," +
                                $"{table.ConfidenceLevel:F2}," +
                                $"{row.Result.CoefficientOfVariation:F4}," +
                                $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
@@ -152,9 +152,9 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                                $"\"{safeEffectMetric}\"," +
                                $"{row.Result.Effect?.Value?.ToString("F4") ?? ""}," +
                                $"\"{safeMagnitude}\"," +
-                               $"{row.Result.MeanAllocatedBytes?.ToString() ?? "null"}," +
+                               $"{row.Result.AllocatedBytesMean?.ToString() ?? "null"}," +
                                $"{diagCols}," +
-                               $"{row.Result.MarginPercent:F2}," +
+                               $"{row.Result.MarginOfErrorPercent:F2}," +
                                $"{row.Result.OutliersRemoved}," +
                                $"{ReportFormat.SchemaVersion},{ReportFormat.MeasurementEpoch}," +
                                $"{detail}," +
@@ -167,11 +167,11 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     sb.AppendLine($"{fullData},\"{safeIsolation}\"");
                 else
                 {
-                    var lowerFence = row.Result.LowerFence?.ToString("F1") ?? "";
-                    var upperFence = row.Result.UpperFence?.ToString("F1") ?? "";
-                    var allocMedian = row.Result.AllocMedian?.ToString() ?? "";
-                    var allocP95 = row.Result.AllocP95?.ToString() ?? "";
-                    var allocMax = row.Result.AllocMax?.ToString() ?? "";
+                    var lowerFence = row.Result.LowerFenceNs?.ToString("F1") ?? "";
+                    var upperFence = row.Result.UpperFenceNs?.ToString("F1") ?? "";
+                    var allocatedBytesMedian = row.Result.AllocatedBytesMedian?.ToString() ?? "";
+                    var allocatedBytesP95 = row.Result.AllocatedBytesP95?.ToString() ?? "";
+                    var allocatedBytesMax = row.Result.AllocatedBytesMax?.ToString() ?? "";
 
                     var autoTune = row.Result.AutoTune;
                     var atWarmup = autoTune?.ResolvedWarmup.ToString() ?? "";
@@ -202,22 +202,22 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
 
                     sb.AppendLine(
                         $"{fullData}," +
-                        $"{row.Result.Q1:F1}," +
-                        $"{row.Result.Q3:F1}," +
-                        $"{row.Result.InterquartileRange:F1}," +
+                        $"{row.Result.Q1Ns:F1}," +
+                        $"{row.Result.Q3Ns:F1}," +
+                        $"{row.Result.InterquartileRangeNs:F1}," +
                         $"\"{lowerFence}\"," +
                         $"\"{upperFence}\"," +
-                        $"{row.Result.Range:F1}," +
-                        $"{row.Result.N}," +
+                        $"{row.Result.RangeNs:F1}," +
+                        $"{row.Result.SampleCount}," +
                         $"{row.Result.Skewness:F4}," +
                         $"{row.Result.Kurtosis:F4}," +
-                        $"{row.Result.Mad:F1}," +
-                        $"{allocMedian}," +
-                        $"{allocP95}," +
-                        $"{allocMax}," +
+                        $"{row.Result.MedianAbsoluteDeviationNs:F1}," +
+                        $"{allocatedBytesMedian}," +
+                        $"{allocatedBytesP95}," +
+                        $"{allocatedBytesMax}," +
                         $"{row.Result.StandardErrorPercent:F2}," +
                         $"{row.Result.CoefficientOfVariationPercent:F2}," +
-                        $"{table.WarmupIterations}," +
+                        $"{table.WarmupSamples}," +
                         $"{atWarmup}," +
                         $"{atSamples}," +
                         $"{atOps}," +

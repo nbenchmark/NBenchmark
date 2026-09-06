@@ -78,7 +78,8 @@ internal static class RuntimeProfileEnvironment
         if (Current.WasApplied)
             return;
 
-        if (options is { SuppressRuntimeProfileWarning: true } || IsSuppressEnvVarSet())
+        if (options?.SuppressedWarnings.HasFlag(BenchmarkWarnings.RuntimeProfile) == true
+            || IsSuppressEnvVarSet())
             return;
 
         if (Interlocked.CompareExchange(ref _guidanceEmitted, 1, 0) != 0)

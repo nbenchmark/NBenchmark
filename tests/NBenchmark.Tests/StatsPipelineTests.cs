@@ -12,14 +12,14 @@ public class StatsPipelineTests
         var timings = new double[50];
         Array.Fill(timings, 100.0);
 
-        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { Iterations = 50, OutlierMode = OutlierMode.None });
+        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { Samples = 50, OutlierMode = OutlierMode.None });
 
-        Assert.Equal(100.0, result.Stats.Mean);
-        Assert.Equal(100.0, result.Stats.Median);
-        Assert.Equal(0, result.Stats.StandardDeviation);
-        Assert.Equal(100, result.Stats.Min);
-        Assert.Equal(100, result.Stats.Max);
-        Assert.Equal(50, result.MeasuredIterations);
+        Assert.Equal(100.0, result.Stats.MeanNs);
+        Assert.Equal(100.0, result.Stats.MedianNs);
+        Assert.Equal(0, result.Stats.StandardDeviationNs);
+        Assert.Equal(100, result.Stats.MinNs);
+        Assert.Equal(100, result.Stats.MaxNs);
+        Assert.Equal(50, result.SampleCount);
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public class StatsPipelineTests
 
         var result = StatsPipeline.Run(timings, allocations, new MeasurementOptions());
 
-        Assert.Equal(250, result.MeanAllocatedBytes);
+        Assert.Equal(250, result.AllocatedBytesMean);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class StatsPipelineTests
 
         var result = StatsPipeline.Run(timings, null, new MeasurementOptions());
 
-        Assert.Null(result.MeanAllocatedBytes);
+        Assert.Null(result.AllocatedBytesMean);
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public class StatsPipelineTests
 
         var result = StatsPipeline.Run(timings, null, new MeasurementOptions { OutlierMode = OutlierMode.None });
 
-        Assert.Equal(100, result.MeasuredIterations);
+        Assert.Equal(100, result.SampleCount);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class StatsPipelineTests
 
         var result = StatsPipeline.Run(timings, null, new MeasurementOptions { OutlierMode = OutlierMode.RemoveTop5Percent });
 
-        Assert.Equal(95, result.MeasuredIterations);
+        Assert.Equal(95, result.SampleCount);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class StatsPipelineTests
 
         var result = StatsPipeline.Run(timings, null, new MeasurementOptions { OutlierMode = OutlierMode.RemoveTopAndBottom5Percent });
 
-        Assert.Equal(90, result.MeasuredIterations);
+        Assert.Equal(90, result.SampleCount);
     }
 
     [Fact]
@@ -89,17 +89,17 @@ public class StatsPipelineTests
     {
         var result = StatsPipeline.Run([], null, new MeasurementOptions());
 
-        Assert.Equal(0, result.Stats.Mean);
-        Assert.Equal(0, result.Stats.Median);
+        Assert.Equal(0, result.Stats.MeanNs);
+        Assert.Equal(0, result.Stats.MedianNs);
         Assert.Equal(0, result.Stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.95) < 1e-9).Value);
         Assert.Equal(0, result.Stats.Percentiles.FirstOrDefault(e => Math.Abs(e.Percentile - 0.99) < 1e-9).Value);
-        Assert.Equal(0, result.Stats.Min);
-        Assert.Equal(0, result.Stats.Max);
-        Assert.Equal(0, result.Stats.StandardDeviation);
-        Assert.Equal(0, result.Stats.StandardError);
-        Assert.Equal(0, result.Stats.MarginOfError);
-        Assert.Equal(0, result.MeasuredIterations);
-        Assert.Null(result.MeanAllocatedBytes);
+        Assert.Equal(0, result.Stats.MinNs);
+        Assert.Equal(0, result.Stats.MaxNs);
+        Assert.Equal(0, result.Stats.StandardDeviationNs);
+        Assert.Equal(0, result.Stats.StandardErrorNs);
+        Assert.Equal(0, result.Stats.MarginOfErrorNs);
+        Assert.Equal(0, result.SampleCount);
+        Assert.Null(result.AllocatedBytesMean);
     }
 
     [Fact]
@@ -112,10 +112,10 @@ public class StatsPipelineTests
         var unsortedResult = StatsPipeline.Run(unsorted, null, new MeasurementOptions { OutlierMode = OutlierMode.None });
         var sortedResult = StatsPipeline.Run(sorted, null, new MeasurementOptions { OutlierMode = OutlierMode.None });
 
-        Assert.Equal(sortedResult.Stats.Mean, unsortedResult.Stats.Mean);
-        Assert.Equal(sortedResult.Stats.Median, unsortedResult.Stats.Median);
-        Assert.Equal(sortedResult.Stats.Min, unsortedResult.Stats.Min);
-        Assert.Equal(sortedResult.Stats.Max, unsortedResult.Stats.Max);
+        Assert.Equal(sortedResult.Stats.MeanNs, unsortedResult.Stats.MeanNs);
+        Assert.Equal(sortedResult.Stats.MedianNs, unsortedResult.Stats.MedianNs);
+        Assert.Equal(sortedResult.Stats.MinNs, unsortedResult.Stats.MinNs);
+        Assert.Equal(sortedResult.Stats.MaxNs, unsortedResult.Stats.MaxNs);
     }
 
     [Theory]
@@ -134,8 +134,8 @@ public class StatsPipelineTests
     // ---- Raw-basis tail statistics (P2-1) ---------------------------------
 
     // A bimodal stream: 90 fast samples plus a trimmed slow cluster. Under the default Raw
-    // basis, Max/P99/histogram must include the slow cluster (the tail the fence exists to
-    // describe), while Mean/StdDev exclude it (robust central statistics).
+    // basis, MaxNs/P99/histogram must include the slow cluster (the tail the fence exists to
+    // describe), while MeanNs/StdDev exclude it (robust central statistics).
     private static double[] BimodalTimings()
     {
         var timings = new double[100];
@@ -150,31 +150,31 @@ public class StatsPipelineTests
     [Fact]
     public void Run_RawTailBasis_Is_Default_And_Includes_Trimmed_Tail()
     {
-        var result = StatsPipeline.Run(BimodalTimings(), null, new MeasurementOptions { Iterations = 100 });
+        var result = StatsPipeline.Run(BimodalTimings(), null, new MeasurementOptions { Samples = 100 });
 
         Assert.Equal(10, result.OutliersRemoved);
 
         // Central statistics stay on the trimmed set.
-        Assert.Equal(100.0, result.Stats.Mean);
-        Assert.Equal(0.0, result.Stats.StandardDeviation);
+        Assert.Equal(100.0, result.Stats.MeanNs);
+        Assert.Equal(0.0, result.Stats.StandardDeviationNs);
 
         // Order statistics describe the whole distribution.
-        Assert.Equal(1000.0, result.Stats.Max);
+        Assert.Equal(1000.0, result.Stats.MaxNs);
         Assert.Equal(1000.0, PercentileValue(result.Stats, 0.99));
-        Assert.Equal(1000.0, result.Stats.Histogram!.Max);
+        Assert.Equal(1000.0, result.Stats.Histogram!.MaxNs);
     }
 
     [Fact]
     public void Run_TrimmedTailBasis_Excludes_The_Trimmed_Tail()
     {
         var result = StatsPipeline.Run(BimodalTimings(), null,
-            new MeasurementOptions { Iterations = 100, TailMetricsBasis = TailMetricsBasis.Trimmed });
+            new MeasurementOptions { Samples = 100, TailMetricsBasis = TailMetricsBasis.Trimmed });
 
         Assert.Equal(10, result.OutliersRemoved);
-        Assert.Equal(100.0, result.Stats.Mean);
-        Assert.Equal(100.0, result.Stats.Max);
+        Assert.Equal(100.0, result.Stats.MeanNs);
+        Assert.Equal(100.0, result.Stats.MaxNs);
         Assert.Equal(100.0, PercentileValue(result.Stats, 0.99));
-        Assert.Equal(100.0, result.Stats.Histogram!.Max);
+        Assert.Equal(100.0, result.Stats.Histogram!.MaxNs);
     }
 
     [Fact]
@@ -183,12 +183,12 @@ public class StatsPipelineTests
         var timings = Enumerable.Range(1, 100).Select(i => (double)i).ToArray();
 
         var result = StatsPipeline.Run(timings, null,
-            new MeasurementOptions { Iterations = 100, OutlierMode = OutlierMode.None });
+            new MeasurementOptions { Samples = 100, OutlierMode = OutlierMode.None });
 
-        Assert.NotNull(result.Stats.MedianCiLower);
-        Assert.NotNull(result.Stats.MedianCiUpper);
-        Assert.True(result.Stats.MedianCiLower <= result.Stats.Median);
-        Assert.True(result.Stats.MedianCiUpper >= result.Stats.Median);
+        Assert.NotNull(result.Stats.MedianConfidenceIntervalLowerNs);
+        Assert.NotNull(result.Stats.MedianConfidenceIntervalUpperNs);
+        Assert.True(result.Stats.MedianConfidenceIntervalLowerNs <= result.Stats.MedianNs);
+        Assert.True(result.Stats.MedianConfidenceIntervalUpperNs >= result.Stats.MedianNs);
     }
 
     // ---- GC <-> outlier annotation (P2-2) ---------------------------------
@@ -207,7 +207,7 @@ public class StatsPipelineTests
         gcCounts[36] = 1;
         gcCounts[37] = 2;
 
-        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { Iterations = 40 }, gcCounts);
+        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { Samples = 40 }, gcCounts);
 
         Assert.Contains(result.Warnings, w => w.Contains("garbage collection"));
         Assert.Contains(result.Warnings, w => w.Contains("garbage collection") && w.Contains("3"));
@@ -220,7 +220,7 @@ public class StatsPipelineTests
         Array.Fill(timings, 100.0, 0, 35);
         Array.Fill(timings, 1000.0, 35, 5);
 
-        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { Iterations = 40 });
+        var result = StatsPipeline.Run(timings, null, new MeasurementOptions { Samples = 40 });
 
         Assert.DoesNotContain(result.Warnings, w => w.Contains("garbage collection"));
     }
@@ -247,7 +247,7 @@ public class StatsPipelineTests
         timings[38] = 4_500.0;
         timings[39] = 5_000.0;
 
-        var options = new MeasurementOptions { Iterations = 40 };
+        var options = new MeasurementOptions { Samples = 40 };
         var trimmed = StatsPipeline.Run(timings, null, options);
 
         Assert.Equal(3, trimmed.OutliersRemoved);
@@ -256,17 +256,17 @@ public class StatsPipelineTests
         var detailed = OutlierTrim.TrimDetailed(timings, options.ResolveOutlierDetector());
         var naive = StatsSummary.Compute(detailed.Kept, options.ConfidenceLevel);
 
-        Assert.Equal(naive.Mean, trimmed.Stats.Mean);
-        Assert.Equal(naive.StandardDeviation, trimmed.Stats.StandardDeviation);
-        Assert.True(trimmed.Stats.StandardError > naive.StandardError);
-        Assert.True(trimmed.Stats.MarginOfError > naive.MarginOfError);
+        Assert.Equal(naive.MeanNs, trimmed.Stats.MeanNs);
+        Assert.Equal(naive.StandardDeviationNs, trimmed.Stats.StandardDeviationNs);
+        Assert.True(trimmed.Stats.StandardErrorNs > naive.StandardErrorNs);
+        Assert.True(trimmed.Stats.MarginOfErrorNs > naive.MarginOfErrorNs);
 
         // The recomputed Winsorized value is what it reports - not some other widening.
         var expected = WinsorizedError.Compute(TrimContext.From(detailed), options.ConfidenceLevel);
 
         Assert.NotNull(expected);
-        Assert.Equal(expected.Value.StandardError, trimmed.Stats.StandardError);
-        Assert.Equal(expected.Value.MarginOfError, trimmed.Stats.MarginOfError);
+        Assert.Equal(expected.Value.StandardErrorNs, trimmed.Stats.StandardErrorNs);
+        Assert.Equal(expected.Value.MarginOfErrorNs, trimmed.Stats.MarginOfErrorNs);
     }
 
     /// <summary>
@@ -285,7 +285,7 @@ public class StatsPipelineTests
             timings[i] = 100.0 + rng.NextDouble() * 40.0;
         }
 
-        var options = new MeasurementOptions { Iterations = 200, OutlierMode = OutlierMode.None };
+        var options = new MeasurementOptions { Samples = 200, OutlierMode = OutlierMode.None };
         var result = StatsPipeline.Run(timings, null, options);
 
         var sorted = (double[])timings.Clone();
@@ -293,8 +293,8 @@ public class StatsPipelineTests
         var naive = StatsSummary.Compute(sorted, options.ConfidenceLevel);
 
         Assert.Equal(0, result.OutliersRemoved);
-        Assert.Equal(naive.StandardError, result.Stats.StandardError);
-        Assert.Equal(naive.MarginOfError, result.Stats.MarginOfError);
+        Assert.Equal(naive.StandardErrorNs, result.Stats.StandardErrorNs);
+        Assert.Equal(naive.MarginOfErrorNs, result.Stats.MarginOfErrorNs);
     }
 
     /// <summary>
@@ -307,12 +307,12 @@ public class StatsPipelineTests
     {
         var timings = Enumerable.Range(1, 60).Select(i => 100.0 + i % 7).ToArray();
 
-        var fenced = StatsPipeline.Run(timings, null, new MeasurementOptions { Iterations = 60 });
+        var fenced = StatsPipeline.Run(timings, null, new MeasurementOptions { Samples = 60 });
         var untrimmed = StatsPipeline.Run(timings, null,
-            new MeasurementOptions { Iterations = 60, OutlierMode = OutlierMode.None });
+            new MeasurementOptions { Samples = 60, OutlierMode = OutlierMode.None });
 
         Assert.Equal(0, fenced.OutliersRemoved);
-        Assert.Equal(untrimmed.Stats.StandardError, fenced.Stats.StandardError);
-        Assert.Equal(untrimmed.Stats.MarginOfError, fenced.Stats.MarginOfError);
+        Assert.Equal(untrimmed.Stats.StandardErrorNs, fenced.Stats.StandardErrorNs);
+        Assert.Equal(untrimmed.Stats.MarginOfErrorNs, fenced.Stats.MarginOfErrorNs);
     }
 }

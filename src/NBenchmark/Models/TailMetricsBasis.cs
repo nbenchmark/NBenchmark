@@ -10,9 +10,9 @@ public enum TailMetricsBasis
 {
     /// <summary>
     ///     Compute tail metrics from the full pre-trim sample set (the default). The IQR/MAD fence
-    ///     removes exactly the slow tail that P99/P99.9/Max exist to describe, so reporting those on
-    ///     the raw set keeps them honest - a GC pause the <c>Realistic</c> profile deliberately
-    ///     timed is visible in Max rather than trimmed back out of it.
+    ///     removes exactly the slow tail that P99/P99.9/max exist to describe, so reporting those on
+    ///     the raw set keeps them honest - a GC pause the <c>Natural</c> GC behavior deliberately
+    ///     timed is visible in the max rather than trimmed back out of it.
     /// </summary>
     Raw,
 

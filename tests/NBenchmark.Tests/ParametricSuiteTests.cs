@@ -10,8 +10,8 @@ public class ParametricSuiteTests
         var results = await new BenchmarkSuite("parametric").WithIsolation(Isolation.Preferred)
             .WithParameter("size", 10, 100)
             .Add("constant", (int size) => size)
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .RunAsync();
@@ -27,8 +27,8 @@ public class ParametricSuiteTests
         var results = await new BenchmarkSuite("parametric").WithIsolation(Isolation.Preferred)
             .WithParameter("size", 10)
             .Add("constant", (int size) => size)
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -45,8 +45,8 @@ public class ParametricSuiteTests
             .WithParameter("a", 1, 2)
             .WithParameter("b", 10, 20)
             .Add("sum", (int a, int b) => a + b)
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .RunAsync();
@@ -65,8 +65,8 @@ public class ParametricSuiteTests
             .Add("plain", () => { })
             .WithParameter("size", 10)
             .Add("param", (int size) => size)
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .RunAsync();
@@ -84,8 +84,8 @@ public class ParametricSuiteTests
             .Add("baseline", (int size) => Thread.SpinWait(500))
             .Add("faster", (int size) => Thread.SpinWait(100))
             .WithBaseline("baseline")
-            .WithWarmup(1)
-            .WithIterations(20)
+            .WithWarmupSamples(1)
+            .WithSamples(20)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .RunAsync();
@@ -106,8 +106,8 @@ public class ParametricSuiteTests
             .WithParameter("size", 10, 100)
             .Add("slow", (int size) => Thread.SpinWait(1000))
             .Add("fast", (int size) => Thread.SpinWait(100))
-            .WithWarmup(1)
-            .WithIterations(20)
+            .WithWarmupSamples(1)
+            .WithSamples(20)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .RunAsync();
@@ -127,8 +127,8 @@ public class ParametricSuiteTests
         var results = await new BenchmarkSuite("progress").WithIsolation(Isolation.Preferred)
             .WithParameter("size", 10, 100)
             .Add("work", (int size) => size)
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .WithProgress(progress)
@@ -201,8 +201,8 @@ public class ParametricSuiteTests
         var results = await new BenchmarkSuite("nullable").WithIsolation(Isolation.Preferred)
             .WithParameter("value", (string?)null)
             .Add("work", (string? value) => value?.Length ?? 0)
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .RunAsync();
 
@@ -217,8 +217,8 @@ public class ParametricSuiteTests
         var results = await new BenchmarkSuite("enum").WithIsolation(Isolation.Preferred)
             .WithParameter("mode", TestMode.A, TestMode.B)
             .Add("work", (TestMode mode) => (int)mode)
-            .WithWarmup(0)
-            .WithIterations(1)
+            .WithWarmupSamples(0)
+            .WithSamples(1)
             .WithOutlierMode(OutlierMode.None)
             .WithRunOrder(RunOrder.Declaration)
             .RunAsync();
@@ -263,10 +263,10 @@ public class ParametricSuiteTests
         public List<BenchmarkResult> BenchmarkCompletions { get; } = [];
 
         public Task OnSuiteStarting(IReadOnlyList<string> names, int count) => Task.CompletedTask;
-        public Task OnWarmupStarting(string name, int totalWarmupIterations) => Task.CompletedTask;
+        public Task OnWarmupStarting(string name, int totalWarmupSamples) => Task.CompletedTask;
         public Task OnWarmupCompleted(string name) => Task.CompletedTask;
         public Task OnBenchmarkStarting(string name, int index, int total) => Task.CompletedTask;
-        public Task OnIterationCompleted(string name, int iteration, int totalIterations) => Task.CompletedTask;
+        public Task OnSampleCompleted(string name, int sample, int totalSamples) => Task.CompletedTask;
 
         public Task OnBenchmarkCompleted(BenchmarkResult result)
         {

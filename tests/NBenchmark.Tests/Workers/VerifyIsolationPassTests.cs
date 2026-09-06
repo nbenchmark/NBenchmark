@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using NBenchmark.Attributes;
+using NBenchmark;
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
 using Xunit;
@@ -34,7 +34,7 @@ public sealed class VerifyIsolationPassTests
         var harness = BenchmarkHarness.Create(args);
 
         harness.AddFromAssembly(typeof(VerifyIsolationPassTests).Assembly)
-            .WithCategoryFilter(["verify-iso"])
+            .FilterCategories(["verify-iso"])
             .WithLaunchCount(1)
             .WithOptions(MeasurementOptions.Default with
             {
@@ -43,8 +43,8 @@ public sealed class VerifyIsolationPassTests
                 // regression gate, reporters on the measured run only - not about the gate that would
                 // otherwise stop the run before any of it happened.
                 Isolation = Isolation.Preferred,
-                Iterations = 1,
-                WarmupIterations = 0,
+                Samples = 1,
+                WarmupSamples = 0,
                 OpsPerSample = 1,
                 AutoTune = AutoTuneOptions.Default with
                 {
