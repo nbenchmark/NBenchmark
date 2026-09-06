@@ -45,7 +45,7 @@ dotnet run -c Release -- \
 
 ## What's happening
 
-- **Isolated runs**: By default, harness mode runs each discovered class in its own freshly spawned worker process. This ensures that JIT, GC, and thread-pool state from one class cannot bias another. If a specific benchmark requires its own clean environment, add the `[IsolatedProcess]` attribute to that method. For more information, see [Isolated runs](../features/isolated-runs.md).
+- **Isolated runs**: By default, harness mode runs each discovered class in its own freshly spawned worker process. This ensures that JIT, GC, and thread-pool state from one class cannot bias another. If a specific benchmark requires its own clean environment, add the `[Isolation(Isolation.Required)]` attribute to that method. For more information, see [Isolated runs](../features/isolated-runs.md).
 
 - **CPU affinity** (`--cpu-affinity 2,3`): This pins the benchmark process to specific cores, preventing the OS scheduler from migrating the thread to a cold-cache core mid-measurement. It is recommended to choose cores other than core 0, as that core typically handles OS driver interrupts. This setting propagates to isolated workers automatically.
 

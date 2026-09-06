@@ -19,7 +19,7 @@ Console.WriteLine("Single mode: isolated by default");
 // The lambda captures nothing, so NBenchmark locates the compiled method in a worker and
 // measures it there. The call signature is unchanged, including the synchronous return.
 var isolated = Benchmark.Run(() => Thread.SpinWait(5_000), singleOptions, "single/isolated");
-await isolated.PrintAsync();
+await isolated.PrintTableAsync();
 
 Console.WriteLine();
 Console.WriteLine("Single mode: measuring THIS process, on purpose");
@@ -28,7 +28,7 @@ Console.WriteLine("Single mode: measuring THIS process, on purpose");
 // subject - cold-start cost, or a body that must observe host state. It is stamped
 // InProcessRequested and is never compared against an isolated reading.
 var here = Benchmark.RunInProcess(() => Thread.SpinWait(5_000), singleOptions, "single/in-process");
-await here.PrintAsync();
+await here.PrintTableAsync();
 
 Console.WriteLine();
 Console.WriteLine($"isolated: {isolated.IsolationStatus} under '{isolated.RuntimeProfileName}'");

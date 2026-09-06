@@ -83,7 +83,7 @@ public class OutlierDetectorTests
     {
         var custom = new ThresholdOutlierDetector(100);
 
-        var withCustom = MeasurementOptions.Default with { OutlierDetector = custom };
+        var withCustom = MeasurementOptions.Default with { OutlierDetector = () => custom };
         var withModeOnly = MeasurementOptions.Default with { OutlierMode = OutlierMode.None };
 
         Assert.Same(custom, withCustom.ResolveOutlierDetector());

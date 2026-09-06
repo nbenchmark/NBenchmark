@@ -229,7 +229,7 @@ internal sealed class BenchmarkRunner
         // reflects the switch. The effective options are local to this path; the caller's spec
         // is never mutated.
         var effectiveOptions = adaptive.EffectiveOutlierDetector is { } switchedDetector
-            ? spec.Options with { OutlierDetector = switchedDetector }
+            ? spec.Options with { OutlierDetector = () => switchedDetector }
             : spec.Options;
 
         // Per-sample GC deltas (Gen0+Gen1+Gen2), aligned 1:1 with the measured timings, let the
@@ -314,8 +314,6 @@ internal sealed class BenchmarkRunner
             }
         }
 
-        var mode = opts.ToMode();
-
         return new DiagnosticsResult
         {
             Gen0Collections = opts.GcCollectionCounts ? sumGen0 : null,
@@ -332,7 +330,7 @@ internal sealed class BenchmarkRunner
             CpuWallRatio = opts.CpuTime && adaptive.MeasuredDuration.Ticks > 0
                 ? (double)sumCpuTicks / adaptive.MeasuredDuration.Ticks
                 : null,
-            Mode = mode,
+            Collected = opts,
         };
     }
 
@@ -364,7 +362,7 @@ internal sealed class BenchmarkRunner
     private static IReadOnlyList<string> BuildMidBatchGcWarnings(
         MeasurementOptions options, int opsPerSample, long? meanAllocatedBytes)
     {
-        if (options.ForceGcBeforeEachIteration && opsPerSample > 1 && meanAllocatedBytes is > 0)
+        if (options.Resolve().ForceGcBeforeEachIteration && opsPerSample > 1 && meanAllocatedBytes is > 0)
         {
             return
             [

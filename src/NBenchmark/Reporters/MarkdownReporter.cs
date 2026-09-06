@@ -21,6 +21,16 @@ public sealed class MarkdownReporter : IReporter
 
     public ReportDetail Detail { get; set; }
 
+    /// <summary>
+    ///     The path of the file the last <see cref="ReportAsync" /> wrote.
+    /// </summary>
+    /// <remarks>
+    ///     Internal: the extension methods that wrap this reporter for a single result return the path
+    ///     they wrote, and the name is generated inside <see cref="ReportAsync" /> from a timestamp and
+    ///     a counter, so it cannot be predicted from outside.
+    /// </remarks>
+    internal string? LastWrittenPath { get; private set; }
+
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)
@@ -31,6 +41,7 @@ public sealed class MarkdownReporter : IReporter
                        ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.md";
 
         var filePath = Path.Combine(_outputDirectory, fileName);
+        LastWrittenPath = filePath;
 
         var sb = new StringBuilder();
 
@@ -38,7 +49,7 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine();
 
         var tables = BenchmarkTable.BuildPerClass(results);
-        var anyErroredAll = tables.All(t => t.Rows.All(r => r.Errored));
+        var anyErroredAll = tables.All(t => t.Rows.All(r => r.Result.Errored));
 
         if (anyErroredAll)
         {
@@ -48,7 +59,7 @@ public sealed class MarkdownReporter : IReporter
         }
 
         sb.AppendLine(
-            $"> **{tables[0].RunAtUtc} UTC** · {tables[0].WarmupIterations} warmup · {tables[0].MeasuredIterations} measured · {tables[0].Profile.ToString().ToLowerInvariant()} profile");
+            $"> **{tables[0].RunAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? ""} UTC** · {tables[0].WarmupIterations} warmup · {tables[0].MeasuredIterations} measured · {tables[0].Profile.ToString().ToLowerInvariant()} profile");
 
         // The runtime configuration is provenance a reader needs to interpret the numbers at all,
         // so it goes in the header rather than a footnote.
@@ -95,7 +106,7 @@ public sealed class MarkdownReporter : IReporter
         {
             var className = table.CrossClass
                 ? null
-                : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
+                : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.Result.ClassName))?.Result.ClassName;
 
             if (tables.Count > 1)
             {
@@ -131,14 +142,14 @@ public sealed class MarkdownReporter : IReporter
 
     private static void RenderComparisonTable(StringBuilder sb, BenchmarkTable table, ReportDetail detail)
     {
-        var successfulRows = table.Rows.Where(r => !r.Errored).ToList();
-        var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
-        var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Categories.Count > 0);
-        var showRuntime = table.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+        var successfulRows = table.Rows.Where(r => !r.Result.Errored).ToList();
+        var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Result.Median) : 1;
+        var showCategories = detail == ReportDetail.Advanced && table.Rows.Any(r => r.Result.Categories.Count > 0);
+        var showRuntime = table.Rows.Any(r => r.Result.RuntimeMoniker.Length > 0);
 
         // Only when the rows disagree; on a uniform table it would be a constant column.
         var showIsolation = table.MixedIsolationStatuses;
-        var showClass = table.CrossClass && table.Rows.Any(r => r.ClassName.Length > 0);
+        var showClass = table.CrossClass && table.Rows.Any(r => r.Result.ClassName.Length > 0);
         var paramNames = table.ParameterNames;
         var isSimple = detail == ReportDetail.Simple;
 
@@ -146,7 +157,7 @@ public sealed class MarkdownReporter : IReporter
         // competing benchmark in a parameter group or, for a single method swept across parameter
         // values, the fastest point in the table. They collapse to a lone Scale bar only when
         // nothing could be ranked (for example a class whose benchmarks all errored).
-        var hasComparisons = table.Rows.Any(r => !r.Errored && !double.IsNaN(r.Ratio));
+        var hasComparisons = table.Rows.Any(r => !r.Result.Errored && !double.IsNaN(r.Ratio));
         var showRatioInterval = table.Rows.Any(r => r.RatioEstimate is not null);
 
         var header = new StringBuilder("| | Benchmark |");
@@ -236,20 +247,20 @@ public sealed class MarkdownReporter : IReporter
 
         foreach (var row in table.Rows)
         {
-            var baseName = paramNames.Count > 0 ? row.BaseName : row.Name;
+            var baseName = paramNames.Count > 0 ? row.BaseName : row.Result.Name;
 
-            if (row.Errored)
+            if (row.Result.Errored)
             {
                 var errored = new StringBuilder($"| ✗ | ~~{baseName}~~ |");
 
                 if (showClass)
-                    errored.Append($" {row.ClassName} |");
+                    errored.Append($" {row.Result.ClassName} |");
 
                 if (showRuntime)
-                    errored.Append($" {row.RuntimeMoniker} |");
+                    errored.Append($" {row.Result.RuntimeMoniker} |");
 
                 if (showIsolation)
-                    errored.Append($" {row.IsolationStatus.ToLabel()} |");
+                    errored.Append($" {row.Result.IsolationStatus.ToLabel()} |");
 
                 foreach (var name in paramNames)
                 {
@@ -281,24 +292,24 @@ public sealed class MarkdownReporter : IReporter
                 ? $"**{baseName}** _(baseline)_"
                 : baseName;
 
-            var bar = RenderMarkdownBar(row.Median, maxMedian);
+            var bar = RenderMarkdownBar(row.Result.Median, maxMedian);
 
-            var allocText = row.MeanAllocatedBytes.HasValue
-                ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
+            var allocText = row.Result.MeanAllocatedBytes.HasValue
+                ? BenchmarkFormatter.FormatBytes(row.Result.MeanAllocatedBytes.Value)
                 : "-";
 
-            var opsText = BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond);
+            var opsText = BenchmarkFormatter.FormatOpsPerSecond(row.Result.OperationsPerSecond);
 
             var line = new StringBuilder($"| | {nameText} |");
 
             if (showClass)
-                line.Append($" {row.ClassName} |");
+                line.Append($" {row.Result.ClassName} |");
 
             if (showRuntime)
-                line.Append($" {row.RuntimeMoniker} |");
+                line.Append($" {row.Result.RuntimeMoniker} |");
 
             if (showIsolation)
-                line.Append($" {row.IsolationStatus.ToLabel()} |");
+                line.Append($" {row.Result.IsolationStatus.ToLabel()} |");
 
             foreach (var name in paramNames)
             {
@@ -306,10 +317,10 @@ public sealed class MarkdownReporter : IReporter
             }
 
             line.Append(
-                $" {BenchmarkFormatter.FormatNs(row.Median)} |");
+                $" {BenchmarkFormatter.FormatNs(row.Result.Median)} |");
 
             if (!isSimple)
-                line.Append($" {BenchmarkFormatter.FormatNs(row.Mean)} |");
+                line.Append($" {BenchmarkFormatter.FormatNs(row.Result.Mean)} |");
 
             line.Append(
                 $" {opsText} |");
@@ -332,7 +343,7 @@ public sealed class MarkdownReporter : IReporter
 
                 if (!isSimple)
                 {
-                    var magnitudeText = row.Effect?.Magnitude ?? "-";
+                    var magnitudeText = row.Result.Effect?.Magnitude ?? "-";
                     line.Append($" {magnitudeText} |");
                 }
             }
@@ -343,7 +354,7 @@ public sealed class MarkdownReporter : IReporter
 
             if (showCategories)
             {
-                var categoryText = row.Categories.Count > 0 ? string.Join(", ", row.Categories) : "-";
+                var categoryText = row.Result.Categories.Count > 0 ? string.Join(", ", row.Result.Categories) : "-";
                 line.Append($" {categoryText} |");
             }
 
@@ -355,20 +366,20 @@ public sealed class MarkdownReporter : IReporter
 
     private static string FormatParameterCell(BenchmarkRow row, string parameterName)
     {
-        var parameter = row.ParameterSet.FirstOrDefault(p => p.Name == parameterName);
+        var parameter = row.Result.ParameterSet.FirstOrDefault(p => p.Name == parameterName);
         return parameter is null ? "-" : BenchmarkParameter.FormatValue(parameter.Value);
     }
 
     private static void RenderTimingDetail(StringBuilder sb, BenchmarkTable table)
     {
-        var successful = table.Rows.Where(r => !r.Errored).ToList();
-        var showRuntime = successful.Any(r => r.RuntimeMoniker.Length > 0);
+        var successful = table.Rows.Where(r => !r.Result.Errored).ToList();
+        var showRuntime = successful.Any(r => r.Result.RuntimeMoniker.Length > 0);
 
         if (successful.Count == 0)
             return;
 
         var percentileKeys = successful
-            .SelectMany(r => r.Percentiles)
+            .SelectMany(r => r.Result.Percentiles)
             .Select(e => e.Percentile)
             .Where(p => p > 0.50 && p < 1.0)
             .Distinct()
@@ -408,15 +419,15 @@ public sealed class MarkdownReporter : IReporter
                 .Select(p => row.GetPercentile(p))
                 .Select(value => value.HasValue ? BenchmarkFormatter.FormatNs(value.Value) : string.Empty);
 
-            var line = new StringBuilder($"| {row.Name} |");
+            var line = new StringBuilder($"| {row.Result.Name} |");
 
             if (showRuntime)
-                line.Append($" {row.RuntimeMoniker} |");
+                line.Append($" {row.Result.RuntimeMoniker} |");
 
             line.Append(
-                $" ±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}%) "
-                + $"| {BenchmarkFormatter.FormatNs(row.StandardDeviation)} "
-                + $"| {row.CoefficientOfVariationPercent:F2}% ");
+                $" ±{BenchmarkFormatter.FormatNs(row.Result.MarginOfError)} ({row.Result.MarginPercent:F2}%) "
+                + $"| {BenchmarkFormatter.FormatNs(row.Result.StandardDeviation)} "
+                + $"| {row.Result.CoefficientOfVariationPercent:F2}% ");
 
             if (percentileKeys.Count > 0)
                 line.Append($"| {string.Join(" | ", tailCells)} |");
@@ -431,7 +442,7 @@ public sealed class MarkdownReporter : IReporter
 
     private static void RenderDiagnostics(StringBuilder sb, BenchmarkTable table)
     {
-        var rowsWithDiag = table.Rows.Where(r => r.Diagnostics is not null).ToList();
+        var rowsWithDiag = table.Rows.Where(r => r.Result.Diagnostics is not null).ToList();
 
         if (rowsWithDiag.Count == 0)
             return;
@@ -442,7 +453,7 @@ public sealed class MarkdownReporter : IReporter
         var header = new StringBuilder("| Benchmark |");
         var separator = new StringBuilder("|---|");
 
-        var showRuntime = table.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+        var showRuntime = table.Rows.Any(r => r.Result.RuntimeMoniker.Length > 0);
 
         if (showRuntime)
         {
@@ -450,10 +461,10 @@ public sealed class MarkdownReporter : IReporter
             separator.Append("---:|");
         }
 
-        var hasGen0 = rowsWithDiag.Any(r => r.Diagnostics!.Gen0Collections.HasValue);
-        var hasHeap = rowsWithDiag.Any(r => r.Diagnostics!.HeapCommittedBytes.HasValue);
-        var hasCpu = rowsWithDiag.Any(r => r.Diagnostics!.CpuWallRatio.HasValue);
-        var hasExc = rowsWithDiag.Any(r => r.Diagnostics!.ExceptionCountPerOp.HasValue);
+        var hasGen0 = rowsWithDiag.Any(r => r.Result.Diagnostics!.Gen0Collections.HasValue);
+        var hasHeap = rowsWithDiag.Any(r => r.Result.Diagnostics!.HeapCommittedBytes.HasValue);
+        var hasCpu = rowsWithDiag.Any(r => r.Result.Diagnostics!.CpuWallRatio.HasValue);
+        var hasExc = rowsWithDiag.Any(r => r.Result.Diagnostics!.ExceptionCountPerOp.HasValue);
 
         if (hasGen0)
         {
@@ -484,12 +495,12 @@ public sealed class MarkdownReporter : IReporter
 
         foreach (var row in rowsWithDiag)
         {
-            var line = new StringBuilder($"| {MarkdownEscape(row.Name)} |");
+            var line = new StringBuilder($"| {MarkdownEscape(row.Result.Name)} |");
 
             if (showRuntime)
-                line.Append($" {row.RuntimeMoniker} |");
+                line.Append($" {row.Result.RuntimeMoniker} |");
 
-            var diag = row.Diagnostics!;
+            var diag = row.Result.Diagnostics!;
 
             if (hasGen0)
             {
@@ -533,7 +544,7 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine("### Distribution Details");
         sb.AppendLine();
 
-        foreach (var row in table.Rows.Where(r => !r.Errored))
+        foreach (var row in table.Rows.Where(r => !r.Result.Errored))
         {
             var statsBlock = BenchmarkTable.RenderStatsBlock(row, detail);
 
@@ -541,12 +552,12 @@ public sealed class MarkdownReporter : IReporter
                 continue;
 
             sb.AppendLine("<details>");
-            sb.AppendLine($"<summary><strong>{row.Name}</strong></summary>");
+            sb.AppendLine($"<summary><strong>{row.Result.Name}</strong></summary>");
             sb.AppendLine();
             sb.AppendLine("```");
             sb.AppendLine(statsBlock);
 
-            if (row.AutoTune is { } diagnostic)
+            if (row.Result.AutoTune is { } diagnostic)
                 sb.AppendLine(BenchmarkTable.FormatAutoTuneSummary(diagnostic));
 
             sb.AppendLine("```");
@@ -564,8 +575,8 @@ public sealed class MarkdownReporter : IReporter
         sb.AppendLine();
 
         var hasMultipleRuntimes = table.Rows
-            .Where(r => !r.Errored)
-            .Select(r => r.RuntimeMoniker)
+            .Where(r => !r.Result.Errored)
+            .Select(r => r.Result.RuntimeMoniker)
             .Distinct(StringComparer.Ordinal)
             .Take(2)
             .Count() > 1;
@@ -607,7 +618,7 @@ public sealed class MarkdownReporter : IReporter
 
     private static void RenderSimpleFooter(StringBuilder sb, BenchmarkTable table)
     {
-        var count = table.Rows.Count(r => !r.Errored);
+        var count = table.Rows.Count(r => !r.Result.Errored);
 
         sb.AppendLine(
             $"{count} benchmark(s) · {table.TotalDuration.TotalSeconds:F1}s total · CI {table.ConfidenceLevel * 100:0.#}%");
@@ -618,7 +629,7 @@ public sealed class MarkdownReporter : IReporter
     private static void RenderWarnings(StringBuilder sb, BenchmarkTable table)
     {
         var warnings = table.Rows
-            .Where(r => !r.Errored && r.Warnings.Count > 0)
+            .Where(r => !r.Result.Errored && r.Result.Warnings.Count > 0)
             .ToList();
 
         if (warnings.Count == 0)
@@ -629,9 +640,9 @@ public sealed class MarkdownReporter : IReporter
 
         foreach (var row in warnings)
         {
-            foreach (var warning in row.Warnings)
+            foreach (var warning in row.Result.Warnings)
             {
-                sb.AppendLine($"- **{row.Name}**: {warning}");
+                sb.AppendLine($"- **{row.Result.Name}**: {warning}");
             }
         }
 
@@ -699,8 +710,8 @@ public sealed class MarkdownReporter : IReporter
     private static string GetEffectMetricSummary(IReadOnlyList<BenchmarkRow> rows)
     {
         var metrics = rows
-            .Where(r => !r.Errored)
-            .Select(r => r.Effect?.Metric)
+            .Where(r => !r.Result.Errored)
+            .Select(r => r.Result.Effect?.Metric)
             .Where(m => !string.IsNullOrWhiteSpace(m))
             .Distinct(StringComparer.Ordinal)
             .ToList();

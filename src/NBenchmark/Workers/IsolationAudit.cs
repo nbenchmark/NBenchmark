@@ -22,7 +22,7 @@ internal readonly record struct IsolationRefusal(string Name, IsolationStatus St
 internal static class IsolationAudit
 {
     /// <summary>
-    ///     Throws when <see cref="MeasurementOptions.RequireIsolation" /> is set and isolation was
+    ///     Throws when <see cref="MeasurementOptions.Isolation" /> is set and isolation was
     ///     <b>refused</b>.
     /// </summary>
     /// <remarks>
@@ -36,8 +36,8 @@ internal static class IsolationAudit
     ///     </para>
     ///     <para>
     ///         Keyed on <see cref="IsolationStatusExtensions.IsRefusal" />, never on
-    ///         <c>!IsIsolated()</c>. <c>--dry-run</c>, <c>--in-process</c>, <c>[InProcess]</c>,
-    ///         <c>Benchmark.RunInProcess</c>, <c>WithIsolation(false)</c> and
+    ///         <c>!IsIsolated()</c>. <c>--dry-run</c>, <c>--in-process</c>, <c>[Isolation(Isolation.Off)]</c>,
+    ///         <c>Benchmark.RunInProcess</c>, <c>WithIsolation(Isolation.Off)</c> and
     ///         <c>BenchmarkSuite.AddInProcess</c> all produce
     ///         <see cref="IsolationStatus.InProcessRequested" /> and must stay legal - the whole point of
     ///         the default being on is that asking for the host process is still a thing you can do.
@@ -55,7 +55,7 @@ internal static class IsolationAudit
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        if (!options.RequireIsolation || !status.IsRefusal())
+        if (!options.RequiresIsolation || !status.IsRefusal())
             return;
 
         throw new InvalidOperationException(Explain(name, status, refusal));
@@ -76,7 +76,7 @@ internal static class IsolationAudit
     }
 
     /// <summary>
-    ///     Throws when <see cref="MeasurementOptions.RequireIsolation" /> is set and anything in
+    ///     Throws when <see cref="MeasurementOptions.Isolation" /> is set and anything in
     ///     <paramref name="refusals" /> was refused - reporting all of them in one message.
     /// </summary>
     /// <remarks>
@@ -91,7 +91,7 @@ internal static class IsolationAudit
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(refusals);
 
-        if (!options.RequireIsolation)
+        if (!options.RequiresIsolation)
             return;
 
         var offenders = refusals.Where(r => r.Status.IsRefusal()).ToList();
@@ -132,10 +132,10 @@ internal static class IsolationAudit
     ///     - in-process becomes something you ask for rather than something that happens to you.
     /// </summary>
     private const string OptOut =
-        " To measure in this process deliberately, use [InProcess] (Harness mode), "
-        + "Benchmark.RunInProcess (Single mode), or BenchmarkSuite.AddInProcess / WithIsolation(false) "
-        + "(Suite mode) - or set MeasurementOptions.RequireIsolation = false to accept labelled "
-        + "fallbacks everywhere.";
+        " To measure in this process deliberately, use [Isolation(Isolation.Off)] (Harness mode), "
+        + "Benchmark.RunInProcess (Single mode), or BenchmarkSuite.AddInProcess / "
+        + "WithIsolation(Isolation.Off) (Suite mode) - or set Isolation = Isolation.Preferred to accept "
+        + "labelled fallbacks everywhere.";
 
     /// <summary>
     ///     Fails the run when isolation was refused for any result, naming each one and what to do

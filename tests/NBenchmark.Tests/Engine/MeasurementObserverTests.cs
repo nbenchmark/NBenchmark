@@ -16,7 +16,7 @@ public class MeasurementObserverTests
             WarmupIterations = 3,
             Iterations = 5,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
         var clock = new ScriptedClock(2000.0);
@@ -39,7 +39,7 @@ public class MeasurementObserverTests
             WarmupIterations = 3,
             Iterations = 5,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
         };
 
@@ -100,7 +100,7 @@ public class MeasurementObserverTests
             WarmupIterations = null, // auto warmup
             Iterations = 10, // explicit measured count
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             // Isolate the plateau rule from the warmup time floor and JIT gate so the scripted 1000 ns body
             // settles on the plateau (32) rather than running to MaxWarmup.
             AutoTune = AutoTuneOptions.Default with
@@ -149,7 +149,7 @@ public class MeasurementObserverTests
             WarmupIterations = 0, // no warmup
             Iterations = null, // auto sample count -> CI detector
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             // MinMeasurementTime = 0 isolates the CI stop rule from the measurement time floor, which
             // would otherwise hold this scripted 1 us body to its derived sample floor. This test is
             // about the detector events, not the floor.
@@ -198,7 +198,7 @@ public class MeasurementObserverTests
             WarmupIterations = 0,
             Iterations = 3,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             // Pin the 1 µs target this test's scripted 250/2000 ns timings assume (the default is now 10 µs).
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false, TargetSampleDurationNs = 1_000 },
         };
@@ -242,7 +242,7 @@ public class MeasurementObserverTests
             WarmupIterations = 0,
             Iterations = 3,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
 
             // Default AutoTune has EnableJitterCalibration = true.
         };
@@ -277,7 +277,7 @@ public class MeasurementObserverTests
             WarmupIterations = 0,
             Iterations = 5,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
         };
 

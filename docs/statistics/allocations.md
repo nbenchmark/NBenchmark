@@ -115,7 +115,7 @@ dotnet run -- --no-allocations
 Or in code:
 
 ```csharp
-options with { MeasureAllocationsOverride = false }
+options with { MeasureAllocations = false }
 ```
 
 ## See also

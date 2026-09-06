@@ -31,16 +31,16 @@ public class ScopedFactoryIsolationTests
     [Fact]
     public void ScopedServiceProvider_Factory_CanIsolate()
     {
-        var harness = BenchmarkHarness.Create([]).WithScopedServiceProvider(BuildServices);
+        var harness = BenchmarkHarness.Create([]).WithScopedServices(BuildServices);
 
         Assert.Null(harness.InstanceSourceRefusalForTesting());
     }
 
     [Fact]
-    public void UseScopedDependencyInjection_Factory_CanIsolate()
+    public void ScopedServices_Factory_CanIsolate()
     {
         var harness = BenchmarkHarness.Create([])
-            .UseScopedDependencyInjection<FactoryScopedBenchmark>(BuildServices);
+            .AddFromAssembly<FactoryScopedBenchmark>().WithScopedServices(BuildServices);
 
         Assert.Null(harness.InstanceSourceRefusalForTesting());
     }
@@ -62,7 +62,7 @@ public class ScopedFactoryIsolationTests
         var tag = Guid.NewGuid().ToString();
 
         var harness = BenchmarkHarness.Create([])
-            .WithScopedServiceProvider(() => new ServiceCollection()
+            .WithScopedServices(() => new ServiceCollection()
                 .AddSingleton(tag)
                 .BuildServiceProvider());
 
@@ -94,8 +94,8 @@ public class ScopedFactoryIsolationTests
         var harness = BenchmarkHarness.Create([]);
 
         _ = scoped
-            ? harness.WithScopedServiceProvider(Factory)
-            : harness.WithServiceProvider(Factory);
+            ? harness.WithScopedServices(Factory)
+            : harness.WithServices(Factory);
 
         Assert.Equal(0, built);
     }

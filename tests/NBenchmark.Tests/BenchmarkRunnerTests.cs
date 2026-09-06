@@ -435,7 +435,7 @@ public class BenchmarkRunnerTests
                 WarmupIterations = 0,
                 Iterations = null,
                 OutlierMode = OutlierMode.None,
-                MeasureAllocationsOverride = false,
+                MeasureAllocations = false,
                 AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 },
             },
         };
@@ -460,7 +460,7 @@ public class BenchmarkRunnerTests
                 WarmupIterations = 0,
                 Iterations = null,
                 OutlierMode = OutlierMode.None,
-                MeasureAllocationsOverride = false,
+                MeasureAllocations = false,
                 AutoTune = AutoTuneOptions.Default with
                 {
                     MaxTuningTime = TimeSpan.FromTicks(50),
@@ -490,7 +490,7 @@ public class BenchmarkRunnerTests
                 WarmupIterations = null, // auto warmup
                 Iterations = 1,
                 OutlierMode = OutlierMode.None,
-                MeasureAllocationsOverride = false,
+                MeasureAllocations = false,
                 AutoTune = AutoTuneOptions.Default with
                 {
                     MaxTuningTime = TimeSpan.FromTicks(50),
@@ -556,7 +556,7 @@ public class BenchmarkRunnerTests
             {
                 WarmupIterations = 1,
                 Iterations = 10,
-                MeasureAllocationsOverride = true,
+                MeasureAllocations = true,
                 OutlierMode = OutlierMode.None,
             },
         };
@@ -593,8 +593,8 @@ public class BenchmarkRunnerTests
                 {
                     WarmupIterations = 1,
                     Iterations = 30,
-                    MeasureAllocationsOverride = true,
-                    ForceGcBeforeEachIterationOverride = false,
+                    MeasureAllocations = true,
+                    ForceGcBeforeEachIteration = false,
                     OutlierMode = OutlierMode.None,
                 },
             };
@@ -630,7 +630,7 @@ public class BenchmarkRunnerTests
             {
                 WarmupIterations = 1,
                 Iterations = 10,
-                MeasureAllocationsOverride = true,
+                MeasureAllocations = true,
                 OutlierMode = OutlierMode.None,
             },
         };
@@ -677,8 +677,8 @@ public class BenchmarkRunnerTests
                 {
                     WarmupIterations = 1,
                     Iterations = 30,
-                    MeasureAllocationsOverride = true,
-                    ForceGcBeforeEachIterationOverride = false,
+                    MeasureAllocations = true,
+                    ForceGcBeforeEachIteration = false,
                     OutlierMode = OutlierMode.RemoveTop5Percent,
                 },
             };
@@ -725,7 +725,7 @@ public class BenchmarkRunnerTests
         var outcome = BenchmarkRunner.Instance.Run("diag-default", () => Thread.SpinWait(25), spec);
 
         Assert.NotNull(outcome.Result.Diagnostics);
-        Assert.Equal(DiagnosticsMode.Gc, outcome.Result.Diagnostics!.Mode);
+        Assert.Equal(DiagnosticsOptions.Default, outcome.Result.Diagnostics!.Collected);
     }
 
     [Fact]
@@ -749,7 +749,7 @@ public class BenchmarkRunnerTests
         var outcome = BenchmarkRunner.Instance.Run("diag-custom", () => Thread.SpinWait(25), spec);
 
         Assert.NotNull(outcome.Result.Diagnostics);
-        Assert.Equal(DiagnosticsMode.GcHeapInfo | DiagnosticsMode.Exceptions, outcome.Result.Diagnostics!.Mode);
+        Assert.Equal(new DiagnosticsOptions { GcHeapInfo = true, Exceptions = true }, outcome.Result.Diagnostics!.Collected);
     }
 
     // ---------- IsBaseline plumbing ----------
@@ -837,7 +837,7 @@ public class BenchmarkRunnerTests
                 Iterations = 2,
                 OpsPerSample = 1,
                 OutlierMode = OutlierMode.None,
-                MeasureAllocationsOverride = false,
+                MeasureAllocations = false,
                 AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
             },
         };

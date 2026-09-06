@@ -68,7 +68,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     ///     <see cref="RequireIsolation_OnRefusal_ThrowsWithTheReason" />, so both sides are covered
     ///     rather than one being avoided.
     /// </remarks>
-    private static BenchmarkSuite Fallback(BenchmarkSuite suite) => Fast(suite).WithRequireIsolation(false);
+    private static BenchmarkSuite Fallback(BenchmarkSuite suite) => Fast(suite).WithIsolation(Isolation.Preferred);
 
     /// <summary>
     ///     Under <c>RequireIsolation</c> - still all-or-nothing, unaffected by R5 part 2 below - a
@@ -94,7 +94,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
                     .Add("clean", static () => Thread.SpinWait(200))
                     .Add("holds-a-stream", () => first.Length)
                     .Add("holds-a-writer", () => second.ToString().Length))
-                .WithRequireIsolation()
+                .WithIsolation(Isolation.Required)
                 .RunAsync());
 
         Assert.Contains("holds-a-stream", ex.Message);
@@ -300,7 +300,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
             Fast(new BenchmarkSuite("captures")
                     .Add("clean", () => Thread.SpinWait(200))
                     .Add("dirty", () => stream.Length))
-                .WithRequireIsolation()
+                .WithIsolation(Isolation.Required)
                 .RunAsync());
 
         Assert.Contains("dirty", ex.Message);
@@ -511,7 +511,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     <c>WithIsolation(false)</c> is a deliberate request for the host process, and is reported
+    ///     <c>WithIsolation(Isolation.Off)</c> is a deliberate request for the host process, and is reported
     ///     as such rather than as a refusal the user should act on.
     /// </summary>
     [Fact]
@@ -530,7 +530,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         {
             results = await Fast(new BenchmarkSuite("opted-out")
                     .Add("a", () => Thread.SpinWait(200)))
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         }
         finally
@@ -822,7 +822,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             Fast(new BenchmarkSuite("strict")
                     .Add("dirty", () => Thread.SpinWait(spins)))
-                .WithRequireIsolation()
+                .WithIsolation(Isolation.Required)
                 .RunAsync());
 
         Assert.Contains("isolation is required", ex.Message);
@@ -839,7 +839,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     {
         var results = await Fast(new BenchmarkSuite("strict-ok")
                 .Add("clean", () => Thread.SpinWait(200)))
-            .WithRequireIsolation()
+            .WithIsolation(Isolation.Required)
             .RunAsync();
 
         var result = Assert.Single(results);
@@ -854,7 +854,7 @@ public sealed class InlineSuiteIsolationTests : IDisposable
     ///     <para>
     ///         The all-or-nothing behaviour this replaces is the reason it exists: one body holding
     ///         something that cannot cross took every other benchmark in the suite into the host process
-    ///         with it, and <c>WithIsolation(false)</c> was the only lever. The price of measuring one
+    ///         with it, and <c>WithIsolation(Isolation.Off)</c> was the only lever. The price of measuring one
     ///         un-isolatable thing was every comparison it was part of.
     ///     </para>
     ///     <para>

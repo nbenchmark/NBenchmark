@@ -14,13 +14,13 @@ namespace NBenchmark.Tests.Workers;
 ///     The gate keys on <see cref="IsolationStatusExtensions.IsRefusal" />, never on
 ///     <c>!IsIsolated()</c>. That distinction is the whole of what makes the default acceptable: every
 ///     deliberate route to the host process - <c>--dry-run</c>, <c>--in-process</c>,
-///     <c>[InProcess]</c>, <c>RunInProcess</c>, <c>WithIsolation(false)</c>, <c>AddInProcess</c> -
+///     <c>[Isolation(Isolation.Off)]</c>, <c>RunInProcess</c>, <c>WithIsolation(Isolation.Off)</c>, <c>AddInProcess</c> -
 ///     produces <see cref="IsolationStatus.InProcessRequested" />, and every one of them has to stay
 ///     legal.
 /// </remarks>
 public sealed class RequiredIsolationTests
 {
-    private static MeasurementOptions Required => MeasurementOptions.Default with { RequireIsolation = true };
+    private static MeasurementOptions Required => MeasurementOptions.Default with { Isolation = Isolation.Required };
 
     /// <summary>
     ///     Enough measurement to produce a row and no more. These tests are about the isolation
@@ -46,8 +46,8 @@ public sealed class RequiredIsolationTests
     ///     happens to a user who configured nothing.
     /// </summary>
     [Fact]
-    public void RequireIsolation_IsOnByDefault()
-        => Assert.True(MeasurementOptions.Default.RequireIsolation);
+    public void RequiredIsolation_IsTheDefault()
+        => Assert.Equal(Isolation.Required, MeasurementOptions.Default.Isolation);
 
     /// <summary>
     ///     A deliberate in-process run passes the gate. Keyed on <c>!IsIsolated()</c> this would throw
@@ -87,7 +87,7 @@ public sealed class RequiredIsolationTests
     [Fact]
     public void ThrowIfRequired_WhenNotRequired_DoesNotThrow()
         => IsolationAudit.ThrowIfRequired(
-            MeasurementOptions.Default with { RequireIsolation = false },
+            MeasurementOptions.Default with { Isolation = Isolation.Preferred },
             "sorter",
             IsolationStatus.InProcessCapturedState,
             "it captures 'comparer'.");
@@ -121,7 +121,7 @@ public sealed class RequiredIsolationTests
     }
 
     /// <summary>
-    ///     <c>--strict-isolation</c> reaches <see cref="MeasurementOptions.RequireIsolation" />.
+    ///     <c>--strict-isolation</c> reaches <see cref="MeasurementOptions.Isolation" />.
     /// </summary>
     /// <remarks>
     ///     It set a CLI field with no mapping onto the options, so the flag could only ever take the
@@ -130,16 +130,16 @@ public sealed class RequiredIsolationTests
     ///     different times.
     /// </remarks>
     [Fact]
-    public void StrictIsolationFlag_TurnsOnRequireIsolation()
+    public void StrictIsolationFlag_AsksForRequiredIsolation()
     {
         var (cliArgs, errors) = CliArgs.ParseCore(["--strict-isolation"]);
 
         Assert.Empty(errors);
 
         var options = MeasurementOverrides.FromCliArgs(cliArgs)
-            .Apply(MeasurementOptions.Default with { RequireIsolation = false });
+            .Apply(MeasurementOptions.Default with { Isolation = Isolation.Preferred });
 
-        Assert.True(options.RequireIsolation);
+        Assert.Equal(Isolation.Required, options.Isolation);
     }
 
     /// <summary>
@@ -152,9 +152,9 @@ public sealed class RequiredIsolationTests
         var (cliArgs, _) = CliArgs.ParseCore([]);
 
         var options = MeasurementOverrides.FromCliArgs(cliArgs)
-            .Apply(MeasurementOptions.Default with { RequireIsolation = false });
+            .Apply(MeasurementOptions.Default with { Isolation = Isolation.Preferred });
 
-        Assert.False(options.RequireIsolation);
+        Assert.Equal(Isolation.Preferred, options.Isolation);
     }
 
     /// <summary>
@@ -181,7 +181,7 @@ public sealed class RequiredIsolationTests
             // A live factory: the coordinator holds it, so no worker can reproduce it.
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
-            .WithIsolation()
+            .WithIsolation(Isolation.Required)
             .WithOptions(Fast);
 
         using var scope = FakeWorkerLauncher.Install(_ => throw new InvalidOperationException("must not launch"));
@@ -209,11 +209,11 @@ public sealed class RequiredIsolationTests
 
     /// <summary>
     ///     Turning the requirement off restores the labelled fallback, and the harness now reads the
-    ///     setting at all - <c>WithOptions(new MeasurementOptions { RequireIsolation = true })</c> used
+    ///     setting at all - <c>WithOptions(new MeasurementOptions { Isolation = Isolation.Required })</c> used
     ///     to set a field nothing consulted.
     /// </summary>
     [Fact]
-    public async Task Harness_WithRequireIsolationOff_FallsBackAndLabels()
+    public async Task Harness_WithPreferredIsolation_FallsBackAndLabels()
     {
         GateFixtureOne.Invocations = 0;
         GateFixtureTwo.Invocations = 0;
@@ -224,11 +224,10 @@ public sealed class RequiredIsolationTests
             .WithCategoryFilter(["require-isolation-gate"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
-            .WithIsolation()
             .WithOptions(Fast)
 
             // After WithOptions, which replaces the record wholesale.
-            .WithRequireIsolation(false);
+            .WithIsolation(Isolation.Preferred);
 
         // A worker is available, so the refusal is the live factory rather than a missing nbworker -
         // which is what this test is about. The test host deploys none of its own.
@@ -254,7 +253,7 @@ public sealed class RequiredIsolationTests
     }
 
     /// <summary>
-    ///     An explicit <c>[IsolatedProcess]</c> that is denied says so, on the console and on the row.
+    ///     An explicit <c>[Isolation(Isolation.Required)]</c> that is denied says so, on the console and on the row.
     /// </summary>
     /// <remarks>
     ///     It used to be indistinguishable from a benchmark that never asked: same status, same label,
@@ -270,11 +269,10 @@ public sealed class RequiredIsolationTests
             .WithCategoryFilter(["require-isolation-denied"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
-            .WithIsolation()
             .WithOptions(Fast)
 
             // After WithOptions, which replaces the record wholesale.
-            .WithRequireIsolation(false);
+            .WithIsolation(Isolation.Preferred);
 
         // A worker is available, so the refusal is the live factory rather than a missing nbworker -
         // which is what this test is about. The test host deploys none of its own.
@@ -294,28 +292,15 @@ public sealed class RequiredIsolationTests
             Console.SetError(priorError);
         }
 
-        Assert.Contains("[IsolatedProcess]", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("[Isolation(Isolation.Required)]", stderr.ToString(), StringComparison.Ordinal);
 
         var demanded = results.Single(r => r.Name.EndsWith(".Demanded", StringComparison.Ordinal));
         var ordinary = results.Single(r => r.Name.EndsWith(".Ordinary", StringComparison.Ordinal));
 
-        Assert.Contains(demanded.Warnings, w => w.Contains("[IsolatedProcess]", StringComparison.Ordinal));
-        Assert.DoesNotContain(ordinary.Warnings, w => w.Contains("[IsolatedProcess]", StringComparison.Ordinal));
+        Assert.Contains(demanded.Warnings, w => w.Contains("[Isolation(Isolation.Required)]", StringComparison.Ordinal));
+        Assert.DoesNotContain(ordinary.Warnings, w => w.Contains("[Isolation(Isolation.Required)]", StringComparison.Ordinal));
     }
 
-    /// <summary>
-    ///     One member asking for both processes is refused rather than resolved. NB0015 catches it in
-    ///     source; this catches the assemblies no analyzer ever saw.
-    /// </summary>
-    [Fact]
-    public void ConflictingIsolationAttributes_AreRefusedAtDiscovery()
-    {
-        var error = Assert.Throws<InvalidOperationException>(
-            () => new BenchmarkDiscoverer().Discover(typeof(ErrorFixtures.ConflictingIsolationBenchmarks)));
-
-        Assert.Contains("[InProcess]", error.Message, StringComparison.Ordinal);
-        Assert.Contains("[IsolatedProcess]", error.Message, StringComparison.Ordinal);
-    }
 }
 
 // Two classes so the discovery-time pass has something to report about more than one of them.
@@ -341,7 +326,7 @@ public class GateFixtureTwo
 public class DeniedIsolationRequestBenchmarks
 {
     [Benchmark]
-    [IsolatedProcess]
+    [Isolation(Isolation.Required)]
     public void Demanded()
     {
     }

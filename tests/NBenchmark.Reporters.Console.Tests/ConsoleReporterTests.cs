@@ -193,7 +193,7 @@ public class ConsoleReporterTests
                 Gen0Collections = 1,
                 Gen1Collections = 0,
                 Gen2Collections = 0,
-                Mode = DiagnosticsMode.Gc,
+                Collected = DiagnosticsOptions.Default,
             },
         };
 
@@ -202,7 +202,7 @@ public class ConsoleReporterTests
             Diagnostics = new DiagnosticsResult
             {
                 CpuWallRatio = 0.42,
-                Mode = DiagnosticsMode.CpuTime,
+                Collected = new DiagnosticsOptions { CpuTime = true },
             },
         };
 

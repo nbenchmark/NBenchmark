@@ -6,9 +6,10 @@ namespace NBenchmark.DependencyInjection;
 
 public static class DependencyInjectionHarnessExtensions
 {
-    // No WithServiceProvider here. BenchmarkHarness declares the (single) overload itself, and an
-    // extension method of the same name on the same type is shadowed by the instance method - so the
-    // one this package used to carry could never be called.
+    // No root-resolved overload here. BenchmarkHarness.WithServices is the root-resolved form and
+    // needs nothing from this package - Func<IServiceProvider> is a BCL type - so the two live where
+    // their dependencies do. An extension method of the same name on the same type would in any case
+    // be shadowed by the instance method and never called.
 
     // No overload taking a built IServiceProvider, on purpose. It set no Recipe, so InstanceSource
     // .Refusal() was unconditional and the run threw before anything was measured - a compile error
@@ -35,7 +36,8 @@ public static class DependencyInjectionHarnessExtensions
     ///     </para>
     ///     <code>
     ///     await BenchmarkHarness.Create(args)
-    ///         .UseScopedDependencyInjection&lt;OrderBenchmarks&gt;(BuildServices)
+    ///         .AddFromAssembly&lt;OrderBenchmarks&gt;()
+    ///         .WithScopedServices(BuildServices)
     ///         .RunAsync();
     ///
     ///     static IServiceProvider BuildServices() =&gt; new ServiceCollection()
@@ -50,7 +52,7 @@ public static class DependencyInjectionHarnessExtensions
     ///         live object that cannot cross.
     ///     </para>
     /// </remarks>
-    public static BenchmarkHarness WithScopedServiceProvider(
+    public static BenchmarkHarness WithScopedServices(
         this BenchmarkHarness harness,
         Func<IServiceProvider> factory)
     {
@@ -97,66 +99,5 @@ public static class DependencyInjectionHarnessExtensions
                 throw;
             }
         };
-    }
-
-    /// <summary>
-    ///     Discovers benchmarks on <typeparamref name="T" />'s assembly and resolves their instances from
-    ///     a container built by <paramref name="services" />, keeping the run isolated.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         There is no overload taking a built <see cref="IServiceProvider" />: a container is live
-    ///         code holding singletons and open handles, so a worker would have to be handed one rather
-    ///         than able to build it. Passing the factory instead lets the worker build an equivalent
-    ///         container in the process that measures:
-    ///     </para>
-    ///     <code>
-    ///     await BenchmarkHarness.Create(args)
-    ///         .UseDependencyInjection&lt;MyBenchmarks&gt;(BuildServices)
-    ///         .RunAsync();
-    ///
-    ///     static IServiceProvider BuildServices() =&gt; new ServiceCollection()
-    ///         .AddSingleton&lt;IDataStore, InMemoryDataStore&gt;()
-    ///         .AddTransient&lt;MyBenchmarks&gt;()
-    ///         .BuildServiceProvider();
-    ///     </code>
-    ///     <para>
-    ///         The factory must be static and capture nothing, for the same reason a benchmark body must.
-    ///     </para>
-    ///     <para>
-    ///         Instances are resolved from the <b>root</b> container. Use
-    ///         <see cref="UseScopedDependencyInjection{T}(BenchmarkHarness, Func{IServiceProvider})" />
-    ///         when any registration is <c>AddScoped</c>.
-    ///     </para>
-    /// </remarks>
-    public static BenchmarkHarness UseDependencyInjection<T>(
-        this BenchmarkHarness harness,
-        Func<IServiceProvider> services)
-    {
-        ArgumentNullException.ThrowIfNull(harness);
-        ArgumentNullException.ThrowIfNull(services);
-
-        return harness.AddFromAssembly<T>().WithServiceProvider(services);
-    }
-
-    /// <summary>
-    ///     Discovers benchmarks on <typeparamref name="T" />'s assembly and resolves each instance from
-    ///     its own scope in a container built by <paramref name="services" />, keeping the run isolated.
-    /// </summary>
-    /// <remarks>
-    ///     The scoped counterpart of
-    ///     <see cref="UseDependencyInjection{T}(BenchmarkHarness, Func{IServiceProvider})" />, and the
-    ///     one to reach for whenever a registration is <c>AddScoped</c> - an EF Core
-    ///     <c>DbContext</c> being the usual reason. See
-    ///     <see cref="WithScopedServiceProvider(BenchmarkHarness, Func{IServiceProvider})" />.
-    /// </remarks>
-    public static BenchmarkHarness UseScopedDependencyInjection<T>(
-        this BenchmarkHarness harness,
-        Func<IServiceProvider> services)
-    {
-        ArgumentNullException.ThrowIfNull(harness);
-        ArgumentNullException.ThrowIfNull(services);
-
-        return harness.AddFromAssembly<T>().WithScopedServiceProvider(services);
     }
 }

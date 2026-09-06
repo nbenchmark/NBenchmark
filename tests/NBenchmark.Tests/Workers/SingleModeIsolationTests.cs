@@ -61,13 +61,13 @@ public sealed class SingleModeIsolationTests : IDisposable
     /// </summary>
     /// <remarks>
     ///     A refusal throws by default now, so the labelled-fallback path and the guidance it prints are
-    ///     only reachable with <c>RequireIsolation = false</c> - which is exactly the setting a caller
+    ///     only reachable with <c>Isolation = Isolation.Preferred</c> - which is exactly the setting a caller
     ///     who wants a labelled number instead of an exception would use. The gate itself is asserted
     ///     separately, in <see cref="Run_CapturingUnsendableState_ByDefault_Throws" /> and
     ///     <see cref="RequiredIsolationTests" />; without the pair, turning the gate off here would look
     ///     like the tests avoiding the change rather than covering both sides of it.
     /// </remarks>
-    private static MeasurementOptions FallbackOptions => FastOptions with { RequireIsolation = false };
+    private static MeasurementOptions FallbackOptions => FastOptions with { Isolation = Isolation.Preferred };
 
     /// <summary>
     ///     The default: a capture that cannot be sent is an error, not a quietly-labelled host
@@ -436,7 +436,7 @@ public sealed class SingleModeIsolationTests : IDisposable
         var result = Benchmark.Run(
             prepare: () => new int[size],
             body: data => data.Length == size ? 1 : throw new InvalidOperationException("wrong size"),
-            options: FallbackOptions with { RequireIsolation = true },
+            options: FallbackOptions with { Isolation = Isolation.Required },
             name: "captured-prepare");
 
         Assert.False(result.Errored, result.ErrorMessage);

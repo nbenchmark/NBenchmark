@@ -193,14 +193,14 @@ public class DatabaseBenchmarks
 }
 ```
 
-### [IsolatedProcess]
+### [Isolation(Isolation.Required)]
 
 Harness mode is **isolated by default**: every benchmark class runs in its own freshly spawned worker. This ensures the benchmark is not influenced by JIT, GC, or thread-pool state warmed up by other classes.
 
 Use isolation attributes to change the granularity:
 
-- **`[IsolatedProcess]`** on a method gives that single benchmark its **own dedicated** worker. This is the finest granularity, isolating the benchmark even from sibling benchmarks in the same class.
-- **`[InProcess]`** on a method or class opts that benchmark back into the **host process**.
+- **`[Isolation(Isolation.Required)]`** on a method gives that single benchmark its **own dedicated** worker. This is the finest granularity, isolating the benchmark even from sibling benchmarks in the same class.
+- **`[Isolation(Isolation.Off)]`** on a method or class opts that benchmark back into the **host process**.
 
 ```csharp
 public class StartupBenchmarks
@@ -209,18 +209,18 @@ public class StartupBenchmarks
     public int Warm() => RunWarmWork();           // shares one per-class worker
 
     [Benchmark]
-    [IsolatedProcess]
+    [Isolation(Isolation.Required)]
     public int ColdPath() => RunColdSensitiveWork();  // its own dedicated worker
 
     [Benchmark]
-    [InProcess]
+    [Isolation(Isolation.Off)]
     public int InHost() => RunHostObservableWork();   // runs in the host process
 }
 ```
 
-To disable isolation for the **entire run**, pass `--in-process` on the command line or call `WithIsolation(false)` in code. The `--dry-run` flag also always runs in-process.
+To disable isolation for the **entire run**, pass `--in-process` on the command line or call `WithIsolation(Isolation.Off)` in code. The `--dry-run` flag also always runs in-process.
 
-For the full isolation model across all modes, including how mixed `[IsolatedProcess]` and `[InProcess]` classes are dispatched, see [Isolated Runs](../features/isolated-runs.md).
+For the full isolation model across all modes, including how mixed `[Isolation(Isolation.Required)]` and `[Isolation(Isolation.Off)]` classes are dispatched, see [Isolated Runs](../features/isolated-runs.md).
 
 ## Class requirements
 
@@ -249,7 +249,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NBenchmark.DependencyInjection;
 
 await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<OrderBenchmarks>(BuildServices)
+    .AddFromAssembly<OrderBenchmarks>().WithServices(BuildServices)
     .RunAsync();
 
 static IServiceProvider BuildServices() => new ServiceCollection()

@@ -144,7 +144,7 @@ public class SuiteRunnerTests
 
         var (results, _) = await SuiteRunner.RunAsync(
             envelopes, RunOrder.Declaration, null,
-            new MeasurementOptions { Iterations = 0, WarmupIterations = 0, ForceGcBetweenBenchmarksOverride = true },
+            new MeasurementOptions { Iterations = 0, WarmupIterations = 0, ForceGcBetweenBenchmarks = true },
             0, 1,
             NullBenchmarkProgress.Instance, CancellationToken.None);
 
@@ -298,7 +298,7 @@ public class SuiteRunnerTests
         {
             Iterations = 0,
             WarmupIterations = 0,
-            ForceGcBetweenBenchmarksOverride = true,
+            ForceGcBetweenBenchmarks = true,
         };
 
         var dryRunResult = OutcomeBuilder.Build(

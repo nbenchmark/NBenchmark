@@ -9,4 +9,5 @@ var result = Benchmark.Run(() =>
 
 result.Print();
 
-// Or for rich Spectre.Console output: await result.PrintAsync();
+// Or, with the NBenchmark.Reporters.Console package, for the Spectre table:
+// await result.PrintTableAsync();

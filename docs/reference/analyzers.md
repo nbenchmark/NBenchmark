@@ -36,7 +36,6 @@ The analyzers run automatically without additional configuration. The package in
 | NB0012 | `[BenchmarkCases]` cannot be combined with `[BenchmarkCase]` | Error | A method uses both attributes, which is ambiguous. |
 | NB0013 | `PerClass` lifetime with mutable instance field may contaminate state | Warning | A class uses `PerClass` lifetime and has a mutable instance field accessed by multiple benchmarks. |
 | NB0014 | Benchmark body captures state | Info | A lambda passed to `Benchmark.Run*` or `BenchmarkSuite.Add` captures local state. |
-| NB0015 | Conflicting isolation attributes | Error | A member carries both `[InProcess]` and `[IsolatedProcess]`. |
 
 ### NB0001 - Missing parameterless constructor
 
@@ -345,21 +344,6 @@ public class ProcessBenchmarks
 }
 ```
 
-### NB0015 - Conflicting isolation attributes
-
-`[InProcess]` and `[IsolatedProcess]` are contradictory. Applying both to the same member results in an error.
-
-```csharp
-public class MyBenchmarks
-{
-    // Error NB0015
-    [Benchmark, InProcess, IsolatedProcess]
-    public void Both() { }
-}
-```
-
-A method-level attribute overriding a class-level attribute is allowed and is the documented way to force a specific isolation mode.
-
 ## Runtime independence warning
 
 In addition to compile-time analyzers, NBenchmark emits a runtime warning on `BenchmarkResult.Warnings` when a class runs under `InstanceLifetime.PerClass` with multiple `[Benchmark]` methods but declares neither `IStateReset` nor `[SharedState]`. This covers cases where the analyzer is not installed or in suite mode.
@@ -397,7 +381,7 @@ dotnet_diagnostic.NB0004.severity = none
 
 ## Severity
 
-- **Errors**: The benchmark cannot run or will produce meaningless results. (NB0002, NB0003, NB0004, NB0005, NB0006, NB0007, NB0008, NB0009, NB0015).
+- **Errors**: The benchmark cannot run or will produce meaningless results. (NB0002, NB0003, NB0004, NB0005, NB0006, NB0007, NB0008, NB0009).
 - **Warnings**: The code can run, but measurements may be invalid. (NB0001, NB0010, NB0011, NB0013).
 - **Info**: The measurement is fine, but the mechanism is worth noting. (NB0014).
 

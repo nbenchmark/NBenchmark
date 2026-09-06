@@ -1,11 +1,17 @@
 namespace NBenchmark;
 
 /// <summary>
-///     Named bundles of <see cref="AutoTuneOptions" /> that trade measurement time for
-///     precision. Select one with <c>WithAutoTune(AutoTunePreset)</c> or the
-///     <c>--auto-tune</c> CLI flag.
+///     The <c>--auto-tune</c> flag's parse target: the name of one of the
+///     <see cref="AutoTuneOptions" /> presets.
 /// </summary>
-public enum AutoTunePreset
+/// <remarks>
+///     Internal on purpose. <see cref="AutoTuneOptions.Default" />, <see cref="AutoTuneOptions.Quick" />
+///     and <see cref="AutoTuneOptions.Thorough" /> are the public spelling of the same three bundles,
+///     and a public enum beside them meant two ways to say one thing - two <c>WithAutoTune</c>
+///     overloads on every builder, a converter between them, and no answer in the API to which one
+///     wins. The options record is the model; this only carries a command-line word to it.
+/// </remarks>
+internal enum AutoTunePreset
 {
     /// <summary>The balanced default (<see cref="AutoTuneOptions.Default" />).</summary>
     Default = 0,

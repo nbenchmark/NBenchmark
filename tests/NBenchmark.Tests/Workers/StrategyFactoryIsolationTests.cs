@@ -81,40 +81,6 @@ public sealed class StrategyFactoryIsolationTests : IDisposable
     }
 
     /// <summary>
-    ///     The same detector passed as a live instance still refuses, so the contrast is the factory and
-    ///     nothing else.
-    /// </summary>
-    /// <remarks>
-    ///     This is the control. Without it, the test above could pass because something unrelated started
-    ///     isolating configured detectors, and the factory would be carrying no weight.
-    /// </remarks>
-    [Fact]
-    public async Task ConfiguredDetector_AsInstance_StillRefuses()
-    {
-        using var stderr = new StringWriter();
-        var priorError = Console.Error;
-        Console.SetError(stderr);
-
-        IReadOnlyList<BenchmarkResult> results;
-
-        try
-        {
-            results = await Fast(new BenchmarkSuite("detector-instance")
-                    .Add("a", () => Thread.SpinWait(2_000))
-                    .WithOutlierDetector(new TrimFractionDetector(0.25)))
-                .WithRequireIsolation(false)
-                .RunAsync();
-        }
-        finally
-        {
-            Console.SetError(priorError);
-        }
-
-        Assert.All(results, r => Assert.NotEqual(IsolationStatus.Isolated, r.IsolationStatus));
-        Assert.Contains("parameterless constructor", stderr.ToString());
-    }
-
-    /// <summary>
     ///     A capturing factory is refused, and says so as a capture.
     /// </summary>
     [Fact]

@@ -21,10 +21,4 @@ public static class DiagnosticIds
     ///     across a process boundary and will be measured in the host process.
     /// </summary>
     public const string CapturingBody = "NB0014";
-
-    /// <summary>
-    ///     One member carries both <c>[InProcess]</c> and <c>[IsolatedProcess]</c>, which ask for
-    ///     opposite things.
-    /// </summary>
-    public const string ConflictingIsolationAttributes = "NB0015";
 }

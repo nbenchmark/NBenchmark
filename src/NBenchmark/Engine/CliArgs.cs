@@ -29,7 +29,7 @@ internal sealed record CliArgs
 
     /// <summary>
     ///     When true, every benchmark runs in the host process, overriding Harness mode's
-    ///     isolated-by-default execution and any <c>[IsolatedProcess]</c> attributes.
+    ///     isolated-by-default execution and any <c>[Isolation(Isolation.Required)]</c> attributes.
     /// </summary>
     public bool InProcess { get; init; }
 
@@ -78,7 +78,7 @@ internal sealed record CliArgs
 
     /// <summary>
     ///     When true, disables the full GC that otherwise runs between benchmarks under both
-    ///     profiles (maps to <see cref="MeasurementOptions.ForceGcBetweenBenchmarksOverride" /> =
+    ///     profiles (maps to <see cref="MeasurementOptions.ForceGcBetweenBenchmarks" /> =
     ///     <c>false</c>). Use when the inter-benchmark heap carry-over is intended.
     /// </summary>
     public bool NoGcBetweenBenchmarks { get; init; }

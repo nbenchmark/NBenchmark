@@ -18,4 +18,3 @@
  NB0012  | NBenchmark.Usage         | Error    | [BenchmarkCases] cannot be combined with [BenchmarkCase].
  NB0013  | NBenchmark.Usage         | Warning  | PerClass instance lifetime with a mutable instance field.
  NB0014  | NBenchmark.Performance   | Info     | Benchmark body captures state, which may prevent isolation.
- NB0015  | NBenchmark.Usage         | Error    | Conflicting isolation attributes.

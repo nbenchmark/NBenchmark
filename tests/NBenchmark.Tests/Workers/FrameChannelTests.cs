@@ -318,8 +318,8 @@ public sealed class FrameChannelTests
             EnableHistogram = false,
             HistogramBucketCount = 33,
             ReportedPercentiles = [0.5, 0.9, 0.999],
-            ForceGcBeforeEachIterationOverride = true,
-            MeasureAllocationsOverride = false,
+            ForceGcBeforeEachIteration = true,
+            MeasureAllocations = false,
             Diagnostics = new DiagnosticsOptions { GcHeapInfo = true, CpuTime = true },
             AutoTune = AutoTuneOptions.Default with
             {
@@ -344,7 +344,6 @@ public sealed class FrameChannelTests
             DeclaringTypeFullName = "Some.Bench",
             BenchmarkNames = ["A", "B"],
             Options = options,
-            OutlierDetectorTypeName = "Some.Detector, Some.Asm",
             Order = RunOrder.Random,
             Seed = 99,
             DisplayPrefix = "pfx",
@@ -366,7 +365,6 @@ public sealed class FrameChannelTests
         Assert.Equal(WorkGroupKind.DiscoveredClass, received.Kind);
         Assert.Equal("Some.Bench", received.DeclaringTypeFullName);
         Assert.Equal(["A", "B"], received.BenchmarkNames);
-        Assert.Equal("Some.Detector, Some.Asm", received.OutlierDetectorTypeName);
         Assert.Equal(RunOrder.Random, received.Order);
         Assert.Equal(99, received.Seed);
         Assert.Equal("pfx", received.DisplayPrefix);
@@ -422,8 +420,8 @@ public sealed class FrameChannelTests
     {
         var options = MeasurementOptions.Default with
         {
-            OutlierDetector = OutlierDetectors.ForMode(OutlierMode.MedianAbsoluteDeviation),
-            SignificanceTest = DefaultSignificanceTest.Instance,
+            OutlierDetector = static () => OutlierDetectors.ForMode(OutlierMode.MedianAbsoluteDeviation),
+            SignificanceTest = static () => DefaultSignificanceTest.Instance,
         };
 
         var (left, right, cleanup) = CreatePair();

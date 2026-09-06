@@ -29,14 +29,6 @@ public class BenchmarkSuite(string name)
     private string? _baselineName;
     private ReportDetail _detail;
 
-    /// <summary>
-    ///     Set by <see cref="WithIsolation" /><c>(false)</c>, i.e. an explicit request to measure in
-    ///     this process. Distinct from simply not having asked: the default is now to isolate when
-    ///     the suite's bodies can be addressed, so "not isolated" and "asked for in-process" need to
-    ///     be told apart in order to label results honestly.
-    /// </summary>
-    private bool _inProcessRequested;
-
     /// <summary>Why this suite ended up measured in the host process, when it did.</summary>
     private IsolationStatus _inProcessStatus = IsolationStatus.InProcessRequested;
 
@@ -109,8 +101,9 @@ public class BenchmarkSuite(string name)
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The per-benchmark counterpart of <c>[InProcess]</c>, and the one opt-out the suite surface
-    ///         was missing. <see cref="WithIsolation" /><c>(false)</c> is all-or-nothing: a single body
+    ///         The per-benchmark counterpart of <c>[Isolation(Isolation.Off)]</c>, and the one opt-out the
+    ///         suite surface
+    ///         was missing. <see cref="WithIsolation" /><c>(Isolation.Off)</c> is all-or-nothing: a single body
     ///         holding something that cannot cross - a live handle, a mock, an object graph the
     ///         faithfulness rule refuses - took every other benchmark in the suite into the host process
     ///         with it, so the price of measuring one such thing was every comparison it was part of.
@@ -118,7 +111,7 @@ public class BenchmarkSuite(string name)
     ///     </para>
     ///     <para>
     ///         The result is stamped <see cref="IsolationStatus.InProcessRequested" />, so it is not a
-    ///         refusal: it does not trip <see cref="MeasurementOptions.RequireIsolation" /> and it is not
+    ///         refusal: it does not trip <see cref="MeasurementOptions.Isolation" /> and it is not
     ///         counted by <c>--strict-isolation</c>. It is still labelled in the table, and it is still
     ///         never given a ratio against an isolated row - the ~3.3x configuration term between the two
     ///         processes does not go away because the difference was asked for.
@@ -827,13 +820,6 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
-    /// <summary>Selects an adaptive-tuning preset (Default, Quick, or Thorough).</summary>
-    public BenchmarkSuite WithAutoTune(AutoTunePreset preset)
-    {
-        _options = _options with { AutoTune = AutoTuneOptions.FromPreset(preset) };
-        return this;
-    }
-
     /// <summary>
     ///     Pins the number of back-to-back body invocations timed as one sample (<c>K</c>),
     ///     overriding auto-calibration. Honoured even with per-iteration setup/teardown.
@@ -846,7 +832,7 @@ public class BenchmarkSuite(string name)
 
     public BenchmarkSuite WithAllocations(bool enabled = true)
     {
-        _options = _options with { MeasureAllocationsOverride = enabled };
+        _options = _options with { MeasureAllocations = enabled };
         return this;
     }
 
@@ -878,13 +864,6 @@ public class BenchmarkSuite(string name)
 
         _options = options;
 
-        return this;
-    }
-
-    /// <summary>Selects a diagnostics mode (None, Gc, GcAndCpu, All).</summary>
-    public BenchmarkSuite WithDiagnostics(DiagnosticsMode mode)
-    {
-        _options = _options with { Diagnostics = DiagnosticsOptions.FromMode(mode) };
         return this;
     }
 
@@ -948,69 +927,33 @@ public class BenchmarkSuite(string name)
 
     /// <summary>
     ///     Uses a custom <see cref="IOutlierDetector" /> for trimming, overriding
-    ///     <see cref="WithOutlierMode" />. Pass one of the built-ins from
-    ///     <see cref="OutlierDetectors" /> or your own implementation.
-    /// </summary>
-    /// <remarks>
-    ///     Works in an isolated run when <paramref name="detector" />'s type has a parameterless
-    ///     constructor, which the built-ins do - only the type name has to cross, and the worker
-    ///     constructs it. A <i>configured</i> detector cannot be rebuilt that way; use
-    ///     <see cref="WithOutlierDetector(Func{IOutlierDetector})" /> for those.
-    /// </remarks>
-    public BenchmarkSuite WithOutlierDetector(IOutlierDetector detector)
-    {
-        ArgumentNullException.ThrowIfNull(detector);
-        _options = _options with { OutlierDetector = detector, OutlierDetectorFactory = null };
-        return this;
-    }
-
-    /// <summary>
-    ///     Uses a custom <see cref="IOutlierDetector" /> built by <paramref name="factory" />, so a
-    ///     detector needing constructor arguments can still be used in an isolated run.
+    ///     <see cref="WithOutlierMode" />. Pass a factory over one of the built-ins from
+    ///     <see cref="OutlierDetectors" /> or over your own implementation.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>WithOutlierDetector(new KeepFastestDetector(0.9))</c> cannot be isolated: only a type
-    ///         name crosses the boundary, and a type name cannot carry <c>0.9</c>. Rather than score the
-    ///         results under a silently substituted method, the whole suite was measured in the host
-    ///         process. A static factory is addressable, so the worker runs it and gets your detector
-    ///         with your arguments:
+    ///         A factory rather than an instance, because an instance cannot cross a process boundary.
+    ///         An instance-taking overload existed, and pinning <c>new KeepFastestDetector(0.9)</c>
+    ///         through it cost the whole suite its isolation - the worker could only be sent a type
+    ///         name, and a type name cannot carry <c>0.9</c>, so rather than score the results under a
+    ///         silently substituted method the suite was measured in the host process. A static factory
+    ///         is addressable, so the worker runs it and gets your detector with your arguments:
     ///     </para>
     ///     <code>
     ///     .WithOutlierDetector(static () => new KeepFastestDetector(0.9))
     ///     </code>
     ///     <para>
-    ///         The factory must capture nothing, for the same reason a benchmark body must. It is invoked
-    ///         here as well, once, to give the coordinator the instance it scores with.
+    ///         The factory must capture nothing, for the same reason a benchmark body must. One
+    ///         signature makes that constraint visible where it applies, rather than in a refusal
+    ///         message after the run.
     ///     </para>
     /// </remarks>
     public BenchmarkSuite WithOutlierDetector(Func<IOutlierDetector> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
 
-        _options = _options with
-        {
-            OutlierDetector = factory() ?? throw new ArgumentException(
-                "The outlier detector factory returned null.", nameof(factory)),
+        _options = _options with { OutlierDetector = factory };
 
-            OutlierDetectorFactory = factory,
-        };
-
-        return this;
-    }
-
-    /// <summary>
-    ///     Fails the run instead of measuring in this process when the suite cannot be isolated.
-    /// </summary>
-    /// <remarks>
-    ///     The library-side equivalent of <c>--strict-isolation</c>. That flag audits results after the
-    ///     run and sets an exit code, which suits a CLI in CI - it can name every offender at once. A
-    ///     library caller has no exit code to read, so this throws at the point of refusal instead,
-    ///     before anything is measured.
-    /// </remarks>
-    public BenchmarkSuite WithRequireIsolation(bool required = true)
-    {
-        _options = _options with { RequireIsolation = required };
         return this;
     }
 
@@ -1033,37 +976,16 @@ public class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Uses a custom <see cref="ISignificanceTest" /> strategy, overriding the engine
-    ///     default (Mann-Whitney U for two groups, Kruskal-Wallis for three or more). Pass
-    ///     one of the built-ins from <see cref="NBenchmark.Stats" /> or your own implementation.
+    ///     Uses a custom <see cref="ISignificanceTest" /> strategy, overriding the engine default
+    ///     (Mann-Whitney U for two groups, Kruskal-Wallis for three or more). Pass a factory over one
+    ///     of the built-ins from <see cref="NBenchmark.Stats" /> or over your own implementation.
     /// </summary>
-    /// <remarks>
-    ///     Isolatable when the type has a parameterless constructor. For a configured test, use
-    ///     <see cref="WithSignificanceTest(Func{ISignificanceTest})" />.
-    /// </remarks>
-    public BenchmarkSuite WithSignificanceTest(ISignificanceTest test)
-    {
-        ArgumentNullException.ThrowIfNull(test);
-        _options = _options with { SignificanceTest = test, SignificanceTestFactory = null };
-        return this;
-    }
-
-    /// <summary>
-    ///     Uses a custom <see cref="ISignificanceTest" /> built by <paramref name="factory" />, so a test
-    ///     needing constructor arguments can still be used in an isolated run.
-    /// </summary>
-    /// <remarks>See <see cref="WithOutlierDetector(Func{IOutlierDetector})" /> for why this exists.</remarks>
+    /// <remarks>See <see cref="WithOutlierDetector" /> for why this takes a factory.</remarks>
     public BenchmarkSuite WithSignificanceTest(Func<ISignificanceTest> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
 
-        _options = _options with
-        {
-            SignificanceTest = factory() ?? throw new ArgumentException(
-                "The significance test factory returned null.", nameof(factory)),
-
-            SignificanceTestFactory = factory,
-        };
+        _options = _options with { SignificanceTest = factory };
 
         return this;
     }
@@ -1360,41 +1282,26 @@ public class BenchmarkSuite(string name)
     }
 
     /// <summary>
-    ///     Whether to measure this suite in a worker process. Isolation is the default, so the only
-    ///     call that changes anything is <c>WithIsolation(false)</c> - an explicit request to measure
-    ///     in the current process.
+    ///     Whether to measure this suite in a worker process, and what happens when isolation is
+    ///     refused. Defaults to <see cref="NBenchmark.Isolation.Required" />.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Reach for <c>false</c> when the current process <i>is</i> the subject: cold-start cost, or
-    ///         a body that must observe host state a fresh process cannot rebuild. The result is stamped
-    ///         <see cref="IsolationStatus.InProcessRequested" /> and reports the host's runtime
-    ///         configuration, so it is never silently compared against an isolated measurement.
+    ///         Reach for <see cref="NBenchmark.Isolation.Off" /> when the current process <i>is</i> the
+    ///         subject: cold-start cost, or a body that must observe host state a fresh process cannot
+    ///         rebuild. The result is stamped <see cref="IsolationStatus.InProcessRequested" /> and
+    ///         reports the host's runtime configuration, so it is never silently compared against an
+    ///         isolated measurement.
     ///     </para>
     ///     <para>
-    ///         <c>WithIsolation()</c> with no argument is therefore a no-op kept for source
-    ///         compatibility - it asks for what already happens. Only the request for the host process
-    ///         is recorded, because that is the only one that changes anything.
-    ///     </para>
-    ///     <para>
-    ///         That makes it subtly unlike <see cref="BenchmarkHarness.WithIsolation" />, which shares
-    ///         this name and signature but is a global switch settable in both directions - a harness
-    ///         measures many classes, so re-enabling isolation after disabling it means something there.
-    ///         A suite is one group, so there is nothing to re-enable; <c>true</c> only ever restates
-    ///         the default.
+    ///         <see cref="NBenchmark.Isolation.Preferred" /> is the library-side opposite of
+    ///         <c>--strict-isolation</c>: a suite that cannot be addressed across a process boundary is
+    ///         measured here and labelled with the reason instead of failing the run.
     ///     </para>
     /// </remarks>
-    public BenchmarkSuite WithIsolation(bool enabled = true)
+    public BenchmarkSuite WithIsolation(Isolation isolation)
     {
-        // Only the in-process request is stored. There was a second field tracking `enabled` itself,
-        // which nothing ever read once isolation became the default - dead state whose presence
-        // implied a decision was being made here that was not.
-        //
-        // WithIsolation(false) is a real instruction rather than the default, because a suite whose
-        // bodies can be addressed is measured in a worker without being asked. Recording the request
-        // separately is what lets the report distinguish "you chose the host process" from "your suite
-        // could not be isolated", which have entirely different remedies.
-        _inProcessRequested = !enabled;
+        _options = _options with { Isolation = isolation };
 
         return this;
     }
@@ -1497,7 +1404,7 @@ public class BenchmarkSuite(string name)
             // that has not happened yet.
             SingleModeGuidance.EmitPlanRefusal(local.Name, outcome.Status, outcome.Refusal);
 
-            // Deliberately not gated on RequireIsolation, unlike every other refusal site. The plan
+            // Deliberately not gated on Isolation.Required, unlike every other refusal site. The plan
             // being unaddressable does not mean the suite is: RunCoreAsync addresses the bodies
             // individually next and that routinely succeeds where the factory did not, so throwing
             // here would fail runs that go on to be fully isolated. The gate is applied inside
@@ -1616,7 +1523,7 @@ public class BenchmarkSuite(string name)
         // needs no factory, no attribute and no change to how the suite was written. Isolation that
         // costs ergonomics is isolation people turn off, so the accurate path has to be the
         // effortless one.
-        if (!_inProcessRequested)
+        if (!_options.IsolationOff)
         {
             var isolated = await TryRunInWorkerAsync(observer, cancellationToken).ConfigureAwait(false);
 

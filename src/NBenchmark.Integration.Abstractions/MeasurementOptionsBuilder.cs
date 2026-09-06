@@ -13,7 +13,7 @@ internal static class MeasurementOptionsBuilder
             options = options with { WarmupIterations = thresholds.WarmupIterations };
 
         if (thresholds.MeasureAllocations || thresholds.MaxAllocatedBytes >= 0)
-            options = options with { MeasureAllocationsOverride = true };
+            options = options with { MeasureAllocations = true };
 
         options = options with
         {

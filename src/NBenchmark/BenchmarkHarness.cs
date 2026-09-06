@@ -29,7 +29,6 @@ public sealed class BenchmarkHarness
     ///     unrelated fields this replaced could not express.
     /// </summary>
     private InstanceSource? _instanceSource;
-    private bool _isolationEnabled = true;
 
     /// <summary>
     ///     The launch count the caller pinned, or <c>null</c> for "not pinned" - which is what
@@ -384,7 +383,7 @@ public sealed class BenchmarkHarness
     ///     <code>
     ///     await BenchmarkHarness.Create(args)
     ///         .AddFromAssembly&lt;MyBenchmarks&gt;()
-    ///         .WithServiceProvider(BuildServices)
+    ///         .WithServices(BuildServices)
     ///         .RunAsync();
     ///
     ///     static IServiceProvider BuildServices() =&gt; new ServiceCollection()
@@ -399,7 +398,7 @@ public sealed class BenchmarkHarness
     ///         the same reason a benchmark body must.
     ///     </para>
     /// </remarks>
-    public BenchmarkHarness WithServiceProvider(Func<IServiceProvider> factory)
+    public BenchmarkHarness WithServices(Func<IServiceProvider> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
 
@@ -606,13 +605,6 @@ public sealed class BenchmarkHarness
         return this;
     }
 
-    /// <summary>Selects an adaptive-tuning preset (Default, Quick, or Thorough).</summary>
-    public BenchmarkHarness WithAutoTune(AutoTunePreset preset)
-    {
-        _options = _options with { AutoTune = AutoTuneOptions.FromPreset(preset) };
-        return this;
-    }
-
     /// <summary>
     ///     Pins the number of back-to-back body invocations timed as one sample (<c>K</c>),
     ///     overriding auto-calibration. Honoured even with per-iteration setup/teardown.
@@ -628,13 +620,6 @@ public sealed class BenchmarkHarness
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
         _options = _options with { Diagnostics = diagnostics };
-        return this;
-    }
-
-    /// <summary>Selects a diagnostics mode (None, Gc, GcAndCpu, All).</summary>
-    public BenchmarkHarness WithDiagnostics(DiagnosticsMode mode)
-    {
-        _options = _options with { Diagnostics = DiagnosticsOptions.FromMode(mode) };
         return this;
     }
 
@@ -661,45 +646,27 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     Controls Harness mode's isolated-by-default execution. When enabled (the default),
-    ///     each discovered class runs in its own clean-room child process unless a benchmark
-    ///     or its class opts out with <c>[InProcess]</c>. When disabled, every benchmark
-    ///     runs in the host process - equivalent to passing <c>--in-process</c> on the CLI.
-    /// </summary>
-    /// <remarks>
-    ///     Not quite the same method as <see cref="BenchmarkSuite.WithIsolation" />, despite the shared
-    ///     name and signature. This one is a <i>global switch</i> that stays settable in both directions,
-    ///     so a later <c>WithIsolation(true)</c> re-enables what an earlier <c>false</c> turned off.
-    ///     Suite mode has one suite and therefore nothing to switch: there, <c>false</c> records an
-    ///     explicit request for the host process and <c>true</c> is a no-op asking for the default.
-    /// </remarks>
-    public BenchmarkHarness WithIsolation(bool enabled = true)
-    {
-        _isolationEnabled = enabled;
-        return this;
-    }
-
-    /// <summary>
-    ///     Whether an isolation <b>refusal</b> fails the run instead of falling back to the host
-    ///     process. On by default; <c>--strict-isolation</c> turns it on regardless.
+    ///     Controls Harness mode's isolated-by-default execution, and what happens when isolation is
+    ///     refused. Defaults to <see cref="NBenchmark.Isolation.Required" />.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The opposite of <see cref="WithIsolation" />, which says whether to <i>try</i>. This says
-    ///         what happens when trying does not work. Turning isolation off is therefore not affected by
-    ///         this at all - <c>WithIsolation(false)</c> asks for the host process and gets it, which is
-    ///         not a refusal.
+    ///         Under <see cref="NBenchmark.Isolation.Required" /> and
+    ///         <see cref="NBenchmark.Isolation.Preferred" />, each discovered class runs in its own
+    ///         clean-room worker process unless a benchmark or its class opts out with
+    ///         <c>[Isolation(Isolation.Off)]</c>. <see cref="NBenchmark.Isolation.Off" /> runs every
+    ///         benchmark in the host process - equivalent to passing <c>--in-process</c> on the CLI.
     ///     </para>
     ///     <para>
-    ///         Exists because <c>MeasurementOptions.RequireIsolation</c> was unreachable from here:
-    ///         <c>WithOptions(new MeasurementOptions { RequireIsolation = true })</c> set a field the
-    ///         harness never read, so the one mode with a fully-fledged isolation pipeline was the one
-    ///         mode that could not ask for it.
+    ///         The difference between the first two is what happens to a class NBenchmark declines to
+    ///         isolate: <c>Required</c> fails the run before anything is measured,
+    ///         <c>Preferred</c> measures it here and labels the result with the reason.
+    ///         <c>--strict-isolation</c> asks for <c>Required</c> regardless of what is configured here.
     ///     </para>
     /// </remarks>
-    public BenchmarkHarness WithRequireIsolation(bool required = true)
+    public BenchmarkHarness WithIsolation(Isolation isolation)
     {
-        _options = _options with { RequireIsolation = required };
+        _options = _options with { Isolation = isolation };
         return this;
     }
 
@@ -896,7 +863,7 @@ public sealed class BenchmarkHarness
 
             if (effectiveRuntimes.Count > 0)
             {
-                if (_cliArgs.InProcess || !_isolationEnabled)
+                if (_cliArgs.InProcess || _options.IsolationOff)
                     Console.WriteLine("Warning: cross-runtime execution always uses child processes.");
 
                 return await RunMultiRuntimeAsync(effectiveRuntimes, cancellationToken).ConfigureAwait(false);
@@ -958,11 +925,11 @@ public sealed class BenchmarkHarness
             ? _options with { Iterations = 0, WarmupIterations = 0 }
             : MergeCliOptions(_options, _cliArgs);
 
-        // Under --dry-run, --in-process, or WithIsolation(false), nothing is spawned. A dry run never
+        // Under --dry-run, --in-process, or WithIsolation(Isolation.Off), nothing is spawned. A dry run never
         // invokes a body, so isolation would only add process overhead.
         var inProcessGlobal = pass.ForceInProcess
                               || _cliArgs.InProcess
-                              || !_isolationEnabled
+                              || _options.IsolationOff
                               || _cliArgs.DryRun;
 
         // Every class's isolatability, answered here rather than one class at a time inside the run
@@ -1074,7 +1041,7 @@ public sealed class BenchmarkHarness
                         suite with { Benchmarks = inProcess }, suiteOptions, runningIndex, totalBenchmarks,
                         allResults, rawSamples, progress, observer, cancellationToken).ConfigureAwait(false);
 
-                    // A benchmark that carries [InProcess] chose the host itself, whatever the class
+                    // A benchmark that carries [Isolation(Isolation.Off)] chose the host itself, whatever the class
                     // as a whole could or could not do; anything else landed here because of the
                     // class-level refusal, and should say which one.
                     StampIsolationStatus(allResults, inProcessStart, inProcess, workerDecision.Status);
@@ -2164,13 +2131,13 @@ public sealed class BenchmarkHarness
     /// <summary>
     ///     Records why each in-process result ran in the host, on the result itself.
     ///     <para>
-    ///         A benchmark carrying <c>[InProcess]</c> asked for the host and is stamped as such even
+    ///         A benchmark carrying <c>[Isolation(Isolation.Off)]</c> asked for the host and is stamped as such even
     ///         when the class was also refused for another reason - the explicit choice is the true
     ///         explanation, and reporting a refusal the user never hit would send them chasing a
     ///         problem they do not have.
     ///     </para>
     ///     <para>
-    ///         The mirror case is stamped too. A benchmark carrying <c>[IsolatedProcess]</c> that ends up
+    ///         The mirror case is stamped too. A benchmark carrying <c>[Isolation(Isolation.Required)]</c> that ends up
     ///         here asked for a worker and was denied one, which the status alone cannot say - it reads
     ///         identically to a benchmark that never asked - so the row carries a warning naming the
     ///         denied request.
@@ -2208,7 +2175,7 @@ public sealed class BenchmarkHarness
                 ? (IReadOnlyList<string>)
                 [
                     .. result.Warnings,
-                    $"[IsolatedProcess] was requested for '{methodName}' and refused: "
+                    $"[Isolation(Isolation.Required)] was requested for '{methodName}' and refused: "
                     + $"{status.ToLabel()}. The measurement ran in this process anyway.",
                 ]
                 : result.Warnings;
@@ -2346,7 +2313,7 @@ public sealed class BenchmarkHarness
             $"Isolation: '{suite.Type.Name}' is being measured in this process because "
             + (explanation ?? "it could not be addressed across a process boundary."));
 
-        // An explicit [IsolatedProcess] being denied is strictly more interesting than a default being
+        // An explicit [Isolation(Isolation.Required)] being denied is strictly more interesting than a default being
         // denied - the user said what they wanted and is not getting it - and used to be indis-
         // tinguishable from it in both the message and the row label.
         var explicitlyRequested = ExplicitIsolationRequests(suite.Benchmarks);
@@ -2355,7 +2322,7 @@ public sealed class BenchmarkHarness
         {
             Console.Error.WriteLine(
                 $"  {string.Join(", ", explicitlyRequested)} asked for this explicitly with "
-                + "[IsolatedProcess], so the request is being denied rather than defaulted away.");
+                + "[Isolation(Isolation.Required)], so the request is being denied rather than defaulted away.");
         }
 
         Console.Error.WriteLine(
@@ -2365,7 +2332,7 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
-    ///     The benchmarks that carry <c>[IsolatedProcess]</c>, i.e. asked for a worker by name rather
+    ///     The benchmarks that carry <c>[Isolation(Isolation.Required)]</c>, i.e. asked for a worker by name rather
     ///     than getting one by default.
     /// </summary>
     private static IReadOnlyList<string> ExplicitIsolationRequests(

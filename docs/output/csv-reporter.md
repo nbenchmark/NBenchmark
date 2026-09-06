@@ -163,7 +163,7 @@ Advanced mode adds the following columns to the standard set:
 | `ExceptionPerOp` | float or empty | First-chance exceptions per operation. |
 | `CpuTimeNsPerOp` | float or empty | CPU time per operation. |
 | `CpuWallRatio` | float or empty | CPU/wall time ratio. |
-| `DiagnosticsMode` | string or empty | Active diagnostics mode (`none`, `gc`, `gcandcpu`, `all`). |
+| `DiagnosticsMode` | string or empty | Which counters were collected, as a flags name (`None`, `Gc`, `GcAndCpu`, `All`, or a combination). |
 | `Categories` | string or empty | Semicolon-separated category names. |
 
 ## Notes
@@ -177,8 +177,8 @@ Advanced mode adds the following columns to the standard set:
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
-await result.ToCsvAsync("results/");
-await result.ToCsvAsync("results/", "benchmarks.csv");
+await result.SaveCsvAsync("results/");
+await result.SaveCsvAsync("results/", "benchmarks.csv");
 ```
 
 ## CLI usage (BenchmarkHarness)

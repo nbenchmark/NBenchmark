@@ -52,8 +52,8 @@ internal sealed record MeasurementOverrides
     public bool? NoAllocations { get; init; }
 
     /// <summary>
-    ///     Set by <c>--strict-isolation</c>, which asks for the same thing
-    ///     <see cref="MeasurementOptions.RequireIsolation" /> does and had no way to say so.
+    ///     Set by <c>--strict-isolation</c> and <c>--in-process</c>, which ask for the same thing
+    ///     <see cref="MeasurementOptions.Isolation" /> does and had no way to say so.
     /// </summary>
     /// <remarks>
     ///     One-way, like <c>--emit-raw</c>: the flag turns the requirement on and its absence leaves
@@ -64,7 +64,7 @@ internal sealed record MeasurementOverrides
     ///     <see cref="Workers.IsolationAudit.Enforce" /> remains the backstop for anything that reaches
     ///     the results without having passed a gate.
     /// </remarks>
-    public bool? RequireIsolation { get; init; }
+    public Isolation? Isolation { get; init; }
     public bool? NoGcBetweenBenchmarks { get; init; }
     public double? MinPracticalEffect { get; init; }
     public double? MinRelativeShift { get; init; }
@@ -153,7 +153,7 @@ internal sealed record MeasurementOverrides
         RuntimeProfile = cliArgs.RuntimeProfile,
         ForceGc = cliArgs.ForceGc,
         NoAllocations = cliArgs.NoAllocations,
-        RequireIsolation = cliArgs.StrictIsolation ? true : null,
+        Isolation = ResolveIsolation(cliArgs),
         NoGcBetweenBenchmarks = cliArgs.NoGcBetweenBenchmarks ? true : null,
         MinPracticalEffect = cliArgs.MinPracticalEffect,
         MinRelativeShift = cliArgs.MinRelativeShift,
@@ -213,16 +213,16 @@ internal sealed record MeasurementOverrides
             result = result with { RuntimeProfile = RuntimeProfile };
 
         if (ForceGc.HasValue)
-            result = result with { ForceGcBeforeEachIterationOverride = ForceGc.Value };
+            result = result with { ForceGcBeforeEachIteration = ForceGc.Value };
 
         if (NoAllocations.HasValue)
-            result = result with { MeasureAllocationsOverride = !NoAllocations.Value };
+            result = result with { MeasureAllocations = !NoAllocations.Value };
 
         if (NoGcBetweenBenchmarks is true)
-            result = result with { ForceGcBetweenBenchmarksOverride = false };
+            result = result with { ForceGcBetweenBenchmarks = false };
 
-        if (RequireIsolation is true)
-            result = result with { RequireIsolation = true };
+        if (Isolation.HasValue)
+            result = result with { Isolation = Isolation.Value };
 
         if (MinPracticalEffect.HasValue)
             result = result with { MinimumPracticalEffect = MinPracticalEffect.Value };
@@ -387,6 +387,22 @@ internal sealed record MeasurementOverrides
     ///     flags. Returns <c>null</c> when no environment flag was set, so an absent flag leaves any
     ///     programmatic configuration alone instead of overwriting it with defaults.
     /// </summary>
+    /// <summary>
+    ///     The isolation the command line asked for, or <c>null</c> when it asked for nothing.
+    /// </summary>
+    /// <remarks>
+    ///     One-way, like <c>--emit-raw</c>: a flag names an isolation and its absence leaves whatever
+    ///     was configured alone. <c>--in-process</c> wins over <c>--strict-isolation</c> because
+    ///     turning isolation off is not a refusal, so there is nothing left for strictness to gate.
+    /// </remarks>
+    private static Isolation? ResolveIsolation(CliArgs cliArgs)
+    {
+        if (cliArgs.InProcess)
+            return NBenchmark.Isolation.Off;
+
+        return cliArgs.StrictIsolation ? NBenchmark.Isolation.Required : null;
+    }
+
     private static EnvironmentOptions? BuildEnvironmentFromCli(CliArgs cliArgs)
     {
         if (cliArgs.CpuAffinity is null

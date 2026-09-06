@@ -109,7 +109,7 @@ internal static class SingleBodyRunner
 
         // Gated like every other refusal. This one was missed because it is not an addressing decision
         // - the body crossed fine and the process on the other end died - but the outcome the caller
-        // gets is identical to the ones that are gated, so leaving it open meant RequireIsolation held
+        // gets is identical to the ones that are gated, so leaving it open meant Isolation.Required held
         // for the failures that can be predicted and not for the ones that cannot.
         IsolationAudit.ThrowIfRequired(options, name, IsolationStatus.InProcessNoWorker, fault);
 

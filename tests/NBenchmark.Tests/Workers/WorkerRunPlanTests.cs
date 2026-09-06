@@ -37,24 +37,8 @@ public sealed class WorkerRunPlanTests
         => Assert.Null(WorkerRunPlan.DeriveSeed(null, 3));
 
     /// <summary>
-    ///     A strategy object travels as a type name, which only works when the worker can construct
-    ///     it. One that needs constructor arguments is reported rather than silently replaced by the
-    ///     built-in strategy.
-    /// </summary>
-    [Fact]
-    public void StrategyTypeName_RefusesAStrategyItCannotRebuild()
-    {
-        Assert.Null(WorkerRunPlan.StrategyTypeName(new NeedsArguments(5), out var refusal));
-        Assert.Contains("parameterless constructor", refusal);
-
-        var name = WorkerRunPlan.StrategyTypeName(new Rebuildable(), out var ok);
-        Assert.Null(ok);
-        Assert.Contains(nameof(Rebuildable), name);
-    }
-
-    /// <summary>
-    ///     A strategy the worker cannot rebuild makes the whole group un-isolatable, rather than being
-    ///     downgraded on the far side.
+    ///     A strategy factory that captures cannot be addressed, so the whole group is refused rather
+    ///     than being downgraded on the far side.
     /// </summary>
     /// <remarks>
     ///     The failure this prevents is the quietest one available: the body is measured perfectly in a
@@ -63,32 +47,32 @@ public sealed class WorkerRunPlanTests
     ///     Single mode and the test integrations all discarded the refusal.
     /// </remarks>
     [Fact]
-    public void ForDiscoveredClass_RefusesWhenAStrategyCannotBeRebuilt()
+    public void ForDiscoveredClass_RefusesWhenAStrategyFactoryCaptures()
     {
         // A launcher that reports available, so worker deployment is not the variable under test -
         // this assertion is about what happens once a worker *is* known to be reachable.
         using var _ = FakeWorkerLauncher.Install(_ => throw new InvalidOperationException("not run"));
 
-        var options = MeasurementOptions.Default with { OutlierDetector = new NeedsArguments(5) };
+        var captured = new NeedsArguments(5);
+        var options = MeasurementOptions.Default with { OutlierDetector = () => captured };
 
         var decision = WorkerRunPlan.ForDiscoveredClass(
             typeof(WorkerRunPlanTests).Assembly.Location, instanceSource: null, options);
 
         Assert.False(decision.CanIsolate);
         Assert.Equal(WorkerRunPlan.Refusal.UnrebuildableStrategy, decision.Refusal);
-        Assert.Contains("parameterless constructor", decision.Explanation);
 
         // The reason travels with the numbers, not just with the console message.
         Assert.Equal(IsolationStatus.InProcessLiveFixture, decision.Status);
     }
 
-    /// <summary>A strategy the worker can construct is no obstacle at all.</summary>
+    /// <summary>A static factory is addressable, so it is no obstacle at all.</summary>
     [Fact]
-    public void ForDiscoveredClass_AllowsARebuildableStrategy()
+    public void ForDiscoveredClass_AllowsAStaticStrategyFactory()
     {
         using var _ = FakeWorkerLauncher.Install(_ => throw new InvalidOperationException("not run"));
 
-        var options = MeasurementOptions.Default with { OutlierDetector = new Rebuildable() };
+        var options = MeasurementOptions.Default with { OutlierDetector = static () => new Rebuildable() };
 
         Assert.Null(WorkerRunPlan.UnrebuildableStrategy(options));
 
@@ -99,14 +83,15 @@ public sealed class WorkerRunPlanTests
 
     /// <summary>
     ///     Both strategy slots are checked, not just the first. A significance test that cannot be
-    ///     rebuilt is exactly as invisible as a detector that cannot.
+    ///     addressed is exactly as invisible as a detector that cannot.
     /// </summary>
     [Fact]
     public void UnrebuildableStrategy_ChecksTheSignificanceTestToo()
     {
-        var options = MeasurementOptions.Default with { SignificanceTest = new NeedsArgumentsTest(3) };
+        var captured = new NeedsArgumentsTest(3);
+        var options = MeasurementOptions.Default with { SignificanceTest = () => captured };
 
-        Assert.Contains("parameterless constructor", WorkerRunPlan.UnrebuildableStrategy(options));
+        Assert.NotNull(WorkerRunPlan.UnrebuildableStrategy(options));
     }
 
     private sealed class NeedsArguments(int value) : IOutlierDetector

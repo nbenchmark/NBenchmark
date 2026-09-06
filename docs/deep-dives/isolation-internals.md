@@ -24,7 +24,7 @@ The second step is necessary because these paths differ when using `dotnet bench
 
 The engine checks both deployment layouts: `dir/nbworker/nbworker.dll` and then `dir/nbworker.dll`. The subdirectory is the shipped layout, ensuring the worker's `runtimeconfig.json` and `deps.json` do not conflict with the application's.
 
-If the worker is missing - due to an incomplete restore or `NBenchmarkDeployWorker=false` - the run fails with a message naming the searched directories. You can override discovery by setting `NBENCHMARK_WORKER_PATH` to point to a specific `nbworker.dll`, or set `RequireIsolation = false` to accept a labeled host-process measurement.
+If the worker is missing - due to an incomplete restore or `NBenchmarkDeployWorker=false` - the run fails with a message naming the searched directories. You can override discovery by setting `NBENCHMARK_WORKER_PATH` to point to a specific `nbworker.dll`, or set `Isolation = Isolation.Preferred` to accept a labeled host-process measurement.
 
 ### Shared framework configuration
 
@@ -164,7 +164,7 @@ The factory must follow these constraints:
 `Workers/AddressedFactory` is the mechanism for every recipe on the wire. Since values cannot cross process boundaries, the engine sends the instructions for building them instead. Recipes are used for:
 - Body argument recipes (`ArgumentSource.Recipe`).
 - Service-provider factories (`InstanceSource`).
-- Statistical-strategy factories (`OutlierDetectorFactory`, `SignificanceTestFactory`).
+- Statistical-strategy factories (`OutlierDetector`, `SignificanceTest`).
 - Suite factories (`RunGroupPayload.Plan`).
 
 A factory can carry its own argument values via the `BodyRef` used to address it. This allows `prepare: (int size) => Build(size)` to work: the size is a recipe argument, and any captured locals travel in the receiver table.
@@ -191,7 +191,7 @@ The type the factory must produce is **not** carried. `NBenchmark.Worker/Factory
 
 Every result includes an `IsolationStatus` indicating where it was measured and, if not isolated, why.
 
-- **Requested In-Process:** `Isolated` and `InProcessRequested` occur when the user explicitly asks for the current state (e.g., via `--in-process` or `[InProcess]`).
+- **Requested In-Process:** `Isolated` and `InProcessRequested` occur when the user explicitly asks for the current state (e.g., via `--in-process` or `[Isolation(Isolation.Off)]`).
 - **Refusals:** `InProcessCapturedState`, `InProcessLiveFixture`, `InProcessUnaddressablePlan`, and `InProcessNoWorker` occur when the engine cannot isolate the run.
 
 The `Iso` column in reports keys on refusals rather than just `!IsIsolated()`. Keying on `!IsIsolated()` treats a deliberate in-process run as a failure, which would put a column reading `no` on every row of an `--in-process` run and, because reporters trade the two, remove the bar column. This ensures that deliberate in-process runs don't look like failures. Conversely, the column renders whenever *anything* was refused rather than only when statuses are mixed: a table where nothing could be isolated has one distinct status, so the mixed rule suppressed it for exactly the run a reader is most likely to misread.
@@ -200,15 +200,15 @@ Errored rows have no provenance because they were not measured. This prevents er
 
 Provenance is communicated through five channels: the stderr refusal at the moment of refusal (`SingleModeGuidance` for Single/Suite/Plan, deduped per offender and bounded; `BenchmarkHarness.EmitIsolationRefusal` per class), the per-row stamp, the Console/Markdown `Iso` column with its remedy footer, a `Isolation` column in CSV at every detail level, and `BenchmarkResult.Print()`. JSON serializes the full record.
 
-If a user explicitly requests isolation via `[IsolatedProcess]` and it is refused, the engine names the benchmarks that asked and adds a warning to their rows.
+If a user explicitly requests isolation via `[Isolation(Isolation.Required)]` and it is refused, the engine names the benchmarks that asked and adds a warning to their rows.
 
 ## Required isolation
 
-A refusal is treated as an error. `MeasurementOptions.RequireIsolation` defaults to `true`, meaning a benchmark that cannot be isolated fails the run instead of falling back to the host process.
+A refusal is treated as an error. `MeasurementOptions.Isolation` defaults to `true`, meaning a benchmark that cannot be isolated fails the run instead of falling back to the host process.
 
 This default is acceptable because most isolation gaps (captured locals, prepared values, scoped containers) now support isolation.
 
-`IsolationAudit.ThrowIfRequired` keys on `IsRefusal()`. This allows requests like `--dry-run` or `[InProcess]` to remain legal.
+`IsolationAudit.ThrowIfRequired` keys on `IsRefusal()`. This allows requests like `--dry-run` or `[Isolation(Isolation.Off)]` to remain legal.
 
 When a run fails due to isolation, the engine reports the benchmark, the structured refusal, the remedy, and the opt-out flag.
 
@@ -216,7 +216,7 @@ In harness mode, `BenchmarkHarness.ResolveIsolationPlan` answers "can a worker m
 
 `--strict-isolation` maps to `RequireIsolation` and audits the results. It previously set a CLI field with no mapping onto the options, so the flag could only ever take the expensive path - measure everything, then report - even though the early-throw mechanism it wanted already existed and the two are the same request phrased at different times.
 
-`BenchmarkSuite.AddInProcess` provides a per-benchmark opt-out for suites. `WithIsolation(false)` is all-or-nothing, so one body holding a live object took every other benchmark in the suite into the host process with it - the price of measuring one un-isolatable thing was every comparison it was part of. The suite splits: addressable bodies go to a worker, while named bodies are measured in-process and stamped `InProcessRequested`, and the merged rows are put back into declaration order because a table's order is the one thing the author fully controls.
+`BenchmarkSuite.AddInProcess` provides a per-benchmark opt-out for suites. `WithIsolation(Isolation.Off)` is all-or-nothing, so one body holding a live object took every other benchmark in the suite into the host process with it - the price of measuring one un-isolatable thing was every comparison it was part of. The suite splits: addressable bodies go to a worker, while named bodies are measured in-process and stamped `InProcessRequested`, and the merged rows are put back into declaration order because a table's order is the one thing the author fully controls.
 
 ## See also
 

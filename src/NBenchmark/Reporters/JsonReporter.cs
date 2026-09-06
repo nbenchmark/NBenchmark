@@ -26,6 +26,16 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
     /// </summary>
     public bool IncludeSamples { get; set; } = true;
 
+    /// <summary>
+    ///     The path of the file the last <see cref="ReportAsync" /> wrote.
+    /// </summary>
+    /// <remarks>
+    ///     Internal: the extension methods that wrap this reporter for a single result return the path
+    ///     they wrote, and the name is generated inside <see cref="ReportAsync" /> from a timestamp and
+    ///     a counter, so it cannot be predicted from outside.
+    /// </remarks>
+    internal string? LastWrittenPath { get; private set; }
+
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)
@@ -36,6 +46,7 @@ public sealed class JsonReporter(string outputDirectory = ".", string? name = nu
                        ?? $"benchmarks-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.json";
 
         var filePath = Path.Combine(_outputDirectory, fileName);
+        LastWrittenPath = filePath;
 
         var serializedResults = IncludeSamples
             ? results

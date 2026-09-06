@@ -90,9 +90,9 @@ For more information, see [Descriptive Statistics: Percentiles](../statistics/de
 The speed relative to the baseline. A ratio of `0.75x` means the implementation is 25% faster, while `2.0x` means it is twice as slow. The baseline is either the benchmark you designated with `WithBaseline` or the fastest benchmark in the group.
 
 #### `n/a` in the Ratio column
-The engine only calculates ratios between rows measured under the same runtime configuration. If a row was measured differently (for example, a `[InProcess]` benchmark in a table of isolated ones), the ratio reads `n/a`. An **Iso** column will indicate which rows were isolated.
+The engine only calculates ratios between rows measured under the same runtime configuration. If a row was measured differently (for example, a `[Isolation(Isolation.Off)]` benchmark in a table of isolated ones), the ratio reads `n/a`. An **Iso** column will indicate which rows were isolated.
 
-Runtime configuration significantly impacts small measurements. Because an in-process reading and an isolated reading of the same body can differ substantially, a ratio spanning them would report the configuration difference rather than the code difference. Compare rows measured using the same method, or remove `[InProcess]` so the entire group is isolated. For more information, see [Isolated runs](../features/isolated-runs.md).
+Runtime configuration significantly impacts small measurements. Because an in-process reading and an isolated reading of the same body can differ substantially, a ratio spanning them would report the configuration difference rather than the code difference. Compare rows measured using the same method, or remove `[Isolation(Isolation.Off)]` so the entire group is isolated. For more information, see [Isolated runs](../features/isolated-runs.md).
 
 ### Sig (suite mode)
 

@@ -361,7 +361,7 @@ internal static class TestMethodRunner
             : launches[0].Result with { RawSamples = launches[0].RawSamples };
 
         // Errored rows are left alone: a measurement that never happened was not taken in a worker
-        // either, and stamping it isolated would let it satisfy RequireIsolation.
+        // either, and stamping it isolated would let it satisfy Isolation.Required.
         return result.Errored ? result : result with { IsolationStatus = IsolationStatus.Isolated };
     }
 

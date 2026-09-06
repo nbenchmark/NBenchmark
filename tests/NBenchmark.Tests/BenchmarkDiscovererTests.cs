@@ -532,7 +532,7 @@ public class PublicBenchmarks
 public class IsolatedMethodBenchmarks
 {
     [Benchmark]
-    [IsolatedProcess]
+    [Isolation(Isolation.Required)]
     public int Isolated() => 1;
 
     [Benchmark]
@@ -542,14 +542,14 @@ public class IsolatedMethodBenchmarks
 public class InProcessMethodBenchmarks
 {
     [Benchmark]
-    [InProcess]
+    [Isolation(Isolation.Off)]
     public int Forced() => 1;
 
     [Benchmark]
     public int Plain() => 2;
 }
 
-[IsolatedProcess]
+[Isolation(Isolation.Required)]
 public class IsolatedClassBenchmarks
 {
     [Benchmark]
@@ -559,7 +559,7 @@ public class IsolatedClassBenchmarks
     public int B() => 2;
 }
 
-[InProcess]
+[Isolation(Isolation.Off)]
 public class InProcessClassBenchmarks
 {
     [Benchmark]
@@ -569,18 +569,18 @@ public class InProcessClassBenchmarks
     public int B() => 2;
 }
 
-[IsolatedProcess]
+[Isolation(Isolation.Required)]
 public class MixedIsolationBenchmarks
 {
     [Benchmark]
-    [InProcess]
+    [Isolation(Isolation.Off)]
     public int OptedOut() => 1;
 
     [Benchmark]
     public int Inherited() => 2;
 }
 
-[IsolatedProcess]
+[Isolation(Isolation.Required)]
 public class BaseIsolatedBenchmarks
 {
     [Benchmark]

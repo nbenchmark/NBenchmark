@@ -59,7 +59,7 @@ public sealed class ConsoleReporter : IReporter
             {
                 var className = table.CrossClass
                     ? null
-                    : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
+                    : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.Result.ClassName))?.Result.ClassName;
 
                 RenderComparisonTable(table, className, Detail);
                 AnsiConsole.WriteLine();
@@ -78,7 +78,7 @@ public sealed class ConsoleReporter : IReporter
         {
             var className = table.CrossClass
                 ? null
-                : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
+                : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.Result.ClassName))?.Result.ClassName;
 
             RenderComparisonTable(table, className, Detail);
             AnsiConsole.WriteLine();
@@ -108,7 +108,7 @@ public sealed class ConsoleReporter : IReporter
 
     private static void RenderSimpleFooter(BenchmarkTable benchTable)
     {
-        var count = benchTable.Rows.Count(r => !r.Errored);
+        var count = benchTable.Rows.Count(r => !r.Result.Errored);
 
         // Runtime provenance is included even at Simple detail. The configuration a benchmark was
         // measured under moves the number by more than most of the effects people are looking for,
@@ -123,7 +123,7 @@ public sealed class ConsoleReporter : IReporter
     /// <summary>
     ///     A short description of the runtime configuration the rows were measured under. Reports
     ///     <c>mixed</c> rather than picking one arbitrarily when the rows disagree, which happens
-    ///     whenever a class combines <c>[InProcess]</c> benchmarks with isolated ones.
+    ///     whenever a class combines <c>[Isolation(Isolation.Off)]</c> benchmarks with isolated ones.
     /// </summary>
     private static string RuntimeSummary(BenchmarkTable benchTable)
     {
@@ -165,11 +165,11 @@ public sealed class ConsoleReporter : IReporter
                 + "difference between two configurations is worth roughly 3.3x on bodies of "
                 + "identical cost - so the ratio would have reported that, under the name of a "
                 + "speedup. Compare rows measured the same way, or run the group without "
-                + "[bold]--in-process[/] / [bold][[InProcess]][/] so every row is isolated.[/]");
+                + "[bold]--in-process[/] / [bold][[Isolation(Isolation.Off)]][/] so every row is isolated.[/]");
         }
 
         var inconclusive = benchTable.Rows
-            .Where(r => !r.Errored && !r.IsBaseline && r.RatioEstimate is { IncludesUnity: true })
+            .Where(r => !r.Result.Errored && !r.IsBaseline && r.RatioEstimate is { IncludesUnity: true })
             .ToList();
 
         if (inconclusive.Count > 0)
@@ -216,7 +216,7 @@ public sealed class ConsoleReporter : IReporter
 
     private static void RenderHeader(BenchmarkTable benchTable)
     {
-        var rule = new Rule($"[bold steelblue1]BENCHMARK RESULTS[/]  [grey]{benchTable.RunAtUtc} UTC[/]")
+        var rule = new Rule($"[bold steelblue1]BENCHMARK RESULTS[/]  [grey]{benchTable.RunAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? ""} UTC[/]")
             .LeftJustified()
             .RuleStyle(Style.Parse("steelblue1"));
 
@@ -225,22 +225,22 @@ public sealed class ConsoleReporter : IReporter
 
     private static void RenderComparisonTable(BenchmarkTable benchTable, string? sectionClassName, ReportDetail detail)
     {
-        var successfulRows = benchTable.Rows.Where(r => !r.Errored).ToList();
-        var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Median) : 1;
-        var showCategories = detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Categories.Count > 0);
-        var showRuntime = benchTable.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+        var successfulRows = benchTable.Rows.Where(r => !r.Result.Errored).ToList();
+        var maxMedian = successfulRows.Count > 0 ? successfulRows.Max(r => r.Result.Median) : 1;
+        var showCategories = detail == ReportDetail.Advanced && benchTable.Rows.Any(r => r.Result.Categories.Count > 0);
+        var showRuntime = benchTable.Rows.Any(r => r.Result.RuntimeMoniker.Length > 0);
 
         // Only when the rows disagree. On a uniform table the column would be a constant, and the
         // footer already names the configuration; when they disagree it is the difference between
         // reading the table and misreading it.
         var showIsolation = benchTable.MixedIsolationStatuses;
         var isSimple = detail == ReportDetail.Simple;
-        var showClass = benchTable.CrossClass && benchTable.Rows.Any(r => r.ClassName.Length > 0);
+        var showClass = benchTable.CrossClass && benchTable.Rows.Any(r => r.Result.ClassName.Length > 0);
 
         // A ratio is present whenever a row was ranked against a reference - either a competing
         // benchmark in its parameter group or, for a single method swept across parameter values,
         // the fastest point in the table. Parametric tables use compact headers to save width.
-        var hasComparisons = benchTable.Rows.Any(r => !r.Errored && !double.IsNaN(r.Ratio));
+        var hasComparisons = benchTable.Rows.Any(r => !r.Result.Errored && !double.IsNaN(r.Ratio));
         var ratioHeader = "Ratio";
         var magnitudeHeader = "Mag";
 
@@ -294,28 +294,28 @@ public sealed class ConsoleReporter : IReporter
         if (showCategories)
             table.AddColumn(new TableColumn("[bold]Categories[/]"));
 
-        var hasDescriptions = !isSimple && benchTable.Rows.Any(r => !string.IsNullOrEmpty(r.Description));
+        var hasDescriptions = !isSimple && benchTable.Rows.Any(r => !string.IsNullOrEmpty(r.Result.Description));
 
         if (hasDescriptions)
             table.AddColumn(new TableColumn("[bold]Description[/]"));
 
         foreach (var row in benchTable.Rows)
         {
-            var rawName = benchTable.ParameterNames.Count > 0 ? row.BaseName : row.Name;
+            var rawName = benchTable.ParameterNames.Count > 0 ? row.BaseName : row.Result.Name;
 
             var displayName = !string.IsNullOrEmpty(sectionClassName) && rawName.StartsWith(sectionClassName + ".", StringComparison.Ordinal)
                 ? rawName[(sectionClassName.Length + 1)..]
                 : rawName;
 
-            if (row.Errored)
+            if (row.Result.Errored)
             {
                 var errorCols = new List<string> { $"[red]✗ {Esc(displayName)}[/]" };
 
                 if (showClass)
-                    errorCols.Add(Esc(row.ClassName));
+                    errorCols.Add(Esc(row.Result.ClassName));
 
                 if (showRuntime)
-                    errorCols.Add(Esc(row.RuntimeMoniker));
+                    errorCols.Add(Esc(row.Result.RuntimeMoniker));
 
                 if (showIsolation)
                     errorCols.Add("[dim]-[/]");
@@ -354,7 +354,7 @@ public sealed class ConsoleReporter : IReporter
                 ? $"[bold]{Esc(displayName)}[/] [dim italic](baseline)[/]"
                 : $"[{ratioColor}]{Esc(displayName)}[/]";
 
-            var bar = RenderBar(row.Median, maxMedian, ratioColor);
+            var bar = RenderBar(row.Result.Median, maxMedian, ratioColor);
 
             string barCell;
 
@@ -370,21 +370,21 @@ public sealed class ConsoleReporter : IReporter
             else
                 barCell = showBar ? $"{bar} [{ratioColor}]{ratioText}[/]" : $"[{ratioColor}]{ratioText}[/]";
 
-            var allocText = row.MeanAllocatedBytes.HasValue
-                ? BenchmarkFormatter.FormatBytes(row.MeanAllocatedBytes.Value)
+            var allocText = row.Result.MeanAllocatedBytes.HasValue
+                ? BenchmarkFormatter.FormatBytes(row.Result.MeanAllocatedBytes.Value)
                 : "[dim]-[/]";
 
             var rowCols = new List<string> { nameText };
 
             if (showClass)
-                rowCols.Add(Esc(row.ClassName));
+                rowCols.Add(Esc(row.Result.ClassName));
 
             if (showRuntime)
-                rowCols.Add(Esc(row.RuntimeMoniker));
+                rowCols.Add(Esc(row.Result.RuntimeMoniker));
 
             if (showIsolation)
             {
-                rowCols.Add(row.IsolationStatus.IsIsolated()
+                rowCols.Add(row.Result.IsolationStatus.IsIsolated()
                     ? "[dim]yes[/]"
                     : "[yellow]no[/]");
             }
@@ -392,14 +392,14 @@ public sealed class ConsoleReporter : IReporter
             rowCols.AddRange(ParameterCells(row, benchTable.ParameterNames));
 
             rowCols.AddRange([
-                $"[bold]{BenchmarkFormatter.FormatNs(row.Median)}[/]",
+                $"[bold]{BenchmarkFormatter.FormatNs(row.Result.Median)}[/]",
             ]);
 
             if (!isSimple)
-                rowCols.Add(BenchmarkFormatter.FormatNs(row.Mean));
+                rowCols.Add(BenchmarkFormatter.FormatNs(row.Result.Mean));
 
             rowCols.AddRange([
-                BenchmarkFormatter.FormatOpsPerSecond(row.OperationsPerSecond),
+                BenchmarkFormatter.FormatOpsPerSecond(row.Result.OperationsPerSecond),
                 barCell,
             ]);
 
@@ -415,16 +415,16 @@ public sealed class ConsoleReporter : IReporter
                 rowCols.Add(sigIcon);
 
                 if (!isSimple)
-                    rowCols.Add(RenderMagnitude(row.Effect));
+                    rowCols.Add(RenderMagnitude(row.Result.Effect));
             }
 
             rowCols.Add(allocText);
 
             if (showCategories)
-                rowCols.Add(row.Categories.Count > 0 ? Esc(string.Join(", ", row.Categories)) : "[dim]-[/]");
+                rowCols.Add(row.Result.Categories.Count > 0 ? Esc(string.Join(", ", row.Result.Categories)) : "[dim]-[/]");
 
             if (hasDescriptions)
-                rowCols.Add(string.IsNullOrEmpty(row.Description) ? "" : Esc(row.Description));
+                rowCols.Add(string.IsNullOrEmpty(row.Result.Description) ? "" : Esc(row.Result.Description));
 
             table.AddRow(rowCols.ToArray());
         }
@@ -436,15 +436,15 @@ public sealed class ConsoleReporter : IReporter
     {
         foreach (var parameterName in parameterNames)
         {
-            var parameter = row.ParameterSet.FirstOrDefault(p => p.Name == parameterName);
+            var parameter = row.Result.ParameterSet.FirstOrDefault(p => p.Name == parameterName);
             yield return parameter is null ? "[dim]-[/]" : Esc(BenchmarkParameter.FormatValue(parameter.Value));
         }
     }
 
     private static void RenderTimingDetail(BenchmarkTable benchTable)
     {
-        var rows = benchTable.Rows.Where(r => !r.Errored).ToList();
-        var showRuntime = rows.Any(r => r.RuntimeMoniker.Length > 0);
+        var rows = benchTable.Rows.Where(r => !r.Result.Errored).ToList();
+        var showRuntime = rows.Any(r => r.Result.RuntimeMoniker.Length > 0);
 
         if (rows.Count == 0)
             return;
@@ -459,7 +459,7 @@ public sealed class ConsoleReporter : IReporter
         // Determine which percentile columns to show (upper tail: >P50, not Max).
         // Use the union across successful rows so errored/partial rows cannot hide columns.
         var percentileKeys = rows
-            .SelectMany(r => r.Percentiles)
+            .SelectMany(r => r.Result.Percentiles)
             .Select(e => e.Percentile)
             .Where(p => p > 0.50 && p < 1.0)
             .Distinct()
@@ -487,7 +487,7 @@ public sealed class ConsoleReporter : IReporter
 
         foreach (var row in rows)
         {
-            var cvColor = row.CoefficientOfVariationPercent switch
+            var cvColor = row.Result.CoefficientOfVariationPercent switch
             {
                 <= 2.0 => "green",
                 <= 5.0 => "yellow",
@@ -496,16 +496,16 @@ public sealed class ConsoleReporter : IReporter
 
             var cells = new List<string>
             {
-                $"[dim]{Esc(row.Name)}[/]",
+                $"[dim]{Esc(row.Result.Name)}[/]",
             };
 
             if (showRuntime)
-                cells.Add(Esc(row.RuntimeMoniker));
+                cells.Add(Esc(row.Result.RuntimeMoniker));
 
             cells.AddRange([
-                $"±{BenchmarkFormatter.FormatNs(row.MarginOfError)} [dim]({row.MarginPercent:F2}%)[/]",
-                BenchmarkFormatter.FormatNs(row.StandardDeviation),
-                $"[{cvColor}]{row.CoefficientOfVariationPercent:F2}%[/]",
+                $"±{BenchmarkFormatter.FormatNs(row.Result.MarginOfError)} [dim]({row.Result.MarginPercent:F2}%)[/]",
+                BenchmarkFormatter.FormatNs(row.Result.StandardDeviation),
+                $"[{cvColor}]{row.Result.CoefficientOfVariationPercent:F2}%[/]",
             ]);
 
             foreach (var percentile in percentileKeys)
@@ -522,7 +522,7 @@ public sealed class ConsoleReporter : IReporter
 
     private static void RenderLaunchStats(BenchmarkTable benchTable)
     {
-        var rows = benchTable.Rows.Where(r => !r.Errored && r.LaunchStatistics is not null).ToList();
+        var rows = benchTable.Rows.Where(r => !r.Result.Errored && r.Result.LaunchStatistics is not null).ToList();
 
         if (rows.Count == 0)
             return;
@@ -546,14 +546,14 @@ public sealed class ConsoleReporter : IReporter
 
         foreach (var row in rows)
         {
-            var ls = row.LaunchStatistics!;
+            var ls = row.Result.LaunchStatistics!;
 
             var ciText = ls.LaunchConfidenceIntervalLower.HasValue && ls.LaunchConfidenceIntervalUpper.HasValue
                 ? $"[[{ls.LaunchConfidenceIntervalLower!.Value:F1}–{ls.LaunchConfidenceIntervalUpper!.Value:F1}]]"
                 : "[dim]-[/]";
 
             table.AddRow(
-                $"[dim]{Esc(row.Name)}[/]",
+                $"[dim]{Esc(row.Result.Name)}[/]",
                 $"{ls.LaunchCount}",
                 BenchmarkFormatter.FormatNs(ls.LaunchMean),
                 BenchmarkFormatter.FormatNs(ls.LaunchStandardDeviation),
@@ -567,7 +567,7 @@ public sealed class ConsoleReporter : IReporter
 
     private static void RenderDiagnostics(BenchmarkTable benchTable)
     {
-        var rows = benchTable.Rows.Where(r => !r.Errored && r.Diagnostics is not null).ToList();
+        var rows = benchTable.Rows.Where(r => !r.Result.Errored && r.Result.Diagnostics is not null).ToList();
 
         if (rows.Count == 0)
             return;
@@ -584,15 +584,15 @@ public sealed class ConsoleReporter : IReporter
             .BorderColor(Color.Grey42)
             .AddColumn(new TableColumn("[dim]Benchmark[/]").NoWrap());
 
-        var showRuntime = benchTable.Rows.Any(r => r.RuntimeMoniker.Length > 0);
+        var showRuntime = benchTable.Rows.Any(r => r.Result.RuntimeMoniker.Length > 0);
 
         if (showRuntime)
             table.AddColumn(new TableColumn("[dim]Runtime[/]").RightAligned().NoWrap());
 
-        var hasGen0 = rows.Any(r => r.Diagnostics!.Gen0Collections.HasValue);
-        var hasHeap = rows.Any(r => r.Diagnostics!.HeapCommittedBytes.HasValue);
-        var hasCpu = rows.Any(r => r.Diagnostics!.CpuWallRatio.HasValue);
-        var hasExc = rows.Any(r => r.Diagnostics!.ExceptionCountPerOp.HasValue);
+        var hasGen0 = rows.Any(r => r.Result.Diagnostics!.Gen0Collections.HasValue);
+        var hasHeap = rows.Any(r => r.Result.Diagnostics!.HeapCommittedBytes.HasValue);
+        var hasCpu = rows.Any(r => r.Result.Diagnostics!.CpuWallRatio.HasValue);
+        var hasExc = rows.Any(r => r.Result.Diagnostics!.ExceptionCountPerOp.HasValue);
 
         if (hasGen0)
         {
@@ -612,12 +612,12 @@ public sealed class ConsoleReporter : IReporter
 
         foreach (var row in rows)
         {
-            var cells = new List<IRenderable> { new Markup(Esc(row.Name)) };
+            var cells = new List<IRenderable> { new Markup(Esc(row.Result.Name)) };
 
             if (showRuntime)
-                cells.Add(new Markup(Esc(row.RuntimeMoniker)));
+                cells.Add(new Markup(Esc(row.Result.RuntimeMoniker)));
 
-            var diag = row.Diagnostics!;
+            var diag = row.Result.Diagnostics!;
 
             if (hasGen0)
             {
@@ -667,7 +667,7 @@ public sealed class ConsoleReporter : IReporter
 
     private static void RenderAutoTune(BenchmarkTable benchTable)
     {
-        var rows = benchTable.Rows.Where(r => !r.Errored && r.AutoTune is not null).ToList();
+        var rows = benchTable.Rows.Where(r => !r.Result.Errored && r.Result.AutoTune is not null).ToList();
 
         if (rows.Count == 0)
             return;
@@ -676,13 +676,13 @@ public sealed class ConsoleReporter : IReporter
 
         foreach (var row in rows)
         {
-            AnsiConsole.MarkupLine($"[grey]{Esc(row.Name)}: {Esc(BenchmarkTable.FormatAutoTuneSummary(row.AutoTune!))}[/]");
+            AnsiConsole.MarkupLine($"[grey]{Esc(row.Result.Name)}: {Esc(BenchmarkTable.FormatAutoTuneSummary(row.Result.AutoTune!))}[/]");
         }
     }
 
     private static void RenderAdvancedDetails(BenchmarkTable benchTable)
     {
-        var rows = benchTable.Rows.Where(r => !r.Errored).ToList();
+        var rows = benchTable.Rows.Where(r => !r.Result.Errored).ToList();
 
         if (rows.Count == 0)
             return;
@@ -712,7 +712,7 @@ public sealed class ConsoleReporter : IReporter
                 continue;
 
             var panel = new Panel(Markup.Escape(statsBlock))
-                .Header($"[bold]{Esc(row.Name)}[/]")
+                .Header($"[bold]{Esc(row.Result.Name)}[/]")
                 .Border(BoxBorder.Rounded)
                 .BorderColor(Color.Grey42)
                 .Padding(1, 0)
@@ -742,7 +742,7 @@ public sealed class ConsoleReporter : IReporter
     private static void RenderWarnings(BenchmarkTable benchTable)
     {
         var warnings = benchTable.Rows
-            .Where(r => !r.Errored && r.Warnings.Count > 0)
+            .Where(r => !r.Result.Errored && r.Result.Warnings.Count > 0)
             .ToList();
 
         if (warnings.Count == 0)
@@ -757,9 +757,9 @@ public sealed class ConsoleReporter : IReporter
 
         foreach (var row in warnings)
         {
-            foreach (var warning in row.Warnings)
+            foreach (var warning in row.Result.Warnings)
             {
-                AnsiConsole.MarkupLine($"[yellow]⚠ {Esc(row.Name)}:[/] [dim]{Esc(warning)}[/]");
+                AnsiConsole.MarkupLine($"[yellow]⚠ {Esc(row.Result.Name)}:[/] [dim]{Esc(warning)}[/]");
             }
         }
     }
@@ -774,8 +774,8 @@ public sealed class ConsoleReporter : IReporter
         AnsiConsole.WriteLine();
 
         var hasMultipleRuntimes = benchTable.Rows
-            .Where(r => !r.Errored)
-            .Select(r => r.RuntimeMoniker)
+            .Where(r => !r.Result.Errored)
+            .Select(r => r.Result.RuntimeMoniker)
             .Distinct(StringComparer.Ordinal)
             .Take(2)
             .Count() > 1;
@@ -830,8 +830,8 @@ public sealed class ConsoleReporter : IReporter
     private static string GetEffectMetricSummary(IReadOnlyList<BenchmarkRow> rows)
     {
         var metrics = rows
-            .Where(r => !r.Errored)
-            .Select(r => r.Effect?.Metric)
+            .Where(r => !r.Result.Errored)
+            .Select(r => r.Result.Effect?.Metric)
             .Where(m => !string.IsNullOrWhiteSpace(m))
             .Distinct(StringComparer.Ordinal)
             .ToList();
@@ -891,7 +891,7 @@ public sealed class ConsoleReporter : IReporter
     private static void RenderDistribution(BenchmarkTable benchTable)
     {
         var rows = benchTable.Rows
-            .Where(r => !r.Errored && (r.RawSamples.Count > 0 || r.Max > r.Min))
+            .Where(r => !r.Result.Errored && (r.Result.RawSamples.Count > 0 || r.Result.Max > r.Result.Min))
             .ToList();
 
         if (rows.Count == 0)
@@ -915,13 +915,13 @@ public sealed class ConsoleReporter : IReporter
             // red dot at its true position. The strip is drawn purely from Q1/Q3/median and
             // the kept/discarded split, so it is correct for any outlier detector (IQR, MAD,
             // percentile, none, custom) - only which points are dots changes.
-            if (row.RawSamples.Count > 0)
+            if (row.Result.RawSamples.Count > 0)
             {
                 // Give the sparkline the same width as the axis and indent it so its bins sit
                 // directly above the axis cells - the two rows then read as a single chart.
                 var (lo, _) = SampleRange(row);
                 var indent = new string(' ', StripIndent + BenchmarkFormatter.FormatNs(lo).Length + 1);
-                content.AppendLine(indent + RenderSparkline(row.RawSamples, row.TrimmedOrdinals, axisWidth));
+                content.AppendLine(indent + RenderSparkline(row.Result.RawSamples, row.Result.TrimmedOrdinals, axisWidth));
             }
 
             content.AppendLine(RenderBoxWhisker(row, axisWidth));
@@ -931,7 +931,7 @@ public sealed class ConsoleReporter : IReporter
                 content.AppendLine(line);
 
             var panel = new Panel(content.ToString().TrimEnd())
-                .Header($"[bold]{Esc(row.Name)}[/]")
+                .Header($"[bold]{Esc(row.Result.Name)}[/]")
                 .Border(BoxBorder.Rounded)
                 .BorderColor(Color.Grey42)
                 .Padding(2, 1)
@@ -1032,7 +1032,7 @@ public sealed class ConsoleReporter : IReporter
         var (lo, hi) = SampleRange(row);
 
         if (hi <= lo || width < 4)
-            return $"  [dim]▉ all samples ≈ {BenchmarkFormatter.FormatNs(row.Median)}[/]";
+            return $"  [dim]▉ all samples ≈ {BenchmarkFormatter.FormatNs(row.Result.Median)}[/]";
 
         var cells = new char[width];
         var styles = new string[width];
@@ -1057,8 +1057,8 @@ public sealed class ConsoleReporter : IReporter
         }
 
         // Box: Q1-Q3 (clamped into the axis in case the pre-trim quartiles sit at an edge).
-        var bLo = Col(Math.Clamp(row.Q1, lo, hi));
-        var bHi = Col(Math.Clamp(row.Q3, lo, hi));
+        var bLo = Col(Math.Clamp(row.Result.Q1, lo, hi));
+        var bHi = Col(Math.Clamp(row.Result.Q3, lo, hi));
 
         for (var i = bLo; i <= bHi; i++)
         {
@@ -1074,17 +1074,17 @@ public sealed class ConsoleReporter : IReporter
             cells[wHi] = '┤';
 
         // Median line.
-        var mCol = Col(Math.Clamp(row.Median, lo, hi));
+        var mCol = Col(Math.Clamp(row.Result.Median, lo, hi));
         cells[mCol] = '◉';
         styles[mCol] = MedianStyle;
 
         // Trimmed samples as dots at their true positions.
-        foreach (var ordinal in row.TrimmedOrdinals)
+        foreach (var ordinal in row.Result.TrimmedOrdinals)
         {
-            if (ordinal < 0 || ordinal >= row.RawSamples.Count)
+            if (ordinal < 0 || ordinal >= row.Result.RawSamples.Count)
                 continue;
 
-            var oCol = Col(row.RawSamples[ordinal]);
+            var oCol = Col(row.Result.RawSamples[ordinal]);
             cells[oCol] = '●';
             styles[oCol] = OutlierStyle;
         }
@@ -1094,35 +1094,35 @@ public sealed class ConsoleReporter : IReporter
 
     private static string[] RenderDistributionSummary(BenchmarkRow row, string outlierDetector)
     {
-        var sampleCount = row.RawSamples.Count > 0 ? row.RawSamples.Count : row.N + row.OutliersRemoved;
+        var sampleCount = row.Result.RawSamples.Count > 0 ? row.Result.RawSamples.Count : row.Result.N + row.Result.OutliersRemoved;
 
         var stats =
-            $"  [dim]median {BenchmarkFormatter.FormatNs(row.Median)} · "
-            + $"IQR {BenchmarkFormatter.FormatNs(row.Q1)}–{BenchmarkFormatter.FormatNs(row.Q3)}[/]";
+            $"  [dim]median {BenchmarkFormatter.FormatNs(row.Result.Median)} · "
+            + $"IQR {BenchmarkFormatter.FormatNs(row.Result.Q1)}–{BenchmarkFormatter.FormatNs(row.Result.Q3)}[/]";
 
         var counts = $"  [dim]{sampleCount} samples[/]";
 
-        if (row.OutliersRemoved > 0)
-            counts += $"[red] · {row.OutliersRemoved} trimmed ({Esc(outlierDetector)})[/]";
+        if (row.Result.OutliersRemoved > 0)
+            counts += $"[red] · {row.Result.OutliersRemoved} trimmed ({Esc(outlierDetector)})[/]";
 
         return [stats, counts];
     }
 
     private static (double Lo, double Hi) SampleRange(BenchmarkRow row)
     {
-        if (row.RawSamples.Count == 0)
-            return (row.Min, row.Max);
+        if (row.Result.RawSamples.Count == 0)
+            return (row.Result.Min, row.Result.Max);
 
-        var lo = row.RawSamples[0];
-        var hi = row.RawSamples[0];
+        var lo = row.Result.RawSamples[0];
+        var hi = row.Result.RawSamples[0];
 
-        for (var i = 1; i < row.RawSamples.Count; i++)
+        for (var i = 1; i < row.Result.RawSamples.Count; i++)
         {
-            if (row.RawSamples[i] < lo)
-                lo = row.RawSamples[i];
+            if (row.Result.RawSamples[i] < lo)
+                lo = row.Result.RawSamples[i];
 
-            if (row.RawSamples[i] > hi)
-                hi = row.RawSamples[i];
+            if (row.Result.RawSamples[i] > hi)
+                hi = row.Result.RawSamples[i];
         }
 
         return (lo, hi);
@@ -1130,23 +1130,23 @@ public sealed class ConsoleReporter : IReporter
 
     private static (double Lo, double Hi) KeptExtent(BenchmarkRow row, double fallbackLo, double fallbackHi)
     {
-        if (row.RawSamples.Count == 0 || row.TrimmedOrdinals.Count == 0)
+        if (row.Result.RawSamples.Count == 0 || row.Result.TrimmedOrdinals.Count == 0)
             return (fallbackLo, fallbackHi);
 
-        var trimmed = new HashSet<int>(row.TrimmedOrdinals);
+        var trimmed = new HashSet<int>(row.Result.TrimmedOrdinals);
         var lo = double.PositiveInfinity;
         var hi = double.NegativeInfinity;
 
-        for (var i = 0; i < row.RawSamples.Count; i++)
+        for (var i = 0; i < row.Result.RawSamples.Count; i++)
         {
             if (trimmed.Contains(i))
                 continue;
 
-            if (row.RawSamples[i] < lo)
-                lo = row.RawSamples[i];
+            if (row.Result.RawSamples[i] < lo)
+                lo = row.Result.RawSamples[i];
 
-            if (row.RawSamples[i] > hi)
-                hi = row.RawSamples[i];
+            if (row.Result.RawSamples[i] > hi)
+                hi = row.Result.RawSamples[i];
         }
 
         return double.IsInfinity(lo) || double.IsInfinity(hi) ? (fallbackLo, fallbackHi) : (lo, hi);

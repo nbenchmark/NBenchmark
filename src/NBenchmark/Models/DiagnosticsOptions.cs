@@ -24,7 +24,7 @@ public sealed record DiagnosticsOptions
 
     public bool Any => GcCollectionCounts || GcHeapInfo || Exceptions || CpuTime;
 
-    public DiagnosticsMode ToMode()
+    internal DiagnosticsMode ToMode()
     {
         var mode = DiagnosticsMode.None;
 
@@ -43,7 +43,7 @@ public sealed record DiagnosticsOptions
         return mode;
     }
 
-    public static DiagnosticsOptions FromMode(DiagnosticsMode mode)
+    internal static DiagnosticsOptions FromMode(DiagnosticsMode mode)
     {
         var unknownFlags = mode & ~DiagnosticsMode.All;
 

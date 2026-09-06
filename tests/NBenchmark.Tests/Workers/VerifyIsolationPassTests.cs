@@ -42,7 +42,7 @@ public sealed class VerifyIsolationPassTests
                 // tests are about the shape of the --verify-isolation pass - one suite stream, one
                 // regression gate, reporters on the measured run only - not about the gate that would
                 // otherwise stop the run before any of it happened.
-                RequireIsolation = false,
+                Isolation = Isolation.Preferred,
                 Iterations = 1,
                 WarmupIterations = 0,
                 OpsPerSample = 1,

@@ -40,7 +40,7 @@ public class TimingSanityTests
                     WarmupIterations = 3,
                     Iterations = 15,
                     OutlierMode = OutlierMode.None,
-                    MeasureAllocationsOverride = false,
+                    MeasureAllocations = false,
                 },
             });
 
@@ -73,7 +73,7 @@ public class TimingSanityTests
                     WarmupIterations = 5,
                     Iterations = 100,
                     OutlierMode = OutlierMode.None,
-                    ForceGcBeforeEachIterationOverride = false,
+                    ForceGcBeforeEachIteration = false,
                 },
             });
 

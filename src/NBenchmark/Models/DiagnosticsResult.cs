@@ -10,5 +10,6 @@ public sealed record DiagnosticsResult
     public double? ExceptionCountPerOp { get; init; }
     public double? CpuTimeNsPerOp { get; init; }
     public double? CpuWallRatio { get; init; }
-    public DiagnosticsMode Mode { get; init; }
+    /// <summary>Which counters this result carries - the resolved <see cref="MeasurementOptions.Diagnostics" />.</summary>
+    public DiagnosticsOptions Collected { get; init; } = DiagnosticsOptions.None;
 }

@@ -15,7 +15,7 @@ public class ObserverPlumbingTests
     {
         var observer = new RecordingObserver();
 
-        await new BenchmarkSuite("observer-plumbing").WithRequireIsolation(false)
+        await new BenchmarkSuite("observer-plumbing").WithIsolation(Isolation.Preferred)
             .Add("fast", () => { })
             .Add("slow", () => { })
             .WithWarmup(0)
@@ -41,7 +41,7 @@ public class ObserverPlumbingTests
     {
         var observer = new RecordingObserver();
 
-        await new BenchmarkSuite("null-observer").WithRequireIsolation(false)
+        await new BenchmarkSuite("null-observer").WithIsolation(Isolation.Preferred)
             .Add("bench", () => { })
             .WithWarmup(0)
             .WithIterations(1)
@@ -59,7 +59,7 @@ public class ObserverPlumbingTests
     {
         var observer = new RecordingObserver();
 
-        await new BenchmarkSuite("name-check").WithRequireIsolation(false)
+        await new BenchmarkSuite("name-check").WithIsolation(Isolation.Preferred)
             .Add("alpha", () => { })
             .Add("beta", () => { })
             .WithWarmup(0)
@@ -98,7 +98,7 @@ public class ObserverPlumbingTests
                 WarmupIterations = 0,
                 Iterations = 2,
                 OutlierMode = OutlierMode.None,
-                MeasureAllocationsOverride = false,
+                MeasureAllocations = false,
             },
             Observer = observer,
         };

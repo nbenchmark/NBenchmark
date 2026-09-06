@@ -15,7 +15,7 @@ public class ParametricHarnessIntegrationTests
             await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -32,7 +32,7 @@ public class ParametricHarnessIntegrationTests
             await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -49,7 +49,7 @@ public class ParametricHarnessIntegrationTests
                 .Create(["--filter", "ParametricHarnessBenchmarks.Compute(n=100)", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -66,7 +66,7 @@ public class ParametricHarnessIntegrationTests
                 ])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -82,7 +82,7 @@ public class ParametricHarnessIntegrationTests
             BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--list"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync().GetAwaiter().GetResult();
         });
 
@@ -100,7 +100,7 @@ public class ParametricHarnessIntegrationTests
             await BenchmarkHarness.Create(["--filter", "ParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<ParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -129,7 +129,7 @@ public class ParametricHarnessIntegrationTests
             await BenchmarkHarness.Create(["--filter", "BaselineParametricHarnessBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<BaselineParametricHarnessBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 

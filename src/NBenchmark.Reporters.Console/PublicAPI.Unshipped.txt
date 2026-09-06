@@ -15,4 +15,4 @@ NBenchmark.Reporters.Console.ConsoleReporter.Detail.get -> NBenchmark.Reporters.
 NBenchmark.Reporters.Console.ConsoleReporter.Detail.set -> void
 NBenchmark.Reporters.Console.ConsoleReporter.Name.get -> string!
 NBenchmark.Reporters.Console.ConsoleReporter.ReportAsync(System.Collections.Generic.IReadOnlyList<NBenchmark.BenchmarkResult!>! results, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-static NBenchmark.Reporters.Console.ConsoleBenchmarkResultExtensions.PrintAsync(this NBenchmark.BenchmarkResult! result) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!
+static NBenchmark.Reporters.Console.ConsoleBenchmarkResultExtensions.PrintTableAsync(this NBenchmark.BenchmarkResult! result) -> System.Threading.Tasks.Task<NBenchmark.BenchmarkResult!>!

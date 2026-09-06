@@ -39,7 +39,7 @@ public sealed class IsolatedRunOrderTests
         // The fake launcher deliberately returns nothing, which is a worker fault and therefore a
         // refusal. These tests are about the request that was sent, not about what happens after it
         // fails, so they accept the fallback rather than the throw it would otherwise produce.
-        .WithRequireIsolation(false);
+        .WithIsolation(Isolation.Preferred);
 
     /// <summary>
     ///     An inline suite's configured order reaches the worker. The suite default is

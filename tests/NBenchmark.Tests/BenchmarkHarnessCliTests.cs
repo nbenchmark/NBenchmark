@@ -103,7 +103,7 @@ public class BenchmarkHarnessCliTests
                     "--launch-count", "1",
                 ]);
 
-                harness.AddFromAssembly<TestBenchmarks>().WithRunOrder(RunOrder.Declaration).WithIsolation(false)
+                harness.AddFromAssembly<TestBenchmarks>().WithRunOrder(RunOrder.Declaration).WithIsolation(Isolation.Off)
                     .RunAsync().GetAwaiter().GetResult();
             });
 
@@ -137,7 +137,7 @@ public class BenchmarkHarnessCliTests
                         "--launch-count", "1",
                     ]);
 
-                    harness.AddFromAssembly<SlowVsBaselineBenchmarks>().WithRunOrder(RunOrder.Declaration).WithIsolation(false)
+                    harness.AddFromAssembly<SlowVsBaselineBenchmarks>().WithRunOrder(RunOrder.Declaration).WithIsolation(Isolation.Off)
                         .RunAsync().GetAwaiter().GetResult();
                 });
             });
@@ -159,7 +159,7 @@ public class BenchmarkHarnessCliTests
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--launch-count", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -174,7 +174,7 @@ public class BenchmarkHarnessCliTests
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--iterations", "1", "--warmup", "0"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -205,7 +205,7 @@ public class BenchmarkHarnessCliTests
                 .AddFromAssembly<TestBenchmarks>()
                 .WithOptions(MeasurementOptions.Default with { Iterations = 1, WarmupIterations = 0 })
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -230,7 +230,7 @@ public class BenchmarkHarnessCliTests
                 .WithOptions(MeasurementOptions.Default with { Iterations = 1, WarmupIterations = 0 })
                 .WithLaunchCount(LaunchCounts.Single)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -245,7 +245,7 @@ public class BenchmarkHarnessCliTests
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--dry-run", "--launch-count", "9"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -357,7 +357,7 @@ public class BenchmarkHarnessCliTests
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -376,7 +376,7 @@ public class BenchmarkHarnessCliTests
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -396,7 +396,7 @@ public class BenchmarkHarnessCliTests
                 ])
                 .AddFromAssembly<CategoryBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -414,7 +414,7 @@ public class BenchmarkHarnessCliTests
                 .AddFromAssembly<CategoryBenchmarks>()
                 .WithCategoryFilter(["Fast"])
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -436,7 +436,7 @@ public class BenchmarkHarnessCliTests
         {
             BenchmarkHarness.Create(["--filter", "CategoryBenchmarks.*", "--list"])
                 .AddFromAssembly<CategoryBenchmarks>()
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync().GetAwaiter().GetResult();
         });
 
@@ -455,7 +455,7 @@ public class BenchmarkHarnessCliTests
                 .AddFromAssembly<CategoryBenchmarks>()
                 .WithCategoryFilter(["Number"])
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -469,7 +469,7 @@ public class BenchmarkHarnessCliTests
             await BenchmarkHarness.Create(["--filter", "HarnessOrderBenchmarks.*", "--seed", "7", "--launch-count", "1"])
                 .AddFromAssembly<HarnessOrderBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync());
 
         var randomized = await CaptureConsoleOutputAsync(async () =>
@@ -477,7 +477,7 @@ public class BenchmarkHarnessCliTests
                 .AddFromAssembly<HarnessOrderBenchmarks>()
                 .WithRunOrder(RunOrder.Random)
                 .WithInstanceLifetime(InstanceLifetime.PerMethod)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync());
 
         Assert.Equal(2, ordered.Count);
@@ -501,7 +501,7 @@ public class BenchmarkHarnessCliTests
                 .WithProgress(new OrderingProgress(
                     () => events.Add("onSuiteStarting"),
                     () => events.Add("onSuiteCompleted")))
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -522,7 +522,7 @@ public class BenchmarkHarnessCliTests
                 await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--launch-count", "1"])
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
-                    .WithIsolation(false)
+                    .WithIsolation(Isolation.Off)
                     .RunAsync();
             });
 
@@ -532,7 +532,7 @@ public class BenchmarkHarnessCliTests
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
                     .WithReporter(new JsonReporter(tempDir))
-                    .WithIsolation(false)
+                    .WithIsolation(Isolation.Off)
                     .RunAsync();
             });
 
@@ -561,7 +561,7 @@ public class BenchmarkHarnessCliTests
                     await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--reporter", name, "--output", tempDir, "--launch-count", "1"])
                         .AddFromAssembly<TestBenchmarks>()
                         .WithRunOrder(RunOrder.Declaration)
-                        .WithIsolation(false)
+                        .WithIsolation(Isolation.Off)
                         .RunAsync();
                 });
 
@@ -622,7 +622,7 @@ public class BenchmarkHarnessCliTests
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
                     .WithReporter(customReporter)
-                    .WithIsolation(false)
+                    .WithIsolation(Isolation.Off)
                     .RunAsync();
             });
 
@@ -649,7 +649,7 @@ public class BenchmarkHarnessCliTests
                     ])
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
-                    .WithIsolation(false)
+                    .WithIsolation(Isolation.Off)
                     .RunAsync();
             });
 
@@ -676,7 +676,7 @@ public class BenchmarkHarnessCliTests
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithReporter(customReporter)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -696,7 +696,7 @@ public class BenchmarkHarnessCliTests
                 await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--reporter", "csv", "--output", tempDir, "--launch-count", "1"])
                     .AddFromAssembly<TestBenchmarks>()
                     .WithRunOrder(RunOrder.Declaration)
-                    .WithIsolation(false)
+                    .WithIsolation(Isolation.Off)
                     .RunAsync();
             });
 
@@ -752,7 +752,7 @@ public class BenchmarkHarnessCliTests
                     .WithRunOrder(RunOrder.Declaration)
                     .WithReporter(customReporter)
                     .WithDetail(ReportDetail.Advanced)
-                    .WithIsolation(false)
+                    .WithIsolation(Isolation.Off)
                     .RunAsync();
             });
 
@@ -828,7 +828,7 @@ public class BenchmarkHarnessCliTests
             await BenchmarkHarness.Create(["--filter", "NoRuntimeAttributeBenchmarks.*", "--iterations", "5", "--warmup", "2", "--launch-count", "1"])
                 .AddFromAssembly<NoRuntimeAttributeBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync()
         );
 
@@ -857,7 +857,7 @@ public class BenchmarkHarnessCliTests
         {
             BenchmarkHarness.Create(["--filter", "RuntimeAttributedHarnessBenchmarks.*", "--list"])
                 .AddFromAssembly<RuntimeAttributedHarnessBenchmarks>()
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync().GetAwaiter().GetResult();
         });
 

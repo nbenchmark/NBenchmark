@@ -271,7 +271,7 @@ public class ReporterTests
                     Gen0Collections = 1,
                     Gen1Collections = 0,
                     Gen2Collections = 0,
-                    Mode = DiagnosticsMode.Gc,
+                    Collected = DiagnosticsOptions.Default,
                 },
             };
 
@@ -280,7 +280,7 @@ public class ReporterTests
                 Diagnostics = new DiagnosticsResult
                 {
                     CpuWallRatio = 0.42,
-                    Mode = DiagnosticsMode.CpuTime,
+                    Collected = new DiagnosticsOptions { CpuTime = true },
                 },
             };
 
@@ -521,7 +521,7 @@ public class ReporterTests
             {
                 Diagnostics = new DiagnosticsResult
                 {
-                    Mode = DiagnosticsMode.GcHeapInfo | DiagnosticsMode.Exceptions,
+                    Collected = new DiagnosticsOptions { GcHeapInfo = true, Exceptions = true },
                 },
             };
 

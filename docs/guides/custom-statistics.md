@@ -106,8 +106,8 @@ await new BenchmarkSuite("latency-slo")
     .Add("v1", () => CurrentImpl())
     .Add("v2", () => CandidateImpl())
     .WithBaseline("v1")
-    .WithOutlierDetector(new KeepFastestDetector(0.90))
-    .WithSignificanceTest(new MedianRatioSignificanceTest(thresholdPercent: 25))
+    .WithOutlierDetector(static () => new KeepFastestDetector(0.90))
+    .WithSignificanceTest(static () => new MedianRatioSignificanceTest(thresholdPercent: 25))
     .WithReporter(new ConsoleReporter())
     .RunAsync();
 ```
@@ -117,8 +117,8 @@ For single or harness mode, assign the strategies to the `MeasurementOptions` ob
 ```csharp
 new MeasurementOptions
 {
-    OutlierDetector = new KeepFastestDetector(0.90),
-    SignificanceTest = new MedianRatioSignificanceTest(25),
+    OutlierDetector = static () => new KeepFastestDetector(0.90),
+    SignificanceTest = static () => new MedianRatioSignificanceTest(25),
 }
 ```
 

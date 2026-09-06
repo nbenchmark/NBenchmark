@@ -195,7 +195,7 @@ public sealed class StateGapIsolationTests : IDisposable
 
                 // The labelled fallback, not the hard error: this test is about the hook being named
                 // in the guidance, which only the fallback path prints.
-                options: FastOptions with { RequireIsolation = false },
+                options: FastOptions with { Isolation = Isolation.Preferred },
                 name: "capturing-setup");
         }
         finally

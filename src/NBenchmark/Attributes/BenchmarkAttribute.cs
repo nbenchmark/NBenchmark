@@ -11,7 +11,11 @@ public sealed class BenchmarkAttribute : Attribute
     public int WarmupIterations { get; set; } = Unset;
     public int LaunchCount { get; set; } = Unset;
 
-    public bool HasIterationsOverride => Iterations >= 0;
-    public bool HasWarmupIterationsOverride => WarmupIterations >= 0;
-    public bool HasLaunchCountOverride => LaunchCount >= 0;
+    // Internal: the sentinel these read is a workaround for `int?` not being a legal attribute
+    // argument type, so the question they answer - "did the author set this one?" - belongs to the
+    // engine that has to layer the value onto the run's options, not to the author who just wrote a
+    // number. Three public getters over one private sentinel only invite a consumer to depend on it.
+    internal bool HasIterationsOverride => Iterations >= 0;
+    internal bool HasWarmupIterationsOverride => WarmupIterations >= 0;
+    internal bool HasLaunchCountOverride => LaunchCount >= 0;
 }

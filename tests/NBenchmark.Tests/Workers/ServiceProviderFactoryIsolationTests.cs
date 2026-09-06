@@ -10,7 +10,7 @@ namespace NBenchmark.Tests.Workers;
 /// <remarks>
 ///     <para>
 ///         A live <see cref="IServiceProvider" /> cannot cross a process boundary, which is why there is
-///         no <c>WithServiceProvider</c> overload that takes one directly (S3) - constructing the
+///         no <c>WithServices</c> overload that takes one directly (S3) - constructing the
 ///         benchmark type in a worker instead would measure an object with none of its dependencies
 ///         configured and report it under the right name. A static factory is a <i>recipe</i> for a
 ///         container, and a recipe is addressable: the worker runs it and resolves instances from the
@@ -74,7 +74,7 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
     public async Task ServiceProviderFactory_IsIsolated_AndResolvesTheConfiguredInstance()
     {
         var results = await Harness()
-            .WithServiceProvider(BuildProvider)
+            .WithServices(BuildProvider)
             .RunAsync();
 
         var result = Assert.Single(results, r => r.ClassName == typeof(InjectedBenchmarks).FullName);
@@ -100,7 +100,7 @@ public sealed class ServiceProviderFactoryIsolationTests : IDisposable
         var spins = 20_000;
 
         var results = await Harness()
-            .WithServiceProvider(() => new SingleServiceProvider(new Probe(spins)))
+            .WithServices(() => new SingleServiceProvider(new Probe(spins)))
             .RunAsync();
 
         var result = Assert.Single(results, r => r.ClassName == typeof(InjectedBenchmarks).FullName);

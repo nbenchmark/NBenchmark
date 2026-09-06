@@ -167,7 +167,7 @@ The output is similar to the following:
 ```csharp
 using NBenchmark.Reporters.Console;
 
-await result.PrintAsync();
+await result.PrintTableAsync();
 ```
 
 This method runs the result through `ConsoleReporter` and renders a Spectre.Console table.
@@ -175,9 +175,9 @@ This method runs the result through `ConsoleReporter` and renders a Spectre.Cons
 ### File reporters
 
 ```csharp
-await result.ToMarkdownAsync("results.md");
-await result.ToCsvAsync("results.csv");
-await result.ToJsonAsync("results/");   // output directory
+await result.SaveMarkdownAsync("results.md");
+await result.SaveCsvAsync("results.csv");
+await result.SaveJsonAsync("results/");   // output directory
 ```
 
 ## Accessing result fields directly

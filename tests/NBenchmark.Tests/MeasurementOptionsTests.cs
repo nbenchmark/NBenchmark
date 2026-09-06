@@ -15,10 +15,10 @@ public class MeasurementOptionsTests
         Assert.Null(opts.OpsPerSample);
         Assert.Equal(AutoTuneOptions.Default, opts.AutoTune);
         Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
-        Assert.False(opts.ForceGcBeforeEachIteration);
-        Assert.False(opts.ForceGcBeforeMeasurement);
-        Assert.True(opts.ForceGcBetweenBenchmarks);
-        Assert.True(opts.MeasureAllocations);
+        Assert.False(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.False(opts.Resolve().ForceGcBeforeMeasurement);
+        Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
+        Assert.True(opts.Resolve().MeasureAllocations);
         Assert.Equal(OutlierMode.IqrFence, opts.OutlierMode);
         Assert.Equal(0.95, opts.ConfidenceLevel);
         Assert.Equal([0.50, 0.95, 0.99, 0.999, 1.0], opts.ReportedPercentiles);
@@ -32,14 +32,15 @@ public class MeasurementOptionsTests
     }
 
     [Theory]
-    [InlineData(DiagnosticsMode.None)]
-    [InlineData(DiagnosticsMode.Gc)]
-    [InlineData(DiagnosticsMode.GcAndCpu)]
-    [InlineData(DiagnosticsMode.All)]
-    [InlineData(DiagnosticsMode.Exceptions)]
-    [InlineData(DiagnosticsMode.GcHeapInfo | DiagnosticsMode.Exceptions)]
-    public void DiagnosticsOptions_FromMode_ToMode_RoundTrips(DiagnosticsMode mode)
+    [InlineData(0)]
+    [InlineData((int)DiagnosticsMode.Gc)]
+    [InlineData((int)DiagnosticsMode.GcAndCpu)]
+    [InlineData((int)DiagnosticsMode.All)]
+    [InlineData((int)DiagnosticsMode.Exceptions)]
+    [InlineData((int)(DiagnosticsMode.GcHeapInfo | DiagnosticsMode.Exceptions))]
+    public void DiagnosticsOptions_FromMode_ToMode_RoundTrips(int flags)
     {
+        var mode = (DiagnosticsMode)flags;
         var options = DiagnosticsOptions.FromMode(mode);
 
         Assert.Equal(mode, options.ToMode());
@@ -127,12 +128,12 @@ public class MeasurementOptionsTests
         var opts = MeasurementOptions.For(MeasurementProfile.Independent);
 
         Assert.Equal(MeasurementProfile.Independent, opts.Profile);
-        Assert.True(opts.ForceGcBeforeEachIteration);
-        Assert.True(opts.ForceGcBeforeMeasurement);
-        Assert.True(opts.ForceGcBetweenBenchmarks);
+        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.True(opts.Resolve().ForceGcBeforeMeasurement);
+        Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
         // Allocation tracking is on for both profiles now - it is measured outside the timed
         // window, so it costs nothing and surfaces the "this pure-CPU body allocates" signal.
-        Assert.True(opts.MeasureAllocations);
+        Assert.True(opts.Resolve().MeasureAllocations);
     }
 
     [Fact]
@@ -142,8 +143,8 @@ public class MeasurementOptionsTests
 
         // The pre-measurement GC is off (Realistic inherits the warmup heap to match production),
         // but the between-benchmark GC is on so one benchmark cannot bias the next.
-        Assert.False(opts.ForceGcBeforeMeasurement);
-        Assert.True(opts.ForceGcBetweenBenchmarks);
+        Assert.False(opts.Resolve().ForceGcBeforeMeasurement);
+        Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
     }
 
     [Fact]
@@ -152,10 +153,10 @@ public class MeasurementOptionsTests
         var opts = new MeasurementOptions() with { Profile = MeasurementProfile.Independent };
 
         Assert.Equal(MeasurementProfile.Independent, opts.Profile);
-        Assert.True(opts.ForceGcBeforeEachIteration);
-        Assert.True(opts.ForceGcBeforeMeasurement);
-        Assert.True(opts.ForceGcBetweenBenchmarks);
-        Assert.True(opts.MeasureAllocations);
+        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.True(opts.Resolve().ForceGcBeforeMeasurement);
+        Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
+        Assert.True(opts.Resolve().MeasureAllocations);
     }
 
     [Fact]
@@ -164,14 +165,14 @@ public class MeasurementOptionsTests
         var opts = new MeasurementOptions() with
         {
             Profile = MeasurementProfile.Realistic,
-            ForceGcBeforeEachIterationOverride = true,
+            ForceGcBeforeEachIteration = true,
         };
 
         Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
-        Assert.True(opts.ForceGcBeforeEachIteration);
-        Assert.False(opts.ForceGcBeforeMeasurement);
-        Assert.True(opts.ForceGcBetweenBenchmarks);
-        Assert.True(opts.MeasureAllocations);
+        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.False(opts.Resolve().ForceGcBeforeMeasurement);
+        Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
+        Assert.True(opts.Resolve().MeasureAllocations);
     }
 
     [Fact]
@@ -180,14 +181,14 @@ public class MeasurementOptionsTests
         var opts = MeasurementOptions.For(MeasurementProfile.Independent) with
         {
             Profile = MeasurementProfile.Realistic,
-            ForceGcBeforeEachIterationOverride = true,
+            ForceGcBeforeEachIteration = true,
         };
 
         Assert.Equal(MeasurementProfile.Realistic, opts.Profile);
-        Assert.True(opts.ForceGcBeforeEachIteration);
-        Assert.False(opts.ForceGcBeforeMeasurement);
-        Assert.True(opts.ForceGcBetweenBenchmarks);
-        Assert.True(opts.MeasureAllocations);
+        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
+        Assert.False(opts.Resolve().ForceGcBeforeMeasurement);
+        Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
+        Assert.True(opts.Resolve().MeasureAllocations);
     }
 
     [Fact]
@@ -196,16 +197,16 @@ public class MeasurementOptionsTests
         var independent = new MeasurementOptions
         {
             Profile = MeasurementProfile.Independent,
-            ForceGcBeforeMeasurementOverride = false,
+            ForceGcBeforeMeasurement = false,
         };
-        Assert.False(independent.ForceGcBeforeMeasurement);
+        Assert.False(independent.Resolve().ForceGcBeforeMeasurement);
 
         var realistic = new MeasurementOptions
         {
             Profile = MeasurementProfile.Realistic,
-            ForceGcBeforeMeasurementOverride = true,
+            ForceGcBeforeMeasurement = true,
         };
-        Assert.True(realistic.ForceGcBeforeMeasurement);
+        Assert.True(realistic.Resolve().ForceGcBeforeMeasurement);
     }
 
     [Fact]
@@ -214,16 +215,16 @@ public class MeasurementOptionsTests
         var realistic = new MeasurementOptions
         {
             Profile = MeasurementProfile.Realistic,
-            ForceGcBetweenBenchmarksOverride = false,
+            ForceGcBetweenBenchmarks = false,
         };
-        Assert.False(realistic.ForceGcBetweenBenchmarks);
+        Assert.False(realistic.Resolve().ForceGcBetweenBenchmarks);
 
         var independent = new MeasurementOptions
         {
             Profile = MeasurementProfile.Independent,
-            ForceGcBetweenBenchmarksOverride = false,
+            ForceGcBetweenBenchmarks = false,
         };
-        Assert.False(independent.ForceGcBetweenBenchmarks);
+        Assert.False(independent.Resolve().ForceGcBetweenBenchmarks);
     }
 
     [Fact]
@@ -232,10 +233,10 @@ public class MeasurementOptionsTests
         var opts = new MeasurementOptions() with
         {
             Profile = MeasurementProfile.Realistic,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
-        Assert.False(opts.MeasureAllocations);
+        Assert.False(opts.Resolve().MeasureAllocations);
     }
 
     [Fact]
@@ -244,10 +245,10 @@ public class MeasurementOptionsTests
         var opts = new MeasurementOptions() with
         {
             Profile = MeasurementProfile.Realistic,
-            ForceGcBeforeEachIterationOverride = true,
+            ForceGcBeforeEachIteration = true,
         };
 
-        Assert.True(opts.ForceGcBeforeEachIteration);
+        Assert.True(opts.Resolve().ForceGcBeforeEachIteration);
     }
 
     [Fact]
@@ -256,10 +257,10 @@ public class MeasurementOptionsTests
         var opts = new MeasurementOptions() with
         {
             Profile = MeasurementProfile.Realistic,
-            ForceGcBetweenBenchmarksOverride = true,
+            ForceGcBetweenBenchmarks = true,
         };
 
-        Assert.True(opts.ForceGcBetweenBenchmarks);
+        Assert.True(opts.Resolve().ForceGcBetweenBenchmarks);
     }
 
     [Theory]

@@ -354,9 +354,9 @@ internal sealed record RunGroupPayload
 
     /// <summary>
     ///     The measurement configuration, serialized whole. Everything on
-    ///     <see cref="MeasurementOptions" /> is value data except the two strategy interfaces,
-    ///     which travel as <see cref="OutlierDetectorTypeName" /> and
-    ///     <see cref="SignificanceTestTypeName" />.
+    ///     <see cref="MeasurementOptions" /> is value data except the two strategy factories, which
+    ///     travel as <see cref="OutlierDetectorFactory" /> and
+    ///     <see cref="SignificanceTestFactory" />.
     ///     <para>
     ///         A request is always <b>one</b> measurement pass over the group. The replicate count is
     ///         spent by the coordinator, which sends one request per replicate - so nothing here says
@@ -368,23 +368,16 @@ internal sealed record RunGroupPayload
     public required MeasurementOptions Options { get; init; }
 
     /// <summary>
-    ///     Assembly-qualified type name of a custom <see cref="Stats.IOutlierDetector" />, which
-    ///     the worker instantiates through its load context. <c>null</c> uses the built-in
-    ///     detector for <see cref="MeasurementOptions.OutlierMode" />.
-    /// </summary>
-    public string? OutlierDetectorTypeName { get; init; }
-
-    /// <summary>Assembly-qualified type name of a custom <see cref="Stats.ISignificanceTest" />.</summary>
-    public string? SignificanceTestTypeName { get; init; }
-
-    /// <summary>
-    ///     Address of a factory producing the custom <see cref="Stats.IOutlierDetector" />, used in
-    ///     preference to <see cref="OutlierDetectorTypeName" /> when the caller supplied one.
+    ///     Address of the factory producing the custom <see cref="Stats.IOutlierDetector" />.
+    ///     <c>null</c> uses the built-in detector for
+    ///     <see cref="MeasurementOptions.OutlierMode" />.
     ///     <para>
-    ///         A type name can only rebuild a detector with a parameterless constructor. A factory
-    ///         rebuilds a configured one - <c>new KeepFastestDetector(0.9)</c> - which previously cost
-    ///         the whole group its isolation, because scoring under a silently substituted statistical
-    ///         method is worse than measuring in the host and saying so.
+    ///         The only mechanism, since <see cref="MeasurementOptions.OutlierDetector" /> became a
+    ///         factory. An assembly-qualified type name travelled here too, which could only rebuild a
+    ///         detector with a parameterless constructor: a configured one -
+    ///         <c>new KeepFastestDetector(0.9)</c> - cost the whole group its isolation, because
+    ///         scoring under a silently substituted statistical method is worse than measuring in the
+    ///         host and saying so.
     ///     </para>
     /// </summary>
     public AddressedFactory? OutlierDetectorFactory { get; init; }

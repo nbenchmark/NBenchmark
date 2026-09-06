@@ -229,10 +229,10 @@ Register your test through `MeasurementOptions.SignificanceTest`, the suite buil
 
 ```csharp
 // Suite mode
-.WithSignificanceTest(new MedianRatioSignificanceTest(thresholdPercent: 25))
+.WithSignificanceTest(static () => new MedianRatioSignificanceTest(thresholdPercent: 25))
 
 // Single / Harness mode
-new MeasurementOptions { SignificanceTest = new MedianRatioSignificanceTest(25) }
+new MeasurementOptions { SignificanceTest = static () => new MedianRatioSignificanceTest(25) }
 ```
 
 The `Analyze` method receives a `SignificanceContext` and returns a `SignificanceReport` containing pairwise comparisons, an optional effect size, an optional location shift, and an optional omnibus verdict.

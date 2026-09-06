@@ -15,7 +15,7 @@ namespace NBenchmark.Tests;
 ///     <para>
 ///         Significance testing has always partitioned on this key. The ratio column did not, and
 ///         the default <c>samples/Harness</c> run printed <c>0.38x</c> next to its one
-///         <c>[InProcess]</c> benchmark - a fabricated 2.6x "win" that was purely the profile.
+///         <c>[Isolation(Isolation.Off)]</c> benchmark - a fabricated 2.6x "win" that was purely the profile.
 ///     </para>
 /// </remarks>
 public class MixedIsolationTableTests
@@ -29,11 +29,11 @@ public class MixedIsolationTableTests
             InProcess("InHarness", 40),
         ]);
 
-        var candidate = table.Rows.Single(r => r.Name == "Candidate");
+        var candidate = table.Rows.Single(r => r.Result.Name == "Candidate");
         Assert.Equal(2.0, candidate.Ratio, 3);
         Assert.False(candidate.RatioSuppressed);
 
-        var inProcess = table.Rows.Single(r => r.Name == "InHarness");
+        var inProcess = table.Rows.Single(r => r.Result.Name == "InHarness");
         Assert.True(double.IsNaN(inProcess.Ratio));
         Assert.True(inProcess.RatioSuppressed);
     }
@@ -47,7 +47,7 @@ public class MixedIsolationTableTests
         ]);
 
         Assert.All(table.Rows, r => Assert.False(r.RatioSuppressed));
-        Assert.Equal(2.5, table.Rows.Single(r => r.Name == "Candidate").Ratio, 3);
+        Assert.Equal(2.5, table.Rows.Single(r => r.Result.Name == "Candidate").Ratio, 3);
         Assert.False(table.MixedIsolationStatuses);
     }
 
@@ -69,9 +69,9 @@ public class MixedIsolationTableTests
         // An implicit baseline is not flagged on the row (only a declared one is), so it is read
         // off the ratios: A is the reference at 1.00x. Had the in-process row been picked instead,
         // A would read 10.00x and both isolated rows would have lost their ratio entirely.
-        Assert.Equal(1.0, table.Rows.Single(r => r.Name == "A").Ratio, 3);
-        Assert.Equal(2.0, table.Rows.Single(r => r.Name == "B").Ratio, 3);
-        Assert.True(table.Rows.Single(r => r.Name == "Fastest").RatioSuppressed);
+        Assert.Equal(1.0, table.Rows.Single(r => r.Result.Name == "A").Ratio, 3);
+        Assert.Equal(2.0, table.Rows.Single(r => r.Result.Name == "B").Ratio, 3);
+        Assert.True(table.Rows.Single(r => r.Result.Name == "Fastest").RatioSuppressed);
     }
 
     [Fact]
@@ -83,8 +83,8 @@ public class MixedIsolationTableTests
         Assert.True(mixed.MixedIsolationStatuses);
         Assert.False(uniform.MixedIsolationStatuses);
 
-        Assert.Equal(IsolationStatus.InProcessRequested, mixed.Rows.Single(r => r.Name == "B").IsolationStatus);
-        Assert.Equal(IsolationStatus.Isolated, mixed.Rows.Single(r => r.Name == "A").IsolationStatus);
+        Assert.Equal(IsolationStatus.InProcessRequested, mixed.Rows.Single(r => r.Result.Name == "B").Result.IsolationStatus);
+        Assert.Equal(IsolationStatus.Isolated, mixed.Rows.Single(r => r.Result.Name == "A").Result.IsolationStatus);
     }
 
     /// <summary>
@@ -100,7 +100,7 @@ public class MixedIsolationTableTests
             InProcess("Fixture", 300, IsolationStatus.InProcessLiveFixture),
         ]);
 
-        var fixtureRow = table.Rows.Single(r => r.Name == "Fixture");
+        var fixtureRow = table.Rows.Single(r => r.Result.Name == "Fixture");
 
         Assert.False(fixtureRow.RatioSuppressed);
         Assert.Equal(3.0, fixtureRow.Ratio, 3);

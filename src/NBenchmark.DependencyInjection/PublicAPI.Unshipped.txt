@@ -1,5 +1,3 @@
 #nullable enable
 NBenchmark.DependencyInjection.DependencyInjectionHarnessExtensions
-static NBenchmark.DependencyInjection.DependencyInjectionHarnessExtensions.UseDependencyInjection<T>(this NBenchmark.BenchmarkHarness! harness, System.Func<System.IServiceProvider!>! services) -> NBenchmark.BenchmarkHarness!
-static NBenchmark.DependencyInjection.DependencyInjectionHarnessExtensions.UseScopedDependencyInjection<T>(this NBenchmark.BenchmarkHarness! harness, System.Func<System.IServiceProvider!>! services) -> NBenchmark.BenchmarkHarness!
-static NBenchmark.DependencyInjection.DependencyInjectionHarnessExtensions.WithScopedServiceProvider(this NBenchmark.BenchmarkHarness! harness, System.Func<System.IServiceProvider!>! factory) -> NBenchmark.BenchmarkHarness!
+static NBenchmark.DependencyInjection.DependencyInjectionHarnessExtensions.WithScopedServices(this NBenchmark.BenchmarkHarness! harness, System.Func<System.IServiceProvider!>! factory) -> NBenchmark.BenchmarkHarness!

@@ -145,54 +145,43 @@ internal static class WorkerRunPlan
     ///     or <c>null</c> when both can be.
     /// </summary>
     /// <remarks>
-    ///     Only a type name crosses the boundary, so a strategy built with constructor arguments
-    ///     cannot be reconstructed there - and the worker falls back to the built-in one. That is the
-    ///     quietest failure available: the body is measured correctly and then scored under a
-    ///     different statistical method than the caller asked for, with nothing in the output saying
-    ///     so. Declining to isolate keeps the caller's own strategy, which is the thing they were
-    ///     explicit about.
+    ///     A strategy travels as its factory delegate, so what can refuse is the delegate: one that
+    ///     captures is not addressable, exactly as a capturing body is not. Declining to isolate keeps
+    ///     the caller's own strategy, which is the thing they were explicit about - the alternative is
+    ///     the quietest failure available, where the body is measured correctly and then scored under
+    ///     a different statistical method with nothing in the output saying so.
     /// </remarks>
     public static string? UnrebuildableStrategy(MeasurementOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        // A factory answers the question outright: the worker runs it and gets the caller's own object,
-        // arguments and all, so there is nothing about the strategy left to refuse.
-        var candidates = new (object? Strategy, Delegate? Factory, string Role)[]
+        var candidates = new (Delegate? Factory, string Role)[]
         {
-            (options.OutlierDetector, options.OutlierDetectorFactory, OutlierDetectorRole),
-            (options.SignificanceTest, options.SignificanceTestFactory, SignificanceTestRole),
+            (options.OutlierDetector, OutlierDetectorRole),
+            (options.SignificanceTest, SignificanceTestRole),
         };
 
-        foreach (var (strategy, factory, role) in candidates)
+        foreach (var (factory, role) in candidates)
         {
-            if (factory is not null)
-            {
-                // The factory itself still has to be addressable. One that captures is refused for the
-                // same reason a capturing body is - and saying so names the actionable fix, which is to
-                // make the factory static.
-                // A throwaway table, because this only asks whether the factory can be addressed at
-                // all. The entries that actually travel are built into the group's own table when the
-                // request is assembled; the two agree because addressability is a property of the
-                // delegate, not of which table is holding the answer.
-                if (!AddressedFactory.TryCreate(
-                        factory,
-                        role,
-                        out _,
-                        out var factoryRefusal,
-                        receivers: new ReceiverTable(options.MaxTransferredStateBytes)))
-                {
-                    return $"the factory supplied for '{strategy?.GetType().Name ?? "a custom strategy"}' "
-                           + $"{factoryRefusal}";
-                }
-
+            if (factory is null)
                 continue;
+
+            // The factory itself still has to be addressable. One that captures is refused for the
+            // same reason a capturing body is - and saying so names the actionable fix, which is to
+            // make the factory static.
+            // A throwaway table, because this only asks whether the factory can be addressed at
+            // all. The entries that actually travel are built into the group's own table when the
+            // request is assembled; the two agree because addressability is a property of the
+            // delegate, not of which table is holding the answer.
+            if (!AddressedFactory.TryCreate(
+                    factory,
+                    role,
+                    out _,
+                    out var factoryRefusal,
+                    receivers: new ReceiverTable(options.MaxTransferredStateBytes)))
+            {
+                return $"the factory supplied for the {role} {factoryRefusal}";
             }
-
-            _ = StrategyTypeName(strategy, out var refusal);
-
-            if (refusal is not null)
-                return refusal;
         }
 
         return null;
@@ -227,12 +216,10 @@ internal static class WorkerRunPlan
 
         return payload with
         {
-            OutlierDetectorTypeName = StrategyTypeName(options.OutlierDetector, out _),
-            SignificanceTestTypeName = StrategyTypeName(options.SignificanceTest, out _),
             OutlierDetectorFactory =
-                AddressedFactory.OrNull(options.OutlierDetectorFactory, OutlierDetectorRole, receivers),
+                AddressedFactory.OrNull(options.OutlierDetector, OutlierDetectorRole, receivers),
             SignificanceTestFactory =
-                AddressedFactory.OrNull(options.SignificanceTestFactory, SignificanceTestRole, receivers),
+                AddressedFactory.OrNull(options.SignificanceTest, SignificanceTestRole, receivers),
 
             // Set last, so it carries whatever the strategy factories added on top of what the caller's
             // own bodies already put there. The table hands back its live list, so an entry added after
@@ -319,29 +306,4 @@ internal static class WorkerRunPlan
         }
     }
 
-    /// <summary>
-    ///     The assembly-qualified type name of a strategy object, or <c>null</c> when there is none
-    ///     to send. A strategy that cannot be reconstructed from a type name alone - one built with
-    ///     constructor arguments or holding captured state - is reported so the caller can decline to
-    ///     isolate rather than quietly measuring under a different statistical method.
-    /// </summary>
-    public static string? StrategyTypeName(object? strategy, out string? refusal)
-    {
-        refusal = null;
-
-        if (strategy is null)
-            return null;
-
-        var type = strategy.GetType();
-
-        if (type.GetConstructor(Type.EmptyTypes) is null)
-        {
-            refusal = $"'{type.Name}' has no parameterless constructor, so it cannot be rebuilt in a "
-                      + "worker; only its type name can cross the process boundary.";
-
-            return null;
-        }
-
-        return type.AssemblyQualifiedName;
-    }
 }

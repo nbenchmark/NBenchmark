@@ -53,9 +53,10 @@ internal static class AdaptiveLoop
     {
         var o = spec.Options;
         var autoTune = o.AutoTune;
-        var measureAllocations = o.MeasureAllocations;
+        var resolvedOptions = o.Resolve();
+        var measureAllocations = resolvedOptions.MeasureAllocations;
         var diagnostics = o.Diagnostics;
-        var forceGc = o.ForceGcBeforeEachIteration;
+        var forceGc = resolvedOptions.ForceGcBeforeEachIteration;
         var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
         var calibrationWarmupCapNs = maxTuningNs * autoTune.WarmupBudgetFraction;
         var graceCapNs = maxTuningNs * autoTune.CapGraceFactor;
@@ -399,7 +400,7 @@ internal static class AdaptiveLoop
         // Realistic profile deliberately inherits the warmup heap to match production. This is a
         // distinct decision from the between-benchmark GC (ForceGcBetweenBenchmarks, run by
         // SuiteRunner), which is on for both profiles.
-        if (o.ForceGcBeforeMeasurement)
+        if (o.Resolve().ForceGcBeforeMeasurement)
             GcControl.ForceFullGc();
 
         // ----- Phase C: measurement -----
@@ -656,9 +657,10 @@ internal static class AdaptiveLoop
     {
         var o = spec.Options;
         var autoTune = o.AutoTune;
-        var measureAllocations = o.MeasureAllocations;
+        var resolvedOptions = o.Resolve();
+        var measureAllocations = resolvedOptions.MeasureAllocations;
         var diagnostics = o.Diagnostics;
-        var forceGc = o.ForceGcBeforeEachIteration;
+        var forceGc = resolvedOptions.ForceGcBeforeEachIteration;
         var maxTuningNs = autoTune.MaxTuningTime.Ticks * 100.0;
         var calibrationWarmupCapNs = maxTuningNs * autoTune.WarmupBudgetFraction;
         var graceCapNs = maxTuningNs * autoTune.CapGraceFactor;
@@ -1006,7 +1008,7 @@ internal static class AdaptiveLoop
         // Realistic profile deliberately inherits the warmup heap to match production. This is a
         // distinct decision from the between-benchmark GC (ForceGcBetweenBenchmarks, run by
         // SuiteRunner), which is on for both profiles.
-        if (o.ForceGcBeforeMeasurement)
+        if (o.Resolve().ForceGcBeforeMeasurement)
             GcControl.ForceFullGc();
 
         // ----- Phase C: measurement -----

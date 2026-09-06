@@ -139,10 +139,10 @@ Progress output is a live, updating line per benchmark:
 using NBenchmark.Reporters.Console;
 
 var result = Benchmark.Run(() => MyMethod());
-await result.PrintAsync();
+await result.PrintTableAsync();
 ```
 
-`PrintAsync` passes the single result through `ConsoleReporter` to render a table.
+`PrintTableAsync` passes the single result through `ConsoleReporter` to render a table.
 
 ## Summary line markup
 

@@ -113,9 +113,9 @@ You can export results to various file formats:
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
 
-await result.ToMarkdownAsync("results.md");
-await result.ToCsvAsync("results.csv");
-await result.ToJsonAsync("results/");   // specifies a directory
+await result.SaveMarkdownAsync("results.md");
+await result.SaveCsvAsync("results.csv");
+await result.SaveJsonAsync("results/");   // specifies a directory
 ```
 
 ## Understand the numbers

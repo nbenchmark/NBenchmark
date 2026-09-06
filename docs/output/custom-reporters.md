@@ -96,9 +96,10 @@ For reporters that produce comparison tables, use `BenchmarkTable.Build(results)
 
 - **Baseline selection**: Picks the first result marked `[Baseline]`, or falls back to the fastest (lowest median) if none is marked.
 - **Ratio computation**: `row.Ratio` is `result.Median / baseline.Median`, or `NaN` for errored results or single-benchmark runs.
+- **Composition**: a `BenchmarkRow` carries the measurement itself as `row.Result` and adds only what is relative to the baseline - `Ratio`, `RatioEstimate`, `RatioSuppressed`, `SignificanceLabel`, `IsBaseline`, and `BaseName`. Every other property is read through `row.Result`.
 - **Significance labels**: `row.SignificanceLabel` is `"✓"` (significant), `"✗"` (not significant), or `""` (not applicable).
 - **Ordering**: Rows are sorted by median ascending.
-- **Run metadata**: Provides `table.RunAtUtc`, `table.WarmupIterations`, `table.MeasuredIterations`, `table.ConfidenceLevel`, `table.OutlierDetector` (the display name, such as `"IQR fence (1.5×)"`), `table.SignificanceTestName`, and `table.TotalDuration`.
+- **Run metadata**: Provides `table.RunAtUtc` (a `DateTimeOffset?`, `null` for an empty table), `table.WarmupIterations`, `table.MeasuredIterations`, `table.ConfidenceLevel`, `table.OutlierDetector` (the display name, such as `"IQR fence (1.5×)"`), `table.SignificanceTestName`, and `table.TotalDuration`.
 - **Omnibus verdict**: `table.Omnibus` is non-`null` when an omnibus test runs (Kruskal-Wallis across three or more groups). It exposes `TestName`, `Statistic`, `DegreesOfFreedom`, `GroupCount`, `PValue`, and `Verdict`.
 
 ```csharp
@@ -109,18 +110,18 @@ public async Task ReportAsync(
     var table = BenchmarkTable.Build(results);
 
     Console.WriteLine(
-        $"Run at {table.RunAtUtc} UTC - {table.WarmupIterations} warmup / {table.MeasuredIterations} measured");
+        $"Run at {table.RunAtUtc:yyyy-MM-dd HH:mm:ss} UTC - {table.WarmupIterations} warmup / {table.MeasuredIterations} measured");
 
     foreach (var row in table.Rows)
     {
-        if (row.Errored)
+        if (row.Result.Errored)
         {
-            Console.WriteLine($"{row.Name}: ERROR - {row.ErrorMessage}");
+            Console.WriteLine($"{row.Result.Name}: ERROR - {row.Result.ErrorMessage}");
             continue;
         }
 
         var sig = row.SignificanceLabel is "" ? "" : $" {row.SignificanceLabel}";
-        Console.WriteLine($"{row.Name}{sig}: {row.Median:F0} ns  ratio={row.Ratio:F2}x");
+        Console.WriteLine($"{row.Result.Name}{sig}: {row.Result.Median:F0} ns  ratio={row.Ratio:F2}x");
     }
 }
 ```

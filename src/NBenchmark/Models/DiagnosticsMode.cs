@@ -1,11 +1,17 @@
 namespace NBenchmark;
 
 /// <summary>
-///     Diagnostics mode bit flags. The named presets (<see cref="Gc" />, <see cref="GcAndCpu" />,
-///     <see cref="All" />) are aliases over these flags and may be combined.
+///     The <c>--diagnostics</c> flag's parse target, and the compact form the CSV report stamps.
 /// </summary>
+/// <remarks>
+///     Internal on purpose, for the reason given on <see cref="AutoTunePreset" />:
+///     <see cref="DiagnosticsOptions" /> is the model, and a parallel flags enum meant two
+///     <c>WithDiagnostics</c> overloads on every builder over one concept. <see cref="Gc" /> and
+///     <see cref="GcAndCpu" /> survive only because <c>--diagnostics gc</c> and
+///     <c>--diagnostics gcandcpu</c> are the words users type.
+/// </remarks>
 [Flags]
-public enum DiagnosticsMode
+internal enum DiagnosticsMode
 {
     None = 0,
     GcCollectionCounts = 1 << 0,

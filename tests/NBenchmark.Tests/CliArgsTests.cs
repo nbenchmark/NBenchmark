@@ -240,17 +240,19 @@ public class CliArgsTests
         Assert.Contains("Invalid --tail-basis", error);
     }
 
+    // DiagnosticsMode is internal - the flag's parse target rather than a configuration model - so the
+    // expectation travels as its underlying int rather than as the enum itself.
     [Theory]
-    [InlineData("none", DiagnosticsMode.None)]
-    [InlineData("gc", DiagnosticsMode.Gc)]
-    [InlineData("gcandcpu", DiagnosticsMode.GcAndCpu)]
-    [InlineData("all", DiagnosticsMode.All)]
-    public void ParseCore_Diagnostics_Valid_SetsDiagnosticsMode(string value, DiagnosticsMode expected)
+    [InlineData("none", 0)]
+    [InlineData("gc", (int)DiagnosticsMode.Gc)]
+    [InlineData("gcandcpu", (int)DiagnosticsMode.GcAndCpu)]
+    [InlineData("all", (int)DiagnosticsMode.All)]
+    public void ParseCore_Diagnostics_Valid_SetsDiagnosticsMode(string value, int expected)
     {
         var (result, errors) = CliArgs.ParseCore(["--diagnostics", value]);
 
         Assert.Empty(errors);
-        Assert.Equal(expected, result.Diagnostics);
+        Assert.Equal((DiagnosticsMode)expected, result.Diagnostics);
     }
 
     [Fact]
@@ -841,10 +843,10 @@ public class CliArgsTests
         var realistic = overrides.Apply(MeasurementOptions.For(MeasurementProfile.Realistic));
         var independent = overrides.Apply(MeasurementOptions.For(MeasurementProfile.Independent));
 
-        Assert.False(realistic.ForceGcBetweenBenchmarks);
-        Assert.False(independent.ForceGcBetweenBenchmarks);
+        Assert.False(realistic.Resolve().ForceGcBetweenBenchmarks);
+        Assert.False(independent.Resolve().ForceGcBetweenBenchmarks);
         // The pre-measurement GC is a distinct knob and is untouched by this flag.
-        Assert.True(independent.ForceGcBeforeMeasurement);
+        Assert.True(independent.Resolve().ForceGcBeforeMeasurement);
     }
 
     [Theory]

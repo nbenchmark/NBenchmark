@@ -78,7 +78,7 @@ public sealed class AwaitableResultTests
     public async Task Suite_AddOverAValueTaskBody_ErrorsRatherThanMeasuringNothing()
     {
         var results = await new BenchmarkSuite("vt")
-            .WithIsolation(false)
+            .WithIsolation(Isolation.Off)
             .WithIterations(1)
             .WithWarmup(0)
             .Add("work", static () => default(ValueTask))

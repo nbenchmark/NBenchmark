@@ -625,14 +625,13 @@ internal sealed class BenchmarkDiscoverer
     /// </summary>
     /// <remarks>
     ///     A method-level attribute beating a class-level one is deliberate and useful - it is how a
-    ///     mostly-in-process class forces one benchmark into a worker. Both on <i>one</i> member is not:
-    ///     they ask for opposite things, and the previous rule resolved it silently in favour of
-    ///     <c>[InProcess]</c>, so a request for a clean-room reading was read and discarded with nothing
-    ///     said. Analyzer NB0015 catches it in source; this catches the assemblies an analyzer never saw.
+    ///     mostly-in-process class forces one benchmark into a worker. One member can no longer ask for
+    ///     two opposite things: <c>[Isolation]</c> carries a single value, which is why the pair of
+    ///     opposed attributes it replaced needed a conflict analyzer and it does not.
     /// </remarks>
     private static IsolationMode ResolveIsolationMode(MethodInfo method)
     {
-        var methodMode = ExplicitIsolationMode(method, $"'{method.Name}'");
+        var methodMode = ExplicitIsolationMode(method);
 
         if (methodMode is { } fromMethod)
             return fromMethod;
@@ -642,30 +641,21 @@ internal sealed class BenchmarkDiscoverer
         if (declaringType is null)
             return IsolationMode.Default;
 
-        return ExplicitIsolationMode(declaringType, $"'{declaringType.Name}'") ?? IsolationMode.Default;
+        return ExplicitIsolationMode(declaringType) ?? IsolationMode.Default;
     }
 
     /// <summary>
-    ///     The isolation one member declares, or <c>null</c> when it declares none. Throws when it
-    ///     declares both.
+    ///     The isolation one member declares, or <c>null</c> when it declares none.
     /// </summary>
-    private static IsolationMode? ExplicitIsolationMode(MemberInfo member, string description)
+    private static IsolationMode? ExplicitIsolationMode(MemberInfo member)
     {
-        var inProcess = member.GetCustomAttribute<InProcessAttribute>(true) is not null;
-        var isolated = member.GetCustomAttribute<IsolatedProcessAttribute>(true) is not null;
-
-        if (inProcess && isolated)
+        return member.GetCustomAttribute<IsolationAttribute>(true)?.Isolation switch
         {
-            throw new InvalidOperationException(
-                $"{description} carries both [InProcess] and [IsolatedProcess], which ask for opposite "
-                + "things. Remove one: [InProcess] measures in the host process, [IsolatedProcess] "
-                + "measures in a dedicated worker.");
-        }
-
-        if (inProcess)
-            return IsolationMode.InProcess;
-
-        return isolated ? IsolationMode.PerBenchmark : null;
+            Isolation.Off => IsolationMode.InProcess,
+            Isolation.Required => IsolationMode.PerBenchmark,
+            Isolation.Preferred => IsolationMode.Default,
+            _ => null,
+        };
     }
 
     private static IReadOnlyList<string> ResolveCategories(MemberInfo member)

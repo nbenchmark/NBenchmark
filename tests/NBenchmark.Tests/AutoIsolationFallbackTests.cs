@@ -35,11 +35,11 @@ public class AutoIsolationFallbackTests
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
-            .WithIsolation()
+            .WithIsolation(Isolation.Required)
 
             // The labelled fallback rather than the hard error: these tests are about what the refusal
             // says, and the throw is covered by RequiredIsolationTests.
-            .WithRequireIsolation(false);
+            .WithIsolation(Isolation.Preferred);
 
         using var scope = FakeWorkerLauncher.Install(SimulateWorkerGroup);
         using var stderr = new StringWriter();
@@ -84,11 +84,11 @@ public class AutoIsolationFallbackTests
             .WithCategoryFilter(["auto-iso-fallback"])
             .WithInstanceFactory(type => InstanceHandle.NoTeardown(Activator.CreateInstance(type)!))
             .WithLaunchCount(1)
-            .WithIsolation()
+            .WithIsolation(Isolation.Required)
 
             // The labelled fallback rather than the hard error: these tests are about what the refusal
             // says, and the throw is covered by RequiredIsolationTests.
-            .WithRequireIsolation(false);
+            .WithIsolation(Isolation.Preferred);
 
         using var scope = FakeWorkerLauncher.Install(SimulateWorkerGroup);
         using var stderr = new StringWriter();
@@ -122,7 +122,7 @@ public class AutoIsolationFallbackTests
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-nofactory"])
             .WithLaunchCount(1)
-            .WithIsolation();
+            .WithIsolation(Isolation.Required);
 
         using var scope = FakeWorkerLauncher.Install(SimulateWorkerGroup);
         await harness.RunAsync();
@@ -211,7 +211,7 @@ public class AutoIsolationFallbackTests
             .WithCategoryFilter(["auto-iso-factory-perclass"])
             .WithInstanceFactory(AddressableFactoryPerClassBenchmarks.Create)
             .WithLaunchCount(1)
-            .WithIsolation(false);
+            .WithIsolation(Isolation.Off);
 
         var results = await harness.RunAsync();
 
@@ -229,7 +229,7 @@ public class AutoIsolationFallbackTests
             .WithCategoryFilter([category])
             .WithInstanceFactory(AddressableFactoryPerClassBenchmarks.Create)
             .WithLaunchCount(1)
-            .WithIsolation();
+            .WithIsolation(Isolation.Required);
 
         using var scope = FakeWorkerLauncher.Install(SimulateWorkerGroup);
         var results = await harness.RunAsync();
@@ -238,7 +238,7 @@ public class AutoIsolationFallbackTests
     }
 
     /// <summary>
-    ///     <c>[InProcess]</c> on a method keeps that one benchmark in the host while its siblings go
+    ///     <c>[Isolation(Isolation.Off)]</c> on a method keeps that one benchmark in the host while its siblings go
     ///     to a worker, so a benchmark that genuinely needs to observe the host process still can.
     /// </summary>
     [Fact]
@@ -249,7 +249,7 @@ public class AutoIsolationFallbackTests
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-inprocess-nofactory"])
             .WithLaunchCount(1)
-            .WithIsolation();
+            .WithIsolation(Isolation.Required);
 
         using var scope = FakeWorkerLauncher.Install(SimulateWorkerGroup);
         var results = await harness.RunAsync();
@@ -276,7 +276,7 @@ public class AutoIsolationFallbackTests
             .WithCategoryFilter(["auto-iso-nofactory"])
             .WithLaunchCount(3)
             .WithRunOrder(RunOrder.Random)
-            .WithIsolation();
+            .WithIsolation(Isolation.Required);
 
         using var scope = FakeWorkerLauncher.Install(SimulateWorkerGroup);
         await harness.RunAsync();
@@ -306,8 +306,8 @@ public class AutoIsolationFallbackTests
         harness.AddFromAssembly(typeof(AutoIsolationFallbackTests).Assembly)
             .WithCategoryFilter(["auto-iso-nofactory"])
             .WithLaunchCount(1)
-            .WithIsolation()
-            .WithRequireIsolation(false);
+            .WithIsolation(Isolation.Required)
+            .WithIsolation(Isolation.Preferred);
 
         using var _ = FakeWorkerLauncher.InstallUnavailable();
         using var stderr = new StringWriter();
@@ -424,13 +424,13 @@ public class FactoryWithResetBenchmarks : IStateReset
     }
 }
 
-// [InProcess] on one method, with a factory.
+// [Isolation(Isolation.Off)] on one method, with a factory.
 [BenchmarkCategory("auto-iso-inprocess")]
 [InstanceLifetime(InstanceLifetime.PerClass)]
 public class FactoryInProcessBenchmarks
 {
     [Benchmark]
-    [InProcess]
+    [Isolation(Isolation.Off)]
     public void InProcessMethod()
     {
     }
@@ -441,12 +441,12 @@ public class FactoryInProcessBenchmarks
     }
 }
 
-// [InProcess] on one method, no factory: the sibling goes to a worker, this one stays in the host.
+// [Isolation(Isolation.Off)] on one method, no factory: the sibling goes to a worker, this one stays in the host.
 [BenchmarkCategory("auto-iso-inprocess-nofactory")]
 public class MixedWorkerIsolationBenchmarks
 {
     [Benchmark]
-    [InProcess]
+    [Isolation(Isolation.Off)]
     public void InProcessMethod()
     {
     }

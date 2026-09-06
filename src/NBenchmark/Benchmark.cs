@@ -15,10 +15,10 @@ namespace NBenchmark;
 ///         was measured to return plausible, silently wrong numbers.
 ///     </para>
 ///     <para>
-///         A refusal is an error. <see cref="MeasurementOptions.RequireIsolation" /> defaults to
+///         A refusal is an error. <see cref="MeasurementOptions.Isolation" /> defaults to
 ///         <c>true</c>, so a body that cannot be isolated throws rather than being quietly measured
 ///         here - in-process measurement is something you ask for, not something that happens to
-///         you. Set <c>RequireIsolation = false</c> to take the labelled fallback instead: the run
+///         you. Set <c>Isolation = Isolation.Preferred</c> to take the labelled fallback instead: the run
 ///         continues in this process, says so on stderr, and stamps
 ///         <see cref="IsolationStatus.InProcessCapturedState" /> on the result.
 ///     </para>

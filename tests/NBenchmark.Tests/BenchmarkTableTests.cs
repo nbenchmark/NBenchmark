@@ -11,7 +11,7 @@ public class BenchmarkTableTests
         var table = BenchmarkTable.Build([]);
 
         Assert.Empty(table.Rows);
-        Assert.Equal("", table.RunAtUtc);
+        Assert.Null(table.RunAtUtc);
         Assert.Equal(0, table.WarmupIterations);
         Assert.Equal(0, table.MeasuredIterations);
     }
@@ -43,9 +43,9 @@ public class BenchmarkTableTests
         var table = BenchmarkTable.Build(results);
 
         var row = Assert.Single(table.Rows);
-        Assert.Equal("A", row.Name);
+        Assert.Equal("A", row.Result.Name);
         Assert.Equal(1.0, row.Ratio);
-        Assert.False(row.Errored);
+        Assert.False(row.Result.Errored);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class BenchmarkTableTests
 
         var table = BenchmarkTable.Build(results);
 
-        Assert.Equal("A", Assert.Single(table.Rows).Name);
+        Assert.Equal("A", Assert.Single(table.Rows).Result.Name);
     }
 
     [Fact]
@@ -122,8 +122,8 @@ public class BenchmarkTableTests
         var table = BenchmarkTable.Build(results);
 
         Assert.Equal(2, table.Rows.Count);
-        var slowRow = table.Rows.First(r => r.Name == "Slow");
-        var fastRow = table.Rows.First(r => r.Name == "Fast");
+        var slowRow = table.Rows.First(r => r.Result.Name == "Slow");
+        var fastRow = table.Rows.First(r => r.Result.Name == "Fast");
         Assert.True(slowRow.IsBaseline);
         Assert.Equal(1.0, slowRow.Ratio);
         Assert.Equal(0.5, fastRow.Ratio);
@@ -173,8 +173,8 @@ public class BenchmarkTableTests
         var table = BenchmarkTable.Build(results);
 
         Assert.Equal(2, table.Rows.Count);
-        var fastRow = table.Rows.First(r => r.Name == "Fast");
-        var slowRow = table.Rows.First(r => r.Name == "Slow");
+        var fastRow = table.Rows.First(r => r.Result.Name == "Fast");
+        var slowRow = table.Rows.First(r => r.Result.Name == "Slow");
         Assert.False(fastRow.IsBaseline);
         Assert.False(slowRow.IsBaseline);
         Assert.Equal(1.0, fastRow.Ratio);
@@ -208,8 +208,8 @@ public class BenchmarkTableTests
         var table = BenchmarkTable.Build(results);
 
         var row = Assert.Single(table.Rows);
-        Assert.True(row.Errored);
-        Assert.Equal("fail", row.ErrorMessage);
+        Assert.True(row.Result.Errored);
+        Assert.Equal("fail", row.Result.ErrorMessage);
         Assert.True(double.IsNaN(row.Ratio));
     }
 
@@ -273,9 +273,9 @@ public class BenchmarkTableTests
 
         var table = BenchmarkTable.Build(results);
 
-        Assert.Equal(1.0, table.Rows.First(r => r.Name == "Base").Ratio);
-        Assert.Equal(2.0, table.Rows.First(r => r.Name == "TwoX").Ratio);
-        Assert.Equal(0.5, table.Rows.First(r => r.Name == "Half").Ratio);
+        Assert.Equal(1.0, table.Rows.First(r => r.Result.Name == "Base").Ratio);
+        Assert.Equal(2.0, table.Rows.First(r => r.Result.Name == "TwoX").Ratio);
+        Assert.Equal(0.5, table.Rows.First(r => r.Result.Name == "Half").Ratio);
     }
 
     [Fact]
@@ -321,7 +321,7 @@ public class BenchmarkTableTests
 
         var table = BenchmarkTable.Build(results);
 
-        Assert.True(double.IsNaN(table.Rows.First(r => r.Name == "Other").Ratio));
+        Assert.True(double.IsNaN(table.Rows.First(r => r.Result.Name == "Other").Ratio));
     }
 
     [Fact]
@@ -368,7 +368,7 @@ public class BenchmarkTableTests
 
         var table = BenchmarkTable.Build(results);
 
-        Assert.True(double.IsNaN(table.Rows.First(r => r.Name == "Fail").Ratio));
+        Assert.True(double.IsNaN(table.Rows.First(r => r.Result.Name == "Fail").Ratio));
     }
 
     [Fact]
@@ -452,10 +452,10 @@ public class BenchmarkTableTests
 
         var table = BenchmarkTable.Build(results);
 
-        Assert.Equal("", table.Rows.First(r => r.Name == "Base").SignificanceLabel);
-        Assert.Equal("✓", table.Rows.First(r => r.Name == "Sig").SignificanceLabel);
-        Assert.Equal("✗", table.Rows.First(r => r.Name == "NotSig").SignificanceLabel);
-        Assert.Equal("", table.Rows.First(r => r.Name == "NoSig").SignificanceLabel);
+        Assert.Equal("", table.Rows.First(r => r.Result.Name == "Base").SignificanceLabel);
+        Assert.Equal("✓", table.Rows.First(r => r.Result.Name == "Sig").SignificanceLabel);
+        Assert.Equal("✗", table.Rows.First(r => r.Result.Name == "NotSig").SignificanceLabel);
+        Assert.Equal("", table.Rows.First(r => r.Result.Name == "NoSig").SignificanceLabel);
     }
 
     [Fact]
@@ -516,7 +516,7 @@ public class BenchmarkTableTests
 
         var table = BenchmarkTable.Build(results);
 
-        Assert.Equal(now.ToString("yyyy-MM-dd HH:mm:ss"), table.RunAtUtc);
+        Assert.Equal(now, table.RunAtUtc);
         Assert.Equal(5, table.WarmupIterations);
         Assert.Equal(10, table.MeasuredIterations);
         Assert.Equal(0.99, table.ConfidenceLevel);
@@ -630,7 +630,7 @@ public class BenchmarkTableTests
 
         var table = BenchmarkTable.Build(results);
 
-        Assert.Equal(["Fastest", "Middle", "Slowest"], table.Rows.Select(r => r.Name));
+        Assert.Equal(["Fastest", "Middle", "Slowest"], table.Rows.Select(r => r.Result.Name));
     }
 
     [Fact]
@@ -824,10 +824,10 @@ public class BenchmarkTableTests
 
         var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
 
-        var baseNet8 = table.Rows.Single(r => r.BaseName == "Base" && r.RuntimeMoniker == "net8.0");
-        var altNet8 = table.Rows.Single(r => r.BaseName == "Alt" && r.RuntimeMoniker == "net8.0");
-        var baseNet9 = table.Rows.Single(r => r.BaseName == "Base" && r.RuntimeMoniker == "net9.0");
-        var altNet9 = table.Rows.Single(r => r.BaseName == "Alt" && r.RuntimeMoniker == "net9.0");
+        var baseNet8 = table.Rows.Single(r => r.BaseName == "Base" && r.Result.RuntimeMoniker == "net8.0");
+        var altNet8 = table.Rows.Single(r => r.BaseName == "Alt" && r.Result.RuntimeMoniker == "net8.0");
+        var baseNet9 = table.Rows.Single(r => r.BaseName == "Base" && r.Result.RuntimeMoniker == "net9.0");
+        var altNet9 = table.Rows.Single(r => r.BaseName == "Alt" && r.Result.RuntimeMoniker == "net9.0");
 
         Assert.True(baseNet8.IsBaseline);
         Assert.Equal(1.0, baseNet8.Ratio, 6);
@@ -851,10 +851,10 @@ public class BenchmarkTableTests
 
         var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
 
-        var binaryNet8 = table.Rows.Single(r => r.BaseName == "Binary" && r.RuntimeMoniker == "net8.0");
-        var linearNet8 = table.Rows.Single(r => r.BaseName == "Linear" && r.RuntimeMoniker == "net8.0");
-        var binaryNet9 = table.Rows.Single(r => r.BaseName == "Binary" && r.RuntimeMoniker == "net9.0");
-        var linearNet9 = table.Rows.Single(r => r.BaseName == "Linear" && r.RuntimeMoniker == "net9.0");
+        var binaryNet8 = table.Rows.Single(r => r.BaseName == "Binary" && r.Result.RuntimeMoniker == "net8.0");
+        var linearNet8 = table.Rows.Single(r => r.BaseName == "Linear" && r.Result.RuntimeMoniker == "net8.0");
+        var binaryNet9 = table.Rows.Single(r => r.BaseName == "Binary" && r.Result.RuntimeMoniker == "net9.0");
+        var linearNet9 = table.Rows.Single(r => r.BaseName == "Linear" && r.Result.RuntimeMoniker == "net9.0");
 
         Assert.Equal(1.0, binaryNet8.Ratio, 6);
         Assert.Equal(2.0, linearNet8.Ratio, 6);
@@ -877,7 +877,7 @@ public class BenchmarkTableTests
         var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
 
         var ordering = table.Rows
-            .Select(r => (r.BaseName, Size: (int)r.ParameterSet.Single(p => p.Name == "size").Value!))
+            .Select(r => (r.BaseName, Size: (int)r.Result.ParameterSet.Single(p => p.Name == "size").Value!))
             .ToArray();
 
         Assert.Equal(
@@ -900,11 +900,11 @@ public class BenchmarkTableTests
         Assert.Equal(["count"], table.ParameterNames);
 
         var plain = Assert.Single(table.Rows, r => r.BaseName == "Constant");
-        Assert.Empty(plain.ParameterSet);
+        Assert.Empty(plain.Result.ParameterSet);
 
         Assert.All(
             table.Rows.Where(r => r.BaseName == "Variable"),
-            r => Assert.Single(r.ParameterSet, p => p.Name == "count"));
+            r => Assert.Single(r.Result.ParameterSet, p => p.Name == "count"));
     }
 
     [Fact]
@@ -915,9 +915,9 @@ public class BenchmarkTableTests
         var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
         var row = Assert.Single(table.Rows);
 
-        Assert.Equal("Sort(size=10)", row.Name);
+        Assert.Equal("Sort(size=10)", row.Result.Name);
         Assert.Equal("Sort", row.BaseName);
-        var parameter = Assert.Single(row.ParameterSet);
+        var parameter = Assert.Single(row.Result.ParameterSet);
         Assert.Equal("size", parameter.Name);
         Assert.Equal(10, parameter.Value);
     }
@@ -976,7 +976,7 @@ public class BenchmarkTableTests
     private static BenchmarkRow Row(BenchmarkTable table, string baseName, int size)
         => table.Rows.Single(r =>
             r.BaseName == baseName
-            && r.ParameterSet.Any(p => p.Name == "size" && (int)p.Value! == size));
+            && r.Result.ParameterSet.Any(p => p.Name == "size" && (int)p.Value! == size));
 
     [Fact]
     public void BuildPerClass_CrossClassMode_ReturnsSingleCombinedTable()
@@ -1020,7 +1020,7 @@ public class BenchmarkTableTests
             var table = Assert.Single(BenchmarkTable.BuildPerClass(results));
 
             var baselineRow = table.Rows.Single(r => r.IsBaseline);
-            Assert.Equal("ClassA.M1", baselineRow.Name);
+            Assert.Equal("ClassA.M1", baselineRow.Result.Name);
         }
         finally
         {

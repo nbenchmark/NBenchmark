@@ -17,7 +17,7 @@ using NBenchmark.Reporters.Console;
 // instance from any built here, and that is the point rather than a caveat - a benchmark resolved
 // from a container this process already warmed up is partly measuring that warmth.
 var results = await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<DependencyInjectionBenchmarks>(BuildServices)
+    .AddFromAssembly<DependencyInjectionBenchmarks>().WithServices(BuildServices)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();

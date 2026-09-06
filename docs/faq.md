@@ -202,7 +202,7 @@ Use `--list` to check which benchmarks NBenchmark finds before running.
 
 ```csharp
 await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<MyBenchmarks>(BuildServices)
+    .AddFromAssembly<MyBenchmarks>().WithServices(BuildServices)
     .RunAsync();
 
 static IServiceProvider BuildServices() => new ServiceCollection()
@@ -221,7 +221,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NBenchmark.DependencyInjection;
 
 await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<OrderBenchmarks>(BuildServices)
+    .AddFromAssembly<OrderBenchmarks>().WithServices(BuildServices)
     .RunAsync();
 
 static IServiceProvider BuildServices() => new ServiceCollection()
@@ -235,7 +235,7 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-The worker runs `BuildServices` in its own process and resolves the class from the container it builds there, ensuring the run stays isolated. You cannot pass a built `IServiceProvider` because a live container cannot cross a process boundary. A scoped variant (`UseScopedDependencyInjection`) is available for `DbContext`-style lifetimes; the scope is created per instance and disposed after teardown. For more information, see the [Dependency Injection guide](./features/dependency-injection.md) for the full API and lifetime semantics.
+The worker runs `BuildServices` in its own process and resolves the class from the container it builds there, ensuring the run stays isolated. You cannot pass a built `IServiceProvider` because a live container cannot cross a process boundary. A scoped variant (`WithScopedServices`) is available for `DbContext`-style lifetimes; the scope is created per instance and disposed after teardown. For more information, see the [Dependency Injection guide](./features/dependency-injection.md) for the full API and lifetime semantics.
 
 ### Can I use a DI container other than Microsoft.Extensions.DependencyInjection?
 
@@ -243,7 +243,7 @@ Yes. The companion package only depends on `IServiceProvider` from the BCL. Any 
 
 ```csharp
 await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<OrderBenchmarks>(BuildServices)
+    .AddFromAssembly<OrderBenchmarks>().WithServices(BuildServices)
     .RunAsync();
 
 static IServiceProvider BuildServices()

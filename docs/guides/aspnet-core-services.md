@@ -16,7 +16,7 @@ The following `Program.cs` example demonstrates how to target an ASP.NET Core se
 
 ```csharp
 await BenchmarkHarness.Create(args)
-    .UseScopedDependencyInjection<OrderBenchmarks>(BuildServices)
+    .AddFromAssembly<OrderBenchmarks>().WithScopedServices(BuildServices)
     .WithReporter(new ConsoleReporter())
     .RunAsync();
 
@@ -51,14 +51,14 @@ public sealed class OrderBenchmarks(BenchDbContext db)
 
 - **Using a factory instead of a provider**: You must pass a factory rather than a pre-built `IServiceProvider`. Because a container is live code containing singletons and open connections, it cannot cross a process boundary; attempting to pass a built container results in a compile error. A factory serves as a recipe that the worker process executes in its own process to build its own container. This ensures that the benchmark does not measure the "warmth" of a container created in the host process. The factory can capture values like connection strings, but it must not return the container itself.
 
-- **`AddDbContext` and `UseScopedDependencyInjection`**: This combination provides each benchmark method with a fresh `DbContext`. With the default `PerMethod` lifetime, one method cannot warm the entity cache for another. For a full overview, see the [lifetime and disposal table](../features/dependency-injection.md#lifetime-and-disposal-semantics).
+- **`AddDbContext` and `WithScopedServices`**: This combination provides each benchmark method with a fresh `DbContext`. With the default `PerMethod` lifetime, one method cannot warm the entity cache for another. For a full overview, see the [lifetime and disposal table](../features/dependency-injection.md#lifetime-and-disposal-semantics).
 
 - **`[BenchmarkCase(...)]`**: This attribute expands a single method into multiple benchmarks, one for each case. The display name includes the parameter, such as `ListRecentOrders(limit=10)`. The engine groups significance testing by parameter set, meaning benchmarks with `limit=100` are compared against each other rather than against benchmarks with `limit=1_000`. For more information, see [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
 
 - **`[BenchmarkCategory(...)]`**: This attribute tags benchmarks for easier filtering. For example, you can run only the read path using `dotnet run -- --category Read`, or exclude writes using `dotnet run -- --exclude-category Write`. For more information, see [Categories](../features/categories.md).
 
 > [!WARNING] Shared state breaks statistical independence
-> Pairing `UseScopedDependencyInjection` with `[InstanceLifetime(InstanceLifetime.PerClass)]` causes a single instance and `DbContext` to be shared by every `[Benchmark]` method in the class. This allows the cache to warm across methods, linking the timings of one method to another and violating the independence assumption of the significance test. To prevent this, the engine resolves the lifetime to `PerMethod` (a fresh instance and scope per method) and attaches a warning to the results. To maintain `PerClass` lifetime, implement `IStateReset` or add `[SharedState]` if the carry-over is the subject of your measurement. The **NB0011 analyzer** also reports this combination at build time. For more information, see [State isolation](../features/state-isolation.md).
+> Pairing `WithScopedServices` with `[InstanceLifetime(InstanceLifetime.PerClass)]` causes a single instance and `DbContext` to be shared by every `[Benchmark]` method in the class. This allows the cache to warm across methods, linking the timings of one method to another and violating the independence assumption of the significance test. To prevent this, the engine resolves the lifetime to `PerMethod` (a fresh instance and scope per method) and attaches a warning to the results. To maintain `PerClass` lifetime, implement `IStateReset` or add `[SharedState]` if the carry-over is the subject of your measurement. The **NB0011 analyzer** also reports this combination at build time. For more information, see [State isolation](../features/state-isolation.md).
 
 ## Run the benchmark
 
@@ -97,7 +97,7 @@ For a full explanation of every column, indicator, and warning, see [Reading You
 
 For more information, see the following pages:
 
-- [Harness mode: BenchmarkHarness](../usage-modes/harness-mode.md) - Full attribute reference, including `[BenchmarkSetup]`, `[BenchmarkIterationSetup]`, `[IsolatedProcess]`, and `[Runtimes]`.
+- [Harness mode: BenchmarkHarness](../usage-modes/harness-mode.md) - Full attribute reference, including `[BenchmarkSetup]`, `[BenchmarkIterationSetup]`, `[Isolation(Isolation.Required)]`, and `[Runtimes]`.
 - [Dependency Injection](../features/dependency-injection.md) - Details on scoped vs. root providers, multiple assemblies, non-Microsoft containers, and the `WithInstanceFactory` method.
 - [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) - Using `[BenchmarkCases]` for generated or file-backed inputs.
 - [State isolation](../features/state-isolation.md) - Using `IStateReset` for classes that intentionally share state.

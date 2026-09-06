@@ -85,9 +85,9 @@ internal enum IsolationMode
     /// <summary>No attribute - Harness mode isolates this benchmark with its class siblings.</summary>
     Default,
 
-    /// <summary><c>[InProcess]</c> - run in the host process, never a child.</summary>
+    /// <summary><c>[Isolation(Isolation.Off)]</c> - run in the host process, never a child.</summary>
     InProcess,
 
-    /// <summary><c>[IsolatedProcess]</c> - run alone in a dedicated child process.</summary>
+    /// <summary><c>[Isolation(Isolation.Required)]</c> - run alone in a dedicated child process.</summary>
     PerBenchmark,
 }

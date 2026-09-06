@@ -12,7 +12,7 @@ namespace NBenchmark.Tests.Workers;
 ///         Every one of these shapes used to be measured in the host process. The coordinator held the
 ///         resolver as live code, and the only thing that lifted the refusal was a
 ///         <c>Func&lt;IServiceProvider&gt;</c> passed to one specific overload - so
-///         <c>WithInstanceFactory</c>, <c>WithScopedServiceProvider</c> and everything the scoped-DI
+///         <c>WithInstanceFactory</c>, <c>WithScopedServices</c> and everything the scoped-DI
 ///         guide teaches lost the run its isolation regardless of how the factory was written.
 ///     </para>
 ///     <para>

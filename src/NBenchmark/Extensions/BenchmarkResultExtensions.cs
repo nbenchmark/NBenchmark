@@ -114,24 +114,40 @@ public static class BenchmarkResultExtensions
         return result;
     }
 
-    public static async Task<BenchmarkResult> ToMarkdownAsync(this BenchmarkResult result, string outputDir = ".", string? fileName = null)
+    /// <summary>
+    ///     Writes this result to a Markdown file and returns the path written.
+    /// </summary>
+    /// <remarks>
+    ///     Named <c>Save</c> rather than <c>To</c>: <c>To*</c> conventionally converts and returns the
+    ///     conversion, and this writes a file. It also used to return the result it was handed, which
+    ///     said nothing about where the file went - the one thing a caller has to know next.
+    /// </remarks>
+    /// <param name="result">The result to write.</param>
+    /// <param name="outputDir">Directory to write into. Created if it does not exist.</param>
+    /// <param name="fileName">File name to use, or <c>null</c> for a generated timestamped one.</param>
+    public static async Task<string> SaveMarkdownAsync(
+        this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {
         var reporter = new MarkdownReporter(outputDir, fileName);
         await reporter.ReportAsync([result]);
-        return result;
+        return reporter.LastWrittenPath!;
     }
 
-    public static async Task<BenchmarkResult> ToJsonAsync(this BenchmarkResult result, string outputDir = ".", string? fileName = null)
+    /// <inheritdoc cref="SaveMarkdownAsync" />
+    public static async Task<string> SaveJsonAsync(
+        this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {
         var reporter = new JsonReporter(outputDir, fileName);
         await reporter.ReportAsync([result]);
-        return result;
+        return reporter.LastWrittenPath!;
     }
 
-    public static async Task<BenchmarkResult> ToCsvAsync(this BenchmarkResult result, string outputDir = ".", string? fileName = null)
+    /// <inheritdoc cref="SaveMarkdownAsync" />
+    public static async Task<string> SaveCsvAsync(
+        this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {
         var reporter = new CsvReporter(outputDir, fileName);
         await reporter.ReportAsync([result]);
-        return result;
+        return reporter.LastWrittenPath!;
     }
 }

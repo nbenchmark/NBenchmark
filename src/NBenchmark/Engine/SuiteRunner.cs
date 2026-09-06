@@ -162,7 +162,7 @@ internal static class SuiteRunner
 
     private static bool ShouldForceGcBetweenBenchmarks(MeasurementOptions options, BenchmarkResult result)
     {
-        if (!options.ForceGcBetweenBenchmarks)
+        if (!options.Resolve().ForceGcBetweenBenchmarks)
             return false;
 
         // True dry-runs do no work (0 warmup, 0 measured); skip inter-benchmark GC overhead.

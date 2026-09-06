@@ -1247,35 +1247,20 @@ internal sealed class WorkerSession(FrameChannel channel)
     {
         var options = request.Options;
 
-        // A factory wins over a type name. It is the stronger mechanism - it reproduces the caller's own
-        // object with its own constructor arguments, where a type name can only reach a parameterless
-        // constructor - so where both are present the type name is the weaker fallback, not a conflict.
+        // The factory is run once here and its product pinned, rather than re-run per resolution: the
+        // caller's factory is theirs to have side effects in, and the coordinator invokes it once too.
         if (RunStrategyFactory<IOutlierDetector>(
                 context, request, request.OutlierDetectorFactory, receivers, substitutions) is
             { } detector)
         {
-            options = options with { OutlierDetector = detector };
-        }
-        else if (request.OutlierDetectorTypeName is { Length: > 0 } detectorName)
-        {
-            options = options with
-            {
-                OutlierDetector = Construct<IOutlierDetector>(detectorName, context, substitutions),
-            };
+            options = options with { OutlierDetector = () => detector };
         }
 
         if (RunStrategyFactory<ISignificanceTest>(
                 context, request, request.SignificanceTestFactory, receivers, substitutions) is
             { } test)
         {
-            options = options with { SignificanceTest = test };
-        }
-        else if (request.SignificanceTestTypeName is { Length: > 0 } testName)
-        {
-            options = options with
-            {
-                SignificanceTest = Construct<ISignificanceTest>(testName, context, substitutions),
-            };
+            options = options with { SignificanceTest = () => test };
         }
 
         return options;

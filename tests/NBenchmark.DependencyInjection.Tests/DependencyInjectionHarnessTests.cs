@@ -8,7 +8,7 @@ namespace NBenchmark.DependencyInjection.Tests;
 public class DependencyInjectionHarnessTests
 {
     [Fact]
-    public async Task WithServiceProvider_Resolves_Benchmark_With_Constructor_Dependencies()
+    public async Task WithServices_Resolves_Benchmark_With_Constructor_Dependencies()
     {
         var store = new RecordingDataStore();
 
@@ -23,9 +23,9 @@ public class DependencyInjectionHarnessTests
                     "--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1",
                 ])
                 .AddFromAssembly<DependentBenchmark>()
-                .WithServiceProvider(() => services)
+                .WithServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -33,7 +33,7 @@ public class DependencyInjectionHarnessTests
     }
 
     [Fact]
-    public async Task WithScopedServiceProvider_Creates_New_Scope_Per_Suite()
+    public async Task WithScopedServices_Creates_New_Scope_Per_Suite()
     {
         var services = new ServiceCollection()
             .AddSingleton(new ScopeCounter())
@@ -45,9 +45,9 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "ScopedDependentBenchmark.*", "--dry-run", "--launch-count", "1"])
                 .AddFromAssembly<ScopedDependentBenchmark>()
-                .WithScopedServiceProvider(() => services)
+                .WithScopedServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -56,7 +56,7 @@ public class DependencyInjectionHarnessTests
     }
 
     [Fact]
-    public async Task WithScopedServiceProvider_Disposes_Scope_After_Teardown()
+    public async Task WithScopedServices_Disposes_Scope_After_Teardown()
     {
         var disposable = new DisposableTracker();
 
@@ -69,9 +69,9 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run", "--launch-count", "1"])
                 .AddFromAssembly<DisposableBenchmark>()
-                .WithScopedServiceProvider(() => services)
+                .WithScopedServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -89,14 +89,14 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "UnresolvableBenchmark.*", "--dry-run"])
                 .AddFromAssembly<UnresolvableBenchmark>()
-                .WithScopedServiceProvider(() => services)
-                .WithIsolation(false)
+                .WithScopedServices(() => services)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
     }
 
     [Fact]
-    public async Task UseDependencyInjection_Discovers_And_Wires_Service_Provider_In_One_Call()
+    public async Task AddFromAssembly_And_WithServices_Wire_The_Service_Provider()
     {
         var store = new RecordingDataStore();
 
@@ -110,9 +110,9 @@ public class DependencyInjectionHarnessTests
             await BenchmarkHarness.Create([
                     "--filter", "DependentBenchmark.*", "--iterations", "1", "--warmup", "0", "--ops-per-sample", "1", "--launch-count", "1",
                 ])
-                .UseDependencyInjection<DependentBenchmark>(() => services)
+                .AddFromAssembly<DependentBenchmark>().WithServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -120,7 +120,7 @@ public class DependencyInjectionHarnessTests
     }
 
     [Fact]
-    public async Task UseScopedDependencyInjection_Discovers_And_Wires_Scoped_Provider_In_One_Call()
+    public async Task AddFromAssembly_And_WithScopedServices_Wire_The_Scoped_Provider()
     {
         var tracker = new DisposableTracker();
 
@@ -132,9 +132,9 @@ public class DependencyInjectionHarnessTests
         await CaptureAndSuppressConsoleOutputAsync(async () =>
         {
             await BenchmarkHarness.Create(["--filter", "DisposableBenchmark.*", "--dry-run", "--launch-count", "1"])
-                .UseScopedDependencyInjection<DisposableBenchmark>(() => services)
+                .AddFromAssembly<DisposableBenchmark>().WithScopedServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -151,7 +151,7 @@ public class DependencyInjectionHarnessTests
             await BenchmarkHarness.Create(["--filter", "ParameterlessBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<ParameterlessBenchmark>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -173,7 +173,7 @@ public class DependencyInjectionHarnessTests
                     return Activator.CreateInstance(type)!;
                 })
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -182,7 +182,7 @@ public class DependencyInjectionHarnessTests
     }
 
     [Fact]
-    public async Task WithScopedServiceProvider_PerMethod_Disposes_One_Scope_Per_Method()
+    public async Task WithScopedServices_PerMethod_Disposes_One_Scope_Per_Method()
     {
         // The fix for the unbounded-hook-list leak: each [Benchmark] method gets its
         // own scope, and the scope is disposed when that method's runAsync finishes.
@@ -197,9 +197,9 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<PerMethodScopeBenchmark>()
-                .WithScopedServiceProvider(() => services)
+                .WithScopedServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -208,7 +208,7 @@ public class DependencyInjectionHarnessTests
     }
 
     [Fact]
-    public async Task WithScopedServiceProvider_Leaves_No_Hooks_Bound_To_Host()
+    public async Task WithScopedServices_Leaves_No_Hooks_Bound_To_Host()
     {
         // Regression: the previous design accumulated a closure in a host-level
         // list every time the factory was called. For a suite with N methods the
@@ -226,9 +226,9 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "PerMethodScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<PerMethodScopeBenchmark>()
-                .WithScopedServiceProvider(() => services)
+                .WithScopedServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -249,7 +249,7 @@ public class DependencyInjectionHarnessTests
     ///     the same fact, so this is the test that says which one the engine believes.
     /// </remarks>
     [Fact]
-    public async Task WithScopedServiceProvider_PerClass_Scopes_Per_Method()
+    public async Task WithScopedServices_PerClass_Scopes_Per_Method()
     {
         var services = new ServiceCollection()
             .AddSingleton(new DisposableTracker())
@@ -260,9 +260,9 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "PerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<PerClassScopeBenchmark>()
-                .WithScopedServiceProvider(() => services)
+                .WithScopedServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -271,7 +271,7 @@ public class DependencyInjectionHarnessTests
     }
 
     [Fact]
-    public async Task WithScopedServiceProvider_And_WithInstanceLifetime_PerClass_Scopes_Per_Method()
+    public async Task WithScopedServices_And_WithInstanceLifetime_PerClass_Scopes_Per_Method()
     {
         var services = new ServiceCollection()
             .AddSingleton(new DisposableTracker())
@@ -282,10 +282,10 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "HarnessPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<HarnessPerClassScopeBenchmark>()
-                .WithScopedServiceProvider(() => services)
+                .WithScopedServices(() => services)
                 .WithInstanceLifetime(InstanceLifetime.PerClass)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -297,7 +297,7 @@ public class DependencyInjectionHarnessTests
     ///     A class that resets itself keeps PerClass - one scope for the whole class, as asked for.
     /// </summary>
     [Fact]
-    public async Task WithScopedServiceProvider_PerClass_With_IStateReset_Keeps_One_Scope()
+    public async Task WithScopedServices_PerClass_With_IStateReset_Keeps_One_Scope()
     {
         var services = new ServiceCollection()
             .AddSingleton(new DisposableTracker())
@@ -308,9 +308,9 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "ResettingPerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<ResettingPerClassScopeBenchmark>()
-                .WithScopedServiceProvider(() => services)
+                .WithScopedServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -325,7 +325,7 @@ public class DependencyInjectionHarnessTests
     ///     empty <c>ResetAsync</c> was the only way to say this.
     /// </summary>
     [Fact]
-    public async Task WithScopedServiceProvider_PerClass_With_SharedState_Keeps_One_Scope()
+    public async Task WithScopedServices_PerClass_With_SharedState_Keeps_One_Scope()
     {
         var services = new ServiceCollection()
             .AddSingleton(new DisposableTracker())
@@ -336,9 +336,9 @@ public class DependencyInjectionHarnessTests
         {
             await BenchmarkHarness.Create(["--filter", "SharedStatePerClassScopeBenchmark.*", "--iterations", "1", "--warmup", "0", "--launch-count", "1"])
                 .AddFromAssembly<SharedStatePerClassScopeBenchmark>()
-                .WithScopedServiceProvider(() => services)
+                .WithScopedServices(() => services)
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 

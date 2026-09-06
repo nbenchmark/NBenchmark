@@ -173,7 +173,7 @@ AutoTune = AutoTuneOptions.Default   // default
 
 > `Quick` does **not** shorten `MinWarmupTime`. This floor is a measurement-correctness requirement, not a speed/accuracy trade-off. Too short a warmup can result in measurements on tier-0 code, which may report a median several times off with a ±1% error bar and will not reproduce between runs. `Quick` achieves its speed through `CiTarget`, `MinSamples`, and `MaxTuningTime`.
 
-Select a preset using `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) or `--auto-tune thorough` on the CLI, or build a custom `AutoTuneOptions` record. Individual knobs include:
+Select a preset using `.WithAutoTune(AutoTuneOptions.Thorough)` (suite/harness) or `--auto-tune thorough` on the CLI, or build a custom `AutoTuneOptions` record. Individual knobs include:
 
 | Knob | Default | Meaning |
 | --- | --- | --- |
@@ -203,7 +203,7 @@ Select a preset using `.WithAutoTune(AutoTunePreset.Thorough)` (suite/harness) o
 
 The interval's confidence level is set by `ConfidenceLevel` (see below).
 
-BenchmarkSuite/BenchmarkHarness fluent method: `.WithAutoTune(AutoTunePreset.Quick)` or `.WithAutoTune(customOptions)`
+BenchmarkSuite/BenchmarkHarness fluent method: `.WithAutoTune(AutoTuneOptions.Quick)` or `.WithAutoTune(customOptions)`
 CLI flags: `--auto-tune <default|quick|thorough>`, plus `--ci-target`, `--min-samples`, `--max-samples`, `--min-warmup`, `--max-warmup`, `--max-tuning-time`, `--autotune-cap-behavior`, `--warmup-budget-fraction`, `--cap-grace-factor`, `--min-warmup-time`, `--no-jit-quiescence`, `--jit-quiet-period`, `--min-measurement-time`, `--drift-tolerance`, `--max-drift-restarts`.
 
 ### Profile
@@ -223,13 +223,13 @@ You can override each resolved boolean individually:
 
 ```csharp
 // Enable per-iteration GC under Realistic
-options with { ForceGcBeforeEachIterationOverride = true }
+options with { ForceGcBeforeEachIteration = true }
 
 // Inherit the warmup heap under Independent (skip the pre-measurement GC)
-options with { ForceGcBeforeMeasurementOverride = false }
+options with { ForceGcBeforeMeasurement = false }
 
 // Disable the between-benchmark GC (both profiles)
-options with { ForceGcBetweenBenchmarksOverride = false }
+options with { ForceGcBetweenBenchmarks = false }
 ```
 
 BenchmarkHarness fluent method: `.WithMeasurementProfile(MeasurementProfile.Independent)`
@@ -280,42 +280,42 @@ For the measured impact and a full list of limitations, see [`--runtime-profile`
 ### ForceGcBeforeEachIteration
 
 ```csharp
-ForceGcBeforeEachIteration => ForceGcBeforeEachIterationOverride ?? (Profile == MeasurementProfile.Independent)
+ForceGcBeforeEachIteration => ForceGcBeforeEachIteration ?? (Profile == MeasurementProfile.Independent)
 ```
 
-This is a **computed property** derived from `Profile` (or `ForceGcBeforeEachIterationOverride`). When `true`, NBenchmark triggers a Gen0 GC collection before each measured sample (the K-batch), before the timestamp and outside the timed window. This prevents allocation side-effects from previous samples from affecting the measurement.
+This is a **computed property** derived from `Profile` (or `ForceGcBeforeEachIteration`). When `true`, NBenchmark triggers a Gen0 GC collection before each measured sample (the K-batch), before the timestamp and outside the timed window. This prevents allocation side-effects from previous samples from affecting the measurement.
 
-Under the `Realistic` profile (default), this resolves to `false`. To enable per-iteration GC under `Realistic`, set `ForceGcBeforeEachIterationOverride = true` or use `--force-gc` on the CLI.
+Under the `Realistic` profile (default), this resolves to `false`. To enable per-iteration GC under `Realistic`, set `ForceGcBeforeEachIteration = true` or use `--force-gc` on the CLI.
 
 ### ForceGcBeforeMeasurement
 
 ```csharp
-ForceGcBeforeMeasurement => ForceGcBeforeMeasurementOverride ?? (Profile == MeasurementProfile.Independent)
+ForceGcBeforeMeasurement => ForceGcBeforeMeasurement ?? (Profile == MeasurementProfile.Independent)
 ```
 
-A **computed property** derived from `Profile` (or `ForceGcBeforeMeasurementOverride`). When `true`, a full Gen2 GC (with finalizer wait) runs once after warmup and before the measurement loop begins. This clears the warmup heap to prevent a collection from triggering mid-measurement.
+A **computed property** derived from `Profile` (or `ForceGcBeforeMeasurement`). When `true`, a full Gen2 GC (with finalizer wait) runs once after warmup and before the measurement loop begins. This clears the warmup heap to prevent a collection from triggering mid-measurement.
 
 Under the `Realistic` profile (default), this resolves to `false`: the benchmark body inherits the heap state left by warmup, matching production behavior. This is distinct from `ForceGcBetweenBenchmarks`, which runs *between* benchmarks.
 
 ### ForceGcBetweenBenchmarks
 
 ```csharp
-ForceGcBetweenBenchmarks => ForceGcBetweenBenchmarksOverride ?? true
+ForceGcBetweenBenchmarks => ForceGcBetweenBenchmarks ?? true
 ```
 
-A **computed property** (or `ForceGcBetweenBenchmarksOverride`). When `true`, a full Gen2 GC (with finalizer wait) runs between benchmarks. This prevents one benchmark's leftover heap from biasing the next, which would make results order-dependent and undermine the significance test's independence assumption.
+A **computed property** (or `ForceGcBetweenBenchmarks`). When `true`, a full Gen2 GC (with finalizer wait) runs between benchmarks. This prevents one benchmark's leftover heap from biasing the next, which would make results order-dependent and undermine the significance test's independence assumption.
 
-This is on by default for **both** profiles. Set `ForceGcBetweenBenchmarksOverride = false` or use `--no-gc-between-benchmarks` on the CLI if inter-benchmark heap carry-over is intended.
+This is on by default for **both** profiles. Set `ForceGcBetweenBenchmarks = false` or use `--no-gc-between-benchmarks` on the CLI if inter-benchmark heap carry-over is intended.
 
 ### MeasureAllocations
 
 ```csharp
-MeasureAllocations => MeasureAllocationsOverride ?? true
+MeasureAllocations => MeasureAllocations ?? true
 ```
 
-A **computed property** (or `MeasureAllocationsOverride`). When `true`, NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` around each iteration and reports the mean bytes allocated per operation in the **Alloc/op** column.
+A **computed property** (or `MeasureAllocations`). When `true`, NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` around each iteration and reports the mean bytes allocated per operation in the **Alloc/op** column.
 
-This is on by default for **both** profiles. The snapshot is taken outside the timed window, so it does not affect timing purity. To disable allocation tracking, set `MeasureAllocationsOverride = false` or use `--no-allocations` on the CLI.
+This is on by default for **both** profiles. The snapshot is taken outside the timed window, so it does not affect timing purity. To disable allocation tracking, set `MeasureAllocations = false` or use `--no-allocations` on the CLI.
 
 BenchmarkSuite fluent method: `.WithAllocations()`
 
@@ -337,14 +337,13 @@ Runtime diagnostics are collected alongside timing and allocations. `Diagnostics
 | `Exceptions` | `false` | Total first-chance exceptions during the measurement phase via an `AppDomain.FirstChanceException` subscription. |
 | `CpuTime` | `false` | Process CPU time (`TotalProcessorTime`) delta per sample. Also reports the CPU/wall-clock ratio. |
 
-Three named presets are available via `DiagnosticsOptions.FromMode(DiagnosticsMode)`:
+Three named bundles are available as static properties:
 
-| Mode | Toggles enabled |
+| Bundle | Toggles enabled |
 | --- | --- |
-| `DiagnosticsMode.None` | None |
-| `DiagnosticsMode.Gc` | `GcCollectionCounts` |
-| `DiagnosticsMode.GcAndCpu` | `GcCollectionCounts`, `CpuTime` |
-| `DiagnosticsMode.All` | All four toggles |
+| `DiagnosticsOptions.None` | None |
+| `DiagnosticsOptions.Default` | `GcCollectionCounts` |
+| `DiagnosticsOptions.All` | All four toggles |
 
 ```csharp
 // Programmatic - enable everything
@@ -360,7 +359,7 @@ var options = new MeasurementOptions
 };
 ```
 
-BenchmarkSuite/BenchmarkHarness fluent methods: `.WithDiagnostics(DiagnosticsMode.All)` or `.WithDiagnostics(DiagnosticsOptions.All)`
+BenchmarkSuite/BenchmarkHarness fluent method: `.WithDiagnostics(DiagnosticsOptions.All)`
 CLI flag: `--diagnostics <none|gc|gcandcpu|all>`
 
 > [!NOTE]
@@ -499,10 +498,10 @@ A custom `IOutlierDetector` (from `NBenchmark.Stats`) that **takes priority over
 ```csharp
 using NBenchmark.Stats;
 
-new MeasurementOptions { OutlierDetector = new KeepFastestDetector(0.90) };
+new MeasurementOptions { OutlierDetector = static () => new KeepFastestDetector(0.90) };
 ```
 
-BenchmarkSuite fluent method: `.WithOutlierDetector(detector)`
+BenchmarkSuite fluent method: `.WithOutlierDetector(factory)`
 
 > [!NOTE]
 > The `--outlier` CLI flag always wins. Passing it clears any programmatic `OutlierDetector` so the command line remains authoritative. See [Custom outlier detectors](../statistics/outliers.md#custom-outlier-detectors).
@@ -624,10 +623,10 @@ A custom `ISignificanceTest` (from `NBenchmark.Stats`) that replaces the built-i
 ```csharp
 using NBenchmark.Stats;
 
-new MeasurementOptions { SignificanceTest = new MedianRatioSignificanceTest(25) };
+new MeasurementOptions { SignificanceTest = static () => new MedianRatioSignificanceTest(25) };
 ```
 
-BenchmarkSuite fluent method: `.WithSignificanceTest(test)`
+BenchmarkSuite fluent method: `.WithSignificanceTest(factory)`
 
 For more information, see [Custom significance tests](../statistics/significance.md#custom-significance-tests).
 
@@ -670,14 +669,14 @@ This is the proactive counterpart to the statistical noise handling in [Outlier 
 ### RequireIsolation
 
 ```csharp
-RequireIsolation = true   // default
+Isolation = Isolation.Required   // default
 ```
 
 Whether an isolation **refusal** fails the run instead of falling back to a labeled host-process measurement.
 
 A refusal occurs when NBenchmark cannot spawn a worker process. This happens if a capture's behavior is not determined by its contents, instances come from live code in the host process, the suite has no addressable entry point, or `nbworker` is not deployed. The exception names the benchmark, the reason, the remedy, and how to request the host process deliberately. In Harness mode, this is raised at discovery time.
 
-This never gates a deliberate in-process run. `--dry-run`, `--in-process`, `[InProcess]`, `Benchmark.RunInProcess`, `WithIsolation(false)`, and `BenchmarkSuite.AddInProcess` all stamp `InProcessRequested`, which is not a refusal.
+This never gates a deliberate in-process run. `--dry-run`, `--in-process`, `[Isolation(Isolation.Off)]`, `Benchmark.RunInProcess`, `WithIsolation(Isolation.Off)`, and `BenchmarkSuite.AddInProcess` all stamp `InProcessRequested`, which is not a refusal.
 
 Set this to `false` to accept labeled fallbacks everywhere. This is the right setting for scratchpad use, where a labeled measurement is better than no measurement.
 
@@ -715,10 +714,10 @@ Categories are metadata declared with `[BenchmarkCategory]` and used for filteri
 | `ConfidenceLevel` | `double` | `0.95` | `>0` and `<1` |
 | `SignificanceLevel` | `double` | `0.05` | `>0` and `<1` |
 | `Profile` | `enum` | `Realistic` | `Realistic` or `Independent` |
-| `ForceGcBeforeEachIteration` | `bool` (computed) | `false` | Derives from `Profile`; override via `ForceGcBeforeEachIterationOverride` |
-| `ForceGcBeforeMeasurement` | `bool` (computed) | `false` | Derives from `Profile` (`true` under `Independent`); override via `ForceGcBeforeMeasurementOverride` |
-| `MeasureAllocations` | `bool` (computed) | `true` | On for both profiles; override via `MeasureAllocationsOverride` |
-| `ForceGcBetweenBenchmarks` | `bool` (computed) | `true` | On for both profiles; override via `ForceGcBetweenBenchmarksOverride` |
+| `ForceGcBeforeEachIteration` | `bool` (computed) | `false` | Derives from `Profile`; override via `ForceGcBeforeEachIteration` |
+| `ForceGcBeforeMeasurement` | `bool` (computed) | `false` | Derives from `Profile` (`true` under `Independent`); override via `ForceGcBeforeMeasurement` |
+| `MeasureAllocations` | `bool` (computed) | `true` | On for both profiles; override via `MeasureAllocations` |
+| `ForceGcBetweenBenchmarks` | `bool` (computed) | `true` | On for both profiles; override via `ForceGcBetweenBenchmarks` |
 | `MinimumPracticalEffect` | `double?` | `0.147` | `0` - `1` when set (`0` = p-value-only verdicts; `null` disables the gate) |
 | `OutlierMode` | `enum` | `IqrFence` | See above |
 | `OutlierDetector` | `IOutlierDetector?` | `null` | Overrides `OutlierMode` when set |

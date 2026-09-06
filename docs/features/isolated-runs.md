@@ -85,11 +85,11 @@ public sealed class MixedBenchmarks
     public int Default() => Work();               // Shares one per-class worker
 
     [Benchmark]
-    [IsolatedProcess]
+    [Isolation(Isolation.Required)]
     public int OwnProcess() => ColdWork();        // Uses its own dedicated worker
 
     [Benchmark]
-    [InProcess]
+    [Isolation(Isolation.Off)]
     public int InHost() => HostObservableWork();  // Runs in the host process
 }
 ```
@@ -112,7 +112,7 @@ Sibling contamination is rarely the dominant error; uncontrolled JIT tiering is 
 
 The engine handles order effects by randomizing run order (`WithRunOrder(RunOrder.Random)`, reproducible via `WithSeed`). Additionally, `WithLaunchCount(n)` measures the suite in *n* separate workers to estimate run-to-run reproducibility.
 
-If a benchmark genuinely pollutes its siblings - for example, by permanently filling a static cache - place it in its own suite or use `[IsolatedProcess]`.
+If a benchmark genuinely pollutes its siblings - for example, by permanently filling a static cache - place it in its own suite or use `[Isolation(Isolation.Required)]`.
 
 ## Measuring in the host process
 
@@ -121,8 +121,8 @@ Sometimes the current process is the subject, such as for cold-start costs, firs
 | Mode | How to request |
 | --- | --- |
 | Single | `Benchmark.RunInProcess(...)` and its async / prepared-state overloads |
-| Suite | `AddInProcess(...)` for one benchmark, `WithIsolation(false)` for the whole suite |
-| Harness | `[InProcess]` on a method or class, `--in-process`, `WithIsolation(false)` |
+| Suite | `AddInProcess(...)` for one benchmark, `WithIsolation(Isolation.Off)` for the whole suite |
+| Harness | `[Isolation(Isolation.Off)]` on a method or class, `--in-process`, `WithIsolation(Isolation.Off)` |
 | Any | `--dry-run`, which never invokes a body and so never spawns a worker |
 
 ```csharp
@@ -133,7 +133,7 @@ await new BenchmarkSuite("cache")
     .RunAsync();
 ```
 
-`AddInProcess` exists because `WithIsolation(false)` is all-or-nothing. Without it, a single un-isolatable body would force every other benchmark in the suite into the host process.
+`AddInProcess` exists because `WithIsolation(Isolation.Off)` is all-or-nothing. Without it, a single un-isolatable body would force every other benchmark in the suite into the host process.
 
 These rows are labeled in the `Iso` column and are never given a ratio against an isolated row, as the configuration difference between two processes does not vanish just because it was requested.
 
@@ -159,9 +159,9 @@ The engine names every offending benchmark in a suite at once so you can fix all
 To accept labeled host-process measurements - which is reasonable for scratchpad use - turn the requirement off:
 
 ```csharp
-Benchmark.Run(body, new MeasurementOptions { RequireIsolation = false });
-new BenchmarkSuite("s").WithRequireIsolation(false);
-BenchmarkHarness.Create(args).WithRequireIsolation(false);
+Benchmark.Run(body, new MeasurementOptions { Isolation = Isolation.Preferred });
+new BenchmarkSuite("s").WithIsolation(Isolation.Preferred);
+BenchmarkHarness.Create(args).WithIsolation(Isolation.Preferred);
 ```
 
 For more information, see [Isolation internals: captured-state transfer](../deep-dives/isolation-internals.md#captured-state-transfer), which covers the complete set of types that cross, the `[BenchmarkState]` contract, and the `[BenchmarkPlan]` factory rules.
@@ -187,6 +187,6 @@ For more information, see the [CLI reference](../reference/cli.md#isolation).
 For more information, see the following pages:
 
 - [Isolation internals](../deep-dives/isolation-internals.md) - How the engine finds and launches workers, what crosses the wire, and how refusals are classified.
-- [Harness mode](../usage-modes/harness-mode.md#isolatedprocess) - The `[IsolatedProcess]` and `[InProcess]` attributes.
+- [Harness mode](../usage-modes/harness-mode.md#isolatedprocess) - The `[Isolation(Isolation.Required)]` and `[Isolation(Isolation.Off)]` attributes.
 - [Suite mode](../usage-modes/suite-mode.md) - The full `BenchmarkSuite` API.
 - [Samples](../samples.md) - A runnable isolated-runs sample project.

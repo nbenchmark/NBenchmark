@@ -22,7 +22,7 @@ public enum IsolationStatus
 
     /// <summary>
     ///     Measured in the host process because that is what was asked for - <c>--in-process</c>,
-    ///     <c>WithIsolation(false)</c>, <c>[InProcess]</c>, <c>--dry-run</c>, or
+    ///     <c>WithIsolation(Isolation.Off)</c>, <c>[Isolation(Isolation.Off)]</c>, <c>--dry-run</c>, or
     ///     <c>Benchmark.RunInProcess</c>. Nothing was refused; the numbers still inherit the host's
     ///     runtime configuration and are labelled accordingly.
     /// </summary>
@@ -78,7 +78,7 @@ public static class IsolationStatusExtensions
     ///     <para>
     ///         The distinction <see cref="IsIsolated" /> cannot make, and the one every gate and
     ///         warning actually wants. <see cref="IsolationStatus.InProcessRequested" /> is produced by
-    ///         <c>--dry-run</c>, <c>--in-process</c>, <c>WithIsolation(false)</c>, <c>[InProcess]</c>,
+    ///         <c>--dry-run</c>, <c>--in-process</c>, <c>WithIsolation(Isolation.Off)</c>, <c>[Isolation(Isolation.Off)]</c>,
     ///         <c>Benchmark.RunInProcess</c> and the <c>--verify-isolation</c> comparison pass - all of
     ///         which are the user getting exactly what they asked for. Keying on <c>!IsIsolated()</c>
     ///         treats those as failures, which is why <c>--strict-isolation --dry-run</c> fails a build
@@ -129,7 +129,7 @@ public static class IsolationStatusExtensions
             + "rather than needing a value from this process",
         IsolationStatus.InProcessLiveFixture =>
             "instances come from a factory or fixture this process owns; supply a static factory instead "
-            + "- WithServiceProvider(BuildServices), WithOutlierDetector(static () => new …) - so the "
+            + "- WithServices(BuildServices), WithOutlierDetector(static () => new …) - so the "
             + "worker can build an equivalent one itself",
         IsolationStatus.InProcessUnaddressablePlan =>
             "add a [BenchmarkPlan] factory so a worker can build the suite itself",

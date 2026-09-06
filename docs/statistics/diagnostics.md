@@ -79,7 +79,7 @@ All collected counters are available on `BenchmarkResult.Diagnostics` as a `Diag
 | `ExceptionCountPerOp` | `double?` | Exceptions per operation (total exceptions / measurement ops). |
 | `CpuTimeNsPerOp` | `double?` | CPU time per operation in nanoseconds. |
 | `CpuWallRatio` | `double?` | CPU time / wall-clock time (process-wide, can exceed 1.0 on multi-core). |
-| `Mode` | `DiagnosticsMode` | Which counters were collected. |
+| `Collected` | `DiagnosticsOptions` | Which counters were collected. |
 
 All fields are `null` when the corresponding toggle was off, when diagnostics are disabled (`DiagnosticsOptions.None`), or when the run errored.
 
@@ -96,13 +96,13 @@ var result = Benchmark.Run(() => MyMethod(), options: new MeasurementOptions
 
 // Suite mode
 await new BenchmarkSuite("MySuite")
-    .WithDiagnostics(DiagnosticsMode.All)
+    .WithDiagnostics(DiagnosticsOptions.All)
     .Add("MethodA", () => MethodA())
     .RunAsync();
 
 // Harness mode
 BenchmarkHarness.Create(args)
-    .WithDiagnostics(DiagnosticsMode.GcAndCpu)
+    .WithDiagnostics(DiagnosticsOptions.Default with { CpuTime = true })
     .RunAsync();
 ```
 
@@ -175,7 +175,7 @@ The CSV reporter adds diagnostics columns at all detail levels:
 |---|---|
 | Simple | `Gen0`, `Gen1`, `Gen2` |
 | Standard | `Gen0`, `Gen1`, `Gen2` |
-| Advanced | `Gen0`, `Gen1`, `Gen2`, `HeapCommitted`, `HeapFragmented`, `ExceptionPerOp`, `CpuTimeNsPerOp`, `CpuWallRatio`, `DiagnosticsMode` |
+| Advanced | `Gen0`, `Gen1`, `Gen2`, `HeapCommitted`, `HeapFragmented`, `ExceptionPerOp`, `CpuTimeNsPerOp`, `CpuWallRatio`, `Collected` |
 
 Null values render as empty fields, consistent with other optional columns.
 

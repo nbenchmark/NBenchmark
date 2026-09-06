@@ -56,7 +56,7 @@ internal enum InstanceSourceKind
 ///         separate <c>Func&lt;IServiceProvider&gt;</c> whose presence lifted that. Nothing tied them
 ///         together, so the harness could not tell a scoped provider from a plain one, or an
 ///         addressable factory from a live closure, and every DI API that was not exactly
-///         <c>WithServiceProvider(Func&lt;IServiceProvider&gt;)</c> lost the run its isolation.
+///         <c>WithServices(Func&lt;IServiceProvider&gt;)</c> lost the run its isolation.
 ///     </para>
 ///     <para>
 ///         <see cref="Resolve" /> is deliberately a delegate rather than a built object. The host-side
@@ -129,7 +129,7 @@ internal sealed record InstanceSource
                     "benchmark instances come from a service provider, which is live code in this "
                     + "process and cannot be reproduced in a worker. Constructing the type directly "
                     + "instead would measure a differently-configured object and report it as though "
-                    + "nothing had changed. Pass a factory instead - WithServiceProvider(BuildServices) "
+                    + "nothing had changed. Pass a factory instead - WithServices(BuildServices) "
                     + "with a static BuildServices - and the worker builds an equivalent container in "
                     + "the process that measures.",
             };

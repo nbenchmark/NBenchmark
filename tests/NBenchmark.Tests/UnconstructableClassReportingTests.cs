@@ -26,7 +26,7 @@ public class UnconstructableClassReportingTests
             .AddFromAssembly(typeof(UnconstructableClassReportingTests).Assembly)
             .WithCategoryFilter([category])
             .WithLaunchCount(1)
-            .WithIsolation(false);
+            .WithIsolation(Isolation.Off);
     }
 
     /// <summary>

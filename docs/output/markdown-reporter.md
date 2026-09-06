@@ -130,8 +130,8 @@ Percentile columns (such as P95, P99, etc.) are dynamic. They appear only when y
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
-await result.ToMarkdownAsync("results/");
-await result.ToMarkdownAsync("results/", "benchmarks.md");
+await result.SaveMarkdownAsync("results/");
+await result.SaveMarkdownAsync("results/", "benchmarks.md");
 ```
 
 ## CLI usage (BenchmarkHarness)

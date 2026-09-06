@@ -10,7 +10,7 @@ These pages cover capabilities that apply across all usage modes. Most are opt-i
 
 ## Feature overview
 
-- **[Isolated runs](./isolated-runs.md)** - Every mode measures in a clean worker process by default because JIT tiering and GC flavor are fixed at process start. Use `WithIsolation(false)` to opt a suite back into the host process.
+- **[Isolated runs](./isolated-runs.md)** - Every mode measures in a clean worker process by default because JIT tiering and GC flavor are fixed at process start. Use `WithIsolation(Isolation.Off)` to opt a suite back into the host process.
 - **[Categories](./categories.md)** - Tag benchmarks with `[BenchmarkCategory]` to include or exclude groups from a run via CLI flags or the `WithCategoryFilter` API.
 - **[Parameterized benchmarks: Suite mode](./parameterized-suite.md)** - Run a benchmark body across multiple input values using `WithParameter` and typed `Add` lambdas. Each parameter combination produces a separate benchmark entry.
 - **[Parameterized benchmarks: Harness mode](./parameterized-harness.md)** - Run a benchmark body across multiple input values using the `[BenchmarkCase]` and `[BenchmarkCases]` attributes.

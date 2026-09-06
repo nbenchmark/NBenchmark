@@ -34,7 +34,7 @@ public class ObserverOverheadTests
             WarmupIterations = 5,
             Iterations = 30,
             OutlierMode = OutlierMode.IqrFence,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
         // Interleave the null and observed arms across multiple rounds so both sample the
@@ -89,7 +89,7 @@ public class ObserverOverheadTests
             WarmupIterations = 3,
             Iterations = 10,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
         var observer = new RecordingObserver();

@@ -69,7 +69,7 @@ dotnet run -- --priority high --outlier mad --launch-count 3 --autotune-cap-beha
 ```csharp
 await new BenchmarkSuite("fast-feedback")
     .Add("myBenchmark", () => MyMethod())
-    .WithAutoTune(AutoTunePreset.Quick)
+    .WithAutoTune(AutoTuneOptions.Quick)
     .WithWarmup(4)
     .WithIterations(20)
     .WithConfidenceLevel(0.90)
@@ -108,7 +108,7 @@ dotnet run -- --auto-tune quick --warmup 4 --iterations 20 --confidence 0.90
 ```csharp
 await new BenchmarkSuite("publication")
     .Add("myBenchmark", () => MyMethod())
-    .WithAutoTune(AutoTunePreset.Thorough)
+    .WithAutoTune(AutoTuneOptions.Thorough)
     .WithConfidenceLevel(0.99)
     .WithLaunchCount(5)
     .RunAsync();
@@ -180,7 +180,7 @@ dotnet run -- --profile independent
 ```csharp
 await new BenchmarkSuite("debug")
     .Add("myBenchmark", () => MyMethod())
-    .WithDiagnostics(DiagnosticsMode.All)
+    .WithDiagnostics(DiagnosticsOptions.All)
     .WithOutlierMode(OutlierMode.MedianAbsoluteDeviation)
     .WithLaunchCount(5)
     .RunAsync();

@@ -17,7 +17,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 3,
             Iterations = 5,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
         // 2000 ns per sample at K = 2 -> 1000 ns per op.
@@ -47,7 +47,7 @@ public class AdaptiveLoopTests
             WarmupIterations = null, // auto warmup
             Iterations = 10, // explicit measured count
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             // Isolate the plateau rule from the warmup time floor and JIT gate (both covered by
             // dedicated tests): with a scripted 1000 ns/sample body the 100 ms floor would otherwise
             // hold warmup open to MaxWarmup instead of settling on the plateau.
@@ -80,7 +80,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0, // no warmup
             Iterations = null, // auto sample count -> CI detector
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
         // Zero-variance signal -> CI half-width is 0, so the target is met at the first cadence point.
@@ -111,7 +111,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0, // no warmup
             Iterations = null, // auto sample count -> CI detector
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
         // Zero-variance signal: the CI half-width is 0, so the target is met at the first
@@ -144,7 +144,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 1,
             Iterations = 4, // pinned measured count -> no CI detector is constructed
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
         var clock = new ScriptedClock(1000.0);
@@ -170,7 +170,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = 3,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             // Isolate Phase A calibration, and pin the 1 µs target this test's scripted timings assume
             // (the default is now 10 µs).
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false, TargetSampleDurationNs = 1_000 },
@@ -225,7 +225,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = 3,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             // Isolate Phase A; pin the 1 µs target so the short-circuit ratio below is unambiguous.
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false, TargetSampleDurationNs = 1_000 },
         };
@@ -263,7 +263,7 @@ public class AdaptiveLoopTests
             WarmupIterations = null, // auto warmup (recalibration only runs in this path)
             Iterations = 3,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             // 10 µs target; isolate from the warmup time floor / JIT gate so warmup settles on the
             // plateau at 32 samples.
             AutoTune = AutoTuneOptions.Default with
@@ -304,7 +304,7 @@ public class AdaptiveLoopTests
             WarmupIterations = null,
             Iterations = 3,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 EnableJitterCalibration = false,
@@ -341,7 +341,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = 5,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
         var clock = new ScriptedClock(1000.0);
@@ -366,7 +366,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 1, // JIT the body before measuring so allocation deltas are clean
             Iterations = 3,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = true,
+            MeasureAllocations = true,
         };
 
         // 4000 ns per sample at K = 4 -> 1000 ns per op.
@@ -405,7 +405,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = null, // auto -> would otherwise collect at least MinSamples (30)
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 }, // 5000 ns
         };
 
@@ -435,7 +435,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = null, // auto -> CI detector; MinSamples (30) never reached under the cap
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             // Base cap 10000 ns (10 samples), grace ceiling 20000 ns (20 samples). Both below the
             // MinSamples floor of 30, so the grace ceiling is what stops the loop.
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(100), CapGraceFactor = 2.0 },
@@ -467,7 +467,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = null,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             // Base cap 25000 ns (25 samples), grace ceiling 50000 ns. MinSamples (30) sits between
             // them, so grace carries the loop to exactly 30 samples and then stops at the base cap.
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(250), CapGraceFactor = 2.0 },
@@ -495,7 +495,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = null,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(100), CapGraceFactor = 2.0 },
         };
 
@@ -531,7 +531,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = 1_000, // pinned count, far above what the cap allows
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 }, // 5000 ns
         };
 
@@ -565,7 +565,7 @@ public class AdaptiveLoopTests
             WarmupIterations = null, // auto warmup
             Iterations = 0, // measurement phase exits immediately on explicit count
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { MaxTuningTime = TimeSpan.FromTicks(50), CapGraceFactor = 1.0 }, // 5000 ns
         };
 
@@ -596,7 +596,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 2,
             Iterations = 4,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
         };
 
         var clock = new ScriptedClock(1000.0);
@@ -636,7 +636,7 @@ public class AdaptiveLoopTests
             WarmupIterations = null, // auto warmup (skipped if calibration is capped)
             Iterations = 5, // explicit measured count
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 MaxTuningTime = TimeSpan.FromTicks(50), // 5000 ns cap
@@ -675,7 +675,7 @@ public class AdaptiveLoopTests
             WarmupIterations = null, // auto warmup
             Iterations = 0, // measurement exits immediately on explicit count
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 MaxTuningTime = TimeSpan.FromTicks(50), // 5000 ns cap
@@ -707,7 +707,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = null, // auto -> CI detector
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 MinSamples = 4,
@@ -745,7 +745,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = null,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 MinSamples = 4,
@@ -777,7 +777,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = 3,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 JitterCalibrationSamples = 8,
@@ -806,7 +806,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = 3,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
         };
 
@@ -831,7 +831,7 @@ public class AdaptiveLoopTests
             Iterations = 3,
 
             // Leave OutlierMode at the default IqrFence so the auto-switch is eligible.
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 JitterCalibrationSamples = jitterSamples,
@@ -876,7 +876,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = 3,
             OutlierMode = OutlierMode.RemoveTop5Percent, // not IqrFence -> switch is not eligible
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 JitterCalibrationSamples = jitterSamples,
@@ -912,8 +912,8 @@ public class AdaptiveLoopTests
             Iterations = 3,
 
             // Custom detector pinned -> switch is not eligible, even with OutlierMode at default.
-            OutlierDetector = OutlierDetectors.None,
-            MeasureAllocationsOverride = false,
+            OutlierDetector = static () => OutlierDetectors.None,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 JitterCalibrationSamples = jitterSamples,
@@ -945,7 +945,7 @@ public class AdaptiveLoopTests
             OpsPerSample = 1,
             WarmupIterations = 0,
             Iterations = 3,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 JitterCalibrationSamples = jitterSamples,
@@ -979,7 +979,7 @@ public class AdaptiveLoopTests
             OpsPerSample = 1,
             WarmupIterations = 0,
             Iterations = 3,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 JitterCalibrationSamples = jitterSamples,
@@ -1047,7 +1047,7 @@ public class AdaptiveLoopTests
         WarmupIterations = 0, // no warmup, so scripted sample 0 is the first measured sample
         Iterations = null, // auto -> CI detector, so the drift gate is consulted
         OutlierMode = OutlierMode.None,
-        MeasureAllocationsOverride = false,
+        MeasureAllocations = false,
         AutoTune = AutoTuneOptions.Default with
         {
             EnableJitterCalibration = false, // the probe would consume scripted samples
@@ -1161,7 +1161,7 @@ public class AdaptiveLoopTests
         // timings, allocations, and diagnostics are read by shared ordinal downstream (the
         // "outlier coincided with a GC" annotation walks trimmed ordinals into the diagnostics array),
         // so a restart that cleared one list but not the others would silently corrupt that mapping.
-        var options = DriftOptions(restartLimit: 2) with { MeasureAllocationsOverride = true };
+        var options = DriftOptions(restartLimit: 2) with { MeasureAllocations = true };
         options = options with { Diagnostics = new DiagnosticsOptions { GcCollectionCounts = true } };
 
         var result = RunSync(() => { }, options, SteppingClock());
@@ -1185,7 +1185,7 @@ public class AdaptiveLoopTests
             WarmupIterations = null, // auto warmup
             Iterations = 4,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 EnableJitterCalibration = false,
@@ -1215,7 +1215,7 @@ public class AdaptiveLoopTests
             WarmupIterations = null,
             Iterations = 4,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with
             {
                 EnableJitterCalibration = false,
@@ -1246,7 +1246,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = null,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
         };
 
@@ -1271,7 +1271,7 @@ public class AdaptiveLoopTests
             WarmupIterations = 0,
             Iterations = null,
             OutlierMode = OutlierMode.None,
-            MeasureAllocationsOverride = false,
+            MeasureAllocations = false,
             AutoTune = AutoTuneOptions.Default with { EnableJitterCalibration = false },
         };
 

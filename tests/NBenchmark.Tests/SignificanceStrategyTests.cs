@@ -354,7 +354,7 @@ public class SignificanceStrategyTests
         var custom = new FixedSignificanceTest("x", 0.5);
 
         Assert.IsType<DefaultSignificanceTest>(MeasurementOptions.Default.ResolveSignificanceTest());
-        Assert.Same(custom, (MeasurementOptions.Default with { SignificanceTest = custom }).ResolveSignificanceTest());
+        Assert.Same(custom, (MeasurementOptions.Default with { SignificanceTest = () => custom }).ResolveSignificanceTest());
     }
 
     [Fact]

@@ -500,7 +500,7 @@ public sealed record AutoTuneOptions
     }
 
     /// <summary>Resolves a <see cref="AutoTunePreset" /> to its concrete options.</summary>
-    public static AutoTuneOptions FromPreset(AutoTunePreset preset) => preset switch
+    internal static AutoTuneOptions FromPreset(AutoTunePreset preset) => preset switch
     {
         AutoTunePreset.Quick => Quick,
         AutoTunePreset.Thorough => Thorough,

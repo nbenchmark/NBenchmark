@@ -172,51 +172,66 @@ public record MeasurementOptions
     public InterferenceOptions Interference { get; init; } = InterferenceOptions.Default;
 
     /// <summary>
-    ///     The authoritative measurement profile. The resolved booleans
-    ///     (<see cref="ForceGcBeforeEachIteration" />, <see cref="ForceGcBeforeMeasurement" />,
-    ///     <see cref="ForceGcBetweenBenchmarks" />, <see cref="MeasureAllocations" />) derive from
-    ///     this unless an explicit override is set.
+    ///     The authoritative measurement profile. The four nullable GC/allocation settings below
+    ///     derive from this when left <c>null</c>; see <see cref="Resolve" />.
     /// </summary>
     public MeasurementProfile Profile { get; init; } = MeasurementProfile.Realistic;
 
-    /// <summary>Overrides <see cref="ForceGcBeforeEachIteration" />. When <c>null</c>, the value derives from <see cref="Profile" />.</summary>
-    public bool? ForceGcBeforeEachIterationOverride { get; init; }
-
-    /// <summary>Overrides <see cref="ForceGcBeforeMeasurement" />. When <c>null</c>, the value derives from <see cref="Profile" />.</summary>
-    public bool? ForceGcBeforeMeasurementOverride { get; init; }
-
-    /// <summary>Overrides <see cref="ForceGcBetweenBenchmarks" />. When <c>null</c>, the value defaults to <c>true</c>.</summary>
-    public bool? ForceGcBetweenBenchmarksOverride { get; init; }
-
-    /// <summary>Overrides <see cref="MeasureAllocations" />. When <c>null</c>, allocation tracking defaults to <c>true</c>.</summary>
-    public bool? MeasureAllocationsOverride { get; init; }
-
-    /// <summary>Whether a Gen0 GC is forced before each measured iteration. Forced under <see cref="MeasurementProfile.Independent" />, unless overridden.</summary>
-    public bool ForceGcBeforeEachIteration =>
-        ForceGcBeforeEachIterationOverride ?? Profile == MeasurementProfile.Independent;
+    /// <summary>
+    ///     Whether a Gen0 GC is forced before each measured iteration. <c>null</c> - the default -
+    ///     follows <see cref="Profile" />, which forces one under
+    ///     <see cref="MeasurementProfile.Independent" /> and not under
+    ///     <see cref="MeasurementProfile.Realistic" />.
+    /// </summary>
+    /// <remarks>
+    ///     The settable property is the one you can name. These four were once pairs - a resolved
+    ///     <c>bool</c> under the discoverable name and a nullable <c>*Override</c> beside it - so
+    ///     <c>new MeasurementOptions { ForceGcBeforeEachIteration = true }</c> was a compile error
+    ///     pointing at a property whose <c>Override</c> suffix described an internal resolution step
+    ///     the caller had no reason to know about. The resolved value is what a run <i>did</i>, and it
+    ///     is read off <see cref="Resolve" /> or the result, not off the request.
+    /// </remarks>
+    public bool? ForceGcBeforeEachIteration { get; init; }
 
     /// <summary>
     ///     Whether a full GC runs once between warmup and measurement, clearing the warmup heap so
-    ///     it cannot trigger a collection mid-measurement. Forced under
-    ///     <see cref="MeasurementProfile.Independent" />, unless overridden;
+    ///     it cannot trigger a collection mid-measurement. <c>null</c> follows <see cref="Profile" />:
+    ///     forced under <see cref="MeasurementProfile.Independent" />, while
     ///     <see cref="MeasurementProfile.Realistic" /> deliberately inherits the warmup heap to match
     ///     production. Distinct from <see cref="ForceGcBetweenBenchmarks" />, which runs a full GC
     ///     <em>between</em> benchmarks to keep them independent of one another.
     /// </summary>
-    public bool ForceGcBeforeMeasurement =>
-        ForceGcBeforeMeasurementOverride ?? Profile == MeasurementProfile.Independent;
+    public bool? ForceGcBeforeMeasurement { get; init; }
 
     /// <summary>
     ///     Whether a full GC runs between benchmarks so one benchmark's leftover heap cannot bias
     ///     the next (which would make results order-dependent and undermine the significance test's
-    ///     independence assumption). On by default under both profiles, unless overridden.
+    ///     independence assumption). <c>null</c> means on, under both profiles.
     /// </summary>
-    public bool ForceGcBetweenBenchmarks =>
-        ForceGcBetweenBenchmarksOverride ?? true;
+    public bool? ForceGcBetweenBenchmarks { get; init; }
 
-    /// <summary>Whether per-iteration allocations are sampled and reported. On by default under both profiles, unless overridden.</summary>
-    public bool MeasureAllocations =>
-        MeasureAllocationsOverride ?? true;
+    /// <summary>
+    ///     Whether per-iteration allocations are sampled and reported. <c>null</c> means on, under
+    ///     both profiles.
+    /// </summary>
+    public bool? MeasureAllocations { get; init; }
+
+    /// <summary>
+    ///     This request with every profile-derived value resolved to the concrete setting the
+    ///     measurement will use.
+    /// </summary>
+    /// <remarks>
+    ///     The counterpart to the four nullable properties above: they say what was asked for,
+    ///     <c>null</c> included, and this says what that resolves to. Reading the pair off one record
+    ///     is why the resolved names used to need an <c>Override</c>-suffixed twin.
+    /// </remarks>
+    public ResolvedMeasurementOptions Resolve() => new()
+    {
+        ForceGcBeforeEachIteration = ForceGcBeforeEachIteration ?? Profile == MeasurementProfile.Independent,
+        ForceGcBeforeMeasurement = ForceGcBeforeMeasurement ?? Profile == MeasurementProfile.Independent,
+        ForceGcBetweenBenchmarks = ForceGcBetweenBenchmarks ?? true,
+        MeasureAllocations = MeasureAllocations ?? true,
+    };
 
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
@@ -239,29 +254,30 @@ public record MeasurementOptions
     ///     type name that the worker instantiates through its own load context, which works for
     ///     any detector with a parameterless constructor. See <c>NBenchmark.Workers</c>.
     /// </remarks>
-    [JsonIgnore]
-    public IOutlierDetector? OutlierDetector { get; init; }
-
     /// <summary>
-    ///     A factory for <see cref="OutlierDetector" />, which is what lets a detector needing
-    ///     constructor arguments be used in an isolated run.
+    ///     A custom outlier detector, supplied as a factory. When set, it takes precedence over
+    ///     <see cref="OutlierMode" />. Leave <c>null</c> to use the built-in detector for the
+    ///     configured mode.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Sending a type name works only for a detector with a parameterless constructor. Anything
-    ///         configured - <c>new KeepFastestDetector(0.9)</c> - could not be rebuilt in the worker, so
-    ///         the whole group was measured in the host process instead, to avoid the far worse outcome
-    ///         of scoring it under a different statistical method than the caller chose.
+    ///         A factory rather than an instance, because an instance cannot cross a process boundary
+    ///         and a static, non-capturing factory can: the worker runs it and gets the caller's own
+    ///         detector, with its own constructor arguments. There was an instance-typed property here
+    ///         too, and pinning <c>new KeepFastestDetector(0.9)</c> through it cost the whole group its
+    ///         isolation - a constraint the signature said nothing about and the caller only met as a
+    ///         refusal after the fact.
     ///     </para>
+    ///     <code>
+    ///     options with { OutlierDetector = static () => new KeepFastestDetector(0.9) }
+    ///     </code>
     ///     <para>
-    ///         A static, non-capturing factory is addressable, so the worker can run it and get the
-    ///         caller's own detector with its own arguments. Set alongside
-    ///         <see cref="OutlierDetector" /> rather than instead of it: the coordinator still needs a
-    ///         live instance for its own scoring, and the factory is only how the worker obtains one.
+    ///         Excluded from serialization: a delegate has no wire form. It reaches a worker as an
+    ///         address into the run request instead - see <c>NBenchmark.Workers</c>.
     ///     </para>
     /// </remarks>
     [JsonIgnore]
-    public Func<IOutlierDetector>? OutlierDetectorFactory { get; init; }
+    public Func<IOutlierDetector>? OutlierDetector { get; init; }
 
     /// <summary>
     ///     Confidence level for the interval reported on the mean (e.g. 0.95 for 95%).
@@ -418,21 +434,13 @@ public record MeasurementOptions
     public bool EnableSignificance { get; init; } = true;
 
     /// <summary>
-    ///     A custom statistical significance strategy. When set, it takes precedence over the
-    ///     built-in default (Mann-Whitney U for two groups, Kruskal-Wallis for three or
-    ///     more), letting you plug in your own comparison. Leave <c>null</c> to use the
-    ///     default strategy.
+    ///     A custom statistical significance strategy, supplied as a factory. When set, it takes
+    ///     precedence over the built-in default (Mann-Whitney U for two groups, Kruskal-Wallis for
+    ///     three or more). Leave <c>null</c> to use the default strategy.
     /// </summary>
-    /// <remarks>Excluded from serialization for the reason given on <see cref="OutlierDetector" />.</remarks>
+    /// <remarks>A factory for the reason given on <see cref="OutlierDetector" />.</remarks>
     [JsonIgnore]
-    public ISignificanceTest? SignificanceTest { get; init; }
-
-    /// <summary>
-    ///     A factory for <see cref="SignificanceTest" />, for the reason given on
-    ///     <see cref="OutlierDetectorFactory" />.
-    /// </summary>
-    [JsonIgnore]
-    public Func<ISignificanceTest>? SignificanceTestFactory { get; init; }
+    public Func<ISignificanceTest>? SignificanceTest { get; init; }
 
     /// <summary>
     ///     The significance level (alpha) a benchmark's p-value must fall below to be
@@ -564,17 +572,18 @@ public record MeasurementOptions
     public bool SuppressRuntimeProfileWarning { get; init; }
 
     /// <summary>
-    ///     Turns an isolation <b>refusal</b> into a thrown exception rather than a labelled fallback.
-    ///     On by default.
+    ///     Whether to measure in a worker process, and what happens when isolation is refused.
+    ///     Defaults to <see cref="NBenchmark.Isolation.Required" />.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The default is <c>true</c> because the in-process fallback should be something a user asks
-    ///         for, never something that happens to them. It was off while there was a great deal left to
-    ///         refuse - a captured local, a prepared value, a scoped container and a parameter sweep over
-    ///         a non-scalar each cost a run its isolation - and in that world a hard error would have been
-    ///         a wall rather than a signal. Those shapes now cross, so what remains under this gate is a
-    ///         genuinely small set, and every member of it has a remedy that fits on one line.
+    ///         The default is <see cref="NBenchmark.Isolation.Required" /> because the in-process
+    ///         fallback should be something a user asks for, never something that happens to them. It
+    ///         was <see cref="NBenchmark.Isolation.Preferred" /> while there was a great deal left to
+    ///         refuse - a captured local, a prepared value, a scoped container and a parameter sweep
+    ///         over a non-scalar each cost a run its isolation - and in that world a hard error would
+    ///         have been a wall rather than a signal. Those shapes now cross, so what remains under this
+    ///         gate is a genuinely small set, and every member of it has a remedy that fits on one line.
     ///     </para>
     ///     <para>
     ///         A refusal throws, carrying the refusal text, at the point of refusal - and in Harness mode
@@ -583,13 +592,14 @@ public record MeasurementOptions
     ///         cheapest place to fail.
     ///     </para>
     ///     <para>
-    ///         It gates the four refusal statuses only, never <c>!IsIsolated()</c>: <c>--dry-run</c>,
-    ///         <c>--in-process</c>, <c>[InProcess]</c>, <c>Benchmark.RunInProcess</c>,
-    ///         <c>WithIsolation(false)</c> and <c>BenchmarkSuite.AddInProcess</c> all remain legal and
-    ///         produce <see cref="IsolationStatus.InProcessRequested" />. Set this to <c>false</c> to go
-    ///         back to a labelled fallback everywhere - which is still the right setting for the
-    ///         scratchpad use Single mode exists for, where a number measured in this process and clearly
-    ///         stamped beats no number at all.
+    ///         <see cref="NBenchmark.Isolation.Required" /> gates the four refusal statuses only, never
+    ///         <c>!IsIsolated()</c>: <c>--dry-run</c>, <c>--in-process</c>,
+    ///         <c>[Isolation(Isolation.Off)]</c>, <c>Benchmark.RunInProcess</c>,
+    ///         <c>WithIsolation(Isolation.Off)</c> and <c>BenchmarkSuite.AddInProcess</c> all remain
+    ///         legal and produce <see cref="IsolationStatus.InProcessRequested" />. Choose
+    ///         <see cref="NBenchmark.Isolation.Preferred" /> to go back to a labelled fallback
+    ///         everywhere - which is still the right setting for the scratchpad use Single mode exists
+    ///         for, where a number measured in this process and clearly stamped beats no number at all.
     ///     </para>
     ///     <para>
     ///         Excluded from serialization: this is a decision the coordinator makes before a worker
@@ -599,26 +609,34 @@ public record MeasurementOptions
     ///     </para>
     /// </remarks>
     [JsonIgnore]
-    public bool RequireIsolation { get; init; } = true;
+    public Isolation Isolation { get; init; } = Isolation.Required;
+
+    /// <summary>
+    ///     Whether an isolation refusal is fatal. The engine asks this question in a dozen places and
+    ///     only ever cares about the one enum value, so it is spelled once here rather than compared
+    ///     inline everywhere.
+    /// </summary>
+    internal bool RequiresIsolation => Isolation == Isolation.Required;
+
+    /// <summary>Whether the caller asked to measure in the host process.</summary>
+    internal bool IsolationOff => Isolation == Isolation.Off;
 
     /// <summary>Creates options for the specified <paramref name="profile" />.</summary>
     public static MeasurementOptions For(MeasurementProfile profile) => new() { Profile = profile };
 
     /// <summary>
-    ///     Resolves the effective outlier detector: the custom
-    ///     <see cref="OutlierDetector" /> when supplied, otherwise the built-in detector for
-    ///     the configured <see cref="OutlierMode" />.
+    ///     Resolves the effective outlier detector: the one <see cref="OutlierDetector" /> builds when
+    ///     supplied, otherwise the built-in detector for the configured <see cref="OutlierMode" />.
     /// </summary>
     public IOutlierDetector ResolveOutlierDetector() =>
-        OutlierDetector ?? OutlierDetectors.ForMode(OutlierMode);
+        OutlierDetector?.Invoke() ?? OutlierDetectors.ForMode(OutlierMode);
 
     /// <summary>
-    ///     Resolves the effective significance test: the custom
-    ///     <see cref="SignificanceTest" /> when supplied, otherwise
-    ///     <see cref="DefaultSignificanceTest" />.
+    ///     Resolves the effective significance test: the one <see cref="SignificanceTest" /> builds
+    ///     when supplied, otherwise <see cref="DefaultSignificanceTest" />.
     /// </summary>
     public ISignificanceTest ResolveSignificanceTest() =>
-        SignificanceTest ?? DefaultSignificanceTest.Instance;
+        SignificanceTest?.Invoke() ?? DefaultSignificanceTest.Instance;
 
     internal static IReadOnlyList<double> NormalizePercentiles(IReadOnlyList<double> values)
     {

@@ -26,7 +26,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--launch-count", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -50,7 +50,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithReporter(explicitReporter)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -70,7 +70,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--launch-count", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -92,7 +92,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--launch-count", "1"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -118,7 +118,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
                 .WithReporter(explicitInstance)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 
@@ -144,7 +144,7 @@ public class BenchmarkHarnessAutoAttachReporterTests : IDisposable
             await BenchmarkHarness.Create(["--filter", "TestBenchmarks.*", "--launch-count", "2"])
                 .AddFromAssembly<TestBenchmarks>()
                 .WithRunOrder(RunOrder.Declaration)
-                .WithIsolation(false)
+                .WithIsolation(Isolation.Off)
                 .RunAsync();
         });
 

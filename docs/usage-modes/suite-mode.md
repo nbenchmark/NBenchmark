@@ -115,16 +115,16 @@ await new BenchmarkSuite("name")
     .WithLaunchCount(3)             // Repeats each benchmark 3 times as separate launches (default: 1)
     .WithAllocations()              // Enables allocation tracking
     .WithOutlierMode(OutlierMode.IqrFence)   // Default outlier mode
-    .WithOutlierDetector(new MyDetector())   // Uses a custom IOutlierDetector (overrides WithOutlierMode)
+    .WithOutlierDetector(static () => new MyDetector())   // Uses a custom IOutlierDetector (overrides WithOutlierMode)
     .WithConfidenceLevel(0.99)      // Default: 0.95
     .WithSignificanceLevel(0.05)    // Sets alpha for the significance test; default: 0.05
     .WithSignificance(false)        // Disables significance testing
-    .WithSignificanceTest(new MyTest())   // Uses a custom ISignificanceTest
+    .WithSignificanceTest(static () => new MyTest())   // Uses a custom ISignificanceTest
     .WithRunOrder(RunOrder.Declaration)   // Default: RunOrder.Random
     .WithSeed(1234)                 // Pins the shuffle seed for a reproducible order
     .WithSuiteSetup(() => { })      // Runs once before all benchmarks
     .WithSuiteTeardown(() => { })   // Runs once after all benchmarks
-    .WithIsolation(false)           // Measures in the host process; the default is a worker
+    .WithIsolation(Isolation.Off)           // Measures in the host process; the default is a worker
     .WithReporter(new ConsoleReporter())
     .WithReporter(new MarkdownReporter("results/"))
     .WithProgress(new ConsoleBenchmarkProgress())
@@ -146,8 +146,8 @@ await new BenchmarkSuite("latency")
     .Add("a", RunA)
     .Add("b", RunB)
     .Add("c", RunC)
-    .WithOutlierDetector(new KeepFastestDetector(0.90))   // Custom trimming
-    .WithSignificanceTest(new MedianRatioSignificanceTest(25))   // Custom significance rule
+    .WithOutlierDetector(static () => new KeepFastestDetector(0.90))   // Custom trimming
+    .WithSignificanceTest(static () => new MedianRatioSignificanceTest(25))   // Custom significance rule
     .RunAsync();
 ```
 
@@ -203,7 +203,7 @@ The whole suite shares one worker, which keeps every ratio between its benchmark
 
 - **`AddInProcess(name, body)`**: Measures one benchmark in the host process while the rest of the suite stays in a worker. Use this when a single body holds an object that cannot cross process boundaries, such as a live handle or a warm cache.
 
-- **`WithIsolation(false)`**: Opts the entire suite into the host process.
+- **`WithIsolation(Isolation.Off)`**: Opts the entire suite into the host process.
 
 If a benchmark requires a worker but cannot have one, NBenchmark fails the run rather than quietly falling back to a host-process measurement. For a list of what cannot cross process boundaries and the corresponding remedies, see [Isolated runs](../features/isolated-runs.md#when-isolation-is-refused).
 

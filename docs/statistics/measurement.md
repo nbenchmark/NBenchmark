@@ -203,16 +203,16 @@ You can override specific behaviors individually:
 
 ```csharp
 // Enable per-iteration GC under Realistic
-options with { ForceGcBeforeEachIterationOverride = true }
+options with { ForceGcBeforeEachIteration = true }
 
 // Inherit the warmup heap under Independent (skip the pre-measurement GC)
-options with { ForceGcBeforeMeasurementOverride = false }
+options with { ForceGcBeforeMeasurement = false }
 
 // Disable allocation tracking (both profiles)
-options with { MeasureAllocationsOverride = false }
+options with { MeasureAllocations = false }
 
 // Disable the between-benchmark GC (both profiles)
-options with { ForceGcBetweenBenchmarksOverride = false }
+options with { ForceGcBetweenBenchmarks = false }
 ```
 
 CLI equivalents:

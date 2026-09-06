@@ -36,7 +36,7 @@ public class PairedRatioReportingTests
         };
 
         var table = BenchmarkTable.Build(results);
-        var candidate = table.Rows.Single(r => r.Name == "Candidate");
+        var candidate = table.Rows.Single(r => r.Result.Name == "Candidate");
 
         Assert.NotNull(candidate.RatioEstimate);
         Assert.Equal(3, candidate.RatioEstimate.Replicates);
@@ -60,7 +60,7 @@ public class PairedRatioReportingTests
             Result("Candidate", [130, 90, 100]),
         };
 
-        var candidate = BenchmarkTable.Build(results).Rows.Single(r => r.Name == "Candidate");
+        var candidate = BenchmarkTable.Build(results).Rows.Single(r => r.Result.Name == "Candidate");
 
         Assert.NotNull(candidate.RatioEstimate);
         Assert.True(candidate.RatioEstimate.IncludesUnity);
@@ -76,7 +76,7 @@ public class PairedRatioReportingTests
             Result("Candidate", [150, 150, 150]),
         };
 
-        Assert.Null(BenchmarkTable.Build(results).Rows.Single(r => r.Name == "Baseline").RatioEstimate);
+        Assert.Null(BenchmarkTable.Build(results).Rows.Single(r => r.Result.Name == "Baseline").RatioEstimate);
     }
 
     /// <summary>
@@ -92,7 +92,7 @@ public class PairedRatioReportingTests
             Result("Candidate", [150]) with { LaunchStatistics = null, Median = 150 },
         };
 
-        var candidate = BenchmarkTable.Build(results).Rows.Single(r => r.Name == "Candidate");
+        var candidate = BenchmarkTable.Build(results).Rows.Single(r => r.Result.Name == "Candidate");
 
         Assert.Null(candidate.RatioEstimate);
         Assert.Equal(1.5, candidate.Ratio, 6);
@@ -116,7 +116,7 @@ public class PairedRatioReportingTests
             },
         };
 
-        var candidate = BenchmarkTable.Build(results).Rows.Single(r => r.Name == "Candidate");
+        var candidate = BenchmarkTable.Build(results).Rows.Single(r => r.Result.Name == "Candidate");
 
         Assert.True(candidate.RatioSuppressed);
         Assert.Null(candidate.RatioEstimate);
@@ -183,7 +183,7 @@ public class PairedRatioReportingTests
             Result("Candidate", [130, 90, 100]),
         };
 
-        var candidate = BenchmarkTable.Build(results).Rows.Single(r => r.Name == "Candidate");
+        var candidate = BenchmarkTable.Build(results).Rows.Single(r => r.Result.Name == "Candidate");
         var block = BenchmarkTable.RenderStatsBlock(candidate, ReportDetail.Advanced);
 
         Assert.Contains("Ratio:", block);

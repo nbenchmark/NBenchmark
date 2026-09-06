@@ -49,7 +49,7 @@ internal static class InlineSuitePlan
         /// <summary>
         ///     R5 part 2: benchmarks demoted to run in this process instead of costing the whole suite
         ///     its isolation, each with why. Only <see cref="TryAddressWithDemotion" /> ever populates
-        ///     this - demotion is not a promise <see cref="MeasurementOptions.RequireIsolation" /> makes,
+        ///     this - demotion is not a promise <see cref="MeasurementOptions.Isolation" /> makes,
         ///     so it only happens when isolation is best-effort.
         /// </summary>
         public IReadOnlyDictionary<string, string> DemotedNames { get; init; } = new Dictionary<string, string>();
@@ -86,12 +86,12 @@ internal static class InlineSuitePlan
                 + "worker constructs it the same way you did.");
         }
 
-        // Demotion is additive and opt-in by construction: RequireIsolation promises every benchmark
+        // Demotion is additive and opt-in by construction: Isolation.Required promises every benchmark
         // isolates or the run is refused, and demoting only the offenders would quietly break that
         // promise instead of honouring it loudly. The strict path below is untouched by R5 part 2 -
         // same single pass, same all-or-nothing refusal, so a suite that already depends on that
         // guarantee sees no change at all.
-        return options.RequireIsolation
+        return options.RequiresIsolation
             ? TryAddressStrict(benchmarks, options, suiteSetup, suiteTeardown)
             : TryAddressWithDemotion(benchmarks, options, suiteSetup, suiteTeardown);
     }
@@ -99,7 +99,7 @@ internal static class InlineSuitePlan
     /// <summary>
     ///     Today's all-or-nothing addressing, unchanged: every benchmark has to cross or the whole
     ///     suite is refused. What <see cref="TryAddress" /> uses under
-    ///     <see cref="MeasurementOptions.RequireIsolation" />.
+    ///     <see cref="MeasurementOptions.Isolation" />.
     /// </summary>
     private static Decision TryAddressStrict(
         IReadOnlyList<BenchmarkEnvelope> benchmarks,
@@ -218,7 +218,7 @@ internal static class InlineSuitePlan
     ///     R5 part 2: addresses what can be addressed, and demotes only the benchmarks that cannot -
     ///     rather than costing the whole suite its isolation - by repeating the addressing pass with
     ///     the offenders excluded until a pass finds none. What <see cref="TryAddress" /> uses when
-    ///     <see cref="MeasurementOptions.RequireIsolation" /> is off.
+    ///     <see cref="MeasurementOptions.Isolation" /> is off.
     /// </summary>
     /// <remarks>
     ///     <para>

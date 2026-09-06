@@ -69,7 +69,7 @@ This maintains the `PerClass` lifetime, suppresses the independence warning, and
 
 ## Lifetime resolution for container-resolved classes
 
-If a `PerClass` class's instances are provided by a factory or service container (via `WithInstanceFactory`, `WithServiceProvider`, `WithScopedServiceProvider`, or `UseScopedDependencyInjection`) and the class implements neither `IStateReset` nor `[SharedState]`, the engine resolves the lifetime to **PerMethod**. Each `[Benchmark]` method receives a fresh instance and, under scoped DI, its own `IServiceScope`. The affected results include a warning:
+If a `PerClass` class's instances are provided by a factory or service container (via `WithInstanceFactory`, `WithServices`, `WithScopedServices`, or `WithScopedServices`) and the class implements neither `IStateReset` nor `[SharedState]`, the engine resolves the lifetime to **PerMethod**. Each `[Benchmark]` method receives a fresh instance and, under scoped DI, its own `IServiceScope`. The affected results include a warning:
 
 > Class 'OrderBenchmarks' declares InstanceLifetime.PerClass and its instances come from a factory or service container, so one instance - and, under scoped DI, one scope and everything it holds - would be shared by every [Benchmark] method. It is measured with a fresh instance per method instead, because the significance test assumes the methods are independent. Implement IStateReset to keep PerClass and reset between methods, or add [SharedState] to declare that the carry-over is deliberate.
 
@@ -106,7 +106,7 @@ For more information, see the [analyzers reference](../reference/analyzers.md#nb
 
 For more information, see the following pages:
 
-- [Dependency injection](./dependency-injection.md) - `WithScopedServiceProvider`, `WithServiceProvider`, and the `PerClass` sharing warning.
+- [Dependency injection](./dependency-injection.md) - `WithScopedServices`, `WithServices`, and the `PerClass` sharing warning.
 - [Analyzers reference](../reference/analyzers.md) - NB0011 (PerClass with scoped service) and NB0013 (PerClass with mutable field).
 - [Configuration reference](../reference/configuration.md) - `SuppressPerClassIndependenceWarning` and `MeasurementOptions`.
 - [Deep dive: Instance lifetime resolution](../deep-dives/instance-lifetime-resolution.md) - How the engine determines how long an instance lives and how that decision is propagated.

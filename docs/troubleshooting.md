@@ -20,7 +20,7 @@ If the entry assembly is built in `Debug` configuration or a debugger is attache
 ### Large error (wide confidence interval)
 
 > [!CAUTION] Pick one based on the cause
-> - **Demand a tighter target:** Use `.WithAutoTune(AutoTunePreset.Thorough)` or `--ci-target 0.01`.
+> - **Demand a tighter target:** Use `.WithAutoTune(AutoTuneOptions.Thorough)` or `--ci-target 0.01`.
 > - **Raise the sample ceiling:** Use `--max-samples <n>` and `--max-tuning-time <s>` if the loop stops at a cap.
 > - **Reduce OS scheduling noise:** Use `.WithOutlierMode(OutlierMode.IqrFence)` (the default).
 > - **Stabilize a hot laptop:** Use `--warmup 50` to let the CPU stabilize and ensure the laptop is plugged in.
@@ -216,7 +216,7 @@ For more information, see [Dependency Injection](./features/dependency-injection
 > - **Build the value in the worker** with a prepare delegate: `Benchmark.Run(prepare: () => BuildIt(), body: v => Use(v))`, or `BenchmarkSuite.Over(name, () => BuildIt())` in Suite mode.
 > - **Mark your own type `[BenchmarkState]`** if its measured behavior is fully determined by its serialized contents.
 > - **Use `AddInProcess(name, body)`** to keep a specific benchmark in the host process while others run in a worker.
-> - **Use `WithRequireIsolation(false)`** to accept a labeled host-process measurement.
+> - **Use `WithIsolation(Isolation.Preferred)`** to accept a labeled host-process measurement.
 
 `RequireIsolation` defaults to `true`. A benchmark that requires a worker but cannot be sent to one fails the run.
 

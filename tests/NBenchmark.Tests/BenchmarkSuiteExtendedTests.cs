@@ -8,7 +8,7 @@ public class BenchmarkSuiteExtendedTests
     [Fact]
     public async Task RunAsync_With_Async_Benchmarks()
     {
-        var results = await new BenchmarkSuite("async-suite").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("async-suite").WithIsolation(Isolation.Preferred)
             .Add("async-fast", async () => { await Task.Yield(); })
             .WithWarmup(1)
             .WithIterations(5)
@@ -22,7 +22,7 @@ public class BenchmarkSuiteExtendedTests
     [Fact]
     public async Task RunAsync_With_Generic_Func_Benchmark()
     {
-        var results = await new BenchmarkSuite("generic-suite").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("generic-suite").WithIsolation(Isolation.Preferred)
             .Add("returns-value", () => 42)
             .WithWarmup(1)
             .WithIterations(5)
@@ -36,7 +36,7 @@ public class BenchmarkSuiteExtendedTests
     [Fact]
     public async Task RunAsync_With_Generic_Async_Benchmark()
     {
-        var results = await new BenchmarkSuite("generic-async-suite").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("generic-async-suite").WithIsolation(Isolation.Preferred)
             .Add("async-returns-value", async () =>
             {
                 await Task.Yield();
@@ -54,7 +54,7 @@ public class BenchmarkSuiteExtendedTests
     [Fact]
     public async Task RunAsync_With_Memory_Enabled()
     {
-        var results = await new BenchmarkSuite("memory-suite").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("memory-suite").WithIsolation(Isolation.Preferred)
             .Add("alloc", () => { _ = new byte[1024]; })
             .WithWarmup(1)
             .WithIterations(10)
@@ -70,7 +70,7 @@ public class BenchmarkSuiteExtendedTests
     [Fact]
     public async Task RunAsync_With_ConfidenceLevel()
     {
-        var results = await new BenchmarkSuite("confidence-suite").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("confidence-suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => Thread.SpinWait(100))
             .WithWarmup(1)
             .WithIterations(10)
@@ -88,7 +88,7 @@ public class BenchmarkSuiteExtendedTests
         var setupCount = 0;
         var teardownCount = 0;
 
-        var results = await new BenchmarkSuite("lifecycle").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("lifecycle").WithIsolation(Isolation.Preferred)
             .Add("work", () => Thread.SpinWait(100))
             .WithSuiteSetup(() => Interlocked.Increment(ref setupCount))
             .WithSuiteTeardown(() => Interlocked.Increment(ref teardownCount))
@@ -108,7 +108,7 @@ public class BenchmarkSuiteExtendedTests
         var setupCount = 0;
         var teardownCount = 0;
 
-        var results = await new BenchmarkSuite("iter-lifecycle").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("iter-lifecycle").WithIsolation(Isolation.Preferred)
             .Add("work", () => Thread.SpinWait(100),
                 () => Interlocked.Increment(ref setupCount),
                 () => Interlocked.Increment(ref teardownCount))
@@ -127,7 +127,7 @@ public class BenchmarkSuiteExtendedTests
     {
         var reported = false;
 
-        var results = await new BenchmarkSuite("reporter-suite").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("reporter-suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => { })
             .WithWarmup(1)
             .WithIterations(2)
@@ -143,7 +143,7 @@ public class BenchmarkSuiteExtendedTests
     {
         var stub = new StubReporter(_ => { });
 
-        var results = await new BenchmarkSuite("detail-suite").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("detail-suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => Thread.SpinWait(100))
             .WithWarmup(1)
             .WithIterations(2)
@@ -161,7 +161,7 @@ public class BenchmarkSuiteExtendedTests
     {
         var stub = new StubReporter(_ => { });
 
-        var results = await new BenchmarkSuite("detail-order-suite").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("detail-order-suite").WithIsolation(Isolation.Preferred)
             .Add("a", () => Thread.SpinWait(100))
             .WithWarmup(1)
             .WithIterations(2)
@@ -177,7 +177,7 @@ public class BenchmarkSuiteExtendedTests
     [Fact]
     public async Task RunAsync_With_Significance_Disabled()
     {
-        var results = await new BenchmarkSuite("no-sig").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("no-sig").WithIsolation(Isolation.Preferred)
             .Add("baseline", () => Thread.SpinWait(500))
             .Add("other", () => Thread.SpinWait(1000))
             .WithBaseline("baseline")
@@ -194,7 +194,7 @@ public class BenchmarkSuiteExtendedTests
     [Fact]
     public async Task RunAsync_With_Declaration_RunOrder_Preserves_Order()
     {
-        var results = await new BenchmarkSuite("ordered").WithRequireIsolation(false)
+        var results = await new BenchmarkSuite("ordered").WithIsolation(Isolation.Preferred)
             .Add("first", () => Thread.SpinWait(100))
             .Add("second", () => Thread.SpinWait(100))
             .WithWarmup(1)

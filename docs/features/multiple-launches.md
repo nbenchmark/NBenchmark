@@ -75,7 +75,7 @@ public class MyBenchmarks
 ```
 
 > [!NOTE]
-> An isolated group takes the maximum launch count. NBenchmark spawns one set of workers per isolated group, using the highest launch count any member requested. Consequently, raising the count for one method also raises it for every benchmark measured alongside it. Use `[IsolatedProcess]` to confine extra launches to a single method.
+> An isolated group takes the maximum launch count. NBenchmark spawns one set of workers per isolated group, using the highest launch count any member requested. Consequently, raising the count for one method also raises it for every benchmark measured alongside it. Use `[Isolation(Isolation.Required)]` to confine extra launches to a single method.
 
 ## Reading the reproducibility warning
 

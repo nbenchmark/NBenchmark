@@ -91,10 +91,6 @@ internal static class TestSources
                                         {
                                             public bool Intentional { get; init; } = true;
                                         }
-                                        [System.AttributeUsage(System.AttributeTargets.Method | System.AttributeTargets.Class)]
-                                        public sealed class InProcessAttribute : System.Attribute {}
-                                        [System.AttributeUsage(System.AttributeTargets.Method | System.AttributeTargets.Class)]
-                                        public sealed class IsolatedProcessAttribute : System.Attribute {}
                                     }
                                     namespace NBenchmark
                                     {

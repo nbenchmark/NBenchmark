@@ -19,7 +19,7 @@ namespace NBenchmark.Worker;
 ///     <para>
 ///         The types are resolved through the <b>target's</b> load context, which is where they
 ///         certainly are: a run reaches this code only because the user called
-///         <c>WithScopedServiceProvider</c>, so their benchmark project references the package by
+///         <c>WithScopedServices</c>, so their benchmark project references the package by
 ///         construction. This is the same resolution route custom statistical strategies already take.
 ///     </para>
 ///     <para>

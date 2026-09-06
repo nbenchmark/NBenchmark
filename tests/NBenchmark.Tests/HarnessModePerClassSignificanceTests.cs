@@ -24,7 +24,7 @@ public class HarnessModePerClassSignificanceTests
                 WarmupIterations = 0,
                 OutlierMode = OutlierMode.None,
             })
-            .WithIsolation();
+            .WithIsolation(Isolation.Required);
 
         using (FakeWorkerLauncher.Install(SimulateWorkerGroup))
         {
@@ -79,7 +79,7 @@ public class HarnessModePerClassSignificanceTests
                 WarmupIterations = 0,
                 OutlierMode = OutlierMode.None,
             })
-            .WithIsolation()
+            .WithIsolation(Isolation.Required)
             .WithCrossClassSignificance();
 
         using (FakeWorkerLauncher.Install(SimulateWorkerGroup))

@@ -86,7 +86,7 @@ internal static class RuntimeProfileEnvironment
 
         // Scoped to "benchmarks measured in this process", not to the whole run. This method is
         // only reached from an in-process measurement, so in an otherwise-isolated Harness run it
-        // fires for the [InProcess] benchmarks alone - claiming the run was unprofiled would be
+        // fires for the [Isolation(Isolation.Off)] benchmarks alone - claiming the run was unprofiled would be
         // wrong. Kept short deliberately: a wall of text on every run trains people to skip it.
         Console.Error.WriteLine(
             $"Runtime profile: benchmarks measured in this process could not use the "
@@ -104,7 +104,7 @@ internal static class RuntimeProfileEnvironment
             "  In-process numbers are materially less trustworthy: on benchmarks of provably "
             + "identical cost they spanned 3.27x and fabricated a 2.80x difference, each reported "
             + "with a tight confidence interval. Every mode isolates by default, so check for an "
-            + "explicit --in-process or WithIsolation(false), and otherwise read the per-benchmark "
+            + "explicit --in-process or WithIsolation(Isolation.Off), and otherwise read the per-benchmark "
             + "reason on the affected results. To accept the host's configuration, set "
             + $"RuntimeProfile.Host - or {SuppressWarningEnvVar}=1 to silence this without changing "
             + "the profile.");

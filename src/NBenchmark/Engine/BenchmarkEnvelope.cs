@@ -77,8 +77,8 @@ internal sealed record BenchmarkEnvelope(
     /// </summary>
     /// <remarks>
     ///     A request, not a refusal - so it stamps <see cref="IsolationStatus.InProcessRequested" /> and
-    ///     never trips <see cref="MeasurementOptions.RequireIsolation" />. It exists because
-    ///     <c>WithIsolation(false)</c> was the only lever and it is all-or-nothing: one body holding a
+    ///     never trips <see cref="MeasurementOptions.Isolation" />. It exists because
+    ///     <c>WithIsolation(Isolation.Off)</c> was the only lever and it is all-or-nothing: one body holding a
     ///     live object took every other benchmark in the suite into the host process with it, so the
     ///     price of measuring one un-isolatable thing was every comparison it was part of.
     /// </remarks>

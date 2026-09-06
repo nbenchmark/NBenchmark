@@ -69,9 +69,9 @@ Single mode benchmarks provide extension methods to emit reports directly from t
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
 
-await result.ToMarkdownAsync("results/");
-await result.ToCsvAsync("results/");
-await result.ToJsonAsync("results/");
+await result.SaveMarkdownAsync("results/");
+await result.SaveCsvAsync("results/");
+await result.SaveJsonAsync("results/");
 ```
 
 ## Available reporters

@@ -207,8 +207,8 @@ The `detail` and `profile` fields in the envelope report the active detail level
 
 ```csharp
 var result = Benchmark.Run(() => MyMethod());
-await result.ToJsonAsync("results/");
-await result.ToJsonAsync("results/", "benchmarks.json");
+await result.SaveJsonAsync("results/");
+await result.SaveJsonAsync("results/", "benchmarks.json");
 ```
 
 ## CLI usage (BenchmarkHarness)

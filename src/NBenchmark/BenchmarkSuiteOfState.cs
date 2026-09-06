@@ -205,7 +205,7 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         => Chain(() => base.WithSuiteTeardown(teardown));
 
     /// <inheritdoc cref="BenchmarkSuite.WithIsolation" />
-    public new BenchmarkSuite<TState> WithIsolation(bool enabled = true) => Chain(() => base.WithIsolation(enabled));
+    public new BenchmarkSuite<TState> WithIsolation(Isolation isolation) => Chain(() => base.WithIsolation(isolation));
 
     // --- The rest of the base's fluent surface ---
     //
@@ -222,10 +222,6 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithAutoTune(AutoTuneOptions autoTune)
         => Chain(() => base.WithAutoTune(autoTune));
-
-    /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithAutoTune(AutoTunePreset preset)
-        => Chain(() => base.WithAutoTune(preset));
 
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithCategories(params string[] categories)
@@ -246,10 +242,6 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithDiagnostics(DiagnosticsOptions diagnostics)
         => Chain(() => base.WithDiagnostics(diagnostics));
-
-    /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithDiagnostics(DiagnosticsMode mode)
-        => Chain(() => base.WithDiagnostics(mode));
 
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithDriftCanary(DriftCanaryOptions driftCanary)
@@ -284,20 +276,12 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
         => Chain(() => base.WithObserver(observer));
 
     /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithOutlierDetector(IOutlierDetector detector)
-        => Chain(() => base.WithOutlierDetector(detector));
-
-    /// <inheritdoc />
     public new BenchmarkSuite<TState> WithOutlierDetector(Func<IOutlierDetector> factory)
         => Chain(() => base.WithOutlierDetector(factory));
 
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithProcessPriority(ProcessPriorityClass priority)
         => Chain(() => base.WithProcessPriority(priority));
-
-    /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithRequireIsolation(bool required = true)
-        => Chain(() => base.WithRequireIsolation(required));
 
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithRuntimes(params RuntimeMoniker[] runtimes)
@@ -310,10 +294,6 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithSignificanceLevel(double level)
         => Chain(() => base.WithSignificanceLevel(level));
-
-    /// <inheritdoc />
-    public new BenchmarkSuite<TState> WithSignificanceTest(ISignificanceTest test)
-        => Chain(() => base.WithSignificanceTest(test));
 
     /// <inheritdoc />
     public new BenchmarkSuite<TState> WithSignificanceTest(Func<ISignificanceTest> factory)

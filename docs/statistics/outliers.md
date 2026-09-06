@@ -186,10 +186,10 @@ Register your detector through `MeasurementOptions.OutlierDetector`, the suite b
 
 ```csharp
 // Suite mode
-.WithOutlierDetector(new KeepFastestDetector(0.90))
+.WithOutlierDetector(static () => new KeepFastestDetector(0.90))
 
 // Single / Harness mode
-new MeasurementOptions { OutlierDetector = new KeepFastestDetector(0.90) }
+new MeasurementOptions { OutlierDetector = static () => new KeepFastestDetector(0.90) }
 ```
 
 A custom `OutlierDetector` takes priority over `OutlierMode`.

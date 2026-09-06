@@ -59,13 +59,13 @@ public sealed class SuitePlanIsolationTests : IDisposable
     ///     factory is addressed by token and the isolated tests must keep measuring the unmodified one.
     /// </summary>
     private static BenchmarkSuite BuildComparisonAcceptingFallback() =>
-        BuildComparison().WithRequireIsolation(false);
+        BuildComparison().WithIsolation(Isolation.Preferred);
 
     /// <summary>A factory whose suite carries a custom strategy object that could never be serialized.</summary>
     private static BenchmarkSuite BuildWithLiveStrategy() =>
         Fast(new BenchmarkSuite("plan-live-strategy")
             .Add("only", () => Thread.SpinWait(200))
-            .WithOutlierDetector(new ProbeDetector(sentinel: 4242)));
+            .WithOutlierDetector(static () => new ProbeDetector(sentinel: 4242)));
 
     /// <summary>A factory whose suite asks for replicates.</summary>
     private static BenchmarkSuite BuildReplicated() =>
@@ -188,7 +188,7 @@ public sealed class SuitePlanIsolationTests : IDisposable
             // only reachable with the gate down. The gate itself is covered by RequiredIsolationTests.
             results = await BenchmarkSuite.RunPlanAsync(
                 () => Fast(new BenchmarkSuite("captured").Add("only", () => Thread.SpinWait(spins)))
-                    .WithRequireIsolation(false));
+                    .WithIsolation(Isolation.Preferred));
         }
         finally
         {

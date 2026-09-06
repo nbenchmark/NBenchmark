@@ -55,13 +55,13 @@ var result = Benchmark.Run(() =>
 });
 
 result.Print();
-await result.PrintAsync();
+await result.PrintTableAsync();
 ```
 
 Key observations:
 
 - The plain-text output from `result.Print()` (core package only).
-- The Spectre.Console table from `result.PrintAsync()` (requires `NBenchmark.Reporters.Console`).
+- The Spectre.Console table from `result.PrintTableAsync()` (requires `NBenchmark.Reporters.Console`).
 - The 95% CI line in the plain-text output.
 
 ---
@@ -174,7 +174,7 @@ using NBenchmark.DependencyInjection;
 // Pass the container as a factory instead of a built provider.
 // This allows the worker to rebuild the container and ensures the run remains isolated.
 await BenchmarkHarness.Create(args)
-    .UseDependencyInjection<DependencyInjectionBenchmarks>(BuildServices)
+    .AddFromAssembly<DependencyInjectionBenchmarks>().WithServices(BuildServices)
     .WithReporter(new ConsoleReporter())
     .WithProgress(new ConsoleBenchmarkProgress())
     .RunAsync();
@@ -235,8 +235,8 @@ await new BenchmarkSuite("hashing-custom")
     .Add("sha1", () => SHA1.HashData(payload))
     .Add("md5", () => MD5.HashData(payload))
     .WithBaseline("md5")
-    .WithOutlierDetector(new KeepFastestDetector(0.90))
-    .WithSignificanceTest(new MedianRatioSignificanceTest(thresholdPercent: 25))
+    .WithOutlierDetector(static () => new KeepFastestDetector(0.90))
+    .WithSignificanceTest(static () => new MedianRatioSignificanceTest(thresholdPercent: 25))
     .WithReporter(new ConsoleReporter())
     .RunAsync();
 ```

@@ -12,6 +12,16 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
 
     public ReportDetail Detail { get; set; } = detail;
 
+    /// <summary>
+    ///     The path of the file the last <see cref="ReportAsync" /> wrote.
+    /// </summary>
+    /// <remarks>
+    ///     Internal: the extension methods that wrap this reporter for a single result return the path
+    ///     they wrote, and the name is generated inside <see cref="ReportAsync" /> from a timestamp and
+    ///     a counter, so it cannot be predicted from outside.
+    /// </remarks>
+    internal string? LastWrittenPath { get; private set; }
+
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         CancellationToken cancellationToken = default)
@@ -22,6 +32,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                        ?? $"benchmark-results-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Interlocked.Increment(ref _fileCounter):D3}.csv";
 
         var filePath = Path.Combine(_outputDirectory, fileName);
+        LastWrittenPath = filePath;
 
         var sb = new StringBuilder();
         var detail = Detail.ToString().ToLowerInvariant();
@@ -31,7 +42,7 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
 
         var percentileCols = tables
             .SelectMany(t => t.Rows)
-            .SelectMany(r => r.Percentiles)
+            .SelectMany(r => r.Result.Percentiles)
             .Select(e => e.Percentile)
             .Where(p => p > 0.50 && p < 1.0)
             .Distinct()
@@ -75,17 +86,17 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                 _ => "",
             };
 
-            var safeClassName = row.ClassName.Replace("\"", "\"\"");
-            var safeName = row.Name.Replace("\"", "\"\"");
+            var safeClassName = row.Result.ClassName.Replace("\"", "\"\"");
+            var safeName = row.Result.Name.Replace("\"", "\"\"");
             var safeSig = sig.Replace("\"", "\"\"");
-            var safeEffectMetric = (row.Effect?.Metric ?? string.Empty).Replace("\"", "\"\"");
-            var safeMagnitude = (row.Effect?.Magnitude ?? string.Empty).Replace("\"", "\"\"");
+            var safeEffectMetric = (row.Result.Effect?.Metric ?? string.Empty).Replace("\"", "\"\"");
+            var safeMagnitude = (row.Result.Effect?.Magnitude ?? string.Empty).Replace("\"", "\"\"");
 
             // Where the row was measured. Present at every detail level, because a CSV-driven
             // dashboard had no way at all to tell a clean-room row from a host one - JSON carries the
             // whole record and Markdown renders a column, but CSV emitted neither, so the one format
             // built for automated trend-tracking was the one that could silently plot the two together.
-            var safeIsolation = row.IsolationStatus.ToLabel().Replace("\"", "\"\"");
+            var safeIsolation = row.Result.IsolationStatus.ToLabel().Replace("\"", "\"\"");
 
             var percentileValues = string.Join(",", percentileCols
                 .Select(p => row.GetPercentile(p)?.ToString("F1") ?? ""));
@@ -94,17 +105,17 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
 
             var commonData = $"\"{safeClassName}\"," +
                              $"\"{safeName}\"," +
-                             $"{row.Median:F1}";
+                             $"{row.Result.Median:F1}";
 
             if (Detail == ReportDetail.Simple)
             {
-                var simpleDiag = row.Diagnostics;
+                var simpleDiag = row.Result.Diagnostics;
 
                 sb.AppendLine(
-                    $"{commonData},{row.OperationsPerSecond:F1}," +
+                    $"{commonData},{row.Result.OperationsPerSecond:F1}," +
                     $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
                     $"\"{safeSig}\"," +
-                    $"{row.MeanAllocatedBytes?.ToString() ?? "null"}," +
+                    $"{row.Result.MeanAllocatedBytes?.ToString() ?? "null"}," +
                     $"{simpleDiag?.Gen0Collections?.ToString() ?? ""}," +
                     $"{simpleDiag?.Gen1Collections?.ToString() ?? ""}," +
                     $"{simpleDiag?.Gen2Collections?.ToString() ?? ""}," +
@@ -112,23 +123,23 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     $"{detail}," +
                     $"{profile}," +
                     $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\"," +
-                    $"{(row.ThreadControlEnabled ? "true" : "false")}," +
-                    $"{(row.InterferenceFilterEnabled ? "true" : "false")}," +
+                    $"{(row.Result.ThreadControlEnabled ? "true" : "false")}," +
+                    $"{(row.Result.InterferenceFilterEnabled ? "true" : "false")}," +
                     $"\"{safeIsolation}\"");
             }
             else
             {
-                var diag = row.Diagnostics;
+                var diag = row.Result.Diagnostics;
                 var diagCols = $"{diag?.Gen0Collections?.ToString() ?? ""},{diag?.Gen1Collections?.ToString() ?? ""},{diag?.Gen2Collections?.ToString() ?? ""}";
 
-                var fullData = $"{commonData},{row.Mean:F1},{row.OperationsPerSecond:F1}{percentileData}," +
-                               $"{row.StandardDeviation:F1}," +
-                               $"{row.StandardError:F1}," +
-                               $"{row.MarginOfError:F1}," +
-                               $"{row.ConfidenceIntervalLower:F1}," +
-                               $"{row.ConfidenceIntervalUpper:F1}," +
+                var fullData = $"{commonData},{row.Result.Mean:F1},{row.Result.OperationsPerSecond:F1}{percentileData}," +
+                               $"{row.Result.StandardDeviation:F1}," +
+                               $"{row.Result.StandardError:F1}," +
+                               $"{row.Result.MarginOfError:F1}," +
+                               $"{row.Result.ConfidenceIntervalLower:F1}," +
+                               $"{row.Result.ConfidenceIntervalUpper:F1}," +
                                $"{table.ConfidenceLevel:F2}," +
-                               $"{row.CoefficientOfVariation:F4}," +
+                               $"{row.Result.CoefficientOfVariation:F4}," +
                                $"{(double.IsNaN(row.Ratio) ? "null" : $"{row.Ratio:F2}")}," +
 
                                // Empty rather than null when the run had a single launch: there is no
@@ -139,30 +150,30 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                                $"{row.RatioEstimate?.Replicates.ToString() ?? ""}," +
                                $"\"{safeSig}\"," +
                                $"\"{safeEffectMetric}\"," +
-                               $"{row.Effect?.Value?.ToString("F4") ?? ""}," +
+                               $"{row.Result.Effect?.Value?.ToString("F4") ?? ""}," +
                                $"\"{safeMagnitude}\"," +
-                               $"{row.MeanAllocatedBytes?.ToString() ?? "null"}," +
+                               $"{row.Result.MeanAllocatedBytes?.ToString() ?? "null"}," +
                                $"{diagCols}," +
-                               $"{row.MarginPercent:F2}," +
-                               $"{row.OutliersRemoved}," +
+                               $"{row.Result.MarginPercent:F2}," +
+                               $"{row.Result.OutliersRemoved}," +
                                $"{ReportFormat.SchemaVersion},{ReportFormat.MeasurementEpoch}," +
                                $"{detail}," +
                                $"{profile}," +
                                $"{table.RuntimeProfileName},\"{table.RuntimeKnobs}\"," +
-                               $"{(row.ThreadControlEnabled ? "true" : "false")}," +
-                               $"{(row.InterferenceFilterEnabled ? "true" : "false")}";
+                               $"{(row.Result.ThreadControlEnabled ? "true" : "false")}," +
+                               $"{(row.Result.InterferenceFilterEnabled ? "true" : "false")}";
 
                 if (Detail == ReportDetail.Standard)
                     sb.AppendLine($"{fullData},\"{safeIsolation}\"");
                 else
                 {
-                    var lowerFence = row.LowerFence?.ToString("F1") ?? "";
-                    var upperFence = row.UpperFence?.ToString("F1") ?? "";
-                    var allocMedian = row.AllocMedian?.ToString() ?? "";
-                    var allocP95 = row.AllocP95?.ToString() ?? "";
-                    var allocMax = row.AllocMax?.ToString() ?? "";
+                    var lowerFence = row.Result.LowerFence?.ToString("F1") ?? "";
+                    var upperFence = row.Result.UpperFence?.ToString("F1") ?? "";
+                    var allocMedian = row.Result.AllocMedian?.ToString() ?? "";
+                    var allocP95 = row.Result.AllocP95?.ToString() ?? "";
+                    var allocMax = row.Result.AllocMax?.ToString() ?? "";
 
-                    var autoTune = row.AutoTune;
+                    var autoTune = row.Result.AutoTune;
                     var atWarmup = autoTune?.ResolvedWarmup.ToString() ?? "";
                     var atSamples = autoTune?.ResolvedSamples.ToString() ?? "";
                     var atOps = autoTune?.OpsPerSample.ToString() ?? "";
@@ -180,32 +191,32 @@ public sealed class CsvReporter(string outputDirectory = ".", string? name = nul
                     var atWarmupFloorMet = autoTune is null ? "" : autoTune.WarmupTimeFloorMet ? "true" : "false";
                     var atWarmupJitMethods = autoTune?.WarmupJitCompiledMethods.ToString() ?? "";
 
-                    var safeCategories = string.Join("; ", row.Categories).Replace("\"", "\"\"");
-                    var advancedDiag = row.Diagnostics;
+                    var safeCategories = string.Join("; ", row.Result.Categories).Replace("\"", "\"\"");
+                    var advancedDiag = row.Result.Diagnostics;
                     var heapCommitted = advancedDiag?.HeapCommittedBytes?.ToString() ?? "";
                     var heapFragmented = advancedDiag?.HeapFragmentedBytes?.ToString() ?? "";
                     var excPerOp = advancedDiag?.ExceptionCountPerOp?.ToString("F4") ?? "";
                     var cpuNs = advancedDiag?.CpuTimeNsPerOp?.ToString("F1") ?? "";
                     var cpuRatio = advancedDiag?.CpuWallRatio?.ToString("F4") ?? "";
-                    var diagMode = (advancedDiag?.Mode.ToString() ?? "").Replace("\"", "\"\"");
+                    var diagMode = (advancedDiag?.Collected.ToMode().ToString() ?? "").Replace("\"", "\"\"");
 
                     sb.AppendLine(
                         $"{fullData}," +
-                        $"{row.Q1:F1}," +
-                        $"{row.Q3:F1}," +
-                        $"{row.InterquartileRange:F1}," +
+                        $"{row.Result.Q1:F1}," +
+                        $"{row.Result.Q3:F1}," +
+                        $"{row.Result.InterquartileRange:F1}," +
                         $"\"{lowerFence}\"," +
                         $"\"{upperFence}\"," +
-                        $"{row.Range:F1}," +
-                        $"{row.N}," +
-                        $"{row.Skewness:F4}," +
-                        $"{row.Kurtosis:F4}," +
-                        $"{row.Mad:F1}," +
+                        $"{row.Result.Range:F1}," +
+                        $"{row.Result.N}," +
+                        $"{row.Result.Skewness:F4}," +
+                        $"{row.Result.Kurtosis:F4}," +
+                        $"{row.Result.Mad:F1}," +
                         $"{allocMedian}," +
                         $"{allocP95}," +
                         $"{allocMax}," +
-                        $"{row.StandardErrorPercent:F2}," +
-                        $"{row.CoefficientOfVariationPercent:F2}," +
+                        $"{row.Result.StandardErrorPercent:F2}," +
+                        $"{row.Result.CoefficientOfVariationPercent:F2}," +
                         $"{table.WarmupIterations}," +
                         $"{atWarmup}," +
                         $"{atSamples}," +

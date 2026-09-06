@@ -9,7 +9,7 @@ public sealed record BenchmarkTable
 {
     /// <summary>
     ///     When set by the harness, <see cref="BuildPerClass" /> returns a single combined table
-    ///     with a <see cref="BenchmarkRow.ClassName" /> column instead of one table per class.
+    ///     with a <see cref="BenchmarkResult.ClassName" /> column instead of one table per class.
     ///     The harness sets this before calling reporters and clears it after.
     /// </summary>
     /// <remarks>
@@ -21,13 +21,23 @@ public sealed record BenchmarkTable
 
     /// <summary>
     ///     <c>true</c> when this table combines benchmarks from more than one class, so
-    ///     <see cref="BenchmarkRow.ClassName" /> distinguishes the rows and reporters should render
+    ///     <see cref="BenchmarkResult.ClassName" /> distinguishes the rows and reporters should render
     ///     it as a column.
     /// </summary>
     public bool CrossClass { get; init; }
 
     public required IReadOnlyList<BenchmarkRow> Rows { get; init; }
-    public required string RunAtUtc { get; init; }
+    /// <summary>
+    ///     When the run this table summarises started. <c>null</c> for an empty table, which has no
+    ///     run behind it to date.
+    /// </summary>
+    /// <remarks>
+    ///     Was a preformatted <c>string</c>, which meant the same name carried a different type on
+    ///     sibling records - <see cref="BenchmarkResult.RunAtUtc" /> is the instant - and every
+    ///     consumer that wanted to sort, compare or reformat had to parse the table's own rendering
+    ///     back out. Reporters format it; the model carries the value.
+    /// </remarks>
+    public required DateTimeOffset? RunAtUtc { get; init; }
     public required int WarmupIterations { get; init; }
     public required int MeasuredIterations { get; init; }
     public required double ConfidenceLevel { get; init; }
@@ -56,7 +66,7 @@ public sealed record BenchmarkTable
 
     /// <summary>
     ///     <c>true</c> when the rows in this table were not all measured under the same runtime
-    ///     profile - for example a class combining <c>[InProcess]</c> benchmarks with isolated
+    ///     profile - for example a class combining <c>[Isolation(Isolation.Off)]</c> benchmarks with isolated
     ///     ones. Their numbers are not comparable with each other, and reporters must say so:
     ///     the profile difference alone was measured to move a value by roughly 3.3x, which is far
     ///     larger than most effects anyone is looking for.
@@ -312,7 +322,7 @@ public sealed record BenchmarkTable
             Rows = rows,
             CrossClass = CrossClassMode,
             ParameterNames = parameterNames,
-            RunAtUtc = headerSource?.RunAtUtc.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
+            RunAtUtc = headerSource?.RunAtUtc,
             WarmupIterations = headerSource?.WarmupIterations ?? 0,
             MeasuredIterations = headerSource?.MeasuredIterations ?? 0,
             ConfidenceLevel = headerSource?.ConfidenceLevel ?? 0.95,
@@ -368,69 +378,13 @@ public sealed record BenchmarkTable
 
         return new BenchmarkRow
         {
-            Name = result.Name,
-            ClassName = result.ClassName,
-            Description = result.Description,
-            Median = result.Median,
-            Mean = result.Mean,
-            OperationsPerSecond = result.OperationsPerSecond,
-            MedianOperationsPerSecond = result.MedianOperationsPerSecond,
-            MarginOfError = result.MarginOfError,
-            StandardDeviation = result.StandardDeviation,
-            StandardError = result.StandardError,
-            CoefficientOfVariation = result.CoefficientOfVariation,
-            Percentiles = result.Percentiles,
-            Histogram = result.Histogram,
-            RawSamples = result.RawSamples,
-            TrimmedOrdinals = result.TrimmedOrdinals,
+            Result = result,
+            BaseName = ComputeBaseName(result),
             Ratio = ratio?.Value ?? (comparable && !mixedGroup ? ComputeRatio(result, baseline) : double.NaN),
             RatioEstimate = ratio,
             RatioSuppressed = mixedGroup,
-            IsolationStatus = result.IsolationStatus,
-            RuntimeProfileName = result.RuntimeProfileName,
-            ThreadControlEnabled = result.ThreadControlEnabled,
-            InterferenceFilterEnabled = result.InterferenceFilterEnabled,
-            IsBaseline = comparable && (isBaselineOverride ?? result.IsBaseline),
-            Errored = result.Errored,
-            ErrorMessage = result.ErrorMessage,
-            MeanAllocatedBytes = result.MeanAllocatedBytes,
-            ConfidenceIntervalLower = result.ConfidenceIntervalLower,
-            ConfidenceIntervalUpper = result.ConfidenceIntervalUpper,
             SignificanceLabel = ComputeSignificanceLabel(result, multiBenchmark),
-            LaunchBlockedVerdict = result.LaunchBlockedVerdict,
-            Effect = result.Effect,
-            Warnings = result.Warnings,
-            Q1 = result.Q1,
-            Q3 = result.Q3,
-            InterquartileRange = result.InterquartileRange,
-            LowerFence = result.LowerFence,
-            UpperFence = result.UpperFence,
-            OutliersRemoved = result.OutliersRemoved,
-            N = result.N,
-            Skewness = result.Skewness,
-            Kurtosis = result.Kurtosis,
-            Mad = result.Mad,
-            MedianCiLower = result.MedianCiLower,
-            MedianCiUpper = result.MedianCiUpper,
-            MedianShift = result.MedianShift,
-            AllocMedian = result.AllocMedian,
-            AllocP95 = result.AllocP95,
-            AllocMax = result.AllocMax,
-            Range = result.Range,
-            Min = result.Min,
-            Max = result.Max,
-            WarmupIterations = result.WarmupIterations,
-            ConfidenceLevel = result.ConfidenceLevel,
-            StandardErrorPercent = result.StandardErrorPercent,
-            MarginPercent = result.MarginPercent,
-            CoefficientOfVariationPercent = result.CoefficientOfVariationPercent,
-            AutoTune = result.AutoTune,
-            LaunchStatistics = result.LaunchStatistics,
-            Diagnostics = result.Diagnostics,
-            Categories = result.Categories,
-            ParameterSet = result.ParameterSet,
-            BaseName = ComputeBaseName(result),
-            RuntimeMoniker = result.RuntimeMoniker,
+            IsBaseline = comparable && (isBaselineOverride ?? result.IsBaseline),
         };
     }
 
@@ -488,42 +442,42 @@ public sealed record BenchmarkTable
 
         var lines = new List<string>();
 
-        lines.Add($"Iterations: {row.N} measured (warmup: {row.WarmupIterations}, pre-trim: {row.N + row.OutliersRemoved})");
+        lines.Add($"Iterations: {row.Result.N} measured (warmup: {row.Result.WarmupIterations}, pre-trim: {row.Result.N + row.Result.OutliersRemoved})");
 
-        if (row.OutliersRemoved > 0)
+        if (row.Result.OutliersRemoved > 0)
         {
-            var label = row.OutliersRemoved == 1 ? "outlier" : "outliers";
-            lines.Add($"Outliers: {row.OutliersRemoved} {label} removed");
+            var label = row.Result.OutliersRemoved == 1 ? "outlier" : "outliers";
+            lines.Add($"Outliers: {row.Result.OutliersRemoved} {label} removed");
         }
 
-        lines.Add($"Range: {BenchmarkFormatter.FormatNs(row.Range)} ({BenchmarkFormatter.FormatNs(row.Min)} -> {BenchmarkFormatter.FormatNs(row.Max)})");
+        lines.Add($"Range: {BenchmarkFormatter.FormatNs(row.Result.Range)} ({BenchmarkFormatter.FormatNs(row.Result.Min)} -> {BenchmarkFormatter.FormatNs(row.Result.Max)})");
 
         lines.Add(
-            $"Quartiles: Q1 = {BenchmarkFormatter.FormatNs(row.Q1)}, Q3 = {BenchmarkFormatter.FormatNs(row.Q3)}, IQR = {BenchmarkFormatter.FormatNs(row.InterquartileRange)}");
+            $"Quartiles: Q1 = {BenchmarkFormatter.FormatNs(row.Result.Q1)}, Q3 = {BenchmarkFormatter.FormatNs(row.Result.Q3)}, IQR = {BenchmarkFormatter.FormatNs(row.Result.InterquartileRange)}");
 
-        if (row.LowerFence is not null && row.UpperFence is not null)
-            lines.Add($"Fences: [{BenchmarkFormatter.FormatNs(row.LowerFence.Value)}; {BenchmarkFormatter.FormatNs(row.UpperFence.Value)}]");
+        if (row.Result.LowerFence is not null && row.Result.UpperFence is not null)
+            lines.Add($"Fences: [{BenchmarkFormatter.FormatNs(row.Result.LowerFence.Value)}; {BenchmarkFormatter.FormatNs(row.Result.UpperFence.Value)}]");
 
         lines.Add(
-            $"CI: [{BenchmarkFormatter.FormatNs(row.ConfidenceIntervalLower)}; {BenchmarkFormatter.FormatNs(row.ConfidenceIntervalUpper)}] (CI {row.ConfidenceLevel * 100:F1}%)");
+            $"CI: [{BenchmarkFormatter.FormatNs(row.Result.ConfidenceIntervalLower)}; {BenchmarkFormatter.FormatNs(row.Result.ConfidenceIntervalUpper)}] (CI {row.Result.ConfidenceLevel * 100:F1}%)");
 
-        if (row.MedianCiLower is { } medianLower && row.MedianCiUpper is { } medianUpper)
+        if (row.Result.MedianCiLower is { } medianLower && row.Result.MedianCiUpper is { } medianUpper)
         {
             // With more than one launch this interval is the between-launch reproducibility
             // interval (the Student-t band over the k launch medians); with one launch it is the
             // within-launch distribution-free interval the single process measured. The label
             // says which, so the number is not read as one kind of interval when it is the other.
-            var betweenLaunch = row.LaunchStatistics is { LaunchCount: > 1 };
+            var betweenLaunch = row.Result.LaunchStatistics is { LaunchCount: > 1 };
             var source = betweenLaunch
-                ? $"between-launch over {row.LaunchStatistics!.LaunchCount} launches"
+                ? $"between-launch over {row.Result.LaunchStatistics!.LaunchCount} launches"
                 : "distribution-free";
 
             lines.Add(
                 $"Median CI: [{BenchmarkFormatter.FormatNs(medianLower)}; {BenchmarkFormatter.FormatNs(medianUpper)}] "
-                + $"({source}, CI {row.ConfidenceLevel * 100:F1}%)");
+                + $"({source}, CI {row.Result.ConfidenceLevel * 100:F1}%)");
         }
 
-        lines.Add($"Margin: ±{BenchmarkFormatter.FormatNs(row.MarginOfError)} ({row.MarginPercent:F2}% of Mean)");
+        lines.Add($"Margin: ±{BenchmarkFormatter.FormatNs(row.Result.MarginOfError)} ({row.Result.MarginPercent:F2}% of Mean)");
 
         if (row.RatioEstimate is { } ratio)
         {
@@ -540,30 +494,30 @@ public sealed record BenchmarkTable
                 + $"(paired across {ratio.Replicates} launches, CI {ratio.ConfidenceLevel * 100:F1}%){verdict}");
         }
 
-        if (row.LaunchBlockedVerdict != SignificanceVerdict.NotTested)
+        if (row.Result.LaunchBlockedVerdict != SignificanceVerdict.NotTested)
         {
             // The formal significance companion to the ratio line above: the paired per-launch
             // Student-t at the run's significance level, reported beside the pooled verdict so a
             // reproducibility-only difference is named as such rather than read as a code change.
             // A ✓ here means the launches reproduce the difference; a ✗ means they do not, however
             // significant the pooled test called it.
-            var label = row.LaunchBlockedVerdict == SignificanceVerdict.Significant ? "✓" : "✗";
+            var label = row.Result.LaunchBlockedVerdict == SignificanceVerdict.Significant ? "✓" : "✗";
             lines.Add($"Launch verdict: {label} (paired per-launch Student-t)");
         }
 
-        lines.Add($"CV: {row.CoefficientOfVariation:F4} ({row.CoefficientOfVariationPercent:F2}%)");
+        lines.Add($"CV: {row.Result.CoefficientOfVariation:F4} ({row.Result.CoefficientOfVariationPercent:F2}%)");
 
-        var skewSuffix = row.N < 3 ? " (n too small)" : "";
-        lines.Add($"Skewness: {row.Skewness:F4}{skewSuffix}");
+        var skewSuffix = row.Result.N < 3 ? " (n too small)" : "";
+        lines.Add($"Skewness: {row.Result.Skewness:F4}{skewSuffix}");
 
-        var kurtSuffix = row.N < 4 ? " (n too small)" : "";
-        lines.Add($"Kurtosis: {row.Kurtosis:F4}{kurtSuffix}");
+        var kurtSuffix = row.Result.N < 4 ? " (n too small)" : "";
+        lines.Add($"Kurtosis: {row.Result.Kurtosis:F4}{kurtSuffix}");
 
-        lines.Add($"MAD: {BenchmarkFormatter.FormatNs(row.Mad)}");
+        lines.Add($"MAD: {BenchmarkFormatter.FormatNs(row.Result.Mad)}");
 
-        if (row.Percentiles.Count > 0)
+        if (row.Result.Percentiles.Count > 0)
         {
-            var parts = row.Percentiles.Select(e =>
+            var parts = row.Result.Percentiles.Select(e =>
             {
                 var label = e.Percentile >= 1.0 ? "Max" : $"P{FormatPercentileKey(e.Percentile)}";
                 return $"{label} = {BenchmarkFormatter.FormatNs(e.Value)}";
@@ -578,7 +532,7 @@ public sealed record BenchmarkTable
             }
         }
 
-        if (row.Effect is { } effect && string.Equals(effect.Metric, EffectMetrics.CliffsDelta, StringComparison.Ordinal))
+        if (row.Result.Effect is { } effect && string.Equals(effect.Metric, EffectMetrics.CliffsDelta, StringComparison.Ordinal))
         {
             var magnitudeText = effect.Magnitude ?? "?";
             var deltaText = effect.Value.HasValue ? effect.Value.Value.ToString("F4") : "?";
@@ -592,27 +546,27 @@ public sealed record BenchmarkTable
 
             lines.Add($"Cliff's \u03b4: {deltaText} ({magnitudeText}) \u2014 candidate tends to be {directionText}");
         }
-        else if (row.Effect is { } genericEffect)
+        else if (row.Result.Effect is { } genericEffect)
         {
             var valueText = genericEffect.Value.HasValue ? genericEffect.Value.Value.ToString("F4") : "?";
             var magnitudeText = string.IsNullOrWhiteSpace(genericEffect.Magnitude) ? "?" : genericEffect.Magnitude;
             lines.Add($"Effect ({genericEffect.Metric}): {valueText} ({magnitudeText})");
         }
 
-        if (row.MedianShift is { } shift)
+        if (row.Result.MedianShift is { } shift)
             lines.Add($"Median shift (Hodges-Lehmann): {FormatShift(shift)}");
 
-        if (row.AllocMedian is not null)
+        if (row.Result.AllocMedian is not null)
         {
             lines.Add("");
             lines.Add("Allocations:");
-            lines.Add($"  Mean: {BenchmarkFormatter.FormatAlloc(row.MeanAllocatedBytes ?? 0)}");
-            lines.Add($"  P50:  {BenchmarkFormatter.FormatAlloc(row.AllocMedian.Value)}");
-            lines.Add($"  P95:  {BenchmarkFormatter.FormatAlloc(row.AllocP95 ?? 0)}");
-            lines.Add($"  Max:  {BenchmarkFormatter.FormatAlloc(row.AllocMax ?? 0)}");
+            lines.Add($"  Mean: {BenchmarkFormatter.FormatAlloc(row.Result.MeanAllocatedBytes ?? 0)}");
+            lines.Add($"  P50:  {BenchmarkFormatter.FormatAlloc(row.Result.AllocMedian.Value)}");
+            lines.Add($"  P95:  {BenchmarkFormatter.FormatAlloc(row.Result.AllocP95 ?? 0)}");
+            lines.Add($"  Max:  {BenchmarkFormatter.FormatAlloc(row.Result.AllocMax ?? 0)}");
         }
 
-        if (row.Diagnostics is { } diag)
+        if (row.Result.Diagnostics is { } diag)
         {
             lines.Add("");
             lines.Add("Diagnostics:");
@@ -707,46 +661,31 @@ public sealed record BenchmarkTable
     }
 }
 
+/// <summary>
+///     One benchmark's place in a comparison: the measurement itself, plus everything that only
+///     means something relative to the table's baseline.
+/// </summary>
+/// <remarks>
+///     Composition rather than a parallel copy. This record once restated 58 of
+///     <see cref="BenchmarkResult" />'s properties by name, which made a reporter author learn two
+///     sixty-property DTOs whose relationship was written down nowhere, and made every new metric a
+///     change in two places that could silently disagree. The five properties below are the ones a
+///     row genuinely adds; everything else is read through <see cref="Result" />.
+/// </remarks>
 public record BenchmarkRow
 {
-    public required string Name { get; init; }
-    public string ClassName { get; init; } = "";
+    /// <summary>The measurement this row presents.</summary>
+    public required BenchmarkResult Result { get; init; }
 
     /// <summary>
     ///     The benchmark name with any parameter suffix removed (e.g. <c>Sort</c> for
-    ///     <c>Sort(size=10)</c>). Equal to <see cref="Name" /> for non-parameterised benchmarks.
-    ///     Reporters show this in the Benchmark column while parameter values appear as columns.
+    ///     <c>Sort(size=10)</c>). Equal to <see cref="BenchmarkResult.Name" /> for non-parameterised
+    ///     benchmarks. Reporters show this in the Benchmark column while parameter values appear as
+    ///     columns.
     /// </summary>
     public string BaseName { get; init; } = "";
 
-    /// <summary>The parameter set for this row; empty for non-parameterised benchmarks.</summary>
-    public IReadOnlyList<BenchmarkParameter> ParameterSet { get; init; } = [];
-
-    public string? Description { get; init; }
-    public required double Median { get; init; }
-    public required double Mean { get; init; }
-    public required double OperationsPerSecond { get; init; }
-    public required double MedianOperationsPerSecond { get; init; }
-    public required double MarginOfError { get; init; }
-    public required double StandardDeviation { get; init; }
-    public required double StandardError { get; init; }
-    public required double CoefficientOfVariation { get; init; }
-    public required IReadOnlyList<PercentileEntry> Percentiles { get; init; }
-    public LatencyHistogram? Histogram { get; init; }
-
-    /// <summary>
-    ///     The raw per-op nanoseconds of every measured sample, in sample order, before outlier
-    ///     trimming. Empty for dry-run, errored, or calibration-derived results. Used by the
-    ///     Console reporter's density sparkline.
-    /// </summary>
-    public IReadOnlyList<double> RawSamples { get; init; } = [];
-
-    /// <summary>
-    ///     Ordinals (zero-based positions in <see cref="RawSamples" />) of every sample the
-    ///     outlier detector discarded. Used by the Console reporter to mark trimmed samples.
-    /// </summary>
-    public IReadOnlyList<int> TrimmedOrdinals { get; init; } = [];
-
+    /// <summary>This row's median over the baseline's; <c>NaN</c> when there is no comparison.</summary>
     public required double Ratio { get; init; }
 
     /// <summary>
@@ -767,101 +706,17 @@ public record BenchmarkRow
     /// </remarks>
     public bool RatioSuppressed { get; init; }
 
-    /// <summary>Where this row was measured, and if it was not isolated, why not.</summary>
-    public IsolationStatus IsolationStatus { get; init; } = IsolationStatus.InProcessRequested;
-
-    /// <summary>The runtime profile the measuring process was launched under.</summary>
-    public string RuntimeProfileName { get; init; } = RuntimeProfile.Host.Name;
-
-    /// <summary>
-    ///     Whether thread-level environment control was enabled for this row's measurement. See
-    ///     <see cref="BenchmarkResult.ThreadControlEnabled" /> for the full semantics. Surfaced as a
-    ///     CSV column so a trend consumer can group or filter on the setting.
-    /// </summary>
-    public bool ThreadControlEnabled { get; init; } = true;
-
-    /// <summary>
-    ///     Whether the evidence-based interference rejection filter was enabled for this row's
-    ///     measurement. See <see cref="BenchmarkResult.InterferenceFilterEnabled" /> for the full
-    ///     semantics. Surfaced as a CSV column so a trend consumer can group or filter on the
-    ///     setting.
-    /// </summary>
-    public bool InterferenceFilterEnabled { get; init; } = true;
-
-    public required bool IsBaseline { get; init; }
-    public required bool Errored { get; init; }
-    public string? ErrorMessage { get; init; }
-    public required double ConfidenceIntervalLower { get; init; }
-    public required double ConfidenceIntervalUpper { get; init; }
-    public long? MeanAllocatedBytes { get; init; }
+    /// <summary>The pooled significance verdict rendered for this row; empty when not tested.</summary>
     public string SignificanceLabel { get; init; } = "";
 
     /// <summary>
-    ///     The launch-blocked verdict (paired per-launch Student-t) reported alongside the pooled
-    ///     <see cref="SignificanceLabel" />. <see cref="SignificanceVerdict.NotTested" /> for the
-    ///     baseline, single-benchmark tables, single-launch runs, or when significance did not run.
+    ///     Whether this row is the table's baseline. Not simply
+    ///     <see cref="BenchmarkResult.IsBaseline" />: a result that declared itself the baseline is
+    ///     only the baseline of a table that actually compares against it, so a non-comparable table
+    ///     and a per-parameter partition both re-decide this.
     /// </summary>
-    public SignificanceVerdict LaunchBlockedVerdict { get; init; } = SignificanceVerdict.NotTested;
+    public required bool IsBaseline { get; init; }
 
-    public EffectSize? Effect { get; init; }
-    public IReadOnlyList<string> Warnings { get; init; } = [];
-
-    /// <summary>
-    ///     Cross-launch summary when the benchmark was run with a launch count above one.
-    ///     <c>null</c> for single-launch runs. Reporters can display this to explain
-    ///     between-launch variance.
-    /// </summary>
-    public LaunchStatistics? LaunchStatistics { get; init; }
-
-    public required double Q1 { get; init; }
-    public required double Q3 { get; init; }
-    public required double InterquartileRange { get; init; }
-    public double? LowerFence { get; init; }
-    public double? UpperFence { get; init; }
-    public required int OutliersRemoved { get; init; }
-    public required int N { get; init; }
-    public required double Skewness { get; init; }
-    public required double Kurtosis { get; init; }
-    public required double Mad { get; init; }
-
-    /// <summary>Lower/upper bounds of the distribution-free median confidence interval; <c>null</c> when undefined.</summary>
-    public double? MedianCiLower { get; init; }
-
-    public double? MedianCiUpper { get; init; }
-
-    /// <summary>The Hodges-Lehmann shift versus the baseline with its CI; <c>null</c> for the baseline or when not tested.</summary>
-    public ShiftEstimate? MedianShift { get; init; }
-
-    public long? AllocMedian { get; init; }
-    public long? AllocP95 { get; init; }
-    public long? AllocMax { get; init; }
-
-    public required double Range { get; init; }
-    public required double Min { get; init; }
-    public required double Max { get; init; }
-    public int WarmupIterations { get; init; }
-    public double ConfidenceLevel { get; init; }
-    public required double StandardErrorPercent { get; init; }
-    public required double MarginPercent { get; init; }
-    public required double CoefficientOfVariationPercent { get; init; }
-    public AutoTuneDiagnostic? AutoTune { get; init; }
-    public DiagnosticsResult? Diagnostics { get; init; }
-    public IReadOnlyList<string> Categories { get; init; } = [];
-
-    /// <summary>
-    ///     The target framework moniker (e.g. "net8.0", "net9.0") under which this
-    ///     benchmark was executed. Empty for single-runtime runs.
-    /// </summary>
-    public string RuntimeMoniker { get; init; } = "";
-
-    public double? GetPercentile(double p)
-    {
-        foreach (var e in Percentiles)
-        {
-            if (Math.Abs(e.Percentile - p) < 1e-9)
-                return e.Value;
-        }
-
-        return null;
-    }
+    /// <inheritdoc cref="BenchmarkResult.GetPercentile" />
+    public double? GetPercentile(double p) => Result.GetPercentile(p);
 }
