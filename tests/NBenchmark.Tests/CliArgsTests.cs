@@ -1303,10 +1303,14 @@ public class CliArgsTests
     [Fact]
     public void ParseCore_CpuAffinity_Multiple_Cores_Parses()
     {
-        var (result, errors) = CliArgs.ParseCore(["--cpu-affinity", "2,3"]);
+        // The parser validates each index against this host, and CI runners go as small as three
+        // logical CPUs, so the pair has to be picked from what the host actually has.
+        var highest = Environment.ProcessorCount - 1;
+
+        var (result, errors) = CliArgs.ParseCore(["--cpu-affinity", $"0,{highest}"]);
 
         Assert.Empty(errors);
-        Assert.Equal([2, 3], result.CpuAffinity);
+        Assert.Equal([0, highest], result.CpuAffinity);
     }
 
     [Fact]

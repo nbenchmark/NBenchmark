@@ -46,10 +46,15 @@ public class EnvironmentControlTests
     [Fact]
     public void BuildAffinityMask_Multiple_Cores_Produces_Bitmask()
     {
-        var mask = EnvironmentControl.BuildAffinityMask([0, 2, 3]);
+        // BuildAffinityMask rejects a core index the host does not have, and CI runners go as
+        // small as three logical CPUs, so the indices have to come from the host. The lowest and
+        // the highest still sit apart on any host worth running this on, which is what makes the
+        // result a bitmask rather than a count.
+        var highest = Environment.ProcessorCount - 1;
 
-        // Bits 0, 2, 3 set = 1 + 4 + 8 = 13
-        Assert.Equal(new IntPtr(13), mask);
+        var mask = EnvironmentControl.BuildAffinityMask([0, highest]);
+
+        Assert.Equal(new IntPtr(1L | (1L << highest)), mask);
     }
 
     [Fact]
@@ -198,6 +203,14 @@ public class EnvironmentControlTests
         Assert.Equal(Environment.ProcessorCount < 4, assessment.IsSharedRunner);
     }
 
+    /// <summary>
+    ///     Being on Apple Silicon does not guarantee the split is <i>visible</i>: a virtualised
+    ///     host - the macOS CI runner among them - is handed a slice of CPUs with no
+    ///     <c>hw.nperflevels</c> behind it, and the core-topology probe reports zero, meaning
+    ///     unknown. So the assertion is the contract rather than the hardware: either the split is
+    ///     unreported, or it is internally coherent. On a real Mac the second branch is the one
+    ///     that runs.
+    /// </summary>
     [Fact]
     public void AssessHost_Reports_The_Core_Split_On_Apple_Silicon()
     {
@@ -206,10 +219,20 @@ public class EnvironmentControlTests
 
         var assessment = EnvironmentControl.AssessHost();
 
-        Assert.True(assessment.HasCoreSplit);
+        if (!assessment.HasCoreSplit)
+        {
+            Assert.Equal(0, assessment.PerformanceCoreCount);
+            Assert.Equal(0, assessment.EfficiencyCoreCount);
+            return;
+        }
+
         Assert.True(assessment.PerformanceCoreCount > 0);
         Assert.True(assessment.EfficiencyCoreCount > 0);
-        Assert.True(assessment.PerformanceCoreCount + assessment.EfficiencyCoreCount <= assessment.CoreCount);
+
+        // Deliberately not compared against CoreCount. The sysctl counts describe the machine,
+        // while ProcessorCount describes what this process is permitted to use, and a cgroup CPU
+        // quota or DOTNET_PROCESSOR_COUNT caps the second without touching the first - so the sum
+        // exceeding CoreCount is a legitimate state, not a contradiction.
     }
 
     [Fact]
@@ -227,7 +250,9 @@ public class EnvironmentControlTests
     [Fact]
     public void Apply_DedicatedHostGuidance_Names_The_Core_Split_On_Apple_Silicon()
     {
-        if (!OperatingSystem.IsMacOS() || !System.Runtime.Intrinsics.Arm.ArmBase.IsSupported)
+        // A virtualised Apple Silicon host reports no split, and the guidance then has no counts
+        // to name - see AssessHost_Reports_The_Core_Split_On_Apple_Silicon.
+        if (!OperatingSystem.IsMacOS() || !EnvironmentControl.AssessHost().HasCoreSplit)
             return;
 
         var assessment = EnvironmentControl.AssessHost();
@@ -248,7 +273,8 @@ public class EnvironmentControlTests
     [Fact]
     public void Apply_DedicatedHostGuidance_Warns_When_Thread_Control_Is_Off_On_Apple_Silicon()
     {
-        if (!OperatingSystem.IsMacOS() || !System.Runtime.Intrinsics.Arm.ArmBase.IsSupported)
+        // As above: no reported split means no --no-thread-control warning to assert on.
+        if (!OperatingSystem.IsMacOS() || !EnvironmentControl.AssessHost().HasCoreSplit)
             return;
 
         var stderr = CaptureStderr(() =>
