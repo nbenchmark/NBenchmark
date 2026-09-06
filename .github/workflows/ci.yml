@@ -7,8 +7,16 @@ on:
 
 jobs:
   build:
-    name: Build and Test
-    runs-on: ubuntu-latest
+    # NBenchmark carries more platform-conditional code than most libraries - thread affinity,
+    # process priority, core topology and the macOS quality-of-service call each have their own
+    # path, and the tests branch on the operating system rather than skipping. A single-OS run
+    # leaves two thirds of that untested, for a library whose whole claim is accurate measurement.
+    name: Build and Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@v7

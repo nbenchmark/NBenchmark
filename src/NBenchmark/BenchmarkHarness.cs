@@ -315,6 +315,14 @@ public sealed class BenchmarkHarness
     }
 
     /// <summary>
+    ///     Supplies the instance of each discovered benchmark class, in place of its parameterless
+    ///     constructor.
+    /// </summary>
+    /// <param name="factory">
+    ///     Called with the benchmark class's type, returns an instance of it. Capture nothing: the
+    ///     factory itself is sent to the measurement worker and run there, which is what keeps a
+    ///     custom factory from costing the run its isolation.
+    /// </param>
     public BenchmarkHarness WithInstanceFactory(Func<Type, object> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
@@ -895,7 +903,10 @@ public sealed class BenchmarkHarness
             }
         }
 
-        if (pass.Publishes)
+        // The clock probe describes a measurement, so it belongs only to a pass that measures.
+        // --list is a listing and --dry-run only proves the wiring; neither times anything, and the
+        // banner reads as noise ahead of their output.
+        if (pass.Publishes && !_cliArgs.ListOnly && !_cliArgs.DryRun)
         {
             Console.WriteLine($"Timer resolution: {Stopwatch.Frequency:N0} ticks/s "
                               + $"({1_000_000_000.0 / Stopwatch.Frequency:F2} ns per tick)");

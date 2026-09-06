@@ -70,7 +70,7 @@ public sealed class ReferenceMethodIntegrationTests
     /// <summary>
     ///     Both sides are marked as measured in a worker, which is what a reference-method test
     ///     produces in practice. The ratio gate is only enforced between two such measurements -
-    ///     see <see cref="PerformanceGate" /> - so a fixture left at the default in-host status
+    ///     see <see cref="NBenchmark.Integration.Abstractions.PerformanceGate" /> - so a fixture left at the default in-host status
     ///     would be testing the isolation policy rather than the comparison these tests are about.
     /// </summary>
     private static BenchmarkResult CreateOkResultWithMean(string name, double mean) => new()

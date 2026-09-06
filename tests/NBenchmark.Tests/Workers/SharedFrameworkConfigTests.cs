@@ -8,7 +8,7 @@ namespace NBenchmark.Tests.Workers;
 ///     The rules for extending the worker's framework set from the assembly under test.
 /// </summary>
 /// <remarks>
-///     Every case runs in its own temporary directory. <see cref="SharedFrameworkConfig.ResolveFor" />
+///     Every case runs in its own temporary directory. <see cref="SharedFrameworkConfig.ResolveFor(string, string?)" />
 ///     memoizes on the two paths, so reusing a path across cases with different content would have
 ///     one test answer another test's question.
 /// </remarks>

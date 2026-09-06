@@ -191,7 +191,7 @@ internal sealed class StreamingProgress(
     ///     Sample reduction and the per-result seed offset are the same work <c>SendResults</c> did at
     ///     group end; they move here unchanged. <see cref="BenchmarkResult.RawSamples" /> is
     ///     <see cref="IReadOnlyList{T}" /> at the type level but is always a <see cref="double" /> array
-    ///     at runtime (<see cref="OutcomeBuilder" /> shares one array between the outcome and the
+    ///     at runtime (<see cref="NBenchmark.Engine.OutcomeBuilder" /> shares one array between the outcome and the
     ///     result), so the cast avoids a copy in the common case.
     /// </remarks>
     public Task OnBenchmarkCompleted(BenchmarkResult result)

@@ -731,7 +731,7 @@ public class BenchmarkSuite(string name)
     ///         The wrapper is a closure this library built, so its metadata token addresses
     ///         NBenchmark's code rather than the user's. Keeping <paramref name="body" /> is what
     ///         lets an inline suite be measured in a worker without the caller restructuring
-    ///         anything - see <see cref="TryAddressBodies" />.
+    ///         anything - see <see cref="InlineSuitePlan.TryAddress" />.
     ///     </para>
     /// </summary>
     private BenchmarkSuite AddEnvelope(

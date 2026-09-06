@@ -8,12 +8,19 @@ namespace NBenchmark;
 ///     <para>
 ///         Bodies are measured in a dedicated worker process by default, because JIT tiering,
 ///         dynamic PGO, ReadyToRun and GC flavour are fixed when a process starts and can only be
-///         chosen for a process that has not started yet. A body that cannot be addressed across
-///         that boundary - most often because it captures a local - is measured here instead, said
-///         so on stderr, and stamped
-///         <see cref="IsolationStatus.InProcessCapturedState" /> on the result. Isolation is never
-///         faked and captured state is never reconstructed: doing so was measured to return
-///         plausible, silently wrong numbers.
+///         chosen for a process that has not started yet. Captured state crosses that boundary when
+///         it can be sent faithfully - primitives, strings, arrays, the standard collections under a
+///         default comparer, and types marked <c>[BenchmarkState]</c>. Anything else is refused by
+///         name: isolation is never faked and captured state is never reconstructed, because doing so
+///         was measured to return plausible, silently wrong numbers.
+///     </para>
+///     <para>
+///         A refusal is an error. <see cref="MeasurementOptions.RequireIsolation" /> defaults to
+///         <c>true</c>, so a body that cannot be isolated throws rather than being quietly measured
+///         here - in-process measurement is something you ask for, not something that happens to
+///         you. Set <c>RequireIsolation = false</c> to take the labelled fallback instead: the run
+///         continues in this process, says so on stderr, and stamps
+///         <see cref="IsolationStatus.InProcessCapturedState" /> on the result.
 ///     </para>
 ///     <para>
 ///         Every original overload keeps its signature, including the synchronous return of
@@ -24,8 +31,10 @@ namespace NBenchmark;
 ///     <para>
 ///         For a benchmark over prepared data, pass the preparation as its own delegate:
 ///         <c>Run(prepare: () =&gt; BuildData(), body: d =&gt; Sort(d))</c>. The <c>var data = Build();
-///         Run(() =&gt; Sort(data))</c> shape captures, so it can only be refused - splitting it makes
-///         both halves addressable and the worker builds the data itself. See
+///         Run(() =&gt; Sort(data))</c> shape captures, which isolates only when <c>data</c> is
+///         sendable, and hands the same instance to every sample either way - a body that mutates its
+///         input then measures an already-mutated one from the second sample onward. Splitting it
+///         builds the data in the measuring process, once per benchmark. See
 ///         <see cref="Run{TState}(Func{TState}, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />.
 ///     </para>
 /// </summary>

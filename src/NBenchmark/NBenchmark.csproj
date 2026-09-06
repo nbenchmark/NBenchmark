@@ -4,7 +4,7 @@
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <RootNamespace>NBenchmark</RootNamespace>
     <PackageId>NBenchmark</PackageId>
-    <Description>NBenchmark is the easiest way to measure the speed of your .NET code. With zero setup and a focus on simplicity, you can go from installation to your first accurate benchmark in seconds-perfect for quick checks and full performance suites alike.</Description>
+    <Description>NBenchmark is the easiest way to measure the speed of your .NET code. With zero setup and a focus on simplicity, you can go from installation to your first accurate benchmark in seconds - perfect for quick checks and full performance suites alike.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>benchmark;performance;measurement;microbenchmark</PackageTags>
 

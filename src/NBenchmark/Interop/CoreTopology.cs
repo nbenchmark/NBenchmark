@@ -17,7 +17,7 @@ internal static partial class CoreTopology
 {
     /// <summary>
     ///     Read once per process. The values cannot change while the process runs, and
-    ///     <c>sysctlbyname</c> is a syscall - <see cref="EnvironmentControl.AssessHost" /> is
+    ///     <c>sysctlbyname</c> is a syscall - <see cref="NBenchmark.Engine.EnvironmentControl.AssessHost" /> is
     ///     called from guidance, from the test-integration gates, and once per worker group.
     /// </summary>
     private static readonly Lazy<(int Performance, int Efficiency)> Cached = new(Read);

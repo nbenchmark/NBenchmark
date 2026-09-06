@@ -8,12 +8,12 @@ namespace NBenchmark.Stats;
 /// <remarks>
 ///     <para>
 ///         The <see cref="TrimDetailed(double[], IOutlierDetector)" /> overload does not
-///         mutate <paramref name="timings" />: it sorts a copy for the detector and
+///         mutate <c>timings</c>: it sorts a copy for the detector and
 ///         preserves the original order so callers can re-use the input. The returned
 ///         <see cref="TrimResult.Kept" /> and <see cref="TrimResult.Discarded" /> arrays
 ///         are sorted ascending (the detector contract), while
 ///         <see cref="TrimResult.TrimmedOrdinals" /> maps the discarded values back to
-///         their positions in the original <paramref name="timings" /> array, so a
+///         their positions in the original <c>timings</c> array, so a
 ///         consumer can flag which raw samples were outliers without re-running the
 ///         detector.
 ///     </para>
@@ -22,7 +22,7 @@ public static class OutlierTrim
 {
     /// <summary>
     ///     Trims <paramref name="timings" /> and returns only the kept (inlier) samples.
-    ///     Ordinal information is discarded; use <see cref="TrimDetailed" /> when the
+    ///     Ordinal information is discarded; use <see cref="TrimDetailed(double[], OutlierMode)" /> when the
     ///     discard set or fence boundaries are needed.
     /// </summary>
     public static double[] Trim(double[] timings, OutlierMode mode) => TrimDetailed(timings, mode).Kept;
@@ -134,7 +134,7 @@ public static class OutlierTrim
 }
 
 /// <summary>
-///     The output of <see cref="OutlierTrim.TrimDetailed" />: the kept and discarded sample
+///     The output of <see cref="OutlierTrim.TrimDetailed(double[], OutlierMode)" />: the kept and discarded sample
 ///     arrays, the quartile descriptive statistics, the fence boundaries (when the detector
 ///     is fence-based), and the original ordinals of every discarded sample.
 /// </summary>

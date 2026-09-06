@@ -3,7 +3,18 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
     <VersionPrefix>0.0.1</VersionPrefix>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- A new warning is a build break. NU1506 shipped across every project for months because
+         nothing stopped it. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(IsPackable)' != 'false'">
@@ -18,6 +29,16 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PackageIcon>icon.png</PackageIcon>
+
+    <!-- Without this no NBenchmark.xml is produced, so none is packed, and every XML doc comment in
+         the repository is invisible in a consumer's IntelliSense. CS1591 (missing doc comment on a
+         public member) and CS1573 (a documented member with an undocumented parameter) stay
+         warnings rather than errors: together they are the inventory of what still needs
+         documenting before 1.0, not a reason nobody can build. Every other doc diagnostic - an
+         unresolvable cref, a paramref naming nothing, an ambiguous overload reference - is a
+         broken link in shipped IntelliSense and stays an error. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1591;CS1573</WarningsNotAsErrors>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsPackable)' != 'false'">

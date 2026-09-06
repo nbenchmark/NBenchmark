@@ -1042,7 +1042,7 @@ internal sealed record CliArgs
 
     internal static void PrintHelp()
     {
-        Console.WriteLine("Usage: myapp.exe [options]");
+        Console.WriteLine($"Usage: {ProgramName()} [options]");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  --filter <pattern>     Run suites/methods matching glob (e.g., String*, *.Contains*)");
@@ -1052,9 +1052,7 @@ internal sealed record CliArgs
         Console.WriteLine("  --warmup <n>           Pin warmup sample count (default: auto, plateau-driven)");
         Console.WriteLine($"  --reporter <type>      Set reporter: {string.Join(", ", ReporterRegistry.Available.Select(r => r.Name))}{FormatAutoAttached()}");
 
-        Console.WriteLine(
-            $"  --observer <type>      Attach measurement observer: {string.Join(", ", ObserverRegistry.Available.Select(r => r.Name))}{FormatAutoAttachedObservers()}");
-
+        Console.WriteLine($"  --observer <type>      Attach measurement observer: {FormatObservers()}");
         Console.WriteLine("                         (repeatable; multiple observers are composed into a fan-out)");
         Console.WriteLine("  --output <dir>         Set output directory for file-based reporters");
         Console.WriteLine("  --confidence <0-1>     Confidence level for the interval on the mean (default: 0.95)");
@@ -1115,6 +1113,20 @@ internal sealed record CliArgs
         Console.WriteLine("  --help, -h             Show this help text");
     }
 
+    /// <summary>
+    ///     The name the user typed to start this process, so the usage line names the harness
+    ///     rather than a placeholder. Falls back to the entry assembly's name when the host does
+    ///     not report a process path (single-file and some embedded hosts).
+    /// </summary>
+    private static string ProgramName()
+    {
+        var path = Environment.ProcessPath;
+
+        return string.IsNullOrEmpty(path)
+            ? AppDomain.CurrentDomain.FriendlyName
+            : Path.GetFileNameWithoutExtension(path);
+    }
+
     private static string FormatAutoAttached()
     {
         var names = ReporterRegistry.AutoAttached;
@@ -1123,6 +1135,20 @@ internal sealed record CliArgs
             return string.Empty;
 
         return $" (auto-attached: {string.Join(", ", names.Select(r => r.Name))})";
+    }
+
+    /// <summary>
+    ///     The registered observers, or a pointer to the package that supplies one. The registry is
+    ///     empty in a bare install, and a dangling colon reads as a bug rather than as "none yet".
+    /// </summary>
+    private static string FormatObservers()
+    {
+        var available = ObserverRegistry.Available;
+
+        if (available.Count == 0)
+            return "(none installed - see NBenchmark.Exporters.OpenTelemetry)";
+
+        return $"{string.Join(", ", available.Select(r => r.Name))}{FormatAutoAttachedObservers()}";
     }
 
     private static string FormatAutoAttachedObservers()

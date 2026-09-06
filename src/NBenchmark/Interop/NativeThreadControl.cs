@@ -14,7 +14,7 @@ namespace NBenchmark.Interop;
 ///         warn under both.
 ///     </para>
 ///     <para>
-///         Thread scope, not process scope, is the point. <see cref="EnvironmentControl" /> pins
+///         Thread scope, not process scope, is the point. <see cref="NBenchmark.Engine.EnvironmentControl" /> pins
 ///         the whole process, which does not stop the runtime's own threads - finalizer,
 ///         background GC, tiering JIT - from sharing the pinned core, and on macOS the process
 ///         call does not exist at all. The macOS quality-of-service call is moreover *self-only*:
@@ -36,7 +36,7 @@ internal static partial class NativeThreadControl
     ///     <c>cpu_set_t</c> is larger, but it accepts any multiple of <c>sizeof(unsigned long)</c>
     ///     and treats the remaining CPUs as unset - which is what a mask covering CPUs 0-63 means.
     ///     Hosts with more than 64 logical CPUs cannot be addressed through this path, and
-    ///     <see cref="EnvironmentControl.BuildAffinityMask" /> already produces a 64-bit mask, so
+    ///     <see cref="NBenchmark.Engine.EnvironmentControl.BuildAffinityMask" /> already produces a 64-bit mask, so
     ///     nothing is lost here that was available before.
     /// </summary>
     private const int CpuSetSize = sizeof(ulong);

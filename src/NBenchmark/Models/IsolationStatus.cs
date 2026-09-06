@@ -36,7 +36,7 @@ public enum IsolationStatus
     ///     <para>
     ///         The remedy is to hand over a recipe rather than a value: pass the preparation as its own
     ///         delegate, with
-    ///         <see cref="Benchmark.Run{TState}(Func{TState}, Action{TState}, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
+    ///         <see cref="Benchmark.Run{TState}(Func{TState}, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
     ///         or <see cref="BenchmarkSuite.Over{TState}" />, and the worker builds the state
     ///         itself.
     ///     </para>

@@ -1,0 +1,25 @@
+# Normalize line endings to LF in the repository, so a Windows contributor's first
+# commit does not rewrite every file.
+* text=auto eol=lf
+
+*.cs        text diff=csharp
+*.csproj    text
+*.sln       text eol=crlf
+*.props     text
+*.targets   text
+*.json      text
+*.md        text
+*.yml       text
+*.yaml      text
+*.editorconfig text
+*.gitattributes text
+*.gitignore text
+
+*.png       binary
+*.ico       binary
+*.snk       binary
+*.nupkg     binary
+*.snupkg    binary
+*.dll       binary
+*.exe       binary
+*.pdb       binary

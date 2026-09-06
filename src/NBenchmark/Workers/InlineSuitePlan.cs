@@ -211,7 +211,7 @@ internal static class InlineSuitePlan
             };
     }
 
-    /// <summary>The suite's own lifecycle, as an <see cref="ownersOf" /> key that no benchmark name can collide with.</summary>
+    /// <summary>The suite's own lifecycle, as an <c>ownersOf</c> key that no benchmark name can collide with.</summary>
     private const string SuiteLifecycleOwner = "\0suite-lifecycle";
 
     /// <summary>

@@ -45,7 +45,7 @@ internal static class InterferenceRejector
 
     /// <summary>The result of one call to <see cref="Reject" />.</summary>
     /// <param name="SurvivingTimings">
-    ///     <paramref name="timings"/> with rejected samples removed, in arrival order.
+    ///     <c>timings</c> with rejected samples removed, in arrival order.
     /// </param>
     /// <param name="SurvivingOriginalIndices">
     ///     For each entry in <see cref="SurvivingTimings" />, its position in the original input

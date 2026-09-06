@@ -2,7 +2,7 @@ namespace NBenchmark.Engine;
 
 /// <summary>
 ///     Reusable jitter-tolerance relaxation logic shared between
-///     <see cref="BenchmarkAssert" /> (the test-integration helper layer) and external
+///     <c>BenchmarkAssert</c> (the test-integration helper layer) and external
 ///     consumers such as NBenchmark.Studio. Extracted from
 ///     <c>NBenchmark.Integration.Abstractions</c> so Studio can reuse the same
 ///     relaxation rules without depending on the test-framework helper assembly.
@@ -80,7 +80,7 @@ public static class RegressionTolerance
     /// <param name="isSharedRunner"><c>true</c> when the host looks like a shared CI runner.</param>
     /// <param name="jitterAutoSwitchThreshold">
     ///     The jitter metric value above which relaxation is applied. Pass
-    ///     <see cref="AutoTuneOptions.Default.JitterAutoSwitchThreshold" /> to match the
+    ///     <c>AutoTuneOptions.Default.JitterAutoSwitchThreshold</c> to match the
     ///     engine's default, or a custom value.
     /// </param>
     /// <returns><c>true</c> when relaxation should be applied; otherwise <c>false</c>.</returns>

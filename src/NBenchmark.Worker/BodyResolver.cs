@@ -190,7 +190,7 @@ internal static class BodyResolver
     ///         addressing safe lives here.
     ///     </para>
     ///     <para>
-    ///         Separate from <see cref="TryResolve" /> because a factory and a benchmark body need the
+    ///         Separate from <see cref="TryResolve(BenchmarkLoadContext, BodyRef, ResolvedReceivers, out Delegate, out string?)" /> because a factory and a benchmark body need the
     ///         same locating and different shaping. A body with parameters and no argument values is
     ///         unmeasurable and is refused; a <c>Func&lt;Type, object&gt;</c> instance factory has
     ///         parameters by definition and is supplied its argument at invocation. Routing the second

@@ -135,7 +135,7 @@ internal sealed record CapturedField
     ///     happened to agree for every element type this ever allowed through, which is exactly what
     ///     made the disagreement latent rather than live - <c>bool</c> is the type that would have
     ///     caught it (1 managed byte, 4 marshaled), and it is excluded from
-    ///     <see cref="IsBlittablePrimitiveElement" /> for other reasons already. Naming the element
+    ///     <see cref="StateTransfer.IsBlittablePrimitiveElement" /> for other reasons already. Naming the element
     ///     count directly removes the question rather than answering it more carefully.
     /// </remarks>
     public int[]? ArrayDimensions { get; init; }

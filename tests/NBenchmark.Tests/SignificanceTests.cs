@@ -45,7 +45,7 @@ public class SignificanceTests
     }
 
     /// <summary>
-    ///     <see cref="Significance.ComputeSignificance" /> is public, so a caller can hand it a list
+    ///     <see cref="Significance.ComputeSignificance(System.Collections.Generic.List{BenchmarkResult}, System.Collections.Generic.Dictionary{string, double[]}, double, double?, double?, double?)" /> is public, so a caller can hand it a list
     ///     with two successful results sharing a <see cref="BenchmarkResult.Name" />. The sample
     ///     lookup, group construction and write-back all key on <c>Name</c>, so a collision either
     ///     collapses two benchmarks onto one sample set (silent corruption) or surfaces later as an

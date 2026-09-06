@@ -5,7 +5,7 @@ namespace NBenchmark;
 
 /// <summary>
 ///     Opt-in hardware/OS controls that reduce measurement noise at its source, rather
-///     than only reacting to it statistically. When set, <see cref="EnvironmentControl" />
+///     than only reacting to it statistically. When set, <see cref="NBenchmark.Engine.EnvironmentControl" />
 ///     applies them for the duration of a run and restores the prior values on exit.
 ///     <para>
 ///         All fields are nullable and default to <c>null</c> (do nothing). Leave them
@@ -21,7 +21,7 @@ public record EnvironmentOptions
     /// <summary>
     ///     The set of CPU cores the benchmark process is pinned to (processor affinity).
     ///     Core indices are zero-based and logical (as reported by the OS); out-of-range
-    ///     indices are rejected by <see cref="EnvironmentControl" />. Duplicate indices
+    ///     indices are rejected by <see cref="NBenchmark.Engine.EnvironmentControl" />. Duplicate indices
     ///     are silently deduplicated (OR-ing the same bit is idempotent). When
     ///     <c>null</c>, affinity is left untouched.
     /// </summary>
@@ -44,7 +44,7 @@ public record EnvironmentOptions
     public ProcessPriorityClass? ProcessPriority { get; init; }
 
     /// <summary>
-    ///     When <c>true</c>, <see cref="EnvironmentControl" /> probes the host before each
+    ///     When <c>true</c>, <see cref="NBenchmark.Engine.EnvironmentControl" /> probes the host before each
     ///     run and emits a console warning when it detects conditions that typically
     ///     inflate noise: a low CPU core count (shared-tenant CI runners), an unraisable
     ///     process priority, or (on macOS) unobservable frequency scaling and thermal
@@ -64,7 +64,7 @@ public record EnvironmentOptions
     ///     <para>
     ///         Set to <c>false</c> (<c>--no-thread-control</c>) to measure under the host's
     ///         default thread scheduling - which is what you want if the *scheduling* is the
-    ///         subject, and not otherwise. See <see cref="ThreadEnvironmentControl" />.
+    ///         subject, and not otherwise. See <see cref="NBenchmark.Engine.ThreadEnvironmentControl" />.
     ///     </para>
     /// </summary>
     public bool ThreadControl { get; init; } = true;

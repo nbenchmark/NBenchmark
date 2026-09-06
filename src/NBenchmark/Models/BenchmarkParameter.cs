@@ -117,7 +117,7 @@ public sealed record BenchmarkParameter(string Name, object? Value)
 ///         <c>object?</c> - so on arrival <c>System.Text.Json</c> has no target type to deserialize
 ///         into and produces a bare <c>JsonElement</c>, the same one regardless of whether the real
 ///         value was an <c>int</c> or a <c>DayOfWeek</c>. Two things followed from that: an enum
-///         rendered as its underlying number instead of its member name, and <see cref="GetKey" />'s
+///         rendered as its underlying number instead of its member name, and <see cref="BenchmarkParameter.GetKey" />'s
 ///         type component read <c>System.Text.Json.JsonElement</c> for every isolated parameter,
 ///         which is what let an in-process row and its isolated counterpart land in different
 ///         groups for a table that should have compared them.
@@ -126,7 +126,7 @@ public sealed record BenchmarkParameter(string Name, object? Value)
 ///         Fixed by formatting the value in the worker, where it is still the real object, rather
 ///         than trying to reformat it in the coordinator, where it no longer is. Nothing here
 ///         reconstructs a live typed value on arrival - <see cref="BenchmarkParameter.FormatValue" />
-///         and <see cref="GetKey" /> are display and grouping only, so a formatted string plus the
+///         and <see cref="BenchmarkParameter.GetKey" /> are display and grouping only, so a formatted string plus the
 ///         original type's name is everything either one needs.
 ///     </para>
 ///     <para>

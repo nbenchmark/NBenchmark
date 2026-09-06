@@ -9,7 +9,7 @@ public sealed record ObserverInfo(string Name, string Description);
 
 /// <summary>
 ///     A registry of named <see cref="IMeasurementObserver" /> factories, mirroring the
-///     <see cref="ReporterRegistry" /> pattern. External packages (such as
+///     <see cref="NBenchmark.Reporters.ReporterRegistry" /> pattern. External packages (such as
 ///     <c>NBenchmark.Live</c>) self-register via a <c>[ModuleInitializer]</c> calling
 ///     <see cref="Register(string, string, Func{IMeasurementObserver})" />, exactly as
 ///     <c>NBenchmark.Reporters.Console</c> registers into <c>ReporterRegistry</c>.
@@ -155,7 +155,7 @@ public static class ObserverRegistry
     /// <summary>
     ///     Checks whether an observer with the given name is registered (in either the
     ///     explicit opt-in list or the auto-attached list) without constructing an instance.
-    ///     Used by <see cref="CliArgs" /> validation to avoid calling the factory twice (once
+    ///     Used by <see cref="NBenchmark.Engine.CliArgs" /> validation to avoid calling the factory twice (once
     ///     for validation, once for construction in <see cref="BenchmarkHarness.Create" />).
     /// </summary>
     public static bool IsRegistered(string name)

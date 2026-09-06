@@ -403,7 +403,7 @@ internal sealed record RunGroupPayload
     ///         for one can be: a static factory that registers the services and builds the container is
     ///         addressable, so the worker constructs an equivalent one in its own process. Without this,
     ///         every DI-backed benchmark was measured in the host - the case
-    ///         <see cref="Refusal.LiveInstanceFactory" /> exists for.
+    ///         <see cref="WorkerRunPlan.Refusal.LiveInstanceFactory" /> exists for.
     ///     </para>
     ///     <para>
     ///         The kind travels with the address because two of them return the same type and differ

@@ -284,7 +284,7 @@ public sealed record AutoTuneDiagnostic
     ///     Why the interference filter did not reject anything on its own initiative for this
     ///     benchmark, or <c>null</c> when it ran normally (whether or not it found anything to
     ///     reject). Set when: the thread-CPU clock is unavailable on this platform; two clock reads
-    ///     cost more than <see cref="InterferenceOptions.MaxProbeCostFraction" /> of the resolved
+    ///     cost more than <see cref="InterferenceOptions.ProbeCostBudgetFraction" /> of the resolved
     ///     sample-duration target, so the probe was disabled for this run before it started; or too
     ///     few samples carried a known occupancy reading to trust a median - typically an async body
     ///     whose continuations mostly resumed on a different thread.
